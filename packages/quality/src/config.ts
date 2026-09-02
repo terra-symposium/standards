@@ -12,6 +12,8 @@ export type QualityConfig = {
 	protectedIdentifiers?: string[];
 	tsconfig?: string;
 	lintRoots?: string[];
+	typecheckRoots?: string[];
+	typecheckExtensions?: string[];
 	tools?: {
 		prettier?: string;
 		tsc?: string;
@@ -32,5 +34,6 @@ export function createQualityConfig(config: QualityConfig): QualityConfig {
 		aliases: config.aliases ?? {},
 		protectedIdentifiers: config.protectedIdentifiers ?? [],
 		lintRoots: (config.lintRoots ?? []).map(path => resolve(config.root, path)),
+		typecheckRoots: (config.typecheckRoots ?? []).map(path => resolve(config.root, path)),
 	};
 }
