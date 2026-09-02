@@ -10,10 +10,11 @@ function resolveImport(specifier: string, importer: string, config: QualityConfi
 	const alias = Object.entries(config.aliases ?? {}).find(([prefix]) => specifier.startsWith(prefix));
 	const raw = alias ? resolve(config.root, alias[1], specifier.slice(alias[0].length)) : specifier.startsWith('.') ? resolve(dirname(importer), specifier) : null;
 	if (!raw) return null;
-	for (const extension of moduleExtensions) {
-		const candidate = raw + extension;
+	const stripped = /\.(?:c|m)?(?:j|t)sx?$/.test(raw) ? raw.slice(0, raw.lastIndexOf('.')) : raw;
+	for (const base of [...new Set([raw, stripped])]) for (const extension of moduleExtensions) {
+		const candidate = base + extension;
 		if (isFile(candidate)) return candidate;
-		const index = join(raw, `index${extension}`);
+		const index = join(base, `index${extension}`);
 		if (isFile(index)) return index;
 	}
 	return null;
@@ -38,6 +39,7 @@ export function checkImports(config: QualityConfig): ImportFailure[] {
 	const failures: ImportFailure[] = [];
 	for (const importer of sourceFiles(config)) {
 		for (const specifier of specifiers(importer)) {
+			if (config.externalPrefixes?.some(prefix => specifier.startsWith(prefix))) continue;
 			if (!specifier.startsWith('.') && !Object.keys(config.aliases ?? {}).some(prefix => specifier.startsWith(prefix))) continue;
 			if (specifier.startsWith('.') && extname(specifier) && !moduleExtensions.includes(extname(specifier))) continue;
 			if (!resolveImport(specifier, importer, config)) failures.push({ importer: displayPath(config, importer), specifier });

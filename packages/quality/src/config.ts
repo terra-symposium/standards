@@ -6,13 +6,17 @@ export type QualityConfig = {
 	includeRoots?: string[];
 	extensions: string[];
 	aliases?: Record<string, string>;
+	externalPrefixes?: string[];
 	skippedDirectories?: string[];
 	skippedFiles?: string[];
 	protectedIdentifiers?: string[];
 	tsconfig?: string;
+	lintRoots?: string[];
 	tools?: {
 		prettier?: string;
 		tsc?: string;
+		eslint?: string;
+		knip?: string;
 	};
 };
 
@@ -23,9 +27,10 @@ export function createQualityConfig(config: QualityConfig): QualityConfig {
 		root: resolve(config.root),
 		sourceRoots: config.sourceRoots.map(path => resolve(config.root, path)),
 		includeRoots: (config.includeRoots ?? []).map(path => resolve(config.root, path)),
-		skippedDirectories: config.skippedDirectories ?? ['.git', 'node_modules', 'dist', 'build', 'coverage', '.next', '.astro'],
+		skippedDirectories: config.skippedDirectories ?? ['.git', 'node_modules', 'dist', 'build', 'coverage', 'test-results', '.next', '.astro', '.sanity', '.netlify', '.cache', '.output', '.vercel', '.nuxt', '.husky'],
 		skippedFiles: (config.skippedFiles ?? []).map(path => resolve(config.root, path)),
 		aliases: config.aliases ?? {},
 		protectedIdentifiers: config.protectedIdentifiers ?? [],
+		lintRoots: (config.lintRoots ?? []).map(path => resolve(config.root, path)),
 	};
 }

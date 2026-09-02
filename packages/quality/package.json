@@ -1,10 +1,14 @@
 {
 	"name": "@terra-symposium/quality",
-	"version": "0.1.0",
+	"version": "0.1.4",
 	"description": "Configurable quality checks and maintenance tooling for Terra Symposium repositories",
 	"type": "module",
 	"main": "./dist/index.js",
 	"types": "./dist/index.d.ts",
+	"publishConfig": {
+		"registry": "https://npm.pkg.github.com",
+		"access": "restricted"
+	},
 	"exports": {
 		".": "./dist/index.js",
 		"./cli": "./dist/cli.js",
