@@ -1,0 +1,30 @@
+{
+	"name": "@terra-symposium/error-boundaries",
+	"version": "0.1.0",
+	"description": "Framework-neutral React error boundaries for Terra Symposium applications",
+	"type": "module",
+	"main": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": "./dist/index.js",
+		"./react": "./dist/react.js",
+		"./astro": "./dist/astro.js",
+		"./next": "./dist/next.js"
+	},
+	"files": ["dist"],
+	"scripts": {
+		"build": "tsc -p tsconfig.json",
+		"test": "node --test test/*.test.mjs"
+	},
+	"peerDependencies": {
+		"react": ">=18",
+		"react-dom": ">=18"
+	},
+	"devDependencies": {
+		"@types/react": "^19.2.7",
+		"@types/react-dom": "^19.2.3",
+		"react": "^19.2.7",
+		"react-dom": "^19.2.7",
+		"typescript": "^5.9.3"
+	}
+}

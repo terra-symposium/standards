@@ -1,0 +1,25 @@
+{
+	"name": "@terra-symposium/quality",
+	"version": "0.1.0",
+	"description": "Configurable quality checks and maintenance tooling for Terra Symposium repositories",
+	"type": "module",
+	"main": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": "./dist/index.js",
+		"./cli": "./dist/cli.js",
+		"./naming": "./dist/naming.js"
+	},
+	"files": ["dist"],
+	"scripts": {
+		"build": "tsc -p tsconfig.json",
+		"test": "node --test test/*.test.mjs"
+	},
+	"dependencies": {
+		"typescript": ">=5.0.0"
+	},
+	"devDependencies": {
+		"@types/node": "^22.14.1",
+		"typescript": "^5.9.3"
+	}
+}

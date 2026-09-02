@@ -1,0 +1,32 @@
+name: Release shared packages
+
+on:
+	push:
+		branches: [main]
+
+jobs:
+	release:
+		runs-on: ubuntu-latest
+		permissions:
+			contents: write
+			packages: write
+		steps:
+			- uses: actions/checkout@v4
+			- uses: pnpm/action-setup@v4
+				with:
+					version: 10.30.3
+			- uses: actions/setup-node@v4
+				with:
+					node-version: 22.19.0
+					registry-url: https://npm.pkg.github.com
+			- run: pnpm install --frozen-lockfile
+			- run: pnpm build
+			- run: pnpm test
+			- uses: changesets/action@v1
+				with:
+					publish: pnpm release
+					title: chore: release shared packages
+					summary: Version and publish shared package changes.
+				env:
+					GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+					NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
