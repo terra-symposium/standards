@@ -1,6 +1,7 @@
 import { spawnSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import ts from 'typescript';
 import { checkImports } from './imports.js';
 import type { QualityConfig } from './config.js';
 import { collapseInlineIfs } from './inline-if.js';
@@ -82,6 +83,39 @@ export function runFormatter(config: QualityConfig, args = process.argv.slice(2)
 
 export function runTypecheck(config: QualityConfig, args = process.argv.slice(2)): void {
 	const tsc = config.tools?.tsc ?? 'tsc';
-	const result = spawnSync(tsc, ['--noEmit', '-p', config.tsconfig ?? 'tsconfig.json', ...args], { cwd: config.root, stdio: 'inherit' });
+	const typecheckFiles = config.typecheckExtensions?.length
+		? sourceFiles(config).filter(file => config.typecheckExtensions?.includes(file.slice(file.lastIndexOf('.'))) && (!config.typecheckRoots?.length || config.typecheckRoots.some(root => file.startsWith(`${root}/`) || file.startsWith(`${root}\\`))))
+		: [];
+	if (typecheckFiles.length) {
+		const configPath = config.tsconfig ? resolve(config.root, config.tsconfig) : '';
+		const configJson = configPath && existsSync(configPath) ? ts.readConfigFile(configPath, file => readFileSync(file, 'utf8')) : { config: {}, error: undefined };
+		const parsed = ts.parseJsonConfigFileContent(configJson.config, ts.sys, config.root);
+		const program = ts.createProgram({
+			rootNames: typecheckFiles,
+			options: {
+				...parsed.options,
+				allowImportingTsExtensions: true,
+				allowJs: true,
+				checkJs: true,
+				module: ts.ModuleKind.ESNext,
+				moduleResolution: ts.ModuleResolutionKind.Bundler,
+				noEmit: true,
+				skipLibCheck: true,
+				strict: true,
+				target: ts.ScriptTarget.ESNext,
+			},
+		});
+		const roots = new Set(typecheckFiles.map(file => resolve(file)));
+		const diagnostics = ts.getPreEmitDiagnostics(program).filter(diagnostic => !diagnostic.file || roots.has(resolve(diagnostic.file.fileName)));
+		if (diagnostics.length) {
+			console.error(ts.formatDiagnosticsWithColorAndContext(diagnostics, { getCanonicalFileName: file => file, getCurrentDirectory: () => config.root, getNewLine: () => '\n' }));
+			process.exitCode = 1;
+		}
+		return;
+	}
+	const compilerArgs = typecheckFiles.length
+		? ['--noEmit', '--allowJs', '--checkJs', '--strict', '--skipLibCheck', '--module', 'ESNext', '--moduleResolution', 'Bundler', '--target', 'ESNext', '--allowImportingTsExtensions', ...typecheckFiles, ...args]
+		: ['--noEmit', '-p', config.tsconfig ?? 'tsconfig.json', ...args];
+	const result = spawnSync(toolPath(config, tsc, 'tsc'), compilerArgs, { cwd: config.root, stdio: 'inherit' });
 	if (result.status) process.exitCode = result.status ?? 1;
 }
