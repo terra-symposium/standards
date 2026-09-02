@@ -69,6 +69,7 @@ export function runQualityCli(config: QualityConfig, args = process.argv.slice(2
 			if (config.tools?.eslint) runLint(config);
 			if (config.tools?.knip) runKnip(config, ['--include', 'unresolved,nsExports,nsTypes,cycles']);
 			if (config.tools?.prettier) runFormatter(config, ['--write', '--ignore-unknown', ...(all ? ['.'] : config.sourceRoots)]);
+			if (config.tools?.tsc) runTypecheck(config, all ? ['--all'] : []);
 		}
 		runQuality(config, args.includes('--strict'));
 		if (command === 'quality' || command === 'quality:all' || command === 'quality:baseline') runDiffCheck(config);
