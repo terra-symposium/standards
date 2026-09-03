@@ -64,18 +64,42 @@ export function isApprovedIdentifier(name: string, kind: { numericIndex?: boolea
 	return renameIdentifier(name, kind) === name;
 }
 
-export type NamingFinding = { file: string; name: string; suggestion: string; severity: 'error' | 'warning' };
+/** Returns whether an identifier declares a repository-owned symbol safe to rename with all references. */
+export function isRenamableDeclaration(node: ts.Identifier): boolean {
+	const parent = node.parent;
+	const variableStatement = ts.isVariableDeclaration(parent) && ts.isVariableDeclarationList(parent.parent) && ts.isVariableStatement(parent.parent.parent) ? parent.parent.parent : undefined;
+	return (
+		(ts.isVariableDeclaration(parent) && parent.name === node && !variableStatement?.modifiers?.some(modifier => modifier.kind === ts.SyntaxKind.ExportKeyword)) ||
+		(ts.isParameter(parent) && parent.name === node) ||
+		(ts.isFunctionDeclaration(parent) && parent.name === node && !parent.modifiers?.some(modifier => modifier.kind === ts.SyntaxKind.ExportKeyword)) ||
+		(ts.isFunctionExpression(parent) && parent.name === node) ||
+		(ts.isClassDeclaration(parent) && parent.name === node && !parent.modifiers?.some(modifier => modifier.kind === ts.SyntaxKind.ExportKeyword)) ||
+		(ts.isClassExpression(parent) && parent.name === node) ||
+		(ts.isInterfaceDeclaration(parent) && parent.name === node && !parent.modifiers?.some(modifier => modifier.kind === ts.SyntaxKind.ExportKeyword)) ||
+		(ts.isTypeAliasDeclaration(parent) && parent.name === node && !parent.modifiers?.some(modifier => modifier.kind === ts.SyntaxKind.ExportKeyword))
+	);
+}
+
+export type NamingFinding = { file: string; name: string; suggestion: string; severity: 'error' | 'warning'; start: number };
 
 /** Reports concise-name drift without mutating the consumer repository. */
 export function namingFindings(config: QualityConfig): NamingFinding[] {
 	const protectedNames = new Set([...PROTECTED_IDENTIFIERS, ...(config.protectedIdentifiers ?? [])]);
 	const findings: NamingFinding[] = [];
 	for (const fileName of sourceFiles(config)) {
+		if (isProtectedPath(displayPath(config, fileName)) || isProtectedFilename(fileName)) continue;
 		const file = ts.createSourceFile(fileName, readFileSync(fileName, 'utf8'), ts.ScriptTarget.Latest, true, fileName.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
+		const exportedNames = new Set(
+			file.statements.flatMap(statement =>
+				ts.isExportDeclaration(statement) && statement.exportClause && ts.isNamedExports(statement.exportClause)
+					? statement.exportClause.elements.map(element => (element.propertyName ?? element.name).text)
+					: [],
+			),
+		);
 		const inspect = (node: ts.Node): void => {
-			if (ts.isIdentifier(node) && !protectedNames.has(node.text)) {
+			if (ts.isIdentifier(node) && isRenamableDeclaration(node) && !protectedNames.has(node.text) && !exportedNames.has(node.text)) {
 				const suggestion = renameIdentifier(node.text);
-				if (suggestion !== node.text && node.parent && !ts.isPropertyAccessExpression(node.parent) && !ts.isPropertyAssignment(node.parent)) findings.push({ file: displayPath(config, fileName), name: node.text, suggestion, severity: hasPrefixReplacement(node.text) ? 'warning' : 'error' });
+				if (suggestion !== node.text) findings.push({ file: displayPath(config, fileName), name: node.text, suggestion, severity: hasPrefixReplacement(node.text) ? 'warning' : 'error', start: node.getStart(file) });
 			}
 			ts.forEachChild(node, inspect);
 		};
