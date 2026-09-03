@@ -1,3 +1,7 @@
+/**
+ * packages/quality/src/index.ts
+ */
+
 export * from './config.js';
 export * from './files.js';
 export * from './imports.js';

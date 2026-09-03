@@ -1,3 +1,7 @@
+/**
+ * packages/error-boundaries/src/next.ts
+ */
+
 export type NextRouteError = Error & { digest?: string };
 
 export type NextRouteErrorProps = {
@@ -6,6 +10,6 @@ export type NextRouteErrorProps = {
 };
 
 /** Returns the framework-provided digest without exposing an error message as a public identifier. */
-export function errorDigest(error: NextRouteError): string | undefined {
-	return error.digest;
+export function errorDigest(err: NextRouteError): string | undefined {
+	return err.digest;
 }
