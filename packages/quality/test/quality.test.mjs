@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import test from 'node:test';
-import { checkImports, collapseInlineIfs, createQualityConfig, namingFindings, runQualityCli } from '../dist/index.js';
+import { checkImports, collapseInlineIfs, createQualityConfig, maintainSourceFile, namingFindings, runQualityCli } from '../dist/index.js';
 
 test('resolves aliases and extensionless relative imports', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-'));
@@ -28,6 +28,52 @@ test('does not collapse comment-only blocks before else', () => {
 	writeFileSync(file, 'if (ok) { /* keep this comment */ } else { fail(); }\n');
 	assert.equal(collapseInlineIfs(file), false);
 	assert.equal(readFileSync(file, 'utf8'), 'if (ok) { /* keep this comment */ } else { fail(); }\n');
+});
+
+test('maintenance adds headers and grouped sorted imports', () => {
+	const root = mkdtempSync(join(tmpdir(), 'terra-quality-'));
+	mkdirSync(join(root, 'src'), { recursive: true });
+	const file = join(root, 'src', 'main.ts');
+	writeFileSync(file, `/** test */
+
+/*//////////////////////////////////////////////////
+ IMPORTS
+ //////////////////////////////////////////////////*/
+// API
+
+/*//////////////////////////////////////////////////
+IMPORTS
+//////////////////////////////////////////////////*/
+// API
+import type { Zed } from './z';
+import { Widget, API_URL, beta } from 'beta';
+import { alpha } from 'alpha';
+void alpha; void beta;
+`);
+	assert.equal(maintainSourceFile(root, file), true);
+	const source = readFileSync(file, 'utf8');
+	assert.match(source, /^\/\*\* test \*\//);
+	assert.ok(source.indexOf("from 'alpha'") < source.indexOf("from 'beta'"));
+	assert.ok(source.indexOf('// API') < source.indexOf('// COMPONENTS'));
+	assert.ok(source.indexOf('// COMPONENTS') < source.indexOf('// DATA'));
+	assert.ok(source.indexOf('// DATA') < source.indexOf('// TYPES'));
+	assert.equal(source.match(/IMPORTS/g)?.length, 1);
+	assert.ok(source.includes(`${'/'.repeat(50)}*/\n\n// API`));
+	assert.ok(source.endsWith('\n') && !source.endsWith('\n\n'));
+	assert.equal(maintainSourceFile(root, file), false);
+});
+
+test('domain runs one configured quality command', () => {
+	const root = mkdtempSync(join(tmpdir(), 'terra-quality-'));
+	const marker = join(root, 'marker.txt');
+	const config = createQualityConfig({
+		root,
+		sourceRoots: [],
+		extensions: ['.ts'],
+		qualityCommands: [{ name: 'fixture', command: process.execPath, args: ['-e', `require('node:fs').writeFileSync(${JSON.stringify(marker)}, 'ok')`] }],
+	});
+	runQualityCli(config, ['domain', 'fixture', '--all']);
+	assert.equal(readFileSync(marker, 'utf8'), 'ok');
 });
 
 test('naming supports warning-only and automatic-fix modes', () => {

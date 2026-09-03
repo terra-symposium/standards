@@ -1,6 +1,6 @@
 {
 	"name": "@terra-symposium/quality",
-	"version": "0.2.7",
+	"version": "0.3.6",
 	"description": "Configurable quality checks and maintenance tooling for Terra Symposium repositories",
 	"type": "module",
 	"main": "./dist/index.js",

@@ -1,12 +1,16 @@
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from "node:fs";
 
 /** Collapses single-statement conditional blocks without changing nested blocks. */
 export function collapseInlineIfs(fileName: string): boolean {
-	const source = readFileSync(fileName, 'utf8');
-	const next = source.replace(/(^[ \t]*)(if\s*\([^\n{}]+\))\s*\{\s*([^{}\n]+?)\s*\}(?=\s*(?:else|\n|$))/gm, (match, indent: string, condition: string, statement: string) =>
-		statement.includes('/*') || statement.includes('//') ? match : `${indent}${condition} ${statement}`,
-	);
-	if (next === source) return false;
-	writeFileSync(fileName, next);
-	return true;
+  const src = readFileSync(fileName, "utf8");
+  const next = src.replace(
+    /(^[ \t]*)(if\s*\([^\n{}]+\))\s*\{\s*([^{}\n]+?)\s*\}(?=\s*(?:else|\n|$))/gm,
+    (match, indent: string, condition: string, statement: string) =>
+      statement.includes("/*") || statement.includes("//")
+        ? match
+        : `${indent}${condition} ${statement}`,
+  );
+  if (next === src) return false;
+  writeFileSync(fileName, next);
+  return true;
 }
