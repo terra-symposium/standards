@@ -10,6 +10,7 @@ export type QualityConfig = {
 	skippedDirectories?: string[];
 	skippedFiles?: string[];
 	protectedIdentifiers?: string[];
+	qualityCommands?: { name: string; command: string; args?: string[] }[];
 	tsconfig?: string;
 	lintRoots?: string[];
 	typecheckRoots?: string[];

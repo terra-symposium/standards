@@ -5,6 +5,7 @@ import ts from 'typescript';
 import { checkImports } from './imports.js';
 import type { QualityConfig } from './config.js';
 import { collapseInlineIfs } from './inline-if.js';
+import { maintainSourceFile } from './maintenance.js';
 import { isRenamableDeclaration, namingFindings, PROTECTED_IDENTIFIERS, renameIdentifier } from './naming.js';
 import { sourceFiles, workingSourceFiles } from './files.js';
 
@@ -18,7 +19,13 @@ function toolPath(config: QualityConfig, configured: string | undefined, fallbac
 }
 
 function run(config: QualityConfig, command: string, args: string[]): number {
-	return spawnSync(command, args, { cwd: config.root, stdio: 'inherit', env: process.env }).status ?? 1;
+	const result = spawnSync(command, args, { cwd: config.root, stdio: 'inherit', env: process.env });
+	if (result.error) console.error(`${command} failed: ${result.error.message}`);
+	return result.status ?? 1;
+}
+
+function batches<T>(values: T[], size = 100): T[][] {
+	return Array.from({ length: Math.ceil(values.length / size) }, (_, index) => values.slice(index * size, (index + 1) * size));
 }
 
 function filesFor(config: QualityConfig, all: boolean): string[] {
@@ -29,15 +36,34 @@ function scopedConfig(config: QualityConfig, all: boolean): QualityConfig {
 	return all ? config : { ...config, sourceRoots: filesFor(config, false) };
 }
 
-function runLint(config: QualityConfig, options: QualityOptions): void {
+function runLint(config: QualityConfig, options: QualityOptions, exhaustive = false): void {
 	const files = filesFor(config, options.all).filter(file => /\.(?:astro|cjs|js|jsx|mjs|ts|tsx)$/.test(file));
 	if (!files.length) return;
-	const status = run(config, toolPath(config, config.tools?.eslint, 'eslint'), ['--cache', '--cache-strategy', 'content', '--cache-location', '.eslintcache', '--no-warn-ignored', ...(options.fix ? ['--fix'] : []), ...files]);
+	const flags = ['--cache', '--cache-strategy', 'content', '--cache-location', '.eslintcache', '--no-warn-ignored', ...(exhaustive ? ['--max-warnings=0'] : []), ...(options.fix ? ['--fix'] : [])];
+	for (const filesBatch of batches(files)) {
+		const status = run(config, toolPath(config, config.tools?.eslint, 'eslint'), [...flags, ...filesBatch]);
+		if (status) process.exitCode = status;
+	}
+}
+
+function runConfiguredCommand(config: QualityConfig, name: string): void {
+	const check = config.qualityCommands?.find(command => command.name === name);
+	if (!check) throw new Error(`Unknown quality domain: ${name}`);
+	const status = run(config, check.command, check.args ?? []);
 	if (status) process.exitCode = status;
 }
 
-function runKnip(config: QualityConfig, fix: boolean): void {
-	const status = run(config, toolPath(config, config.tools?.knip, 'knip'), [ ...(fix ? ['--fix'] : ['--include', 'unresolved,nsExports,nsTypes,cycles']), '--no-exit-code']);
+function runConfiguredCommands(config: QualityConfig): void {
+	for (const check of config.qualityCommands ?? []) runConfiguredCommand(config, check.name);
+}
+
+function runProjectTypecheck(config: QualityConfig): void {
+	const status = run(config, toolPath(config, config.tools?.tsc, 'tsc'), ['--noEmit', '-p', config.tsconfig ?? 'tsconfig.json']);
+	if (status) process.exitCode = status;
+}
+
+function runKnip(config: QualityConfig, fix: boolean, exhaustive = false): void {
+	const status = run(config, toolPath(config, config.tools?.knip, 'knip'), [...(fix && !exhaustive ? ['--fix'] : exhaustive ? [] : ['--include', 'unresolved,nsExports,nsTypes,cycles']), ...(exhaustive ? [] : ['--no-exit-code'])]);
 	if (status) process.exitCode = status;
 }
 
@@ -110,11 +136,18 @@ export function runQualityCli(config: QualityConfig, args = process.argv.slice(2
 	if (command === 'format' || command === 'maintain') {
 		runFormatter(config, options, command === 'format' ? args.slice(1) : files);
 		if (options.fix) for (const file of files) if (/\.(?:c|m)?(?:js|ts)x?$/.test(file)) collapseInlineIfs(file);
+		if (options.fix) for (const file of files) maintainSourceFile(config.root, file);
 		return;
 	}
 	if (command === 'naming') {
 		if (options.fix) fixNames(config, options.all);
 		runQuality(config, options.strict, options.all);
+		return;
+	}
+	if (command === 'domain') {
+		const name = args[args.indexOf('domain') + 1];
+		if (!name) throw new Error('Pass a quality domain name.');
+		runConfiguredCommand(config, name);
 		return;
 	}
 	if (command === 'lint') return runLint(config, options);
@@ -127,10 +160,15 @@ export function runQualityCli(config: QualityConfig, args = process.argv.slice(2
 	if (command === 'quality' || command === 'quality:all' || command === 'quality:baseline') {
 		runQualityCli(config, ['maintain', ...(options.all ? ['--all'] : []), ...(options.fix ? [] : ['--warn'])]);
 		if (options.fix) fixNames(config, options.all);
-		runLint(config, options);
-		if (config.tools?.knip) runKnip(config, options.fix);
-		if (config.tools?.tsc) runTypecheck(config);
-		runQuality(config, options.strict, options.all);
+		runLint(config, options, true);
+		if (config.tools?.knip) runKnip(config, options.fix, true);
+		if (options.fix) runQualityCli(config, ['maintain', ...(options.all ? ['--all'] : [])]);
+		if (config.tools?.tsc) {
+			runTypecheck(config);
+			if (config.typecheckExtensions?.length) runProjectTypecheck(config);
+		}
+		runConfiguredCommands(config);
+		runQuality(config, true, options.all);
 		runDiffCheck(config);
 	}
 }
@@ -142,8 +180,12 @@ export function runFormatter(config: QualityConfig, optionsOrArgs: QualityOption
 	const hasMode = suppliedArgs.includes('--write') || suppliedArgs.includes('--check');
 	const hasIgnoreMode = suppliedArgs.some(arg => arg.startsWith('--ignore-unknown'));
 	const formatterArgs = [...(hasMode ? [] : [options.fix ? '--write' : '--check']), ...(hasIgnoreMode ? [] : ['--ignore-unknown']), ...(suppliedArgs.length ? suppliedArgs : filesFor(config, options.all))];
-	const status = run(config, toolPath(config, config.tools?.prettier, 'prettier'), formatterArgs);
-	if (status) process.exitCode = status;
+	const flags = formatterArgs.filter(arg => arg.startsWith('-'));
+	const targets = formatterArgs.filter(arg => !arg.startsWith('-'));
+	for (const targetBatch of batches(targets)) {
+		const status = run(config, toolPath(config, config.tools?.prettier, 'prettier'), [...flags, ...targetBatch]);
+		if (status) process.exitCode = status;
+	}
 }
 
 export function runTypecheck(config: QualityConfig, args: string[] = []): void {
