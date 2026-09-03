@@ -1,7 +1,21 @@
+/**
+ * packages/error-boundaries/test/error-boundaries.test.mjs
+ */
+
+/*//////////////////////////////////////////////////
+IMPORTS
+//////////////////////////////////////////////////*/
+
+// API
+
+import { withErrorBoundary } from '../dist/react.js';
 import assert from 'node:assert/strict';
 import test from 'node:test';
+
+// COMPONENTS
+
+import { ErrorBoundary } from '../dist/react.js';
 import React from 'react';
-import { ErrorBoundary, withErrorBoundary } from '../dist/react.js';
 
 test('exports the shared boundary lifecycle and HOC', () => {
 	assert.equal(typeof ErrorBoundary, 'function');
@@ -10,12 +24,16 @@ test('exports the shared boundary lifecycle and HOC', () => {
 
 test('captures component metadata and exposes reset-key recovery state', () => {
 	const reports = [];
-	const boundary = new ErrorBoundary({ fallback: React.createElement('div'), onError: (reportedError, report) => reports.push({ error: reportedError, ...report }), resetKey: 'first' });
-	const error = new Error('broken');
+	const boundary = new ErrorBoundary({
+		fallback: React.createElement('div'),
+		onError: (reportedErr, report) => reports.push({ error: reportedErr, ...report }),
+		resetKey: 'first',
+	});
+	const err = new Error('broken');
 
-	assert.deepEqual(ErrorBoundary.getDerivedStateFromError(error), { error });
-	boundary.componentDidCatch(error, { componentStack: '\n    at Panel' });
-	assert.deepEqual(reports, [{ error, name: 'Component', componentStack: '\n    at Panel' }]);
+	assert.deepEqual(ErrorBoundary.getDerivedStateFromError(err), { error: err });
+	boundary.componentDidCatch(err, { componentStack: '\n    at Panel' });
+	assert.deepEqual(reports, [{ error: err, name: 'Component', componentStack: '\n    at Panel' }]);
 
 	function Panel() {
 		return React.createElement('div');

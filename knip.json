@@ -1,0 +1,18 @@
+{
+	"$schema": "https://unpkg.com/knip@6/schema.json",
+	"workspaces": {
+		"packages/error-boundaries": {
+			"entry": ["test/*.test.mjs"],
+			"project": ["src/**/*.ts", "test/**/*.mjs"],
+			"ignoreDependencies": ["@types/react-dom", "react-dom"]
+		},
+		"packages/quality": {
+			"entry": ["test/*.test.mjs"],
+			"project": ["src/**/*.ts", "test/**/*.mjs"]
+		},
+		".": {
+			"project": ["scripts/**/*.mjs"],
+			"ignoreDependencies": ["prettier"]
+		}
+	}
+}

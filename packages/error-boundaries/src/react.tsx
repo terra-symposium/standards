@@ -1,15 +1,26 @@
-import React, { Component } from 'react';
+/**
+ * packages/error-boundaries/src/react.tsx
+ */
+
+/*//////////////////////////////////////////////////
+IMPORTS
+//////////////////////////////////////////////////*/
+
+// COMPONENTS
+
+import { Component } from 'react';
+import React from 'react';
 
 export type ErrorReport = {
 	name: string;
 	componentStack: string | null;
 };
 
-export type ErrorReporter = (error: Error, report: ErrorReport) => void;
+export type ErrorReporter = (err: Error, report: ErrorReport) => void;
 
 export type ErrorBoundaryProps = {
 	children?: React.ReactNode;
-	fallback?: (error: Error) => React.ReactNode;
+	fallback?: (err: Error) => React.ReactNode;
 	name?: string;
 	resetKey?: string;
 	onError?: ErrorReporter;
@@ -23,33 +34,33 @@ export type ErrorBoundaryState = {
 export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
 	state: ErrorBoundaryState = { error: null };
 
-	static getDerivedStateFromError(error: Error): ErrorBoundaryState {
-		return { error };
+	static getDerivedStateFromError(err: Error): ErrorBoundaryState {
+		return { error: err };
 	}
 
-	componentDidCatch(error: Error, info: React.ErrorInfo): void {
-		this.props.onError?.(error, {
+	componentDidCatch(err: Error, info: React.ErrorInfo): void {
+		this.props.onError?.(err, {
 			name: this.props.name ?? 'Component',
 			componentStack: info.componentStack ?? null,
 		});
 	}
 
-	componentDidUpdate(previous: ErrorBoundaryProps): void {
-		if (previous.resetKey !== this.props.resetKey && this.state.error) this.setState({ error: null });
+	componentDidUpdate(prev: ErrorBoundaryProps): void {
+		if (prev.resetKey !== this.props.resetKey && this.state.error) this.setState({ error: null });
 	}
 
 	render(): React.ReactNode {
 		if (!this.state.error) return this.props.children;
 		if (this.props.fallback) return this.props.fallback(this.state.error);
-		return <div role='alert'>An unexpected error occurred while rendering this section.</div>;
+		return <div role="alert">An unexpected error occurred while rendering this section.</div>;
 	}
 }
 
 /** Wraps a component in a named error boundary without coupling it to application UI. */
-export function withErrorBoundary<P extends object>(ComponentToWrap: React.ComponentType<P>, name: string, onError?: ErrorReporter): React.ComponentType<P> {
+export function withErrorBoundary<P extends object>(ComponentToWrap: React.ComponentType<P>, name: string, onErr?: ErrorReporter): React.ComponentType<P> {
 	function BoundedComponent(props: P): React.JSX.Element {
 		return (
-			<ErrorBoundary name={name} onError={onError}>
+			<ErrorBoundary name={name} onError={onErr}>
 				<ComponentToWrap {...props} />
 			</ErrorBoundary>
 		);

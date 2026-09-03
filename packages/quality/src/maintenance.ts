@@ -1,3 +1,13 @@
+/**
+ * packages/quality/src/maintenance.ts
+ */
+
+/*//////////////////////////////////////////////////
+IMPORTS
+//////////////////////////////////////////////////*/
+
+// API
+
 import { readFileSync, writeFileSync } from 'node:fs';
 import { extname, relative, sep } from 'node:path';
 import ts from 'typescript';
@@ -6,11 +16,11 @@ const OPEN = `/*${'/'.repeat(50)}`;
 const CLOSE = `${'/'.repeat(50)}*/`;
 const SUPPORTED = new Set(['.cjs', '.cts', '.js', '.jsx', '.mjs', '.mts', '.ts', '.tsx']);
 
-function sourceKind(fileName: string): ts.ScriptKind {
+function srcKind(fileName: string): ts.ScriptKind {
 	return /\.[cm]?tsx?$/.test(fileName) && fileName.endsWith('x') ? ts.ScriptKind.TSX : ts.ScriptKind.TS;
 }
 
-function importSource(node: ts.ImportDeclaration): string {
+function importSrc(node: ts.ImportDeclaration): string {
 	return ts.isStringLiteral(node.moduleSpecifier) ? node.moduleSpecifier.text : '';
 }
 
@@ -23,10 +33,18 @@ function importGroup(name: string): ImportGroup {
 }
 
 function groupedImports(parsed: ts.SourceFile, imports: ts.ImportDeclaration[]): Record<ImportGroup, { source: string; text: string }[]> {
-	const groups: Record<ImportGroup, { source: string; text: string }[]> = { API: [], COMPONENTS: [], DATA: [], TYPES: [] };
+	const groups: Record<ImportGroup, { source: string; text: string }[]> = {
+		API: [],
+		COMPONENTS: [],
+		DATA: [],
+		TYPES: [],
+	};
 	const add = (group: ImportGroup, node: ts.ImportDeclaration, clause: string): void => {
 		const module = node.moduleSpecifier.getText(parsed);
-		groups[group].push({ source: importSource(node), text: clause ? `import ${clause} from ${module};` : `import ${module};` });
+		groups[group].push({
+			source: importSrc(node),
+			text: clause ? `import ${clause} from ${module};` : `import ${module};`,
+		});
 	};
 	for (const node of imports) {
 		const clause = node.importClause;
@@ -56,10 +74,10 @@ export function maintainSourceFile(root: string, fileName: string): boolean {
 	if (!SUPPORTED.has(extname(fileName))) return false;
 	const original = readFileSync(fileName, 'utf8');
 	const eol = original.includes('\r\n') ? '\r\n' : '\n';
-	let source = original.replace(/^\uFEFF/, '').replace(/^\s+/, '');
+	let src = original.replace(/^\uFEFF/, '').replace(/^\s+/, '');
 	const path = relative(root, fileName).split(sep).join('/');
-	if (!source.startsWith('/**') && !source.startsWith('#!')) source = `/**${eol} * ${path}${eol} */${eol}${eol}${source}`;
-	const parsed = ts.createSourceFile(fileName, source, ts.ScriptTarget.Latest, true, sourceKind(fileName));
+	if (!src.startsWith('/**') && !src.startsWith('#!')) src = `/**${eol} * ${path}${eol} */${eol}${eol}${src}`;
+	const parsed = ts.createSourceFile(fileName, src, ts.ScriptTarget.Latest, true, srcKind(fileName));
 	const imports = parsed.statements.filter(ts.isImportDeclaration);
 	if (imports.length) {
 		const first = imports[0];
@@ -67,19 +85,19 @@ export function maintainSourceFile(root: string, fileName: string): boolean {
 		const groups = groupedImports(parsed, imports);
 		const render = (label: ImportGroup): string[] => {
 			const entries = groups[label].sort((a, b) => a.source.localeCompare(b.source) || a.text.localeCompare(b.text));
-			return entries.length ? [`// ${label}`, ...entries.map(entry => entry.text), ''] : [];
+			return entries.length ? [`// ${label}`, '', ...entries.map((entry) => entry.text), ''] : [];
 		};
 		const block = `${OPEN}${eol}IMPORTS${eol}${CLOSE}${eol}${eol}${(['API', 'COMPONENTS', 'DATA', 'TYPES'] as ImportGroup[]).flatMap(render).join(eol)}`;
-		const prefix = source.slice(0, first.getStart(parsed));
+		const prefix = src.slice(0, first.getStart(parsed));
 		const fenceStart = prefix.search(/\/\*\/{10,}[ \t]*\r?\n[ \t]*IMPORTS[ \t]*\r?\n[ \t]*\/{10,}\*\//);
 		const start = fenceStart >= 0 ? fenceStart : first.getStart(parsed);
-		source = `${source.slice(0, start).replace(/\s*$/, `${eol}${eol}`)}${block}${source.slice(last.end).replace(/^\s*/, eol)}`;
+		src = `${src.slice(0, start).replace(/\s*$/, `${eol}${eol}`)}${block}${src.slice(last.end).replace(/^\s*/, eol)}`;
 	}
-	const normalized = source
+	const norm = src
 		.replace(/^([ \t]*)\/\*\/{10,}[ \t]*$/gm, `$1${OPEN}`)
 		.replace(/^([ \t]*)\/{10,}\*\/[ \t]*$/gm, `$1${CLOSE}`)
 		.replace(/\s*$/, eol);
-	const next = original.startsWith('\uFEFF') ? `\uFEFF${normalized}` : normalized;
+	const next = original.startsWith('\uFEFF') ? `\uFEFF${norm}` : norm;
 	if (next === original) return false;
 	writeFileSync(fileName, next);
 	return true;
