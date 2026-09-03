@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { existsSync, readdirSync, statSync } from 'node:fs';
 import { basename, join, relative } from 'node:path';
 import type { QualityConfig } from './config.js';
@@ -19,6 +20,18 @@ export function sourceFiles(config: QualityConfig): string[] {
 	};
 	for (const root of roots) walk(root);
 	return files.sort((a, b) => a.localeCompare(b));
+}
+
+/** Returns configured source files changed in the working tree, including untracked files. */
+export function workingSourceFiles(config: QualityConfig): string[] {
+	const changed = new Set(
+		execFileSync('git', ['diff', '--name-only', '--diff-filter=ACMR'], { cwd: config.root, encoding: 'utf8' })
+			.concat(execFileSync('git', ['ls-files', '--others', '--exclude-standard'], { cwd: config.root, encoding: 'utf8' }))
+			.split('\n')
+			.filter(Boolean)
+			.map(path => join(config.root, path)),
+	);
+	return sourceFiles(config).filter(file => changed.has(file));
 }
 
 export function displayPath(config: QualityConfig, fileName: string): string {
