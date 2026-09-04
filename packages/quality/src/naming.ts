@@ -5,21 +5,17 @@
 /*//////////////////////////////////////////////////
 IMPORTS
 //////////////////////////////////////////////////*/
-
 // API
-
 import { displayPath, sourceFiles } from './files.js';
 import { readFileSync } from 'node:fs';
 import ts from 'typescript';
 
 // TYPES
-
 import type { QualityConfig } from './config.js';
 
 /*//////////////////////////////////////////////////
 CONFIG
 //////////////////////////////////////////////////*/
-
 type ReplacementGroup = readonly [names: string | readonly string[], replacement: string];
 type RenameKind = { numericIndex?: boolean; callback?: boolean; reserved?: string[] };
 export const IDENTIFIER_REPLACEMENTS = replacementMap([
@@ -34,6 +30,8 @@ export const IDENTIFIER_REPLACEMENTS = replacementMap([
 	['formats', 'fmts'],
 	['formatter', 'fmt'],
 	['formatters', 'fmts'],
+	['image', 'img'],
+	['images', 'imgs'],
 	[['initialise', 'initialised', 'initialises', 'initialising', 'initialisation', 'initialize', 'initialized', 'initializes', 'initializing', 'initialization'], 'init'],
 	[['initialiser', 'initializer'], 'init'],
 	[['initialisers', 'initializers', 'initialisations', 'initializations'], 'inits'],
@@ -61,6 +59,8 @@ export const IDENTIFIER_REPLACEMENTS = replacementMap([
 	['values', 'vals'],
 ]);
 export const PREFIX_REPLACEMENTS = replacementMap([
+	['active', 'a'],
+	['next', 'n'],
 	['safe', 's'],
 	[['normalise', 'normalised', 'normalises', 'normalize', 'normalized', 'normalizes'], 'norm'],
 	[['clean', 'cleaned', 'cleaner'], 'c'],
@@ -117,7 +117,6 @@ export type NamingFinding = { file: string; name: string; suggestion: string; se
 /*//////////////////////////////////////////////////
 HELPERS
 //////////////////////////////////////////////////*/
-
 /**
  *
  * @param groups

@@ -5,21 +5,17 @@
 /*//////////////////////////////////////////////////
 IMPORTS
 //////////////////////////////////////////////////*/
-
 // API
-
 import { execFileSync } from 'node:child_process';
 import { existsSync, readdirSync, statSync } from 'node:fs';
 import { basename, join, relative } from 'node:path';
 
 // TYPES
-
 import type { QualityConfig } from './config.js';
 
 /*//////////////////////////////////////////////////
 HELPERS
 //////////////////////////////////////////////////*/
-
 /**
  *
  * @param config
@@ -32,6 +28,10 @@ export function sourceFiles(config: QualityConfig): string[] {
 	const files: string[] = [];
 	const walk = (directory: string): void => {
 		if (!existsSync(directory)) return;
+		if (statSync(directory).isFile()) {
+			if (extensions.has(directory.slice(directory.lastIndexOf('.'))) && !config.skippedFiles?.includes(directory)) files.push(directory);
+			return;
+		}
 		for (const entry of readdirSync(directory, { withFileTypes: true })) {
 			if (entry.isDirectory()) {
 				if (!skipped.has(entry.name)) walk(join(directory, entry.name));

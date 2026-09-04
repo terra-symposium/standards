@@ -5,15 +5,12 @@
 /*//////////////////////////////////////////////////
 IMPORTS
 //////////////////////////////////////////////////*/
-
 // API
-
 import { withErrorBoundary } from '../dist/react.js';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
 // COMPONENTS
-
 import { ErrorBoundary } from '../dist/react.js';
 import React from 'react';
 

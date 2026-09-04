@@ -5,16 +5,13 @@
 /*//////////////////////////////////////////////////
 IMPORTS
 //////////////////////////////////////////////////*/
-
 // COMPONENTS
-
 import { Component } from 'react';
 import React from 'react';
 
 /*//////////////////////////////////////////////////
 CONFIG
 //////////////////////////////////////////////////*/
-
 export type ErrorReport = { name: string; componentStack: string | null };
 export type ErrorReporter = (err: Error, report: ErrorReport) => void;
 export type ErrorBoundaryProps = { children?: React.ReactNode; fallback?: (err: Error) => React.ReactNode; name?: string; resetKey?: string; onError?: ErrorReporter };
@@ -23,7 +20,6 @@ export type ErrorBoundaryState = { error: Error | null };
 /*//////////////////////////////////////////////////
 HELPERS
 //////////////////////////////////////////////////*/
-
 /** Wraps a component in a named error boundary without coupling it to application UI. */
 export function withErrorBoundary<P extends object>(ComponentToWrap: React.ComponentType<P>, name: string, onErr?: ErrorReporter): React.ComponentType<P> {
 	function BoundedComponent(props: P): React.JSX.Element {

@@ -5,11 +5,9 @@
 /*//////////////////////////////////////////////////
 IMPORTS
 //////////////////////////////////////////////////*/
-
 // API
-
 // prettier-ignore
-import { checkImports, collapseInlineIfs, collapseTypesAndObjects, createQualityConfig, maintainSourceFile, namingFindings, protectLongImports, renameIdentifier, runQualityCli } from '../dist/index.js';
+import { checkImports, collapseInlineIfs, collapseTypesAndObjects, createQualityConfig, maintainSourceFile, namingFindings, protectLongImports, renameIdentifier, runQualityCli, sourceFiles } from '../dist/index.js';
 import assert from 'node:assert/strict';
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -24,6 +22,15 @@ test('resolves aliases and extensionless relative imports', () => {
 	writeFileSync(join(root, 'src', 'main.ts'), "import { ok } from './helper';\nimport { ok as alias } from '@/helper';\nvoid ok; void alias;\n");
 	const config = createQualityConfig({ root, sourceRoots: ['src'], extensions: ['.ts'], aliases: { '@/': 'src/' } });
 	assert.deepEqual(checkImports(config), []);
+});
+
+test('quality accepts individual changed files as scoped source roots', () => {
+	const root = mkdtempSync(join(tmpdir(), 'terra-quality-file-root-'));
+	mkdirSync(join(root, 'src'));
+	const file = join(root, 'src', 'main.ts');
+	writeFileSync(file, 'const value = true;\n');
+	const config = createQualityConfig({ root, sourceRoots: [file], extensions: ['.ts'] });
+	assert.deepEqual(sourceFiles(config), [file]);
 });
 
 test('reports concise-name drift without changing source', () => {
@@ -241,11 +248,11 @@ void alpha; void beta;
 	assert.ok(src.indexOf('// COMPONENTS') < src.indexOf('// DATA'));
 	assert.ok(src.indexOf('// DATA') < src.indexOf('// TYPES'));
 	assert.equal(src.match(/IMPORTS/g)?.length, 1);
-	assert.ok(src.includes(`${'/'.repeat(50)}*/\n\n// API`));
-	assert.ok(src.includes('// API\n\nimport'));
-	assert.ok(src.includes('// COMPONENTS\n\nimport'));
-	assert.ok(src.includes('// DATA\n\nimport'));
-	assert.ok(src.includes('// TYPES\n\nimport'));
+	assert.ok(src.includes(`${'/'.repeat(50)}*/\n// API`));
+	assert.ok(src.includes('// API\nimport'));
+	assert.ok(src.includes('// COMPONENTS\nimport'));
+	assert.ok(src.includes('// DATA\nimport'));
+	assert.ok(src.includes('// TYPES\nimport'));
 	assert.ok(src.endsWith('\n') && !src.endsWith('\n\n'));
 	assert.equal(maintainSourceFile(root, file), false);
 });
@@ -302,6 +309,7 @@ void [Service, runtime, OPEN];
 	assert.match(src, /function readValue\(\) \{\n\tconst nested = 1;/);
 	assert.equal(src.match(/\nCONFIG\n/g)?.length, 1);
 	assert.equal(src.match(/\nHELPERS\n/g)?.length, 1);
+	assert.equal(src.match(/\nCOMPONENTS\n/g)?.length ?? 0, 0);
 	assert.equal(maintainSourceFile(root, file), false);
 });
 
@@ -359,6 +367,54 @@ const VALUE = true;
 	assert.equal(readFileSync(file, 'utf8'), src);
 });
 
+test('maintenance normalizes section, group, and line-comment whitespace without duplicate empty sections', () => {
+	const root = mkdtempSync(join(tmpdir(), 'terra-quality-comment-layout-'));
+	const file = join(root, 'main.ts');
+	writeFileSync(
+		file,
+		`import { z } from 'zod';
+const nullableText = z.string().nullable();
+/*//////////////////////////////////////////////////
+HELPERS
+//////////////////////////////////////////////////*/
+/*//////////////////////////////////////////////////
+COMPONENTS
+//////////////////////////////////////////////////*/
+function component() {
+	const now = new Date();
+	// MUTATION
+
+	mutate(now);
+
+
+	// VALIDATION
+
+	validate(now);
+}
+void component;
+`,
+	);
+	assert.equal(maintainSourceFile(root, file), true);
+	const src = readFileSync(file, 'utf8');
+	assert.equal(src.match(/\nHELPERS\n/g)?.length ?? 0, 0);
+	assert.equal(src.match(/\nCOMPONENTS\n/g)?.length, 1);
+	assert.doesNotMatch(src, /HELPERS\n\/{10,}\*\/\n\n\/\*\/{10,}\nCOMPONENTS/);
+	assert.match(src, /nullableText = z\.string\(\)\.nullable\(\);\n\n\/\*\/{10,}/);
+	assert.match(src, /\/\/ MUTATION\n\tmutate\(now\);/);
+	assert.match(src, /mutate\(now\);\n\n\t\/\/ VALIDATION\n\tvalidate\(now\);/);
+	assert.doesNotMatch(src, /\/\/ (?:API|COMPONENTS|DATA|TYPES|MUTATION|VALIDATION)\n\n/);
+	assert.equal(maintainSourceFile(root, file), false);
+});
+
+test('maintenance does not normalize section-shaped text inside templates', () => {
+	const root = mkdtempSync(join(tmpdir(), 'terra-quality-comment-layout-'));
+	const file = join(root, 'main.ts');
+	const literal = `before\n\n/*//////////////////////////////////////////////////\nHELPERS\n//////////////////////////////////////////////////*/\n\nafter`;
+	writeFileSync(file, `import fs from 'node:fs';\nconst value = \`${literal}\`;\nvoid [fs, value];\n`);
+	maintainSourceFile(root, file);
+	assert.ok(readFileSync(file, 'utf8').includes(`\`${literal}\``));
+});
+
 test('protects long one-line imports from Prettier wrapping', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-'));
 	const file = join(root, 'main.ts');
@@ -393,6 +449,22 @@ test('naming supports warning-only and automatic-fix modes', () => {
 	assert.equal(readFileSync(file, 'utf8'), src);
 	runQualityCli(config, ['naming', '--all']);
 	assert.equal(readFileSync(file, 'utf8'), 'const org = true;\nexport const result = org;\n');
+});
+
+test('naming applies whole-word image aliases and prefix-only state aliases', () => {
+	assert.equal(renameIdentifier('image'), 'img');
+	assert.equal(renameIdentifier('Image'), 'Img');
+	assert.equal(renameIdentifier('heroImage'), 'heroImg');
+	assert.equal(renameIdentifier('images'), 'imgs');
+	assert.equal(renameIdentifier('activeCard'), 'aCard');
+	assert.equal(renameIdentifier('ActiveCard'), 'ACard');
+	assert.equal(renameIdentifier('nextCard'), 'nCard');
+	assert.equal(renameIdentifier('cleanCard'), 'cCard');
+	assert.equal(renameIdentifier('safeCard'), 'sCard');
+	assert.equal(renameIdentifier('isActive'), 'isActive');
+	assert.equal(renameIdentifier('isNext'), 'isNext');
+	assert.equal(renameIdentifier('isClean'), 'isClean');
+	assert.equal(renameIdentifier('isSafe'), 'isSafe');
 });
 
 test('naming automatically fixes local declarations in Astro frontmatter', () => {

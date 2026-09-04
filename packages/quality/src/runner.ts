@@ -5,9 +5,7 @@
 /*//////////////////////////////////////////////////
 IMPORTS
 //////////////////////////////////////////////////*/
-
 // API
-
 import { collapseTypesAndObjects } from './collapse.js';
 import { sourceFiles, workingSourceFiles } from './files.js';
 import { checkImports } from './imports.js';
@@ -20,24 +18,20 @@ import { resolve, sep } from 'node:path';
 import ts from 'typescript';
 
 // DATA
-
 import { PROTECTED_IDENTIFIERS } from './naming.js';
 
 // TYPES
-
 import type { QualityConfig } from './config.js';
 
 /*//////////////////////////////////////////////////
 CONFIG
 //////////////////////////////////////////////////*/
-
 export type QualityResult = { imports: ReturnType<typeof checkImports>; naming: ReturnType<typeof namingFindings> };
 export type QualityOptions = { fix: boolean; all: boolean; strict: boolean };
 
 /*//////////////////////////////////////////////////
 HELPERS
 //////////////////////////////////////////////////*/
-
 /**
  *
  * @param config
@@ -273,8 +267,8 @@ function fixNames(config: QualityConfig, all: boolean): void {
 	}
 	for (const [fileName, fileEdits] of edits) {
 		const src = readFileSync(fileName, 'utf8');
-		const next = fileEdits.sort((a, b) => b.span.start - a.span.start).reduce((text, edit) => `${text.slice(0, edit.span.start)}${edit.newText}${text.slice(edit.span.start + edit.span.length)}`, src);
-		if (next !== src) writeFileSync(fileName, next);
+		const n = fileEdits.sort((a, b) => b.span.start - a.span.start).reduce((text, edit) => `${text.slice(0, edit.span.start)}${edit.newText}${text.slice(edit.span.start + edit.span.length)}`, src);
+		if (n !== src) writeFileSync(fileName, n);
 	}
 }
 

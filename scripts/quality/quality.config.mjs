@@ -5,9 +5,7 @@
 /*//////////////////////////////////////////////////
 IMPORTS
 //////////////////////////////////////////////////*/
-
 // API
-
 import { createQualityConfig } from '../../packages/quality/dist/config.js';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -15,7 +13,6 @@ import { fileURLToPath } from 'node:url';
 /*//////////////////////////////////////////////////
 CONFIG
 //////////////////////////////////////////////////*/
-
 const root = resolve(fileURLToPath(new URL('../..', import.meta.url)));
 
 export default createQualityConfig({

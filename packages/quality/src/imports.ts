@@ -5,29 +5,24 @@
 /*//////////////////////////////////////////////////
 IMPORTS
 //////////////////////////////////////////////////*/
-
 // API
-
 import { displayPath, isFile, sourceFiles } from './files.js';
 import { readFileSync } from 'node:fs';
 import { dirname, extname, join, resolve } from 'node:path';
 import ts from 'typescript';
 
 // TYPES
-
 import type { QualityConfig } from './config.js';
 
 /*//////////////////////////////////////////////////
 CONFIG
 //////////////////////////////////////////////////*/
-
 const MODULE_EXTS = ['', '.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs', '.mts', '.cts', '.astro', '.mdx', '.json', '.css', '.scss', '.svg', '.png', '.jpg', '.jpeg', '.webp'];
 export type ImportFailure = { importer: string; specifier: string };
 
 /*//////////////////////////////////////////////////
 HELPERS
 //////////////////////////////////////////////////*/
-
 /**
  *
  * @param specifier

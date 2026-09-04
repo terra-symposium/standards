@@ -5,9 +5,7 @@
 /*//////////////////////////////////////////////////
 IMPORTS
 //////////////////////////////////////////////////*/
-
 // API
-
 import { runQualityCli } from '../../packages/quality/dist/runner.js';
 import config from './quality.config.mjs';
 
