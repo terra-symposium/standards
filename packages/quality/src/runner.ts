@@ -37,7 +37,8 @@ HELPERS
  * @param cfg
  * @param cfgd
  * @param fallback
- * @returns
+ *
+ * @return
  */
 function toolPath(cfg: QualityConfig, cfgd: string | undefined, fallback: string): string {
 	if (cfgd && (cfgd.includes('/') || cfgd.includes('\\'))) return cfgd;
@@ -51,7 +52,8 @@ function toolPath(cfg: QualityConfig, cfgd: string | undefined, fallback: string
  * @param cfg
  * @param cmd
  * @param args
- * @returns
+ *
+ * @return
  */
 function run(cfg: QualityConfig, cmd: string, args: string[]): number {
 	const result = spawnSync(cmd, args, { cwd: cfg.root, stdio: 'inherit', env: process.env });
@@ -63,7 +65,8 @@ function run(cfg: QualityConfig, cmd: string, args: string[]): number {
  *
  * @param vals
  * @param size
- * @returns
+ *
+ * @return
  */
 function batches<T>(vals: T[], size = 100): T[][] {
 	return Array.from({ length: Math.ceil(vals.length / size) }, (_, index) => vals.slice(index * size, (index + 1) * size));
@@ -73,7 +76,8 @@ function batches<T>(vals: T[], size = 100): T[][] {
  *
  * @param cfg
  * @param all
- * @returns
+ *
+ * @return
  */
 function filesFor(cfg: QualityConfig, all: boolean): string[] {
 	return all ? srcFiles(cfg) : workingSourceFiles(cfg);
@@ -83,7 +87,8 @@ function filesFor(cfg: QualityConfig, all: boolean): string[] {
  *
  * @param cfg
  * @param all
- * @returns
+ *
+ * @return
  */
 function scopedCfg(cfg: QualityConfig, all: boolean): QualityConfig {
 	return all ? cfg : { ...cfg, sourceRoots: filesFor(cfg, false) };
@@ -94,7 +99,8 @@ function scopedCfg(cfg: QualityConfig, all: boolean): QualityConfig {
  * @param cfg
  * @param opts
  * @param exhaustive
- * @returns
+ *
+ * @return
  */
 function runLint(cfg: QualityConfig, opts: QualityOptions, exhaustive = false): void {
 	const files = filesFor(cfg, opts.all).filter((file) => /\.(?:astro|cjs|js|jsx|mjs|ts|tsx)$/.test(file));
@@ -119,7 +125,8 @@ function runLint(cfg: QualityConfig, opts: QualityOptions, exhaustive = false): 
  *
  * @param cfg
  * @param name
- * @returns
+ *
+ * @return
  */
 function runCfgdCmd(cfg: QualityConfig, name: string): void {
 	const check = cfg.qualityCommands?.find((cmd) => cmd.name === name);
@@ -131,7 +138,8 @@ function runCfgdCmd(cfg: QualityConfig, name: string): void {
 /**
  *
  * @param cfg
- * @returns
+ *
+ * @return
  */
 function runCfgdCmds(cfg: QualityConfig): void {
 	for (const check of cfg.qualityCommands ?? []) runCfgdCmd(cfg, check.name);
@@ -140,7 +148,8 @@ function runCfgdCmds(cfg: QualityConfig): void {
 /**
  *
  * @param cfg
- * @returns
+ *
+ * @return
  */
 function runProjectTypecheck(cfg: QualityConfig): void {
 	const status = run(cfg, toolPath(cfg, cfg.tools?.tsc, 'tsc'), ['--noEmit', '-p', cfg.tsconfig ?? 'tsconfig.json']);
@@ -152,7 +161,8 @@ function runProjectTypecheck(cfg: QualityConfig): void {
  * @param cfg
  * @param fix
  * @param exhaustive
- * @returns
+ *
+ * @return
  */
 function runKnip(cfg: QualityConfig, fix: boolean, exhaustive = false): void {
 	const status = run(cfg, toolPath(cfg, cfg.tools?.knip, 'knip'), [
@@ -165,7 +175,8 @@ function runKnip(cfg: QualityConfig, fix: boolean, exhaustive = false): void {
 /**
  *
  * @param cfg
- * @returns
+ *
+ * @return
  */
 function runDiffCheck(cfg: QualityConfig): void {
 	const status = run(cfg, 'git', ['-c', 'core.pager=cat', 'diff', '--check']);
@@ -176,7 +187,8 @@ function runDiffCheck(cfg: QualityConfig): void {
  *
  * @param cfg
  * @param all
- * @returns
+ *
+ * @return
  */
 function fixNames(cfg: QualityConfig, all: boolean): void {
 	const allowed = new Set(filesFor(cfg, all).filter((file) => !isProtectedPath(file) && !isProtectedFilename(file)));
@@ -277,7 +289,8 @@ function fixNames(cfg: QualityConfig, all: boolean): void {
  * @param config
  * @param strict
  * @param all
- * @returns
+ *
+ * @return
  */
 export function runQuality(config: QualityConfig, strict = false, all = true): QualityResult {
 	const result = { imports: checkImports(scopedCfg(config, all)), naming: namingFindings(scopedCfg(config, all)) };
@@ -291,7 +304,8 @@ export function runQuality(config: QualityConfig, strict = false, all = true): Q
  *
  * @param cfg
  * @param args
- * @returns
+ *
+ * @return
  */
 export function runQualityCli(cfg: QualityConfig, args = process.argv.slice(2)): void {
 	const cmd = args.find((arg) => !arg.startsWith('-')) ?? 'quality';
@@ -350,7 +364,8 @@ export function runQualityCli(cfg: QualityConfig, args = process.argv.slice(2)):
  * @param cfg
  * @param optsOrArgs
  * @param args
- * @returns
+ *
+ * @return
  */
 export function runFormatter(cfg: QualityConfig, optsOrArgs: QualityOptions | string[] = { fix: true, all: false, strict: false }, args: string[] = []): void {
 	const legacyArgs = Array.isArray(optsOrArgs);
@@ -378,7 +393,8 @@ export function runFormatter(cfg: QualityConfig, optsOrArgs: QualityOptions | st
  *
  * @param cfg
  * @param args
- * @returns
+ *
+ * @return
  */
 export function runTypecheck(cfg: QualityConfig, args: string[] = []): void {
 	const tsc = cfg.tools?.tsc ?? 'tsc';

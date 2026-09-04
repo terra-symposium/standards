@@ -28,7 +28,8 @@ HELPERS
  * @param specifier
  * @param importer
  * @param cfg
- * @returns
+ *
+ * @return
  */
 function resolveImport(specifier: string, importer: string, cfg: QualityConfig): string | null {
 	const alias = Object.entries(cfg.aliases ?? {}).find(([prefix]) => specifier.startsWith(prefix));
@@ -48,7 +49,8 @@ function resolveImport(specifier: string, importer: string, cfg: QualityConfig):
 /**
  *
  * @param fileName
- * @returns
+ *
+ * @return
  */
 function specifiers(fileName: string): string[] {
 	const src = readFileSync(fileName, 'utf8');
@@ -63,7 +65,13 @@ function specifiers(fileName: string): string[] {
 	return vals;
 }
 
-/** Checks all configured internal imports, including assets and extensionless modules. */
+/**
+ * Checks all configured internal imports, including assets and extensionless modules.
+ *
+ * @param cfg
+ *
+ * @return
+ */
 export function checkImports(cfg: QualityConfig): ImportFailure[] {
 	const failures: ImportFailure[] = [];
 	for (const importer of sourceFiles(cfg)) {

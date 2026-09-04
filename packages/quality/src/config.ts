@@ -36,7 +36,13 @@ export type QualityConfig = {
 /*//////////////////////////////////////////////////
 HELPERS
 //////////////////////////////////////////////////*/
-/** Normalizes a consumer repository configuration once at the package boundary. */
+/**
+ * Normalizes a consumer repository configuration once at the package boundary.
+ *
+ * @param cfg
+ *
+ * @return
+ */
 export function createQualityConfig(cfg: QualityConfig): QualityConfig {
 	return {
 		...cfg,

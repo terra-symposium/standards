@@ -21,7 +21,8 @@ HELPERS
 /**
  *
  * @param fileName
- * @returns
+ *
+ * @return
  */
 function scriptKind(fileName: string): ts.ScriptKind {
 	if (/\.[cm]?tsx$/.test(fileName)) return ts.ScriptKind.TSX;
@@ -34,7 +35,8 @@ function scriptKind(fileName: string): ts.ScriptKind {
  *
  * @param n
  * @param src
- * @returns
+ *
+ * @return
  */
 function candidateSpan(n: ts.Node, src: string): { start: number; end: number } | undefined {
 	if (ts.isObjectLiteralExpression(n) || ts.isTypeLiteralNode(n) || ts.isMappedTypeNode(n)) return { start: n.getStart(), end: n.end };
@@ -46,7 +48,13 @@ function candidateSpan(n: ts.Node, src: string): { start: number; end: number } 
 	return undefined;
 }
 
-/** Collapses whitespace inside object and type bodies so Prettier alone decides whether they exceed print width. */
+/**
+ * Collapses whitespace inside object and type bodies so Prettier alone decides whether they exceed print width.
+ *
+ * @param fileName
+ *
+ * @return
+ */
 export function collapseTypesAndObjects(fileName: string): boolean {
 	if (!SUPPORTED.has(extname(fileName))) return false;
 	const original = readFileSync(fileName, 'utf8');

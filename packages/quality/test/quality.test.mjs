@@ -334,23 +334,30 @@ function specifiers(fileName: string): string[] {
 }
 /** Existing documentation. */
 function documented(value: string): string { return value; }
+/** */
+function empty(enabled: boolean): void { void enabled; }
 `,
 	);
 	assert.equal(maintainSourceFile(root, file), true);
 	const src = readFileSync(file, 'utf8');
-	assert.ok(src.includes('/**\n *\n * @param fileName\n * @returns\n */\nfunction specifiers'));
+	assert.ok(src.includes('/**\n *\n * @param fileName\n *\n * @return\n */\nfunction specifiers'));
 	assert.equal(src.match(/Existing documentation/g)?.length, 1);
-	assert.doesNotMatch(src, /@param value/);
+	assert.match(src, /\* Existing documentation\.\n \*\n \* @param value\n \*\n \* @return/);
+	assert.match(src, /\/\*\*\n \*\n \* @param enabled\n \*\n \* @return\n \*\//);
 	assert.equal(maintainSourceFile(root, file), false);
 });
 
-test('maintenance repairs generated TSDoc tags from the current function signature', () => {
+test('maintenance repairs TSDoc tags from the current function signature and preserves descriptions', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-tsdoc-'));
 	const file = join(root, 'main.ts');
-	writeFileSync(file, "import fs from 'node:fs';\n/**\n *\n * @param wrongName\n * @returns\n */\nfunction read(fileName: string) { return fs.readFileSync(fileName); }\n");
+	writeFileSync(
+		file,
+		"import fs from 'node:fs';\n/**\n * Reads a file.\n *\n * @param wrongName - stale\n * @param fileName - Path to read.\n * @returns - File contents.\n * @throws When reading fails.\n */\nfunction read(fileName: string) { return fs.readFileSync(fileName); }\n",
+	);
 	assert.equal(maintainSourceFile(root, file), true);
 	const src = readFileSync(file, 'utf8');
-	assert.match(src, /\* @param fileName\n \* @returns/);
+	assert.match(src, /\* @param fileName - Path to read\.\n \*\n \* @return - File contents\./);
+	assert.match(src, /\* @throws When reading fails\./);
 	assert.doesNotMatch(src, /wrongName/);
 	assert.equal(maintainSourceFile(root, file), false);
 });

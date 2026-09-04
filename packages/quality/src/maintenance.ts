@@ -25,7 +25,8 @@ HELPERS
 /**
  *
  * @param fileName
- * @returns
+ *
+ * @return
  */
 function srcKind(fileName: string): ts.ScriptKind {
 	return /\.[cm]?tsx?$/.test(fileName) && fileName.endsWith('x') ? ts.ScriptKind.TSX : ts.ScriptKind.TS;
@@ -34,7 +35,8 @@ function srcKind(fileName: string): ts.ScriptKind {
 /**
  *
  * @param n
- * @returns
+ *
+ * @return
  */
 function importSrc(n: ts.ImportDeclaration): string {
 	return ts.isStringLiteral(n.moduleSpecifier) ? n.moduleSpecifier.text : '';
@@ -43,7 +45,8 @@ function importSrc(n: ts.ImportDeclaration): string {
 /**
  *
  * @param name
- * @returns
+ *
+ * @return
  */
 function importGroup(name: string): ImportGroup {
 	if (/^[A-Z][A-Z0-9_]*$/.test(name)) return 'DATA';
@@ -55,7 +58,8 @@ function importGroup(name: string): ImportGroup {
  *
  * @param parsed
  * @param imports
- * @returns
+ *
+ * @return
  */
 function groupedImports(parsed: ts.SourceFile, imports: ts.ImportDeclaration[]): Record<ImportGroup, { source: string; text: string }[]> {
 	const groups: Record<ImportGroup, { source: string; text: string }[]> = { API: [], COMPONENTS: [], DATA: [], TYPES: [] };
@@ -89,7 +93,8 @@ function groupedImports(parsed: ts.SourceFile, imports: ts.ImportDeclaration[]):
 /**
  *
  * @param n
- * @returns
+ *
+ * @return
  */
 function srcGroup(n: ts.Statement): SrcGroup | undefined {
 	if (ts.isTypeAliasDeclaration(n) || ts.isInterfaceDeclaration(n) || ts.isEnumDeclaration(n) || (ts.isVariableStatement(n) && (n.declarationList.flags & ts.NodeFlags.Const) !== 0)) return 'CONFIG';
@@ -102,13 +107,21 @@ function srcGroup(n: ts.Statement): SrcGroup | undefined {
  * @param label
  * @param statements
  * @param eol
- * @returns
+ *
+ * @return
  */
 function srcSection(label: SrcGroup, statements: string[], eol: string): string {
 	return `${OPEN}${eol}${label}${eol}${CLOSE}${eol}${statements.join(label === 'CONFIG' ? eol : `${eol}${eol}`)}`;
 }
 
-/** Returns source spans whose whitespace is content rather than layout. */
+/**
+ * Returns source spans whose whitespace is content rather than layout.
+ *
+ * @param src
+ * @param fileName
+ *
+ * @return
+ */
 function literalSpans(src: string, fileName: string): { start: number; end: number }[] {
 	const parsed = ts.createSourceFile(fileName, src, ts.ScriptTarget.Latest, true, srcKind(fileName));
 	const spans: { start: number; end: number }[] = [];
@@ -123,7 +136,15 @@ function literalSpans(src: string, fileName: string): { start: number; end: numb
 	return spans.sort((a, b) => a.start - b.start);
 }
 
-/** Normalizes structural comment spacing without changing literal content. */
+/**
+ * Normalizes structural comment spacing without changing literal content.
+ *
+ * @param src
+ * @param fileName
+ * @param eol
+ *
+ * @return
+ */
 function normCommentLayout(src: string, fileName: string, eol: string): string {
 	const spans = literalSpans(src, fileName);
 	const rawLines = src.split(/\r?\n/);
@@ -184,7 +205,8 @@ function normCommentLayout(src: string, fileName: string, eol: string): string {
  *
  * @param src
  * @param fileName
- * @returns
+ *
+ * @return
  */
 function removeManagedSections(src: string, fileName: string): string {
 	const parsed = ts.createSourceFile(fileName, src, ts.ScriptTarget.Latest, true, srcKind(fileName));
@@ -215,11 +237,48 @@ function removeManagedSections(src: string, fileName: string): string {
  * @param node
  * @param parsed
  * @param eol
- * @returns
+ * @param existing
+ *
+ * @return
  */
-function genFunctionDoc(node: ts.FunctionDeclaration, parsed: ts.SourceFile, eol: string): string {
+function genFnDoc(node: ts.FunctionDeclaration, parsed: ts.SourceFile, eol: string, existing = ''): string {
 	const params = node.parameters.map((p, i) => (ts.isIdentifier(p.name) ? p.name.text : ts.isObjectBindingPattern(p.name) ? 'props' : `param${i + 1}`));
-	return ['/**', ' *', ...params.map((n) => ` * @param ${n}`), ' * @returns', ' */'].join(eol);
+	const body = existing
+		.slice(3, -2)
+		.split(/\r?\n/)
+		.map((l) => l.replace(/^\s*\* ?/, '').trim());
+	while (body.length && !body.at(0)?.trim()) body.shift();
+	while (body.length && !body.at(-1)?.trim()) body.pop();
+	const firstTag = body.findIndex((line) => /^\s*@\w+/.test(line));
+	const summary = (firstTag < 0 ? body : body.slice(0, firstTag)).map((l) => l.trim());
+	while (summary.length && !summary.at(-1)?.trim()) summary.pop();
+	const tagLines = firstTag < 0 ? [] : body.slice(firstTag).filter((line) => line.trim());
+	const blocks: string[][] = [];
+	for (const line of tagLines) {
+		if (/^\s*@\w+/.test(line) || !blocks.length) blocks.push([line.trim()]);
+		else blocks.at(-1)!.push(line);
+	}
+	const paramBlocks = new Map<string, string[]>();
+	let returnBlock: string[] | undefined;
+	const otherBlocks: string[][] = [];
+	for (const block of blocks) {
+		const param = block[0]?.match(/^@param\s+(?:\{[^}]*\}\s*)?(\S+)/);
+		if (param) {
+			paramBlocks.set(param[1]!.replace(/^\[|\]$/g, '').split('=')[0]!, block);
+			continue;
+		}
+		if (/^@returns?\b/.test(block[0] ?? '')) {
+			returnBlock = [`${block[0]!.replace(/^@returns?\b/, '@return')}`, ...block.slice(1)];
+			continue;
+		}
+		otherBlocks.push(block);
+	}
+	const content = [...summary];
+	if (!content.length || content.at(-1) !== '') content.push('');
+	for (const name of params) content.push(...(paramBlocks.get(name) ?? [`@param ${name}`]));
+	content.push('', ...(returnBlock ?? ['@return']));
+	for (const block of otherBlocks) content.push('', ...block);
+	return ['/**', ...content.map((l) => (l ? ` * ${l}` : ' *')), ' */'].join(eol);
 }
 
 /**
@@ -228,20 +287,29 @@ function genFunctionDoc(node: ts.FunctionDeclaration, parsed: ts.SourceFile, eol
  * @param parsed
  * @param src
  * @param eol
- * @returns
+ *
+ * @return
  */
 function statementText(n: ts.Statement, parsed: ts.SourceFile, src: string, eol: string): string {
 	const leading = src.slice(n.getFullStart(), n.getStart(parsed)).trim();
 	const text = src.slice(n.getStart(parsed), n.end);
 	if (!ts.isFunctionDeclaration(n)) return [leading, text].filter(Boolean).join(eol);
-	const gen = genFunctionDoc(n, parsed, eol);
-	const genPattern = /\/\*\*\r?\n \*\r?\n(?: \* @param [^\r\n]+\r?\n)* \* @returns\r?\n \*\//;
-	if (genPattern.test(leading)) return [leading.replace(genPattern, gen), text].filter(Boolean).join(eol);
-	if (/\/\*\*/.test(leading)) return [leading, text].filter(Boolean).join(eol);
+	const docs = [...leading.matchAll(/\/\*\*[\s\S]*?\*\//g)];
+	const doc = docs.at(-1);
+	const gen = genFnDoc(n, parsed, eol, doc?.[0]);
+	if (doc?.index !== undefined) return [`${leading.slice(0, doc.index)}${gen}${leading.slice(doc.index + doc[0].length)}`.trim(), text].filter(Boolean).join(eol);
 	return [leading, gen, text].filter(Boolean).join(eol);
 }
 
-/** Moves top-level configuration and helper declarations into canonical sections after imports. */
+/**
+ * Moves top-level configuration and helper declarations into canonical sections after imports.
+ *
+ * @param src
+ * @param fileName
+ * @param eol
+ *
+ * @return
+ */
 function organizeSrcSections(src: string, fileName: string, eol: string): string {
 	const withoutManagedSections = removeManagedSections(src, fileName);
 	const parsed = ts.createSourceFile(fileName, withoutManagedSections, ts.ScriptTarget.Latest, true, srcKind(fileName));
@@ -265,7 +333,14 @@ function organizeSrcSections(src: string, fileName: string, eol: string): string
 	return `${withoutManagedSections.slice(0, lastImport.end).trimEnd()}${eol}${eol}${sections.join(`${eol}${eol}`)}${eol}`;
 }
 
-/** Adds the canonical header, grouped imports, and top-level source sections. */
+/**
+ * Adds the canonical header, grouped imports, and top-level source sections.
+ *
+ * @param root
+ * @param fileName
+ *
+ * @return
+ */
 export function maintainSourceFile(root: string, fileName: string): boolean {
 	if (!SUPPORTED.has(extname(fileName))) return false;
 	const original = readFileSync(fileName, 'utf8');
@@ -301,7 +376,14 @@ export function maintainSourceFile(root: string, fileName: string): boolean {
 	return true;
 }
 
-/** Adds Prettier protection to one-line imports that exceed the configured print width. */
+/**
+ * Adds Prettier protection to one-line imports that exceed the configured print width.
+ *
+ * @param fileName
+ * @param printWidth
+ *
+ * @return
+ */
 export function protectLongImports(fileName: string, printWidth = 200): boolean {
 	if (!SUPPORTED.has(extname(fileName))) return false;
 	const original = readFileSync(fileName, 'utf8');

@@ -38,6 +38,8 @@ export const IDENTIFIER_REPLACEMENTS = replacementMap([
 	['formats', 'fmts'],
 	['formatter', 'fmt'],
 	['formatters', 'fmts'],
+	['function', 'fn'],
+	['functions', 'fns'],
 	[['generation', 'generate', 'generated', 'generating'], 'gen'],
 	[['generations', 'generates'], 'gens'],
 	['image', 'img'],
@@ -132,7 +134,8 @@ HELPERS
 /**
  *
  * @param groups
- * @returns
+ *
+ * @return
  */
 function replacementMap(groups: readonly ReplacementGroup[]): Readonly<Record<string, string>> {
 	return Object.freeze(Object.fromEntries(groups.flatMap(([n, r]) => (typeof n === 'string' ? [n] : n).map((n) => [n, r]))));
@@ -141,7 +144,8 @@ function replacementMap(groups: readonly ReplacementGroup[]): Readonly<Record<st
 /**
  *
  * @param name
- * @returns
+ *
+ * @return
  */
 export function identifierTokens(name: string): string[] {
 	return name
@@ -154,7 +158,8 @@ export function identifierTokens(name: string): string[] {
  *
  * @param original
  * @param tokens
- * @returns
+ *
+ * @return
  */
 function renderIdentifier(original: string, tokens: string[]): string {
 	if (/^[A-Z][A-Z0-9_]*$/.test(original)) return tokens.join(original.includes('_') ? '_' : '').toUpperCase();
@@ -168,7 +173,8 @@ function renderIdentifier(original: string, tokens: string[]): string {
  *
  * @param original
  * @param replacement
- * @returns
+ *
+ * @return
  */
 function tokenCase(original: string, replacement: string): string {
 	if (original === original.toUpperCase()) return replacement.toUpperCase();
@@ -180,7 +186,8 @@ function tokenCase(original: string, replacement: string): string {
  *
  * @param name
  * @param reserved
- * @returns
+ *
+ * @return
  */
 export function callbackAlias(name: string, reserved: string[] = []): string {
 	const preferred = CALLBACK_ALIASES[name.toLowerCase() as keyof typeof CALLBACK_ALIASES] ?? identifierTokens(name)[0]?.charAt(0).toLowerCase() ?? 'v';
@@ -193,7 +200,8 @@ export function callbackAlias(name: string, reserved: string[] = []): string {
  *
  * @param name
  * @param kind
- * @returns
+ *
+ * @return
  */
 export function renameIdentifier(name: string, kind: RenameKind = {}): string {
 	if (PROTECTED_IDENTIFIERS.has(name) || name === '_') return name;
@@ -217,7 +225,8 @@ export function renameIdentifier(name: string, kind: RenameKind = {}): string {
 /**
  *
  * @param n
- * @returns
+ *
+ * @return
  */
 function callbackKind(n: ts.Identifier): RenameKind | undefined {
 	const param = ts.findAncestor(n, ts.isParameter);
@@ -254,12 +263,24 @@ function callbackKind(n: ts.Identifier): RenameKind | undefined {
 	return undefined;
 }
 
-/** Returns whether a declaration belongs to a configured collection callback. */
+/**
+ * Returns whether a declaration belongs to a configured collection callback.
+ *
+ * @param node
+ *
+ * @return
+ */
 export function isCallbackDeclaration(node: ts.Identifier): boolean {
 	return callbackKind(node) !== undefined;
 }
 
-/** Returns the context-aware concise suggestion for one repository-owned declaration. */
+/**
+ * Returns the context-aware concise suggestion for one repository-owned declaration.
+ *
+ * @param n
+ *
+ * @return
+ */
 export function renameDeclaration(n: ts.Identifier): string {
 	return renameIdentifier(n.text, callbackKind(n));
 }
@@ -267,7 +288,8 @@ export function renameDeclaration(n: ts.Identifier): string {
 /**
  *
  * @param name
- * @returns
+ *
+ * @return
  */
 export function hasPrefixReplacement(name: string): boolean {
 	return Object.hasOwn(PREFIX_REPLACEMENTS, identifierTokens(name)[0]?.toLowerCase() ?? '');
@@ -276,7 +298,8 @@ export function hasPrefixReplacement(name: string): boolean {
 /**
  *
  * @param fileName
- * @returns
+ *
+ * @return
  */
 export function isProtectedPath(fileName: string): boolean {
 	const norm = fileName.replaceAll('\\', '/');
@@ -289,7 +312,8 @@ export function isProtectedPath(fileName: string): boolean {
 /**
  *
  * @param fileName
- * @returns
+ *
+ * @return
  */
 export function isProtectedFilename(fileName: string): boolean {
 	return PROTECTED_FILENAMES.has(fileName.split(/[\\/]/).at(-1) ?? fileName);
@@ -299,13 +323,20 @@ export function isProtectedFilename(fileName: string): boolean {
  *
  * @param name
  * @param kind
- * @returns
+ *
+ * @return
  */
 export function isApprovedIdentifier(name: string, kind: RenameKind = {}): boolean {
 	return renameIdentifier(name, kind) === name;
 }
 
-/** Returns whether an identifier declares a repository-owned symbol safe to rename with all references. */
+/**
+ * Returns whether an identifier declares a repository-owned symbol safe to rename with all references.
+ *
+ * @param n
+ *
+ * @return
+ */
 export function isRenamableDeclaration(n: ts.Identifier): boolean {
 	const p = n.parent;
 	const declaration = ts.findAncestor(p, (a): a is ts.VariableDeclaration | ts.ParameterDeclaration => ts.isVariableDeclaration(a) || ts.isParameter(a));
@@ -326,7 +357,13 @@ export function isRenamableDeclaration(n: ts.Identifier): boolean {
 	);
 }
 
-/** Reports concise-name drift without mutating the consumer repository. */
+/**
+ * Reports concise-name drift without mutating the consumer repository.
+ *
+ * @param cfg
+ *
+ * @return
+ */
 export function namingFindings(cfg: QualityConfig): NamingFinding[] {
 	const protectedNames = new Set([...PROTECTED_IDENTIFIERS, ...(cfg.protectedIdentifiers ?? [])]);
 	const findings: NamingFinding[] = [];

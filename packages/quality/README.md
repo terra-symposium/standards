@@ -14,6 +14,8 @@ Empty adjacent sections are invalid. When one section is immediately followed by
 
 Maintenance removes trailing horizontal whitespace, collapses repeated layout-only blank lines, inserts the blank lines required above, and removes blank lines forbidden after fences, groups, and line labels. String, template, regular-expression, and JSX text content is never treated as layout.
 
+Function TSDoc is derived from the current signature. Existing summaries and tag descriptions are preserved, including one-line and empty documentation blocks; stale parameter tags are removed, missing `@param` tags are added in signature order, and a singular `@return` tag is added. A blank documentation line separates the summary, parameters, return tag, and any other tags.
+
 ## Source grouping
 
 Imports are sorted into `API`, `COMPONENTS`, `DATA`, and `TYPES` groups. Top-level types, interfaces, enums, and `const` declarations belong to `CONFIG`; top-level functions belong to `HELPERS`. Other declarations retain source order after those managed sections.

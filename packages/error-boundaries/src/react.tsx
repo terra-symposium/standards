@@ -20,7 +20,15 @@ export type ErrorBoundaryState = { error: Error | null };
 /*//////////////////////////////////////////////////
 HELPERS
 //////////////////////////////////////////////////*/
-/** Wraps a component in a named error boundary without coupling it to application UI. */
+/**
+ * Wraps a component in a named error boundary without coupling it to application UI.
+ *
+ * @param ComponentToWrap
+ * @param name
+ * @param onErr
+ *
+ * @return
+ */
 export function withErrorBoundary<P extends object>(ComponentToWrap: React.ComponentType<P>, name: string, onErr?: ErrorReporter): React.ComponentType<P> {
 	function BoundedComponent(props: P): React.JSX.Element {
 		return (

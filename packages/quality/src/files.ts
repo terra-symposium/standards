@@ -19,7 +19,8 @@ HELPERS
 /**
  *
  * @param cfg
- * @returns
+ *
+ * @return
  */
 export function sourceFiles(cfg: QualityConfig): string[] {
 	const roots = [...cfg.sourceRoots, ...(cfg.includeRoots ?? [])];
@@ -44,7 +45,13 @@ export function sourceFiles(cfg: QualityConfig): string[] {
 	return files.sort((a, b) => a.localeCompare(b));
 }
 
-/** Returns configured source files changed in the working tree, including untracked files. */
+/**
+ * Returns configured source files changed in the working tree, including untracked files.
+ *
+ * @param cfg
+ *
+ * @return
+ */
 export function workingSourceFiles(cfg: QualityConfig): string[] {
 	const changed = new Set(
 		execFileSync('git', ['diff', '--name-only', '--diff-filter=ACMR'], { cwd: cfg.root, encoding: 'utf8' })
@@ -60,7 +67,8 @@ export function workingSourceFiles(cfg: QualityConfig): string[] {
  *
  * @param config
  * @param fileName
- * @returns
+ *
+ * @return
  */
 export function displayPath(config: QualityConfig, fileName: string): string {
 	return relative(config.root, fileName) || basename(fileName);
@@ -69,7 +77,8 @@ export function displayPath(config: QualityConfig, fileName: string): string {
 /**
  *
  * @param path
- * @returns
+ *
+ * @return
  */
 export function isFile(path: string): boolean {
 	try {
