@@ -11,7 +11,7 @@ IMPORTS
 import { sourceFiles, workingSourceFiles } from './files.js';
 import { checkImports } from './imports.js';
 import { collapseInlineIfs } from './inline-if.js';
-import { maintainSourceFile } from './maintenance.js';
+import { maintainSourceFile, protectLongImports } from './maintenance.js';
 import { isRenamableDeclaration, namingFindings, renameIdentifier } from './naming.js';
 import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
@@ -218,7 +218,11 @@ export function runQualityCli(config: QualityConfig, args = process.argv.slice(2
 	if (command === 'format' || command === 'maintain') {
 		runFormatter(config, opts, command === 'format' ? args.slice(1) : files);
 		if (opts.fix) for (const file of files) if (/\.(?:c|m)?(?:js|ts)x?$/.test(file)) collapseInlineIfs(file);
-		if (opts.fix) for (const file of files) maintainSourceFile(config.root, file);
+		if (opts.fix)
+			for (const file of files) {
+				maintainSourceFile(config.root, file);
+				if (config.oneLineImports) protectLongImports(file, config.prettierPrintWidth);
+			}
 		return;
 	}
 	if (command === 'naming') {

@@ -102,3 +102,32 @@ export function maintainSourceFile(root: string, fileName: string): boolean {
 	writeFileSync(fileName, next);
 	return true;
 }
+
+/** Adds Prettier protection to one-line imports that exceed the configured print width. */
+export function protectLongImports(fileName: string, printWidth = 200): boolean {
+	if (!SUPPORTED.has(extname(fileName))) return false;
+	const original = readFileSync(fileName, 'utf8');
+	const eol = original.includes('\r\n') ? '\r\n' : '\n';
+	const parsed = ts.createSourceFile(fileName, original, ts.ScriptTarget.Latest, true, srcKind(fileName));
+	const lineStarts = parsed.getLineStarts();
+	const insertions = new Set<number>();
+	for (const node of parsed.statements.filter(ts.isImportDeclaration)) {
+		const lineStart = lineStarts[parsed.getLineAndCharacterOfPosition(node.getStart(parsed)).line] ?? 0;
+		const newline = original.indexOf('\n', node.end);
+		const line = original.slice(lineStart, newline < 0 ? original.length : newline).replace(/\r$/, '');
+		if (line.length <= printWidth || original.slice(lineStart, node.getStart(parsed)).trim()) continue;
+		const previousLineEnd = lineStart > 0 ? lineStart - 1 : -1;
+		const previousLineStart = previousLineEnd >= 0 ? original.lastIndexOf('\n', previousLineEnd - 1) + 1 : 0;
+		if (original.slice(previousLineStart, previousLineEnd + 1).trim() === '// prettier-ignore') continue;
+		insertions.add(lineStart);
+	}
+	if (!insertions.size) return false;
+	let next = original;
+	for (const offset of [...insertions].sort((a, b) => b - a)) {
+		const newline = original.indexOf('\n', offset);
+		const indent = original.slice(offset, newline < 0 ? original.length : newline).match(/^\s*/)?.[0] ?? '';
+		next = `${next.slice(0, offset)}${indent}// prettier-ignore${eol}${next.slice(offset)}`;
+	}
+	writeFileSync(fileName, next);
+	return true;
+}

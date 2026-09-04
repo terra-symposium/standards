@@ -23,6 +23,8 @@ export default createQualityConfig({
 		knip: 'knip',
 		prettier: 'prettier',
 	},
+	oneLineImports: true,
+	prettierPrintWidth: 200,
 	qualityCommands: [
 		{ name: 'build', command: 'pnpm', args: ['run', 'build'] },
 		{ name: 'test', command: 'pnpm', args: ['run', 'test'] },

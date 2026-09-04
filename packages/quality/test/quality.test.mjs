@@ -8,7 +8,7 @@ IMPORTS
 
 // API
 
-import { checkImports, collapseInlineIfs, createQualityConfig, maintainSourceFile, namingFindings, runQualityCli } from '../dist/index.js';
+import { checkImports, collapseInlineIfs, createQualityConfig, maintainSourceFile, namingFindings, protectLongImports, runQualityCli } from '../dist/index.js';
 import assert from 'node:assert/strict';
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -87,6 +87,16 @@ void alpha; void beta;
 	assert.ok(src.includes('// TYPES\n\nimport'));
 	assert.ok(src.endsWith('\n') && !src.endsWith('\n\n'));
 	assert.equal(maintainSourceFile(root, file), false);
+});
+
+test('protects long one-line imports from Prettier wrapping', () => {
+	const root = mkdtempSync(join(tmpdir(), 'terra-quality-'));
+	const file = join(root, 'main.ts');
+	const src = `import { ${'VeryLongTypeName, '.repeat(18)}result } from '@terra-symposium/a-very-long-package-name';\n`;
+	writeFileSync(file, src);
+	assert.equal(protectLongImports(file, 80), true);
+	assert.equal(readFileSync(file, 'utf8'), `// prettier-ignore\n${src}`);
+	assert.equal(protectLongImports(file, 80), false);
 });
 
 test('domain runs one configured quality command', () => {
