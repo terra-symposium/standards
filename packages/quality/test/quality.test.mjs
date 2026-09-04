@@ -722,6 +722,17 @@ test('naming refuses file-level destination collisions', () => {
 	runQualityCli(cfg, ['naming', '--all']);
 	assert.equal(readFileSync(file, 'utf8'), src);
 });
+
+test('naming avoids repository helper shadowing in initializers', () => {
+	const root = mkdtempSync(join(tmpdir(), 'terra-quality-shadow-'));
+	const file = join(root, 'main.ts');
+	writeFileSync(file, 'function repository() { return { ok: true }; }\nfunction run() { const repository = repository(); return repository.ok; }\n');
+	const cfg = createQualityConfig({ root, sourceRoots: ['.'], extensions: ['.ts'], tools: { prettier: 'prettier' } });
+	runQualityCli(cfg, ['naming', '--all']);
+	const src = readFileSync(file, 'utf8');
+	assert.match(src, /function repo\(\)/);
+	assert.match(src, /const repository = repository\(\)/);
+});
 test('naming keeps distinct aliases for adjacent parameters', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-parameter-collisions-'));
 	mkdirSync(join(root, 'src'));

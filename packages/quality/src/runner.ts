@@ -211,6 +211,18 @@ function fixNames(cfg: QualityConfig, all: boolean): void {
 	const checker = program.getTypeChecker();
 	const identifierSymbol = (node: ts.Identifier): ts.Symbol | undefined =>
 		ts.isShorthandPropertyAssignment(node.parent) ? (checker.getShorthandAssignmentValueSymbol(node.parent) ?? checker.getSymbolAtLocation(node)) : checker.getSymbolAtLocation(node);
+	const hasInitShadow = (node: ts.Identifier): boolean => {
+		const declaration = node.parent;
+		if (!ts.isVariableDeclaration(declaration) || !declaration.initializer) return false;
+		let found = false;
+		const visit = (child: ts.Node): void => {
+			if (found || child === node) return;
+			if (ts.isIdentifier(child) && child.text === node.text) found = true;
+			ts.forEachChild(child, visit);
+		};
+		visit(declaration.initializer);
+		return found;
+	};
 	const protectedNames = new Set([...PROTECTED_IDENTIFIERS, ...(cfg.protectedIdentifiers ?? [])]);
 	const exported = new Set<ts.Symbol>();
 	for (const src of program.getSourceFiles()) {
@@ -226,7 +238,7 @@ function fixNames(cfg: QualityConfig, all: boolean): void {
 				const scope = declarationScope(n);
 				const safety = renameSafetyByScope.get(scope) ?? { declared: new Set<string>(), proposals: new Map<string, number>() };
 				safety.declared.add(n.text);
-				if (!n.text.startsWith('_') && !protectedNames.has(n.text)) {
+				if (!n.text.startsWith('_') && !protectedNames.has(n.text) && !hasInitShadow(n)) {
 					const suggestion = renameDeclaration(n);
 					if (suggestion !== n.text && !isCallbackDeclaration(n)) safety.proposals.set(suggestion, (safety.proposals.get(suggestion) ?? 0) + 1);
 				}
@@ -239,7 +251,7 @@ function fixNames(cfg: QualityConfig, all: boolean): void {
 	for (const src of program.getSourceFiles()) {
 		if (!allowed.has(src.fileName)) continue;
 		const inspect = (node: ts.Node): void => {
-			if (ts.isIdentifier(node) && isRenamableDeclaration(node) && !node.text.startsWith('_') && !protectedNames.has(node.text)) {
+			if (ts.isIdentifier(node) && isRenamableDeclaration(node) && !node.text.startsWith('_') && !protectedNames.has(node.text) && !hasInitShadow(node)) {
 				const suggestion = renameDeclaration(node);
 				const safety = renameSafetyByScope.get(declarationScope(node));
 				if (!isCallbackDeclaration(node) && (safety?.declared.has(suggestion) || (safety?.proposals.get(suggestion) ?? 0) > 1)) return;

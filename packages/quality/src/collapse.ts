@@ -83,7 +83,7 @@ export function collapseTypesAndObjects(fileName: string): boolean {
 			ts.forEachChild(c, protectLiterals);
 		};
 		protectLiterals(node);
-		const isProtected = (position: number): boolean => protectedRanges.some((range) => position >= range.start && position < range.end);
+		const isProtected = (pos: number): boolean => protectedRanges.some((range) => pos >= range.start && pos < range.end);
 		const scanner = ts.createScanner(ts.ScriptTarget.Latest, false, langVariant, text);
 		let result = '';
 		let whitespace = false;
