@@ -339,6 +339,8 @@ export function isApprovedIdentifier(name: string, kind: RenameKind = {}): boole
  */
 export function isRenamableDeclaration(n: ts.Identifier): boolean {
 	const p = n.parent;
+	if (ts.isParameter(p) && p.modifiers?.some((m) => [ts.SyntaxKind.PublicKeyword, ts.SyntaxKind.PrivateKeyword, ts.SyntaxKind.ProtectedKeyword, ts.SyntaxKind.ReadonlyKeyword].includes(m.kind)))
+		return false;
 	const declaration = ts.findAncestor(p, (a): a is ts.VariableDeclaration | ts.ParameterDeclaration => ts.isVariableDeclaration(a) || ts.isParameter(a));
 	const varStatement =
 		declaration && ts.isVariableDeclaration(declaration) && ts.isVariableDeclarationList(declaration.parent) && ts.isVariableStatement(declaration.parent.parent)

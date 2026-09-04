@@ -733,6 +733,17 @@ test('naming avoids repository helper shadowing in initializers', () => {
 	assert.match(src, /function repository\(\)/);
 	assert.match(src, /const repo = repository\(\)/);
 });
+
+test('naming preserves parameter properties and their constructor references', () => {
+	const root = mkdtempSync(join(tmpdir(), 'terra-quality-parameter-property-'));
+	const file = join(root, 'main.ts');
+	writeFileSync(file, 'class RedirectError extends Error { constructor(readonly destination: string) { super(`Redirect to ${destination}`); } }\n');
+	const cfg = createQualityConfig({ root, sourceRoots: ['.'], extensions: ['.ts'], tools: { prettier: 'prettier' } });
+	runQualityCli(cfg, ['naming', '--all']);
+	const src = readFileSync(file, 'utf8');
+	assert.match(src, /readonly destination: string/);
+	assert.match(src, /\$\{destination\}/);
+});
 test('naming keeps distinct aliases for adjacent parameters', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-parameter-collisions-'));
 	mkdirSync(join(root, 'src'));
