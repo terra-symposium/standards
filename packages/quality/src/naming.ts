@@ -19,17 +19,27 @@ CONFIG
 type ReplacementGroup = readonly [names: string | readonly string[], replacement: string];
 type RenameKind = { numericIndex?: boolean; callback?: boolean; reserved?: string[] };
 export const IDENTIFIER_REPLACEMENTS = replacementMap([
+	['attribute', 'attr'],
 	['current', 'curr'],
+	['command', 'cmd'],
+	['commands', 'cmds'],
 	['context', 'ctx'],
 	['contexts', 'ctxs'],
 	[['config', 'configuration'], 'cfg'],
-	['configurations', 'cfgs'],
+	[['configs', 'configurations'], 'cfgs'],
+	['configured', 'cfgd'],
+	['directory', 'dir'],
+	['directories', 'dirs'],
 	['error', 'err'],
 	['errors', 'errs'],
+	['expression', 'expr'],
+	['expressions', 'exprs'],
 	[['format', 'formatted', 'formatting'], 'fmt'],
 	['formats', 'fmts'],
 	['formatter', 'fmt'],
 	['formatters', 'fmts'],
+	[['generation', 'generate'], 'gen'],
+	[['generations', 'generates'], 'gens'],
 	['image', 'img'],
 	['images', 'imgs'],
 	[['initialise', 'initialised', 'initialises', 'initialising', 'initialisation', 'initialize', 'initialized', 'initializes', 'initializing', 'initialization'], 'init'],
@@ -41,6 +51,8 @@ export const IDENTIFIER_REPLACEMENTS = replacementMap([
 	['members', 'mems'],
 	[['organization', 'organisation'], 'org'],
 	[['organizations', 'organisations'], 'orgs'],
+	['operation', 'op'],
+	['operations', 'ops'],
 	['option', 'opt'],
 	['options', 'opts'],
 	['parameter', 'param'],
@@ -204,17 +216,17 @@ export function renameIdentifier(name: string, kind: RenameKind = {}): string {
 
 /**
  *
- * @param node
+ * @param n
  * @returns
  */
-function callbackKind(node: ts.Identifier): RenameKind | undefined {
-	const param = ts.findAncestor(node, ts.isParameter);
+function callbackKind(n: ts.Identifier): RenameKind | undefined {
+	const param = ts.findAncestor(n, ts.isParameter);
 	if (!param || (!ts.isArrowFunction(param.parent) && !ts.isFunctionExpression(param.parent))) return undefined;
 	const callback = param.parent;
 	const call = callback.parent;
 	if (!ts.isCallExpression(call) || !call.arguments.includes(callback)) return undefined;
-	const expression = call.expression;
-	if (!ts.isPropertyAccessExpression(expression) || !CALLBACK_METHODS.has(expression.name.text)) return undefined;
+	const expr = call.expression;
+	if (!ts.isPropertyAccessExpression(expr) || !CALLBACK_METHODS.has(expr.name.text)) return undefined;
 	const declarations: ts.Identifier[] = [];
 	const collectBinding = (name: ts.BindingName): void => {
 		if (ts.isIdentifier(name)) declarations.push(name);
@@ -229,7 +241,7 @@ function callbackKind(node: ts.Identifier): RenameKind | undefined {
 	};
 	collect(callback);
 	for (const declaration of declarations) {
-		if (declaration === node) return { callback: true, numericIndex: callback.parameters.indexOf(param) === 1 && node.text === 'index', reserved: [...reserved] };
+		if (declaration === n) return { callback: true, numericIndex: callback.parameters.indexOf(param) === 1 && n.text === 'index', reserved: [...reserved] };
 		const declarationParam = ts.findAncestor(declaration, ts.isParameter);
 		reserved.add(
 			renameIdentifier(declaration.text, {
@@ -248,8 +260,8 @@ export function isCallbackDeclaration(node: ts.Identifier): boolean {
 }
 
 /** Returns the context-aware concise suggestion for one repository-owned declaration. */
-export function renameDeclaration(node: ts.Identifier): string {
-	return renameIdentifier(node.text, callbackKind(node));
+export function renameDeclaration(n: ts.Identifier): string {
+	return renameIdentifier(n.text, callbackKind(n));
 }
 
 /**
@@ -294,23 +306,23 @@ export function isApprovedIdentifier(name: string, kind: RenameKind = {}): boole
 }
 
 /** Returns whether an identifier declares a repository-owned symbol safe to rename with all references. */
-export function isRenamableDeclaration(node: ts.Identifier): boolean {
-	const parent = node.parent;
-	const declaration = ts.findAncestor(parent, (ancestor): ancestor is ts.VariableDeclaration | ts.ParameterDeclaration => ts.isVariableDeclaration(ancestor) || ts.isParameter(ancestor));
-	const variableStatement =
+export function isRenamableDeclaration(n: ts.Identifier): boolean {
+	const p = n.parent;
+	const declaration = ts.findAncestor(p, (a): a is ts.VariableDeclaration | ts.ParameterDeclaration => ts.isVariableDeclaration(a) || ts.isParameter(a));
+	const varStatement =
 		declaration && ts.isVariableDeclaration(declaration) && ts.isVariableDeclarationList(declaration.parent) && ts.isVariableStatement(declaration.parent.parent)
 			? declaration.parent.parent
 			: undefined;
 	return (
-		(ts.isVariableDeclaration(parent) && parent.name === node && !variableStatement?.modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword)) ||
-		(ts.isParameter(parent) && parent.name === node) ||
-		(ts.isBindingElement(parent) && parent.name === node && !!declaration && !variableStatement?.modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword)) ||
-		(ts.isFunctionDeclaration(parent) && parent.name === node && !parent.modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword)) ||
-		(ts.isFunctionExpression(parent) && parent.name === node) ||
-		(ts.isClassDeclaration(parent) && parent.name === node && !parent.modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword)) ||
-		(ts.isClassExpression(parent) && parent.name === node) ||
-		(ts.isInterfaceDeclaration(parent) && parent.name === node && !parent.modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword)) ||
-		(ts.isTypeAliasDeclaration(parent) && parent.name === node && !parent.modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword))
+		(ts.isVariableDeclaration(p) && p.name === n && !varStatement?.modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword)) ||
+		(ts.isParameter(p) && p.name === n) ||
+		(ts.isBindingElement(p) && p.name === n && !!declaration && !varStatement?.modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword)) ||
+		(ts.isFunctionDeclaration(p) && p.name === n && !p.modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword)) ||
+		(ts.isFunctionExpression(p) && p.name === n) ||
+		(ts.isClassDeclaration(p) && p.name === n && !p.modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword)) ||
+		(ts.isClassExpression(p) && p.name === n) ||
+		(ts.isInterfaceDeclaration(p) && p.name === n && !p.modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword)) ||
+		(ts.isTypeAliasDeclaration(p) && p.name === n && !p.modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword))
 	);
 }
 
@@ -326,23 +338,22 @@ export function namingFindings(cfg: QualityConfig): NamingFinding[] {
 		);
 		const declaredNames = new Set<string>();
 		const proposalCounts = new Map<string, number>();
-		const collect = (node: ts.Node): void => {
-			if (ts.isIdentifier(node) && isRenamableDeclaration(node)) {
-				declaredNames.add(node.text);
-				const suggestion = renameDeclaration(node);
-				if (!node.text.startsWith('_') && suggestion !== node.text && !isCallbackDeclaration(node)) proposalCounts.set(suggestion, (proposalCounts.get(suggestion) ?? 0) + 1);
+		const collect = (n: ts.Node): void => {
+			if (ts.isIdentifier(n) && isRenamableDeclaration(n)) {
+				declaredNames.add(n.text);
+				const suggestion = renameDeclaration(n);
+				if (!n.text.startsWith('_') && suggestion !== n.text && !isCallbackDeclaration(n)) proposalCounts.set(suggestion, (proposalCounts.get(suggestion) ?? 0) + 1);
 			}
-			ts.forEachChild(node, collect);
+			ts.forEachChild(n, collect);
 		};
 		collect(file);
-		const inspect = (node: ts.Node): void => {
-			if (ts.isIdentifier(node) && isRenamableDeclaration(node) && !node.text.startsWith('_') && !protectedNames.has(node.text) && !exportedNames.has(node.text)) {
-				const suggestion = renameDeclaration(node);
-				if (!isCallbackDeclaration(node) && (declaredNames.has(suggestion) || (proposalCounts.get(suggestion) ?? 0) > 1)) return;
-				if (suggestion !== node.text)
-					findings.push({ file: displayPath(cfg, fileName), name: node.text, suggestion, severity: hasPrefixReplacement(node.text) ? 'warning' : 'error', start: node.getStart(file) });
+		const inspect = (n: ts.Node): void => {
+			if (ts.isIdentifier(n) && isRenamableDeclaration(n) && !n.text.startsWith('_') && !protectedNames.has(n.text) && !exportedNames.has(n.text)) {
+				const suggestion = renameDeclaration(n);
+				if (!isCallbackDeclaration(n) && (declaredNames.has(suggestion) || (proposalCounts.get(suggestion) ?? 0) > 1)) return;
+				if (suggestion !== n.text) findings.push({ file: displayPath(cfg, fileName), name: n.text, suggestion, severity: hasPrefixReplacement(n.text) ? 'warning' : 'error', start: n.getStart(file) });
 			}
-			ts.forEachChild(node, inspect);
+			ts.forEachChild(n, inspect);
 		};
 		inspect(file);
 	}

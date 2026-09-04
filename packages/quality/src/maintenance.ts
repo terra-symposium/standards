@@ -224,17 +224,17 @@ function generatedFunctionDoc(node: ts.FunctionDeclaration, parsed: ts.SourceFil
 
 /**
  *
- * @param node
+ * @param n
  * @param parsed
  * @param src
  * @param eol
  * @returns
  */
-function statementText(node: ts.Statement, parsed: ts.SourceFile, src: string, eol: string): string {
-	const leading = src.slice(node.getFullStart(), node.getStart(parsed)).trim();
-	const text = src.slice(node.getStart(parsed), node.end);
-	if (!ts.isFunctionDeclaration(node)) return [leading, text].filter(Boolean).join(eol);
-	const generated = generatedFunctionDoc(node, parsed, eol);
+function statementText(n: ts.Statement, parsed: ts.SourceFile, src: string, eol: string): string {
+	const leading = src.slice(n.getFullStart(), n.getStart(parsed)).trim();
+	const text = src.slice(n.getStart(parsed), n.end);
+	if (!ts.isFunctionDeclaration(n)) return [leading, text].filter(Boolean).join(eol);
+	const generated = generatedFunctionDoc(n, parsed, eol);
 	const generatedPattern = /\/\*\*\r?\n \*\r?\n(?: \* @param [^\r\n]+\r?\n)* \* @returns\r?\n \*\//;
 	if (generatedPattern.test(leading)) return [leading.replace(generatedPattern, generated), text].filter(Boolean).join(eol);
 	if (/\/\*\*/.test(leading)) return [leading, text].filter(Boolean).join(eol);
@@ -248,12 +248,12 @@ function organizeSrcSections(src: string, fileName: string, eol: string): string
 	const imports = parsed.statements.filter(ts.isImportDeclaration);
 	if (!imports.length) return src;
 	const lastImport = imports.at(-1) as ts.ImportDeclaration;
-	const statements = parsed.statements.filter((node) => !ts.isImportDeclaration(node) && node.getStart(parsed) >= lastImport.end);
+	const statements = parsed.statements.filter((n) => !ts.isImportDeclaration(n) && n.getStart(parsed) >= lastImport.end);
 	const groups: Record<SrcGroup, string[]> = { CONFIG: [], HELPERS: [] };
 	const remaining: string[] = [];
-	for (const node of statements) {
-		const text = statementText(node, parsed, withoutManagedSections, eol);
-		const group = srcGroup(node);
+	for (const n of statements) {
+		const text = statementText(n, parsed, withoutManagedSections, eol);
+		const group = srcGroup(n);
 		if (group) groups[group].push(text);
 		else remaining.push(text);
 	}

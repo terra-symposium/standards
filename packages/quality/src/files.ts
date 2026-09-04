@@ -18,26 +18,26 @@ HELPERS
 //////////////////////////////////////////////////*/
 /**
  *
- * @param config
+ * @param cfg
  * @returns
  */
-export function sourceFiles(config: QualityConfig): string[] {
-	const roots = [...config.sourceRoots, ...(config.includeRoots ?? [])];
-	const extensions = new Set(config.extensions);
-	const skipped = new Set(config.skippedDirectories ?? []);
+export function sourceFiles(cfg: QualityConfig): string[] {
+	const roots = [...cfg.sourceRoots, ...(cfg.includeRoots ?? [])];
+	const exts = new Set(cfg.extensions);
+	const skipped = new Set(cfg.skippedDirectories ?? []);
 	const files: string[] = [];
-	const walk = (directory: string): void => {
-		if (!existsSync(directory)) return;
-		if (statSync(directory).isFile()) {
-			if (extensions.has(directory.slice(directory.lastIndexOf('.'))) && !config.skippedFiles?.includes(directory)) files.push(directory);
+	const walk = (dir: string): void => {
+		if (!existsSync(dir)) return;
+		if (statSync(dir).isFile()) {
+			if (exts.has(dir.slice(dir.lastIndexOf('.'))) && !cfg.skippedFiles?.includes(dir)) files.push(dir);
 			return;
 		}
-		for (const entry of readdirSync(directory, { withFileTypes: true })) {
-			if (entry.isDirectory()) {
-				if (!skipped.has(entry.name)) walk(join(directory, entry.name));
+		for (const e of readdirSync(dir, { withFileTypes: true })) {
+			if (e.isDirectory()) {
+				if (!skipped.has(e.name)) walk(join(dir, e.name));
 				continue;
 			}
-			if (extensions.has(entry.name.slice(entry.name.lastIndexOf('.'))) && !config.skippedFiles?.includes(join(directory, entry.name))) files.push(join(directory, entry.name));
+			if (exts.has(e.name.slice(e.name.lastIndexOf('.'))) && !cfg.skippedFiles?.includes(join(dir, e.name))) files.push(join(dir, e.name));
 		}
 	};
 	for (const root of roots) walk(root);
@@ -45,15 +45,15 @@ export function sourceFiles(config: QualityConfig): string[] {
 }
 
 /** Returns configured source files changed in the working tree, including untracked files. */
-export function workingSourceFiles(config: QualityConfig): string[] {
+export function workingSourceFiles(cfg: QualityConfig): string[] {
 	const changed = new Set(
-		execFileSync('git', ['diff', '--name-only', '--diff-filter=ACMR'], { cwd: config.root, encoding: 'utf8' })
-			.concat(execFileSync('git', ['ls-files', '--others', '--exclude-standard'], { cwd: config.root, encoding: 'utf8' }))
+		execFileSync('git', ['diff', '--name-only', '--diff-filter=ACMR'], { cwd: cfg.root, encoding: 'utf8' })
+			.concat(execFileSync('git', ['ls-files', '--others', '--exclude-standard'], { cwd: cfg.root, encoding: 'utf8' }))
 			.split('\n')
 			.filter(Boolean)
-			.map((p) => join(config.root, p)),
+			.map((p) => join(cfg.root, p)),
 	);
-	return sourceFiles(config).filter((file) => changed.has(file));
+	return sourceFiles(cfg).filter((file) => changed.has(file));
 }
 
 /**

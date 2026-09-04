@@ -415,6 +415,21 @@ test('maintenance does not normalize section-shaped text inside templates', () =
 	assert.ok(readFileSync(file, 'utf8').includes(`\`${literal}\``));
 });
 
+test('format applies maintenance before Prettier and is idempotent', () => {
+	const root = mkdtempSync(join(tmpdir(), 'terra-quality-format-order-'));
+	mkdirSync(join(root, 'src'));
+	const file = join(root, 'src', 'main.ts');
+	writeFileSync(file, "import { readFileSync } from 'node:fs';\n\nconst value={active:true};\n");
+	const prettier = fileURLToPath(new URL('../../../node_modules/.bin/prettier', import.meta.url));
+	const config = createQualityConfig({ root, sourceRoots: ['src'], extensions: ['.ts'], tools: { prettier } });
+	runQualityCli(config, ['format', '--all']);
+	const first = readFileSync(file, 'utf8');
+	assert.match(first, /\/\/ API\nimport/);
+	assert.match(first, /CONFIG\n\/{10,}\*\/\nconst value/);
+	runQualityCli(config, ['format', '--all']);
+	assert.equal(readFileSync(file, 'utf8'), first);
+});
+
 test('protects long one-line imports from Prettier wrapping', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-'));
 	const file = join(root, 'main.ts');
@@ -663,6 +678,16 @@ test('naming refuses file-level destination collisions', () => {
 	const config = createQualityConfig({ root, sourceRoots: ['src'], extensions: ['.ts'] });
 	runQualityCli(config, ['naming', '--all']);
 	assert.equal(readFileSync(file, 'utf8'), src);
+});
+
+test('naming keeps distinct aliases for adjacent parameters', () => {
+	const root = mkdtempSync(join(tmpdir(), 'terra-quality-parameter-collisions-'));
+	mkdirSync(join(root, 'src'));
+	const file = join(root, 'src', 'main.ts');
+	writeFileSync(file, 'function run(config: object, command: string) { return [config, command]; }\nvoid run;\n');
+	const config = createQualityConfig({ root, sourceRoots: ['src'], extensions: ['.ts'] });
+	runQualityCli(config, ['naming', '--all']);
+	assert.equal(readFileSync(file, 'utf8'), 'function run(cfg: object, cmd: string) { return [cfg, cmd]; }\nvoid run;\n');
 });
 
 test('naming ignores external types, JSX attributes, properties, and exported contracts', () => {

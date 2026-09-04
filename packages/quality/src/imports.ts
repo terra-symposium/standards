@@ -69,7 +69,7 @@ export function checkImports(cfg: QualityConfig): ImportFailure[] {
 	for (const importer of sourceFiles(cfg)) {
 		for (const specifier of specifiers(importer)) {
 			if (cfg.externalPrefixes?.some((prefix) => specifier.startsWith(prefix))) continue;
-			if (!specifier.startsWith('.') && !Object.keys(cfg.aliases ?? {}).some((prefix) => specifier.startsWith(prefix))) continue;
+			if (!specifier.startsWith('.') && !Object.keys(cfg.aliases ?? {}).some((p) => specifier.startsWith(p))) continue;
 			if (specifier.startsWith('.') && extname(specifier) && !MODULE_EXTS.includes(extname(specifier))) continue;
 			if (!resolveImport(specifier, importer, cfg)) failures.push({ importer: displayPath(cfg, importer), specifier });
 		}
