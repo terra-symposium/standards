@@ -15,7 +15,6 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
-
 test('resolves aliases and extensionless relative imports', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-'));
 	mkdirSync(join(root, 'src'), { recursive: true });
@@ -24,7 +23,6 @@ test('resolves aliases and extensionless relative imports', () => {
 	const cfg = createQualityConfig({ root, sourceRoots: ['src'], extensions: ['.ts'], aliases: { '@/': 'src/' } });
 	assert.deepEqual(checkImports(cfg), []);
 });
-
 test('quality accepts individual changed files as scoped source roots', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-file-root-'));
 	mkdirSync(join(root, 'src'));
@@ -33,7 +31,6 @@ test('quality accepts individual changed files as scoped source roots', () => {
 	const cfg = createQualityConfig({ root, sourceRoots: [file], extensions: ['.ts'] });
 	assert.deepEqual(sourceFiles(cfg), [file]);
 });
-
 test('reports concise-name drift without changing source', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-'));
 	mkdirSync(join(root, 'src'), { recursive: true });
@@ -41,7 +38,6 @@ test('reports concise-name drift without changing source', () => {
 	const cfg = createQualityConfig({ root, sourceRoots: ['src'], extensions: ['.ts'] });
 	assert.equal(namingFindings(cfg)[0].suggestion, 'org');
 });
-
 test('renames requested words across casing, separators, compounds, plurals, and inflections', () => {
 	const cases = {
 		error: 'err',
@@ -78,14 +74,12 @@ test('renames requested words across casing, separators, compounds, plurals, and
 	};
 	for (const [name, expected] of Object.entries(cases)) assert.equal(renameIdentifier(name), expected, name);
 });
-
 test('does not rename substrings, protected platform names, or underscore placeholders', () => {
 	for (const name of ['terror', 'deformat', 'repositoryFactory', 'FormData', 'NextResponse', '_']) {
 		const expected = name === 'repositoryFactory' ? 'repoFactory' : name;
 		assert.equal(renameIdentifier(name), expected, name);
 	}
 });
-
 test('does not collapse comment-only blocks before else', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-'));
 	const file = join(root, 'main.ts');
@@ -93,7 +87,6 @@ test('does not collapse comment-only blocks before else', () => {
 	assert.equal(collapseInlineIfs(file), false);
 	assert.equal(readFileSync(file, 'utf8'), 'if (ok) { /* keep this comment */ } else { fail(); }\n');
 });
-
 test('collapses multiline object literals, type literals, mapped types, and interfaces', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-collapse-'));
 	const file = join(root, 'main.ts');
@@ -125,7 +118,6 @@ interface Contract {
 	);
 	assert.equal(collapseTypesAndObjects(file), false);
 });
-
 test('collapse preserves comments and whitespace inside strings, templates, and regex literals', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-collapse-'));
 	const file = join(root, 'main.ts');
@@ -159,7 +151,6 @@ third  fourth\`, url: 'https://example.com/a  b', };
 `,
 	);
 });
-
 test('collapse handles CRLF and ignores unsupported files and already-inline constructs', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-collapse-'));
 	const tsFile = join(root, 'main.ts');
@@ -170,7 +161,6 @@ test('collapse handles CRLF and ignores unsupported files and already-inline con
 	assert.equal(readFileSync(tsFile, 'utf8'), 'const inline = { ok: true };\r\nconst wrapped = { value: 1, };\r\n');
 	assert.equal(collapseTypesAndObjects(jsonFile), false);
 });
-
 test('format collapses objects before invoking Prettier', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-format-order-'));
 	const srcRoot = join(root, 'src');
@@ -193,7 +183,6 @@ writeFileSync(${JSON.stringify(marker)}, 'ok');
 	runQualityCli(cfg, ['format', '--all']);
 	assert.equal(readFileSync(marker, 'utf8'), 'ok');
 });
-
 test('Prettier keeps short objects and types inline while wrapping constructs over print width', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-prettier-wrap-'));
 	mkdirSync(join(root, 'src'));
@@ -224,7 +213,6 @@ void [short, long];
 	assert.match(result, /type Short = \{ alpha: boolean; beta: boolean \};/);
 	assert.match(result, /const long = \{\n/);
 });
-
 test('maintenance adds headers and grouped sorted imports', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-'));
 	mkdirSync(join(root, 'src'), { recursive: true });
@@ -264,7 +252,6 @@ void alpha; void beta;
 	assert.ok(src.endsWith('\n') && !src.endsWith('\n\n'));
 	assert.equal(maintainSourceFile(root, file), false);
 });
-
 test('maintenance removes duplicate file headers and preserves a blank after section fences', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-duplicate-header-'));
 	const file = join(root, 'src.ts');
@@ -296,7 +283,23 @@ function read() { return fs.readFileSync('/dev/null'); }
 	assert.match(src, /\/{10,}\*\/\n\n\/\*\*/);
 	assert.equal(maintainSourceFile(root, file), false);
 });
+test('maintenance removes unauthorized blank lines inside functions', () => {
+	const root = mkdtempSync(join(tmpdir(), 'terra-quality-whitespace-'));
+	const file = join(root, 'main.ts');
+	writeFileSync(
+		file,
+		`import fs from 'node:fs';
+function read(path: string) {
+  const value = fs.readFileSync(path, 'utf8');
 
+  return value.trim();
+}
+`,
+	);
+	maintainSourceFile(root, file);
+	const src = readFileSync(file, 'utf8');
+	assert.doesNotMatch(src, /readFileSync\(path, 'utf8'\);\n\n/);
+});
 test('maintenance groups top-level consts and types as config and functions as helpers', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-sections-'));
 	const file = join(root, 'main.ts');
@@ -352,7 +355,6 @@ void [Service, runtime, OPEN];
 	assert.equal(src.match(/\nCOMPONENTS\n/g)?.length ?? 0, 0);
 	assert.equal(maintainSourceFile(root, file), false);
 });
-
 test('maintenance does not interpret section-shaped string content as managed headers', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-sections-'));
 	const file = join(root, 'main.ts');
@@ -362,7 +364,6 @@ test('maintenance does not interpret section-shaped string content as managed he
 	assert.ok(readFileSync(file, 'utf8').includes(`\`${fence}\``));
 	assert.equal(maintainSourceFile(root, file), false);
 });
-
 test('maintenance generates blank TSDoc parameter and return tags for undocumented helpers', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-tsdoc-'));
 	const file = join(root, 'main.ts');
@@ -386,7 +387,6 @@ function empty(enabled: boolean): void { void enabled; }
 	assert.match(src, /\/\*\*\n \*\n \* @param enabled\n \*\n \* @return\n \*\//);
 	assert.equal(maintainSourceFile(root, file), false);
 });
-
 test('maintenance repairs TSDoc tags from the current function signature and preserves descriptions', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-tsdoc-'));
 	const file = join(root, 'main.ts');
@@ -401,7 +401,6 @@ test('maintenance repairs TSDoc tags from the current function signature and pre
 	assert.doesNotMatch(src, /wrongName/);
 	assert.equal(maintainSourceFile(root, file), false);
 });
-
 test('maintenance preserves managed-looking sections in files without imports', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-sections-'));
 	const file = join(root, 'main.ts');
@@ -413,7 +412,6 @@ const VALUE = true;
 	assert.equal(maintainSourceFile(root, file), false);
 	assert.equal(readFileSync(file, 'utf8'), src);
 });
-
 test('maintenance normalizes section, group, and line-comment whitespace without duplicate empty sections', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-comment-layout-'));
 	const file = join(root, 'main.ts');
@@ -453,7 +451,6 @@ void component;
 	assert.doesNotMatch(src, /\/\/ (?:API|COMPONENTS|DATA|TYPES|MUTATION|VALIDATION)\n\n/);
 	assert.equal(maintainSourceFile(root, file), false);
 });
-
 test('maintenance does not normalize section-shaped text inside templates', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-comment-layout-'));
 	const file = join(root, 'main.ts');
@@ -462,7 +459,6 @@ test('maintenance does not normalize section-shaped text inside templates', () =
 	maintainSourceFile(root, file);
 	assert.ok(readFileSync(file, 'utf8').includes(`\`${literal}\``));
 });
-
 test('format applies maintenance before Prettier and is idempotent', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-format-order-'));
 	mkdirSync(join(root, 'src'));
@@ -477,7 +473,6 @@ test('format applies maintenance before Prettier and is idempotent', () => {
 	runQualityCli(cfg, ['format', '--all']);
 	assert.equal(readFileSync(file, 'utf8'), first);
 });
-
 test('protects long one-line imports from Prettier wrapping', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-'));
 	const file = join(root, 'main.ts');
@@ -487,7 +482,6 @@ test('protects long one-line imports from Prettier wrapping', () => {
 	assert.equal(readFileSync(file, 'utf8'), `// prettier-ignore\n${src}`);
 	assert.equal(protectLongImports(file, 80), false);
 });
-
 test('domain runs one configured quality command', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-'));
 	const marker = join(root, 'marker.txt');
@@ -500,7 +494,6 @@ test('domain runs one configured quality command', () => {
 	runQualityCli(cfg, ['domain', 'fixture', '--all']);
 	assert.equal(readFileSync(marker, 'utf8'), 'ok');
 });
-
 test('naming supports warning-only and automatic-fix modes', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-'));
 	mkdirSync(join(root, 'src'), { recursive: true });
@@ -513,7 +506,6 @@ test('naming supports warning-only and automatic-fix modes', () => {
 	runQualityCli(cfg, ['naming', '--all']);
 	assert.equal(readFileSync(file, 'utf8'), 'const org = true;\nconst genPattern = /ok/;\nexport const result = [org, genPattern];\n');
 });
-
 test('naming applies whole-word image aliases and prefix-only state aliases', () => {
 	assert.equal(renameIdentifier('image'), 'img');
 	assert.equal(renameIdentifier('Image'), 'Img');
@@ -530,7 +522,6 @@ test('naming applies whole-word image aliases and prefix-only state aliases', ()
 	assert.equal(renameIdentifier('isClean'), 'isClean');
 	assert.equal(renameIdentifier('isSafe'), 'isSafe');
 });
-
 test('naming automatically fixes local declarations in Astro frontmatter', () => {
 	const root = mkdtempSync(join(tmpdir(), 'quality-naming-astro-'));
 	mkdirSync(join(root, 'src'));
@@ -543,7 +534,6 @@ test('naming automatically fixes local declarations in Astro frontmatter', () =>
 	assert.match(readFileSync(join(root, 'src', 'Page.astro'), 'utf8'), /<p>\{err\.message\}<\/p>/);
 	assert.deepEqual(namingFindings(cfg), []);
 });
-
 test('naming preserves shorthand property keys while renaming their values', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-'));
 	mkdirSync(join(root, 'src'), { recursive: true });
@@ -553,7 +543,6 @@ test('naming preserves shorthand property keys while renaming their values', () 
 	runQualityCli(cfg, ['naming', '--all']);
 	assert.equal(readFileSync(file, 'utf8'), 'function result(err: Error) { return { error: err }; }\nvoid result;\n');
 });
-
 test('naming preserves call punctuation when expanding a shorthand parameter', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-shorthand-param-'));
 	mkdirSync(join(root, 'src'));
@@ -563,7 +552,6 @@ test('naming preserves call punctuation when expanding a shorthand parameter', (
 	runQualityCli(cfg, ['naming', '--all']);
 	assert.equal(readFileSync(file, 'utf8'), 'function result({ request: req }: { request: Request }) { return handle(req, true); }\nvoid result;\n');
 });
-
 test('naming shortens map callback parameters and all symbol references', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-callbacks-'));
 	mkdirSync(join(root, 'src'));
@@ -574,7 +562,6 @@ test('naming shortens map callback parameters and all symbol references', () => 
 	assert.equal(readFileSync(file, 'utf8'), 'const output = input.map((n, i) => ({ node: n, index: i }));\nvoid output;\n');
 	assert.deepEqual(namingFindings(cfg), []);
 });
-
 test('naming reduces arbitrary map callback parameters to free initials', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-callback-initials-'));
 	mkdirSync(join(root, 'src'));
@@ -584,7 +571,6 @@ test('naming reduces arbitrary map callback parameters to free initials', () => 
 	runQualityCli(cfg, ['naming', '--all']);
 	assert.equal(readFileSync(file, 'utf8'), 'const output = content.map((l) => (l ? ` * ${l}` : " *"));\nvoid output;\n');
 });
-
 test('naming shortens TypeScript traversal callbacks with conflict checks', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-callbacks-'));
 	mkdirSync(join(root, 'src'));
@@ -594,7 +580,6 @@ test('naming shortens TypeScript traversal callbacks with conflict checks', () =
 	runQualityCli(cfg, ['naming', '--all']);
 	assert.equal(readFileSync(file, 'utf8'), 'ts.forEachChild(file, (n) => { if (ts.isIdentifier(n)) output.push(n.text); });\n');
 });
-
 test('naming chooses a free map callback alias when preferred names conflict', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-callbacks-'));
 	mkdirSync(join(root, 'src'));
@@ -604,7 +589,6 @@ test('naming chooses a free map callback alias when preferred names conflict', (
 	runQualityCli(cfg, ['naming', '--all']);
 	assert.equal(readFileSync(file, 'utf8'), 'const n = 1;\nconst v = 2;\nconst output = input.map((r) => r + n + v);\nvoid output;\n');
 });
-
 test('naming reuses concise aliases safely across independent map scopes', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-callbacks-'));
 	mkdirSync(join(root, 'src'));
@@ -614,7 +598,6 @@ test('naming reuses concise aliases safely across independent map scopes', () =>
 	runQualityCli(cfg, ['naming', '--all']);
 	assert.equal(readFileSync(file, 'utf8'), 'const first = input.map((n) => n.id);\nconst second = input.flatMap((n) => n.children);\nvoid [first, second];\n');
 });
-
 test('naming preserves object keys but not positional syntax in destructured map parameters', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-callbacks-'));
 	mkdirSync(join(root, 'src'));
@@ -624,7 +607,6 @@ test('naming preserves object keys but not positional syntax in destructured map
 	runQualityCli(cfg, ['naming', '--all']);
 	assert.equal(readFileSync(file, 'utf8'), 'const first = input.map(({ node: n }) => n.id);\nconst second = pairs.map(([n, i]) => n[i]);\nvoid [first, second];\n');
 });
-
 test('naming allocates distinct aliases across one destructured callback parameter', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-callback-collisions-'));
 	mkdirSync(join(root, 'src'));
@@ -634,7 +616,6 @@ test('naming allocates distinct aliases across one destructured callback paramet
 	runQualityCli(cfg, ['naming', '--all']);
 	assert.equal(readFileSync(file, 'utf8'), 'const output = pairs.map(([r, v]) => v(r));\nvoid output;\n');
 });
-
 test('callback renames do not alter unrelated JSDoc parameters with the same name', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-callbacks-'));
 	mkdirSync(join(root, 'src'));
@@ -644,7 +625,6 @@ test('callback renames do not alter unrelated JSDoc parameters with the same nam
 	runQualityCli(cfg, ['naming', '--all']);
 	assert.equal(readFileSync(file, 'utf8'), '/** @param name */\nfunction retain(name: string) { return name; }\nconst output = input.map((n) => n.id);\nvoid [retain, output];\n');
 });
-
 test('naming leaves node unchanged outside configured map callbacks', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-callbacks-'));
 	mkdirSync(join(root, 'src'));
@@ -655,7 +635,6 @@ test('naming leaves node unchanged outside configured map callbacks', () => {
 	runQualityCli(cfg, ['naming', '--all']);
 	assert.equal(readFileSync(file, 'utf8'), src);
 });
-
 test('naming fix mode leaves protected component paths unchanged', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-protected-path-'));
 	mkdirSync(join(root, 'src', 'components', 'ui'), { recursive: true });
@@ -666,7 +645,6 @@ test('naming fix mode leaves protected component paths unchanged', () => {
 	runQualityCli(cfg, ['naming', '--all']);
 	assert.equal(readFileSync(file, 'utf8'), src);
 });
-
 test('naming fixes PascalCase declarations, catch variables, and destructuring without changing property keys', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-naming-cases-'));
 	mkdirSync(join(root, 'src'));
@@ -693,7 +671,6 @@ void [articleErr, ErrBoundary];
 	);
 	assert.deepEqual(namingFindings(cfg), []);
 });
-
 test('naming preserves exported contracts and configurable protected identifiers', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-naming-protected-'));
 	mkdirSync(join(root, 'src'));
@@ -705,7 +682,6 @@ test('naming preserves exported contracts and configurable protected identifiers
 	assert.equal(readFileSync(file, 'utf8'), src);
 	assert.deepEqual(namingFindings(cfg), []);
 });
-
 test('naming updates JSDoc parameter tags with parameter declarations', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-'));
 	mkdirSync(join(root, 'src'), { recursive: true });
@@ -715,7 +691,6 @@ test('naming updates JSDoc parameter tags with parameter declarations', () => {
 	runQualityCli(cfg, ['naming', '--all']);
 	assert.equal(readFileSync(file, 'utf8'), '/** @param val - Input value. */\nfunction result(val: string) { return val; }\nvoid result;\n');
 });
-
 test('naming preserves explicitly unused underscore parameters', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-'));
 	mkdirSync(join(root, 'src'), { recursive: true });
@@ -727,7 +702,6 @@ test('naming preserves explicitly unused underscore parameters', () => {
 	assert.equal(readFileSync(file, 'utf8'), src);
 	assert.deepEqual(namingFindings(cfg), []);
 });
-
 test('naming refuses file-level destination collisions', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-'));
 	mkdirSync(join(root, 'src'), { recursive: true });
@@ -738,7 +712,6 @@ test('naming refuses file-level destination collisions', () => {
 	runQualityCli(cfg, ['naming', '--all']);
 	assert.equal(readFileSync(file, 'utf8'), src);
 });
-
 test('naming keeps distinct aliases for adjacent parameters', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-parameter-collisions-'));
 	mkdirSync(join(root, 'src'));
@@ -748,7 +721,6 @@ test('naming keeps distinct aliases for adjacent parameters', () => {
 	runQualityCli(cfg, ['naming', '--all']);
 	assert.equal(readFileSync(file, 'utf8'), 'function run(cfg: object, cmd: string) { return [cfg, cmd]; }\nvoid run;\n');
 });
-
 test('naming reuses aliases in sibling function scopes and updates their TSDoc', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-function-scopes-'));
 	mkdirSync(join(root, 'src'));
@@ -758,7 +730,6 @@ test('naming reuses aliases in sibling function scopes and updates their TSDoc',
 	runQualityCli(cfg, ['naming', '--all']);
 	assert.equal(readFileSync(file, 'utf8'), '/** @param cfg */\nexport function first(cfg: object) { return cfg; }\n/** @param cfg */\nexport function second(cfg: object) { return cfg; }\n');
 });
-
 test('naming ignores external types, JSX attributes, properties, and exported contracts', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-'));
 	mkdirSync(join(root, 'src'), { recursive: true });
@@ -769,7 +740,6 @@ test('naming ignores external types, JSX attributes, properties, and exported co
 	const cfg = createQualityConfig({ root, sourceRoots: ['src'], extensions: ['.tsx'] });
 	assert.deepEqual(namingFindings(cfg), []);
 });
-
 test('naming ignores declarations exported through an export list', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-'));
 	mkdirSync(join(root, 'src'), { recursive: true });

@@ -64,7 +64,6 @@ export function collapseTypesAndObjects(fileName: string): boolean {
 	const parsed = ts.createSourceFile(fileName, original, ts.ScriptTarget.Latest, true, scriptKind(fileName));
 	const langVariant = parsed.languageVariant;
 	const edits: { start: number; end: number; text: string }[] = [];
-
 	const collapse = (node: ts.Node, start: number, text: string): string | undefined => {
 		if (!/[\r\n]/.test(text)) return undefined;
 		const protectedRanges: { start: number; end: number }[] = [];
@@ -107,7 +106,6 @@ export function collapseTypesAndObjects(fileName: string): boolean {
 		}
 		return result;
 	};
-
 	const visit = (n: ts.Node): void => {
 		const span = candidateSpan(n, original);
 		if (span) {

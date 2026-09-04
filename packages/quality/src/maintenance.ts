@@ -184,7 +184,6 @@ function normCommentLayout(src: string, fileName: string, eol: string): string {
 			i = Math.max(-1, i - 2);
 		}
 	}
-
 	const out: string[] = [];
 	const pushBlank = (): void => {
 		if (out.length && out.at(-1) !== '') out.push('');
@@ -193,7 +192,11 @@ function normCommentLayout(src: string, fileName: string, eol: string): string {
 		const text = lines[i].text.replace(/[ \t]+$/, '');
 		const closesSection = sectionClose(i);
 		if (!text && !protectedLine(lines[i])) {
-			if (out.length && out.at(-1) !== '') out.push('');
+			const prev = out.at(-1) ?? '';
+			let next = i + 1;
+			while (next < lines.length && !lines[next].text.trim() && !protectedLine(lines[next])) next++;
+			const adjacentComment = /^\s*(?:\/\/|\/\*|\*\/|\*)/.test(prev) || (next < lines.length && /^\s*(?:\/\/|\/\*|\*\/|\*)/.test(lines[next].text));
+			if (adjacentComment && out.length && out.at(-1) !== '') out.push('');
 			continue;
 		}
 		if (sectionOpen(i)) pushBlank();
