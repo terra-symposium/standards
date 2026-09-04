@@ -13,7 +13,7 @@ import { sourceFiles, workingSourceFiles } from './files.js';
 import { checkImports } from './imports.js';
 import { collapseInlineIfs } from './inline-if.js';
 import { maintainSourceFile, protectLongImports } from './maintenance.js';
-import { isCallbackDeclaration, isRenamableDeclaration, namingFindings, renameDeclaration } from './naming.js';
+import { isCallbackDeclaration, isProtectedFilename, isProtectedPath, isRenamableDeclaration, namingFindings, renameDeclaration } from './naming.js';
 import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve, sep } from 'node:path';
@@ -185,7 +185,7 @@ function runDiffCheck(config: QualityConfig): void {
  * @returns
  */
 function fixNames(config: QualityConfig, all: boolean): void {
-	const allowed = new Set(filesFor(config, all));
+	const allowed = new Set(filesFor(config, all).filter((file) => !isProtectedPath(file) && !isProtectedFilename(file)));
 	const program = ts.createProgram({
 		rootNames: sourceFiles(config).filter((file) => /\.(?:(?:c|m)?(?:js|ts)x?|astro)$/.test(file)),
 		options: {

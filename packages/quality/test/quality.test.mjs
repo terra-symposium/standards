@@ -510,6 +510,17 @@ test('naming leaves node unchanged outside configured map callbacks', () => {
 	assert.equal(readFileSync(file, 'utf8'), src);
 });
 
+test('naming fix mode leaves protected component paths unchanged', () => {
+	const root = mkdtempSync(join(tmpdir(), 'terra-quality-protected-path-'));
+	mkdirSync(join(root, 'src', 'components', 'ui'), { recursive: true });
+	const file = join(root, 'src', 'components', 'ui', 'chart.tsx');
+	const src = 'const output = payload.map((item, index) => item[index]);\nvoid output;\n';
+	writeFileSync(file, src);
+	const config = createQualityConfig({ root, sourceRoots: ['src'], extensions: ['.tsx'] });
+	runQualityCli(config, ['naming', '--all']);
+	assert.equal(readFileSync(file, 'utf8'), src);
+});
+
 test('naming fixes PascalCase declarations, catch variables, and destructuring without changing property keys', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-naming-cases-'));
 	mkdirSync(join(root, 'src'));
