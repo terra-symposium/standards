@@ -296,7 +296,8 @@ function genFnDoc(node: ts.FunctionDeclaration, parsed: ts.SourceFile, eol: stri
 	const content = [...summary];
 	if (!content.length || content.at(-1) !== '') content.push('');
 	for (const name of params) content.push(...(paramBlocks.get(name) ?? [`@param ${name}`]));
-	content.push('', ...(returnBlock ?? ['@return']));
+	if (content.at(-1) !== '') content.push('');
+	content.push(...(returnBlock ?? ['@return']));
 	for (const block of otherBlocks) content.push('', ...block);
 	return ['/**', ...content.map((l) => (l ? ` * ${l}` : ' *')), ' */'].join(eol);
 }

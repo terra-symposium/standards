@@ -387,6 +387,16 @@ function empty(enabled: boolean): void { void enabled; }
 	assert.match(src, /\/\*\*\n \*\n \* @param enabled\n \*\n \* @return\n \*\//);
 	assert.equal(maintainSourceFile(root, file), false);
 });
+
+test('maintenance keeps a single blank line before return in summary-only TSDoc', () => {
+	const dir = mkdtempSync(join(tmpdir(), 'terra-quality-tsdoc-summary-'));
+	const file = join(dir, 'src.ts');
+	writeFileSync(file, "import fs from 'node:fs';\n/** Handles create client. */\nfunction createClient() { return fs.existsSync('.'); }\n");
+	maintainSourceFile(dir, file);
+	const src = readFileSync(file, 'utf8');
+	assert.ok(src.includes('/**\n * Handles create client.\n *\n * @return\n */\nfunction createClient'));
+	assert.doesNotMatch(src, /Handles create client\.\n \*\n \*\n \* @return/);
+});
 test('maintenance repairs TSDoc tags from the current function signature and preserves descriptions', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-tsdoc-'));
 	const file = join(root, 'main.ts');
