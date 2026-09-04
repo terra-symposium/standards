@@ -354,6 +354,9 @@ export function maintainSourceFile(root: string, fileName: string): boolean {
 	const eol = original.includes('\r\n') ? '\r\n' : '\n';
 	let src = original.replace(/^\uFEFF/, '').replace(/^\s+/, '');
 	const path = relative(root, fileName).split(sep).join('/');
+	const escapedPath = path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+	const duplicateHeader = new RegExp(`^(\\/\\*\\*\\r?\\n \\* ${escapedPath}\\r?\\n \\*\\/)(?:\\r?\\n)+\\1(?:\\r?\\n)+`);
+	src = src.replace(duplicateHeader, `$1${eol}${eol}`);
 	if (!src.startsWith('/**') && !src.startsWith('#!')) src = `/**${eol} * ${path}${eol} */${eol}${eol}${src}`;
 	const parsed = ts.createSourceFile(fileName, src, ts.ScriptTarget.Latest, true, srcKind(fileName));
 	const imports = parsed.statements.filter(ts.isImportDeclaration);

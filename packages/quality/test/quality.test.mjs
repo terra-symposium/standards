@@ -265,6 +265,38 @@ void alpha; void beta;
 	assert.equal(maintainSourceFile(root, file), false);
 });
 
+test('maintenance removes duplicate file headers and preserves a blank after section fences', () => {
+	const root = mkdtempSync(join(tmpdir(), 'terra-quality-duplicate-header-'));
+	const file = join(root, 'src.ts');
+	writeFileSync(
+		file,
+		`/**
+ * src.ts
+ */
+
+/**
+ * src.ts
+ */
+
+/*//////////////////////////////////////////////////
+IMPORTS
+//////////////////////////////////////////////////*/
+// API
+import fs from 'node:fs';
+
+/**
+ *
+ */
+function read() { return fs.readFileSync('/dev/null'); }
+`,
+	);
+	assert.equal(maintainSourceFile(root, file), true);
+	const src = readFileSync(file, 'utf8');
+	assert.equal(src.match(/\* src\.ts/g)?.length, 1);
+	assert.match(src, /\/{10,}\*\/\n\n\/\*\*/);
+	assert.equal(maintainSourceFile(root, file), false);
+});
+
 test('maintenance groups top-level consts and types as config and functions as helpers', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-sections-'));
 	const file = join(root, 'main.ts');
