@@ -186,7 +186,7 @@ export function callbackAlias(name: string, reserved: string[] = []): string {
  */
 export function renameIdentifier(name: string, kind: RenameKind = {}): string {
 	if (PROTECTED_IDENTIFIERS.has(name) || name === '_') return name;
-	if (kind.numericIndex && name === 'index') return 'i';
+	if (kind.numericIndex && name === 'index') return callbackAlias('item', kind.reserved);
 	if (kind.callback) return callbackAlias(name, kind.reserved);
 	const tokens = identifierTokens(name);
 	if (!tokens.some((token) => Object.hasOwn(IDENTIFIER_REPLACEMENTS, token.toLowerCase()) || Object.hasOwn(PREFIX_REPLACEMENTS, token.toLowerCase()))) return name;
@@ -216,13 +216,31 @@ function callbackKind(node: ts.Identifier): RenameKind | undefined {
 	if (!ts.isCallExpression(call) || !call.arguments.includes(callback)) return undefined;
 	const expression = call.expression;
 	if (!ts.isPropertyAccessExpression(expression) || !CALLBACK_METHODS.has(expression.name.text)) return undefined;
+	const declarations: ts.Identifier[] = [];
+	const collectBinding = (name: ts.BindingName): void => {
+		if (ts.isIdentifier(name)) declarations.push(name);
+		else for (const element of name.elements) if (ts.isBindingElement(element)) collectBinding(element.name);
+	};
+	for (const parameter of callback.parameters) collectBinding(parameter.name);
+	const declarationNames = new Set(declarations.map((d) => d.text));
 	const reserved = new Set<string>();
 	const collect = (child: ts.Node): void => {
-		if (ts.isIdentifier(child) && child !== node && child.text !== node.text) reserved.add(child.text);
+		if (ts.isIdentifier(child) && !declarationNames.has(child.text)) reserved.add(child.text);
 		ts.forEachChild(child, collect);
 	};
 	collect(callback);
-	return { callback: true, numericIndex: callback.parameters.indexOf(param) === 1 && node.text === 'index', reserved: [...reserved] };
+	for (const declaration of declarations) {
+		if (declaration === node) return { callback: true, numericIndex: callback.parameters.indexOf(param) === 1 && node.text === 'index', reserved: [...reserved] };
+		const declarationParam = ts.findAncestor(declaration, ts.isParameter);
+		reserved.add(
+			renameIdentifier(declaration.text, {
+				callback: true,
+				numericIndex: !!declarationParam && callback.parameters.indexOf(declarationParam) === 1 && declaration.text === 'index',
+				reserved: [...reserved],
+			}),
+		);
+	}
+	return undefined;
 }
 
 /** Returns whether a declaration belongs to a configured collection callback. */

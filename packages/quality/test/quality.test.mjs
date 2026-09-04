@@ -479,6 +479,16 @@ test('naming preserves object keys but not positional syntax in destructured map
 	assert.equal(readFileSync(file, 'utf8'), 'const first = input.map(({ node: n }) => n.id);\nconst second = pairs.map(([n, i]) => n[i]);\nvoid [first, second];\n');
 });
 
+test('naming allocates distinct aliases across one destructured callback parameter', () => {
+	const root = mkdtempSync(join(tmpdir(), 'terra-quality-callback-collisions-'));
+	mkdirSync(join(root, 'src'));
+	const file = join(root, 'src', 'main.ts');
+	writeFileSync(file, 'const output = pairs.map(([record, result]) => result(record));\nvoid output;\n');
+	const config = createQualityConfig({ root, sourceRoots: ['src'], extensions: ['.ts'] });
+	runQualityCli(config, ['naming', '--all']);
+	assert.equal(readFileSync(file, 'utf8'), 'const output = pairs.map(([r, v]) => v(r));\nvoid output;\n');
+});
+
 test('callback renames do not alter unrelated JSDoc parameters with the same name', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-callbacks-'));
 	mkdirSync(join(root, 'src'));
