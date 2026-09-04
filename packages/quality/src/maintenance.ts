@@ -217,7 +217,7 @@ function removeManagedSections(src: string, fileName: string): string {
  * @param eol
  * @returns
  */
-function generatedFunctionDoc(node: ts.FunctionDeclaration, parsed: ts.SourceFile, eol: string): string {
+function genFunctionDoc(node: ts.FunctionDeclaration, parsed: ts.SourceFile, eol: string): string {
 	const params = node.parameters.map((p, i) => (ts.isIdentifier(p.name) ? p.name.text : ts.isObjectBindingPattern(p.name) ? 'props' : `param${i + 1}`));
 	return ['/**', ' *', ...params.map((n) => ` * @param ${n}`), ' * @returns', ' */'].join(eol);
 }
@@ -234,11 +234,11 @@ function statementText(n: ts.Statement, parsed: ts.SourceFile, src: string, eol:
 	const leading = src.slice(n.getFullStart(), n.getStart(parsed)).trim();
 	const text = src.slice(n.getStart(parsed), n.end);
 	if (!ts.isFunctionDeclaration(n)) return [leading, text].filter(Boolean).join(eol);
-	const generated = generatedFunctionDoc(n, parsed, eol);
-	const generatedPattern = /\/\*\*\r?\n \*\r?\n(?: \* @param [^\r\n]+\r?\n)* \* @returns\r?\n \*\//;
-	if (generatedPattern.test(leading)) return [leading.replace(generatedPattern, generated), text].filter(Boolean).join(eol);
+	const gen = genFunctionDoc(n, parsed, eol);
+	const genPattern = /\/\*\*\r?\n \*\r?\n(?: \* @param [^\r\n]+\r?\n)* \* @returns\r?\n \*\//;
+	if (genPattern.test(leading)) return [leading.replace(genPattern, gen), text].filter(Boolean).join(eol);
 	if (/\/\*\*/.test(leading)) return [leading, text].filter(Boolean).join(eol);
-	return [leading, generated, text].filter(Boolean).join(eol);
+	return [leading, gen, text].filter(Boolean).join(eol);
 }
 
 /** Moves top-level configuration and helper declarations into canonical sections after imports. */

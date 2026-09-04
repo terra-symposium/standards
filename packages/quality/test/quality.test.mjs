@@ -400,6 +400,7 @@ void component;
 	assert.equal(src.match(/\nCOMPONENTS\n/g)?.length, 1);
 	assert.doesNotMatch(src, /HELPERS\n\/{10,}\*\/\n\n\/\*\/{10,}\nCOMPONENTS/);
 	assert.match(src, /nullableText = z\.string\(\)\.nullable\(\);\n\n\/\*\/{10,}/);
+	assert.doesNotMatch(src, /\/{10,}\*\/\n\n(?:\/\/|\S)/);
 	assert.match(src, /\/\/ MUTATION\n\tmutate\(now\);/);
 	assert.match(src, /mutate\(now\);\n\n\t\/\/ VALIDATION\n\tvalidate\(now\);/);
 	assert.doesNotMatch(src, /\/\/ (?:API|COMPONENTS|DATA|TYPES|MUTATION|VALIDATION)\n\n/);
@@ -457,13 +458,13 @@ test('naming supports warning-only and automatic-fix modes', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-'));
 	mkdirSync(join(root, 'src'), { recursive: true });
 	const file = join(root, 'src', 'main.ts');
-	const src = 'const organization = true;\nexport const result = organization;\n';
+	const src = 'const organization = true;\nconst generatedPattern = /ok/;\nexport const result = [organization, generatedPattern];\n';
 	writeFileSync(file, src);
 	const config = createQualityConfig({ root, sourceRoots: ['src'], extensions: ['.ts'] });
 	runQualityCli(config, ['naming', '--all', '--warn']);
 	assert.equal(readFileSync(file, 'utf8'), src);
 	runQualityCli(config, ['naming', '--all']);
-	assert.equal(readFileSync(file, 'utf8'), 'const org = true;\nexport const result = org;\n');
+	assert.equal(readFileSync(file, 'utf8'), 'const org = true;\nconst genPattern = /ok/;\nexport const result = [org, genPattern];\n');
 });
 
 test('naming applies whole-word image aliases and prefix-only state aliases', () => {
@@ -476,6 +477,7 @@ test('naming applies whole-word image aliases and prefix-only state aliases', ()
 	assert.equal(renameIdentifier('nextCard'), 'nCard');
 	assert.equal(renameIdentifier('cleanCard'), 'cCard');
 	assert.equal(renameIdentifier('safeCard'), 'sCard');
+	assert.equal(renameIdentifier('generatedPattern'), 'genPattern');
 	assert.equal(renameIdentifier('isActive'), 'isActive');
 	assert.equal(renameIdentifier('isNext'), 'isNext');
 	assert.equal(renameIdentifier('isClean'), 'isClean');

@@ -38,7 +38,7 @@ export const IDENTIFIER_REPLACEMENTS = replacementMap([
 	['formats', 'fmts'],
 	['formatter', 'fmt'],
 	['formatters', 'fmts'],
-	[['generation', 'generate'], 'gen'],
+	[['generation', 'generate', 'generated', 'generating'], 'gen'],
 	[['generations', 'generates'], 'gens'],
 	['image', 'img'],
 	['images', 'imgs'],
