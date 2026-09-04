@@ -211,10 +211,10 @@ function normCommentLayout(src: string, fileName: string, eol: string): string {
 	// Keep blank lines only when they explicitly separate comments/groups.
 	// This also removes stale whitespace inside function bodies while preserving
 	// spacing around TSDoc, line groups, and section fences.
-	const compact = out.filter((line, index) => {
+	const compact = out.filter((line, idx) => {
 		if (line !== '') return true;
-		const prev = out[index - 1] ?? '';
-		const following = out[index + 1] ?? '';
+		const prev = out[idx - 1] ?? '';
+		const following = out[idx + 1] ?? '';
 		const comment = (textVal: string): boolean => /^\s*(?:\/\/|\/\*|\*\/|\*)/.test(textVal);
 		return comment(prev) || comment(following);
 	});

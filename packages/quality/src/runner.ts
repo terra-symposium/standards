@@ -72,7 +72,7 @@ function run(cfg: QualityConfig, cmd: string, args: string[]): number {
  * @return
  */
 function batches<T>(vals: T[], size = 100): T[][] {
-	return Array.from({ length: Math.ceil(vals.length / size) }, (_, index) => vals.slice(index * size, (index + 1) * size));
+	return Array.from({ length: Math.ceil(vals.length / size) }, (_, idx) => vals.slice(idx * size, (idx + 1) * size));
 }
 
 /**
@@ -231,6 +231,7 @@ function fixNames(cfg: QualityConfig, all: boolean): void {
 	}
 	const replacements = new Map<ts.Symbol, string>();
 	const renameSafetyByScope = new Map<ts.Node, { declared: Set<string>; proposals: Map<string, number> }>();
+	const declaredByFile = new Map<string, Set<string>>();
 	for (const src of program.getSourceFiles()) {
 		if (!allowed.has(src.fileName)) continue;
 		const inspect = (n: ts.Node): void => {
@@ -238,6 +239,9 @@ function fixNames(cfg: QualityConfig, all: boolean): void {
 				const scope = declarationScope(n);
 				const safety = renameSafetyByScope.get(scope) ?? { declared: new Set<string>(), proposals: new Map<string, number>() };
 				safety.declared.add(n.text);
+				const fileDeclared = declaredByFile.get(src.fileName) ?? new Set<string>();
+				fileDeclared.add(n.text);
+				declaredByFile.set(src.fileName, fileDeclared);
 				if (!n.text.startsWith('_') && !protectedNames.has(n.text) && !hasInitShadow(n)) {
 					const suggestion = renameDeclaration(n);
 					if (suggestion !== n.text && !isCallbackDeclaration(n)) safety.proposals.set(suggestion, (safety.proposals.get(suggestion) ?? 0) + 1);
@@ -248,13 +252,20 @@ function fixNames(cfg: QualityConfig, all: boolean): void {
 		};
 		inspect(src);
 	}
+	const hasDescCollision = (scope: ts.Node, suggestion: string): boolean =>
+		[...renameSafetyByScope.entries()].some(([child, safety]) => child !== scope && child.getStart() >= scope.getStart() && child.end <= scope.end && safety.declared.has(suggestion));
 	for (const src of program.getSourceFiles()) {
 		if (!allowed.has(src.fileName)) continue;
 		const inspect = (node: ts.Node): void => {
 			if (ts.isIdentifier(node) && isRenamableDeclaration(node) && !node.text.startsWith('_') && !protectedNames.has(node.text) && !hasInitShadow(node)) {
 				const suggestion = renameDeclaration(node);
 				const safety = renameSafetyByScope.get(declarationScope(node));
-				if (!isCallbackDeclaration(node) && (safety?.declared.has(suggestion) || (safety?.proposals.get(suggestion) ?? 0) > 1)) return;
+				const fileDeclared = declaredByFile.get(src.fileName);
+				if (
+					!isCallbackDeclaration(node) &&
+					(safety?.declared.has(suggestion) || fileDeclared?.has(suggestion) || (safety?.proposals.get(suggestion) ?? 0) > 1 || hasDescCollision(declarationScope(node), suggestion))
+				)
+					return;
 				const symbol = suggestion === node.text ? undefined : identifierSymbol(node);
 				if (symbol && !exported.has(symbol)) replacements.set(symbol, suggestion);
 			}

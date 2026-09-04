@@ -43,8 +43,8 @@ function resolveImport(specifier: string, importer: string, cfg: QualityConfig):
 		for (const ext of MODULE_EXTS) {
 			const candidate = base + ext;
 			if (isFile(candidate)) return candidate;
-			const index = join(base, `index${ext}`);
-			if (isFile(index)) return index;
+			const idx = join(base, `index${ext}`);
+			if (isFile(idx)) return idx;
 		}
 	return null;
 }
