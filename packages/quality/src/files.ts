@@ -16,6 +16,15 @@ import { basename, join, relative } from 'node:path';
 
 import type { QualityConfig } from './config.js';
 
+/*//////////////////////////////////////////////////
+HELPERS
+//////////////////////////////////////////////////*/
+
+/**
+ *
+ * @param config
+ * @returns
+ */
 export function sourceFiles(config: QualityConfig): string[] {
 	const roots = [...config.sourceRoots, ...(config.includeRoots ?? [])];
 	const extensions = new Set(config.extensions);
@@ -38,27 +47,30 @@ export function sourceFiles(config: QualityConfig): string[] {
 /** Returns configured source files changed in the working tree, including untracked files. */
 export function workingSourceFiles(config: QualityConfig): string[] {
 	const changed = new Set(
-		execFileSync('git', ['diff', '--name-only', '--diff-filter=ACMR'], {
-			cwd: config.root,
-			encoding: 'utf8',
-		})
-			.concat(
-				execFileSync('git', ['ls-files', '--others', '--exclude-standard'], {
-					cwd: config.root,
-					encoding: 'utf8',
-				}),
-			)
+		execFileSync('git', ['diff', '--name-only', '--diff-filter=ACMR'], { cwd: config.root, encoding: 'utf8' })
+			.concat(execFileSync('git', ['ls-files', '--others', '--exclude-standard'], { cwd: config.root, encoding: 'utf8' }))
 			.split('\n')
 			.filter(Boolean)
-			.map((path) => join(config.root, path)),
+			.map((p) => join(config.root, p)),
 	);
 	return sourceFiles(config).filter((file) => changed.has(file));
 }
 
+/**
+ *
+ * @param config
+ * @param fileName
+ * @returns
+ */
 export function displayPath(config: QualityConfig, fileName: string): string {
 	return relative(config.root, fileName) || basename(fileName);
 }
 
+/**
+ *
+ * @param path
+ * @returns
+ */
 export function isFile(path: string): boolean {
 	try {
 		return statSync(path).isFile();

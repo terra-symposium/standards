@@ -17,8 +17,24 @@ import ts from 'typescript';
 
 import type { QualityConfig } from './config.js';
 
-const MODULE_EXTS = ['', '.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs', '.mts', '.cts', '.astro', '.mdx', '.json', '.css', '.scss', '.svg', '.png', '.jpg', '.jpeg', '.webp'];
+/*//////////////////////////////////////////////////
+CONFIG
+//////////////////////////////////////////////////*/
 
+const MODULE_EXTS = ['', '.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs', '.mts', '.cts', '.astro', '.mdx', '.json', '.css', '.scss', '.svg', '.png', '.jpg', '.jpeg', '.webp'];
+export type ImportFailure = { importer: string; specifier: string };
+
+/*//////////////////////////////////////////////////
+HELPERS
+//////////////////////////////////////////////////*/
+
+/**
+ *
+ * @param specifier
+ * @param importer
+ * @param cfg
+ * @returns
+ */
 function resolveImport(specifier: string, importer: string, cfg: QualityConfig): string | null {
 	const alias = Object.entries(cfg.aliases ?? {}).find(([prefix]) => specifier.startsWith(prefix));
 	const raw = alias ? resolve(cfg.root, alias[1], specifier.slice(alias[0].length)) : specifier.startsWith('.') ? resolve(dirname(importer), specifier) : null;
@@ -34,35 +50,33 @@ function resolveImport(specifier: string, importer: string, cfg: QualityConfig):
 	return null;
 }
 
+/**
+ *
+ * @param fileName
+ * @returns
+ */
 function specifiers(fileName: string): string[] {
 	const src = readFileSync(fileName, 'utf8');
 	const file = ts.createSourceFile(fileName, src, ts.ScriptTarget.Latest, true);
 	const vals: string[] = [];
-	ts.forEachChild(file, (node) => {
-		if (ts.isImportDeclaration(node) && ts.isStringLiteral(node.moduleSpecifier)) vals.push(node.moduleSpecifier.text);
-		if (ts.isExportDeclaration(node) && node.moduleSpecifier && ts.isStringLiteral(node.moduleSpecifier)) vals.push(node.moduleSpecifier.text);
-		if (
-			ts.isCallExpression(node) &&
-			node.arguments.length === 1 &&
-			ts.isStringLiteral(node.arguments[0]) &&
-			(node.expression.kind === ts.SyntaxKind.ImportKeyword || node.expression.getText(file) === 'require')
-		)
-			vals.push(node.arguments[0].text);
+	ts.forEachChild(file, (n) => {
+		if (ts.isImportDeclaration(n) && ts.isStringLiteral(n.moduleSpecifier)) vals.push(n.moduleSpecifier.text);
+		if (ts.isExportDeclaration(n) && n.moduleSpecifier && ts.isStringLiteral(n.moduleSpecifier)) vals.push(n.moduleSpecifier.text);
+		if (ts.isCallExpression(n) && n.arguments.length === 1 && ts.isStringLiteral(n.arguments[0]) && (n.expression.kind === ts.SyntaxKind.ImportKeyword || n.expression.getText(file) === 'require'))
+			vals.push(n.arguments[0].text);
 	});
 	return vals;
 }
 
-export type ImportFailure = { importer: string; specifier: string };
-
 /** Checks all configured internal imports, including assets and extensionless modules. */
-export function checkImports(config: QualityConfig): ImportFailure[] {
+export function checkImports(cfg: QualityConfig): ImportFailure[] {
 	const failures: ImportFailure[] = [];
-	for (const importer of sourceFiles(config)) {
+	for (const importer of sourceFiles(cfg)) {
 		for (const specifier of specifiers(importer)) {
-			if (config.externalPrefixes?.some((prefix) => specifier.startsWith(prefix))) continue;
-			if (!specifier.startsWith('.') && !Object.keys(config.aliases ?? {}).some((prefix) => specifier.startsWith(prefix))) continue;
+			if (cfg.externalPrefixes?.some((prefix) => specifier.startsWith(prefix))) continue;
+			if (!specifier.startsWith('.') && !Object.keys(cfg.aliases ?? {}).some((prefix) => specifier.startsWith(prefix))) continue;
 			if (specifier.startsWith('.') && extname(specifier) && !MODULE_EXTS.includes(extname(specifier))) continue;
-			if (!resolveImport(specifier, importer, config)) failures.push({ importer: displayPath(config, importer), specifier });
+			if (!resolveImport(specifier, importer, cfg)) failures.push({ importer: displayPath(cfg, importer), specifier });
 		}
 	}
 	return failures;

@@ -3,6 +3,7 @@
  */
 
 export * from './config.js';
+export * from './collapse.js';
 export * from './files.js';
 export * from './imports.js';
 export * from './inline-if.js';

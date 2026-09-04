@@ -10,6 +10,10 @@ IMPORTS
 
 import { resolve } from 'node:path';
 
+/*//////////////////////////////////////////////////
+CONFIG
+//////////////////////////////////////////////////*/
+
 export type QualityConfig = {
 	root: string;
 	sourceRoots: string[];
@@ -29,21 +33,20 @@ export type QualityConfig = {
 	lintRoots?: string[];
 	typecheckRoots?: string[];
 	typecheckExtensions?: string[];
-	tools?: {
-		prettier?: string;
-		tsc?: string;
-		eslint?: string;
-		knip?: string;
-	};
+	tools?: { prettier?: string; tsc?: string; eslint?: string; knip?: string };
 };
+
+/*//////////////////////////////////////////////////
+HELPERS
+//////////////////////////////////////////////////*/
 
 /** Normalizes a consumer repository configuration once at the package boundary. */
 export function createQualityConfig(config: QualityConfig): QualityConfig {
 	return {
 		...config,
 		root: resolve(config.root),
-		sourceRoots: config.sourceRoots.map((path) => resolve(config.root, path)),
-		includeRoots: (config.includeRoots ?? []).map((path) => resolve(config.root, path)),
+		sourceRoots: config.sourceRoots.map((p) => resolve(config.root, p)),
+		includeRoots: (config.includeRoots ?? []).map((p) => resolve(config.root, p)),
 		skippedDirectories: config.skippedDirectories ?? [
 			'.git',
 			'node_modules',
@@ -61,10 +64,10 @@ export function createQualityConfig(config: QualityConfig): QualityConfig {
 			'.nuxt',
 			'.husky',
 		],
-		skippedFiles: (config.skippedFiles ?? []).map((path) => resolve(config.root, path)),
+		skippedFiles: (config.skippedFiles ?? []).map((p) => resolve(config.root, p)),
 		aliases: config.aliases ?? {},
 		protectedIdentifiers: config.protectedIdentifiers ?? [],
-		lintRoots: (config.lintRoots ?? []).map((path) => resolve(config.root, path)),
-		typecheckRoots: (config.typecheckRoots ?? []).map((path) => resolve(config.root, path)),
+		lintRoots: (config.lintRoots ?? []).map((p) => resolve(config.root, p)),
+		typecheckRoots: (config.typecheckRoots ?? []).map((p) => resolve(config.root, p)),
 	};
 }

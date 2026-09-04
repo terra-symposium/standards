@@ -11,8 +11,7 @@
 			"project": ["src/**/*.ts", "test/**/*.mjs"]
 		},
 		".": {
-			"project": ["scripts/**/*.mjs"],
-			"ignoreDependencies": ["prettier"]
+			"project": ["scripts/**/*.mjs"]
 		}
 	}
 }

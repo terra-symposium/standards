@@ -10,6 +10,10 @@ IMPORTS
 
 import { readFileSync, writeFileSync } from 'node:fs';
 
+/*//////////////////////////////////////////////////
+HELPERS
+//////////////////////////////////////////////////*/
+
 /** Collapses single-statement conditional blocks without changing nested blocks. */
 export function collapseInlineIfs(fileName: string): boolean {
 	const src = readFileSync(fileName, 'utf8');

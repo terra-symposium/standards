@@ -23,6 +23,9 @@ importers:
       globals:
         specifier: ^17.12.0
         version: 17.12.0
+      husky:
+        specifier: ^9.1.7
+        version: 9.1.7
       knip:
         specifier: ^6.34.0
         version: 6.34.0
@@ -763,6 +766,11 @@ packages:
 
   human-id@4.2.1:
     resolution: {integrity: sha512-zPGsiS+dWoTZtZ4AtpA9Y+BdSFSNWvnouNlWNoUFyAM6xHOHmdCvqO3k8AIbdamCOv4gUFUVNPf6rJFfc4UiJw==}
+    hasBin: true
+
+  husky@9.1.7:
+    resolution: {integrity: sha512-5gs5ytaNjBrh5Ow3zrvdUUY+0VxIuWVL4i9irt6friV+BqdCfmV11CQTWMiBYWHbXhco+J1kHfTOUkePhCDvMA==}
+    engines: {node: '>=18'}
     hasBin: true
 
   iconv-lite@0.7.3:
@@ -1847,6 +1855,8 @@ snapshots:
   graceful-fs@4.2.11: {}
 
   human-id@4.2.1: {}
+
+  husky@9.1.7: {}
 
   iconv-lite@0.7.3:
     dependencies:

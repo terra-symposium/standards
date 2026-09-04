@@ -11,50 +11,18 @@ IMPORTS
 import { Component } from 'react';
 import React from 'react';
 
-export type ErrorReport = {
-	name: string;
-	componentStack: string | null;
-};
+/*//////////////////////////////////////////////////
+CONFIG
+//////////////////////////////////////////////////*/
 
+export type ErrorReport = { name: string; componentStack: string | null };
 export type ErrorReporter = (err: Error, report: ErrorReport) => void;
+export type ErrorBoundaryProps = { children?: React.ReactNode; fallback?: (err: Error) => React.ReactNode; name?: string; resetKey?: string; onError?: ErrorReporter };
+export type ErrorBoundaryState = { error: Error | null };
 
-export type ErrorBoundaryProps = {
-	children?: React.ReactNode;
-	fallback?: (err: Error) => React.ReactNode;
-	name?: string;
-	resetKey?: string;
-	onError?: ErrorReporter;
-};
-
-export type ErrorBoundaryState = {
-	error: Error | null;
-};
-
-/** Catches render failures while keeping error reporting and fallback UI injectable. */
-export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
-	state: ErrorBoundaryState = { error: null };
-
-	static getDerivedStateFromError(err: Error): ErrorBoundaryState {
-		return { error: err };
-	}
-
-	componentDidCatch(err: Error, info: React.ErrorInfo): void {
-		this.props.onError?.(err, {
-			name: this.props.name ?? 'Component',
-			componentStack: info.componentStack ?? null,
-		});
-	}
-
-	componentDidUpdate(prev: ErrorBoundaryProps): void {
-		if (prev.resetKey !== this.props.resetKey && this.state.error) this.setState({ error: null });
-	}
-
-	render(): React.ReactNode {
-		if (!this.state.error) return this.props.children;
-		if (this.props.fallback) return this.props.fallback(this.state.error);
-		return <div role="alert">An unexpected error occurred while rendering this section.</div>;
-	}
-}
+/*//////////////////////////////////////////////////
+HELPERS
+//////////////////////////////////////////////////*/
 
 /** Wraps a component in a named error boundary without coupling it to application UI. */
 export function withErrorBoundary<P extends object>(ComponentToWrap: React.ComponentType<P>, name: string, onErr?: ErrorReporter): React.ComponentType<P> {
@@ -67,4 +35,27 @@ export function withErrorBoundary<P extends object>(ComponentToWrap: React.Compo
 	}
 	BoundedComponent.displayName = `withErrorBoundary(${ComponentToWrap.displayName || ComponentToWrap.name || 'Component'})`;
 	return BoundedComponent;
+}
+
+/** Catches render failures while keeping error reporting and fallback UI injectable. */
+export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+	state: ErrorBoundaryState = { error: null };
+
+	static getDerivedStateFromError(err: Error): ErrorBoundaryState {
+		return { error: err };
+	}
+
+	componentDidCatch(err: Error, info: React.ErrorInfo): void {
+		this.props.onError?.(err, { name: this.props.name ?? 'Component', componentStack: info.componentStack ?? null });
+	}
+
+	componentDidUpdate(prev: ErrorBoundaryProps): void {
+		if (prev.resetKey !== this.props.resetKey && this.state.error) this.setState({ error: null });
+	}
+
+	render(): React.ReactNode {
+		if (!this.state.error) return this.props.children;
+		if (this.props.fallback) return this.props.fallback(this.state.error);
+		return <div role="alert">An unexpected error occurred while rendering this section.</div>;
+	}
 }
