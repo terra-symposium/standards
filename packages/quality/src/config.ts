@@ -22,6 +22,10 @@ export type QualityConfig = {
 	protectedIdentifiers?: string[];
 	qualityCommands?: { name: string; command: string; args?: string[] }[];
 	tsconfig?: string;
+	/** Preserve canonical one-line imports by adding Prettier protection when they exceed print width. */
+	oneLineImports?: boolean;
+	/** Print width used by the one-line import protection rule. */
+	prettierPrintWidth?: number;
 	lintRoots?: string[];
 	typecheckRoots?: string[];
 	typecheckExtensions?: string[];
