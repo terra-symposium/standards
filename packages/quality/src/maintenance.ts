@@ -5,6 +5,7 @@
 /*//////////////////////////////////////////////////
 IMPORTS
 //////////////////////////////////////////////////*/
+
 // API
 import { readFileSync, writeFileSync } from 'node:fs';
 import { extname, relative, sep } from 'node:path';
@@ -13,6 +14,7 @@ import ts from 'typescript';
 /*//////////////////////////////////////////////////
 CONFIG
 //////////////////////////////////////////////////*/
+
 const OPEN = `/*${'/'.repeat(50)}`;
 const CLOSE = `${'/'.repeat(50)}*/`;
 const SUPPORTED = new Set(['.cjs', '.cts', '.js', '.jsx', '.mjs', '.mts', '.ts', '.tsx']);
@@ -22,6 +24,7 @@ type SrcGroup = 'CONFIG' | 'HELPERS';
 /*//////////////////////////////////////////////////
 HELPERS
 //////////////////////////////////////////////////*/
+
 /**
  *
  * @param fileName
@@ -174,10 +177,10 @@ function normCommentLayout(src: string, fileName: string, eol: string): string {
 	// Remove an empty section immediately followed by another section.
 	for (let i = 0; i + 5 < lines.length; i++) {
 		if (!sectionOpen(i) || !sectionClose(i + 2)) continue;
-		let next = i + 3;
-		while (next < lines.length && !lines[next].text.trim()) next++;
-		if (next < lines.length && sectionOpen(next)) {
-			lines.splice(i, next - i);
+		let n = i + 3;
+		while (n < lines.length && !lines[n].text.trim()) n++;
+		if (n < lines.length && sectionOpen(n)) {
+			lines.splice(i, n - i);
 			i = Math.max(-1, i - 2);
 		}
 	}
@@ -188,14 +191,18 @@ function normCommentLayout(src: string, fileName: string, eol: string): string {
 	};
 	for (let i = 0; i < lines.length; i++) {
 		const text = lines[i].text.replace(/[ \t]+$/, '');
+		const closesSection = sectionClose(i);
 		if (!text && !protectedLine(lines[i])) {
 			if (out.length && out.at(-1) !== '') out.push('');
 			continue;
 		}
 		if (sectionOpen(i)) pushBlank();
-		if (lineGroup(i) && out.length && !/^\s*\/{10,}\*\/\s*$/.test(out.at(-1) ?? '')) pushBlank();
+		if (lineGroup(i)) pushBlank();
 		out.push(text);
-		if (sectionClose(i) || lineGroup(i)) while (i + 1 < lines.length && !lines[i + 1].text.trim() && !protectedLine(lines[i + 1])) i++;
+		if (closesSection || lineGroup(i)) {
+			while (i + 1 < lines.length && !lines[i + 1].text.trim() && !protectedLine(lines[i + 1])) i++;
+			if (closesSection && i + 1 < lines.length) pushBlank();
+		}
 	}
 	while (out.at(-1) === '') out.pop();
 	return `${out.join(eol)}${eol}`;
@@ -370,9 +377,9 @@ export function maintainSourceFile(root: string, fileName: string): boolean {
 		.replace(/^([ \t]*)\/{10,}\*\/[ \t]*$/gm, `$1${CLOSE}`)
 		.replace(/\s*$/, eol);
 	const laidOut = normCommentLayout(norm, fileName, eol);
-	const next = original.startsWith('\uFEFF') ? `\uFEFF${laidOut}` : laidOut;
-	if (next === original) return false;
-	writeFileSync(fileName, next);
+	const n = original.startsWith('\uFEFF') ? `\uFEFF${laidOut}` : laidOut;
+	if (n === original) return false;
+	writeFileSync(fileName, n);
 	return true;
 }
 

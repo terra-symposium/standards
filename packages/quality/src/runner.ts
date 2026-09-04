@@ -5,13 +5,14 @@
 /*//////////////////////////////////////////////////
 IMPORTS
 //////////////////////////////////////////////////*/
+
 // API
 import { collapseTypesAndObjects } from './collapse.js';
 import { sourceFiles as srcFiles, workingSourceFiles } from './files.js';
 import { checkImports } from './imports.js';
 import { collapseInlineIfs } from './inline-if.js';
 import { maintainSourceFile, protectLongImports } from './maintenance.js';
-import { isCallbackDeclaration, isProtectedFilename, isProtectedPath, isRenamableDeclaration, namingFindings, renameDeclaration } from './naming.js';
+import { declarationScope, isCallbackDeclaration, isProtectedFilename, isProtectedPath, isRenamableDeclaration, namingFindings, renameDeclaration } from './naming.js';
 import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve, sep } from 'node:path';
@@ -26,12 +27,14 @@ import type { QualityConfig } from './config.js';
 /*//////////////////////////////////////////////////
 CONFIG
 //////////////////////////////////////////////////*/
+
 export type QualityResult = { imports: ReturnType<typeof checkImports>; naming: ReturnType<typeof namingFindings> };
 export type QualityOptions = { fix: boolean; all: boolean; strict: boolean };
 
 /*//////////////////////////////////////////////////
 HELPERS
 //////////////////////////////////////////////////*/
+
 /**
  *
  * @param cfg
@@ -215,29 +218,30 @@ function fixNames(cfg: QualityConfig, all: boolean): void {
 		if (module) for (const symbol of checker.getExportsOfModule(module)) exported.add(symbol.flags & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(symbol) : symbol);
 	}
 	const replacements = new Map<ts.Symbol, string>();
-	const renameSafetyByFile = new Map<string, { declared: Set<string>; proposals: Map<string, number> }>();
+	const renameSafetyByScope = new Map<ts.Node, { declared: Set<string>; proposals: Map<string, number> }>();
 	for (const src of program.getSourceFiles()) {
 		if (!allowed.has(src.fileName)) continue;
-		const safety = { declared: new Set<string>(), proposals: new Map<string, number>() };
 		const inspect = (n: ts.Node): void => {
 			if (ts.isIdentifier(n) && isRenamableDeclaration(n)) {
+				const scope = declarationScope(n);
+				const safety = renameSafetyByScope.get(scope) ?? { declared: new Set<string>(), proposals: new Map<string, number>() };
 				safety.declared.add(n.text);
 				if (!n.text.startsWith('_') && !protectedNames.has(n.text)) {
 					const suggestion = renameDeclaration(n);
 					if (suggestion !== n.text && !isCallbackDeclaration(n)) safety.proposals.set(suggestion, (safety.proposals.get(suggestion) ?? 0) + 1);
 				}
+				renameSafetyByScope.set(scope, safety);
 			}
 			ts.forEachChild(n, inspect);
 		};
 		inspect(src);
-		renameSafetyByFile.set(src.fileName, safety);
 	}
 	for (const src of program.getSourceFiles()) {
 		if (!allowed.has(src.fileName)) continue;
 		const inspect = (node: ts.Node): void => {
 			if (ts.isIdentifier(node) && isRenamableDeclaration(node) && !node.text.startsWith('_') && !protectedNames.has(node.text)) {
 				const suggestion = renameDeclaration(node);
-				const safety = renameSafetyByFile.get(src.fileName);
+				const safety = renameSafetyByScope.get(declarationScope(node));
 				if (!isCallbackDeclaration(node) && (safety?.declared.has(suggestion) || (safety?.proposals.get(suggestion) ?? 0) > 1)) return;
 				const symbol = suggestion === node.text ? undefined : identifierSymbol(node);
 				if (symbol && !exported.has(symbol)) replacements.set(symbol, suggestion);
@@ -286,14 +290,14 @@ function fixNames(cfg: QualityConfig, all: boolean): void {
 
 /**
  *
- * @param config
+ * @param cfg
  * @param strict
  * @param all
  *
  * @return
  */
-export function runQuality(config: QualityConfig, strict = false, all = true): QualityResult {
-	const result = { imports: checkImports(scopedCfg(config, all)), naming: namingFindings(scopedCfg(config, all)) };
+export function runQuality(cfg: QualityConfig, strict = false, all = true): QualityResult {
+	const result = { imports: checkImports(scopedCfg(cfg, all)), naming: namingFindings(scopedCfg(cfg, all)) };
 	for (const f of result.imports) console.error(`Unresolved import: ${f.importer} -> ${f.specifier}`);
 	for (const f of result.naming) console.warn(`${f.severity === 'error' ? 'Naming drift' : 'Naming suggestion'}: ${f.file}: ${f.name} -> ${f.suggestion}`);
 	if (result.imports.length || (strict && result.naming.some((f) => f.severity === 'error'))) process.exitCode = 1;

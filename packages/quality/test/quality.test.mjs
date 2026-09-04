@@ -5,6 +5,7 @@
 /*//////////////////////////////////////////////////
 IMPORTS
 //////////////////////////////////////////////////*/
+
 // API
 // prettier-ignore
 import { checkImports, collapseInlineIfs, collapseTypesAndObjects, createQualityConfig, maintainSourceFile, namingFindings, protectLongImports, renameIdentifier, runQualityCli, sourceFiles } from '../dist/index.js';
@@ -20,8 +21,8 @@ test('resolves aliases and extensionless relative imports', () => {
 	mkdirSync(join(root, 'src'), { recursive: true });
 	writeFileSync(join(root, 'src', 'helper.ts'), 'export const ok = true;\n');
 	writeFileSync(join(root, 'src', 'main.ts'), "import { ok } from './helper';\nimport { ok as alias } from '@/helper';\nvoid ok; void alias;\n");
-	const config = createQualityConfig({ root, sourceRoots: ['src'], extensions: ['.ts'], aliases: { '@/': 'src/' } });
-	assert.deepEqual(checkImports(config), []);
+	const cfg = createQualityConfig({ root, sourceRoots: ['src'], extensions: ['.ts'], aliases: { '@/': 'src/' } });
+	assert.deepEqual(checkImports(cfg), []);
 });
 
 test('quality accepts individual changed files as scoped source roots', () => {
@@ -29,16 +30,16 @@ test('quality accepts individual changed files as scoped source roots', () => {
 	mkdirSync(join(root, 'src'));
 	const file = join(root, 'src', 'main.ts');
 	writeFileSync(file, 'const value = true;\n');
-	const config = createQualityConfig({ root, sourceRoots: [file], extensions: ['.ts'] });
-	assert.deepEqual(sourceFiles(config), [file]);
+	const cfg = createQualityConfig({ root, sourceRoots: [file], extensions: ['.ts'] });
+	assert.deepEqual(sourceFiles(cfg), [file]);
 });
 
 test('reports concise-name drift without changing source', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-'));
 	mkdirSync(join(root, 'src'), { recursive: true });
 	writeFileSync(join(root, 'src', 'main.ts'), 'const organization = true;\nvoid organization;\n');
-	const config = createQualityConfig({ root, sourceRoots: ['src'], extensions: ['.ts'] });
-	assert.equal(namingFindings(config)[0].suggestion, 'org');
+	const cfg = createQualityConfig({ root, sourceRoots: ['src'], extensions: ['.ts'] });
+	assert.equal(namingFindings(cfg)[0].suggestion, 'org');
 });
 
 test('renames requested words across casing, separators, compounds, plurals, and inflections', () => {
@@ -67,6 +68,13 @@ test('renames requested words across casing, separators, compounds, plurals, and
 		repository: 'repo',
 		Repositories: 'Repos',
 		articleRepositoryError: 'articleRepoErr',
+		attributes: 'attrs',
+		commands: 'cmds',
+		directories: 'dirs',
+		functions: 'fns',
+		images: 'imgs',
+		organisations: 'orgs',
+		responses: 'res',
 	};
 	for (const [name, expected] of Object.entries(cases)) assert.equal(renameIdentifier(name), expected, name);
 });
@@ -181,8 +189,8 @@ writeFileSync(${JSON.stringify(marker)}, 'ok');
 `,
 	);
 	chmodSync(fmt, 0o755);
-	const config = createQualityConfig({ root, sourceRoots: ['src'], extensions: ['.ts'], tools: { prettier: fmt } });
-	runQualityCli(config, ['format', '--all']);
+	const cfg = createQualityConfig({ root, sourceRoots: ['src'], extensions: ['.ts'], tools: { prettier: fmt } });
+	runQualityCli(cfg, ['format', '--all']);
 	assert.equal(readFileSync(marker, 'utf8'), 'ok');
 });
 
@@ -209,8 +217,8 @@ void [short, long];
 `,
 	);
 	const prettier = fileURLToPath(new URL('../../../node_modules/.bin/prettier', import.meta.url));
-	const config = createQualityConfig({ root, sourceRoots: ['src'], extensions: ['.ts'], tools: { prettier } });
-	runQualityCli(config, ['format', '--all']);
+	const cfg = createQualityConfig({ root, sourceRoots: ['src'], extensions: ['.ts'], tools: { prettier } });
+	runQualityCli(cfg, ['format', '--all']);
 	const result = readFileSync(file, 'utf8');
 	assert.match(result, /const short = \{ alpha: true, beta: false \};/);
 	assert.match(result, /type Short = \{ alpha: boolean; beta: boolean \};/);
@@ -248,7 +256,7 @@ void alpha; void beta;
 	assert.ok(src.indexOf('// COMPONENTS') < src.indexOf('// DATA'));
 	assert.ok(src.indexOf('// DATA') < src.indexOf('// TYPES'));
 	assert.equal(src.match(/IMPORTS/g)?.length, 1);
-	assert.ok(src.includes(`${'/'.repeat(50)}*/\n// API`));
+	assert.ok(src.includes(`${'/'.repeat(50)}*/\n\n// API`));
 	assert.ok(src.includes('// API\nimport'));
 	assert.ok(src.includes('// COMPONENTS\nimport'));
 	assert.ok(src.includes('// DATA\nimport'));
@@ -292,11 +300,11 @@ void [Service, runtime, OPEN];
 	);
 	assert.equal(maintainSourceFile(root, file), true);
 	const src = readFileSync(file, 'utf8');
-	const config = src.indexOf('CONFIG');
+	const cfg = src.indexOf('CONFIG');
 	const helpers = src.indexOf('HELPERS');
 	const remaining = src.indexOf('class Service');
-	assert.ok(src.indexOf('IMPORTS') < config);
-	assert.ok(config < src.indexOf('interface Settings'));
+	assert.ok(src.indexOf('IMPORTS') < cfg);
+	assert.ok(cfg < src.indexOf('interface Settings'));
 	assert.ok(src.indexOf('interface Settings') < src.indexOf("const OPEN = 'open'"));
 	assert.ok(src.indexOf("const OPEN = 'open'") < src.indexOf("type Mode = 'read' | 'write'"));
 	assert.ok(src.indexOf("type Mode = 'read' | 'write'") < src.indexOf('const SUPPORTED'));
@@ -407,7 +415,7 @@ void component;
 	assert.equal(src.match(/\nCOMPONENTS\n/g)?.length, 1);
 	assert.doesNotMatch(src, /HELPERS\n\/{10,}\*\/\n\n\/\*\/{10,}\nCOMPONENTS/);
 	assert.match(src, /nullableText = z\.string\(\)\.nullable\(\);\n\n\/\*\/{10,}/);
-	assert.doesNotMatch(src, /\/{10,}\*\/\n\n(?:\/\/|\S)/);
+	assert.match(src, /\/{10,}\*\/\n\n(?:\/\/|\S)/);
 	assert.match(src, /\/\/ MUTATION\n\tmutate\(now\);/);
 	assert.match(src, /mutate\(now\);\n\n\t\/\/ VALIDATION\n\tvalidate\(now\);/);
 	assert.doesNotMatch(src, /\/\/ (?:API|COMPONENTS|DATA|TYPES|MUTATION|VALIDATION)\n\n/);
@@ -429,12 +437,12 @@ test('format applies maintenance before Prettier and is idempotent', () => {
 	const file = join(root, 'src', 'main.ts');
 	writeFileSync(file, "import { readFileSync } from 'node:fs';\n\nconst value={active:true};\n");
 	const prettier = fileURLToPath(new URL('../../../node_modules/.bin/prettier', import.meta.url));
-	const config = createQualityConfig({ root, sourceRoots: ['src'], extensions: ['.ts'], tools: { prettier } });
-	runQualityCli(config, ['format', '--all']);
+	const cfg = createQualityConfig({ root, sourceRoots: ['src'], extensions: ['.ts'], tools: { prettier } });
+	runQualityCli(cfg, ['format', '--all']);
 	const first = readFileSync(file, 'utf8');
 	assert.match(first, /\/\/ API\nimport/);
-	assert.match(first, /CONFIG\n\/{10,}\*\/\nconst value/);
-	runQualityCli(config, ['format', '--all']);
+	assert.match(first, /CONFIG\n\/{10,}\*\/\n\nconst value/);
+	runQualityCli(cfg, ['format', '--all']);
 	assert.equal(readFileSync(file, 'utf8'), first);
 });
 
@@ -451,13 +459,13 @@ test('protects long one-line imports from Prettier wrapping', () => {
 test('domain runs one configured quality command', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-'));
 	const marker = join(root, 'marker.txt');
-	const config = createQualityConfig({
+	const cfg = createQualityConfig({
 		root,
 		sourceRoots: [],
 		extensions: ['.ts'],
 		qualityCommands: [{ name: 'fixture', command: process.execPath, args: ['-e', `require('node:fs').writeFileSync(${JSON.stringify(marker)}, 'ok')`] }],
 	});
-	runQualityCli(config, ['domain', 'fixture', '--all']);
+	runQualityCli(cfg, ['domain', 'fixture', '--all']);
 	assert.equal(readFileSync(marker, 'utf8'), 'ok');
 });
 
@@ -467,10 +475,10 @@ test('naming supports warning-only and automatic-fix modes', () => {
 	const file = join(root, 'src', 'main.ts');
 	const src = 'const organization = true;\nconst generatedPattern = /ok/;\nexport const result = [organization, generatedPattern];\n';
 	writeFileSync(file, src);
-	const config = createQualityConfig({ root, sourceRoots: ['src'], extensions: ['.ts'] });
-	runQualityCli(config, ['naming', '--all', '--warn']);
+	const cfg = createQualityConfig({ root, sourceRoots: ['src'], extensions: ['.ts'] });
+	runQualityCli(cfg, ['naming', '--all', '--warn']);
 	assert.equal(readFileSync(file, 'utf8'), src);
-	runQualityCli(config, ['naming', '--all']);
+	runQualityCli(cfg, ['naming', '--all']);
 	assert.equal(readFileSync(file, 'utf8'), 'const org = true;\nconst genPattern = /ok/;\nexport const result = [org, genPattern];\n');
 });
 
@@ -495,13 +503,13 @@ test('naming automatically fixes local declarations in Astro frontmatter', () =>
 	const root = mkdtempSync(join(tmpdir(), 'quality-naming-astro-'));
 	mkdirSync(join(root, 'src'));
 	writeFileSync(join(root, 'src', 'Page.astro'), '---\nconst error = new Error("x");\nconsole.log(error);\n---\n<Component error={error} />\n<p>{error.message}</p>\n');
-	const config = createQualityConfig({ root, sourceRoots: ['src'], extensions: ['.astro'] });
-	runQualityCli(config, ['naming', '--all']);
+	const cfg = createQualityConfig({ root, sourceRoots: ['src'], extensions: ['.astro'] });
+	runQualityCli(cfg, ['naming', '--all']);
 	assert.match(readFileSync(join(root, 'src', 'Page.astro'), 'utf8'), /const err = new Error/);
 	assert.match(readFileSync(join(root, 'src', 'Page.astro'), 'utf8'), /console\.log\(err\)/);
 	assert.match(readFileSync(join(root, 'src', 'Page.astro'), 'utf8'), /<Component error=\{err\} \/>/);
 	assert.match(readFileSync(join(root, 'src', 'Page.astro'), 'utf8'), /<p>\{err\.message\}<\/p>/);
-	assert.deepEqual(namingFindings(config), []);
+	assert.deepEqual(namingFindings(cfg), []);
 });
 
 test('naming preserves shorthand property keys while renaming their values', () => {
@@ -509,8 +517,8 @@ test('naming preserves shorthand property keys while renaming their values', () 
 	mkdirSync(join(root, 'src'), { recursive: true });
 	const file = join(root, 'src', 'main.ts');
 	writeFileSync(file, 'function result(error: Error) { return { error }; }\nvoid result;\n');
-	const config = createQualityConfig({ root, sourceRoots: ['src'], extensions: ['.ts'] });
-	runQualityCli(config, ['naming', '--all']);
+	const cfg = createQualityConfig({ root, sourceRoots: ['src'], extensions: ['.ts'] });
+	runQualityCli(cfg, ['naming', '--all']);
 	assert.equal(readFileSync(file, 'utf8'), 'function result(err: Error) { return { error: err }; }\nvoid result;\n');
 });
 
@@ -519,8 +527,8 @@ test('naming preserves call punctuation when expanding a shorthand parameter', (
 	mkdirSync(join(root, 'src'));
 	const file = join(root, 'src', 'main.ts');
 	writeFileSync(file, 'function result({ request }: { request: Request }) { return handle(request, true); }\nvoid result;\n');
-	const config = createQualityConfig({ root, sourceRoots: ['src'], extensions: ['.ts'] });
-	runQualityCli(config, ['naming', '--all']);
+	const cfg = createQualityConfig({ root, sourceRoots: ['src'], extensions: ['.ts'] });
+	runQualityCli(cfg, ['naming', '--all']);
 	assert.equal(readFileSync(file, 'utf8'), 'function result({ request: req }: { request: Request }) { return handle(req, true); }\nvoid result;\n');
 });
 
@@ -529,10 +537,20 @@ test('naming shortens map callback parameters and all symbol references', () => 
 	mkdirSync(join(root, 'src'));
 	const file = join(root, 'src', 'main.ts');
 	writeFileSync(file, 'const output = input.map((node, index) => ({ node, index }));\nvoid output;\n');
-	const config = createQualityConfig({ root, sourceRoots: ['src'], extensions: ['.ts'] });
-	runQualityCli(config, ['naming', '--all']);
+	const cfg = createQualityConfig({ root, sourceRoots: ['src'], extensions: ['.ts'] });
+	runQualityCli(cfg, ['naming', '--all']);
 	assert.equal(readFileSync(file, 'utf8'), 'const output = input.map((n, i) => ({ node: n, index: i }));\nvoid output;\n');
-	assert.deepEqual(namingFindings(config), []);
+	assert.deepEqual(namingFindings(cfg), []);
+});
+
+test('naming reduces arbitrary map callback parameters to free initials', () => {
+	const root = mkdtempSync(join(tmpdir(), 'terra-quality-callback-initials-'));
+	mkdirSync(join(root, 'src'));
+	const file = join(root, 'src', 'main.ts');
+	writeFileSync(file, 'const output = content.map((line) => (line ? ` * ${line}` : " *"));\nvoid output;\n');
+	const cfg = createQualityConfig({ root, sourceRoots: ['src'], extensions: ['.ts'] });
+	runQualityCli(cfg, ['naming', '--all']);
+	assert.equal(readFileSync(file, 'utf8'), 'const output = content.map((l) => (l ? ` * ${l}` : " *"));\nvoid output;\n');
 });
 
 test('naming shortens TypeScript traversal callbacks with conflict checks', () => {
@@ -540,8 +558,8 @@ test('naming shortens TypeScript traversal callbacks with conflict checks', () =
 	mkdirSync(join(root, 'src'));
 	const file = join(root, 'src', 'main.ts');
 	writeFileSync(file, 'ts.forEachChild(file, (node) => { if (ts.isIdentifier(node)) output.push(node.text); });\n');
-	const config = createQualityConfig({ root, sourceRoots: ['src'], extensions: ['.ts'] });
-	runQualityCli(config, ['naming', '--all']);
+	const cfg = createQualityConfig({ root, sourceRoots: ['src'], extensions: ['.ts'] });
+	runQualityCli(cfg, ['naming', '--all']);
 	assert.equal(readFileSync(file, 'utf8'), 'ts.forEachChild(file, (n) => { if (ts.isIdentifier(n)) output.push(n.text); });\n');
 });
 
@@ -550,8 +568,8 @@ test('naming chooses a free map callback alias when preferred names conflict', (
 	mkdirSync(join(root, 'src'));
 	const file = join(root, 'src', 'main.ts');
 	writeFileSync(file, 'const n = 1;\nconst v = 2;\nconst output = input.map((node) => node + n + v);\nvoid output;\n');
-	const config = createQualityConfig({ root, sourceRoots: ['src'], extensions: ['.ts'] });
-	runQualityCli(config, ['naming', '--all']);
+	const cfg = createQualityConfig({ root, sourceRoots: ['src'], extensions: ['.ts'] });
+	runQualityCli(cfg, ['naming', '--all']);
 	assert.equal(readFileSync(file, 'utf8'), 'const n = 1;\nconst v = 2;\nconst output = input.map((r) => r + n + v);\nvoid output;\n');
 });
 
@@ -560,8 +578,8 @@ test('naming reuses concise aliases safely across independent map scopes', () =>
 	mkdirSync(join(root, 'src'));
 	const file = join(root, 'src', 'main.ts');
 	writeFileSync(file, 'const first = input.map((node) => node.id);\nconst second = input.flatMap((node) => node.children);\nvoid [first, second];\n');
-	const config = createQualityConfig({ root, sourceRoots: ['src'], extensions: ['.ts'] });
-	runQualityCli(config, ['naming', '--all']);
+	const cfg = createQualityConfig({ root, sourceRoots: ['src'], extensions: ['.ts'] });
+	runQualityCli(cfg, ['naming', '--all']);
 	assert.equal(readFileSync(file, 'utf8'), 'const first = input.map((n) => n.id);\nconst second = input.flatMap((n) => n.children);\nvoid [first, second];\n');
 });
 
@@ -570,8 +588,8 @@ test('naming preserves object keys but not positional syntax in destructured map
 	mkdirSync(join(root, 'src'));
 	const file = join(root, 'src', 'main.ts');
 	writeFileSync(file, 'const first = input.map(({ node }) => node.id);\nconst second = pairs.map(([node, index]) => node[index]);\nvoid [first, second];\n');
-	const config = createQualityConfig({ root, sourceRoots: ['src'], extensions: ['.ts'] });
-	runQualityCli(config, ['naming', '--all']);
+	const cfg = createQualityConfig({ root, sourceRoots: ['src'], extensions: ['.ts'] });
+	runQualityCli(cfg, ['naming', '--all']);
 	assert.equal(readFileSync(file, 'utf8'), 'const first = input.map(({ node: n }) => n.id);\nconst second = pairs.map(([n, i]) => n[i]);\nvoid [first, second];\n');
 });
 
@@ -580,8 +598,8 @@ test('naming allocates distinct aliases across one destructured callback paramet
 	mkdirSync(join(root, 'src'));
 	const file = join(root, 'src', 'main.ts');
 	writeFileSync(file, 'const output = pairs.map(([record, result]) => result(record));\nvoid output;\n');
-	const config = createQualityConfig({ root, sourceRoots: ['src'], extensions: ['.ts'] });
-	runQualityCli(config, ['naming', '--all']);
+	const cfg = createQualityConfig({ root, sourceRoots: ['src'], extensions: ['.ts'] });
+	runQualityCli(cfg, ['naming', '--all']);
 	assert.equal(readFileSync(file, 'utf8'), 'const output = pairs.map(([r, v]) => v(r));\nvoid output;\n');
 });
 
@@ -590,8 +608,8 @@ test('callback renames do not alter unrelated JSDoc parameters with the same nam
 	mkdirSync(join(root, 'src'));
 	const file = join(root, 'src', 'main.ts');
 	writeFileSync(file, '/** @param name */\nfunction retain(name: string) { return name; }\nconst output = input.map((name) => name.id);\nvoid [retain, output];\n');
-	const config = createQualityConfig({ root, sourceRoots: ['src'], extensions: ['.ts'] });
-	runQualityCli(config, ['naming', '--all']);
+	const cfg = createQualityConfig({ root, sourceRoots: ['src'], extensions: ['.ts'] });
+	runQualityCli(cfg, ['naming', '--all']);
 	assert.equal(readFileSync(file, 'utf8'), '/** @param name */\nfunction retain(name: string) { return name; }\nconst output = input.map((n) => n.id);\nvoid [retain, output];\n');
 });
 
@@ -601,8 +619,8 @@ test('naming leaves node unchanged outside configured map callbacks', () => {
 	const file = join(root, 'src', 'main.ts');
 	const src = 'function visit(node: unknown) { return node; }\nvoid visit;\n';
 	writeFileSync(file, src);
-	const config = createQualityConfig({ root, sourceRoots: ['src'], extensions: ['.ts'] });
-	runQualityCli(config, ['naming', '--all']);
+	const cfg = createQualityConfig({ root, sourceRoots: ['src'], extensions: ['.ts'] });
+	runQualityCli(cfg, ['naming', '--all']);
 	assert.equal(readFileSync(file, 'utf8'), src);
 });
 
@@ -612,8 +630,8 @@ test('naming fix mode leaves protected component paths unchanged', () => {
 	const file = join(root, 'src', 'components', 'ui', 'chart.tsx');
 	const src = 'const output = payload.map((item, index) => item[index]);\nvoid output;\n';
 	writeFileSync(file, src);
-	const config = createQualityConfig({ root, sourceRoots: ['src'], extensions: ['.tsx'] });
-	runQualityCli(config, ['naming', '--all']);
+	const cfg = createQualityConfig({ root, sourceRoots: ['src'], extensions: ['.tsx'] });
+	runQualityCli(cfg, ['naming', '--all']);
 	assert.equal(readFileSync(file, 'utf8'), src);
 });
 
@@ -630,8 +648,8 @@ try { throw error; } catch (format) { console.log(format, repository); }
 void [articleError, ErrorBoundary];
 `,
 	);
-	const config = createQualityConfig({ root, sourceRoots: ['src'], extensions: ['.ts'] });
-	runQualityCli(config, ['naming', '--all']);
+	const cfg = createQualityConfig({ root, sourceRoots: ['src'], extensions: ['.ts'] });
+	runQualityCli(cfg, ['naming', '--all']);
 	assert.equal(
 		readFileSync(file, 'utf8'),
 		`class ErrBoundary {}
@@ -641,7 +659,7 @@ try { throw err; } catch (fmt) { console.log(fmt, repo); }
 void [articleErr, ErrBoundary];
 `,
 	);
-	assert.deepEqual(namingFindings(config), []);
+	assert.deepEqual(namingFindings(cfg), []);
 });
 
 test('naming preserves exported contracts and configurable protected identifiers', () => {
@@ -650,10 +668,10 @@ test('naming preserves exported contracts and configurable protected identifiers
 	const file = join(root, 'src', 'main.ts');
 	const src = 'export class ErrorBoundary {}\nconst repository = new ErrorBoundary();\nvoid repository;\n';
 	writeFileSync(file, src);
-	const config = createQualityConfig({ root, sourceRoots: ['src'], extensions: ['.ts'], protectedIdentifiers: ['repository'] });
-	runQualityCli(config, ['naming', '--all']);
+	const cfg = createQualityConfig({ root, sourceRoots: ['src'], extensions: ['.ts'], protectedIdentifiers: ['repository'] });
+	runQualityCli(cfg, ['naming', '--all']);
 	assert.equal(readFileSync(file, 'utf8'), src);
-	assert.deepEqual(namingFindings(config), []);
+	assert.deepEqual(namingFindings(cfg), []);
 });
 
 test('naming updates JSDoc parameter tags with parameter declarations', () => {
@@ -661,8 +679,8 @@ test('naming updates JSDoc parameter tags with parameter declarations', () => {
 	mkdirSync(join(root, 'src'), { recursive: true });
 	const file = join(root, 'src', 'main.ts');
 	writeFileSync(file, '/** @param value - Input value. */\nfunction result(value: string) { return value; }\nvoid result;\n');
-	const config = createQualityConfig({ root, sourceRoots: ['src'], extensions: ['.ts'] });
-	runQualityCli(config, ['naming', '--all']);
+	const cfg = createQualityConfig({ root, sourceRoots: ['src'], extensions: ['.ts'] });
+	runQualityCli(cfg, ['naming', '--all']);
 	assert.equal(readFileSync(file, 'utf8'), '/** @param val - Input value. */\nfunction result(val: string) { return val; }\nvoid result;\n');
 });
 
@@ -672,10 +690,10 @@ test('naming preserves explicitly unused underscore parameters', () => {
 	const file = join(root, 'src', 'main.ts');
 	const src = 'const proxy = new Proxy({}, { get(_target, key) { return key; } });\nvoid proxy;\n';
 	writeFileSync(file, src);
-	const config = createQualityConfig({ root, sourceRoots: ['src'], extensions: ['.ts'] });
-	runQualityCli(config, ['naming', '--all']);
+	const cfg = createQualityConfig({ root, sourceRoots: ['src'], extensions: ['.ts'] });
+	runQualityCli(cfg, ['naming', '--all']);
 	assert.equal(readFileSync(file, 'utf8'), src);
-	assert.deepEqual(namingFindings(config), []);
+	assert.deepEqual(namingFindings(cfg), []);
 });
 
 test('naming refuses file-level destination collisions', () => {
@@ -684,8 +702,8 @@ test('naming refuses file-level destination collisions', () => {
 	const file = join(root, 'src', 'main.ts');
 	const src = 'const target = 1;\nconst tgt = 2;\nvoid [target, tgt];\n';
 	writeFileSync(file, src);
-	const config = createQualityConfig({ root, sourceRoots: ['src'], extensions: ['.ts'] });
-	runQualityCli(config, ['naming', '--all']);
+	const cfg = createQualityConfig({ root, sourceRoots: ['src'], extensions: ['.ts'] });
+	runQualityCli(cfg, ['naming', '--all']);
 	assert.equal(readFileSync(file, 'utf8'), src);
 });
 
@@ -694,9 +712,19 @@ test('naming keeps distinct aliases for adjacent parameters', () => {
 	mkdirSync(join(root, 'src'));
 	const file = join(root, 'src', 'main.ts');
 	writeFileSync(file, 'function run(config: object, command: string) { return [config, command]; }\nvoid run;\n');
-	const config = createQualityConfig({ root, sourceRoots: ['src'], extensions: ['.ts'] });
-	runQualityCli(config, ['naming', '--all']);
+	const cfg = createQualityConfig({ root, sourceRoots: ['src'], extensions: ['.ts'] });
+	runQualityCli(cfg, ['naming', '--all']);
 	assert.equal(readFileSync(file, 'utf8'), 'function run(cfg: object, cmd: string) { return [cfg, cmd]; }\nvoid run;\n');
+});
+
+test('naming reuses aliases in sibling function scopes and updates their TSDoc', () => {
+	const root = mkdtempSync(join(tmpdir(), 'terra-quality-function-scopes-'));
+	mkdirSync(join(root, 'src'));
+	const file = join(root, 'src', 'main.ts');
+	writeFileSync(file, '/** @param config */\nexport function first(config: object) { return config; }\n/** @param config */\nexport function second(config: object) { return config; }\n');
+	const cfg = createQualityConfig({ root, sourceRoots: ['src'], extensions: ['.ts'] });
+	runQualityCli(cfg, ['naming', '--all']);
+	assert.equal(readFileSync(file, 'utf8'), '/** @param cfg */\nexport function first(cfg: object) { return cfg; }\n/** @param cfg */\nexport function second(cfg: object) { return cfg; }\n');
 });
 
 test('naming ignores external types, JSX attributes, properties, and exported contracts', () => {
@@ -706,8 +734,8 @@ test('naming ignores external types, JSX attributes, properties, and exported co
 		join(root, 'src', 'main.tsx'),
 		"export type ResponseRecord = Record<string, string>;\nexport const response = { value: 'ok' };\nconst view = <input aria-current defaultValue={response.value} />;\nvoid view;\n",
 	);
-	const config = createQualityConfig({ root, sourceRoots: ['src'], extensions: ['.tsx'] });
-	assert.deepEqual(namingFindings(config), []);
+	const cfg = createQualityConfig({ root, sourceRoots: ['src'], extensions: ['.tsx'] });
+	assert.deepEqual(namingFindings(cfg), []);
 });
 
 test('naming ignores declarations exported through an export list', () => {
@@ -716,8 +744,8 @@ test('naming ignores declarations exported through an export list', () => {
 	const file = join(root, 'src', 'main.ts');
 	const src = 'function previous() {}\nexport { previous };\n';
 	writeFileSync(file, src);
-	const config = createQualityConfig({ root, sourceRoots: ['src'], extensions: ['.ts'] });
-	runQualityCli(config, ['naming', '--all']);
+	const cfg = createQualityConfig({ root, sourceRoots: ['src'], extensions: ['.ts'] });
+	runQualityCli(cfg, ['naming', '--all']);
 	assert.equal(readFileSync(file, 'utf8'), src);
-	assert.deepEqual(namingFindings(config), []);
+	assert.deepEqual(namingFindings(cfg), []);
 });

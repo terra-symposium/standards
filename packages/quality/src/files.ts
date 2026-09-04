@@ -5,6 +5,7 @@
 /*//////////////////////////////////////////////////
 IMPORTS
 //////////////////////////////////////////////////*/
+
 // API
 import { execFileSync } from 'node:child_process';
 import { existsSync, readdirSync, statSync } from 'node:fs';
@@ -16,6 +17,7 @@ import type { QualityConfig } from './config.js';
 /*//////////////////////////////////////////////////
 HELPERS
 //////////////////////////////////////////////////*/
+
 /**
  *
  * @param cfg
@@ -65,13 +67,13 @@ export function workingSourceFiles(cfg: QualityConfig): string[] {
 
 /**
  *
- * @param config
+ * @param cfg
  * @param fileName
  *
  * @return
  */
-export function displayPath(config: QualityConfig, fileName: string): string {
-	return relative(config.root, fileName) || basename(fileName);
+export function displayPath(cfg: QualityConfig, fileName: string): string {
+	return relative(cfg.root, fileName) || basename(fileName);
 }
 
 /**

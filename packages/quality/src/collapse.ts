@@ -5,6 +5,7 @@
 /*//////////////////////////////////////////////////
 IMPORTS
 //////////////////////////////////////////////////*/
+
 // API
 import { readFileSync, writeFileSync } from 'node:fs';
 import { extname } from 'node:path';
@@ -13,11 +14,13 @@ import ts from 'typescript';
 /*//////////////////////////////////////////////////
 CONFIG
 //////////////////////////////////////////////////*/
+
 const SUPPORTED = new Set(['.cjs', '.cts', '.js', '.jsx', '.mjs', '.mts', '.ts', '.tsx']);
 
 /*//////////////////////////////////////////////////
 HELPERS
 //////////////////////////////////////////////////*/
+
 /**
  *
  * @param fileName
@@ -118,8 +121,8 @@ export function collapseTypesAndObjects(fileName: string): boolean {
 	};
 	visit(parsed);
 	if (!edits.length) return false;
-	const next = edits.sort((a, b) => b.start - a.start).reduce((text, edit) => `${text.slice(0, edit.start)}${edit.text}${text.slice(edit.end)}`, original);
-	if (next === original) return false;
-	writeFileSync(fileName, next);
+	const n = edits.sort((a, b) => b.start - a.start).reduce((text, edit) => `${text.slice(0, edit.start)}${edit.text}${text.slice(edit.end)}`, original);
+	if (n === original) return false;
+	writeFileSync(fileName, n);
 	return true;
 }

@@ -5,6 +5,7 @@
 /*//////////////////////////////////////////////////
 IMPORTS
 //////////////////////////////////////////////////*/
+
 // API
 import { displayPath, sourceFiles } from './files.js';
 import { readFileSync } from 'node:fs';
@@ -16,61 +17,39 @@ import type { QualityConfig } from './config.js';
 /*//////////////////////////////////////////////////
 CONFIG
 //////////////////////////////////////////////////*/
+
 type ReplacementGroup = readonly [names: string | readonly string[], replacement: string];
 type RenameKind = { numericIndex?: boolean; callback?: boolean; reserved?: string[] };
 export const IDENTIFIER_REPLACEMENTS = replacementMap([
 	['attribute', 'attr'],
 	['current', 'curr'],
 	['command', 'cmd'],
-	['commands', 'cmds'],
 	['context', 'ctx'],
-	['contexts', 'ctxs'],
 	[['config', 'configuration'], 'cfg'],
-	[['configs', 'configurations'], 'cfgs'],
 	['configured', 'cfgd'],
 	['directory', 'dir'],
-	['directories', 'dirs'],
 	['error', 'err'],
-	['errors', 'errs'],
 	['expression', 'expr'],
-	['expressions', 'exprs'],
-	[['format', 'formatted', 'formatting'], 'fmt'],
-	['formats', 'fmts'],
-	['formatter', 'fmt'],
-	['formatters', 'fmts'],
+	[['format', 'formatted', 'formatting', 'formatter'], 'fmt'],
 	['function', 'fn'],
-	['functions', 'fns'],
 	[['generation', 'generate', 'generated', 'generating'], 'gen'],
-	[['generations', 'generates'], 'gens'],
 	['image', 'img'],
-	['images', 'imgs'],
 	[['initialise', 'initialised', 'initialises', 'initialising', 'initialisation', 'initialize', 'initialized', 'initializes', 'initializing', 'initialization'], 'init'],
 	[['initialiser', 'initializer'], 'init'],
-	[['initialisers', 'initializers', 'initialisations', 'initializations'], 'inits'],
 	['language', 'lang'],
-	['languages', 'langs'],
 	['member', 'mem'],
-	['members', 'mems'],
 	[['organization', 'organisation'], 'org'],
-	[['organizations', 'organisations'], 'orgs'],
 	['operation', 'op'],
-	['operations', 'ops'],
 	['option', 'opt'],
-	['options', 'opts'],
 	['parameter', 'param'],
-	['parameters', 'params'],
 	['previous', 'prev'],
 	['record', 'rec'],
-	['records', 'recs'],
 	['repository', 'repo'],
-	['repositories', 'repos'],
 	['request', 'req'],
-	['requests', 'reqs'],
 	['response', 'res'],
 	['source', 'src'],
 	['target', 'tgt'],
 	['value', 'val'],
-	['values', 'vals'],
 ]);
 export const PREFIX_REPLACEMENTS = replacementMap([
 	['active', 'a'],
@@ -82,23 +61,27 @@ export const PREFIX_REPLACEMENTS = replacementMap([
 	[['validate', 'validated', 'validation'], 'valid'],
 	[['sanitize', 'sanitized'], 'san'],
 ]);
-export const CALLBACK_ALIASES = replacementMap([
-	[['workshop', 'workshops'], 'w'],
-	[['customer', 'customers', 'candidate', 'candidates', 'column', 'columns'], 'c'],
-	[['opportunity', 'opportunities', 'organization', 'organisation', 'organizations', 'organisations', 'option', 'options'], 'o'],
-	[['member', 'members'], 'm'],
-	[['record', 'records', 'result', 'results', 'row', 'rows'], 'r'],
-	[['stage', 'stages', 'section', 'sections'], 's'],
-	[['item', 'items'], 'i'],
-	[['entry', 'entries', 'event', 'events', 'edge', 'edges'], 'e'],
-	[['value', 'values', 'intent', 'intents'], 'v'],
-	[['group', 'groups'], 'g'],
-	[['file', 'files'], 'f'],
-	[['problem', 'problems'], 'p'],
-	[['node', 'nodes'], 'n'],
-	[['link', 'links'], 'l'],
-	['data', 'd'],
-]);
+export const CALLBACK_ALIASES = replacementMap(
+	[
+		['workshop', 'w'],
+		[['customer', 'candidate', 'column'], 'c'],
+		[['opportunity', 'organization', 'organisation', 'option'], 'o'],
+		['member', 'm'],
+		[['record', 'result', 'row'], 'r'],
+		[['stage', 'section'], 's'],
+		['item', 'i'],
+		[['entry', 'event', 'edge'], 'e'],
+		[['value', 'intent'], 'v'],
+		['group', 'g'],
+		['file', 'f'],
+		['problem', 'p'],
+		['node', 'n'],
+		['link', 'l'],
+		['line', 'l'],
+		['data', 'd'],
+	],
+	false,
+);
 export const CALLBACK_METHODS = new Set(['map', 'flatMap', 'forEachChild']);
 export const PROTECTED_IDENTIFIERS = new Set([
 	'GET',
@@ -131,14 +114,27 @@ export type NamingFinding = { file: string; name: string; suggestion: string; se
 /*//////////////////////////////////////////////////
 HELPERS
 //////////////////////////////////////////////////*/
+
 /**
  *
  * @param groups
+ * @param pluralReplacements
  *
  * @return
  */
-function replacementMap(groups: readonly ReplacementGroup[]): Readonly<Record<string, string>> {
-	return Object.freeze(Object.fromEntries(groups.flatMap(([n, r]) => (typeof n === 'string' ? [n] : n).map((n) => [n, r]))));
+function replacementMap(groups: readonly ReplacementGroup[], pluralReplacements = true): Readonly<Record<string, string>> {
+	const explicit = new Map(groups.flatMap(([n, r]) => (typeof n === 'string' ? [n] : n).map((n) => [n, r] as const)));
+	const plural = (word: string): string => {
+		if (/[^aeiou]y$/i.test(word)) return `${word.slice(0, -1)}ies`;
+		if (/(?:s|x|z|ch|sh)$/i.test(word)) return word.length <= 4 ? word : `${word}es`;
+		return `${word}s`;
+	};
+	const entries = [...explicit];
+	for (const [name, replacement] of explicit) {
+		const pluralName = plural(name);
+		if (!explicit.has(pluralName)) entries.push([pluralName, pluralReplacements ? plural(replacement) : replacement]);
+	}
+	return Object.freeze(Object.fromEntries(entries));
 }
 
 /**
@@ -358,6 +354,31 @@ export function isRenamableDeclaration(n: ts.Identifier): boolean {
 }
 
 /**
+ * Returns the function or source-file scope that owns a declaration.
+ *
+ * @param n
+ *
+ * @return
+ */
+export function declarationScope(n: ts.Identifier): ts.Node {
+	let scope: ts.Node = n.parent;
+	while (!ts.isSourceFile(scope)) {
+		if (
+			ts.isArrowFunction(scope) ||
+			ts.isFunctionDeclaration(scope) ||
+			ts.isFunctionExpression(scope) ||
+			ts.isMethodDeclaration(scope) ||
+			ts.isConstructorDeclaration(scope) ||
+			ts.isGetAccessorDeclaration(scope) ||
+			ts.isSetAccessorDeclaration(scope)
+		)
+			return scope;
+		scope = scope.parent;
+	}
+	return scope;
+}
+
+/**
  * Reports concise-name drift without mutating the consumer repository.
  *
  * @param cfg
@@ -373,13 +394,15 @@ export function namingFindings(cfg: QualityConfig): NamingFinding[] {
 		const exportedNames = new Set(
 			file.statements.flatMap((s) => (ts.isExportDeclaration(s) && s.exportClause && ts.isNamedExports(s.exportClause) ? s.exportClause.elements.map((e) => (e.propertyName ?? e.name).text) : [])),
 		);
-		const declaredNames = new Set<string>();
-		const proposalCounts = new Map<string, number>();
+		const safetyByScope = new Map<ts.Node, { declared: Set<string>; proposals: Map<string, number> }>();
 		const collect = (n: ts.Node): void => {
 			if (ts.isIdentifier(n) && isRenamableDeclaration(n)) {
-				declaredNames.add(n.text);
+				const scope = declarationScope(n);
+				const safety = safetyByScope.get(scope) ?? { declared: new Set<string>(), proposals: new Map<string, number>() };
+				safety.declared.add(n.text);
 				const suggestion = renameDeclaration(n);
-				if (!n.text.startsWith('_') && suggestion !== n.text && !isCallbackDeclaration(n)) proposalCounts.set(suggestion, (proposalCounts.get(suggestion) ?? 0) + 1);
+				if (!n.text.startsWith('_') && suggestion !== n.text && !isCallbackDeclaration(n)) safety.proposals.set(suggestion, (safety.proposals.get(suggestion) ?? 0) + 1);
+				safetyByScope.set(scope, safety);
 			}
 			ts.forEachChild(n, collect);
 		};
@@ -387,7 +410,8 @@ export function namingFindings(cfg: QualityConfig): NamingFinding[] {
 		const inspect = (n: ts.Node): void => {
 			if (ts.isIdentifier(n) && isRenamableDeclaration(n) && !n.text.startsWith('_') && !protectedNames.has(n.text) && !exportedNames.has(n.text)) {
 				const suggestion = renameDeclaration(n);
-				if (!isCallbackDeclaration(n) && (declaredNames.has(suggestion) || (proposalCounts.get(suggestion) ?? 0) > 1)) return;
+				const safety = safetyByScope.get(declarationScope(n));
+				if (!isCallbackDeclaration(n) && (safety?.declared.has(suggestion) || (safety?.proposals.get(suggestion) ?? 0) > 1)) return;
 				if (suggestion !== n.text) findings.push({ file: displayPath(cfg, fileName), name: n.text, suggestion, severity: hasPrefixReplacement(n.text) ? 'warning' : 'error', start: n.getStart(file) });
 			}
 			ts.forEachChild(n, inspect);

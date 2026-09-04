@@ -6,24 +6,37 @@ The quality package owns deterministic source maintenance, naming, formatting, i
 
 Three comment levels structure source files:
 
-1. A **section** is a full-width three-line fence such as `IMPORTS`, `CONFIG`, `HELPERS`, or `COMPONENTS`. Exactly one blank line precedes a section when code or another section comes before it. No blank line follows its closing fence.
-2. A **group** is an uppercase line comment inside a section, such as `// API`, `// COMPONENTS`, `// DATA`, or `// TYPES`. Exactly one blank line precedes a group unless it immediately follows a section fence. Its first statement or import follows on the next line with no blank line.
-3. A **line label** is an uppercase line comment inside executable code, such as `// MUTATION` or `// VALIDATION`. Exactly one blank line precedes it and the associated statement follows on the next line with no blank line.
+1. A **section** is a full-width three-line fence such as `IMPORTS`, `CONFIG`, `HELPERS`, or `COMPONENTS`.
+   Exactly one blank line precedes a section when code or another section comes before it.
+   Exactly one blank line follows its closing fence.
+2. A **group** is an uppercase line comment inside a section, such as `// API`, `// COMPONENTS`, `// DATA`, or `// TYPES`.
+   Exactly one blank line precedes a group.
+   Its first statement or import follows on the next line with no blank line.
+3. A **line label** is an uppercase line comment inside executable code, such as `// MUTATION` or `// VALIDATION`.
+   Exactly one blank line precedes it and the associated statement follows on the next line with no blank line.
 
 Empty adjacent sections are invalid. When one section is immediately followed by another, maintenance removes the empty earlier section. Existing managed `CONFIG` and `HELPERS` fences are replaced rather than duplicated when top-level declarations are regrouped.
 
-Maintenance removes trailing horizontal whitespace, collapses repeated layout-only blank lines, inserts the blank lines required above, and removes blank lines forbidden after fences, groups, and line labels. String, template, regular-expression, and JSX text content is never treated as layout.
+Maintenance removes trailing horizontal whitespace, collapses repeated layout-only blank lines, inserts the blank lines required around fences and before groups and line labels, and removes blank lines forbidden after groups and line labels. String, template, regular-expression, and JSX text content is never treated as layout.
 
 Function TSDoc is derived from the current signature. Existing summaries and tag descriptions are preserved, including one-line and empty documentation blocks; stale parameter tags are removed, missing `@param` tags are added in signature order, and a singular `@return` tag is added. A blank documentation line separates the summary, parameters, return tag, and any other tags.
 
 ## Source grouping
 
-Imports are sorted into `API`, `COMPONENTS`, `DATA`, and `TYPES` groups. Top-level types, interfaces, enums, and `const` declarations belong to `CONFIG`; top-level functions belong to `HELPERS`. Other declarations retain source order after those managed sections.
+### Imports
+
+Imports are sorted into `API`, `COMPONENTS`, `DATA`, and `TYPES` groups.
+
+### Comment Sections
+
+Top-level types, interfaces, enums, and `const` declarations belong to `CONFIG`; top-level functions belong to `HELPERS`. Other declarations retain source order after those managed sections.
 
 Undocumented top-level functions receive blank TSDoc tags for every parameter and for the return value. Existing authored documentation is preserved.
 
 ## Identifier renaming
 
 Whole-word replacements apply to matching identifier tokens in any position and preserve camel, Pascal, snake, kebab, and constant case. Examples include `image` to `img`, `ErrorBoundary` to `ErrBoundary`, and `articleError` to `articleErr`.
+
+Each whole-word replacement automatically derives its regular plural source and replacement forms. Explicit entries take precedence over derived forms, allowing irregular or invariant aliases to be specified when required. Collection callback parameters use their singular initial for both singular and plural names.
 
 Prefix-only replacements apply only to the first identifier token. `active`, `next`, `clean`, and `safe` become `a`, `n`, `c`, and `s` respectively, so `activeCard` becomes `aCard` while `isActive` remains `isActive`. Renames are skipped when the proposed identifier conflicts with another declaration, and callback aliases are allocated within their own callback scope.
