@@ -418,6 +418,16 @@ test('naming preserves shorthand property keys while renaming their values', () 
 	assert.equal(readFileSync(file, 'utf8'), 'function result(err: Error) { return { error: err }; }\nvoid result;\n');
 });
 
+test('naming preserves call punctuation when expanding a shorthand parameter', () => {
+	const root = mkdtempSync(join(tmpdir(), 'terra-quality-shorthand-param-'));
+	mkdirSync(join(root, 'src'));
+	const file = join(root, 'src', 'main.ts');
+	writeFileSync(file, 'function result({ request }: { request: Request }) { return handle(request, true); }\nvoid result;\n');
+	const config = createQualityConfig({ root, sourceRoots: ['src'], extensions: ['.ts'] });
+	runQualityCli(config, ['naming', '--all']);
+	assert.equal(readFileSync(file, 'utf8'), 'function result({ request: req }: { request: Request }) { return handle(req, true); }\nvoid result;\n');
+});
+
 test('naming shortens map callback parameters and all symbol references', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-callbacks-'));
 	mkdirSync(join(root, 'src'));

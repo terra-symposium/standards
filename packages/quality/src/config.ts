@@ -41,13 +41,13 @@ HELPERS
 //////////////////////////////////////////////////*/
 
 /** Normalizes a consumer repository configuration once at the package boundary. */
-export function createQualityConfig(config: QualityConfig): QualityConfig {
+export function createQualityConfig(cfg: QualityConfig): QualityConfig {
 	return {
-		...config,
-		root: resolve(config.root),
-		sourceRoots: config.sourceRoots.map((p) => resolve(config.root, p)),
-		includeRoots: (config.includeRoots ?? []).map((p) => resolve(config.root, p)),
-		skippedDirectories: config.skippedDirectories ?? [
+		...cfg,
+		root: resolve(cfg.root),
+		sourceRoots: cfg.sourceRoots.map((p) => resolve(cfg.root, p)),
+		includeRoots: (cfg.includeRoots ?? []).map((p) => resolve(cfg.root, p)),
+		skippedDirectories: cfg.skippedDirectories ?? [
 			'.git',
 			'node_modules',
 			'dist',
@@ -64,10 +64,10 @@ export function createQualityConfig(config: QualityConfig): QualityConfig {
 			'.nuxt',
 			'.husky',
 		],
-		skippedFiles: (config.skippedFiles ?? []).map((p) => resolve(config.root, p)),
-		aliases: config.aliases ?? {},
-		protectedIdentifiers: config.protectedIdentifiers ?? [],
-		lintRoots: (config.lintRoots ?? []).map((p) => resolve(config.root, p)),
-		typecheckRoots: (config.typecheckRoots ?? []).map((p) => resolve(config.root, p)),
+		skippedFiles: (cfg.skippedFiles ?? []).map((p) => resolve(cfg.root, p)),
+		aliases: cfg.aliases ?? {},
+		protectedIdentifiers: cfg.protectedIdentifiers ?? [],
+		lintRoots: (cfg.lintRoots ?? []).map((p) => resolve(cfg.root, p)),
+		typecheckRoots: (cfg.typecheckRoots ?? []).map((p) => resolve(cfg.root, p)),
 	};
 }

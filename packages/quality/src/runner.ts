@@ -91,7 +91,7 @@ function filesFor(config: QualityConfig, all: boolean): string[] {
  * @param all
  * @returns
  */
-function scopedConfig(config: QualityConfig, all: boolean): QualityConfig {
+function scopedCfg(config: QualityConfig, all: boolean): QualityConfig {
 	return all ? config : { ...config, sourceRoots: filesFor(config, false) };
 }
 
@@ -251,7 +251,10 @@ function fixNames(config: QualityConfig, all: boolean): void {
 					const shorthandBinding = ts.isBindingElement(node.parent) && node.parent.name === node && !node.parent.propertyName && ts.isObjectBindingPattern(node.parent.parent);
 					const fileEdits = edits.get(src.fileName) ?? [];
 					fileEdits.push({
-						span: { start: node.getStart(src), length: node.getWidth(src) },
+						// Identifier `pos` can include a preceding delimiter (for example the
+						// opening parenthesis of a call argument). Anchor edits from `end` so
+						// expanding a shorthand binding cannot consume adjacent punctuation.
+						span: { start: node.end - node.text.length, length: node.text.length },
 						newText: !src.fileName.endsWith('.astro') && (ts.isShorthandPropertyAssignment(node.parent) || shorthandBinding) ? `${node.text}: ${replacement}` : replacement,
 					});
 					if (ts.isParameter(node.parent) && node.parent.name === node) {
@@ -283,7 +286,7 @@ function fixNames(config: QualityConfig, all: boolean): void {
  * @returns
  */
 export function runQuality(config: QualityConfig, strict = false, all = true): QualityResult {
-	const result = { imports: checkImports(scopedConfig(config, all)), naming: namingFindings(scopedConfig(config, all)) };
+	const result = { imports: checkImports(scopedCfg(config, all)), naming: namingFindings(scopedCfg(config, all)) };
 	for (const failure of result.imports) console.error(`Unresolved import: ${failure.importer} -> ${failure.specifier}`);
 	for (const finding of result.naming) console.warn(`${finding.severity === 'error' ? 'Naming drift' : 'Naming suggestion'}: ${finding.file}: ${finding.name} -> ${finding.suggestion}`);
 	if (result.imports.length || (strict && result.naming.some((finding) => finding.severity === 'error'))) process.exitCode = 1;

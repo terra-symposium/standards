@@ -23,10 +23,11 @@ CONFIG
 type ReplacementGroup = readonly [names: string | readonly string[], replacement: string];
 type RenameKind = { numericIndex?: boolean; callback?: boolean; reserved?: string[] };
 export const IDENTIFIER_REPLACEMENTS = replacementMap([
-	[['organization', 'organisation'], 'org'],
-	[['organizations', 'organisations'], 'orgs'],
-	['member', 'mem'],
-	['members', 'mems'],
+	['current', 'curr'],
+	['context', 'ctx'],
+	['contexts', 'ctxs'],
+	[['config', 'configuration'], 'cfg'],
+	['configurations', 'cfgs'],
 	['error', 'err'],
 	['errors', 'errs'],
 	[['format', 'formatted', 'formatting'], 'fmt'],
@@ -36,27 +37,28 @@ export const IDENTIFIER_REPLACEMENTS = replacementMap([
 	[['initialise', 'initialised', 'initialises', 'initialising', 'initialisation', 'initialize', 'initialized', 'initializes', 'initializing', 'initialization'], 'init'],
 	[['initialiser', 'initializer'], 'init'],
 	[['initialisers', 'initializers', 'initialisations', 'initializations'], 'inits'],
+	['language', 'lang'],
+	['languages', 'langs'],
+	['member', 'mem'],
+	['members', 'mems'],
+	[['organization', 'organisation'], 'org'],
+	[['organizations', 'organisations'], 'orgs'],
+	['option', 'opt'],
+	['options', 'opts'],
+	['parameter', 'param'],
+	['parameters', 'params'],
+	['previous', 'prev'],
+	['record', 'rec'],
+	['records', 'recs'],
 	['repository', 'repo'],
 	['repositories', 'repos'],
 	['request', 'req'],
 	['requests', 'reqs'],
 	['response', 'res'],
-	['context', 'ctx'],
-	['contexts', 'ctxs'],
-	['configuration', 'cfg'],
-	['configurations', 'cfgs'],
-	['option', 'opt'],
-	['options', 'opts'],
-	['parameter', 'param'],
-	['parameters', 'params'],
 	['source', 'src'],
 	['target', 'tgt'],
 	['value', 'val'],
 	['values', 'vals'],
-	['record', 'rec'],
-	['records', 'recs'],
-	['current', 'curr'],
-	['previous', 'prev'],
 ]);
 export const PREFIX_REPLACEMENTS = replacementMap([
 	['safe', 's'],
@@ -296,11 +298,11 @@ export function isRenamableDeclaration(node: ts.Identifier): boolean {
 }
 
 /** Reports concise-name drift without mutating the consumer repository. */
-export function namingFindings(config: QualityConfig): NamingFinding[] {
-	const protectedNames = new Set([...PROTECTED_IDENTIFIERS, ...(config.protectedIdentifiers ?? [])]);
+export function namingFindings(cfg: QualityConfig): NamingFinding[] {
+	const protectedNames = new Set([...PROTECTED_IDENTIFIERS, ...(cfg.protectedIdentifiers ?? [])]);
 	const findings: NamingFinding[] = [];
-	for (const fileName of sourceFiles(config)) {
-		if (isProtectedPath(displayPath(config, fileName)) || isProtectedFilename(fileName)) continue;
+	for (const fileName of sourceFiles(cfg)) {
+		if (isProtectedPath(displayPath(cfg, fileName)) || isProtectedFilename(fileName)) continue;
 		const file = ts.createSourceFile(fileName, readFileSync(fileName, 'utf8'), ts.ScriptTarget.Latest, true, fileName.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
 		const exportedNames = new Set(
 			file.statements.flatMap((s) => (ts.isExportDeclaration(s) && s.exportClause && ts.isNamedExports(s.exportClause) ? s.exportClause.elements.map((e) => (e.propertyName ?? e.name).text) : [])),
@@ -321,7 +323,7 @@ export function namingFindings(config: QualityConfig): NamingFinding[] {
 				const suggestion = renameDeclaration(node);
 				if (!isCallbackDeclaration(node) && (declaredNames.has(suggestion) || (proposalCounts.get(suggestion) ?? 0) > 1)) return;
 				if (suggestion !== node.text)
-					findings.push({ file: displayPath(config, fileName), name: node.text, suggestion, severity: hasPrefixReplacement(node.text) ? 'warning' : 'error', start: node.getStart(file) });
+					findings.push({ file: displayPath(cfg, fileName), name: node.text, suggestion, severity: hasPrefixReplacement(node.text) ? 'warning' : 'error', start: node.getStart(file) });
 			}
 			ts.forEachChild(node, inspect);
 		};

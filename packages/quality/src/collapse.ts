@@ -36,15 +36,15 @@ function scriptKind(fileName: string): ts.ScriptKind {
 
 /**
  *
- * @param node
+ * @param n
  * @param src
  * @returns
  */
-function candidateSpan(node: ts.Node, src: string): { start: number; end: number } | undefined {
-	if (ts.isObjectLiteralExpression(node) || ts.isTypeLiteralNode(node) || ts.isMappedTypeNode(node)) return { start: node.getStart(), end: node.end };
-	if (ts.isInterfaceDeclaration(node)) {
-		const start = src.indexOf('{', node.name.end);
-		const end = src.lastIndexOf('}', node.end - 1);
+function candidateSpan(n: ts.Node, src: string): { start: number; end: number } | undefined {
+	if (ts.isObjectLiteralExpression(n) || ts.isTypeLiteralNode(n) || ts.isMappedTypeNode(n)) return { start: n.getStart(), end: n.end };
+	if (ts.isInterfaceDeclaration(n)) {
+		const start = src.indexOf('{', n.name.end);
+		const end = src.lastIndexOf('}', n.end - 1);
 		if (start >= 0 && end >= start) return { start, end: end + 1 };
 	}
 	return undefined;
@@ -55,30 +55,30 @@ export function collapseTypesAndObjects(fileName: string): boolean {
 	if (!SUPPORTED.has(extname(fileName))) return false;
 	const original = readFileSync(fileName, 'utf8');
 	const parsed = ts.createSourceFile(fileName, original, ts.ScriptTarget.Latest, true, scriptKind(fileName));
-	const languageVariant = parsed.languageVariant;
+	const langVariant = parsed.languageVariant;
 	const edits: { start: number; end: number; text: string }[] = [];
 
 	const collapse = (node: ts.Node, start: number, text: string): string | undefined => {
 		if (!/[\r\n]/.test(text)) return undefined;
 		const protectedRanges: { start: number; end: number }[] = [];
-		const protectLiterals = (child: ts.Node): void => {
+		const protectLiterals = (c: ts.Node): void => {
 			if (
-				ts.isStringLiteral(child) ||
-				ts.isRegularExpressionLiteral(child) ||
-				ts.isNoSubstitutionTemplateLiteral(child) ||
-				ts.isTemplateHead(child) ||
-				ts.isTemplateMiddle(child) ||
-				ts.isTemplateTail(child) ||
-				ts.isJsxText(child)
+				ts.isStringLiteral(c) ||
+				ts.isRegularExpressionLiteral(c) ||
+				ts.isNoSubstitutionTemplateLiteral(c) ||
+				ts.isTemplateHead(c) ||
+				ts.isTemplateMiddle(c) ||
+				ts.isTemplateTail(c) ||
+				ts.isJsxText(c)
 			) {
-				protectedRanges.push({ start: child.getStart(parsed) - start, end: child.end - start });
+				protectedRanges.push({ start: c.getStart(parsed) - start, end: c.end - start });
 				return;
 			}
-			ts.forEachChild(child, protectLiterals);
+			ts.forEachChild(c, protectLiterals);
 		};
 		protectLiterals(node);
 		const isProtected = (position: number): boolean => protectedRanges.some((range) => position >= range.start && position < range.end);
-		const scanner = ts.createScanner(ts.ScriptTarget.Latest, false, languageVariant, text);
+		const scanner = ts.createScanner(ts.ScriptTarget.Latest, false, langVariant, text);
 		let result = '';
 		let whitespace = false;
 		for (let token = scanner.scan(); token !== ts.SyntaxKind.EndOfFileToken; token = scanner.scan()) {
@@ -101,16 +101,16 @@ export function collapseTypesAndObjects(fileName: string): boolean {
 		return result;
 	};
 
-	const visit = (node: ts.Node): void => {
-		const span = candidateSpan(node, original);
+	const visit = (n: ts.Node): void => {
+		const span = candidateSpan(n, original);
 		if (span) {
-			const text = collapse(node, span.start, original.slice(span.start, span.end));
+			const text = collapse(n, span.start, original.slice(span.start, span.end));
 			if (text !== undefined) {
 				edits.push({ ...span, text });
 				return;
 			}
 		}
-		ts.forEachChild(node, visit);
+		ts.forEachChild(n, visit);
 	};
 	visit(parsed);
 	if (!edits.length) return false;

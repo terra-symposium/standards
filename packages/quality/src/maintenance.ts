@@ -254,8 +254,8 @@ export function protectLongImports(fileName: string, printWidth = 200): boolean 
 	if (!insertions.size) return false;
 	let next = original;
 	for (const offset of [...insertions].sort((a, b) => b - a)) {
-		const newline = original.indexOf('\n', offset);
-		const indent = original.slice(offset, newline < 0 ? original.length : newline).match(/^\s*/)?.[0] ?? '';
+		const nLine = original.indexOf('\n', offset);
+		const indent = original.slice(offset, nLine < 0 ? original.length : nLine).match(/^\s*/)?.[0] ?? '';
 		next = `${next.slice(0, offset)}${indent}// prettier-ignore${eol}${next.slice(offset)}`;
 	}
 	writeFileSync(fileName, next);
