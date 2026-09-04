@@ -27,13 +27,16 @@ export const IDENTIFIER_REPLACEMENTS = replacementMap([
 	['context', 'ctx'],
 	[['config', 'configuration'], 'cfg'],
 	['configured', 'cfgd'],
+	['difference', 'diff'],
 	['directory', 'dir'],
+	['destination', 'dest'],
 	['error', 'err'],
 	['expression', 'expr'],
 	[['format', 'formatted', 'formatting', 'formatter'], 'fmt'],
 	['function', 'fn'],
 	[['generation', 'generate', 'generated', 'generating'], 'gen'],
 	['image', 'img'],
+	['index', 'idx'],
 	[['initialise', 'initialised', 'initialises', 'initialising', 'initialisation', 'initialize', 'initialized', 'initializes', 'initializing', 'initialization'], 'init'],
 	[['initialiser', 'initializer'], 'init'],
 	['language', 'lang'],
@@ -43,9 +46,10 @@ export const IDENTIFIER_REPLACEMENTS = replacementMap([
 	['option', 'opt'],
 	['parameter', 'param'],
 	['previous', 'prev'],
+	['position', 'pos'],
 	['record', 'rec'],
 	['repository', 'repo'],
-	['request', 'req'],
+	[['request', 'requested'], 'req'],
 	['response', 'res'],
 	['source', 'src'],
 	['target', 'tgt'],
@@ -395,11 +399,13 @@ export function namingFindings(cfg: QualityConfig): NamingFinding[] {
 			file.statements.flatMap((s) => (ts.isExportDeclaration(s) && s.exportClause && ts.isNamedExports(s.exportClause) ? s.exportClause.elements.map((e) => (e.propertyName ?? e.name).text) : [])),
 		);
 		const safetyByScope = new Map<ts.Node, { declared: Set<string>; proposals: Map<string, number> }>();
+		const declaredNames = new Set<string>();
 		const collect = (n: ts.Node): void => {
 			if (ts.isIdentifier(n) && isRenamableDeclaration(n)) {
 				const scope = declarationScope(n);
 				const safety = safetyByScope.get(scope) ?? { declared: new Set<string>(), proposals: new Map<string, number>() };
 				safety.declared.add(n.text);
+				declaredNames.add(n.text);
 				const suggestion = renameDeclaration(n);
 				if (!n.text.startsWith('_') && suggestion !== n.text && !isCallbackDeclaration(n)) safety.proposals.set(suggestion, (safety.proposals.get(suggestion) ?? 0) + 1);
 				safetyByScope.set(scope, safety);
@@ -411,7 +417,7 @@ export function namingFindings(cfg: QualityConfig): NamingFinding[] {
 			if (ts.isIdentifier(n) && isRenamableDeclaration(n) && !n.text.startsWith('_') && !protectedNames.has(n.text) && !exportedNames.has(n.text)) {
 				const suggestion = renameDeclaration(n);
 				const safety = safetyByScope.get(declarationScope(n));
-				if (!isCallbackDeclaration(n) && (safety?.declared.has(suggestion) || (safety?.proposals.get(suggestion) ?? 0) > 1)) return;
+				if (!isCallbackDeclaration(n) && (safety?.declared.has(suggestion) || declaredNames.has(suggestion) || (safety?.proposals.get(suggestion) ?? 0) > 1)) return;
 				if (suggestion !== n.text) findings.push({ file: displayPath(cfg, fileName), name: n.text, suggestion, severity: hasPrefixReplacement(n.text) ? 'warning' : 'error', start: n.getStart(file) });
 			}
 			ts.forEachChild(n, inspect);
