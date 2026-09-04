@@ -254,6 +254,10 @@ function fixNames(cfg: QualityConfig, all: boolean): void {
 	}
 	const hasDescCollision = (scope: ts.Node, suggestion: string): boolean =>
 		[...renameSafetyByScope.entries()].some(([child, safety]) => child !== scope && child.getStart() >= scope.getStart() && child.end <= scope.end && safety.declared.has(suggestion));
+	const hasDeclaredName = (src: ts.SourceFile, suggestion: string): boolean => {
+		const escaped = suggestion.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+		return new RegExp(`\\b(?:const|let|var|function|class|interface|type)\\s+${escaped}\\b`).test(src.text);
+	};
 	for (const src of program.getSourceFiles()) {
 		if (!allowed.has(src.fileName)) continue;
 		const inspect = (node: ts.Node): void => {
@@ -263,7 +267,11 @@ function fixNames(cfg: QualityConfig, all: boolean): void {
 				const fileDeclared = declaredByFile.get(src.fileName);
 				if (
 					!isCallbackDeclaration(node) &&
-					(safety?.declared.has(suggestion) || fileDeclared?.has(suggestion) || (safety?.proposals.get(suggestion) ?? 0) > 1 || hasDescCollision(declarationScope(node), suggestion))
+					(safety?.declared.has(suggestion) ||
+						fileDeclared?.has(suggestion) ||
+						hasDeclaredName(src, suggestion) ||
+						(safety?.proposals.get(suggestion) ?? 0) > 1 ||
+						hasDescCollision(declarationScope(node), suggestion))
 				)
 					return;
 				const symbol = suggestion === node.text ? undefined : identifierSymbol(node);
