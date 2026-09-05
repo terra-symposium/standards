@@ -22,8 +22,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
       - run: pnpm --filter @terra-symposium/quality publish --no-git-checks --access restricted
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+           env:
+             NODE_AUTH_TOKEN: ${{ secrets.PACKAGES_TOKEN }}
       - run: pnpm --filter @terra-symposium/error-boundaries publish --no-git-checks --access restricted
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+           env:
+             NODE_AUTH_TOKEN: ${{ secrets.PACKAGES_TOKEN }}
