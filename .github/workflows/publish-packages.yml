@@ -21,9 +21,17 @@ jobs:
           registry-url: https://npm.pkg.github.com
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
-           - run: pnpm --filter @terra-symposium/quality publish --no-git-checks --access public
-           env:
-             NODE_AUTH_TOKEN: ${{ secrets.PACKAGES_TOKEN }}
-           - run: pnpm --filter @terra-symposium/error-boundaries publish --no-git-checks --access public
-           env:
-             NODE_AUTH_TOKEN: ${{ secrets.PACKAGES_TOKEN }}
+        - name: Publish quality when missing
+          working-directory: packages/quality
+          run: |
+            version=$(node -p "require('./package.json').version")
+            npm view "@terra-symposium/quality@$version" version >/dev/null 2>&1 || npm publish --access public
+          env:
+            NODE_AUTH_TOKEN: ${{ secrets.PACKAGES_TOKEN }}
+        - name: Publish error boundaries when missing
+          working-directory: packages/error-boundaries
+          run: |
+            version=$(node -p "require('./package.json').version")
+            npm view "@terra-symposium/error-boundaries@$version" version >/dev/null 2>&1 || npm publish --access public
+          env:
+            NODE_AUTH_TOKEN: ${{ secrets.PACKAGES_TOKEN }}
