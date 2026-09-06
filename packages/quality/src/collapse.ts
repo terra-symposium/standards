@@ -7,9 +7,9 @@ IMPORTS
 //////////////////////////////////////////////////*/
 
 // API
-import { readFileSync, writeFileSync } from 'node:fs';
-import { extname } from 'node:path';
 import ts from 'typescript';
+import { extname } from 'node:path';
+import { readFileSync, writeFileSync } from 'node:fs';
 
 /*//////////////////////////////////////////////////
 CONFIG
@@ -42,7 +42,20 @@ function scriptKind(fileName: string): ts.ScriptKind {
  * @return
  */
 function candidateSpan(n: ts.Node, src: string): { start: number; end: number } | undefined {
-	if (ts.isObjectLiteralExpression(n) || ts.isTypeLiteralNode(n) || ts.isMappedTypeNode(n)) return { start: n.getStart(), end: n.end };
+	if (ts.isObjectLiteralExpression(n)) {
+		let containsJsx = false;
+		const findJsx = (child: ts.Node): void => {
+			if (ts.isJsxElement(child) || ts.isJsxSelfClosingElement(child) || ts.isJsxFragment(child)) {
+				containsJsx = true;
+				return;
+			}
+			ts.forEachChild(child, findJsx);
+		};
+		ts.forEachChild(n, findJsx);
+		if (containsJsx) return undefined;
+		return { start: n.getStart(), end: n.end };
+	}
+	if (ts.isTypeLiteralNode(n) || ts.isMappedTypeNode(n)) return { start: n.getStart(), end: n.end };
 	if (ts.isInterfaceDeclaration(n)) {
 		const start = src.indexOf('{', n.name.end);
 		const end = src.lastIndexOf('}', n.end - 1);
@@ -83,7 +96,7 @@ export function collapseTypesAndObjects(fileName: string): boolean {
 			ts.forEachChild(c, protectLiterals);
 		};
 		protectLiterals(node);
-		const isProtected = (pos: number): boolean => protectedRanges.some((range) => pos >= range.start && pos < range.end);
+		const isProtected = (pos: number): boolean => protectedRanges.some((r) => pos >= r.start && pos < r.end);
 		const scanner = ts.createScanner(ts.ScriptTarget.Latest, false, langVariant, text);
 		let result = '';
 		let whitespace = false;
@@ -119,7 +132,7 @@ export function collapseTypesAndObjects(fileName: string): boolean {
 	};
 	visit(parsed);
 	if (!edits.length) return false;
-	const n = edits.sort((a, b) => b.start - a.start).reduce((text, edit) => `${text.slice(0, edit.start)}${edit.text}${text.slice(edit.end)}`, original);
+	const n = edits.sort((a, b) => b.start - a.start).reduce((t, e) => `${t.slice(0, e.start)}${e.text}${t.slice(e.end)}`, original);
 	if (n === original) return false;
 	writeFileSync(fileName, n);
 	return true;

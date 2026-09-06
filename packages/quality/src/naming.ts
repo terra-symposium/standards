@@ -7,12 +7,12 @@ IMPORTS
 //////////////////////////////////////////////////*/
 
 // API
-import { displayPath, sourceFiles } from './files.js';
-import { readFileSync } from 'node:fs';
 import ts from 'typescript';
+import { displayPath, srcFiles } from './files.js';
+import { readFileSync } from 'node:fs';
 
 // TYPES
-import type { QualityConfig } from './config.js';
+import type { QualityCfg } from './config.js';
 
 /*//////////////////////////////////////////////////
 CONFIG
@@ -21,26 +21,35 @@ CONFIG
 type ReplacementGroup = readonly [names: string | readonly string[], replacement: string];
 type RenameKind = { numericIndex?: boolean; callback?: boolean; reserved?: string[] };
 export const IDENTIFIER_REPLACEMENTS = replacementMap([
+	[['administrator', 'administration'], 'admin'],
 	['attribute', 'attr'],
+	['category', 'cat'],
 	['current', 'curr'],
 	['command', 'cmd'],
+	['column', 'col'],
 	['context', 'ctx'],
 	[['config', 'configuration'], 'cfg'],
 	['configured', 'cfgd'],
+	[['compare', 'comp'], 'comp'],
+	['definition', 'def'],
 	['difference', 'diff'],
 	['directory', 'dir'],
 	['destination', 'dest'],
 	['error', 'err'],
+	['event', 'e'],
 	['expression', 'expr'],
+	['extension', 'ext'],
 	[['format', 'formatted', 'formatting', 'formatter'], 'fmt'],
 	['function', 'fn'],
 	[['generation', 'generate', 'generated', 'generating'], 'gen'],
 	['image', 'img'],
+	[['identify', 'indentifier'], 'id'],
 	['index', 'idx'],
 	[['initialise', 'initialised', 'initialises', 'initialising', 'initialisation', 'initialize', 'initialized', 'initializes', 'initializing', 'initialization'], 'init'],
 	[['initialiser', 'initializer'], 'init'],
 	['language', 'lang'],
 	['member', 'mem'],
+	['message', 'msg'],
 	[['organization', 'organisation'], 'org'],
 	['operation', 'op'],
 	['option', 'opt'],
@@ -86,7 +95,23 @@ export const CALLBACK_ALIASES = replacementMap(
 	],
 	false,
 );
-export const CALLBACK_METHODS = new Set(['map', 'flatMap', 'forEachChild']);
+export const CALLBACK_METHODS = new Set([
+	'addEventListener',
+	'every',
+	'filter',
+	'find',
+	'findIndex',
+	'findLast',
+	'findLastIndex',
+	'flatMap',
+	'forEach',
+	'forEachChild',
+	'map',
+	'reduce',
+	'reduceRight',
+	'some',
+	'sort',
+]);
 export const PROTECTED_IDENTIFIERS = new Set([
 	'GET',
 	'HEAD',
@@ -112,7 +137,7 @@ export const PROTECTED_IDENTIFIERS = new Set([
 ]);
 export const PROTECTED_PATH_PARTS = new Set(['node_modules', '.next', 'out', 'build', 'coverage', 'src/components/ui']);
 export const PROTECTED_FILENAMES = new Set(['page.tsx', 'page.ts', 'layout.tsx', 'layout.ts', 'route.ts', 'route.tsx', 'error.tsx', 'loading.tsx', 'not-found.tsx', 'index.ts', 'index.tsx']);
-export const CODE_EXTENSIONS = new Set(['.js', '.jsx', '.mjs', '.cjs', '.ts', '.tsx', '.mts', '.cts']);
+export const CODE_EXTS = new Set(['.js', '.jsx', '.mjs', '.cjs', '.ts', '.tsx', '.mts', '.cts']);
 export type NamingFinding = { file: string; name: string; suggestion: string; severity: 'error' | 'warning'; start: number };
 
 /*//////////////////////////////////////////////////
@@ -203,12 +228,12 @@ export function callbackAlias(name: string, reserved: string[] = []): string {
  *
  * @return
  */
-export function renameIdentifier(name: string, kind: RenameKind = {}): string {
+export function renameId(name: string, kind: RenameKind = {}): string {
 	if (PROTECTED_IDENTIFIERS.has(name) || name === '_') return name;
 	if (kind.numericIndex && name === 'index') return callbackAlias('item', kind.reserved);
 	if (kind.callback) return callbackAlias(name, kind.reserved);
 	const tokens = identifierTokens(name);
-	if (!tokens.some((token) => Object.hasOwn(IDENTIFIER_REPLACEMENTS, token.toLowerCase()) || Object.hasOwn(PREFIX_REPLACEMENTS, token.toLowerCase()))) return name;
+	if (!tokens.some((t) => Object.hasOwn(IDENTIFIER_REPLACEMENTS, t.toLowerCase()) || Object.hasOwn(PREFIX_REPLACEMENTS, t.toLowerCase()))) return name;
 	return renderIdentifier(
 		name,
 		tokens.map((t, i) => {
@@ -230,18 +255,68 @@ export function renameIdentifier(name: string, kind: RenameKind = {}): string {
  */
 function callbackKind(n: ts.Identifier): RenameKind | undefined {
 	const param = ts.findAncestor(n, ts.isParameter);
-	if (!param || (!ts.isArrowFunction(param.parent) && !ts.isFunctionExpression(param.parent))) return undefined;
-	const callback = param.parent;
+	if (!param) return undefined;
+	const callback = ts.findAncestor(
+		param,
+		(n): n is ts.ArrowFunction | ts.FunctionExpression | ts.FunctionDeclaration => ts.isArrowFunction(n) || ts.isFunctionExpression(n) || ts.isFunctionDeclaration(n),
+	);
+	if (!callback) return undefined;
 	const call = callback.parent;
-	if (!ts.isCallExpression(call) || !call.arguments.includes(callback)) return undefined;
-	const expr = call.expression;
-	if (!ts.isPropertyAccessExpression(expr) || !CALLBACK_METHODS.has(expr.name.text)) return undefined;
+	const isCollectionCallback =
+		!ts.isFunctionDeclaration(callback) &&
+		ts.isCallExpression(call) &&
+		call.arguments.includes(callback as ts.Expression) &&
+		ts.isPropertyAccessExpression(call.expression) &&
+		CALLBACK_METHODS.has(call.expression.name.text);
+	let isNamedCallback = false;
+	if (ts.isFunctionDeclaration(callback) && callback.name) {
+		const scan = (n: ts.Node): void => {
+			if (isNamedCallback) return;
+			const jsxAttr = ts.isJsxAttribute(n) ? n : undefined;
+			const jsxExpr = jsxAttr?.initializer && ts.isJsxExpression(jsxAttr.initializer) ? jsxAttr.initializer.expression : undefined;
+			const isJsxHandler =
+				!!jsxAttr &&
+				ts.isIdentifier(jsxAttr.name) &&
+				/^on[A-Z]/.test(jsxAttr.name.text) &&
+				!!jsxExpr &&
+				(() => {
+					let refs = false;
+					const findRef = (c: ts.Node): void => {
+						if (refs) return;
+						if (ts.isIdentifier(c) && c.text === callback.name?.text) {
+							refs = true;
+							return;
+						}
+						ts.forEachChild(c, findRef);
+					};
+					findRef(jsxExpr);
+					return refs;
+				})();
+			if (
+				ts.isCallExpression(n) &&
+				ts.isPropertyAccessExpression(n.expression) &&
+				CALLBACK_METHODS.has(n.expression.name.text) &&
+				n.arguments.some((a) => ts.isIdentifier(a) && a.text === callback.name?.text)
+			) {
+				isNamedCallback = true;
+				return;
+			}
+			if (isJsxHandler) {
+				isNamedCallback = true;
+				return;
+			}
+			ts.forEachChild(n, scan);
+		};
+		scan(callback.parent);
+	}
+	const isJsxCallback = ts.isJsxExpression(call) && call.expression === callback && ts.isJsxAttribute(call.parent);
+	if (!isCollectionCallback && !isNamedCallback && !isJsxCallback) return undefined;
 	const declarations: ts.Identifier[] = [];
 	const collectBinding = (name: ts.BindingName): void => {
 		if (ts.isIdentifier(name)) declarations.push(name);
 		else for (const element of name.elements) if (ts.isBindingElement(element)) collectBinding(element.name);
 	};
-	for (const parameter of callback.parameters) collectBinding(parameter.name);
+	for (const p of callback.parameters) collectBinding(p.name);
 	const declarationNames = new Set(declarations.map((d) => d.text));
 	const reserved = new Set<string>();
 	const collect = (child: ts.Node): void => {
@@ -253,7 +328,7 @@ function callbackKind(n: ts.Identifier): RenameKind | undefined {
 		if (declaration === n) return { callback: true, numericIndex: callback.parameters.indexOf(param) === 1 && n.text === 'index', reserved: [...reserved] };
 		const declarationParam = ts.findAncestor(declaration, ts.isParameter);
 		reserved.add(
-			renameIdentifier(declaration.text, {
+			renameId(declaration.text, {
 				callback: true,
 				numericIndex: !!declarationParam && callback.parameters.indexOf(declarationParam) === 1 && declaration.text === 'index',
 				reserved: [...reserved],
@@ -282,7 +357,7 @@ export function isCallbackDeclaration(node: ts.Identifier): boolean {
  * @return
  */
 export function renameDeclaration(n: ts.Identifier): string {
-	return renameIdentifier(n.text, callbackKind(n));
+	return renameId(n.text, callbackKind(n));
 }
 
 /**
@@ -303,10 +378,7 @@ export function hasPrefixReplacement(name: string): boolean {
  */
 export function isProtectedPath(fileName: string): boolean {
 	const norm = fileName.replaceAll('\\', '/');
-	return (
-		norm.endsWith('.d.ts') ||
-		[...PROTECTED_PATH_PARTS].some((part) => (part.includes('/') ? norm === part || norm.startsWith(`${part}/`) || norm.includes(`/${part}/`) : norm.split('/').includes(part)))
-	);
+	return norm.endsWith('.d.ts') || [...PROTECTED_PATH_PARTS].some((p) => (p.includes('/') ? norm === p || norm.startsWith(`${p}/`) || norm.includes(`/${p}/`) : norm.split('/').includes(p)));
 }
 
 /**
@@ -326,8 +398,8 @@ export function isProtectedFilename(fileName: string): boolean {
  *
  * @return
  */
-export function isApprovedIdentifier(name: string, kind: RenameKind = {}): boolean {
-	return renameIdentifier(name, kind) === name;
+export function isApprovedId(name: string, kind: RenameKind = {}): boolean {
+	return renameId(name, kind) === name;
 }
 
 /**
@@ -391,12 +463,12 @@ export function declarationScope(n: ts.Identifier): ts.Node {
  *
  * @return
  */
-export function namingFindings(cfg: QualityConfig): NamingFinding[] {
+export function namingFindings(cfg: QualityCfg): NamingFinding[] {
 	const protectedNames = new Set([...PROTECTED_IDENTIFIERS, ...(cfg.protectedIdentifiers ?? [])]);
 	const findings: NamingFinding[] = [];
-	for (const fileName of sourceFiles(cfg)) {
-		if (isProtectedPath(displayPath(cfg, fileName)) || isProtectedFilename(fileName)) continue;
-		const file = ts.createSourceFile(fileName, readFileSync(fileName, 'utf8'), ts.ScriptTarget.Latest, true, fileName.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
+	for (const f of srcFiles(cfg)) {
+		if (isProtectedPath(displayPath(cfg, f))) continue;
+		const file = ts.createSourceFile(f, readFileSync(f, 'utf8'), ts.ScriptTarget.Latest, true, f.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
 		const exportedNames = new Set(
 			file.statements.flatMap((s) => (ts.isExportDeclaration(s) && s.exportClause && ts.isNamedExports(s.exportClause) ? s.exportClause.elements.map((e) => (e.propertyName ?? e.name).text) : [])),
 		);
@@ -420,7 +492,7 @@ export function namingFindings(cfg: QualityConfig): NamingFinding[] {
 				const suggestion = renameDeclaration(n);
 				const safety = safetyByScope.get(declarationScope(n));
 				if (!isCallbackDeclaration(n) && (safety?.declared.has(suggestion) || declaredNames.has(suggestion) || (safety?.proposals.get(suggestion) ?? 0) > 1)) return;
-				if (suggestion !== n.text) findings.push({ file: displayPath(cfg, fileName), name: n.text, suggestion, severity: hasPrefixReplacement(n.text) ? 'warning' : 'error', start: n.getStart(file) });
+				if (suggestion !== n.text) findings.push({ file: displayPath(cfg, f), name: n.text, suggestion, severity: hasPrefixReplacement(n.text) ? 'warning' : 'error', start: n.getStart(file) });
 			}
 			ts.forEachChild(n, inspect);
 		};

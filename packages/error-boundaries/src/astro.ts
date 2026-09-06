@@ -2,10 +2,12 @@
  * packages/error-boundaries/src/astro.ts
  */
 
+/*//////////////////////////////////////////////////
+CONFIG
+//////////////////////////////////////////////////*/
+
 export type ErrorStatus = 400 | 401 | 403 | 404 | 500 | 502 | 503;
-
 export type ErrorStatusCopy = { title: string; description: string };
-
 export const ERROR_STATUS_COPY: Readonly<Record<ErrorStatus, ErrorStatusCopy>> = Object.freeze({
 	400: { title: 'Bad Request', description: 'The server could not understand the request due to invalid syntax.' },
 	401: { title: 'Unauthorized', description: 'You need to authenticate to access this resource.' },
@@ -15,6 +17,10 @@ export const ERROR_STATUS_COPY: Readonly<Record<ErrorStatus, ErrorStatusCopy>> =
 	502: { title: 'Bad Gateway', description: 'The server received an invalid response from an upstream server.' },
 	503: { title: 'Service Unavailable', description: 'The server is currently unable to handle the request due to temporary overload or maintenance.' },
 });
+
+/*//////////////////////////////////////////////////
+FUNCTIONS
+//////////////////////////////////////////////////*/
 
 /** Resolves unknown status values to the safe internal-server-error response. */
 export function errorStatusCopy(status: number): ErrorStatusCopy {

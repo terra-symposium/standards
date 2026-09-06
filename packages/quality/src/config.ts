@@ -13,7 +13,7 @@ import { resolve } from 'node:path';
 CONFIG
 //////////////////////////////////////////////////*/
 
-export type QualityConfig = {
+export type QualityCfg = {
 	root: string;
 	sourceRoots: string[];
 	includeRoots?: string[];
@@ -46,7 +46,7 @@ HELPERS
  *
  * @return
  */
-export function createQualityConfig(cfg: QualityConfig): QualityConfig {
+export function createQualityCfg(cfg: QualityCfg): QualityCfg {
 	return {
 		...cfg,
 		root: resolve(cfg.root),

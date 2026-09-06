@@ -7,9 +7,9 @@ IMPORTS
 //////////////////////////////////////////////////*/
 
 // API
-import { readFileSync, writeFileSync } from 'node:fs';
-import { extname, relative, sep } from 'node:path';
 import ts from 'typescript';
+import { extname, relative, sep } from 'node:path';
+import { readFileSync, writeFileSync } from 'node:fs';
 
 /*//////////////////////////////////////////////////
 CONFIG
@@ -46,6 +46,29 @@ function importSrc(n: ts.ImportDeclaration): string {
 }
 
 /**
+ * Returns whether an import would collide with a declaration in the file.
+ * This also handles self-imports and duplicate local component declarations.
+ *
+ * @param parsed
+ * @param n
+ *
+ * @return
+ */
+function selfImportConflicts(parsed: ts.SourceFile, n: ts.ImportDeclaration): boolean {
+	const localNames = new Set<string>();
+	for (const statement of parsed.statements) {
+		if (ts.isFunctionDeclaration(statement) || ts.isClassDeclaration(statement) || ts.isInterfaceDeclaration(statement) || ts.isTypeAliasDeclaration(statement) || ts.isEnumDeclaration(statement))
+			if (statement.name) localNames.add(statement.name.text);
+		if (ts.isVariableStatement(statement)) for (const declaration of statement.declarationList.declarations) if (ts.isIdentifier(declaration.name)) localNames.add(declaration.name.text);
+	}
+	const clause = n.importClause;
+	if (!clause) return false;
+	if (clause.name && localNames.has(clause.name.text)) return true;
+	if (clause.namedBindings && ts.isNamespaceImport(clause.namedBindings) && localNames.has(clause.namedBindings.name.text)) return true;
+	return Boolean(clause.namedBindings && ts.isNamedImports(clause.namedBindings) && clause.namedBindings.elements.some((e) => localNames.has(e.name.text)));
+}
+
+/**
  *
  * @param name
  *
@@ -66,29 +89,53 @@ function importGroup(name: string): ImportGroup {
  */
 function groupedImports(parsed: ts.SourceFile, imports: ts.ImportDeclaration[]): Record<ImportGroup, { source: string; text: string }[]> {
 	const groups: Record<ImportGroup, { source: string; text: string }[]> = { API: [], COMPONENTS: [], DATA: [], TYPES: [] };
-	const add = (group: ImportGroup, n: ts.ImportDeclaration, clause: string): void => {
-		const module = n.moduleSpecifier.getText(parsed);
-		groups[group].push({ source: importSrc(n), text: clause ? `import ${clause} from ${module};` : `import ${module};` });
+	type MergedImport = { group: ImportGroup; source: string; module: string; typeOnly: boolean; defaultName?: string; namespace?: string; named: Set<string> };
+	const merged = new Map<string, MergedImport>();
+	const get = (group: ImportGroup, n: ts.ImportDeclaration, typeOnly: boolean) => {
+		const source = importSrc(n);
+		const key = `${group}|${typeOnly ? 'type|' : ''}${source}`;
+		const existing = merged.get(key);
+		if (existing) return existing;
+		const created: MergedImport = { group, source, module: n.moduleSpecifier.getText(parsed), typeOnly, named: new Set<string>() };
+		merged.set(key, created);
+		return created;
 	};
 	for (const n of imports) {
 		const clause = n.importClause;
 		if (!clause) {
-			add('API', n, '');
+			const entry = get('API', n, false);
+			entry.named.add('');
 			continue;
 		}
-		if (clause.name) add(clause.isTypeOnly ? 'TYPES' : importGroup(clause.name.text), n, `${clause.isTypeOnly ? 'type ' : ''}${clause.name.text}`);
+		const typeOnly = clause.isTypeOnly;
+		if (clause.name) get(typeOnly ? 'TYPES' : importGroup(clause.name.text), n, typeOnly).defaultName = clause.name.text;
 		const bindings = clause.namedBindings;
-		if (bindings && ts.isNamespaceImport(bindings)) add(clause.isTypeOnly ? 'TYPES' : importGroup(bindings.name.text), n, `${clause.isTypeOnly ? 'type ' : ''}* as ${bindings.name.text}`);
+		if (bindings && ts.isNamespaceImport(bindings)) get(typeOnly ? 'TYPES' : importGroup(bindings.name.text), n, typeOnly).namespace = bindings.name.text;
 		if (bindings && ts.isNamedImports(bindings)) {
-			const names = new Map<ImportGroup, string[]>();
 			for (const el of bindings.elements) {
-				const group = clause.isTypeOnly || el.isTypeOnly ? 'TYPES' : importGroup(el.name.text);
-				const els = names.get(group) ?? [];
-				els.push(el.getText(parsed).replace(/^type\s+/, ''));
-				names.set(group, els);
+				const elTypeOnly = typeOnly || el.isTypeOnly;
+				const group = elTypeOnly ? 'TYPES' : importGroup(el.name.text);
+				get(group, n, elTypeOnly).named.add(el.getText(parsed).replace(/^type\s+/, ''));
 			}
-			for (const [group, elements] of names) add(group, n, `${group === 'TYPES' ? 'type ' : ''}{ ${elements.sort().join(', ')} }`);
 		}
+	}
+	for (const v of merged.values()) {
+		const prefix = v.typeOnly ? 'import type ' : 'import ';
+		if (v.named.has('')) {
+			groups[v.group].push({ source: v.source, text: `import ${v.module};` });
+			continue;
+		}
+		if (v.namespace) {
+			const namespaceParts = [v.defaultName, `* as ${v.namespace}`].filter(Boolean);
+			groups[v.group].push({ source: v.source, text: `${prefix}${namespaceParts.join(', ')} from ${v.module};` });
+			if (!v.named.size) continue;
+		}
+		const named = v.named.size ? `{ ${[...v.named].sort().join(', ')} }` : undefined;
+		const clause = v.namespace ? named : [v.defaultName, named].filter(Boolean).join(', ');
+		if (v.typeOnly && v.defaultName && named) {
+			groups[v.group].push({ source: v.source, text: `${prefix}${v.defaultName} from ${v.module};` });
+			groups[v.group].push({ source: v.source, text: `${prefix}${named} from ${v.module};` });
+		} else if (clause) groups[v.group].push({ source: v.source, text: `${prefix}${clause} from ${v.module};` });
 	}
 	return groups;
 }
@@ -151,11 +198,11 @@ function literalSpans(src: string, fileName: string): { start: number; end: numb
 function normCommentLayout(src: string, fileName: string, eol: string): string {
 	const spans = literalSpans(src, fileName);
 	const rawLines = src.split(/\r?\n/);
-	const newlineSize = src.includes('\r\n') ? 2 : 1;
+	const nlineSize = src.includes('\r\n') ? 2 : 1;
 	let offset = 0;
 	const lines = rawLines.map((t) => {
 		const line = { text: t, start: offset };
-		offset += t.length + newlineSize;
+		offset += t.length + nlineSize;
 		return line;
 	});
 	const protectedLine = (line: { start: number }): boolean => {
@@ -190,7 +237,7 @@ function normCommentLayout(src: string, fileName: string, eol: string): string {
 	};
 	for (let i = 0; i < lines.length; i++) {
 		const text = lines[i].text.replace(/[ \t]+$/, '');
-		const closesSection = sectionClose(i);
+		const closesSect = sectionClose(i);
 		if (!text && !protectedLine(lines[i])) {
 			const prev = out.at(-1) ?? '';
 			let next = i + 1;
@@ -202,19 +249,19 @@ function normCommentLayout(src: string, fileName: string, eol: string): string {
 		if (sectionOpen(i)) pushBlank();
 		if (lineGroup(i)) pushBlank();
 		out.push(text);
-		if (closesSection || lineGroup(i)) {
+		if (closesSect || lineGroup(i)) {
 			while (i + 1 < lines.length && !lines[i + 1].text.trim() && !protectedLine(lines[i + 1])) i++;
-			if (closesSection && i + 1 < lines.length) pushBlank();
+			if (closesSect && i + 1 < lines.length) pushBlank();
 		}
 	}
 	while (out.at(-1) === '') out.pop();
 	// Keep blank lines only when they explicitly separate comments/groups.
 	// This also removes stale whitespace inside function bodies while preserving
 	// spacing around TSDoc, line groups, and section fences.
-	const compact = out.filter((line, idx) => {
-		if (line !== '') return true;
-		const prev = out[idx - 1] ?? '';
-		const following = out[idx + 1] ?? '';
+	const compact = out.filter((l, i) => {
+		if (l !== '') return true;
+		const prev = out[i - 1] ?? '';
+		const following = out[i + 1] ?? '';
 		const comment = (textVal: string): boolean => /^\s*(?:\/\/|\/\*|\*\/|\*)/.test(textVal);
 		return comment(prev) || comment(following);
 	});
@@ -228,51 +275,51 @@ function normCommentLayout(src: string, fileName: string, eol: string): string {
  *
  * @return
  */
-function removeManagedSections(src: string, fileName: string): string {
+function removeManagedSects(src: string, fileName: string): string {
 	const parsed = ts.createSourceFile(fileName, src, ts.ScriptTarget.Latest, true, srcKind(fileName));
 	const literals: { start: number; end: number }[] = [];
-	const visit = (node: ts.Node): void => {
+	const visit = (n: ts.Node): void => {
 		if (
-			ts.isStringLiteral(node) ||
-			ts.isRegularExpressionLiteral(node) ||
-			ts.isNoSubstitutionTemplateLiteral(node) ||
-			ts.isTemplateHead(node) ||
-			ts.isTemplateMiddle(node) ||
-			ts.isTemplateTail(node) ||
-			ts.isJsxText(node)
+			ts.isStringLiteral(n) ||
+			ts.isRegularExpressionLiteral(n) ||
+			ts.isNoSubstitutionTemplateLiteral(n) ||
+			ts.isTemplateHead(n) ||
+			ts.isTemplateMiddle(n) ||
+			ts.isTemplateTail(n) ||
+			ts.isJsxText(n)
 		) {
-			literals.push({ start: node.getStart(parsed), end: node.end });
+			literals.push({ start: n.getStart(parsed), end: n.end });
 			return;
 		}
-		ts.forEachChild(node, visit);
+		ts.forEachChild(n, visit);
 	};
 	visit(parsed);
 	const pattern = /^[ \t]*\/\*\/{10,}[ \t]*\r?\n[ \t]*(?:CONFIG|HELPERS)[ \t]*\r?\n[ \t]*\/{10,}\*\/[ \t]*(?:\r?\n)*/gm;
-	const matches = [...src.matchAll(pattern)].filter((match) => !literals.some((literal) => match.index! >= literal.start && match.index! < literal.end));
-	return matches.sort((a, b) => b.index! - a.index!).reduce((text, match) => `${text.slice(0, match.index!)}${text.slice(match.index! + match[0].length)}`, src);
+	const matches = [...src.matchAll(pattern)].filter((m) => !literals.some((l) => m.index! >= l.start && m.index! < l.end));
+	return matches.sort((a, b) => b.index! - a.index!).reduce((t, m) => `${t.slice(0, m.index!)}${t.slice(m.index! + m[0].length)}`, src);
 }
 
 /**
  *
- * @param node
+ * @param n
  * @param parsed
  * @param eol
  * @param existing
  *
  * @return
  */
-function genFnDoc(node: ts.FunctionDeclaration, parsed: ts.SourceFile, eol: string, existing = ''): string {
-	const params = node.parameters.map((p, i) => (ts.isIdentifier(p.name) ? p.name.text : ts.isObjectBindingPattern(p.name) ? 'props' : `param${i + 1}`));
+function genFnDoc(n: ts.FunctionDeclaration, parsed: ts.SourceFile, eol: string, existing = ''): string {
+	const params = n.parameters.map((p, i) => (ts.isIdentifier(p.name) ? p.name.text : ts.isObjectBindingPattern(p.name) ? 'props' : `param${i + 1}`));
 	const body = existing
 		.slice(3, -2)
 		.split(/\r?\n/)
 		.map((l) => l.replace(/^\s*\* ?/, '').trim());
 	while (body.length && !body.at(0)?.trim()) body.shift();
 	while (body.length && !body.at(-1)?.trim()) body.pop();
-	const firstTag = body.findIndex((line) => /^\s*@\w+/.test(line));
+	const firstTag = body.findIndex((l) => /^\s*@\w+/.test(l));
 	const summary = (firstTag < 0 ? body : body.slice(0, firstTag)).map((l) => l.trim());
 	while (summary.length && !summary.at(-1)?.trim()) summary.pop();
-	const tagLines = firstTag < 0 ? [] : body.slice(firstTag).filter((line) => line.trim());
+	const tagLines = firstTag < 0 ? [] : body.slice(firstTag).filter((l) => l.trim());
 	const blocks: string[][] = [];
 	for (const line of tagLines) {
 		if (/^\s*@\w+/.test(line) || !blocks.length) blocks.push([line.trim()]);
@@ -331,8 +378,8 @@ function statementText(n: ts.Statement, parsed: ts.SourceFile, src: string, eol:
  *
  * @return
  */
-function organizeSrcSections(src: string, fileName: string, eol: string): string {
-	const withoutManagedSections = removeManagedSections(src, fileName);
+function organizeSrcSects(src: string, fileName: string, eol: string): string {
+	const withoutManagedSections = removeManagedSects(src, fileName);
 	const parsed = ts.createSourceFile(fileName, withoutManagedSections, ts.ScriptTarget.Latest, true, srcKind(fileName));
 	const imports = parsed.statements.filter(ts.isImportDeclaration);
 	if (!imports.length) return src;
@@ -362,33 +409,40 @@ function organizeSrcSections(src: string, fileName: string, eol: string): string
  *
  * @return
  */
-export function maintainSourceFile(root: string, fileName: string): boolean {
+export function maintainSrcFile(root: string, fileName: string): boolean {
 	if (!SUPPORTED.has(extname(fileName))) return false;
 	const original = readFileSync(fileName, 'utf8');
 	const eol = original.includes('\r\n') ? '\r\n' : '\n';
 	let src = original.replace(/^\uFEFF/, '').replace(/^\s+/, '');
 	const path = relative(root, fileName).split(sep).join('/');
-	const escapedPath = path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-	const duplicateHeader = new RegExp(`^(\\/\\*\\*\\r?\\n \\* ${escapedPath}\\r?\\n \\*\\/)(?:\\r?\\n)+\\1(?:\\r?\\n)+`);
-	src = src.replace(duplicateHeader, `$1${eol}${eol}`);
-	if (!src.startsWith('/**') && !src.startsWith('#!')) src = `/**${eol} * ${path}${eol} */${eol}${eol}${src}`;
+	const header = `/**${eol} * ${path}${eol} */`;
+	const headerPattern = /^\/\*\*[ \t]*\r?\n[ \t]*\*[ \t]*(.+?)[ \t]*\r?\n[ \t]*\*\/[ \t]*(?:\r?\n)*/;
+	const existingHeader = src.match(headerPattern);
+	if (existingHeader && (existingHeader[1].includes('/') || /\.(?:c|m)?(?:js|ts)x?$/.test(existingHeader[1]))) {
+		src = src.replace(headerPattern, `${header}${eol}${eol}`);
+		const escapedPath = path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+		const duplicateHeader = new RegExp(`^(\\/\\*\\*\\r?\\n \\* ${escapedPath}\\r?\\n \\*\\/)(?:\\r?\\n)+\\1(?:\\r?\\n)+`);
+		src = src.replace(duplicateHeader, `$1${eol}${eol}`);
+	} else if (!src.startsWith('#!') && !src.startsWith('/**')) src = `${header}${eol}${eol}${src}`;
 	const parsed = ts.createSourceFile(fileName, src, ts.ScriptTarget.Latest, true, srcKind(fileName));
-	const imports = parsed.statements.filter(ts.isImportDeclaration);
+	const imports = parsed.statements.filter((n): n is ts.ImportDeclaration => ts.isImportDeclaration(n) && !selfImportConflicts(parsed, n));
 	if (imports.length) {
 		const first = imports[0];
 		const last = imports.at(-1) as ts.ImportDeclaration;
 		const groups = groupedImports(parsed, imports);
+		const comp = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
 		const render = (label: ImportGroup): string[] => {
-			const entries = groups[label].sort((a, b) => a.source.localeCompare(b.source) || a.text.localeCompare(b.text));
+			const entries = groups[label].sort((a, b) => comp(a.text, b.text) || comp(a.source, b.source));
 			return entries.length ? [`// ${label}`, ...entries.map((e) => e.text), ''] : [];
 		};
-		const block = `${OPEN}${eol}IMPORTS${eol}${CLOSE}${eol}${(['API', 'COMPONENTS', 'DATA', 'TYPES'] as ImportGroup[]).flatMap(render).join(eol)}`;
+		const sortedGroups = (Object.keys(groups) as ImportGroup[]).sort(comp);
+		const block = `${OPEN}${eol}IMPORTS${eol}${CLOSE}${eol}${sortedGroups.flatMap(render).join(eol)}`;
 		const prefix = src.slice(0, first.getStart(parsed));
 		const fenceStart = prefix.search(/\/\*\/{10,}[ \t]*\r?\n[ \t]*IMPORTS[ \t]*\r?\n[ \t]*\/{10,}\*\//);
 		const start = fenceStart >= 0 ? fenceStart : first.getStart(parsed);
 		src = `${src.slice(0, start).replace(/\s*$/, `${eol}${eol}`)}${block}${src.slice(last.end).replace(/^\s*/, eol)}`;
 	}
-	src = organizeSrcSections(src, fileName, eol);
+	src = organizeSrcSects(src, fileName, eol);
 	const norm = src
 		.replace(/^([ \t]*)\/\*\/{10,}[ \t]*$/gm, `$1${OPEN}`)
 		.replace(/^([ \t]*)\/{10,}\*\/[ \t]*$/gm, `$1${CLOSE}`)

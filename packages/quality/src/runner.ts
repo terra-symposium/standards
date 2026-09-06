@@ -7,22 +7,22 @@ IMPORTS
 //////////////////////////////////////////////////*/
 
 // API
-import { collapseTypesAndObjects } from './collapse.js';
-import { sourceFiles as srcFiles, workingSourceFiles } from './files.js';
+import ts from 'typescript';
 import { checkImports } from './imports.js';
 import { collapseInlineIfs } from './inline-if.js';
-import { maintainSourceFile, protectLongImports } from './maintenance.js';
-import { declarationScope, isCallbackDeclaration, isProtectedFilename, isProtectedPath, isRenamableDeclaration, namingFindings, renameDeclaration } from './naming.js';
-import { spawnSync } from 'node:child_process';
+import { collapseTypesAndObjects } from './collapse.js';
+import { declarationScope, isCallbackDeclaration, isProtectedPath, isRenamableDeclaration, namingFindings, renameDeclaration } from './naming.js';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { maintainSrcFile, protectLongImports } from './maintenance.js';
 import { resolve, sep } from 'node:path';
-import ts from 'typescript';
+import { spawnSync } from 'node:child_process';
+import { srcFiles, workingSrcFiles } from './files.js';
 
 // DATA
 import { PROTECTED_IDENTIFIERS } from './naming.js';
 
 // TYPES
-import type { QualityConfig } from './config.js';
+import type { QualityCfg } from './config.js';
 
 /*//////////////////////////////////////////////////
 CONFIG
@@ -43,7 +43,7 @@ HELPERS
  *
  * @return
  */
-function toolPath(cfg: QualityConfig, cfgd: string | undefined, fallback: string): string {
+function toolPath(cfg: QualityCfg, cfgd: string | undefined, fallback: string): string {
 	if (cfgd && (cfgd.includes('/') || cfgd.includes('\\'))) return cfgd;
 	const executable = cfgd ?? fallback;
 	const local = resolve(cfg.root, 'node_modules', '.bin', executable);
@@ -58,7 +58,7 @@ function toolPath(cfg: QualityConfig, cfgd: string | undefined, fallback: string
  *
  * @return
  */
-function run(cfg: QualityConfig, cmd: string, args: string[]): number {
+function run(cfg: QualityCfg, cmd: string, args: string[]): number {
 	const result = spawnSync(cmd, args, { cwd: cfg.root, stdio: 'inherit', env: process.env });
 	if (result.error) console.error(`${cmd} failed: ${result.error.message}`);
 	return result.status ?? 1;
@@ -82,8 +82,8 @@ function batches<T>(vals: T[], size = 100): T[][] {
  *
  * @return
  */
-function filesFor(cfg: QualityConfig, all: boolean): string[] {
-	return all ? srcFiles(cfg) : workingSourceFiles(cfg);
+function filesFor(cfg: QualityCfg, all: boolean): string[] {
+	return all ? srcFiles(cfg) : workingSrcFiles(cfg);
 }
 
 /**
@@ -93,7 +93,7 @@ function filesFor(cfg: QualityConfig, all: boolean): string[] {
  *
  * @return
  */
-function scopedCfg(cfg: QualityConfig, all: boolean): QualityConfig {
+function scopedCfg(cfg: QualityCfg, all: boolean): QualityCfg {
 	return all ? cfg : { ...cfg, sourceRoots: filesFor(cfg, false) };
 }
 
@@ -105,8 +105,8 @@ function scopedCfg(cfg: QualityConfig, all: boolean): QualityConfig {
  *
  * @return
  */
-function runLint(cfg: QualityConfig, opts: QualityOptions, exhaustive = false): void {
-	const files = filesFor(cfg, opts.all).filter((file) => /\.(?:astro|cjs|js|jsx|mjs|ts|tsx)$/.test(file));
+function runLint(cfg: QualityCfg, opts: QualityOptions, exhaustive = false): void {
+	const files = filesFor(cfg, opts.all).filter((f) => /\.(?:astro|cjs|js|jsx|mjs|ts|tsx)$/.test(f));
 	if (!files.length) return;
 	const flags = [
 		'--cache',
@@ -131,8 +131,8 @@ function runLint(cfg: QualityConfig, opts: QualityOptions, exhaustive = false): 
  *
  * @return
  */
-function runCfgdCmd(cfg: QualityConfig, name: string): void {
-	const check = cfg.qualityCommands?.find((cmd) => cmd.name === name);
+function runCfgdCmd(cfg: QualityCfg, name: string): void {
+	const check = cfg.qualityCommands?.find((c) => c.name === name);
 	if (!check) throw new Error(`Unknown quality domain: ${name}`);
 	const status = run(cfg, check.command, check.args ?? []);
 	if (status) process.exitCode = status;
@@ -144,7 +144,7 @@ function runCfgdCmd(cfg: QualityConfig, name: string): void {
  *
  * @return
  */
-function runCfgdCmds(cfg: QualityConfig): void {
+function runCfgdCmds(cfg: QualityCfg): void {
 	for (const check of cfg.qualityCommands ?? []) runCfgdCmd(cfg, check.name);
 }
 
@@ -154,7 +154,7 @@ function runCfgdCmds(cfg: QualityConfig): void {
  *
  * @return
  */
-function runProjectTypecheck(cfg: QualityConfig): void {
+function runProjectTypecheck(cfg: QualityCfg): void {
 	const status = run(cfg, toolPath(cfg, cfg.tools?.tsc, 'tsc'), ['--noEmit', '-p', cfg.tsconfig ?? 'tsconfig.json']);
 	if (status) process.exitCode = status;
 }
@@ -167,7 +167,7 @@ function runProjectTypecheck(cfg: QualityConfig): void {
  *
  * @return
  */
-function runKnip(cfg: QualityConfig, fix: boolean, exhaustive = false): void {
+function runKnip(cfg: QualityCfg, fix: boolean, exhaustive = false): void {
 	const status = run(cfg, toolPath(cfg, cfg.tools?.knip, 'knip'), [
 		...(fix && !exhaustive ? ['--fix'] : exhaustive ? [] : ['--include', 'unresolved,nsExports,nsTypes,cycles']),
 		...(exhaustive ? [] : ['--no-exit-code']),
@@ -181,7 +181,7 @@ function runKnip(cfg: QualityConfig, fix: boolean, exhaustive = false): void {
  *
  * @return
  */
-function runDiffCheck(cfg: QualityConfig): void {
+function runDiffCheck(cfg: QualityCfg): void {
 	const status = run(cfg, 'git', ['-c', 'core.pager=cat', 'diff', '--check']);
 	if (status) process.exitCode = status;
 }
@@ -193,10 +193,10 @@ function runDiffCheck(cfg: QualityConfig): void {
  *
  * @return
  */
-function fixNames(cfg: QualityConfig, all: boolean): void {
-	const allowed = new Set(filesFor(cfg, all).filter((file) => !isProtectedPath(file) && !isProtectedFilename(file)));
+function fixNames(cfg: QualityCfg, all: boolean): void {
+	const allowed = new Set(filesFor(cfg, all).filter((f) => !isProtectedPath(f)));
 	const program = ts.createProgram({
-		rootNames: srcFiles(cfg).filter((file) => /\.(?:(?:c|m)?(?:js|ts)x?|astro)$/.test(file)),
+		rootNames: srcFiles(cfg).filter((f) => /\.(?:(?:c|m)?(?:js|ts)x?|astro)$/.test(f)),
 		options: {
 			allowNonTsExtensions: true,
 			allowJs: true,
@@ -209,15 +209,16 @@ function fixNames(cfg: QualityConfig, all: boolean): void {
 		},
 	});
 	const checker = program.getTypeChecker();
-	const identifierSymbol = (node: ts.Identifier): ts.Symbol | undefined =>
-		ts.isShorthandPropertyAssignment(node.parent) ? (checker.getShorthandAssignmentValueSymbol(node.parent) ?? checker.getSymbolAtLocation(node)) : checker.getSymbolAtLocation(node);
-	const hasInitShadow = (node: ts.Identifier): boolean => {
-		const declaration = node.parent;
+	const identifierSymbol = (n: ts.Identifier): ts.Symbol | undefined =>
+		ts.isShorthandPropertyAssignment(n.parent) ? (checker.getShorthandAssignmentValueSymbol(n.parent) ?? checker.getSymbolAtLocation(n)) : checker.getSymbolAtLocation(n);
+	const hasInitShadow = (n: ts.Identifier): boolean => {
+		const declaration = n.parent;
 		if (!ts.isVariableDeclaration(declaration) || !declaration.initializer) return false;
+		const tgt = checker.getSymbolAtLocation(n);
 		let found = false;
 		const visit = (child: ts.Node): void => {
-			if (found || child === node) return;
-			if (ts.isIdentifier(child) && child.text === node.text) found = true;
+			if (found || child === n) return;
+			if (ts.isIdentifier(child) && child.text === n.text && checker.getSymbolAtLocation(child) === tgt) found = true;
 			ts.forEachChild(child, visit);
 		};
 		visit(declaration.initializer);
@@ -253,31 +254,31 @@ function fixNames(cfg: QualityConfig, all: boolean): void {
 		inspect(src);
 	}
 	const hasDescCollision = (scope: ts.Node, suggestion: string): boolean =>
-		[...renameSafetyByScope.entries()].some(([child, safety]) => child !== scope && child.getStart() >= scope.getStart() && child.end <= scope.end && safety.declared.has(suggestion));
+		[...renameSafetyByScope.entries()].some(([c, s]) => c !== scope && c.getStart() >= scope.getStart() && c.end <= scope.end && s.declared.has(suggestion));
 	const hasDeclaredName = (src: ts.SourceFile, suggestion: string): boolean => {
 		const escaped = suggestion.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 		return new RegExp(`\\b(?:const|let|var|function|class|interface|type)\\s+${escaped}\\b`).test(src.text);
 	};
 	for (const src of program.getSourceFiles()) {
 		if (!allowed.has(src.fileName)) continue;
-		const inspect = (node: ts.Node): void => {
-			if (ts.isIdentifier(node) && isRenamableDeclaration(node) && !node.text.startsWith('_') && !protectedNames.has(node.text) && !hasInitShadow(node)) {
-				const suggestion = renameDeclaration(node);
-				const safety = renameSafetyByScope.get(declarationScope(node));
+		const inspect = (n: ts.Node): void => {
+			if (ts.isIdentifier(n) && isRenamableDeclaration(n) && !n.text.startsWith('_') && !protectedNames.has(n.text) && !hasInitShadow(n)) {
+				const suggestion = renameDeclaration(n);
+				const safety = renameSafetyByScope.get(declarationScope(n));
 				const fileDeclared = declaredByFile.get(src.fileName);
 				if (
-					!isCallbackDeclaration(node) &&
+					!isCallbackDeclaration(n) &&
 					(safety?.declared.has(suggestion) ||
 						fileDeclared?.has(suggestion) ||
 						hasDeclaredName(src, suggestion) ||
 						(safety?.proposals.get(suggestion) ?? 0) > 1 ||
-						hasDescCollision(declarationScope(node), suggestion))
+						hasDescCollision(declarationScope(n), suggestion))
 				)
 					return;
-				const symbol = suggestion === node.text ? undefined : identifierSymbol(node);
+				const symbol = suggestion === n.text ? undefined : identifierSymbol(n);
 				if (symbol && !exported.has(symbol)) replacements.set(symbol, suggestion);
 			}
-			ts.forEachChild(node, inspect);
+			ts.forEachChild(n, inspect);
 		};
 		inspect(src);
 	}
@@ -295,7 +296,7 @@ function fixNames(cfg: QualityConfig, all: boolean): void {
 						// Identifier `pos` can include a preceding delimiter (for example the
 						// opening parenthesis of a call argument). Anchor edits from `end` so
 						// expanding a shorthand binding cannot consume adjacent punctuation.
-						span: { start: n.end - n.text.length, length: n.text.length },
+						span: { start: n.getStart(src), length: n.text.length },
 						newText: !src.fileName.endsWith('.astro') && (ts.isShorthandPropertyAssignment(n.parent) || shorthandBinding) ? `${n.text}: ${replacement}` : replacement,
 					});
 					if (ts.isParameter(n.parent) && n.parent.name === n) {
@@ -314,7 +315,7 @@ function fixNames(cfg: QualityConfig, all: boolean): void {
 	}
 	for (const [fileName, fileEdits] of edits) {
 		const src = readFileSync(fileName, 'utf8');
-		const n = fileEdits.sort((a, b) => b.span.start - a.span.start).reduce((text, edit) => `${text.slice(0, edit.span.start)}${edit.newText}${text.slice(edit.span.start + edit.span.length)}`, src);
+		const n = fileEdits.sort((a, b) => b.span.start - a.span.start).reduce((t, e) => `${t.slice(0, e.span.start)}${e.newText}${t.slice(e.span.start + e.span.length)}`, src);
 		if (n !== src) writeFileSync(fileName, n);
 	}
 }
@@ -327,7 +328,7 @@ function fixNames(cfg: QualityConfig, all: boolean): void {
  *
  * @return
  */
-export function runQuality(cfg: QualityConfig, strict = false, all = true): QualityResult {
+export function runQuality(cfg: QualityCfg, strict = false, all = true): QualityResult {
 	const result = { imports: checkImports(scopedCfg(cfg, all)), naming: namingFindings(scopedCfg(cfg, all)) };
 	for (const f of result.imports) console.error(`Unresolved import: ${f.importer} -> ${f.specifier}`);
 	for (const f of result.naming) console.warn(`${f.severity === 'error' ? 'Naming drift' : 'Naming suggestion'}: ${f.file}: ${f.name} -> ${f.suggestion}`);
@@ -342,18 +343,20 @@ export function runQuality(cfg: QualityConfig, strict = false, all = true): Qual
  *
  * @return
  */
-export function runQualityCli(cfg: QualityConfig, args = process.argv.slice(2)): void {
-	const cmd = args.find((arg) => !arg.startsWith('-')) ?? 'quality';
+export function runQualityCli(cfg: QualityCfg, args = process.argv.slice(2)): void {
+	const cmd = args.find((a) => !a.startsWith('-')) ?? 'quality';
 	const opts: QualityOptions = { fix: !args.includes('--warn'), all: args.includes('--all'), strict: args.includes('--strict') };
 	const files = filesFor(cfg, opts.all);
 	if (cmd === 'format' || cmd === 'maintain') {
-		if (opts.fix) for (const file of files) if (/\.(?:c|m)?(?:js|ts)x?$/.test(file)) collapseInlineIfs(file);
+		const reqFiles = args.slice(1).filter((a) => !a.startsWith('-'));
+		const tgts = cmd === 'maintain' && reqFiles.length ? reqFiles : files;
+		if (opts.fix) for (const file of tgts) if (/\.(?:c|m)?(?:js|ts)x?$/.test(file)) collapseInlineIfs(file);
 		if (opts.fix)
-			for (const f of files) {
-				maintainSourceFile(cfg.root, f);
+			for (const f of tgts) {
+				maintainSrcFile(cfg.root, f);
 				if (cfg.oneLineImports) protectLongImports(f, cfg.prettierPrintWidth);
 			}
-		runFormatter(cfg, opts, cmd === 'format' ? args.slice(1) : files);
+		runFormatter(cfg, opts, cmd === 'format' ? args.slice(1) : tgts);
 		return;
 	}
 	if (cmd === 'naming') {
@@ -402,20 +405,20 @@ export function runQualityCli(cfg: QualityConfig, args = process.argv.slice(2)):
  *
  * @return
  */
-export function runFormatter(cfg: QualityConfig, optsOrArgs: QualityOptions | string[] = { fix: true, all: false, strict: false }, args: string[] = []): void {
+export function runFormatter(cfg: QualityCfg, optsOrArgs: QualityOptions | string[] = { fix: true, all: false, strict: false }, args: string[] = []): void {
 	const legacyArgs = Array.isArray(optsOrArgs);
 	const opts = legacyArgs ? { fix: optsOrArgs.includes('--write') || !optsOrArgs.includes('--check'), all: optsOrArgs.includes('--all'), strict: false } : optsOrArgs;
-	const suppliedArgs = (legacyArgs ? optsOrArgs : args).filter((arg) => !['--all', '--warn', '--strict'].includes(arg));
+	const suppliedArgs = (legacyArgs ? optsOrArgs : args).filter((a) => !['--all', '--warn', '--strict'].includes(a));
 	const hasMode = suppliedArgs.includes('--write') || suppliedArgs.includes('--check');
-	const hasIgnoreMode = suppliedArgs.some((arg) => arg.startsWith('--ignore-unknown'));
-	const suppliedTgts = suppliedArgs.filter((arg) => !arg.startsWith('-'));
+	const hasIgnoreMode = suppliedArgs.some((a) => a.startsWith('--ignore-unknown'));
+	const suppliedTgts = suppliedArgs.filter((a) => !a.startsWith('-'));
 	const fmtArgs = [...(hasMode ? [] : [opts.fix ? '--write' : '--check']), ...(hasIgnoreMode ? [] : ['--ignore-unknown']), ...suppliedArgs, ...(suppliedTgts.length ? [] : filesFor(cfg, opts.all))];
-	const flags = fmtArgs.filter((arg) => arg.startsWith('-'));
-	const tgts = fmtArgs.filter((arg) => !arg.startsWith('-'));
+	const flags = fmtArgs.filter((a) => a.startsWith('-'));
+	const tgts = fmtArgs.filter((a) => !a.startsWith('-'));
 	if (opts.fix) {
 		const knownFiles = filesFor(cfg, opts.all);
 		const directTgts = suppliedTgts.map((t) => resolve(cfg.root, t));
-		const collapseTgts = directTgts.length ? knownFiles.filter((f) => directTgts.some((tgt) => resolve(f) === tgt || resolve(f).startsWith(`${tgt}${sep}`))) : knownFiles;
+		const collapseTgts = directTgts.length ? knownFiles.filter((f) => directTgts.some((t) => resolve(f) === t || resolve(f).startsWith(`${t}${sep}`))) : knownFiles;
 		for (const file of collapseTgts) collapseTypesAndObjects(file);
 	}
 	for (const tgtBatch of batches(tgts)) {
@@ -431,19 +434,17 @@ export function runFormatter(cfg: QualityConfig, optsOrArgs: QualityOptions | st
  *
  * @return
  */
-export function runTypecheck(cfg: QualityConfig, args: string[] = []): void {
+export function runTypecheck(cfg: QualityCfg, args: string[] = []): void {
 	const tsc = cfg.tools?.tsc ?? 'tsc';
 	const suppliedFiles = cfg.typecheckExtensions?.length
 		? args.filter(
-				(f) =>
-					cfg.typecheckExtensions?.includes(f.slice(f.lastIndexOf('.'))) && (!cfg.typecheckRoots?.length || cfg.typecheckRoots.some((root) => f.startsWith(`${root}/`) || f.startsWith(`${root}\\`))),
+				(f) => cfg.typecheckExtensions?.includes(f.slice(f.lastIndexOf('.'))) && (!cfg.typecheckRoots?.length || cfg.typecheckRoots.some((r) => f.startsWith(`${r}/`) || f.startsWith(`${r}\\`))),
 			)
 		: args;
 	if (args.length && !suppliedFiles.length) return;
 	const typecheckFiles = cfg.typecheckExtensions?.length
 		? srcFiles(cfg).filter(
-				(f) =>
-					cfg.typecheckExtensions?.includes(f.slice(f.lastIndexOf('.'))) && (!cfg.typecheckRoots?.length || cfg.typecheckRoots.some((root) => f.startsWith(`${root}/`) || f.startsWith(`${root}\\`))),
+				(f) => cfg.typecheckExtensions?.includes(f.slice(f.lastIndexOf('.'))) && (!cfg.typecheckRoots?.length || cfg.typecheckRoots.some((r) => f.startsWith(`${r}/`) || f.startsWith(`${r}\\`))),
 			)
 		: [];
 	const compilerArgs = typecheckFiles.length

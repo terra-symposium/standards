@@ -5,8 +5,8 @@
 /*//////////////////////////////////////////////////
 IMPORTS
 //////////////////////////////////////////////////*/
-// API
-import { runQualityCli } from '../../packages/quality/dist/runner.js';
-import config from './quality.config.mjs';
 
+// API
+import config from './quality.config.mjs';
+import { runQualityCli } from '../../packages/quality/dist/runner.js';
 runQualityCli(config, process.argv.slice(2));

@@ -7,12 +7,12 @@ IMPORTS
 //////////////////////////////////////////////////*/
 
 // API
+import { basename, join, relative } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { existsSync, readdirSync, statSync } from 'node:fs';
-import { basename, join, relative } from 'node:path';
 
 // TYPES
-import type { QualityConfig } from './config.js';
+import type { QualityCfg } from './config.js';
 
 /*//////////////////////////////////////////////////
 HELPERS
@@ -24,7 +24,7 @@ HELPERS
  *
  * @return
  */
-export function srcFiles(cfg: QualityConfig): string[] {
+export function srcFiles(cfg: QualityCfg): string[] {
 	const roots = [...cfg.sourceRoots, ...(cfg.includeRoots ?? [])];
 	const exts = new Set(cfg.extensions);
 	const skipped = new Set(cfg.skippedDirectories ?? []);
@@ -47,8 +47,6 @@ export function srcFiles(cfg: QualityConfig): string[] {
 	return files.sort((a, b) => a.localeCompare(b));
 }
 
-export const sourceFiles = srcFiles;
-
 /**
  * Returns configured source files changed in the working tree, including untracked files.
  *
@@ -56,7 +54,7 @@ export const sourceFiles = srcFiles;
  *
  * @return
  */
-export function workingSourceFiles(cfg: QualityConfig): string[] {
+export function workingSrcFiles(cfg: QualityCfg): string[] {
 	const changed = new Set(
 		execFileSync('git', ['diff', '--name-only', '--diff-filter=ACMR'], { cwd: cfg.root, encoding: 'utf8' })
 			.concat(execFileSync('git', ['ls-files', '--others', '--exclude-standard'], { cwd: cfg.root, encoding: 'utf8' }))
@@ -64,7 +62,7 @@ export function workingSourceFiles(cfg: QualityConfig): string[] {
 			.filter(Boolean)
 			.map((p) => join(cfg.root, p)),
 	);
-	return srcFiles(cfg).filter((file) => changed.has(file));
+	return srcFiles(cfg).filter((f) => changed.has(f));
 }
 
 /**
@@ -74,7 +72,7 @@ export function workingSourceFiles(cfg: QualityConfig): string[] {
  *
  * @return
  */
-export function displayPath(cfg: QualityConfig, fileName: string): string {
+export function displayPath(cfg: QualityCfg, fileName: string): string {
 	return relative(cfg.root, fileName) || basename(fileName);
 }
 

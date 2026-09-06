@@ -5,17 +5,18 @@
 /*//////////////////////////////////////////////////
 IMPORTS
 //////////////////////////////////////////////////*/
+
 // API
-import { createQualityConfig } from '../../packages/quality/dist/config.js';
-import { resolve } from 'node:path';
+import { createQualityCfg } from '../../packages/quality/dist/config.js';
 import { fileURLToPath } from 'node:url';
+import { resolve } from 'node:path';
 
 /*//////////////////////////////////////////////////
 CONFIG
 //////////////////////////////////////////////////*/
-const root = resolve(fileURLToPath(new URL('../..', import.meta.url)));
 
-export default createQualityConfig({
+const root = resolve(fileURLToPath(new URL('../..', import.meta.url)));
+export default createQualityCfg({
 	root,
 	sourceRoots: ['packages', 'scripts'],
 	extensions: ['.js', '.jsx', '.mjs', '.cjs', '.ts', '.tsx', '.mts', '.cts'],

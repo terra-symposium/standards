@@ -7,13 +7,13 @@ IMPORTS
 //////////////////////////////////////////////////*/
 
 // API
-import { displayPath, isFile, sourceFiles } from './files.js';
-import { readFileSync } from 'node:fs';
-import { dirname, extname, join, resolve } from 'node:path';
 import ts from 'typescript';
+import { dirname, extname, join, resolve } from 'node:path';
+import { displayPath, isFile, srcFiles } from './files.js';
+import { readFileSync } from 'node:fs';
 
 // TYPES
-import type { QualityConfig } from './config.js';
+import type { QualityCfg } from './config.js';
 
 /*//////////////////////////////////////////////////
 CONFIG
@@ -34,8 +34,8 @@ HELPERS
  *
  * @return
  */
-function resolveImport(specifier: string, importer: string, cfg: QualityConfig): string | null {
-	const alias = Object.entries(cfg.aliases ?? {}).find(([prefix]) => specifier.startsWith(prefix));
+function resolveImport(specifier: string, importer: string, cfg: QualityCfg): string | null {
+	const alias = Object.entries(cfg.aliases ?? {}).find(([p]) => specifier.startsWith(p));
 	const raw = alias ? resolve(cfg.root, alias[1], specifier.slice(alias[0].length)) : specifier.startsWith('.') ? resolve(dirname(importer), specifier) : null;
 	if (!raw) return null;
 	const stripped = /\.(?:c|m)?(?:j|t)sx?$/.test(raw) ? raw.slice(0, raw.lastIndexOf('.')) : raw;
@@ -75,11 +75,11 @@ function specifiers(fileName: string): string[] {
  *
  * @return
  */
-export function checkImports(cfg: QualityConfig): ImportFailure[] {
+export function checkImports(cfg: QualityCfg): ImportFailure[] {
 	const failures: ImportFailure[] = [];
-	for (const importer of sourceFiles(cfg)) {
+	for (const importer of srcFiles(cfg)) {
 		for (const specifier of specifiers(importer)) {
-			if (cfg.externalPrefixes?.some((prefix) => specifier.startsWith(prefix))) continue;
+			if (cfg.externalPrefixes?.some((p) => specifier.startsWith(p))) continue;
 			if (!specifier.startsWith('.') && !Object.keys(cfg.aliases ?? {}).some((p) => specifier.startsWith(p))) continue;
 			if (specifier.startsWith('.') && extname(specifier) && !MODULE_EXTS.includes(extname(specifier))) continue;
 			if (!resolveImport(specifier, importer, cfg)) failures.push({ importer: displayPath(cfg, importer), specifier });

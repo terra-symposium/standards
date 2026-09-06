@@ -1,8 +1,27 @@
-import { execFileSync } from 'node:child_process';
+/**
+ * packages/quality/src/port.ts
+ */
+
+/*//////////////////////////////////////////////////
+IMPORTS
+//////////////////////////////////////////////////*/
+
+// API
 import net from 'node:net';
+import { execFileSync } from 'node:child_process';
 import { setTimeout as delay } from 'node:timers/promises';
 
-/** Lists process ids currently listening on a TCP port. */
+/*//////////////////////////////////////////////////
+HELPERS
+//////////////////////////////////////////////////*/
+
+/**
+ * Lists process ids currently listening on a TCP port.
+ *
+ * @param port
+ *
+ * @return
+ */
 export function portOwners(port: number): number[] {
 	try {
 		return execFileSync('lsof', ['-nP', `-iTCP:${port}`, '-sTCP:LISTEN', '-t'], { encoding: 'utf8' })
@@ -15,7 +34,13 @@ export function portOwners(port: number): number[] {
 	}
 }
 
-/** Terminates listeners and waits until a TCP port can be acquired. */
+/**
+ * Terminates listeners and waits until a TCP port can be acquired.
+ *
+ * @param port
+ *
+ * @return
+ */
 export async function acquirePort(port: number): Promise<void> {
 	for (let attempt = 0; attempt < 20; attempt += 1) {
 		for (const pid of portOwners(port)) {

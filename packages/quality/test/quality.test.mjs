@@ -7,20 +7,25 @@ IMPORTS
 //////////////////////////////////////////////////*/
 
 // API
-// prettier-ignore
-import { checkImports, collapseInlineIfs, collapseTypesAndObjects, createQualityConfig, maintainSourceFile, namingFindings, protectLongImports, renameIdentifier, runQualityCli, sourceFiles } from '../dist/index.js';
 import assert from 'node:assert/strict';
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 import test from 'node:test';
+// prettier-ignore
+import { checkImports, collapseInlineIfs, collapseTypesAndObjects, createQualityCfg, maintainSrcFile, namingFindings, protectLongImports, renameId, runQualityCli, srcFiles } from '../dist/index.js';
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
+
+/*//////////////////////////////////////////////////
+TESTS
+//////////////////////////////////////////////////*/
+
 test('resolves aliases and extensionless relative imports', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-'));
 	mkdirSync(join(root, 'src'), { recursive: true });
 	writeFileSync(join(root, 'src', 'helper.ts'), 'export const ok = true;\n');
 	writeFileSync(join(root, 'src', 'main.ts'), "import { ok } from './helper';\nimport { ok as alias } from '@/helper';\nvoid ok; void alias;\n");
-	const cfg = createQualityConfig({ root, sourceRoots: ['src'], extensions: ['.ts'], aliases: { '@/': 'src/' } });
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], aliases: { '@/': 'src/' } });
 	assert.deepEqual(checkImports(cfg), []);
 });
 test('quality accepts individual changed files as scoped source roots', () => {
@@ -28,14 +33,14 @@ test('quality accepts individual changed files as scoped source roots', () => {
 	mkdirSync(join(root, 'src'));
 	const file = join(root, 'src', 'main.ts');
 	writeFileSync(file, 'const value = true;\n');
-	const cfg = createQualityConfig({ root, sourceRoots: [file], extensions: ['.ts'] });
-	assert.deepEqual(sourceFiles(cfg), [file]);
+	const cfg = createQualityCfg({ root, sourceRoots: [file], extensions: ['.ts'] });
+	assert.deepEqual(srcFiles(cfg), [file]);
 });
 test('reports concise-name drift without changing source', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-'));
 	mkdirSync(join(root, 'src'), { recursive: true });
 	writeFileSync(join(root, 'src', 'main.ts'), 'const organization = true;\nvoid organization;\n');
-	const cfg = createQualityConfig({ root, sourceRoots: ['src'], extensions: ['.ts'] });
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
 	assert.equal(namingFindings(cfg)[0].suggestion, 'org');
 });
 test('renames requested words across casing, separators, compounds, plurals, and inflections', () => {
@@ -72,12 +77,12 @@ test('renames requested words across casing, separators, compounds, plurals, and
 		organisations: 'orgs',
 		responses: 'res',
 	};
-	for (const [name, expected] of Object.entries(cases)) assert.equal(renameIdentifier(name), expected, name);
+	for (const [name, expected] of Object.entries(cases)) assert.equal(renameId(name), expected, name);
 });
 test('does not rename substrings, protected platform names, or underscore placeholders', () => {
 	for (const name of ['terror', 'deformat', 'repositoryFactory', 'FormData', 'NextResponse', '_']) {
 		const expected = name === 'repositoryFactory' ? 'repoFactory' : name;
-		assert.equal(renameIdentifier(name), expected, name);
+		assert.equal(renameId(name), expected, name);
 	}
 });
 test('does not collapse comment-only blocks before else', () => {
@@ -179,7 +184,7 @@ writeFileSync(${JSON.stringify(marker)}, 'ok');
 `,
 	);
 	chmodSync(fmt, 0o755);
-	const cfg = createQualityConfig({ root, sourceRoots: ['src'], extensions: ['.ts'], tools: { prettier: fmt } });
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], tools: { prettier: fmt } });
 	runQualityCli(cfg, ['format', '--all']);
 	assert.equal(readFileSync(marker, 'utf8'), 'ok');
 });
@@ -206,7 +211,7 @@ void [short, long];
 `,
 	);
 	const prettier = fileURLToPath(new URL('../../../node_modules/.bin/prettier', import.meta.url));
-	const cfg = createQualityConfig({ root, sourceRoots: ['src'], extensions: ['.ts'], tools: { prettier } });
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], tools: { prettier } });
 	runQualityCli(cfg, ['format', '--all']);
 	const result = readFileSync(file, 'utf8');
 	assert.match(result, /const short = \{ alpha: true, beta: false \};/);
@@ -236,7 +241,7 @@ import { alpha } from 'alpha';
 void alpha; void beta;
 `,
 	);
-	assert.equal(maintainSourceFile(root, file), true);
+	assert.equal(maintainSrcFile(root, file), true);
 	const src = readFileSync(file, 'utf8');
 	assert.match(src, /^\/\*\* test \*\//);
 	assert.ok(src.indexOf("from 'alpha'") < src.indexOf("from 'beta'"));
@@ -250,7 +255,48 @@ void alpha; void beta;
 	assert.ok(src.includes('// DATA\nimport'));
 	assert.ok(src.includes('// TYPES\nimport'));
 	assert.ok(src.endsWith('\n') && !src.endsWith('\n\n'));
-	assert.equal(maintainSourceFile(root, file), false);
+	assert.equal(maintainSrcFile(root, file), false);
+});
+test('maintenance sorts groups, import lines, and line contents alphabetically', () => {
+	const root = mkdtempSync(join(tmpdir(), 'terra-quality-import-order-'));
+	const file = join(root, 'src.tsx');
+	writeFileSync(
+		file,
+		`import { requireDashboardCtx } from '@/lib/auth.server';
+import { cn, titleCaseWords } from '@/lib/shared';
+import { actions } from 'astro:actions';
+import { DashboardHeader } from '@/components/navigation/DashboardHeader';
+import { Link } from '@/components/runtime/Link';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Card } from '@/components/ui/card';
+import { Hint } from '@/components/ui/hint';
+import { Add, Building, ChartLine, ChevronRight, Flow, Idea, Link as LinkIcon, Notification, Security, Target as Tgt, UserMultiple, UserProfile } from '@carbon/icons-react';
+import * as React from 'react';
+import type { PortalIconName } from '@/lib/types';
+`,
+	);
+	assert.equal(maintainSrcFile(root, file), true);
+	const imports = readFileSync(file, 'utf8')
+		.split('\n')
+		.filter((l) => l.startsWith('import '));
+	assert.deepEqual(imports, [
+		"import { actions } from 'astro:actions';",
+		"import { cn, titleCaseWords } from '@/lib/shared';",
+		"import { requireDashboardCtx } from '@/lib/auth.server';",
+		"import * as React from 'react';",
+		"import { Add, Building, ChartLine, ChevronRight, Flow, Idea, Link as LinkIcon, Notification, Security, Target as Tgt, UserMultiple, UserProfile } from '@carbon/icons-react';",
+		"import { Badge } from '@/components/ui/badge';",
+		"import { Button } from '@/components/ui/button';",
+		"import { Card } from '@/components/ui/card';",
+		"import { DashboardHeader } from '@/components/navigation/DashboardHeader';",
+		"import { Hint } from '@/components/ui/hint';",
+		"import { Link } from '@/components/runtime/Link';",
+		"import type { PortalIconName } from '@/lib/types';",
+	]);
+	assert.ok(readFileSync(file, 'utf8').indexOf('// API') < readFileSync(file, 'utf8').indexOf('// COMPONENTS'));
+	assert.ok(readFileSync(file, 'utf8').indexOf('// COMPONENTS') < readFileSync(file, 'utf8').indexOf('// TYPES'));
+	assert.equal(maintainSrcFile(root, file), false);
 });
 test('maintenance removes duplicate file headers and preserves a blank after section fences', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-duplicate-header-'));
@@ -277,11 +323,11 @@ import fs from 'node:fs';
 function read() { return fs.readFileSync('/dev/null'); }
 `,
 	);
-	assert.equal(maintainSourceFile(root, file), true);
+	assert.equal(maintainSrcFile(root, file), true);
 	const src = readFileSync(file, 'utf8');
 	assert.equal(src.match(/\* src\.ts/g)?.length, 1);
 	assert.match(src, /\/{10,}\*\/\n\n\/\*\*/);
-	assert.equal(maintainSourceFile(root, file), false);
+	assert.equal(maintainSrcFile(root, file), false);
 });
 test('maintenance removes unauthorized blank lines inside functions', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-whitespace-'));
@@ -291,12 +337,11 @@ test('maintenance removes unauthorized blank lines inside functions', () => {
 		`import fs from 'node:fs';
 function read(path: string) {
   const value = fs.readFileSync(path, 'utf8');
-
   return value.trim();
 }
 `,
 	);
-	maintainSourceFile(root, file);
+	maintainSrcFile(root, file);
 	const src = readFileSync(file, 'utf8');
 	assert.doesNotMatch(src, /readFileSync\(path, 'utf8'\);\n\n/);
 });
@@ -316,7 +361,6 @@ function readValue() {
 	const nested = 1;
 	return nested;
 }
-
 class Service {}
 
 /*//////////////////////////////////////////////////
@@ -328,12 +372,11 @@ const OPEN = 'open';
 export type Mode = 'read' | 'write';
 export const SUPPORTED = new Set(['.ts']);
 let runtime = 0;
-
 export default function run() { return readValue(); }
 void [Service, runtime, OPEN];
 `,
 	);
-	assert.equal(maintainSourceFile(root, file), true);
+	assert.equal(maintainSrcFile(root, file), true);
 	const src = readFileSync(file, 'utf8');
 	const cfg = src.indexOf('CONFIG');
 	const helpers = src.indexOf('HELPERS');
@@ -353,16 +396,16 @@ void [Service, runtime, OPEN];
 	assert.equal(src.match(/\nCONFIG\n/g)?.length, 1);
 	assert.equal(src.match(/\nHELPERS\n/g)?.length, 1);
 	assert.equal(src.match(/\nCOMPONENTS\n/g)?.length ?? 0, 0);
-	assert.equal(maintainSourceFile(root, file), false);
+	assert.equal(maintainSrcFile(root, file), false);
 });
 test('maintenance does not interpret section-shaped string content as managed headers', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-sections-'));
 	const file = join(root, 'main.ts');
 	const fence = `/*${'/'.repeat(50)}\nCONFIG\n${'/'.repeat(50)}*/`;
 	writeFileSync(file, `import fs from 'node:fs';\nconst banner = \`${fence}\`;\nvoid [fs, banner];\n`);
-	assert.equal(maintainSourceFile(root, file), true);
+	assert.equal(maintainSrcFile(root, file), true);
 	assert.ok(readFileSync(file, 'utf8').includes(`\`${fence}\``));
-	assert.equal(maintainSourceFile(root, file), false);
+	assert.equal(maintainSrcFile(root, file), false);
 });
 test('maintenance generates blank TSDoc parameter and return tags for undocumented helpers', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-tsdoc-'));
@@ -379,20 +422,19 @@ function documented(value: string): string { return value; }
 function empty(enabled: boolean): void { void enabled; }
 `,
 	);
-	assert.equal(maintainSourceFile(root, file), true);
+	assert.equal(maintainSrcFile(root, file), true);
 	const src = readFileSync(file, 'utf8');
 	assert.ok(src.includes('/**\n *\n * @param fileName\n *\n * @return\n */\nfunction specifiers'));
 	assert.equal(src.match(/Existing documentation/g)?.length, 1);
 	assert.match(src, /\* Existing documentation\.\n \*\n \* @param value\n \*\n \* @return/);
 	assert.match(src, /\/\*\*\n \*\n \* @param enabled\n \*\n \* @return\n \*\//);
-	assert.equal(maintainSourceFile(root, file), false);
+	assert.equal(maintainSrcFile(root, file), false);
 });
-
 test('maintenance keeps a single blank line before return in summary-only TSDoc', () => {
 	const dir = mkdtempSync(join(tmpdir(), 'terra-quality-tsdoc-summary-'));
 	const file = join(dir, 'src.ts');
 	writeFileSync(file, "import fs from 'node:fs';\n/** Handles create client. */\nfunction createClient() { return fs.existsSync('.'); }\n");
-	maintainSourceFile(dir, file);
+	maintainSrcFile(dir, file);
 	const src = readFileSync(file, 'utf8');
 	assert.ok(src.includes('/**\n * Handles create client.\n *\n * @return\n */\nfunction createClient'));
 	assert.doesNotMatch(src, /Handles create client\.\n \*\n \*\n \* @return/);
@@ -404,22 +446,21 @@ test('maintenance repairs TSDoc tags from the current function signature and pre
 		file,
 		"import fs from 'node:fs';\n/**\n * Reads a file.\n *\n * @param wrongName - stale\n * @param fileName - Path to read.\n * @returns - File contents.\n * @throws When reading fails.\n */\nfunction read(fileName: string) { return fs.readFileSync(fileName); }\n",
 	);
-	assert.equal(maintainSourceFile(root, file), true);
+	assert.equal(maintainSrcFile(root, file), true);
 	const src = readFileSync(file, 'utf8');
 	assert.match(src, /\* @param fileName - Path to read\.\n \*\n \* @return - File contents\./);
 	assert.match(src, /\* @throws When reading fails\./);
 	assert.doesNotMatch(src, /wrongName/);
-	assert.equal(maintainSourceFile(root, file), false);
+	assert.equal(maintainSrcFile(root, file), false);
 });
 test('maintenance preserves managed-looking sections in files without imports', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-sections-'));
 	const file = join(root, 'main.ts');
 	const src = `/** main.ts */
-
 const VALUE = true;
 `;
 	writeFileSync(file, src);
-	assert.equal(maintainSourceFile(root, file), false);
+	assert.equal(maintainSrcFile(root, file), false);
 	assert.equal(readFileSync(file, 'utf8'), src);
 });
 test('maintenance normalizes section, group, and line-comment whitespace without duplicate empty sections', () => {
@@ -441,7 +482,6 @@ function component() {
 
 	mutate(now);
 
-
 	// VALIDATION
 
 	validate(now);
@@ -449,7 +489,7 @@ function component() {
 void component;
 `,
 	);
-	assert.equal(maintainSourceFile(root, file), true);
+	assert.equal(maintainSrcFile(root, file), true);
 	const src = readFileSync(file, 'utf8');
 	assert.equal(src.match(/\nHELPERS\n/g)?.length ?? 0, 0);
 	assert.equal(src.match(/\nCOMPONENTS\n/g)?.length, 1);
@@ -459,14 +499,14 @@ void component;
 	assert.match(src, /\/\/ MUTATION\n\tmutate\(now\);/);
 	assert.match(src, /mutate\(now\);\n\n\t\/\/ VALIDATION\n\tvalidate\(now\);/);
 	assert.doesNotMatch(src, /\/\/ (?:API|COMPONENTS|DATA|TYPES|MUTATION|VALIDATION)\n\n/);
-	assert.equal(maintainSourceFile(root, file), false);
+	assert.equal(maintainSrcFile(root, file), false);
 });
 test('maintenance does not normalize section-shaped text inside templates', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-comment-layout-'));
 	const file = join(root, 'main.ts');
 	const literal = `before\n\n/*//////////////////////////////////////////////////\nHELPERS\n//////////////////////////////////////////////////*/\n\nafter`;
 	writeFileSync(file, `import fs from 'node:fs';\nconst value = \`${literal}\`;\nvoid [fs, value];\n`);
-	maintainSourceFile(root, file);
+	maintainSrcFile(root, file);
 	assert.ok(readFileSync(file, 'utf8').includes(`\`${literal}\``));
 });
 test('format applies maintenance before Prettier and is idempotent', () => {
@@ -475,7 +515,7 @@ test('format applies maintenance before Prettier and is idempotent', () => {
 	const file = join(root, 'src', 'main.ts');
 	writeFileSync(file, "import { readFileSync } from 'node:fs';\n\nconst value={active:true};\n");
 	const prettier = fileURLToPath(new URL('../../../node_modules/.bin/prettier', import.meta.url));
-	const cfg = createQualityConfig({ root, sourceRoots: ['src'], extensions: ['.ts'], tools: { prettier } });
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], tools: { prettier } });
 	runQualityCli(cfg, ['format', '--all']);
 	const first = readFileSync(file, 'utf8');
 	assert.match(first, /\/\/ API\nimport/);
@@ -495,7 +535,7 @@ test('protects long one-line imports from Prettier wrapping', () => {
 test('domain runs one configured quality command', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-'));
 	const marker = join(root, 'marker.txt');
-	const cfg = createQualityConfig({
+	const cfg = createQualityCfg({
 		root,
 		sourceRoots: [],
 		extensions: ['.ts'],
@@ -510,33 +550,33 @@ test('naming supports warning-only and automatic-fix modes', () => {
 	const file = join(root, 'src', 'main.ts');
 	const src = 'const organization = true;\nconst generatedPattern = /ok/;\nexport const result = [organization, generatedPattern];\n';
 	writeFileSync(file, src);
-	const cfg = createQualityConfig({ root, sourceRoots: ['src'], extensions: ['.ts'] });
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
 	runQualityCli(cfg, ['naming', '--all', '--warn']);
 	assert.equal(readFileSync(file, 'utf8'), src);
 	runQualityCli(cfg, ['naming', '--all']);
 	assert.equal(readFileSync(file, 'utf8'), 'const org = true;\nconst genPattern = /ok/;\nexport const result = [org, genPattern];\n');
 });
 test('naming applies whole-word image aliases and prefix-only state aliases', () => {
-	assert.equal(renameIdentifier('image'), 'img');
-	assert.equal(renameIdentifier('Image'), 'Img');
-	assert.equal(renameIdentifier('heroImage'), 'heroImg');
-	assert.equal(renameIdentifier('images'), 'imgs');
-	assert.equal(renameIdentifier('activeCard'), 'aCard');
-	assert.equal(renameIdentifier('ActiveCard'), 'ACard');
-	assert.equal(renameIdentifier('nextCard'), 'nCard');
-	assert.equal(renameIdentifier('cleanCard'), 'cCard');
-	assert.equal(renameIdentifier('safeCard'), 'sCard');
-	assert.equal(renameIdentifier('generatedPattern'), 'genPattern');
-	assert.equal(renameIdentifier('isActive'), 'isActive');
-	assert.equal(renameIdentifier('isNext'), 'isNext');
-	assert.equal(renameIdentifier('isClean'), 'isClean');
-	assert.equal(renameIdentifier('isSafe'), 'isSafe');
+	assert.equal(renameId('image'), 'img');
+	assert.equal(renameId('Image'), 'Img');
+	assert.equal(renameId('heroImage'), 'heroImg');
+	assert.equal(renameId('images'), 'imgs');
+	assert.equal(renameId('activeCard'), 'aCard');
+	assert.equal(renameId('ActiveCard'), 'ACard');
+	assert.equal(renameId('nextCard'), 'nCard');
+	assert.equal(renameId('cleanCard'), 'cCard');
+	assert.equal(renameId('safeCard'), 'sCard');
+	assert.equal(renameId('generatedPattern'), 'genPattern');
+	assert.equal(renameId('isActive'), 'isActive');
+	assert.equal(renameId('isNext'), 'isNext');
+	assert.equal(renameId('isClean'), 'isClean');
+	assert.equal(renameId('isSafe'), 'isSafe');
 });
 test('naming automatically fixes local declarations in Astro frontmatter', () => {
 	const root = mkdtempSync(join(tmpdir(), 'quality-naming-astro-'));
 	mkdirSync(join(root, 'src'));
 	writeFileSync(join(root, 'src', 'Page.astro'), '---\nconst error = new Error("x");\nconsole.log(error);\n---\n<Component error={error} />\n<p>{error.message}</p>\n');
-	const cfg = createQualityConfig({ root, sourceRoots: ['src'], extensions: ['.astro'] });
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.astro'] });
 	runQualityCli(cfg, ['naming', '--all']);
 	assert.match(readFileSync(join(root, 'src', 'Page.astro'), 'utf8'), /const err = new Error/);
 	assert.match(readFileSync(join(root, 'src', 'Page.astro'), 'utf8'), /console\.log\(err\)/);
@@ -549,7 +589,7 @@ test('naming preserves shorthand property keys while renaming their values', () 
 	mkdirSync(join(root, 'src'), { recursive: true });
 	const file = join(root, 'src', 'main.ts');
 	writeFileSync(file, 'function result(error: Error) { return { error }; }\nvoid result;\n');
-	const cfg = createQualityConfig({ root, sourceRoots: ['src'], extensions: ['.ts'] });
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
 	runQualityCli(cfg, ['naming', '--all']);
 	assert.equal(readFileSync(file, 'utf8'), 'function result(err: Error) { return { error: err }; }\nvoid result;\n');
 });
@@ -558,7 +598,7 @@ test('naming preserves call punctuation when expanding a shorthand parameter', (
 	mkdirSync(join(root, 'src'));
 	const file = join(root, 'src', 'main.ts');
 	writeFileSync(file, 'function result({ request }: { request: Request }) { return handle(request, true); }\nvoid result;\n');
-	const cfg = createQualityConfig({ root, sourceRoots: ['src'], extensions: ['.ts'] });
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
 	runQualityCli(cfg, ['naming', '--all']);
 	assert.equal(readFileSync(file, 'utf8'), 'function result({ request: req }: { request: Request }) { return handle(req, true); }\nvoid result;\n');
 });
@@ -567,7 +607,7 @@ test('naming shortens map callback parameters and all symbol references', () => 
 	mkdirSync(join(root, 'src'));
 	const file = join(root, 'src', 'main.ts');
 	writeFileSync(file, 'const output = input.map((node, index) => ({ node, index }));\nvoid output;\n');
-	const cfg = createQualityConfig({ root, sourceRoots: ['src'], extensions: ['.ts'] });
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
 	runQualityCli(cfg, ['naming', '--all']);
 	assert.equal(readFileSync(file, 'utf8'), 'const output = input.map((n, i) => ({ node: n, index: i }));\nvoid output;\n');
 	assert.deepEqual(namingFindings(cfg), []);
@@ -577,7 +617,7 @@ test('naming reduces arbitrary map callback parameters to free initials', () => 
 	mkdirSync(join(root, 'src'));
 	const file = join(root, 'src', 'main.ts');
 	writeFileSync(file, 'const output = content.map((line) => (line ? ` * ${line}` : " *"));\nvoid output;\n');
-	const cfg = createQualityConfig({ root, sourceRoots: ['src'], extensions: ['.ts'] });
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
 	runQualityCli(cfg, ['naming', '--all']);
 	assert.equal(readFileSync(file, 'utf8'), 'const output = content.map((l) => (l ? ` * ${l}` : " *"));\nvoid output;\n');
 });
@@ -586,7 +626,7 @@ test('naming shortens TypeScript traversal callbacks with conflict checks', () =
 	mkdirSync(join(root, 'src'));
 	const file = join(root, 'src', 'main.ts');
 	writeFileSync(file, 'ts.forEachChild(file, (node) => { if (ts.isIdentifier(node)) output.push(node.text); });\n');
-	const cfg = createQualityConfig({ root, sourceRoots: ['src'], extensions: ['.ts'] });
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
 	runQualityCli(cfg, ['naming', '--all']);
 	assert.equal(readFileSync(file, 'utf8'), 'ts.forEachChild(file, (n) => { if (ts.isIdentifier(n)) output.push(n.text); });\n');
 });
@@ -595,7 +635,7 @@ test('naming chooses a free map callback alias when preferred names conflict', (
 	mkdirSync(join(root, 'src'));
 	const file = join(root, 'src', 'main.ts');
 	writeFileSync(file, 'const n = 1;\nconst v = 2;\nconst output = input.map((node) => node + n + v);\nvoid output;\n');
-	const cfg = createQualityConfig({ root, sourceRoots: ['src'], extensions: ['.ts'] });
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
 	runQualityCli(cfg, ['naming', '--all']);
 	assert.equal(readFileSync(file, 'utf8'), 'const n = 1;\nconst v = 2;\nconst output = input.map((r) => r + n + v);\nvoid output;\n');
 });
@@ -604,7 +644,7 @@ test('naming reuses concise aliases safely across independent map scopes', () =>
 	mkdirSync(join(root, 'src'));
 	const file = join(root, 'src', 'main.ts');
 	writeFileSync(file, 'const first = input.map((node) => node.id);\nconst second = input.flatMap((node) => node.children);\nvoid [first, second];\n');
-	const cfg = createQualityConfig({ root, sourceRoots: ['src'], extensions: ['.ts'] });
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
 	runQualityCli(cfg, ['naming', '--all']);
 	assert.equal(readFileSync(file, 'utf8'), 'const first = input.map((n) => n.id);\nconst second = input.flatMap((n) => n.children);\nvoid [first, second];\n');
 });
@@ -613,7 +653,7 @@ test('naming preserves object keys but not positional syntax in destructured map
 	mkdirSync(join(root, 'src'));
 	const file = join(root, 'src', 'main.ts');
 	writeFileSync(file, 'const first = input.map(({ node }) => node.id);\nconst second = pairs.map(([node, index]) => node[index]);\nvoid [first, second];\n');
-	const cfg = createQualityConfig({ root, sourceRoots: ['src'], extensions: ['.ts'] });
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
 	runQualityCli(cfg, ['naming', '--all']);
 	assert.equal(readFileSync(file, 'utf8'), 'const first = input.map(({ node: n }) => n.id);\nconst second = pairs.map(([n, i]) => n[i]);\nvoid [first, second];\n');
 });
@@ -622,7 +662,7 @@ test('naming allocates distinct aliases across one destructured callback paramet
 	mkdirSync(join(root, 'src'));
 	const file = join(root, 'src', 'main.ts');
 	writeFileSync(file, 'const output = pairs.map(([record, result]) => result(record));\nvoid output;\n');
-	const cfg = createQualityConfig({ root, sourceRoots: ['src'], extensions: ['.ts'] });
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
 	runQualityCli(cfg, ['naming', '--all']);
 	assert.equal(readFileSync(file, 'utf8'), 'const output = pairs.map(([r, v]) => v(r));\nvoid output;\n');
 });
@@ -631,7 +671,7 @@ test('callback renames do not alter unrelated JSDoc parameters with the same nam
 	mkdirSync(join(root, 'src'));
 	const file = join(root, 'src', 'main.ts');
 	writeFileSync(file, '/** @param name */\nfunction retain(name: string) { return name; }\nconst output = input.map((name) => name.id);\nvoid [retain, output];\n');
-	const cfg = createQualityConfig({ root, sourceRoots: ['src'], extensions: ['.ts'] });
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
 	runQualityCli(cfg, ['naming', '--all']);
 	assert.equal(readFileSync(file, 'utf8'), '/** @param name */\nfunction retain(name: string) { return name; }\nconst output = input.map((n) => n.id);\nvoid [retain, output];\n');
 });
@@ -641,7 +681,7 @@ test('naming leaves node unchanged outside configured map callbacks', () => {
 	const file = join(root, 'src', 'main.ts');
 	const src = 'function visit(node: unknown) { return node; }\nvoid visit;\n';
 	writeFileSync(file, src);
-	const cfg = createQualityConfig({ root, sourceRoots: ['src'], extensions: ['.ts'] });
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
 	runQualityCli(cfg, ['naming', '--all']);
 	assert.equal(readFileSync(file, 'utf8'), src);
 });
@@ -651,7 +691,7 @@ test('naming fix mode leaves protected component paths unchanged', () => {
 	const file = join(root, 'src', 'components', 'ui', 'chart.tsx');
 	const src = 'const output = payload.map((item, index) => item[index]);\nvoid output;\n';
 	writeFileSync(file, src);
-	const cfg = createQualityConfig({ root, sourceRoots: ['src'], extensions: ['.tsx'] });
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.tsx'] });
 	runQualityCli(cfg, ['naming', '--all']);
 	assert.equal(readFileSync(file, 'utf8'), src);
 });
@@ -668,7 +708,7 @@ try { throw error; } catch (format) { console.log(format, repository); }
 void [articleError, ErrorBoundary];
 `,
 	);
-	const cfg = createQualityConfig({ root, sourceRoots: ['src'], extensions: ['.ts'] });
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
 	runQualityCli(cfg, ['naming', '--all']);
 	assert.equal(
 		readFileSync(file, 'utf8'),
@@ -687,7 +727,7 @@ test('naming preserves exported contracts and configurable protected identifiers
 	const file = join(root, 'src', 'main.ts');
 	const src = 'export class ErrorBoundary {}\nconst repository = new ErrorBoundary();\nvoid repository;\n';
 	writeFileSync(file, src);
-	const cfg = createQualityConfig({ root, sourceRoots: ['src'], extensions: ['.ts'], protectedIdentifiers: ['repository'] });
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], protectedIdentifiers: ['repository'] });
 	runQualityCli(cfg, ['naming', '--all']);
 	assert.equal(readFileSync(file, 'utf8'), src);
 	assert.deepEqual(namingFindings(cfg), []);
@@ -697,7 +737,7 @@ test('naming updates JSDoc parameter tags with parameter declarations', () => {
 	mkdirSync(join(root, 'src'), { recursive: true });
 	const file = join(root, 'src', 'main.ts');
 	writeFileSync(file, '/** @param value - Input value. */\nfunction result(value: string) { return value; }\nvoid result;\n');
-	const cfg = createQualityConfig({ root, sourceRoots: ['src'], extensions: ['.ts'] });
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
 	runQualityCli(cfg, ['naming', '--all']);
 	assert.equal(readFileSync(file, 'utf8'), '/** @param val - Input value. */\nfunction result(val: string) { return val; }\nvoid result;\n');
 });
@@ -707,7 +747,7 @@ test('naming preserves explicitly unused underscore parameters', () => {
 	const file = join(root, 'src', 'main.ts');
 	const src = 'const proxy = new Proxy({}, { get(_target, key) { return key; } });\nvoid proxy;\n';
 	writeFileSync(file, src);
-	const cfg = createQualityConfig({ root, sourceRoots: ['src'], extensions: ['.ts'] });
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
 	runQualityCli(cfg, ['naming', '--all']);
 	assert.equal(readFileSync(file, 'utf8'), src);
 	assert.deepEqual(namingFindings(cfg), []);
@@ -718,27 +758,25 @@ test('naming refuses file-level destination collisions', () => {
 	const file = join(root, 'src', 'main.ts');
 	const src = 'const target = 1;\nconst tgt = 2;\nvoid [target, tgt];\n';
 	writeFileSync(file, src);
-	const cfg = createQualityConfig({ root, sourceRoots: ['src'], extensions: ['.ts'] });
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
 	runQualityCli(cfg, ['naming', '--all']);
 	assert.equal(readFileSync(file, 'utf8'), src);
 });
-
 test('naming avoids repository helper shadowing in initializers', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-shadow-'));
 	const file = join(root, 'main.ts');
 	writeFileSync(file, 'function repository() { return { ok: true }; }\nfunction run() { const repo = repository(); return repo.ok; }\n');
-	const cfg = createQualityConfig({ root, sourceRoots: ['.'], extensions: ['.ts'], tools: { prettier: 'prettier' } });
+	const cfg = createQualityCfg({ root, sourceRoots: ['.'], extensions: ['.ts'], tools: { prettier: 'prettier' } });
 	runQualityCli(cfg, ['naming', '--all']);
 	const src = readFileSync(file, 'utf8');
 	assert.match(src, /function repository\(\)/);
 	assert.match(src, /const repo = repository\(\)/);
 });
-
 test('naming preserves parameter properties and their constructor references', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-parameter-property-'));
 	const file = join(root, 'main.ts');
 	writeFileSync(file, 'class RedirectError extends Error { constructor(readonly destination: string) { super(`Redirect to ${destination}`); } }\n');
-	const cfg = createQualityConfig({ root, sourceRoots: ['.'], extensions: ['.ts'], tools: { prettier: 'prettier' } });
+	const cfg = createQualityCfg({ root, sourceRoots: ['.'], extensions: ['.ts'], tools: { prettier: 'prettier' } });
 	runQualityCli(cfg, ['naming', '--all']);
 	const src = readFileSync(file, 'utf8');
 	assert.match(src, /readonly destination: string/);
@@ -749,7 +787,7 @@ test('naming keeps distinct aliases for adjacent parameters', () => {
 	mkdirSync(join(root, 'src'));
 	const file = join(root, 'src', 'main.ts');
 	writeFileSync(file, 'function run(config: object, command: string) { return [config, command]; }\nvoid run;\n');
-	const cfg = createQualityConfig({ root, sourceRoots: ['src'], extensions: ['.ts'] });
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
 	runQualityCli(cfg, ['naming', '--all']);
 	assert.equal(readFileSync(file, 'utf8'), 'function run(cfg: object, cmd: string) { return [cfg, cmd]; }\nvoid run;\n');
 });
@@ -758,7 +796,7 @@ test('naming reuses aliases in sibling function scopes and updates their TSDoc',
 	mkdirSync(join(root, 'src'));
 	const file = join(root, 'src', 'main.ts');
 	writeFileSync(file, '/** @param config */\nexport function first(config: object) { return config; }\n/** @param config */\nexport function second(config: object) { return config; }\n');
-	const cfg = createQualityConfig({ root, sourceRoots: ['src'], extensions: ['.ts'] });
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
 	runQualityCli(cfg, ['naming', '--all']);
 	assert.equal(readFileSync(file, 'utf8'), '/** @param cfg */\nexport function first(cfg: object) { return cfg; }\n/** @param cfg */\nexport function second(cfg: object) { return cfg; }\n');
 });
@@ -769,7 +807,7 @@ test('naming ignores external types, JSX attributes, properties, and exported co
 		join(root, 'src', 'main.tsx'),
 		"export type ResponseRecord = Record<string, string>;\nexport const response = { value: 'ok' };\nconst view = <input aria-current defaultValue={response.value} />;\nvoid view;\n",
 	);
-	const cfg = createQualityConfig({ root, sourceRoots: ['src'], extensions: ['.tsx'] });
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.tsx'] });
 	assert.deepEqual(namingFindings(cfg), []);
 });
 test('naming ignores declarations exported through an export list', () => {
@@ -778,7 +816,7 @@ test('naming ignores declarations exported through an export list', () => {
 	const file = join(root, 'src', 'main.ts');
 	const src = 'function previous() {}\nexport { previous };\n';
 	writeFileSync(file, src);
-	const cfg = createQualityConfig({ root, sourceRoots: ['src'], extensions: ['.ts'] });
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
 	runQualityCli(cfg, ['naming', '--all']);
 	assert.equal(readFileSync(file, 'utf8'), src);
 	assert.deepEqual(namingFindings(cfg), []);
