@@ -24,7 +24,7 @@ HELPERS
  *
  * @return
  */
-export function sourceFiles(cfg: QualityConfig): string[] {
+export function srcFiles(cfg: QualityConfig): string[] {
 	const roots = [...cfg.sourceRoots, ...(cfg.includeRoots ?? [])];
 	const exts = new Set(cfg.extensions);
 	const skipped = new Set(cfg.skippedDirectories ?? []);
@@ -47,6 +47,8 @@ export function sourceFiles(cfg: QualityConfig): string[] {
 	return files.sort((a, b) => a.localeCompare(b));
 }
 
+export const sourceFiles = srcFiles;
+
 /**
  * Returns configured source files changed in the working tree, including untracked files.
  *
@@ -62,7 +64,7 @@ export function workingSourceFiles(cfg: QualityConfig): string[] {
 			.filter(Boolean)
 			.map((p) => join(cfg.root, p)),
 	);
-	return sourceFiles(cfg).filter((file) => changed.has(file));
+	return srcFiles(cfg).filter((file) => changed.has(file));
 }
 
 /**

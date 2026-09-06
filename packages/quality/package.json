@@ -16,7 +16,8 @@
 	"exports": {
 		".": "./dist/index.js",
 		"./cli": "./dist/cli.js",
-		"./naming": "./dist/naming.js"
+		"./naming": "./dist/naming.js",
+		"./port": "./dist/port.js"
 	},
 	"files": [
 		"dist"
