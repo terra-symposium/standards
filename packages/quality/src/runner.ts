@@ -73,6 +73,9 @@ export type QualityCfg = {
 };
 export type QualityAnalysis = { files: string[]; texts: Map<string, string>; sources: Map<string, ts.SourceFile>; program: ts.Program; checker: ts.TypeChecker };
 export type QualityOptions = { fix: boolean; all: boolean; strict: boolean; skipCommands?: boolean; skipRecommendations?: boolean };
+type GenericFinding =
+	{ file?: string; message: string } | { value: string; count: number; locations: string[] } | { source: string; count: number; locations: string[] } | { file: string; pattern: string };
+const ANSI_ESCAPE = new RegExp(`${String.fromCharCode(27)}\\[[0-?]*[ -/]*[@-~]`, 'g');
 
 /*//////////////////////////////////////////////////
 HELPERS
@@ -224,6 +227,47 @@ function toolPath(cfg: QualityCfg, cfgd: string | undefined, fallback: string): 
 }
 
 /**
+ * Prints a readable heading for one quality stage.
+ *
+ * @param name Short name identifying the quality stage.
+ * @param detail Human-readable description of the work being performed.
+ *
+ * @return Nothing; the heading is written to standard output.
+ */
+function qualityHeader(name: string, detail: string): void {
+	console.log(`\n=== ${name} ===`);
+	console.log(detail);
+}
+
+/**
+ * Converts tool output into compact single-line messages without terminal control codes.
+ *
+ * @param val Raw child-process output.
+ *
+ * @return Output lines with ANSI codes removed and whitespace normalized.
+ */
+function compactOutput(val: string): string[] {
+	return val
+		.replace(ANSI_ESCAPE, '')
+		.split(/\r?\n/)
+		.map((l) => l.replace(/\s+/g, ' ').trim())
+		.filter(Boolean);
+}
+
+/**
+ * Prints one-line output emitted by a quality subprocess.
+ *
+ * @param val Raw child-process output.
+ * @param err Whether the output came from standard error.
+ *
+ * @return Nothing; each non-empty output line is printed once.
+ */
+function printChildOutput(val: string | Buffer | null | undefined, err: boolean): void {
+	if (!val) return;
+	for (const line of compactOutput(val.toString())) (err ? console.error : console.log)(`  ${line}`);
+}
+
+/**
  * Runs one subprocess from the configured repository root and returns its exit status.
  *
  * @param cfg Quality configuration defining the subprocess working directory.
@@ -233,8 +277,10 @@ function toolPath(cfg: QualityCfg, cfgd: string | undefined, fallback: string): 
  * @return Child-process exit status, or `1` when spawning fails without a status.
  */
 function run(cfg: QualityCfg, cmd: string, args: string[]): number {
-	const result = spawnSync(cmd, args, { cwd: cfg.root, stdio: 'inherit', env: process.env });
-	if (result.error) console.error(`${cmd} failed: ${result.error.message}`);
+	const result = spawnSync(cmd, args, { cwd: cfg.root, stdio: ['inherit', 'pipe', 'pipe'], env: process.env });
+	printChildOutput(result.stdout, false);
+	printChildOutput(result.stderr, true);
+	if (result.error) console.error(`  ${cmd} failed: ${result.error.message}`);
 	return result.status ?? 1;
 }
 
@@ -286,6 +332,7 @@ function scopedCfg(cfg: QualityCfg, all: boolean): QualityCfg {
 function runLint(cfg: QualityCfg, opts: QualityOptions, exhaustive = false): void {
 	const files = filesFor(cfg, opts.all).filter((f) => /\.(?:astro|cjs|js|jsx|mjs|ts|tsx)$/.test(f));
 	if (!files.length) return;
+	qualityHeader('lint', `${opts.fix ? 'Fixing' : 'Checking'} ${files.length} source files with ESLint`);
 	const flags = [
 		'--cache',
 		'--cache-strategy',
@@ -296,10 +343,15 @@ function runLint(cfg: QualityCfg, opts: QualityOptions, exhaustive = false): voi
 		...(exhaustive ? ['--max-warnings=0'] : []),
 		...(opts.fix ? ['--fix'] : []),
 	];
+	let failed = false;
 	for (const filesBatch of batches(files)) {
 		const status = run(cfg, toolPath(cfg, cfg.tools?.eslint, 'eslint'), [...flags, ...filesBatch]);
-		if (status) process.exitCode = status;
+		if (status) {
+			failed = true;
+			process.exitCode = status;
+		}
 	}
+	console.log(`  ${failed ? '✗ failed' : '✓ passed'}`);
 }
 
 /**
@@ -314,8 +366,10 @@ function runCfgdCmd(cfg: QualityCfg, name: string): void {
 	if (!qualityCommandEnabled(cfg, name)) return;
 	const check = cfg.qualityCommands?.find((c) => c.name === name);
 	if (!check) throw new Error(`Unknown quality domain: ${name}`);
+	qualityHeader(`command:${name}`, `Running ${check.command} ${(check.args ?? []).join(' ')}`.trim());
 	const status = run(cfg, check.command, check.args ?? []);
 	if (status) process.exitCode = status;
+	console.log(`  ${status ? '✗ failed' : '✓ passed'}`);
 }
 
 /**
@@ -337,7 +391,12 @@ function runCfgdCmds(cfg: QualityCfg): void {
  * @return Nothing; advisory failures do not alter the process exit code.
  */
 function runRecommendationCmds(cfg: QualityCfg): void {
-	for (const check of cfg.recommendationCommands ?? []) if (qualityRecommendationEnabled(cfg, check.name)) run(cfg, check.command, check.args ?? []);
+	for (const check of cfg.recommendationCommands ?? []) {
+		if (!qualityRecommendationEnabled(cfg, check.name)) continue;
+		qualityHeader(`recommendation:${check.name}`, `Running ${check.command} ${(check.args ?? []).join(' ')}`.trim());
+		const status = run(cfg, check.command, check.args ?? []);
+		console.log(`  ${status ? '✗ failed (advisory)' : '✓ passed'}`);
+	}
 }
 
 /**
@@ -348,10 +407,12 @@ function runRecommendationCmds(cfg: QualityCfg): void {
  * @return Nothing; typecheck failures are reflected in the process exit code.
  */
 function runProjectTypecheck(cfg: QualityCfg): void {
+	qualityHeader('typecheck', 'Checking the configured project type boundary');
 	const status = cfg.typecheckCommand
 		? run(cfg, cfg.typecheckCommand.command, cfg.typecheckCommand.args ?? [])
 		: run(cfg, toolPath(cfg, cfg.tools?.tsc, 'tsc'), ['--noEmit', '-p', cfg.tsconfig ?? 'tsconfig.json']);
 	if (status) process.exitCode = status;
+	console.log(`  ${status ? '✗ failed' : '✓ passed'}`);
 }
 
 /**
@@ -440,11 +501,13 @@ function repairMissingImports(cfg: QualityCfg, program: ts.Program, checker: ts.
  * @return Nothing; Knip failures are reflected in the process exit code.
  */
 function runKnip(cfg: QualityCfg, fix: boolean, exhaustive = false): void {
+	qualityHeader('knip', `${fix && !exhaustive ? 'Fixing and checking' : 'Checking'} unused files, exports, dependencies, and reachability`);
 	const status = run(cfg, toolPath(cfg, cfg.tools?.knip, 'knip'), [
 		...(fix && !exhaustive ? ['--fix'] : exhaustive ? [] : ['--include', 'unresolved,nsExports,nsTypes,cycles']),
 		...(exhaustive ? [] : ['--no-exit-code']),
 	]);
 	if (status) process.exitCode = status;
+	console.log(`  ${status ? '✗ failed' : '✓ passed'}`);
 }
 
 /**
@@ -455,8 +518,27 @@ function runKnip(cfg: QualityCfg, fix: boolean, exhaustive = false): void {
  * @return Nothing; diff-check failures are reflected in the process exit code.
  */
 function runDiffCheck(cfg: QualityCfg): void {
+	qualityHeader('diff', 'Checking Git whitespace and patch errors');
 	const status = run(cfg, 'git', ['-c', 'core.pager=cat', 'diff', '--check']);
 	if (status) process.exitCode = status;
+	console.log(`  ${status ? '✗ failed' : '✓ passed'}`);
+}
+
+/**
+ * Prints a grouped set of findings with one normalized line per issue.
+ *
+ * @param findings Findings produced by one quality stage.
+ * @param fmt Converts one finding into a human-readable message.
+ *
+ * @return Nothing; findings and a clean summary are written to the console.
+ */
+function printFindings<T>(findings: readonly T[], fmt: (finding: T) => string): void {
+	if (!findings.length) {
+		console.log('  ✓ clean');
+		return;
+	}
+	console.warn(`  ${findings.length} finding${findings.length === 1 ? '' : 's'}:`);
+	for (const finding of findings) console.warn(`  - ${compactOutput(fmt(finding)).join(' ')}`);
 }
 
 /**
@@ -475,10 +557,12 @@ function runGenericChecks(cfg: QualityCfg, analysis?: QualityAnalysis): void {
 		['ui-patterns', cfg.uiPatterns ? uiPatternFindings(cfg) : []],
 	] as const;
 	for (const [name, findings] of checks) {
-		for (const finding of findings)
-			console.warn(
-				`${name}: ${'file' in finding ? `${finding.file}: ` : ''}${'message' in finding ? finding.message : 'value' in finding ? `${finding.count}x ${finding.value} (${finding.locations.join(', ')})` : 'source' in finding ? `${finding.count}x ${finding.source} (${finding.locations.join(', ')})` : finding.pattern}`,
-			);
+		qualityHeader(name, `Checking ${name.replace(/-/g, ' ')}`);
+		printFindings(
+			findings as readonly GenericFinding[],
+			(finding) =>
+				`${'file' in finding ? `${finding.file}: ` : ''}${'message' in finding ? finding.message : 'value' in finding ? `${finding.count}x ${finding.value} (${finding.locations.join(', ')})` : 'source' in finding ? `${finding.count}x ${finding.source} (${finding.locations.join(', ')})` : finding.pattern}`,
+		);
 		if (findings.length && (name === 'security' || name === 'ui-patterns')) process.exitCode = 1;
 	}
 }
@@ -764,12 +848,27 @@ export function runQuality(
 		forwarding: qualityCheckEnabled(cfg, 'forward') ? objectForwardingFindings(scoped, ctx) : [],
 		documentation: qualityCheckEnabled(cfg, 'document') ? documentationFindings(scoped, ctx) : [],
 	};
-	for (const f of result.imports) console.error(`Unresolved import: ${f.importer} -> ${f.specifier}`);
-	for (const f of result.naming) console.warn(`${f.severity === 'error' ? 'Naming drift' : 'Naming suggestion'}: ${f.file}: ${f.name} -> ${f.suggestion}`);
-	for (const f of result.aliases) console.warn(`Alias: ${f.file}:${f.line} ${f.kind} ${f.name} -> ${f.replacement}`);
-	for (const f of result.forwarding) console.warn(`Forwarding suggestion: ${f.file}:${f.line}:${f.column} ${f.callee} repeats ${f.source}.${f.properties.join(', ')}; ${f.recommendation}.`);
-	if (result.documentation.length) console.warn(DOCUMENTATION_DESCRIPTION_NOTICE);
-	for (const f of result.documentation) console.warn(`${f.severity === 'warning' ? 'Documentation warning' : 'Documentation requirement'}: ${f.file}:${f.line}:${f.column} ${f.name}; ${f.reason}.`);
+	if (qualityCheckEnabled(cfg, 'import')) {
+		qualityHeader('imports', 'Checking local import resolution');
+		printFindings(result.imports, (f) => `Unresolved import: ${f.importer} -> ${f.specifier}`);
+	}
+	if (qualityCheckEnabled(cfg, 'name')) {
+		qualityHeader('naming', 'Checking concise, consistent symbol names');
+		printFindings(result.naming, (f) => `${f.severity === 'error' ? 'Naming drift' : 'Naming suggestion'}: ${f.file}: ${f.name} -> ${f.suggestion}`);
+	}
+	if (qualityCheckEnabled(cfg, 'alias')) {
+		qualityHeader('aliases', 'Checking for unnecessary compatibility aliases');
+		printFindings(result.aliases, (f) => `Alias: ${f.file}:${f.line} ${f.kind} ${f.name} -> ${f.replacement}`);
+	}
+	if (qualityCheckEnabled(cfg, 'forward')) {
+		qualityHeader('forwarding', 'Checking object-forwarding opportunities');
+		printFindings(result.forwarding, (f) => `Forwarding suggestion: ${f.file}:${f.line}:${f.column} ${f.callee} repeats ${f.source}.${f.properties.join(', ')}; ${f.recommendation}.`);
+	}
+	if (qualityCheckEnabled(cfg, 'document')) {
+		qualityHeader('documentation', 'Checking meaningful file, function, and parameter documentation');
+		if (result.documentation.length) console.warn(`  note: ${DOCUMENTATION_DESCRIPTION_NOTICE}`);
+		printFindings(result.documentation, (f) => `${f.severity === 'warning' ? 'Documentation warning' : 'Documentation requirement'}: ${f.file}:${f.line}:${f.column} ${f.name}; ${f.reason}.`);
+	}
 	if (result.imports.length || result.aliases.length || result.documentation.some((f) => f.severity === 'error') || (strict && result.naming.some((f) => f.severity === 'error'))) process.exitCode = 1;
 	return result;
 }
@@ -786,6 +885,7 @@ export function runQuality(
  */
 function runDocumentation(cfg: QualityCfg, opts: QualityOptions, args: string[], quiet: boolean): void {
 	if (!qualityCheckEnabled(cfg, 'document')) return;
+	qualityHeader('documentation', `${opts.fix ? 'Fixing and checking' : 'Checking'} documentation structure and meaningful descriptions`);
 	const cmdOpts = { ...opts, fix: qualityAutofixEnabled(cfg, 'document', opts.fix) };
 	const files = filesFor(cfg, opts.all);
 	const reqFiles = args.slice(1).filter((a) => !a.startsWith('-'));
@@ -819,13 +919,13 @@ export function runQualityCli(cfg: QualityCfg, args = process.argv.slice(2)): vo
 		skipRecommendations: args.includes('--skip-recommendations'),
 	};
 	const fix = (check: QualityAutofixName): boolean => qualityAutofixEnabled(cfg, check, opts.fix);
-	const files = filesFor(cfg, opts.all);
 	if (cmd === 'document' || cmd === 'maintain') {
 		runDocumentation(cfg, opts, args, args.includes('--quiet'));
 		return;
 	}
 	if (cmd === 'format') {
 		if (!qualityCheckEnabled(cfg, 'format')) return;
+		const files = filesFor(cfg, opts.all);
 		const cmdOpts = { ...opts, fix: fix('format') };
 		const tgts = files.filter((f) => !f.endsWith('.astro'));
 		if (cmdOpts.fix) for (const file of tgts) if (/\.(?:c|m)?(?:js|ts)x?$/.test(file)) collapseInlineIfs(file);
@@ -849,17 +949,20 @@ export function runQualityCli(cfg: QualityCfg, args = process.argv.slice(2)): vo
 		return;
 	}
 	if (cmd === 'single-use') {
+		qualityHeader('single-use', `${opts.fix ? 'Fixing and checking' : 'Checking'} single-use declarations`);
 		if (opts.fix) fixSingleUseTypes(cfg);
 		const findings = writeSingleUseReport(cfg);
-		for (const finding of findings) console.warn(`Single-use ${finding.decision}: ${finding.file}:${finding.line} ${finding.name} — ${finding.reason}`);
+		printFindings(findings, (finding) => `Single-use ${finding.decision}: ${finding.file}:${finding.line} ${finding.name} — ${finding.reason}`);
 		return;
 	}
 	if (cmd === 'security' || cmd === 'repeated-classes' || cmd === 'regex-dedup' || cmd === 'ui-patterns') {
 		const findings = cmd === 'security' ? securityFindings(cfg) : cmd === 'repeated-classes' ? repeatedClassFindings(cfg) : cmd === 'regex-dedup' ? regexFindings(cfg) : uiPatternFindings(cfg);
-		for (const finding of findings)
-			console.warn(
-				`${cmd}: ${'file' in finding ? `${finding.file}: ` : ''}${'message' in finding ? finding.message : 'value' in finding ? `${finding.count}x ${finding.value} (${finding.locations.join(', ')})` : 'source' in finding ? `${finding.count}x ${finding.source} (${finding.locations.join(', ')})` : finding.pattern}`,
-			);
+		qualityHeader(cmd, `Checking ${cmd.replace(/-/g, ' ')}`);
+		printFindings(
+			findings as readonly GenericFinding[],
+			(finding) =>
+				`${'file' in finding ? `${finding.file}: ` : ''}${'message' in finding ? finding.message : 'value' in finding ? `${finding.count}x ${finding.value} (${finding.locations.join(', ')})` : 'source' in finding ? `${finding.count}x ${finding.source} (${finding.locations.join(', ')})` : finding.pattern}`,
+		);
 		if (findings.length) process.exitCode = 1;
 		return;
 	}
@@ -871,7 +974,7 @@ export function runQualityCli(cfg: QualityCfg, args = process.argv.slice(2)): vo
 	if (cmd === 'knip') return qualityCheckEnabled(cfg, 'knip') ? runKnip(cfg, fix('knip')) : undefined;
 	if (cmd === 'types') {
 		if (!qualityCheckEnabled(cfg, 'type')) return;
-		runTypecheck(cfg, opts.all ? [] : files);
+		runTypecheck(cfg, opts.all ? [] : filesFor(cfg, false));
 		if (cfg.typecheckExtensions?.length && !cfg.typecheckRoots?.length) runProjectTypecheck(cfg);
 		return;
 	}
@@ -931,16 +1034,22 @@ export function runFormatter(cfg: QualityCfg, optsOrArgs: QualityOptions | strin
 	const fmtArgs = [...(hasMode ? [] : [opts.fix ? '--write' : '--check']), ...(hasIgnoreMode ? [] : ['--ignore-unknown']), ...suppliedArgs, ...(suppliedTgts.length ? [] : filesFor(cfg, opts.all))];
 	const flags = fmtArgs.filter((a) => a.startsWith('-'));
 	const tgts = fmtArgs.filter((a) => !a.startsWith('-') && !a.endsWith('.astro'));
+	qualityHeader('format', `${opts.fix ? 'Fixing' : 'Checking'} formatting in ${tgts.length} source files`);
 	if (opts.fix) {
 		const knownFiles = filesFor(cfg, opts.all);
 		const directTgts = suppliedTgts.map((t) => resolve(cfg.root, t));
 		const collapseTgts = directTgts.length ? knownFiles.filter((f) => directTgts.some((t) => resolve(f) === t || resolve(f).startsWith(`${t}${sep}`))) : knownFiles;
 		for (const file of collapseTgts) collapseTypesAndObjects(file);
 	}
+	let failed = false;
 	for (const tgtBatch of batches(tgts)) {
 		const status = run(cfg, toolPath(cfg, cfg.tools?.prettier, 'prettier'), [...flags, ...tgtBatch]);
-		if (status) process.exitCode = status;
+		if (status) {
+			failed = true;
+			process.exitCode = status;
+		}
 	}
+	console.log(`  ${failed ? '✗ failed' : '✓ passed'}`);
 }
 
 /**
@@ -975,7 +1084,11 @@ export function runTypecheck(cfg: QualityCfg, args: string[] = []): void {
         ...(args.length ? suppliedFiles : typecheckFiles),
 			]
 		: ['--noEmit', '-p', cfg.tsconfig ?? 'tsconfig.json', ...suppliedFiles];
-	const result = spawnSync(toolPath(cfg, tsc, 'tsc'), compilerArgs, { cwd: cfg.root, stdio: 'inherit' });
+	qualityHeader('typecheck', `Checking ${args.length ? 'the selected source files' : 'the configured TypeScript project'}`);
+	const result = spawnSync(toolPath(cfg, tsc, 'tsc'), compilerArgs, { cwd: cfg.root, stdio: ['inherit', 'pipe', 'pipe'] });
+	printChildOutput(result.stdout, false);
+	printChildOutput(result.stderr, true);
 	if (result.status) process.exitCode = result.status ?? 1;
+	console.log(`  ${result.status ? '✗ failed' : '✓ passed'}`);
 }
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) runQualityFromConfig();

@@ -1,5 +1,6 @@
 /**
  * packages/error-boundaries/test/error-boundaries.test.mjs
+ * Verifies shared error-boundary exports and recovery behavior.
  */
 
 /*//////////////////////////////////////////////////

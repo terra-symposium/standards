@@ -392,7 +392,10 @@ export function hasPrefixReplacement(name: string): boolean {
  */
 export function isProtectedPath(fileName: string): boolean {
 	const norm = fileName.replaceAll('\\', '/');
-	return norm.endsWith('.d.ts') || [...PROTECTED_PATH_PARTS].some((p) => (p.includes('/') ? norm === p || norm.startsWith(`${p}/`) || norm.includes(`/${p}/`) : norm.split('/').includes(p)));
+	return (
+		norm.endsWith('.d.ts') ||
+		[...PROTECTED_PATH_PARTS].some((p) => (p.includes('/') ? norm === p || norm.endsWith(`/${p}`) || norm.startsWith(`${p}/`) || norm.includes(`/${p}/`) : norm.split('/').includes(p)))
+	);
 }
 
 /**
@@ -591,7 +594,12 @@ export function aliasFindings(cfg: QualityCfg, analysisOrFix: QualityAnalysis | 
 				const name = declaration.name as ts.Identifier;
 				const tgt = declaration.initializer && aliasTgt(declaration.initializer);
 				const symbol = tgt && checker.getSymbolAtLocation(name);
-				const targetSymbol = tgt && checker.getSymbolAtLocation(tgt);
+				const targetSymbol = tgt
+					? (checker.getSymbolAtLocation(tgt) ??
+						(ts.isElementAccessExpression(tgt) && ts.isStringLiteral(tgt.argumentExpression)
+							? checker.getPropertyOfType(checker.getTypeAtLocation(tgt.expression), tgt.argumentExpression.text)
+							: undefined))
+					: undefined;
 				if (
 					tgt &&
 					symbol &&
@@ -607,7 +615,14 @@ export function aliasFindings(cfg: QualityCfg, analysisOrFix: QualityAnalysis | 
 			if (ts.isTypeAliasDeclaration(node) && node.typeParameters === undefined && ts.isTypeReferenceNode(node.type) && node.type.typeArguments === undefined) {
 				const symbol = checker.getSymbolAtLocation(node.name);
 				const targetSymbol = checker.getSymbolAtLocation(node.type.typeName);
-				if (symbol && targetSymbol && symbol !== targetSymbol && !externallyReferenced(files, srcTexts, source.fileName, node.name.text))
+				if (
+					symbol &&
+					targetSymbol &&
+					symbol !== targetSymbol &&
+					!exportedSymbols.has(symbol) &&
+					!exportedNames.has(node.name.text) &&
+					!externallyReferenced(files, srcTexts, source.fileName, node.name.text)
+				)
 					aliases.push({ statement: node, name: node.name, symbol, replacement: node.type.getText(source), kind: 'type' });
 			}
 			ts.forEachChild(node, inspect);
@@ -619,7 +634,11 @@ export function aliasFindings(cfg: QualityCfg, analysisOrFix: QualityAnalysis | 
 		const visit = (node: ts.Node): void => {
 			if (aliases.some((a) => a.statement === node)) return;
 			if (ts.isIdentifier(node)) {
-				const alias = symbols.get(checker.getSymbolAtLocation(node) as ts.Symbol);
+				const symbol =
+					ts.isShorthandPropertyAssignment(node.parent) && node.parent.name === node
+						? (checker.getShorthandAssignmentValueSymbol(node.parent) ?? checker.getSymbolAtLocation(node))
+						: checker.getSymbolAtLocation(node);
+				const alias = symbols.get(symbol as ts.Symbol);
 				if (alias && node !== alias.name)
 					edits.push({
 						start: node.getStart(source),

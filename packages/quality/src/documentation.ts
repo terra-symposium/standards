@@ -554,7 +554,23 @@ function documentationSupported(fileName: string): boolean {
  * @return `true` when a documentation comment directly precedes the node.
  */
 function documented(node: ts.Node, src: string): boolean {
-	return /\/\*\*[\s\S]*?\*\//.test(src.slice(node.getFullStart(), node.getStart()));
+	const leading = src.slice(node.getFullStart(), node.getStart());
+	const docs = [...leading.matchAll(/\/\*\*[\s\S]*?\*\//g)];
+	const doc = docs.at(-1);
+	if (!doc) return false;
+	// The generated file header is source-level metadata, not documentation for
+	// the first declaration. Only exclude it when the block is the first
+	// path-bearing TSDoc in the file; a declaration's own later TSDoc remains
+	// valid even when the file also has a header.
+	const blockStart = node.getFullStart() + doc.index!;
+	let prefix = src.slice(0, blockStart).replace(/^\uFEFF/, '');
+	if (prefix.startsWith('#!')) prefix = prefix.slice(prefix.indexOf('\n') + 1);
+	const docLines = doc[0]!
+		.slice(3, -2)
+		.split(/\r?\n/)
+		.map((l) => l.replace(/^\s*\* ?/, '').trim());
+	const isFileHeader = prefix.trim() === '' && docLines.some((l) => /(?:^|[\\/])[^\\/]+\.(?:c|m)?(?:js|jsx|ts|tsx)$/.test(l));
+	return !isFileHeader;
 }
 
 /**

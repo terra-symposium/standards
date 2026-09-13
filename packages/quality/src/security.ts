@@ -11,7 +11,7 @@ IMPORTS
 import { displayPath, srcFiles } from './files.js';
 import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
-import { readFileSync, readdirSync } from 'node:fs';
+import { readFileSync, readdirSync, realpathSync } from 'node:fs';
 
 // TYPES
 import type { QualityCfg } from './runner.js';
@@ -39,6 +39,8 @@ export function securityFindings(cfg: QualityCfg): SecurityFinding[] {
 	const findings: SecurityFinding[] = [];
 	const visible = (() => {
 		try {
+			const repoRoot = execFileSync('git', ['rev-parse', '--show-toplevel'], { cwd: cfg.root, encoding: 'utf8' }).trim();
+			if (realpathSync(repoRoot) !== realpathSync(cfg.root)) return undefined;
 			return new Set(
 				execFileSync('git', ['ls-files', '--cached', '--others', '--exclude-standard'], { cwd: cfg.root, encoding: 'utf8' })
 					.split('\n')
@@ -66,7 +68,7 @@ export function securityFindings(cfg: QualityCfg): SecurityFinding[] {
 		const src = readFileSync(file, 'utf8');
 		for (const pattern of forbiddenTerms) if (pattern.test(src)) findings.push({ file: name, message: `forbidden term matches ${pattern}` });
 		for (const specifier of forbiddenImports)
-			if (new RegExp(`(?:from|import\\()\\s*['"]${specifier.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&')}['"]`).test(src)) findings.push({ file: name, message: `forbidden import ${specifier}` });
+			if (new RegExp(`(?:from|import)\\s*(?:\\(\\s*)?['"]${specifier.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&')}['"]`).test(src)) findings.push({ file: name, message: `forbidden import ${specifier}` });
 		if (clientRoots.some((r) => file.startsWith(`${r}/`)) && /(?:SECRET|TOKEN|PASSWORD|PRIVATE_KEY|DATABASE_URL)/.test(src) && /import\.meta\.env|process\.env/.test(src))
 			findings.push({ file: name, message: 'client source references a secret-shaped environment value' });
 		if (/dotenv(?:\.config|\/config)/.test(src)) findings.push({ file: name, message: 'environment-file loading is forbidden' });

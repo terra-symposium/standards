@@ -24,6 +24,7 @@ HELPERS
  * @return Process IDs currently listening on the port, or an empty array when the query fails.
  */
 export function portOwners(port: number): number[] {
+	if (!Number.isInteger(port) || port < 0 || port > 65535) return [];
 	try {
 		return execFileSync('lsof', ['-nP', `-iTCP:${port}`, '-sTCP:LISTEN', '-t'], { encoding: 'utf8' })
 			.split(/\s+/)

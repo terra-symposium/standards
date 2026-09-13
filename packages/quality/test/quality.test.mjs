@@ -1,5 +1,6 @@
 /**
  * packages/quality/test/quality.test.mjs
+ * Exercises consolidated quality checks, fixers, and CLI behavior.
  */
 
 /*//////////////////////////////////////////////////
@@ -9,11 +10,42 @@ IMPORTS
 // API
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { aliasFindings, checkImports, collapseInlineIfs, collapseTypesAndObjects, createQualityCfg, maintainSrcFile, namingFindings, objectForwardingFindings, protectLongImports, renameId, runQualityCli, srcFiles } from '../dist/index.js';
+// prettier-ignore
+import { aliasFindings, checkImports, collapseInlineIfs, collapseTypesAndObjects, createQualityAnalysis, createQualityCfg, documentationFindings, maintainSrcFile, namingFindings, objectForwardingFindings, protectLongImports, regexFindings, renameId, runQualityCli, runTailwindCanonical, srcFiles } from '../dist/index.js';
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
+
+// DATA
+import { DOCUMENTATION_DESCRIPTION_NOTICE } from '../dist/index.js';
+test('consolidated quality modules expose their behavior from the public package entrypoint', () => {
+	for (const check of [aliasFindings, createQualityAnalysis, documentationFindings, regexFindings, runTailwindCanonical]) assert.equal(typeof check, 'function');
+});
+test('documentation warnings identify missing file, summary, and tag descriptions without generating prose', () => {
+	const root = mkdtempSync(join(tmpdir(), 'terra-quality-doc-warnings-'));
+	const file = join(root, 'main.ts');
+	writeFileSync(
+		file,
+		`/**
+ * main.ts
+ */
+/**
+ *
+ * @param value
+ *
+ * @return
+ */
+function read(value: string): string { return value; }
+`,
+	);
+	const cfg = createQualityCfg({ root, sourceRoots: ['.'], extensions: ['.ts'] });
+	const findings = documentationFindings(cfg);
+	assert.deepEqual(new Set(findings.map((f) => f.kind)), new Set(['file', 'summary', 'param', 'return']));
+	assert.ok(findings.every((f) => f.severity === 'warning'));
+	assert.match(DOCUMENTATION_DESCRIPTION_NOTICE, /agentically authored/);
+	assert.match(DOCUMENTATION_DESCRIPTION_NOTICE, /never generates descriptions in bulk/);
+});
 
 /*//////////////////////////////////////////////////
 TESTS
@@ -31,7 +63,10 @@ test('reports repeated input forwarding while ignoring persistence payloads', ()
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-object-forwarding-'));
 	mkdirSync(join(root, 'src'), { recursive: true });
 	const file = join(root, 'src', 'main.ts');
-	writeFileSync(file, 'send({ organizationId: input.organizationId, userId: input.userId, opportunities: input.opportunities });\nrepo.upsert({ organizationId: input.organizationId, userId: input.userId, opportunities: input.opportunities });\n');
+	writeFileSync(
+		file,
+		'send({ organizationId: input.organizationId, userId: input.userId, opportunities: input.opportunities });\nrepo.upsert({ organizationId: input.organizationId, userId: input.userId, opportunities: input.opportunities });\n',
+	);
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
 	const findings = objectForwardingFindings(cfg);
 	assert.equal(findings.length, 1);

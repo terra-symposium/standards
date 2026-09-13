@@ -1,5 +1,6 @@
 node_modules/
 dist/
 coverage/
+/.quality-test-tmp/
 .changeset/*.md
 !.changeset/README.md
