@@ -1,0 +1,51 @@
+{
+  "generatedAt": "2026-09-13T01:15:43.951Z",
+  "scope": [
+    "/Users/kaimacann/Desktop/terra-shared/packages",
+    "/Users/kaimacann/Desktop/terra-shared/scripts"
+  ],
+  "findings": [
+    {
+      "file": "packages/quality/src/aliases.ts",
+      "line": 9,
+      "name": "targetNode",
+      "decision": "KEEP",
+      "reason": "callable or rendering boundary"
+    },
+    {
+      "file": "packages/quality/src/aliases.ts",
+      "line": 12,
+      "name": "externallyReferenced",
+      "decision": "KEEP",
+      "reason": "callable or rendering boundary"
+    },
+    {
+      "file": "packages/quality/src/collapse.ts",
+      "line": 18,
+      "name": "SUPPORTED",
+      "decision": "KEEP",
+      "reason": "runtime/workflow boundary"
+    },
+    {
+      "file": "packages/quality/src/single-use.ts",
+      "line": 10,
+      "name": "sourceKind",
+      "decision": "KEEP",
+      "reason": "callable or rendering boundary"
+    },
+    {
+      "file": "packages/quality/src/single-use.ts",
+      "line": 14,
+      "name": "classify",
+      "decision": "KEEP",
+      "reason": "callable or rendering boundary"
+    },
+    {
+      "file": "scripts/quality/quality.config.mjs",
+      "line": 18,
+      "name": "root",
+      "decision": "KEEP",
+      "reason": "runtime/workflow boundary"
+    }
+  ]
+}

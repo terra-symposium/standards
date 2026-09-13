@@ -1,10 +1,16 @@
 {
 	"name": "@terra-symposium/quality",
-	"version": "0.3.7",
+	"version": "0.3.8",
 	"description": "Configurable quality checks and maintenance tooling for Terra Symposium repositories",
 	"type": "module",
+	"engines": {
+		"node": ">=18.18"
+	},
 	"main": "./dist/index.js",
 	"types": "./dist/index.d.ts",
+	"bin": {
+		"terra-quality": "./dist/bin.js"
+	},
 	"publishConfig": {
 		"registry": "https://npm.pkg.github.com",
     "access": "public"
@@ -17,10 +23,13 @@
 		".": "./dist/index.js",
 		"./cli": "./dist/cli.js",
 		"./naming": "./dist/naming.js",
+		"./object-forwarding": "./dist/object-forwarding.js",
+		"./single-use": "./dist/single-use.js",
 		"./port": "./dist/port.js"
 	},
 	"files": [
-		"dist"
+		"dist",
+		"quality.schema.json"
 	],
 	"scripts": {
 		"build": "tsc -p tsconfig.json",

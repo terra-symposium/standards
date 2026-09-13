@@ -9,8 +9,7 @@ IMPORTS
 // API
 import assert from 'node:assert/strict';
 import test from 'node:test';
-// prettier-ignore
-import { checkImports, collapseInlineIfs, collapseTypesAndObjects, createQualityCfg, maintainSrcFile, namingFindings, protectLongImports, renameId, runQualityCli, srcFiles } from '../dist/index.js';
+import { aliasFindings, checkImports, collapseInlineIfs, collapseTypesAndObjects, createQualityCfg, maintainSrcFile, namingFindings, objectForwardingFindings, protectLongImports, renameId, runQualityCli, srcFiles } from '../dist/index.js';
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
@@ -27,6 +26,16 @@ test('resolves aliases and extensionless relative imports', () => {
 	writeFileSync(join(root, 'src', 'main.ts'), "import { ok } from './helper';\nimport { ok as alias } from '@/helper';\nvoid ok; void alias;\n");
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], aliases: { '@/': 'src/' } });
 	assert.deepEqual(checkImports(cfg), []);
+});
+test('reports repeated input forwarding while ignoring persistence payloads', () => {
+	const root = mkdtempSync(join(tmpdir(), 'terra-quality-object-forwarding-'));
+	mkdirSync(join(root, 'src'), { recursive: true });
+	const file = join(root, 'src', 'main.ts');
+	writeFileSync(file, 'send({ organizationId: input.organizationId, userId: input.userId, opportunities: input.opportunities });\nrepo.upsert({ organizationId: input.organizationId, userId: input.userId, opportunities: input.opportunities });\n');
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
+	const findings = objectForwardingFindings(cfg);
+	assert.equal(findings.length, 1);
+	assert.equal(findings[0].recommendation, 'pass input directly');
 });
 test('quality accepts individual changed files as scoped source roots', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-file-root-'));
@@ -544,6 +553,16 @@ test('domain runs one configured quality command', () => {
 	runQualityCli(cfg, ['domain', 'fixture', '--all']);
 	assert.equal(readFileSync(marker, 'utf8'), 'ok');
 });
+test('alias fixer preserves generic aliases and generic references', () => {
+	const root = mkdtempSync(join(tmpdir(), 'terra-quality-alias-'));
+	mkdirSync(join(root, 'src'));
+	const file = join(root, 'src', 'main.ts');
+	const src = `type ArrayOf<T> = Array<T>;\ntype Alias = ArrayOf<string>;\nconst value: ArrayOf<number> = [];\nvoid value;\n`;
+	writeFileSync(file, src);
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
+	assert.deepEqual(aliasFindings(cfg, true), []);
+	assert.equal(readFileSync(file, 'utf8'), src);
+});
 test('naming supports warning-only and automatic-fix modes', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-'));
 	mkdirSync(join(root, 'src'), { recursive: true });
@@ -572,17 +591,16 @@ test('naming applies whole-word image aliases and prefix-only state aliases', ()
 	assert.equal(renameId('isClean'), 'isClean');
 	assert.equal(renameId('isSafe'), 'isSafe');
 });
-test('naming automatically fixes local declarations in Astro frontmatter', () => {
+test('naming leaves Astro frontmatter untouched when no Astro parser is available', () => {
 	const root = mkdtempSync(join(tmpdir(), 'quality-naming-astro-'));
 	mkdirSync(join(root, 'src'));
 	writeFileSync(join(root, 'src', 'Page.astro'), '---\nconst error = new Error("x");\nconsole.log(error);\n---\n<Component error={error} />\n<p>{error.message}</p>\n');
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.astro'] });
 	runQualityCli(cfg, ['naming', '--all']);
-	assert.match(readFileSync(join(root, 'src', 'Page.astro'), 'utf8'), /const err = new Error/);
-	assert.match(readFileSync(join(root, 'src', 'Page.astro'), 'utf8'), /console\.log\(err\)/);
-	assert.match(readFileSync(join(root, 'src', 'Page.astro'), 'utf8'), /<Component error=\{err\} \/>/);
-	assert.match(readFileSync(join(root, 'src', 'Page.astro'), 'utf8'), /<p>\{err\.message\}<\/p>/);
-	assert.deepEqual(namingFindings(cfg), []);
+	assert.match(readFileSync(join(root, 'src', 'Page.astro'), 'utf8'), /const error = new Error/);
+	assert.match(readFileSync(join(root, 'src', 'Page.astro'), 'utf8'), /console\.log\(error\)/);
+	assert.match(readFileSync(join(root, 'src', 'Page.astro'), 'utf8'), /<Component error=\{error\} \/>/);
+	assert.match(readFileSync(join(root, 'src', 'Page.astro'), 'utf8'), /<p>\{error\.message\}<\/p>/);
 });
 test('naming preserves shorthand property keys while renaming their values', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-'));
@@ -809,6 +827,17 @@ test('naming ignores external types, JSX attributes, properties, and exported co
 	);
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.tsx'] });
 	assert.deepEqual(namingFindings(cfg), []);
+});
+test('naming preserves intrinsic JSX tags when component symbols are unresolved', () => {
+	const root = mkdtempSync(join(tmpdir(), 'terra-quality-jsx-tags-'));
+	mkdirSync(join(root, 'src'));
+	const file = join(root, 'src', 'main.tsx');
+	const src = "import { ButtonLink } from './button';\nconst panel = () => <article><ButtonLink>Read</ButtonLink></article>;\nvoid panel;\n";
+	writeFileSync(file, src);
+	writeFileSync(join(root, 'src', 'button.tsx'), 'export const ButtonLink = () => null;\n');
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.tsx'] });
+	runQualityCli(cfg, ['naming', '--all']);
+	assert.equal(readFileSync(file, 'utf8'), src);
 });
 test('naming ignores declarations exported through an export list', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-'));

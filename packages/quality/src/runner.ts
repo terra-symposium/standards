@@ -11,24 +11,29 @@ import ts from 'typescript';
 import { checkImports } from './imports.js';
 import { collapseInlineIfs } from './inline-if.js';
 import { collapseTypesAndObjects } from './collapse.js';
-import { declarationScope, isCallbackDeclaration, isProtectedPath, isRenamableDeclaration, namingFindings, renameDeclaration } from './naming.js';
+import { declarationScope, isCallbackDeclaration, isProtectedPath, isRenamableDeclaration, namingFindings, renameDeclaration, renameId } from './naming.js';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { maintainSrcFile, protectLongImports } from './maintenance.js';
 import { resolve, sep } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { srcFiles, workingSrcFiles } from './files.js';
+import { objectForwardingFindings } from './object-forwarding.js';
+import { documentSrcFile, documentationFindings } from './documentation.js';
+import { aliasFindings } from './aliases.js';
+import { writeSingleUseReport } from './single-use.js';
 
 // DATA
 import { PROTECTED_IDENTIFIERS } from './naming.js';
 
 // TYPES
-import type { QualityCfg } from './config.js';
+import { qualityAutofixEnabled, qualityCheckEnabled, qualityCommandEnabled, qualityRecommendationEnabled } from './config.js';
+import type { QualityAutofixName, QualityCfg } from './config.js';
 
 /*//////////////////////////////////////////////////
 CONFIG
 //////////////////////////////////////////////////*/
 
-export type QualityResult = { imports: ReturnType<typeof checkImports>; naming: ReturnType<typeof namingFindings> };
+export type QualityResult = { imports: ReturnType<typeof checkImports>; naming: ReturnType<typeof namingFindings>; aliases: ReturnType<typeof aliasFindings>; forwarding: ReturnType<typeof objectForwardingFindings>; documentation: ReturnType<typeof documentationFindings> };
 export type QualityOptions = { fix: boolean; all: boolean; strict: boolean };
 
 /*//////////////////////////////////////////////////
@@ -132,6 +137,7 @@ function runLint(cfg: QualityCfg, opts: QualityOptions, exhaustive = false): voi
  * @return
  */
 function runCfgdCmd(cfg: QualityCfg, name: string): void {
+	if (!qualityCommandEnabled(cfg, name)) return;
 	const check = cfg.qualityCommands?.find((c) => c.name === name);
 	if (!check) throw new Error(`Unknown quality domain: ${name}`);
 	const status = run(cfg, check.command, check.args ?? []);
@@ -145,7 +151,18 @@ function runCfgdCmd(cfg: QualityCfg, name: string): void {
  * @return
  */
 function runCfgdCmds(cfg: QualityCfg): void {
-	for (const check of cfg.qualityCommands ?? []) runCfgdCmd(cfg, check.name);
+	for (const check of cfg.qualityCommands ?? []) if (qualityCommandEnabled(cfg, check.name)) runCfgdCmd(cfg, check.name);
+}
+
+/**
+ * Runs configured advisory checks after Knip without turning recommendations into failures.
+ *
+ * @param cfg
+ *
+ * @return
+ */
+function runRecommendationCmds(cfg: QualityCfg): void {
+	for (const check of cfg.recommendationCommands ?? []) if (qualityRecommendationEnabled(cfg, check.name)) run(cfg, check.command, check.args ?? []);
 }
 
 /**
@@ -194,9 +211,11 @@ function runDiffCheck(cfg: QualityCfg): void {
  * @return
  */
 function fixNames(cfg: QualityCfg, all: boolean): void {
-	const allowed = new Set(filesFor(cfg, all).filter((f) => !isProtectedPath(f)));
+	// TypeScript's parser does not understand Astro frontmatter. Keep Astro in
+	// reporting/import scope, but never apply symbol renames to it.
+	const allowed = new Set(filesFor(cfg, all).filter((f) => !isProtectedPath(f) && !f.endsWith('.astro')));
 	const program = ts.createProgram({
-		rootNames: srcFiles(cfg).filter((f) => /\.(?:(?:c|m)?(?:js|ts)x?|astro)$/.test(f)),
+		rootNames: srcFiles(cfg).filter((f) => /\.(?:(?:c|m)?(?:js|ts)x?)$/.test(f)),
 		options: {
 			allowNonTsExtensions: true,
 			allowJs: true,
@@ -209,8 +228,13 @@ function fixNames(cfg: QualityCfg, all: boolean): void {
 		},
 	});
 	const checker = program.getTypeChecker();
+	const isIntrinsicJsxTag = (n: ts.Identifier): boolean => {
+		const parent = n.parent;
+		return (ts.isJsxOpeningLikeElement(parent) || ts.isJsxClosingElement(parent)) && parent.tagName === n && n.text.length > 0 && n.text[0] === n.text[0]!.toLowerCase();
+	};
+	const canonical = (symbol: ts.Symbol | undefined): ts.Symbol | undefined => (symbol && symbol.flags & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(symbol) : symbol);
 	const identifierSymbol = (n: ts.Identifier): ts.Symbol | undefined =>
-		ts.isShorthandPropertyAssignment(n.parent) ? (checker.getShorthandAssignmentValueSymbol(n.parent) ?? checker.getSymbolAtLocation(n)) : checker.getSymbolAtLocation(n);
+		canonical(ts.isShorthandPropertyAssignment(n.parent) ? (checker.getShorthandAssignmentValueSymbol(n.parent) ?? checker.getSymbolAtLocation(n)) : checker.getSymbolAtLocation(n));
 	const hasInitShadow = (n: ts.Identifier): boolean => {
 		const declaration = n.parent;
 		if (!ts.isVariableDeclaration(declaration) || !declaration.initializer) return false;
@@ -276,7 +300,7 @@ function fixNames(cfg: QualityCfg, all: boolean): void {
 				)
 					return;
 				const symbol = suggestion === n.text ? undefined : identifierSymbol(n);
-				if (symbol && !exported.has(symbol)) replacements.set(symbol, suggestion);
+				if (symbol && (!exported.has(symbol) || cfg.renameExports === true)) replacements.set(symbol, suggestion);
 			}
 			ts.forEachChild(n, inspect);
 		};
@@ -286,7 +310,7 @@ function fixNames(cfg: QualityCfg, all: boolean): void {
 	for (const src of program.getSourceFiles()) {
 		if (!allowed.has(src.fileName)) continue;
 		const inspect = (n: ts.Node): void => {
-			if (ts.isIdentifier(n)) {
+			if (ts.isIdentifier(n) && !isIntrinsicJsxTag(n)) {
 				const replacement = replacements.get(identifierSymbol(n) as ts.Symbol);
 				const astroAttrName = src.fileName.endsWith('.astro') && src.text.slice(n.end, n.end + 2) === '={' && src.text.lastIndexOf('---', n.getStart(src)) >= 0;
 				if (replacement && !astroAttrName) {
@@ -318,6 +342,36 @@ function fixNames(cfg: QualityCfg, all: boolean): void {
 		const n = fileEdits.sort((a, b) => b.span.start - a.span.start).reduce((t, e) => `${t.slice(0, e.span.start)}${e.newText}${t.slice(e.span.start + e.span.length)}`, src);
 		if (n !== src) writeFileSync(fileName, n);
 	}
+	// Export renames can leave stale named imports when a consumer was already
+	// out of sync. Repair only an absent import whose concise spelling is an
+	// actual export of the same module; never guess across unrelated symbols.
+	for (const src of program.getSourceFiles()) {
+		if (!allowed.has(src.fileName)) continue;
+		const fileEdits: ts.TextChange[] = [];
+		const visit = (node: ts.Node): void => {
+			if (ts.isImportDeclaration(node) && ts.isStringLiteral(node.moduleSpecifier) && node.importClause?.namedBindings && ts.isNamedImports(node.importClause.namedBindings)) {
+				const module = checker.getSymbolAtLocation(node.moduleSpecifier);
+				const exportsByName = new Map((module ? checker.getExportsOfModule(module) : []).map((symbol) => [symbol.name, symbol]));
+				for (const specifier of node.importClause.namedBindings.elements) {
+					const oldName = specifier.propertyName?.text ?? specifier.name.text;
+					if (exportsByName.has(oldName)) continue;
+					const concise = renameId(oldName);
+					// Never guess a replacement for an unresolved module. A local-looking
+					// specifier is not evidence that the concise spelling is exported.
+					if (concise === oldName || !exportsByName.has(concise)) continue;
+					const imported = specifier.propertyName ?? specifier.name;
+					fileEdits.push({ span: { start: imported.getStart(src), length: imported.text.length }, newText: concise });
+				}
+			}
+			ts.forEachChild(node, visit);
+		};
+		visit(src);
+		if (fileEdits.length) {
+			const source = readFileSync(src.fileName, 'utf8');
+			const updated = fileEdits.sort((a, b) => b.span.start - a.span.start).reduce((text, edit) => `${text.slice(0, edit.span.start)}${edit.newText}${text.slice(edit.span.start + edit.span.length)}`, source);
+			if (updated !== source) writeFileSync(src.fileName, updated);
+		}
+	}
 }
 
 /**
@@ -329,10 +383,20 @@ function fixNames(cfg: QualityCfg, all: boolean): void {
  * @return
  */
 export function runQuality(cfg: QualityCfg, strict = false, all = true): QualityResult {
-	const result = { imports: checkImports(scopedCfg(cfg, all)), naming: namingFindings(scopedCfg(cfg, all)) };
+	const scoped = scopedCfg(cfg, all);
+	const result = {
+		imports: qualityCheckEnabled(cfg, 'import') ? checkImports(scoped) : [],
+		naming: qualityCheckEnabled(cfg, 'name') ? namingFindings(scoped) : [],
+		aliases: qualityCheckEnabled(cfg, 'alias') ? aliasFindings(scoped) : [],
+		forwarding: qualityCheckEnabled(cfg, 'forward') ? objectForwardingFindings(scoped) : [],
+		documentation: qualityCheckEnabled(cfg, 'document') ? documentationFindings(scoped) : [],
+	};
 	for (const f of result.imports) console.error(`Unresolved import: ${f.importer} -> ${f.specifier}`);
 	for (const f of result.naming) console.warn(`${f.severity === 'error' ? 'Naming drift' : 'Naming suggestion'}: ${f.file}: ${f.name} -> ${f.suggestion}`);
-	if (result.imports.length || (strict && result.naming.some((f) => f.severity === 'error'))) process.exitCode = 1;
+	for (const f of result.aliases) console.warn(`Alias: ${f.file}:${f.line} ${f.kind} ${f.name} -> ${f.replacement}`);
+	for (const f of result.forwarding) console.warn(`Forwarding suggestion: ${f.file}:${f.line}:${f.column} ${f.callee} repeats ${f.source}.${f.properties.join(', ')}; ${f.recommendation}.`);
+	for (const f of result.documentation) console.warn(`Documentation requirement: ${f.file}:${f.line}:${f.column} ${f.name}; ${f.reason}.`);
+	if (result.imports.length || result.aliases.length || result.documentation.length || (strict && result.naming.some((f) => f.severity === 'error'))) process.exitCode = 1;
 	return result;
 }
 
@@ -345,22 +409,28 @@ export function runQuality(cfg: QualityCfg, strict = false, all = true): Quality
  */
 export function runQualityCli(cfg: QualityCfg, args = process.argv.slice(2)): void {
 	const cmd = args.find((a) => !a.startsWith('-')) ?? 'quality';
-	const opts: QualityOptions = { fix: !args.includes('--warn'), all: args.includes('--all'), strict: args.includes('--strict') };
+	const opts: QualityOptions = { fix: !args.includes('--warn'), all: args.includes('--all') || cmd === 'quality:all', strict: args.includes('--strict') };
+	const fix = (check: QualityAutofixName): boolean => qualityAutofixEnabled(cfg, check, opts.fix);
 	const files = filesFor(cfg, opts.all);
-	if (cmd === 'format' || cmd === 'maintain') {
+	if (cmd === 'format' || cmd === 'document' || cmd === 'maintain') {
+		if (cmd === 'format' && !qualityCheckEnabled(cfg, 'format')) return;
+		if (cmd !== 'format' && !qualityCheckEnabled(cfg, 'document')) return;
+		const cmdOpts = { ...opts, fix: fix(cmd === 'format' ? 'format' : 'document') };
 		const reqFiles = args.slice(1).filter((a) => !a.startsWith('-'));
-		const tgts = cmd === 'maintain' && reqFiles.length ? reqFiles : files;
-		if (opts.fix) for (const file of tgts) if (/\.(?:c|m)?(?:js|ts)x?$/.test(file)) collapseInlineIfs(file);
-		if (opts.fix)
+		const tgts = (cmd !== 'format' && reqFiles.length ? reqFiles : files).filter((file) => !file.endsWith('.astro'));
+		if (cmdOpts.fix) for (const file of tgts) if (/\.(?:c|m)?(?:js|ts)x?$/.test(file)) collapseInlineIfs(file);
+		if (cmdOpts.fix)
 			for (const f of tgts) {
 				maintainSrcFile(cfg.root, f);
+				if (cmd !== 'format') documentSrcFile(cfg, f);
 				if (cfg.oneLineImports) protectLongImports(f, cfg.prettierPrintWidth);
 			}
-		runFormatter(cfg, opts, cmd === 'format' ? args.slice(1) : tgts);
+		if (qualityCheckEnabled(cfg, 'format')) runFormatter(cfg, cmdOpts, cmd === 'format' ? args.slice(1) : tgts);
+		if (cmd !== 'format' && !args.includes('--quiet')) runQuality(cfg, opts.strict, opts.all);
 		return;
 	}
 	if (cmd === 'naming') {
-		if (opts.fix) fixNames(cfg, opts.all);
+		if (qualityCheckEnabled(cfg, 'name') && fix('name')) fixNames(cfg, opts.all);
 		runQuality(cfg, opts.strict, opts.all);
 		return;
 	}
@@ -370,9 +440,19 @@ export function runQualityCli(cfg: QualityCfg, args = process.argv.slice(2)): vo
 		runCfgdCmd(cfg, name);
 		return;
 	}
-	if (cmd === 'lint') return runLint(cfg, opts);
-	if (cmd === 'knip') return runKnip(cfg, opts.fix);
+	if (cmd === 'single-use') {
+		const findings = writeSingleUseReport(cfg);
+		for (const finding of findings) console.warn(`Single-use ${finding.decision}: ${finding.file}:${finding.line} ${finding.name} — ${finding.reason}`);
+		return;
+	}
+	if (cfg.qualityCommands?.some((check) => check.name === cmd)) {
+		runCfgdCmd(cfg, cmd);
+		return;
+	}
+	if (cmd === 'lint') return qualityCheckEnabled(cfg, 'lint') ? runLint(cfg, { ...opts, fix: fix('lint') }) : undefined;
+	if (cmd === 'knip') return qualityCheckEnabled(cfg, 'knip') ? runKnip(cfg, fix('knip')) : undefined;
 	if (cmd === 'types') {
+		if (!qualityCheckEnabled(cfg, 'type')) return;
 		runTypecheck(cfg, opts.all ? [] : files);
 		if (cfg.typecheckExtensions?.length) runProjectTypecheck(cfg);
 		return;
@@ -382,18 +462,20 @@ export function runQualityCli(cfg: QualityCfg, args = process.argv.slice(2)): vo
 		return;
 	}
 	if (cmd === 'quality' || cmd === 'quality:all' || cmd === 'quality:baseline') {
-		runQualityCli(cfg, ['maintain', ...(opts.all ? ['--all'] : []), ...(opts.fix ? [] : ['--warn'])]);
-		if (opts.fix) fixNames(cfg, opts.all);
-		runLint(cfg, opts, true);
-		if (cfg.tools?.knip) runKnip(cfg, opts.fix, true);
-		if (opts.fix) runQualityCli(cfg, ['maintain', ...(opts.all ? ['--all'] : [])]);
-		if (cfg.tools?.tsc) {
+		if (opts.fix && qualityCheckEnabled(cfg, 'alias')) aliasFindings(cfg, true);
+		if (qualityCheckEnabled(cfg, 'document')) runQualityCli(cfg, ['document', ...(opts.all ? ['--all'] : []), ...(!fix('document') ? ['--warn'] : []), '--quiet']);
+		if (fix('name') && qualityCheckEnabled(cfg, 'name')) fixNames(cfg, opts.all);
+		if (qualityCheckEnabled(cfg, 'lint')) runLint(cfg, { ...opts, fix: fix('lint') }, true);
+		if (qualityCheckEnabled(cfg, 'knip') && cfg.tools?.knip) runKnip(cfg, fix('knip'), true);
+		runRecommendationCmds(cfg);
+		if (fix('document') && qualityCheckEnabled(cfg, 'document')) runQualityCli(cfg, ['document', ...(opts.all ? ['--all'] : []), '--quiet']);
+		if (qualityCheckEnabled(cfg, 'type') && cfg.tools?.tsc) {
 			runTypecheck(cfg);
 			if (cfg.typecheckExtensions?.length) runProjectTypecheck(cfg);
 		}
 		runCfgdCmds(cfg);
 		runQuality(cfg, true, opts.all);
-		runDiffCheck(cfg);
+		if (qualityCheckEnabled(cfg, 'diff')) runDiffCheck(cfg);
 	}
 }
 
@@ -411,10 +493,10 @@ export function runFormatter(cfg: QualityCfg, optsOrArgs: QualityOptions | strin
 	const suppliedArgs = (legacyArgs ? optsOrArgs : args).filter((a) => !['--all', '--warn', '--strict'].includes(a));
 	const hasMode = suppliedArgs.includes('--write') || suppliedArgs.includes('--check');
 	const hasIgnoreMode = suppliedArgs.some((a) => a.startsWith('--ignore-unknown'));
-	const suppliedTgts = suppliedArgs.filter((a) => !a.startsWith('-'));
+	const suppliedTgts = suppliedArgs.filter((a) => !a.startsWith('-') && !a.endsWith('.astro'));
 	const fmtArgs = [...(hasMode ? [] : [opts.fix ? '--write' : '--check']), ...(hasIgnoreMode ? [] : ['--ignore-unknown']), ...suppliedArgs, ...(suppliedTgts.length ? [] : filesFor(cfg, opts.all))];
 	const flags = fmtArgs.filter((a) => a.startsWith('-'));
-	const tgts = fmtArgs.filter((a) => !a.startsWith('-'));
+	const tgts = fmtArgs.filter((a) => !a.startsWith('-') && !a.endsWith('.astro'));
 	if (opts.fix) {
 		const knownFiles = filesFor(cfg, opts.all);
 		const directTgts = suppliedTgts.map((t) => resolve(cfg.root, t));

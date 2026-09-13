@@ -22,9 +22,11 @@ export default createQualityCfg({
 	extensions: ['.js', '.jsx', '.mjs', '.cjs', '.ts', '.tsx', '.mts', '.cts'],
 	tools: { eslint: 'eslint', knip: 'knip', prettier: 'prettier' },
 	oneLineImports: true,
+	renameExports: true,
 	prettierPrintWidth: 200,
 	qualityCommands: [
 		{ name: 'build', command: 'pnpm', args: ['run', 'build'] },
 		{ name: 'test', command: 'pnpm', args: ['run', 'test'] },
 	],
+	recommendationCommands: [{ name: 'single-use-declarations', command: 'node', args: ['scripts/quality/index.mjs', 'single-use', '--all'] }],
 });

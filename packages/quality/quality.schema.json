@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Terra quality configuration",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["sourceRoots", "extensions"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "root": { "type": "string" },
+    "sourceRoots": { "type": "array", "items": { "type": "string" } },
+    "includeRoots": { "type": "array", "items": { "type": "string" } },
+    "extensions": { "type": "array", "items": { "type": "string", "pattern": "^\\." } },
+    "aliases": { "type": "object", "additionalProperties": { "type": "string" } },
+    "externalPrefixes": { "type": "array", "items": { "type": "string" } },
+    "skippedDirectories": { "type": "array", "items": { "type": "string" } },
+    "skippedFiles": { "type": "array", "items": { "type": "string" } },
+    "protectedIdentifiers": { "type": "array", "items": { "type": "string" } },
+    "enabledChecks": { "$ref": "#/$defs/toggles" },
+    "autofix": { "$ref": "#/$defs/toggles" },
+    "documentation": {
+      "type": "object",
+      "properties": {
+        "required": {
+          "type": "object",
+          "properties": {
+            "types": { "type": "boolean" },
+            "functions": { "type": "boolean" },
+            "exportedFunctions": { "type": "boolean" },
+            "noInlineFunctions": { "type": "boolean" }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "tailwindCanonical": {
+      "type": "object",
+      "required": ["stylesheet"],
+      "properties": {
+        "stylesheet": { "type": "string" },
+        "sourceRoots": { "type": "array", "items": { "type": "string" } }
+      },
+      "additionalProperties": false
+    },
+    "enabledCommands": { "type": "object", "additionalProperties": { "type": "boolean" } },
+    "enabledRecommendations": { "type": "object", "additionalProperties": { "type": "boolean" } },
+    "qualityCommands": { "$ref": "#/$defs/commands" },
+    "recommendationCommands": { "$ref": "#/$defs/commands" },
+    "tsconfig": { "type": "string" },
+    "oneLineImports": { "type": "boolean" },
+    "prettierPrintWidth": { "type": "number" },
+    "lintRoots": { "type": "array", "items": { "type": "string" } },
+    "typecheckRoots": { "type": "array", "items": { "type": "string" } },
+    "typecheckExtensions": { "type": "array", "items": { "type": "string" } },
+    "tools": { "type": "object", "additionalProperties": { "type": "string" } }
+  },
+  "$defs": {
+    "toggles": { "type": "object", "additionalProperties": { "type": "boolean" } },
+    "commands": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "command"],
+        "properties": {
+          "name": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+          "command": { "type": "string" },
+          "args": { "type": "array", "items": { "type": "string" } }
+        },
+        "additionalProperties": false
+      }
+    }
+  }
+}

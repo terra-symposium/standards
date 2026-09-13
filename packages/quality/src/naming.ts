@@ -24,6 +24,7 @@ export const IDENTIFIER_REPLACEMENTS = replacementMap([
 	[['administrator', 'administration'], 'admin'],
 	['attribute', 'attr'],
 	['category', 'cat'],
+	['intelligence', 'intel'],
 	['current', 'curr'],
 	['command', 'cmd'],
 	['column', 'col'],
