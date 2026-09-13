@@ -9,11 +9,11 @@
 		"test": "pnpm -r test",
 		"prepare": "husky",
 		"prequality": "pnpm --filter @terra-symposium/quality build",
-		"quality": "node scripts/quality/index.mjs",
+	"quality": "node packages/quality/dist/runner.js quality --skip-commands --skip-recommendations",
 		"prequality:all": "pnpm --filter @terra-symposium/quality build",
-		"quality:all": "node scripts/quality/index.mjs quality --all",
+	"quality:all": "node packages/quality/dist/runner.js quality --all --skip-commands --skip-recommendations",
 		"prequality:check": "pnpm --filter @terra-symposium/quality build",
-		"quality:check": "node scripts/quality/index.mjs quality --all --warn",
+	"quality:check": "node packages/quality/dist/runner.js quality --all --warn --skip-commands --skip-recommendations",
 		"release": "changeset publish"
 	},
 	"devDependencies": {

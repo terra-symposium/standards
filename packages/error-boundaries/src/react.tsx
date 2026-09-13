@@ -1,5 +1,6 @@
 /**
  * packages/error-boundaries/src/react.tsx
+ * React error boundary and higher-order wrapper implementations.
  */
 
 /*//////////////////////////////////////////////////
@@ -13,8 +14,7 @@ import React, { Component } from 'react';
 CONFIG
 //////////////////////////////////////////////////*/
 
-export type ErrorReport = { name: string; componentStack: string | null };
-export type ErrorReporter = (err: Error, report: ErrorReport) => void;
+export type ErrorReporter = (err: Error, report: { name: string; componentStack: string | null }) => void;
 export type ErrorBoundaryProps = { children?: React.ReactNode; fallback?: (err: Error) => React.ReactNode; name?: string; resetKey?: string; onError?: ErrorReporter };
 export type ErrorBoundaryState = { error: Error | null };
 
@@ -25,11 +25,11 @@ HELPERS
 /**
  * Wraps a component in a named error boundary without coupling it to application UI.
  *
- * @param ComponentToWrap
- * @param name
- * @param onErr
+ * @param ComponentToWrap Component to render inside the error boundary.
+ * @param name Stable name reported when the wrapped component fails.
+ * @param onErr Optional callback that receives render errors and component metadata.
  *
- * @return
+ * @return A component with the same props that renders through an error boundary.
  */
 export function withErrorBoundary<P extends object>(ComponentToWrap: React.ComponentType<P>, name: string, onErr?: ErrorReporter): React.ComponentType<P> {
 	function BoundedComponent(props: P): React.JSX.Element {

@@ -42,6 +42,19 @@
       },
       "additionalProperties": false
     },
+    "security": {
+      "type": "object",
+      "properties": {
+        "forbiddenTerms": { "type": "array", "items": { "type": "string" } },
+        "forbiddenImports": { "type": "array", "items": { "type": "string" } },
+        "clientRoots": { "type": "array", "items": { "type": "string" } },
+        "allowProcessEnvRoots": { "type": "array", "items": { "type": "string" } }
+      },
+      "additionalProperties": false
+    },
+    "repeatedClasses": { "type": "object", "properties": { "minimumCount": { "type": "number" }, "extensions": { "type": "array", "items": { "type": "string" } }, "ignoredDirectories": { "type": "array", "items": { "type": "string" } } }, "additionalProperties": false },
+    "regexDedup": { "type": "object", "properties": { "minimumCount": { "type": "number" }, "extensions": { "type": "array", "items": { "type": "string" } }, "ignoredFiles": { "type": "array", "items": { "type": "string" } } }, "additionalProperties": false },
+    "uiPatterns": { "type": "object", "properties": { "forbidden": { "type": "array", "items": { "type": "string" } }, "ignoredFiles": { "type": "array", "items": { "type": "string" } }, "extensions": { "type": "array", "items": { "type": "string" } } }, "additionalProperties": false },
     "enabledCommands": { "type": "object", "additionalProperties": { "type": "boolean" } },
     "enabledRecommendations": { "type": "object", "additionalProperties": { "type": "boolean" } },
     "qualityCommands": { "$ref": "#/$defs/commands" },
@@ -52,6 +65,15 @@
     "lintRoots": { "type": "array", "items": { "type": "string" } },
     "typecheckRoots": { "type": "array", "items": { "type": "string" } },
     "typecheckExtensions": { "type": "array", "items": { "type": "string" } },
+    "typecheckCommand": {
+      "type": "object",
+      "required": ["command"],
+      "properties": {
+        "command": { "type": "string" },
+        "args": { "type": "array", "items": { "type": "string" } }
+      },
+      "additionalProperties": false
+    },
     "tools": { "type": "object", "additionalProperties": { "type": "string" } }
   },
   "$defs": {

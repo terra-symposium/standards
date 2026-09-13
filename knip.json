@@ -9,9 +9,6 @@
 		"packages/quality": {
 			"entry": ["test/*.test.mjs"],
 			"project": ["src/**/*.ts", "test/**/*.mjs"]
-		},
-		".": {
-			"project": ["scripts/**/*.mjs"]
 		}
 	}
 }

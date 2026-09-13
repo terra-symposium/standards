@@ -1,5 +1,6 @@
 /**
  * packages/quality/src/naming.ts
+ * Renames identifiers according to the configured replacement rules.
  */
 
 /*//////////////////////////////////////////////////
@@ -9,16 +10,15 @@ IMPORTS
 // API
 import ts from 'typescript';
 import { displayPath, srcFiles } from './files.js';
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 
 // TYPES
-import type { QualityCfg } from './config.js';
+import type { QualityAnalysis, QualityCfg } from './runner.js';
 
 /*//////////////////////////////////////////////////
 CONFIG
 //////////////////////////////////////////////////*/
 
-type ReplacementGroup = readonly [names: string | readonly string[], replacement: string];
 type RenameKind = { numericIndex?: boolean; callback?: boolean; reserved?: string[] };
 export const IDENTIFIER_REPLACEMENTS = replacementMap([
 	[['administrator', 'administration'], 'admin'],
@@ -142,17 +142,27 @@ export const CODE_EXTS = new Set(['.js', '.jsx', '.mjs', '.cjs', '.ts', '.tsx', 
 export type NamingFinding = { file: string; name: string; suggestion: string; severity: 'error' | 'warning'; start: number };
 
 /*//////////////////////////////////////////////////
+ALIASES
+//////////////////////////////////////////////////*/
+
+/** A declaration that only gives an existing symbol a second local name. */
+export type AliasFinding = { file: string; line: number; kind: 'const' | 'type'; name: string; replacement: string };
+const aliasTgt = (n: ts.Expression): ts.Identifier | ts.PropertyAccessExpression | ts.ElementAccessExpression | undefined =>
+	ts.isIdentifier(n) || ts.isPropertyAccessExpression(n) || ts.isElementAccessExpression(n) ? n : undefined;
+
+/*//////////////////////////////////////////////////
 HELPERS
 //////////////////////////////////////////////////*/
 
 /**
+ * Builds a frozen lookup table of long identifier words and their concise replacements.
  *
- * @param groups
- * @param pluralReplacements
+ * @param groups Replacement groups where each left-hand word maps to one replacement.
+ * @param pluralReplacements Whether inferred plural keys should receive plural replacements.
  *
- * @return
+ * @return Immutable replacement map including supported plural forms.
  */
-function replacementMap(groups: readonly ReplacementGroup[], pluralReplacements = true): Readonly<Record<string, string>> {
+function replacementMap(groups: readonly [names: string | readonly string[], replacement: string][], pluralReplacements = true): Readonly<Record<string, string>> {
 	const explicit = new Map(groups.flatMap(([n, r]) => (typeof n === 'string' ? [n] : n).map((n) => [n, r] as const)));
 	const plural = (word: string): string => {
 		if (/[^aeiou]y$/i.test(word)) return `${word.slice(0, -1)}ies`;
@@ -168,10 +178,11 @@ function replacementMap(groups: readonly ReplacementGroup[], pluralReplacements 
 }
 
 /**
+ * Splits an identifier into words while preserving acronym and numeric boundaries.
  *
- * @param name
+ * @param name Identifier to tokenize.
  *
- * @return
+ * @return Identifier word tokens in source order.
  */
 export function identifierTokens(name: string): string[] {
 	return name
@@ -181,11 +192,12 @@ export function identifierTokens(name: string): string[] {
 }
 
 /**
+ * Reassembles replacement tokens using the original identifier's casing and separators.
  *
- * @param original
- * @param tokens
+ * @param original Identifier whose formatting should be preserved.
+ * @param tokens Replacement tokens to render.
  *
- * @return
+ * @return The replacement identifier in the original naming style.
  */
 function renderIdentifier(original: string, tokens: string[]): string {
 	if (/^[A-Z][A-Z0-9_]*$/.test(original)) return tokens.join(original.includes('_') ? '_' : '').toUpperCase();
@@ -196,11 +208,12 @@ function renderIdentifier(original: string, tokens: string[]): string {
 }
 
 /**
+ * Applies the original token's uppercase, PascalCase, or lowercase style to a replacement word.
  *
- * @param original
- * @param replacement
+ * @param original Original identifier token.
+ * @param replacement Concise replacement token.
  *
- * @return
+ * @return Replacement token with casing matching the original.
  */
 function tokenCase(original: string, replacement: string): string {
 	if (original === original.toUpperCase()) return replacement.toUpperCase();
@@ -209,11 +222,12 @@ function tokenCase(original: string, replacement: string): string {
 }
 
 /**
+ * Chooses the preferred one-letter alias for a callback parameter without colliding with local names.
  *
- * @param name
- * @param reserved
+ * @param name Existing callback parameter name.
+ * @param reserved Names already used in the callback scope.
  *
- * @return
+ * @return A concise available callback alias.
  */
 export function callbackAlias(name: string, reserved: string[] = []): string {
 	const preferred = CALLBACK_ALIASES[name.toLowerCase() as keyof typeof CALLBACK_ALIASES] ?? identifierTokens(name)[0]?.charAt(0).toLowerCase() ?? 'v';
@@ -223,11 +237,12 @@ export function callbackAlias(name: string, reserved: string[] = []): string {
 }
 
 /**
+ * Produces the configured concise form of an identifier, including callback and numeric-index aliases.
  *
- * @param name
- * @param kind
+ * @param name Identifier to shorten.
+ * @param kind Context flags controlling callback, index, and reserved-name handling.
  *
- * @return
+ * @return Concise identifier, or the original name when no safe replacement applies.
  */
 export function renameId(name: string, kind: RenameKind = {}): string {
 	if (PROTECTED_IDENTIFIERS.has(name) || name === '_') return name;
@@ -249,10 +264,11 @@ export function renameId(name: string, kind: RenameKind = {}): string {
 }
 
 /**
+ * Determines whether an identifier parameter belongs to a collection or rendering callback.
  *
- * @param n
+ * @param n Parameter identifier to classify.
  *
- * @return
+ * @return Callback rename context when the parameter is safely concise-able; otherwise `undefined`.
  */
 function callbackKind(n: ts.Identifier): RenameKind | undefined {
 	const param = ts.findAncestor(n, ts.isParameter);
@@ -262,13 +278,12 @@ function callbackKind(n: ts.Identifier): RenameKind | undefined {
 		(n): n is ts.ArrowFunction | ts.FunctionExpression | ts.FunctionDeclaration => ts.isArrowFunction(n) || ts.isFunctionExpression(n) || ts.isFunctionDeclaration(n),
 	);
 	if (!callback) return undefined;
-	const call = callback.parent;
 	const isCollectionCallback =
 		!ts.isFunctionDeclaration(callback) &&
-		ts.isCallExpression(call) &&
-		call.arguments.includes(callback as ts.Expression) &&
-		ts.isPropertyAccessExpression(call.expression) &&
-		CALLBACK_METHODS.has(call.expression.name.text);
+		ts.isCallExpression(callback.parent) &&
+		callback.parent.arguments.includes(callback as ts.Expression) &&
+		ts.isPropertyAccessExpression(callback.parent.expression) &&
+		CALLBACK_METHODS.has(callback.parent.expression.name.text);
 	let isNamedCallback = false;
 	if (ts.isFunctionDeclaration(callback) && callback.name) {
 		const scan = (n: ts.Node): void => {
@@ -310,7 +325,7 @@ function callbackKind(n: ts.Identifier): RenameKind | undefined {
 		};
 		scan(callback.parent);
 	}
-	const isJsxCallback = ts.isJsxExpression(call) && call.expression === callback && ts.isJsxAttribute(call.parent);
+	const isJsxCallback = ts.isJsxExpression(callback.parent) && callback.parent.expression === callback && ts.isJsxAttribute(callback.parent.parent);
 	if (!isCollectionCallback && !isNamedCallback && !isJsxCallback) return undefined;
 	const declarations: ts.Identifier[] = [];
 	const collectBinding = (name: ts.BindingName): void => {
@@ -329,11 +344,7 @@ function callbackKind(n: ts.Identifier): RenameKind | undefined {
 		if (declaration === n) return { callback: true, numericIndex: callback.parameters.indexOf(param) === 1 && n.text === 'index', reserved: [...reserved] };
 		const declarationParam = ts.findAncestor(declaration, ts.isParameter);
 		reserved.add(
-			renameId(declaration.text, {
-				callback: true,
-				numericIndex: !!declarationParam && callback.parameters.indexOf(declarationParam) === 1 && declaration.text === 'index',
-				reserved: [...reserved],
-			}),
+			renameId(declaration.text, { callback: true, numericIndex: !!declarationParam && callback.parameters.indexOf(declarationParam) === 1 && declaration.text === 'index', reserved: [...reserved] }),
 		);
 	}
 	return undefined;
@@ -342,9 +353,9 @@ function callbackKind(n: ts.Identifier): RenameKind | undefined {
 /**
  * Returns whether a declaration belongs to a configured collection callback.
  *
- * @param node
+ * @param node Identifier declaration to inspect.
  *
- * @return
+ * @return `true` when the declaration is a supported collection callback parameter.
  */
 export function isCallbackDeclaration(node: ts.Identifier): boolean {
 	return callbackKind(node) !== undefined;
@@ -353,29 +364,31 @@ export function isCallbackDeclaration(node: ts.Identifier): boolean {
 /**
  * Returns the context-aware concise suggestion for one repository-owned declaration.
  *
- * @param n
+ * @param n Identifier declaration whose context determines the suggestion.
  *
- * @return
+ * @return Concise name appropriate for the declaration's scope and callback role.
  */
 export function renameDeclaration(n: ts.Identifier): string {
 	return renameId(n.text, callbackKind(n));
 }
 
 /**
+ * Checks whether an identifier starts with a configured prefix replacement.
  *
- * @param name
+ * @param name Identifier to inspect.
  *
- * @return
+ * @return `true` when its first token has a configured concise prefix.
  */
 export function hasPrefixReplacement(name: string): boolean {
 	return Object.hasOwn(PREFIX_REPLACEMENTS, identifierTokens(name)[0]?.toLowerCase() ?? '');
 }
 
 /**
+ * Checks whether a path is protected from symbol renaming because it is generated or framework-owned.
  *
- * @param fileName
+ * @param fileName Path to inspect.
  *
- * @return
+ * @return `true` for declaration files and configured protected path segments.
  */
 export function isProtectedPath(fileName: string): boolean {
 	const norm = fileName.replaceAll('\\', '/');
@@ -383,21 +396,23 @@ export function isProtectedPath(fileName: string): boolean {
 }
 
 /**
+ * Checks whether a filename is a framework convention whose declarations must retain their names.
  *
- * @param fileName
+ * @param fileName Path or basename to inspect.
  *
- * @return
+ * @return `true` when the basename is a protected route or component filename.
  */
 export function isProtectedFilename(fileName: string): boolean {
 	return PROTECTED_FILENAMES.has(fileName.split(/[\\/]/).at(-1) ?? fileName);
 }
 
 /**
+ * Reports whether an identifier already satisfies the configured concise-name rules.
  *
- * @param name
- * @param kind
+ * @param name Identifier to validate.
+ * @param kind Context flags used when the identifier is a callback or index parameter.
  *
- * @return
+ * @return `true` when renaming would produce the same identifier.
  */
 export function isApprovedId(name: string, kind: RenameKind = {}): boolean {
 	return renameId(name, kind) === name;
@@ -406,38 +421,40 @@ export function isApprovedId(name: string, kind: RenameKind = {}): boolean {
 /**
  * Returns whether an identifier declares a repository-owned symbol safe to rename with all references.
  *
- * @param n
+ * @param n Identifier declaration to classify.
  *
- * @return
+ * @return `true` when all references can be updated as a repository-local rename.
  */
 export function isRenamableDeclaration(n: ts.Identifier): boolean {
-	const p = n.parent;
-	if (ts.isParameter(p) && p.modifiers?.some((m) => [ts.SyntaxKind.PublicKeyword, ts.SyntaxKind.PrivateKeyword, ts.SyntaxKind.ProtectedKeyword, ts.SyntaxKind.ReadonlyKeyword].includes(m.kind)))
+	if (
+		ts.isParameter(n.parent) &&
+		n.parent.modifiers?.some((m) => [ts.SyntaxKind.PublicKeyword, ts.SyntaxKind.PrivateKeyword, ts.SyntaxKind.ProtectedKeyword, ts.SyntaxKind.ReadonlyKeyword].includes(m.kind))
+	)
 		return false;
-	const declaration = ts.findAncestor(p, (a): a is ts.VariableDeclaration | ts.ParameterDeclaration => ts.isVariableDeclaration(a) || ts.isParameter(a));
+	const declaration = ts.findAncestor(n.parent, (a): a is ts.VariableDeclaration | ts.ParameterDeclaration => ts.isVariableDeclaration(a) || ts.isParameter(a));
 	const varStatement =
 		declaration && ts.isVariableDeclaration(declaration) && ts.isVariableDeclarationList(declaration.parent) && ts.isVariableStatement(declaration.parent.parent)
 			? declaration.parent.parent
 			: undefined;
 	return (
-		(ts.isVariableDeclaration(p) && p.name === n && !varStatement?.modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword)) ||
-		(ts.isParameter(p) && p.name === n) ||
-		(ts.isBindingElement(p) && p.name === n && !!declaration && !varStatement?.modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword)) ||
-		(ts.isFunctionDeclaration(p) && p.name === n && !p.modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword)) ||
-		(ts.isFunctionExpression(p) && p.name === n) ||
-		(ts.isClassDeclaration(p) && p.name === n && !p.modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword)) ||
-		(ts.isClassExpression(p) && p.name === n) ||
-		(ts.isInterfaceDeclaration(p) && p.name === n && !p.modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword)) ||
-		(ts.isTypeAliasDeclaration(p) && p.name === n && !p.modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword))
+		(ts.isVariableDeclaration(n.parent) && n.parent.name === n && !varStatement?.modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword)) ||
+		(ts.isParameter(n.parent) && n.parent.name === n) ||
+		(ts.isBindingElement(n.parent) && n.parent.name === n && !!declaration && !varStatement?.modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword)) ||
+		(ts.isFunctionDeclaration(n.parent) && n.parent.name === n && !n.parent.modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword)) ||
+		(ts.isFunctionExpression(n.parent) && n.parent.name === n) ||
+		(ts.isClassDeclaration(n.parent) && n.parent.name === n && !n.parent.modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword)) ||
+		(ts.isClassExpression(n.parent) && n.parent.name === n) ||
+		(ts.isInterfaceDeclaration(n.parent) && n.parent.name === n && !n.parent.modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword)) ||
+		(ts.isTypeAliasDeclaration(n.parent) && n.parent.name === n && !n.parent.modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword))
 	);
 }
 
 /**
  * Returns the function or source-file scope that owns a declaration.
  *
- * @param n
+ * @param n Identifier whose owning function or source-file scope is required.
  *
- * @return
+ * @return The nearest function-like scope, or the source file when no function owns it.
  */
 export function declarationScope(n: ts.Identifier): ts.Node {
 	let scope: ts.Node = n.parent;
@@ -460,16 +477,17 @@ export function declarationScope(n: ts.Identifier): ts.Node {
 /**
  * Reports concise-name drift without mutating the consumer repository.
  *
- * @param cfg
+ * @param cfg Quality configuration defining source scope and naming protections.
+ * @param analysis Optional shared program and source cache for the current quality run.
  *
- * @return
+ * @return Concise-name findings for declarations that can be renamed safely.
  */
-export function namingFindings(cfg: QualityCfg): NamingFinding[] {
+export function namingFindings(cfg: QualityCfg, analysis?: QualityAnalysis): NamingFinding[] {
 	const protectedNames = new Set([...PROTECTED_IDENTIFIERS, ...(cfg.protectedIdentifiers ?? [])]);
 	const findings: NamingFinding[] = [];
-	for (const f of srcFiles(cfg)) {
+	for (const f of analysis?.files ?? srcFiles(cfg)) {
 		if (isProtectedPath(displayPath(cfg, f))) continue;
-		const file = ts.createSourceFile(f, readFileSync(f, 'utf8'), ts.ScriptTarget.Latest, true, f.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
+		const file = analysis?.sources.get(f) ?? ts.createSourceFile(f, readFileSync(f, 'utf8'), ts.ScriptTarget.Latest, true, f.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
 		const exportedNames = new Set(
 			file.statements.flatMap((s) => (ts.isExportDeclaration(s) && s.exportClause && ts.isNamedExports(s.exportClause) ? s.exportClause.elements.map((e) => (e.propertyName ?? e.name).text) : [])),
 		);
@@ -498,6 +516,135 @@ export function namingFindings(cfg: QualityCfg): NamingFinding[] {
 			ts.forEachChild(n, inspect);
 		};
 		inspect(file);
+	}
+	return findings;
+}
+
+/**
+ * Checks whether a symbol name appears in another source file's text.
+ *
+ * @param files Source files to scan.
+ * @param srcTexts Cached source text keyed by absolute path.
+ * @param src File being excluded from the search.
+ * @param name Symbol name to search for as a complete word.
+ *
+ * @return `true` when another file references the name textually.
+ */
+function externallyReferenced(files: string[], srcTexts: Map<string, string>, src: string, name: string): boolean {
+	const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+	const pattern = new RegExp(`\\b${escaped}\\b`);
+	return files.some((f) => f !== src && pattern.test(srcTexts.get(f) ?? ''));
+}
+
+/**
+ * Finds and optionally removes declarations that only rename another symbol.
+ *
+ * @param cfg Quality configuration defining the source scope and protected identifiers.
+ * @param analysisOrFix Shared analysis context, or the legacy boolean autofix flag.
+ * @param legacyFix Autofix flag used when an analysis context is supplied.
+ *
+ * @return Alias declarations that can be removed, whether or not autofix is enabled.
+ */
+export function aliasFindings(cfg: QualityCfg, analysisOrFix: QualityAnalysis | boolean = false, legacyFix = false): AliasFinding[] {
+	const analysis = typeof analysisOrFix === 'object' ? analysisOrFix : undefined;
+	const fix = typeof analysisOrFix === 'boolean' ? analysisOrFix : legacyFix;
+	const files = (analysis?.files ?? srcFiles(cfg)).filter((f) => /\.(?:c|m)?(?:js|ts)x?$/.test(f));
+	const srcTexts = analysis?.texts ?? new Map(files.map((f) => [f, readFileSync(f, 'utf8')]));
+	const program =
+		analysis?.program ??
+		ts.createProgram(files, {
+			allowJs: true,
+			checkJs: false,
+			jsx: ts.JsxEmit.Preserve,
+			module: ts.ModuleKind.ESNext,
+			moduleResolution: ts.ModuleResolutionKind.Bundler,
+			skipLibCheck: true,
+			target: ts.ScriptTarget.ESNext,
+		});
+	const checker = analysis?.checker ?? program.getTypeChecker();
+	const exportedSymbols = new Set<ts.Symbol>();
+	const exportedNames = new Set<string>();
+	for (const file of program.getSourceFiles()) {
+		const module = checker.getSymbolAtLocation(file);
+		if (module)
+			for (const symbol of checker.getExportsOfModule(module)) {
+				exportedNames.add(symbol.name);
+				exportedSymbols.add(symbol.flags & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(symbol) : symbol);
+			}
+		for (const statement of file.statements) {
+			if (!ts.isExportDeclaration(statement) || !statement.exportClause || !ts.isNamedExports(statement.exportClause)) continue;
+			for (const specifier of statement.exportClause.elements) exportedNames.add(specifier.name.text);
+		}
+	}
+	const findings: AliasFinding[] = [];
+	for (const source of program.getSourceFiles()) {
+		if (!files.includes(source.fileName)) continue;
+		const aliases: Array<{ statement: ts.Statement; name: ts.Identifier; symbol: ts.Symbol; replacement: string; kind: 'const' | 'type' }> = [];
+		const inspect = (node: ts.Node): void => {
+			if (
+				ts.isVariableStatement(node) &&
+				(node.declarationList.flags & ts.NodeFlags.Const) !== 0 &&
+				node.declarationList.declarations.length === 1 &&
+				ts.isIdentifier(node.declarationList.declarations[0].name)
+			) {
+				const declaration = node.declarationList.declarations[0];
+				const name = declaration.name as ts.Identifier;
+				const tgt = declaration.initializer && aliasTgt(declaration.initializer);
+				const symbol = tgt && checker.getSymbolAtLocation(name);
+				const targetSymbol = tgt && checker.getSymbolAtLocation(tgt);
+				if (
+					tgt &&
+					symbol &&
+					targetSymbol &&
+					symbol !== targetSymbol &&
+					!tgt.getText(source).includes('?.') &&
+					!exportedSymbols.has(symbol) &&
+					!exportedNames.has(name.text) &&
+					!node.modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword)
+				)
+					aliases.push({ statement: node, name, symbol, replacement: tgt.getText(source), kind: 'const' });
+			}
+			if (ts.isTypeAliasDeclaration(node) && node.typeParameters === undefined && ts.isTypeReferenceNode(node.type) && node.type.typeArguments === undefined) {
+				const symbol = checker.getSymbolAtLocation(node.name);
+				const targetSymbol = checker.getSymbolAtLocation(node.type.typeName);
+				if (symbol && targetSymbol && symbol !== targetSymbol && !externallyReferenced(files, srcTexts, source.fileName, node.name.text))
+					aliases.push({ statement: node, name: node.name, symbol, replacement: node.type.getText(source), kind: 'type' });
+			}
+			ts.forEachChild(node, inspect);
+		};
+		inspect(source);
+		if (!aliases.length) continue;
+		const edits: Array<{ start: number; end: number; text: string }> = [];
+		const symbols = new Map(aliases.map((a) => [a.symbol, a]));
+		const visit = (node: ts.Node): void => {
+			if (aliases.some((a) => a.statement === node)) return;
+			if (ts.isIdentifier(node)) {
+				const alias = symbols.get(checker.getSymbolAtLocation(node) as ts.Symbol);
+				if (alias && node !== alias.name)
+					edits.push({
+						start: node.getStart(source),
+						end: node.end,
+						text: ts.isShorthandPropertyAssignment(node.parent) && node.parent.name === node ? `${node.text}: ${alias.replacement}` : alias.replacement,
+					});
+			}
+			ts.forEachChild(node, visit);
+		};
+		visit(source);
+		for (const alias of aliases) {
+			findings.push({
+				file: displayPath(cfg, source.fileName),
+				line: source.getLineAndCharacterOfPosition(alias.name.getStart(source)).line + 1,
+				kind: alias.kind,
+				name: alias.name.text,
+				replacement: alias.replacement,
+			});
+			edits.push({ start: alias.statement.getFullStart(), end: alias.statement.end, text: '' });
+		}
+		if (fix) {
+			const original = readFileSync(source.fileName, 'utf8');
+			const updated = edits.sort((a, b) => b.start - a.start).reduce((t, e) => `${t.slice(0, e.start)}${e.text}${t.slice(e.end)}`, original);
+			if (updated !== original) writeFileSync(source.fileName, updated);
+		}
 	}
 	return findings;
 }

@@ -9,7 +9,7 @@
 	"main": "./dist/index.js",
 	"types": "./dist/index.d.ts",
 	"bin": {
-		"terra-quality": "./dist/bin.js"
+		"terra-quality": "./dist/runner.js"
 	},
 	"publishConfig": {
 		"registry": "https://npm.pkg.github.com",
@@ -21,7 +21,7 @@
 	},
 	"exports": {
 		".": "./dist/index.js",
-		"./cli": "./dist/cli.js",
+		"./cli": "./dist/runner.js",
 		"./naming": "./dist/naming.js",
 		"./object-forwarding": "./dist/object-forwarding.js",
 		"./single-use": "./dist/single-use.js",

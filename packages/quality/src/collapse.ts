@@ -1,5 +1,6 @@
 /**
  * packages/quality/src/collapse.ts
+ * Collapses multi-line string literals into single-line ones.
  */
 
 /*//////////////////////////////////////////////////
@@ -22,10 +23,11 @@ HELPERS
 //////////////////////////////////////////////////*/
 
 /**
+ * Selects the TypeScript parser mode matching a JavaScript or TypeScript filename.
  *
- * @param fileName
+ * @param fileName Source filename whose extension determines the parser mode.
  *
- * @return
+ * @return TypeScript compiler script kind for the filename.
  */
 function scriptKind(fileName: string): ts.ScriptKind {
 	if (/\.[cm]?tsx$/.test(fileName)) return ts.ScriptKind.TSX;
@@ -35,21 +37,22 @@ function scriptKind(fileName: string): ts.ScriptKind {
 }
 
 /**
+ * Finds the body span of an object, type literal, mapped type, or interface that can be collapsed safely.
  *
- * @param n
- * @param src
+ * @param n AST node being considered for whitespace collapsing.
+ * @param src Original source text used to locate interface braces.
  *
- * @return
+ * @return Collapsible source span, or `undefined` when the node is unsupported or contains JSX.
  */
 function candidateSpan(n: ts.Node, src: string): { start: number; end: number } | undefined {
 	if (ts.isObjectLiteralExpression(n)) {
 		let containsJsx = false;
-		const findJsx = (child: ts.Node): void => {
-			if (ts.isJsxElement(child) || ts.isJsxSelfClosingElement(child) || ts.isJsxFragment(child)) {
+		const findJsx = (c: ts.Node): void => {
+			if (ts.isJsxElement(c) || ts.isJsxSelfClosingElement(c) || ts.isJsxFragment(c)) {
 				containsJsx = true;
 				return;
 			}
-			ts.forEachChild(child, findJsx);
+			ts.forEachChild(c, findJsx);
 		};
 		ts.forEachChild(n, findJsx);
 		if (containsJsx) return undefined;
@@ -64,20 +67,26 @@ function candidateSpan(n: ts.Node, src: string): { start: number; end: number } 
 	return undefined;
 }
 
+/*//////////////////////////////////////////////////
+EXPORTS
+//////////////////////////////////////////////////*/
+
 /**
  * Collapses whitespace inside object and type bodies so Prettier alone decides whether they exceed print width.
  *
- * @param fileName
+ * @param fileName Absolute path to the source file to rewrite.
  *
- * @return
+ * @return `true` when an eligible object or type body was collapsed; otherwise `false`.
  */
 export function collapseTypesAndObjects(fileName: string): boolean {
+	// ENVIRONMENT
 	if (!SUPPORTED.has(extname(fileName))) return false;
 	const original = readFileSync(fileName, 'utf8');
 	const parsed = ts.createSourceFile(fileName, original, ts.ScriptTarget.Latest, true, scriptKind(fileName));
-	const langVariant = parsed.languageVariant;
 	const edits: { start: number; end: number; text: string }[] = [];
-	const collapse = (node: ts.Node, start: number, text: string): string | undefined => {
+
+	// HELPERS
+	const collapse = (n: ts.Node, start: number, text: string): string | undefined => {
 		if (!/[\r\n]/.test(text)) return undefined;
 		const protectedRanges: { start: number; end: number }[] = [];
 		const protectLiterals = (c: ts.Node): void => {
@@ -95,9 +104,9 @@ export function collapseTypesAndObjects(fileName: string): boolean {
 			}
 			ts.forEachChild(c, protectLiterals);
 		};
-		protectLiterals(node);
+		protectLiterals(n);
 		const isProtected = (pos: number): boolean => protectedRanges.some((r) => pos >= r.start && pos < r.end);
-		const scanner = ts.createScanner(ts.ScriptTarget.Latest, false, langVariant, text);
+		const scanner = ts.createScanner(ts.ScriptTarget.Latest, false, parsed.languageVariant, text);
 		let result = '';
 		let whitespace = false;
 		for (let token = scanner.scan(); token !== ts.SyntaxKind.EndOfFileToken; token = scanner.scan()) {
@@ -119,6 +128,8 @@ export function collapseTypesAndObjects(fileName: string): boolean {
 		}
 		return result;
 	};
+
+	// ANALYSE
 	const visit = (n: ts.Node): void => {
 		const span = candidateSpan(n, original);
 		if (span) {

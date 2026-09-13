@@ -52,7 +52,7 @@ The executable loads `quality.json` from the current repository. A wrapper can c
 
 ### Defaults
 
-The default `quality` command scans changed and untracked files, enables every built-in check, and enables every available autofix. `quality:all` scans every configured source file. `--warn` disables autofixes for one run. `--strict` makes naming errors fail. Configured `build`, `test`, and other commands run exactly as declared because the package cannot safely infer partial execution.
+The default `quality` command scans changed and untracked files, enables every built-in check, and enables every available autofix. `quality:all` scans every configured source file. `--warn` disables autofixes for one run. `--strict` makes naming errors fail. Use `--skip-commands` for a fast static-only pass and `--skip-recommendations` to omit advisory subprocesses; configured domains remain available through `domain`.
 
 ### Switches
 
@@ -163,6 +163,19 @@ Each rule is independent. `functions` covers all named functions. `exportedFunct
 - **Terms:** “Diff” is worktree hygiene, not semantic review.
 - **Configure:** Toggle it with `enabledChecks.diff`. It has no autofix and requires Git. Disable it for source archives or environments without a Git worktree.
 - **Ideology:** Small textual defects should be caught cheaply, but this is not a complete review or generated-artifact validation.
+
+### Security
+
+- **Does:** Reports committed or root-level environment files, environment-file loaders, secret-shaped environment access in configured client roots, disallowed imports, forbidden terms, and process-environment access outside configured runtime roots.
+- **Terms:** “Client root” and “runtime root” are repository paths supplied by configuration; the package does not assume a framework or deployment provider.
+- **Configure:** Use `security.forbiddenTerms`, `security.forbiddenImports`, `security.clientRoots`, and `security.allowProcessEnvRoots`. Run `terra-quality security`.
+- **Ideology:** Security checks should provide conservative, portable guardrails without pretending to understand every application’s trust model.
+
+### Repeated classes, regexes, and UI patterns
+
+- **Does:** `repeated-classes` reports repeated static class strings, `regex-dedup` reports exact duplicate regular-expression sources, and `ui-patterns` reports configurable UI patterns that should use shared primitives.
+- **Configure:** Set `repeatedClasses`, `regexDedup`, and `uiPatterns` in `quality.json`; all three checks accept repository-relative extensions, exclusions, and thresholds.
+- **Ideology:** Generic checks report evidence and let each repository decide which repetition or pattern is intentional.
 
 ## Context limits
 

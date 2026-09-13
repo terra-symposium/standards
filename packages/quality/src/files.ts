@@ -1,5 +1,6 @@
 /**
  * packages/quality/src/files.ts
+ * Shared source discovery and path utilities for quality checks.
  */
 
 /*//////////////////////////////////////////////////
@@ -12,19 +13,33 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, readdirSync, statSync } from 'node:fs';
 
 // TYPES
-import type { QualityCfg } from './config.js';
+import type { QualityCfg } from './runner.js';
+
+/*//////////////////////////////////////////////////
+CONFIG
+//////////////////////////////////////////////////*/
+
+// File discovery is shared by nearly every check. Cache by the effective
+// discovery inputs so a full run walks the repository once per scope instead
+// of once per check. The cache is process-local and naturally disappears
+// between CLI invocations; source edits do not change the file set.
+const fileCache = new Map<string, string[]>();
 
 /*//////////////////////////////////////////////////
 HELPERS
 //////////////////////////////////////////////////*/
 
 /**
+ * Discovers source files under the configured roots, reusing a cached result for identical discovery settings.
  *
- * @param cfg
+ * @param cfg Quality configuration containing roots, extensions, and excluded paths.
  *
- * @return
+ * @return Sorted absolute paths for files that belong to the configured source scope.
  */
 export function srcFiles(cfg: QualityCfg): string[] {
+	const cacheKey = JSON.stringify([cfg.sourceRoots, cfg.includeRoots ?? [], cfg.extensions, cfg.skippedDirectories ?? [], cfg.skippedFiles ?? []]);
+	const cached = fileCache.get(cacheKey);
+	if (cached) return cached;
 	const roots = [...cfg.sourceRoots, ...(cfg.includeRoots ?? [])];
 	const exts = new Set(cfg.extensions);
 	const skipped = new Set(cfg.skippedDirectories ?? []);
@@ -44,15 +59,17 @@ export function srcFiles(cfg: QualityCfg): string[] {
 		}
 	};
 	for (const root of roots) walk(root);
-	return files.sort((a, b) => a.localeCompare(b));
+	const result = files.sort((a, b) => a.localeCompare(b));
+	fileCache.set(cacheKey, result);
+	return result;
 }
 
 /**
  * Returns configured source files changed in the working tree, including untracked files.
  *
- * @param cfg
+ * @param cfg Quality configuration whose repository root is used to query Git.
  *
- * @return
+ * @return Sorted configured source files that are changed or untracked in the working tree.
  */
 export function workingSrcFiles(cfg: QualityCfg): string[] {
 	const changed = new Set(
@@ -66,21 +83,23 @@ export function workingSrcFiles(cfg: QualityCfg): string[] {
 }
 
 /**
+ * Converts an absolute file path into the repository-relative path shown in diagnostics.
  *
- * @param cfg
- * @param fileName
+ * @param cfg Quality configuration defining the repository root.
+ * @param fileName Absolute path to the source file.
  *
- * @return
+ * @return A repository-relative path, or the basename when the path is already outside the root.
  */
 export function displayPath(cfg: QualityCfg, fileName: string): string {
 	return relative(cfg.root, fileName) || basename(fileName);
 }
 
 /**
+ * Tests whether a path currently resolves to a regular file.
  *
- * @param path
+ * @param path Filesystem path to inspect.
  *
- * @return
+ * @return `true` when the path exists and is a file; otherwise `false`.
  */
 export function isFile(path: string): boolean {
 	try {

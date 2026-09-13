@@ -1,5 +1,6 @@
 /**
  * packages/quality/src/port.ts
+ * Port acquisition utilities.
  */
 
 /*//////////////////////////////////////////////////
@@ -18,9 +19,9 @@ HELPERS
 /**
  * Lists process ids currently listening on a TCP port.
  *
- * @param port
+ * @param port TCP port whose listening process IDs should be queried.
  *
- * @return
+ * @return Process IDs currently listening on the port, or an empty array when the query fails.
  */
 export function portOwners(port: number): number[] {
 	try {
@@ -37,9 +38,9 @@ export function portOwners(port: number): number[] {
 /**
  * Terminates listeners and waits until a TCP port can be acquired.
  *
- * @param port
+ * @param port TCP port that must be available to the caller.
  *
- * @return
+ * @return A promise that resolves once the port can be bound locally.
  */
 export async function acquirePort(port: number): Promise<void> {
 	for (let attempt = 0; attempt < 20; attempt += 1) {

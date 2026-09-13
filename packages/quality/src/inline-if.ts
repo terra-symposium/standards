@@ -1,5 +1,6 @@
 /**
  * packages/quality/src/inline-if.ts
+ * Inlines single-statement conditional blocks without changing nested blocks.
  */
 
 /*//////////////////////////////////////////////////
@@ -16,9 +17,9 @@ HELPERS
 /**
  * Collapses single-statement conditional blocks without changing nested blocks.
  *
- * @param fileName
+ * @param fileName Absolute path to the source file to rewrite.
  *
- * @return
+ * @return `true` when at least one eligible conditional was collapsed.
  */
 export function collapseInlineIfs(fileName: string): boolean {
 	const src = readFileSync(fileName, 'utf8');

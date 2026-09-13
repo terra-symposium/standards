@@ -1,5 +1,6 @@
 /**
  * packages/error-boundaries/src/astro.ts
+ * Shared status-code copy for Astro error responses.
  */
 
 /*//////////////////////////////////////////////////

@@ -1,51 +1,464 @@
 {
-  "generatedAt": "2026-09-13T01:16:40.121Z",
+  "generatedAt": "2026-09-13T08:06:33.767Z",
   "scope": [
     "/Users/kaimacann/Desktop/terra-shared/packages",
     "/Users/kaimacann/Desktop/terra-shared/scripts"
   ],
   "findings": [
     {
-      "file": "packages/quality/src/aliases.ts",
-      "line": 9,
-      "name": "targetNode",
+      "file": "packages/error-boundaries/src/astro.ts",
+      "line": 11,
+      "name": "ERROR_STATUS_COPY",
       "decision": "KEEP",
-      "reason": "callable or rendering boundary"
-    },
-    {
-      "file": "packages/quality/src/aliases.ts",
-      "line": 12,
-      "name": "externallyReferenced",
-      "decision": "KEEP",
-      "reason": "callable or rendering boundary"
+      "reason": "exported declaration/public contract"
     },
     {
       "file": "packages/quality/src/collapse.ts",
-      "line": 18,
+      "line": 19,
       "name": "SUPPORTED",
       "decision": "KEEP",
       "reason": "runtime/workflow boundary"
     },
     {
+      "file": "packages/quality/src/collapse.ts",
+      "line": 31,
+      "name": "scriptKind",
+      "decision": "KEEP",
+      "reason": "callable or rendering boundary"
+    },
+    {
+      "file": "packages/quality/src/collapse.ts",
+      "line": 45,
+      "name": "candidateSpan",
+      "decision": "KEEP",
+      "reason": "callable or rendering boundary"
+    },
+    {
+      "file": "packages/quality/src/collapse.ts",
+      "line": 78,
+      "name": "collapseTypesAndObjects",
+      "decision": "KEEP",
+      "reason": "exported declaration/public contract"
+    },
+    {
+      "file": "packages/quality/src/naming.ts",
+      "line": 139,
+      "name": "PROTECTED_PATH_PARTS",
+      "decision": "KEEP",
+      "reason": "exported declaration/public contract"
+    },
+    {
+      "file": "packages/quality/src/naming.ts",
+      "line": 140,
+      "name": "PROTECTED_FILENAMES",
+      "decision": "KEEP",
+      "reason": "exported declaration/public contract"
+    },
+    {
+      "file": "packages/quality/src/naming.ts",
+      "line": 150,
+      "name": "aliasTgt",
+      "decision": "KEEP",
+      "reason": "callable or rendering boundary"
+    },
+    {
+      "file": "packages/quality/src/naming.ts",
+      "line": 199,
+      "name": "renderIdentifier",
+      "decision": "KEEP",
+      "reason": "callable or rendering boundary"
+    },
+    {
+      "file": "packages/quality/src/naming.ts",
+      "line": 214,
+      "name": "tokenCase",
+      "decision": "KEEP",
+      "reason": "callable or rendering boundary"
+    },
+    {
+      "file": "packages/quality/src/naming.ts",
+      "line": 372,
+      "name": "hasPrefixReplacement",
+      "decision": "KEEP",
+      "reason": "exported declaration/public contract"
+    },
+    {
+      "file": "packages/quality/src/naming.ts",
+      "line": 516,
+      "name": "externallyReferenced",
+      "decision": "KEEP",
+      "reason": "callable or rendering boundary"
+    },
+    {
+      "file": "packages/quality/src/imports.ts",
+      "line": 38,
+      "name": "resolveImport",
+      "decision": "KEEP",
+      "reason": "callable or rendering boundary"
+    },
+    {
+      "file": "packages/quality/src/imports.ts",
+      "line": 59,
+      "name": "specifiers",
+      "decision": "KEEP",
+      "reason": "callable or rendering boundary"
+    },
+    {
+      "file": "packages/quality/src/inline-if.ts",
+      "line": 23,
+      "name": "collapseInlineIfs",
+      "decision": "KEEP",
+      "reason": "exported declaration/public contract"
+    },
+    {
       "file": "packages/quality/src/single-use.ts",
-      "line": 10,
-      "name": "sourceKind",
+      "line": 26,
+      "name": "isExported",
       "decision": "KEEP",
       "reason": "callable or rendering boundary"
     },
     {
       "file": "packages/quality/src/single-use.ts",
-      "line": 14,
+      "line": 28,
+      "name": "isCandidateStatement",
+      "decision": "KEEP",
+      "reason": "callable or rendering boundary"
+    },
+    {
+      "file": "packages/quality/src/single-use.ts",
+      "line": 126,
       "name": "classify",
       "decision": "KEEP",
       "reason": "callable or rendering boundary"
     },
     {
-      "file": "scripts/quality/quality.config.mjs",
-      "line": 18,
-      "name": "root",
+      "file": "packages/quality/src/single-use.ts",
+      "line": 183,
+      "name": "singleUseFindings",
       "decision": "KEEP",
-      "reason": "runtime/workflow boundary"
+      "reason": "exported declaration/public contract"
+    },
+    {
+      "file": "packages/quality/src/single-use.ts",
+      "line": 203,
+      "name": "importEdit",
+      "decision": "KEEP",
+      "reason": "callable or rendering boundary"
+    },
+    {
+      "file": "packages/quality/src/single-use.ts",
+      "line": 225,
+      "name": "fixSingleUseTypes",
+      "decision": "KEEP",
+      "reason": "exported declaration/public contract"
+    },
+    {
+      "file": "packages/quality/src/single-use.ts",
+      "line": 262,
+      "name": "writeSingleUseReport",
+      "decision": "KEEP",
+      "reason": "exported declaration/public contract"
+    },
+    {
+      "file": "packages/quality/src/object-forwarding.ts",
+      "line": 35,
+      "name": "scriptKind",
+      "decision": "KEEP",
+      "reason": "callable or rendering boundary"
+    },
+    {
+      "file": "packages/quality/src/object-forwarding.ts",
+      "line": 48,
+      "name": "isIgnoredCallee",
+      "decision": "KEEP",
+      "reason": "callable or rendering boundary"
+    },
+    {
+      "file": "packages/quality/src/object-forwarding.ts",
+      "line": 61,
+      "name": "findingsForFile",
+      "decision": "KEEP",
+      "reason": "callable or rendering boundary"
+    },
+    {
+      "file": "packages/quality/src/patterns.ts",
+      "line": 95,
+      "name": "resolveStylesheet",
+      "decision": "KEEP",
+      "reason": "callable or rendering boundary"
+    },
+    {
+      "file": "packages/quality/src/patterns.ts",
+      "line": 121,
+      "name": "loadStylesheet",
+      "decision": "KEEP",
+      "reason": "callable or rendering boundary"
+    },
+    {
+      "file": "packages/quality/src/patterns.ts",
+      "line": 133,
+      "name": "resolveConsumerImport",
+      "decision": "KEEP",
+      "reason": "callable or rendering boundary"
+    },
+    {
+      "file": "packages/quality/src/patterns.ts",
+      "line": 148,
+      "name": "classVals",
+      "decision": "KEEP",
+      "reason": "callable or rendering boundary"
+    },
+    {
+      "file": "packages/quality/src/patterns.ts",
+      "line": 184,
+      "name": "locationAt",
+      "decision": "KEEP",
+      "reason": "callable or rendering boundary"
+    },
+    {
+      "file": "packages/quality/src/runner.ts",
+      "line": 85,
+      "name": "createAnalysisProgram",
+      "decision": "KEEP",
+      "reason": "callable or rendering boundary"
+    },
+    {
+      "file": "packages/quality/src/runner.ts",
+      "line": 107,
+      "name": "createQualityAnalysis",
+      "decision": "KEEP",
+      "reason": "exported declaration/public contract"
+    },
+    {
+      "file": "packages/quality/src/runner.ts",
+      "line": 138,
+      "name": "qualityAutofixEnabled",
+      "decision": "KEEP",
+      "reason": "exported declaration/public contract"
+    },
+    {
+      "file": "packages/quality/src/runner.ts",
+      "line": 160,
+      "name": "qualityRecommendationEnabled",
+      "decision": "KEEP",
+      "reason": "exported declaration/public contract"
+    },
+    {
+      "file": "packages/quality/src/runner.ts",
+      "line": 170,
+      "name": "loadQualityCfg",
+      "decision": "KEEP",
+      "reason": "exported declaration/public contract"
+    },
+    {
+      "file": "packages/quality/src/runner.ts",
+      "line": 182,
+      "name": "createQualityCfg",
+      "decision": "KEEP",
+      "reason": "exported declaration/public contract"
+    },
+    {
+      "file": "packages/quality/src/runner.ts",
+      "line": 258,
+      "name": "scopedCfg",
+      "decision": "KEEP",
+      "reason": "callable or rendering boundary"
+    },
+    {
+      "file": "packages/quality/src/runner.ts",
+      "line": 310,
+      "name": "runCfgdCmds",
+      "decision": "KEEP",
+      "reason": "callable or rendering boundary"
+    },
+    {
+      "file": "packages/quality/src/runner.ts",
+      "line": 320,
+      "name": "runRecommendationCmds",
+      "decision": "KEEP",
+      "reason": "callable or rendering boundary"
+    },
+    {
+      "file": "packages/quality/src/runner.ts",
+      "line": 348,
+      "name": "repairMissingImports",
+      "decision": "KEEP",
+      "reason": "callable or rendering boundary"
+    },
+    {
+      "file": "packages/quality/src/runner.ts",
+      "line": 434,
+      "name": "runDiffCheck",
+      "decision": "KEEP",
+      "reason": "callable or rendering boundary"
+    },
+    {
+      "file": "packages/quality/src/runner.ts",
+      "line": 445,
+      "name": "runGenericChecks",
+      "decision": "KEEP",
+      "reason": "callable or rendering boundary"
+    },
+    {
+      "file": "packages/quality/src/runner.ts",
+      "line": 850,
+      "name": "runQualityFromConfig",
+      "decision": "KEEP",
+      "reason": "exported declaration/public contract"
+    },
+    {
+      "file": "packages/quality/src/runner.ts",
+      "line": 862,
+      "name": "runFormatter",
+      "decision": "KEEP",
+      "reason": "exported declaration/public contract"
+    },
+    {
+      "file": "packages/quality/src/files.ts",
+      "line": 71,
+      "name": "workingSrcFiles",
+      "decision": "KEEP",
+      "reason": "exported declaration/public contract"
+    },
+    {
+      "file": "packages/quality/src/documentation.ts",
+      "line": 56,
+      "name": "importSrc",
+      "decision": "KEEP",
+      "reason": "callable or rendering boundary"
+    },
+    {
+      "file": "packages/quality/src/documentation.ts",
+      "line": 68,
+      "name": "selfImportConflicts",
+      "decision": "KEEP",
+      "reason": "callable or rendering boundary"
+    },
+    {
+      "file": "packages/quality/src/documentation.ts",
+      "line": 99,
+      "name": "groupedImports",
+      "decision": "KEEP",
+      "reason": "callable or rendering boundary"
+    },
+    {
+      "file": "packages/quality/src/documentation.ts",
+      "line": 156,
+      "name": "srcGroup",
+      "decision": "KEEP",
+      "reason": "callable or rendering boundary"
+    },
+    {
+      "file": "packages/quality/src/documentation.ts",
+      "line": 170,
+      "name": "srcSection",
+      "decision": "KEEP",
+      "reason": "callable or rendering boundary"
+    },
+    {
+      "file": "packages/quality/src/documentation.ts",
+      "line": 181,
+      "name": "literalSpans",
+      "decision": "KEEP",
+      "reason": "callable or rendering boundary"
+    },
+    {
+      "file": "packages/quality/src/documentation.ts",
+      "line": 203,
+      "name": "normCommentLayout",
+      "decision": "KEEP",
+      "reason": "callable or rendering boundary"
+    },
+    {
+      "file": "packages/quality/src/documentation.ts",
+      "line": 283,
+      "name": "removeManagedSects",
+      "decision": "KEEP",
+      "reason": "callable or rendering boundary"
+    },
+    {
+      "file": "packages/quality/src/documentation.ts",
+      "line": 316,
+      "name": "genFnDoc",
+      "decision": "KEEP",
+      "reason": "callable or rendering boundary"
+    },
+    {
+      "file": "packages/quality/src/documentation.ts",
+      "line": 366,
+      "name": "statementText",
+      "decision": "KEEP",
+      "reason": "callable or rendering boundary"
+    },
+    {
+      "file": "packages/quality/src/documentation.ts",
+      "line": 385,
+      "name": "organizeSrcSects",
+      "decision": "KEEP",
+      "reason": "callable or rendering boundary"
+    },
+    {
+      "file": "packages/quality/src/documentation.ts",
+      "line": 415,
+      "name": "maintainSrcFile",
+      "decision": "KEEP",
+      "reason": "exported declaration/public contract"
+    },
+    {
+      "file": "packages/quality/src/documentation.ts",
+      "line": 467,
+      "name": "protectLongImports",
+      "decision": "KEEP",
+      "reason": "exported declaration/public contract"
+    },
+    {
+      "file": "packages/quality/src/documentation.ts",
+      "line": 619,
+      "name": "documentSrcFile",
+      "decision": "KEEP",
+      "reason": "exported declaration/public contract"
+    },
+    {
+      "file": "packages/quality/dist/port.d.ts",
+      "line": 18,
+      "name": "acquirePort",
+      "decision": "KEEP",
+      "reason": "exported declaration/public contract"
+    },
+    {
+      "file": "packages/quality/dist/runner.d.ts",
+      "line": 103,
+      "name": "createQualityAnalysis",
+      "decision": "KEEP",
+      "reason": "exported declaration/public contract"
+    },
+    {
+      "file": "packages/quality/dist/files.d.ts",
+      "line": 11,
+      "name": "srcFiles",
+      "decision": "KEEP",
+      "reason": "exported declaration/public contract"
+    },
+    {
+      "file": "packages/quality/dist/inline-if.d.ts",
+      "line": 11,
+      "name": "collapseInlineIfs",
+      "decision": "KEEP",
+      "reason": "exported declaration/public contract"
+    },
+    {
+      "file": "packages/quality/dist/patterns.d.ts",
+      "line": 42,
+      "name": "runTailwindCanonical",
+      "decision": "KEEP",
+      "reason": "exported declaration/public contract"
+    },
+    {
+      "file": "packages/quality/dist/patterns.d.ts",
+      "line": 50,
+      "name": "regexFindings",
+      "decision": "KEEP",
+      "reason": "exported declaration/public contract"
     }
   ]
 }

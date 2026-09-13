@@ -1,5 +1,6 @@
 /**
  * packages/error-boundaries/src/next.ts
+ * Shared error helpers for Next.js route boundaries.
  */
 
 /*//////////////////////////////////////////////////
