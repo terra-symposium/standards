@@ -70,17 +70,23 @@ function findingsForFile(cfg: QualityCfg, file: string, analysis?: QualityAnalys
 		if (ts.isCallExpression(node) && !isIgnoredCallee(node.expression)) {
 			for (const argument of node.arguments) {
 				if (!ts.isObjectLiteralExpression(argument)) continue;
+				const spreads = new Map<string, number>();
+				for (let idx = 0; idx < argument.properties.length; idx++) {
+					const property = argument.properties[idx]!;
+					if (ts.isSpreadAssignment(property) && ts.isIdentifier(property.expression)) spreads.set(property.expression.text, idx);
+				}
 				const bySrc = new Map<string, string[]>();
-				for (const property of argument.properties) {
+				for (let idx = 0; idx < argument.properties.length; idx++) {
+					const property = argument.properties[idx]!;
 					if (!ts.isPropertyAssignment(property) || !ts.isIdentifier(property.name)) continue;
 					if (!ts.isPropertyAccessExpression(property.initializer) || !ts.isIdentifier(property.initializer.expression)) continue;
 					if (property.initializer.name.text !== property.name.text) continue;
+					if ((spreads.get(property.initializer.expression.text) ?? idx) >= idx) continue;
 					bySrc.set(property.initializer.expression.text, [...(bySrc.get(property.initializer.expression.text) ?? []), property.name.text]);
 				}
 				for (const [srcName, properties] of bySrc) {
-					if (properties.length < 3) continue;
+					if (!properties.length) continue;
 					const pos = parsed.getLineAndCharacterOfPosition(argument.getStart(parsed));
-					const hasOnlyForwardedProperties = argument.properties.length === properties.length;
 					const callee = node.expression.getText(parsed);
 					findings.push({
 						file: displayPath(cfg, file),
@@ -89,7 +95,7 @@ function findingsForFile(cfg: QualityCfg, file: string, analysis?: QualityAnalys
 						callee,
 						source: srcName,
 						properties,
-						recommendation: hasOnlyForwardedProperties ? `pass ${srcName} directly` : `spread ${srcName} and keep only the explicit overrides`,
+						recommendation: `remove exact properties already supplied by ...${srcName}`,
 					});
 				}
 			}
@@ -153,7 +159,6 @@ export function fixObjectForwarding(cfg: QualityCfg, analysis?: QualityAnalysis)
 						edits.push({ start, end: property.end });
 						fixed++;
 					}
-					if (spreads.size === 0 && argument.properties.length >= 3) skipped++;
 				}
 			}
 			ts.forEachChild(node, visit);

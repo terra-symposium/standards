@@ -39,7 +39,11 @@ HELPERS
 export function srcFiles(cfg: QualityCfg): string[] {
 	const cacheKey = JSON.stringify([cfg.root, cfg.sourceRoots, cfg.includeRoots ?? [], cfg.extensions, cfg.skippedDirectories ?? [], cfg.skippedFiles ?? []]);
 	const cached = fileCache.get(cacheKey);
-	if (cached) return cached;
+	// Quality stages can rename or generate source files. Do not reuse a stale
+	// inventory after a discovered path disappears (for example, naming moves a
+	// legacy page into its canonical route directory).
+	if (cached && cached.every((file) => existsSync(file))) return cached;
+	if (cached) fileCache.delete(cacheKey);
 	const roots = [...cfg.sourceRoots, ...(cfg.includeRoots ?? [])];
 	const exts = new Set(cfg.extensions);
 	const skipped = new Set(cfg.skippedDirectories ?? []);

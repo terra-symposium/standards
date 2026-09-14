@@ -18,7 +18,7 @@ import { fixtureFile, fixtureRoot, fixtureText } from './support.mjs';
 TESTS
 //////////////////////////////////////////////////*/
 
-test('object forwarding reports the three-property threshold, direct-pass and spread recommendations, nested calls, and all ignored persistence methods', () => {
+test('object forwarding does not promote shape-changing whole-object rewrites', () => {
 	const root = fixtureRoot('terra-quality-forwarding-');
 	fixtureFile(
 		root,
@@ -40,26 +40,15 @@ repo.assign({ organizationId: input.organizationId, userId: input.userId, opport
 	);
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
 	const findings = objectForwardingFindings(cfg);
-	assert.equal(findings.length, 3);
-	assert.deepEqual(
-		findings.map((f) => [f.callee, f.source, f.properties, f.recommendation]),
-		[
-			['send', 'input', ['organizationId', 'userId', 'opportunities'], 'pass input directly'],
-			['send', 'input', ['organizationId', 'userId', 'opportunities'], 'spread input and keep only the explicit overrides'],
-			['inner', 'source', ['first', 'second', 'third'], 'pass source directly'],
-		],
-	);
+	assert.deepEqual(findings, []);
 });
-test('object forwarding accepts a shared analysis cache and handles multiple source objects in one call', () => {
+test('object forwarding accepts a shared analysis cache without reporting ambiguous projections', () => {
 	const root = fixtureRoot('terra-quality-forwarding-analysis-');
 	fixtureFile(root, 'src/main.ts', 'send({ a: first.a, b: first.b, c: first.c }, { a: second.a, b: second.b, c: second.c });\n');
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
 	const analysis = createQualityAnalysis(cfg);
 	const findings = objectForwardingFindings(cfg, analysis);
-	assert.deepEqual(
-		findings.map((f) => f.source),
-		['first', 'second'],
-	);
+	assert.deepEqual(findings, []);
 });
 test('object forwarding fixer removes only exact properties already covered by a preceding spread', () => {
 	const root = fixtureRoot('terra-quality-forwarding-fix-');
@@ -69,7 +58,7 @@ test('object forwarding fixer removes only exact properties already covered by a
 		`send({ ...input, organizationId: input.organizationId, userId: input.userId });\nsend({ organizationId: input.organizationId, userId: input.userId, opportunities: input.opportunities });\n`,
 	);
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
-	assert.deepEqual(fixObjectForwarding(cfg), { fixed: 2, skipped: 1 });
+	assert.deepEqual(fixObjectForwarding(cfg), { fixed: 2, skipped: 0 });
 	assert.equal(fixtureText(root, 'src/main.ts'), `send({ ...input });\nsend({ organizationId: input.organizationId, userId: input.userId, opportunities: input.opportunities });\n`);
-	assert.equal(objectForwardingFindings(cfg).length, 1);
+	assert.equal(objectForwardingFindings(cfg).length, 0);
 });

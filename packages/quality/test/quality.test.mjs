@@ -59,7 +59,7 @@ test('resolves aliases and extensionless relative imports', () => {
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], aliases: { '@/': 'src/' } });
 	assert.deepEqual(checkImports(cfg), []);
 });
-test('reports repeated input forwarding while ignoring persistence payloads', () => {
+test('does not recommend shape-changing forwarding or persistence payload rewrites', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-object-forwarding-'));
 	mkdirSync(join(root, 'src'), { recursive: true });
 	const file = join(root, 'src', 'main.ts');
@@ -69,8 +69,7 @@ test('reports repeated input forwarding while ignoring persistence payloads', ()
 	);
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
 	const findings = objectForwardingFindings(cfg);
-	assert.equal(findings.length, 1);
-	assert.equal(findings[0].recommendation, 'pass input directly');
+	assert.deepEqual(findings, []);
 });
 test('quality accepts individual changed files as scoped source roots', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-file-root-'));
@@ -625,14 +624,14 @@ test('naming applies whole-word image aliases and prefix-only state aliases', ()
 	assert.equal(renameId('isClean'), 'isClean');
 	assert.equal(renameId('isSafe'), 'isSafe');
 });
-test('naming leaves Astro frontmatter untouched when no Astro parser is available', () => {
+test('naming safely fixes Astro frontmatter while preserving markup boundaries', () => {
 	const root = mkdtempSync(join(tmpdir(), 'quality-naming-astro-'));
 	mkdirSync(join(root, 'src'));
 	writeFileSync(join(root, 'src', 'Page.astro'), '---\nconst error = new Error("x");\nconsole.log(error);\n---\n<Component error={error} />\n<p>{error.message}</p>\n');
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.astro'] });
 	runQualityCli(cfg, ['naming', '--all']);
-	assert.match(readFileSync(join(root, 'src', 'Page.astro'), 'utf8'), /const error = new Error/);
-	assert.match(readFileSync(join(root, 'src', 'Page.astro'), 'utf8'), /console\.log\(error\)/);
+	assert.match(readFileSync(join(root, 'src', 'Page.astro'), 'utf8'), /const err = new Error/);
+	assert.match(readFileSync(join(root, 'src', 'Page.astro'), 'utf8'), /console\.log\(err\)/);
 	assert.match(readFileSync(join(root, 'src', 'Page.astro'), 'utf8'), /<Component error=\{error\} \/>/);
 	assert.match(readFileSync(join(root, 'src', 'Page.astro'), 'utf8'), /<p>\{error\.message\}<\/p>/);
 });

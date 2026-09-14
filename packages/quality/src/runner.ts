@@ -243,6 +243,28 @@ function qualityHeader(name: string, detail: string): void {
 }
 
 /**
+ * Renders compact progress for a file-processing quality section.
+ *
+ * @param label Section operation being performed.
+ * @param current Number of files completed.
+ * @param total Number of files in the section.
+ *
+ * @return Nothing; progress is written to standard error.
+ */
+function qualityProgress(label: string, current: number, total: number): void {
+	const completed = Math.min(Math.max(current, 0), total);
+	const width = 24;
+	const filled = total ? Math.round((completed / total) * width) : width;
+	const line = `  ${label} [${'='.repeat(filled)}${' '.repeat(width - filled)}] ${completed}/${total}`;
+	if (process.stderr.isTTY) {
+		process.stderr.write(`\r${line}`);
+		if (completed >= total) process.stderr.write('\n');
+		return;
+	}
+	console.error(line);
+}
+
+/**
  * Converts tool output into compact single-line messages without terminal control codes.
  *
  * @param val Raw child-process output.
@@ -296,8 +318,8 @@ function run(cfg: QualityCfg, cmd: string, args: string[], opts: { quietSuccess?
  *
  * @return Text snapshots keyed by absolute filename.
  */
-function snapshotFiles(files: string[]): Map<string, string> {
-	return new Map(files.map((f) => [f, readFileSync(f, 'utf8')]));
+function snapshotFiles(cfg: QualityCfg, files: string[]): Map<string, string> {
+	return new Map(files.map((f) => [f, readFileSync(resolve(cfg.root, f), 'utf8')]));
 }
 
 /**
@@ -308,8 +330,8 @@ function snapshotFiles(files: string[]): Map<string, string> {
  *
  * @return Number of changed files.
  */
-function changedFileCount(files: string[], before: Map<string, string>): number {
-	return files.filter((f) => before.get(f) !== readFileSync(f, 'utf8')).length;
+function changedFileCount(cfg: QualityCfg, files: string[], before: Map<string, string>): number {
+	return files.filter((f) => before.get(f) !== readFileSync(resolve(cfg.root, f), 'utf8')).length;
 }
 
 /**
@@ -320,7 +342,7 @@ function changedFileCount(files: string[], before: Map<string, string>): number 
  *
  * @return Ordered batches covering the input values.
  */
-function batches<T>(vals: T[], size = 500): T[][] {
+function batches<T>(vals: T[], size = 100): T[][] {
 	return Array.from({ length: Math.ceil(vals.length / size) }, (_, idx) => vals.slice(idx * size, (idx + 1) * size));
 }
 
@@ -372,16 +394,83 @@ function runLint(cfg: QualityCfg, opts: QualityOptions, exhaustive = false): voi
 		...(opts.fix ? ['--fix'] : []),
 	];
 	let failed = false;
-	const before = opts.fix ? snapshotFiles(files) : undefined;
+	const before = opts.fix ? snapshotFiles(cfg, files) : undefined;
+	let completed = 0;
+	qualityProgress('ESLint', completed, files.length);
 	for (const filesBatch of batches(files)) {
 		const status = run(cfg, toolPath(cfg, cfg.tools?.eslint, 'eslint'), [...flags, ...filesBatch], { quietSuccess: opts.fix });
+		completed += filesBatch.length;
+		qualityProgress('ESLint', completed, files.length);
 		if (status) {
 			failed = true;
 			process.exitCode = status;
 		}
 	}
-	if (before) console.error(`  fixed ${changedFileCount(files, before)} files`);
+	if (before) console.error(`  fixed ${changedFileCount(cfg, files, before)} files`);
 	console.error(`  ${failed ? '✗ failed' : '✓ passed'}`);
+}
+
+/**
+ * Removes function declarations that ESLint proves have no references.
+ *
+ * Knip can safely remove an unused export modifier while leaving the declaration
+ * private. This pass completes that mechanical cleanup without guessing about
+ * variables whose initializers may have side effects.
+ *
+ * @param cfg Quality configuration defining the repository and ESLint executable.
+ * @param all Whether every configured source file should be inspected.
+ *
+ * @return Number of unused function declarations removed.
+ */
+function fixUnusedFunctions(cfg: QualityCfg, all: boolean): number {
+	const files = filesFor(cfg, all).filter((f) => /\.(?:cjs|js|jsx|mjs|ts|tsx)$/.test(f));
+	let fixed = 0;
+	for (const filesBatch of batches(files)) {
+		const result = spawnSync(toolPath(cfg, cfg.tools?.eslint, 'eslint'), ['--format', 'json', '--no-warn-ignored', ...filesBatch], {
+			cwd: cfg.root,
+			encoding: 'utf8',
+			env: process.env,
+		});
+		let reports: Array<{ filePath: string; messages: Array<{ ruleId?: string; line: number; column: number }> }> = [];
+		try {
+			reports = JSON.parse(result.stdout || '[]') as typeof reports;
+		} catch {
+			continue;
+		}
+		for (const report of reports) {
+			const source = readFileSync(report.filePath, 'utf8');
+			const ast = ts.createSourceFile(report.filePath, source, ts.ScriptTarget.Latest, true, C_M_JS_TS_X_CLASS_2.test(report.filePath) && report.filePath.endsWith('x') ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
+			const starts = new Set(
+				report.messages
+					.filter((m) => m.ruleId === 'unused-imports/no-unused-vars')
+					.map((m) => ast.getPositionOfLineAndCharacter(m.line - 1, m.column - 1)),
+			);
+			const edits: Array<{ start: number; end: number }> = [];
+			const visit = (node: ts.Node): void => {
+				if (ts.isFunctionDeclaration(node) && node.name && starts.has(node.name.getStart(ast)) && !node.modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword)) {
+					let start = node.getStart(ast);
+					const comments = ts.getLeadingCommentRanges(source, node.getFullStart()) ?? [];
+					const attached = comments.at(-1);
+					if (attached?.kind === ts.SyntaxKind.MultiLineCommentTrivia && source.slice(attached.end, start).trim() === '' && source.slice(attached.pos, attached.pos + 3) === '/**') start = attached.pos;
+					let end = node.end;
+					while (source[end] === ' ' || source[end] === '\t') end++;
+					if (source.slice(end, end + 2) === '\r\n') end += 2;
+					else if (source[end] === '\n') end++;
+					edits.push({ start, end });
+				}
+				ts.forEachChild(node, visit);
+			};
+			visit(ast);
+			if (!edits.length) continue;
+			let updated = source;
+			for (const edit of edits.sort((a, b) => b.start - a.start)) updated = `${updated.slice(0, edit.start)}${updated.slice(edit.end)}`;
+			const diagnostics = ts.transpileModule(updated, { fileName: report.filePath, reportDiagnostics: true, compilerOptions: { allowJs: true, jsx: ts.JsxEmit.Preserve, target: ts.ScriptTarget.ESNext } }).diagnostics ?? [];
+			if (diagnostics.some((d) => d.category === ts.DiagnosticCategory.Error)) continue;
+			writeFileSync(report.filePath, updated);
+			fixed += edits.length;
+		}
+	}
+	return fixed;
 }
 
 /**
@@ -531,11 +620,10 @@ function repairMissingImports(cfg: QualityCfg, program: ts.Program, checker: ts.
  * @return Nothing; Knip failures are reflected in the process exit code.
  */
 function runKnip(cfg: QualityCfg, fix: boolean, exhaustive = false): void {
-	qualityHeader('knip', `${fix && !exhaustive ? 'Fixing and checking' : 'Checking'} unused files, exports, dependencies, and reachability`);
-	const status = run(cfg, toolPath(cfg, cfg.tools?.knip, 'knip'), [
-		...(fix && !exhaustive ? ['--fix'] : exhaustive ? [] : ['--include', 'unresolved,nsExports,nsTypes,cycles']),
-		...(exhaustive ? [] : ['--no-exit-code']),
-	]);
+	qualityHeader('knip', `${fix ? 'Fixing and checking' : 'Checking'} unused files, exports, dependencies, and reachability`);
+	const knip = toolPath(cfg, cfg.tools?.knip, 'knip');
+	if (fix) run(cfg, knip, ['--fix', '--allow-remove-files', '--no-exit-code'], { quietSuccess: true });
+	const status = run(cfg, knip, exhaustive ? [] : ['--include', 'unresolved,nsExports,nsTypes,cycles', '--no-exit-code']);
 	if (status) process.exitCode = status;
 	console.error(`  ${status ? '✗ failed' : '✓ passed'}`);
 }
@@ -609,6 +697,22 @@ function fixNames(cfg: QualityCfg, all: boolean): void {
 	// TypeScript's parser does not understand Astro frontmatter. Keep Astro in
 	// reporting/import scope, but never apply symbol renames to it.
 	const allowed = new Set(filesFor(cfg, all).filter((f) => !isProtectedPath(f) && !f.endsWith('.astro')));
+	for (const file of filesFor(cfg, all).filter((f) => f.endsWith('.astro') && !isProtectedPath(f))) {
+		const source = readFileSync(file, 'utf8');
+		const frontmatter = /^---\r?\n([\s\S]*?)\r?\n---/.exec(source);
+		if (!frontmatter) continue;
+		const body = frontmatter[1]!;
+		const offset = frontmatter[0].indexOf(body);
+		const astroCfg = { ...cfg, sourceRoots: [file] };
+		const findings = namingFindings(astroCfg);
+		let updated = body;
+		const replacements = new Map(findings.map((finding) => [finding.name, finding.suggestion]));
+		for (const [name, suggestion] of replacements) {
+			const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+			updated = updated.replace(new RegExp(`\\b${escaped}\\b`, 'g'), suggestion);
+		}
+		if (updated !== body) writeFileSync(file, `${source.slice(0, offset)}${updated}${source.slice(offset + body.length)}`);
+	}
 	let program = ts.createProgram({
 		rootNames: srcFiles(cfg).filter((f) => C_M_JS_TS_X_CLASS_2.test(f)),
 		options: {
@@ -920,14 +1024,13 @@ function runDocumentation(cfg: QualityCfg, opts: QualityOptions, args: string[],
 	const files = filesFor(cfg, opts.all);
 	const reqFiles = args.slice(1).filter((a) => !a.startsWith('-'));
 	const tgts = (reqFiles.length ? reqFiles : files).filter((f) => !f.endsWith('.astro'));
-	if (cmdOpts.fix) for (const file of tgts) if (C_M_JS_TS_X_REGEX.test(file)) collapseInlineIfs(file);
+	if (cmdOpts.fix) for (const file of tgts) if (/\.(?:c|m)?(?:js|ts)$/.test(file)) collapseInlineIfs(file);
 	if (cmdOpts.fix)
 		for (const file of tgts) {
 			maintainSrcFile(cfg.root, file);
 			documentSrcFile(cfg, file);
 			if (cfg.oneLineImports) protectLongImports(file, cfg.prettierPrintWidth);
 		}
-	if (qualityCheckEnabled(cfg, 'format')) runFormatter(cfg, cmdOpts, tgts);
 	if (!quiet) runQuality(cfg, opts.strict, opts.all);
 }
 
@@ -951,6 +1054,7 @@ export function runQualityCli(cfg: QualityCfg, args = process.argv.slice(2)): vo
 	const fix = (check: QualityAutofixName): boolean => qualityAutofixEnabled(cfg, check, opts.fix);
 	if (cmd === 'document' || cmd === 'maintain') {
 		runDocumentation(cfg, opts, args, args.includes('--quiet'));
+		if (qualityCheckEnabled(cfg, 'format')) runFormatter(cfg, { ...opts, fix: fix('format') }, args.slice(1));
 		return;
 	}
 	if (cmd === 'format') {
@@ -958,7 +1062,7 @@ export function runQualityCli(cfg: QualityCfg, args = process.argv.slice(2)): vo
 		const files = filesFor(cfg, opts.all);
 		const cmdOpts = { ...opts, fix: fix('format') };
 		const tgts = files.filter((f) => !f.endsWith('.astro'));
-		if (cmdOpts.fix) for (const file of tgts) if (C_M_JS_TS_X_REGEX.test(file)) collapseInlineIfs(file);
+		if (cmdOpts.fix) for (const file of tgts) if (/\.(?:c|m)?(?:js|ts)$/.test(file)) collapseInlineIfs(file);
 		if (cmdOpts.fix)
 			for (const file of tgts) {
 				maintainSrcFile(cfg.root, file);
@@ -1033,12 +1137,10 @@ export function runQualityCli(cfg: QualityCfg, args = process.argv.slice(2)): vo
 	}
 	if (cmd === 'quality' || cmd === 'quality:all' || cmd === 'quality:baseline') {
 		if (opts.fix && qualityCheckEnabled(cfg, 'alias')) aliasFindings(cfg, true);
-		if (qualityCheckEnabled(cfg, 'document')) runDocumentation(cfg, opts, ['document', ...(opts.all ? ['--all'] : []), '--quiet'], true);
-		if (fix('name') && qualityCheckEnabled(cfg, 'name')) fixNames(cfg, opts.all);
-		if (qualityCheckEnabled(cfg, 'lint')) runLint(cfg, { ...opts, fix: fix('lint') }, true);
-		if (qualityCheckEnabled(cfg, 'knip') && cfg.tools?.knip) runKnip(cfg, fix('knip'), true);
-		if (!opts.skipRecommendations) runRecommendationCmds(cfg);
-		if (fix('document') && qualityCheckEnabled(cfg, 'document')) runDocumentation(cfg, opts, ['document', ...(opts.all ? ['--all'] : []), '--quiet'], true);
+		if (fix('name') && qualityCheckEnabled(cfg, 'name')) {
+			const namingScope = scopedCfg(cfg, opts.all);
+			if (namingFindings(namingScope).length) fixNames(cfg, opts.all);
+		}
 		const scoped = scopedCfg(cfg, opts.all);
 		if (fix('forward') && qualityCheckEnabled(cfg, 'forward')) {
 			const result = fixObjectForwarding(scoped);
@@ -1052,6 +1154,20 @@ export function runQualityCli(cfg: QualityCfg, args = process.argv.slice(2)): vo
 			const result = fixRegexDedup(scoped);
 			if (result.fixed || result.skipped) console.info(`Regex fixer: ${result.fixed} literals replaced${result.skipped ? `; ${result.skipped} advisory cases retained` : ''}.`);
 		}
+		if (qualityCheckEnabled(cfg, 'knip') && cfg.tools?.knip) runKnip(cfg, fix('knip'), true);
+		if (opts.fix && qualityCheckEnabled(cfg, 'lint')) {
+			let removed = 0;
+			for (let round = 0; round < 5; round++) {
+				const count = fixUnusedFunctions(cfg, opts.all);
+				removed += count;
+				if (!count) break;
+			}
+			if (removed) console.info(`Unused declaration fixer: ${removed} function${removed === 1 ? '' : 's'} removed.`);
+		}
+		if (qualityCheckEnabled(cfg, 'lint')) runLint(cfg, { ...opts, fix: fix('lint') }, true);
+		if (qualityCheckEnabled(cfg, 'document') && documentationFindings(scopedCfg(cfg, opts.all)).some((finding) => finding.severity === 'error'))
+			runDocumentation(cfg, opts, ['document', ...(opts.all ? ['--all'] : []), '--quiet'], true);
+		if (fix('format') && qualityCheckEnabled(cfg, 'format')) runFormatter(cfg, { ...opts, fix: true }, opts.all ? [] : filesFor(cfg, false));
 		if (opts.fix && qualityCheckEnabled(cfg, 'alias')) aliasFindings(scoped, true);
 		const analysis = createQualityAnalysis(scoped);
 		runGenericChecks(scoped, analysis);
@@ -1060,6 +1176,7 @@ export function runQualityCli(cfg: QualityCfg, args = process.argv.slice(2)): vo
 			if (cfg.typecheckExtensions?.length && !cfg.typecheckRoots?.length) runProjectTypecheck(cfg);
 		}
 		if (!opts.skipCommands) runCfgdCmds(cfg);
+		if (!opts.skipRecommendations) runRecommendationCmds(cfg);
 		runQuality(cfg, true, opts.all, analysis);
 		if (qualityCheckEnabled(cfg, 'diff')) runDiffCheck(cfg);
 	}
@@ -1093,33 +1210,41 @@ export function runFormatter(cfg: QualityCfg, optsOrArgs: QualityOptions | strin
 	const hasMode = suppliedArgs.includes('--write') || suppliedArgs.includes('--check');
 	const hasIgnoreMode = suppliedArgs.some((a) => a.startsWith('--ignore-unknown'));
 	const hasLogLevel = suppliedArgs.includes('--log-level') || suppliedArgs.some((a) => a.startsWith('--log-level='));
-	const suppliedTgts = suppliedArgs.filter((a) => !a.startsWith('-') && !a.endsWith('.astro'));
+	const suppliedTgts = suppliedArgs.filter((a, idx) => a !== 'warn' || suppliedArgs[idx - 1] !== '--log-level').filter((a) => !a.startsWith('-') && !a.endsWith('.astro'));
+	const discoveredTgts = suppliedTgts.length ? [] : filesFor(cfg, opts.all).filter((file) => !file.endsWith('.astro'));
 	const fmtArgs = [
 		...(hasMode ? [] : [opts.fix ? '--write' : '--check']),
 		...(hasIgnoreMode ? [] : ['--ignore-unknown']),
-		...(opts.fix && !hasLogLevel ? ['--log-level', 'warn'] : []),
+		...(opts.fix && !hasLogLevel ? ['--log-level=warn'] : []),
 		...suppliedArgs,
-		...(suppliedTgts.length ? [] : filesFor(cfg, opts.all)),
+		...(suppliedTgts.length ? [] : discoveredTgts),
 	];
 	const flags = fmtArgs.filter((a) => a.startsWith('-'));
-	const tgts = fmtArgs.filter((a) => !a.startsWith('-') && !a.endsWith('.astro'));
+	const tgts = suppliedTgts.length ? suppliedTgts : discoveredTgts;
 	qualityHeader('format', `${opts.fix ? 'Fixing' : 'Checking'} formatting in ${tgts.length} source files`);
-	const before = opts.fix ? snapshotFiles(tgts) : undefined;
+	const before = opts.fix ? snapshotFiles(cfg, tgts) : undefined;
 	if (opts.fix) {
-		const knownFiles = filesFor(cfg, opts.all);
+		// Explicit formatter targets are already the authoritative scope. Avoid
+		// querying Git for a temporary/non-repository fixture when collapsing its
+		// structural sources before Prettier.
+		const knownFiles = suppliedTgts.length ? srcFiles(cfg) : filesFor(cfg, opts.all);
 		const directTgts = suppliedTgts.map((t) => resolve(cfg.root, t));
 		const collapseTgts = directTgts.length ? knownFiles.filter((f) => directTgts.some((t) => resolve(f) === t || resolve(f).startsWith(`${t}${sep}`))) : knownFiles;
-		for (const file of collapseTgts) collapseTypesAndObjects(file);
+		for (const file of collapseTgts) if (/\.(?:c|m)?(?:js|ts)$/.test(file)) collapseTypesAndObjects(file);
 	}
 	let failed = false;
+	let completed = 0;
+	qualityProgress('Prettier', completed, tgts.length);
 	for (const tgtBatch of batches(tgts)) {
 		const status = run(cfg, toolPath(cfg, cfg.tools?.prettier, 'prettier'), [...flags, ...tgtBatch], { quietSuccess: opts.fix });
+		completed += tgtBatch.length;
+		qualityProgress('Prettier', completed, tgts.length);
 		if (status) {
 			failed = true;
 			process.exitCode = status;
 		}
 	}
-	if (before) console.error(`  fixed ${changedFileCount(tgts, before)} files`);
+	if (before) console.error(`  fixed ${changedFileCount(cfg, tgts, before)} files`);
 	console.error(`  ${failed ? '✗ failed' : '✓ passed'}`);
 }
 

@@ -50,18 +50,20 @@ export function repeatedClassFindings(cfg: QualityCfg, analysis?: QualityAnalysi
 	const minimum = settings.minimumCount ?? 3;
 	const exts = new Set(settings.extensions ?? ['.astro', '.html', '.js', '.jsx', '.ts', '.tsx']);
 	const ignored = new Set(['test', 'tests', ...(settings.ignoredDirectories ?? ['node_modules', 'dist', 'build', 'coverage'])]);
-	const vals = new Map<string, string[]>();
+	const findings: RepeatedClassFinding[] = [];
 	for (const file of (analysis?.files ?? srcFiles({ ...cfg, extensions: [...exts] })).filter((f) => exts.has(f.slice(f.lastIndexOf('.'))))) {
 		if ([...ignored].some((d) => file.split('/').includes(d))) continue;
 		const src = analysis?.texts.get(file) ?? readFileSync(file, 'utf8');
+		const vals = new Map<string, string[]>();
 		for (const match of src.matchAll(/\b(?:class|className)\s*=\s*(['"])([^'"\n]+)\1/g)) {
 			const val = match[2].replace(/\s+/g, ' ').trim();
 			if (val.includes('{') || val.split(' ').length < 2) continue;
 			const location = `${displayPath(cfg, file)}:${src.slice(0, match.index ?? 0).split('\n').length}`;
 			vals.set(val, [...(vals.get(val) ?? []), location]);
 		}
+		findings.push(...[...vals.entries()].filter(([, l]) => l.length >= minimum).map(([value, locations]) => ({ value, count: locations.length, locations })));
 	}
-	return [...vals.entries()].filter(([, l]) => l.length >= minimum).map(([v, l]) => ({ value: v, count: l.length, locations: l }));
+	return findings;
 }
 
 /**
@@ -98,14 +100,33 @@ function classConstName(val: string, used: Set<string>): string {
  *
  * @return Source text containing the generated subgroup, or the original source when no CONFIG group exists.
  */
-function insertCfgGroup(src: string, label: string, declarations: string[]): string {
+function insertCfgGroup(src: string, label: string, declarations: string[], file?: string): string {
 	if (!declarations.length) return src;
 	const cfg = /\/\*\/{10,}\r?\n[ \t]*CONFIG[ \t]*\r?\n[ \t]*\/{10,}\*\//.exec(src);
-	if (!cfg) return src;
-	const at = cfg.index + cfg[0].length;
 	const eol = src.includes('\r\n') ? '\r\n' : '\n';
 	const group = [`/*${'/'.repeat(50)}`, label, `${'/'.repeat(50)}*/`, ...declarations].join(eol);
-	return `${src.slice(0, at)}${eol}${group}${eol}${src.slice(at)}`;
+	if (cfg) {
+		const at = cfg.index + cfg[0].length;
+		return `${src.slice(0, at)}${eol}${group}${eol}${src.slice(at)}`;
+	}
+	// Add generated constants only to JavaScript-family sources, after imports
+	// and directive prologues so module and directive semantics remain unchanged.
+	if (!file || file.endsWith('.html')) return src;
+	if (file.endsWith('.astro')) {
+		const frontmatter = /^---\r?\n([\s\S]*?)\r?\n---/.exec(src);
+		if (frontmatter) {
+			const at = frontmatter[0].lastIndexOf('---');
+			return `${src.slice(0, at)}${group}${eol}${src.slice(at)}`;
+		}
+		return `---${eol}${group}${eol}---${eol}${src}`;
+	}
+	const ast = ts.createSourceFile(file, src, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+	let at = 0;
+	for (const statement of ast.statements) {
+		if (ts.isImportDeclaration(statement) || (ts.isExpressionStatement(statement) && ts.isStringLiteral(statement.expression))) at = statement.end;
+		else break;
+	}
+	return `${src.slice(0, at)}${at ? eol : ''}${group}${eol}${src.slice(at)}`;
 }
 
 /**
@@ -166,7 +187,7 @@ export function fixRepeatedClasses(cfg: QualityCfg, analysis?: QualityAnalysis):
 		}
 		let updated = source;
 		for (const edit of edits.sort((a, b) => b.start - a.start)) updated = `${updated.slice(0, edit.start)}${edit.replacement}${updated.slice(edit.end)}`;
-		const withGroup = insertCfgGroup(updated, 'CLASSES', declarations);
+		const withGroup = insertCfgGroup(updated, 'CLASSES', declarations, file);
 		const candidateCount = candidates.reduce((n, [, e]) => n + e.length, 0);
 		if (withGroup === updated) {
 			fixed -= candidateCount;
@@ -388,15 +409,16 @@ export function regexFindings(cfg: QualityCfg, analysis?: QualityAnalysis): Rege
 	const exts = new Set(settings.extensions ?? ['.js', '.jsx', '.mjs', '.ts', '.tsx', '.mts', '.cts']);
 	const ignored = new Set(settings.ignoredFiles ?? []);
 	const minimum = settings.minimumCount ?? 2;
-	const vals = new Map<string, string[]>();
+	const findings: RegexFinding[] = [];
 	for (const file of (analysis?.files ?? srcFiles({ ...cfg, extensions: [...exts] })).filter(
 		(c) => exts.has(c.slice(c.lastIndexOf('.'))) && !c.split('/').includes('test') && !c.split('/').includes('tests'),
 	)) {
 		if (ignored.has(displayPath(cfg, file))) continue;
 		const src = analysis?.texts.get(file) ?? readFileSync(file, 'utf8');
 		const ast = analysis?.sources.get(file) ?? ts.createSourceFile(file, src, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+		const vals = new Map<string, string[]>();
 		const visit = (node: ts.Node): void => {
-			const val = ts.isRegularExpressionLiteral(node) ? node.text : ts.isNewExpression(node) && node.expression.getText(ast) === 'RegExp' ? (node.arguments?.[0]?.getText(ast) ?? '') : '';
+			const val = ts.isRegularExpressionLiteral(node) ? node.getText(ast) : '';
 			if (val) {
 				const location = `${displayPath(cfg, file)}:${ast.getLineAndCharacterOfPosition(node.getStart(ast)).line + 1}`;
 				vals.set(val, [...(vals.get(val) ?? []), location]);
@@ -404,8 +426,9 @@ export function regexFindings(cfg: QualityCfg, analysis?: QualityAnalysis): Rege
 			ts.forEachChild(node, visit);
 		};
 		visit(ast);
+		findings.push(...[...vals.entries()].filter(([, l]) => l.length >= minimum).map(([source, locations]) => ({ source, count: locations.length, locations })));
 	}
-	return [...vals.entries()].filter(([, l]) => l.length >= minimum).map(([s, l]) => ({ source: s, count: l.length, locations: l }));
+	return findings;
 }
 
 /**
@@ -431,8 +454,7 @@ export function fixRegexDedup(cfg: QualityCfg, analysis?: QualityAnalysis): Patt
 		const visit = (node: ts.Node): void => {
 			if (ts.isRegularExpressionLiteral(node)) {
 				const text = node.getText(parsed);
-				const flags = text.slice(text.lastIndexOf('/') + 1);
-				if (!flags.includes('g') && !flags.includes('y')) groups.set(text, [...(groups.get(text) ?? []), node]);
+				groups.set(text, [...(groups.get(text) ?? []), node]);
 			}
 			ts.forEachChild(node, visit);
 		};
@@ -448,13 +470,15 @@ export function fixRegexDedup(cfg: QualityCfg, analysis?: QualityAnalysis): Patt
 		const edits: Array<{ start: number; end: number; replacement: string }> = [];
 		for (const [literal, nodes] of candidates) {
 			const name = classConstName(literal.replace(/\W+/g, '_'), used).replace(/_CLASS$/, '_REGEX');
-			declarations.push(`const ${name} = ${literal};`);
-			for (const node of nodes) edits.push({ start: node.getStart(parsed), end: node.end, replacement: name });
+			const flags = literal.slice(literal.lastIndexOf('/') + 1);
+			const stateful = flags.includes('g') || flags.includes('y');
+			declarations.push(`const ${name} = ${stateful ? `() => ${literal}` : literal};`);
+			for (const node of nodes) edits.push({ start: node.getStart(parsed), end: node.end, replacement: stateful ? `${name}()` : name });
 			fixed += nodes.length;
 		}
 		let updated = source;
 		for (const edit of edits.sort((a, b) => b.start - a.start)) updated = `${updated.slice(0, edit.start)}${edit.replacement}${updated.slice(edit.end)}`;
-		const withGroup = insertCfgGroup(updated, 'REGEX', declarations);
+		const withGroup = insertCfgGroup(updated, 'REGEX', declarations, file);
 		const candidateCount = candidates.reduce((n, [, v]) => n + v.length, 0);
 		if (withGroup === updated) {
 			fixed -= candidateCount;

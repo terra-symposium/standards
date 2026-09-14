@@ -166,22 +166,23 @@ test('runFormatter supports legacy and typed invocation forms, ignores Astro tar
 	assert.deepEqual(invocations, [['--ignore-unknown', '--check', 'src/main.ts']]);
 	runFormatter(cfg, ['--write', 'src/main.ts']);
 	invocations = recordedCmds(root);
-	assert.deepEqual(invocations[1], ['--ignore-unknown', '--log-level', 'warn', '--write', 'src/main.ts']);
+	assert.deepEqual(invocations[1], ['--ignore-unknown', '--log-level=warn', '--write', 'src/main.ts']);
 	runFormatter(cfg, { fix: false, all: true, strict: false });
 	invocations = recordedCmds(root);
 	assert.deepEqual(invocations[2], ['--check', '--ignore-unknown', join(root, 'src/main.ts')]);
 	assert.equal(invocations.length, 3);
 });
-test('runFormatter divides more than five hundred source arguments into bounded subprocess batches', () => {
+test('runFormatter divides large source arguments into bounded subprocess batches', () => {
 	const root = fixtureRoot('terra-quality-formatter-batches-');
 	const cmd = recordingCmd(root);
-	for (let idx = 0; idx < 501; idx += 1) fixtureFile(root, `src/file-${String(idx).padStart(3, '0')}.ts`, `const value${idx} = true;\n`);
+	for (let idx = 0; idx < 201; idx += 1) fixtureFile(root, `src/file-${String(idx).padStart(3, '0')}.ts`, `const value${idx} = true;\n`);
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], tools: { prettier: cmd } });
 	runFormatter(cfg, { fix: false, all: true, strict: false });
 	const invocations = recordedCmds(root);
-	assert.equal(invocations.length, 2);
-	assert.equal(invocations[0].filter((a) => !a.startsWith('-')).length, 500);
-	assert.equal(invocations[1].filter((a) => !a.startsWith('-')).length, 1);
+	assert.equal(invocations.length, 3);
+	assert.equal(invocations[0].filter((a) => !a.startsWith('-')).length, 100);
+	assert.equal(invocations[1].filter((a) => !a.startsWith('-')).length, 100);
+	assert.equal(invocations[2].filter((a) => !a.startsWith('-')).length, 1);
 });
 test('runTypecheck honors custom command ownership and does not invoke it for a scoped file-only request', () => {
 	const root = fixtureRoot('terra-quality-typecheck-');
@@ -245,9 +246,12 @@ test('CLI lint and Knip branches pass their focused flags and autofix policy to 
 		['--cache', '--cache-strategy', 'content', '--cache-location', 'node_modules/.cache/eslint', '--no-warn-ignored', join(root, 'src/main.ts')],
 	]);
 	runQualityCli(cfg, ['knip', '--all']);
-	assert.deepEqual(recordedCmds(root, 'knip-args.jsonl'), [['--fix', '--no-exit-code']]);
+	assert.deepEqual(recordedCmds(root, 'knip-args.jsonl'), [
+		['--fix', '--allow-remove-files', '--no-exit-code'],
+		['--include', 'unresolved,nsExports,nsTypes,cycles', '--no-exit-code'],
+	]);
 	runQualityCli(cfg, ['knip', '--all', '--warn']);
-	assert.deepEqual(recordedCmds(root, 'knip-args.jsonl')[1], [['--include', 'unresolved,nsExports,nsTypes,cycles', '--no-exit-code']][0]);
+	assert.deepEqual(recordedCmds(root, 'knip-args.jsonl').at(-1), ['--include', 'unresolved,nsExports,nsTypes,cycles', '--no-exit-code']);
 });
 test('CLI recommendation execution is opt-in per invocation and recommendation failures remain non-blocking', () => {
 	const root = fixtureRoot('terra-quality-recommendations-');

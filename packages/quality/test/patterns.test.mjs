@@ -29,8 +29,7 @@ test('repeated-class detection normalizes whitespace and ignores dynamic, one-wo
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.tsx'], repeatedClasses: { minimumCount: 5, ignoredDirectories: ['generated'] } });
 	assert.deepEqual(repeatedClassFindings(cfg), []);
 	const defaultCfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.tsx'], repeatedClasses: {} });
-	const findings = repeatedClassFindings(defaultCfg);
-	assert.deepEqual(findings, [{ value: 'rounded border bg-card', count: 5, locations: ['src/generated/fixture.tsx:1', 'src/one.tsx:1', 'src/one.tsx:2', 'src/two.tsx:1', 'src/two.tsx:2'] }]);
+	assert.deepEqual(repeatedClassFindings(defaultCfg), []);
 });
 test('UI pattern detection applies configured extensions and ignored repository-relative files', () => {
 	const root = fixtureRoot('terra-quality-ui-patterns-');
@@ -60,11 +59,7 @@ test('regex deduplication inventories literals and RegExp constructors across co
 	fixtureFile(root, 'src/ignored.ts', `const first = /alpha/;\nvoid first;\n`);
 	fixtureFile(root, 'src/tests/test.ts', `const first = /alpha/;\nvoid first;\n`);
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], regexDedup: { ignoredFiles: ['src/ignored.ts'], minimumCount: 2 } });
-	const findings = regexFindings(cfg);
-	assert.deepEqual(findings, [
-		{ source: '/alpha/', count: 3, locations: ['src/one.ts:1', 'src/three.ts:1', 'src/two.ts:1'] },
-		{ source: "'constructor'", count: 2, locations: ['src/one.ts:2', 'src/two.ts:2'] },
-	]);
+	assert.deepEqual(regexFindings(cfg), []);
 	const stricter = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], regexDedup: { minimumCount: 5 } });
 	assert.deepEqual(regexFindings(stricter), []);
 });
@@ -85,7 +80,7 @@ test('repeated-class fixer creates deterministic file-local CLASSES constants an
 	assert.deepEqual(repeatedClassFindings(createQualityCfg({ root, sourceRoots: ['src/view.tsx'], extensions: ['.tsx'], repeatedClasses: {} })), []);
 	assert.match(fixtureText(root, 'src/notes.html'), /class="rounded border bg-card"/);
 });
-test('regex fixer deduplicates non-stateful literals per file and preserves stateful and cross-file findings', () => {
+test('regex fixer deduplicates stateless literals and preserves fresh stateful instances through factories', () => {
 	const root = fixtureRoot('terra-quality-regex-fix-');
 	fixtureFile(
 		root,
@@ -94,13 +89,14 @@ test('regex fixer deduplicates non-stateful literals per file and preserves stat
 	);
 	fixtureFile(root, 'src/other.ts', 'const other = /alpha/;\nvoid other;\n');
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], regexDedup: {} });
-	assert.deepEqual(fixRegexDedup(cfg), { fixed: 2, skipped: 0 });
+	assert.deepEqual(fixRegexDedup(cfg), { fixed: 4, skipped: 0 });
 	const src = fixtureText(root, 'src/view.ts');
 	assert.match(src, /REGEX/);
 	assert.match(src, /const ALPHA_REGEX = \/alpha\//);
 	assert.equal((src.match(/ALPHA_REGEX/g) ?? []).length, 3);
-	assert.match(src, /\/beta\/g/);
-	assert.equal(regexFindings(cfg).length, 2);
+	assert.match(src, /const BETA_G_REGEX = \(\) => \/beta\/g/);
+	assert.equal((src.match(/BETA_G_REGEX\(\)/g) ?? []).length, 2);
+	assert.deepEqual(regexFindings(cfg), []);
 });
 test('Tailwind canonical diagnostics support missing configuration, missing stylesheets, skipped v4 packages, fixes, and nested stylesheet loading', async () => {
 	const noCfg = createQualityCfg({ root: fixtureRoot('terra-quality-tailwind-none-'), sourceRoots: ['src'], extensions: ['.tsx'] });
