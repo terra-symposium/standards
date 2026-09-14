@@ -174,7 +174,12 @@ Each rule is independent. `functions` covers all named functions. `exportedFunct
 ### Repeated classes, regexes, and UI patterns
 
 - **Does:** `repeated-classes` reports repeated static class strings, `regex-dedup` reports exact duplicate regular-expression sources, and `ui-patterns` reports configurable UI patterns that should use shared primitives.
-- **Configure:** Set `repeatedClasses`, `regexDedup`, and `uiPatterns` in `quality.json`; all three checks accept repository-relative extensions, exclusions, and thresholds.
+- **Configure:** Set `repeatedClasses`, `regexDedup`, and `uiPatterns` in `quality.json`; all three checks accept repository-relative extensions, exclusions, and thresholds. Normal quality mode safely extracts repeated file-local class literals into `CONFIG`/`CLASSES` constants and non-stateful duplicate regex literals into `CONFIG`/`REGEX` constants. Set `autofix.repeatedClasses` or `autofix.regexDedup` to `false` for review-only output; dynamic classes, HTML, stateful regexes, and cross-file candidates remain advisory.
+
+### Object forwarding
+
+- **Does:** Reports object literals that manually forward several properties from one source object.
+- **Configure:** `autofix.forward` defaults to enabled and removes only exact properties redundantly repeated after an existing spread of the same source. Whole-object replacements, projections, mutation payloads, and ambiguous cases remain warnings.
 - **Ideology:** Generic checks report evidence and let each repository decide which repetition or pattern is intentional.
 
 ## Context limits

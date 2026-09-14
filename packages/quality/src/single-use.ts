@@ -17,9 +17,10 @@ import { srcFiles } from './files.js';
 import type { QualityCfg } from './runner.js';
 
 /*//////////////////////////////////////////////////
-CONFIG
+REGEX
 //////////////////////////////////////////////////*/
 
+const C_M_JS_JSX_TS_TSX_REGEX = /\.(?:c|m)?(?:js|jsx|ts|tsx)$/;
 export type SingleUseFinding = { file: string; line: number; name: string; decision: 'INLINE' | 'KEEP' | 'REVIEW'; reason: string };
 type Candidate = { file: string; source: ts.SourceFile; statement: ts.Statement; name: ts.Identifier; symbol: ts.Symbol; kind: 'type' | 'interface' | 'variable' | 'function' };
 type Reference = { file: string; source: ts.SourceFile; node: ts.Identifier };
@@ -50,7 +51,7 @@ HELPERS
  */
 function programFor(cfg: QualityCfg): ts.Program {
 	return ts.createProgram({
-		rootNames: srcFiles(cfg).filter((f) => /\.(?:c|m)?(?:js|jsx|ts|tsx)$/.test(f)),
+		rootNames: srcFiles(cfg).filter((f) => C_M_JS_JSX_TS_TSX_REGEX.test(f)),
 		options: {
 			allowJs: true,
 			checkJs: false,
@@ -78,7 +79,7 @@ function collect(cfg: QualityCfg, program: ts.Program, checker: ts.TypeChecker):
 	const roots = [...cfg.sourceRoots, ...(cfg.includeRoots ?? [])];
 	const inScope = (file: string): boolean => roots.some((r) => file === r || file.startsWith(`${r}/`));
 	for (const source of program.getSourceFiles()) {
-		if (!inScope(source.fileName) || !/\.(?:c|m)?(?:js|jsx|ts|tsx)$/.test(source.fileName)) continue;
+		if (!inScope(source.fileName) || !C_M_JS_JSX_TS_TSX_REGEX.test(source.fileName)) continue;
 		for (const statement of source.statements) {
 			if (!isCandidateStatement(statement)) continue;
 			const name =
@@ -96,7 +97,7 @@ function collect(cfg: QualityCfg, program: ts.Program, checker: ts.TypeChecker):
 	}
 	const candidateSymbols = new Set(candidates.map((c) => c.symbol));
 	for (const src of program.getSourceFiles()) {
-		if (!inScope(src.fileName) || !/\.(?:c|m)?(?:js|jsx|ts|tsx)$/.test(src.fileName)) continue;
+		if (!inScope(src.fileName) || !C_M_JS_JSX_TS_TSX_REGEX.test(src.fileName)) continue;
 		const visit = (node: ts.Node): void => {
 			if (ts.isIdentifier(node)) {
 				let importUse = false;
@@ -161,7 +162,7 @@ function typeUses(cfg: QualityCfg, candidate: Candidate, program: ts.Program): R
 	const inScope = (file: string): boolean => roots.some((r) => file === r || file.startsWith(`${r}/`));
 	const uses: Reference[] = [];
 	for (const src of program.getSourceFiles()) {
-		if (!inScope(src.fileName) || !/\.(?:c|m)?(?:js|jsx|ts|tsx)$/.test(src.fileName)) continue;
+		if (!inScope(src.fileName) || !C_M_JS_JSX_TS_TSX_REGEX.test(src.fileName)) continue;
 		const visit = (node: ts.Node): void => {
 			if (
 				ts.isIdentifier(node) &&

@@ -37,7 +37,7 @@ HELPERS
  * @return Sorted absolute paths for files that belong to the configured source scope.
  */
 export function srcFiles(cfg: QualityCfg): string[] {
-	const cacheKey = JSON.stringify([cfg.sourceRoots, cfg.includeRoots ?? [], cfg.extensions, cfg.skippedDirectories ?? [], cfg.skippedFiles ?? []]);
+	const cacheKey = JSON.stringify([cfg.root, cfg.sourceRoots, cfg.includeRoots ?? [], cfg.extensions, cfg.skippedDirectories ?? [], cfg.skippedFiles ?? []]);
 	const cached = fileCache.get(cacheKey);
 	if (cached) return cached;
 	const roots = [...cfg.sourceRoots, ...(cfg.includeRoots ?? [])];

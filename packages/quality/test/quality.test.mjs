@@ -22,7 +22,7 @@ import { DOCUMENTATION_DESCRIPTION_NOTICE } from '../dist/index.js';
 test('consolidated quality modules expose their behavior from the public package entrypoint', () => {
 	for (const check of [aliasFindings, createQualityAnalysis, documentationFindings, regexFindings, runTailwindCanonical]) assert.equal(typeof check, 'function');
 });
-test('documentation warnings identify missing file, summary, and tag descriptions without generating prose', () => {
+test('documentation warnings identify missing summary and tag descriptions without generating prose', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-doc-warnings-'));
 	const file = join(root, 'main.ts');
 	writeFileSync(
@@ -41,7 +41,7 @@ function read(value: string): string { return value; }
 	);
 	const cfg = createQualityCfg({ root, sourceRoots: ['.'], extensions: ['.ts'] });
 	const findings = documentationFindings(cfg);
-	assert.deepEqual(new Set(findings.map((f) => f.kind)), new Set(['file', 'summary', 'param', 'return']));
+	assert.deepEqual(new Set(findings.map((f) => f.kind)), new Set(['summary', 'param', 'return']));
 	assert.ok(findings.every((f) => f.severity === 'warning'));
 	assert.match(DOCUMENTATION_DESCRIPTION_NOTICE, /agentically authored/);
 	assert.match(DOCUMENTATION_DESCRIPTION_NOTICE, /never generates descriptions in bulk/);
@@ -451,7 +451,7 @@ test('maintenance does not interpret section-shaped string content as managed he
 	assert.ok(readFileSync(file, 'utf8').includes(`\`${fence}\``));
 	assert.equal(maintainSrcFile(root, file), false);
 });
-test('maintenance generates blank TSDoc parameter and return tags for undocumented helpers', () => {
+test('maintenance generates a blank TSDoc block only for helpers without existing documentation', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-tsdoc-'));
 	const file = join(root, 'main.ts');
 	writeFileSync(
@@ -470,20 +470,20 @@ function empty(enabled: boolean): void { void enabled; }
 	const src = readFileSync(file, 'utf8');
 	assert.ok(src.includes('/**\n *\n * @param fileName\n *\n * @return\n */\nfunction specifiers'));
 	assert.equal(src.match(/Existing documentation/g)?.length, 1);
-	assert.match(src, /\* Existing documentation\.\n \*\n \* @param value\n \*\n \* @return/);
-	assert.match(src, /\/\*\*\n \*\n \* @param enabled\n \*\n \* @return\n \*\//);
+	assert.match(src, /\/\*\* Existing documentation\. \*\/\nfunction documented/);
+	assert.match(src, /\/\*\* \*\/\nfunction empty/);
 	assert.equal(maintainSrcFile(root, file), false);
 });
-test('maintenance keeps a single blank line before return in summary-only TSDoc', () => {
+test('maintenance preserves summary-only TSDoc without adding tags', () => {
 	const dir = mkdtempSync(join(tmpdir(), 'terra-quality-tsdoc-summary-'));
 	const file = join(dir, 'src.ts');
 	writeFileSync(file, "import fs from 'node:fs';\n/** Handles create client. */\nfunction createClient() { return fs.existsSync('.'); }\n");
 	maintainSrcFile(dir, file);
 	const src = readFileSync(file, 'utf8');
-	assert.ok(src.includes('/**\n * Handles create client.\n *\n * @return\n */\nfunction createClient'));
+	assert.ok(src.includes('/** Handles create client. */\nfunction createClient'));
 	assert.doesNotMatch(src, /Handles create client\.\n \*\n \*\n \* @return/);
 });
-test('maintenance repairs TSDoc tags from the current function signature and preserves descriptions', () => {
+test('maintenance preserves existing TSDoc tags instead of generating or repairing them', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-tsdoc-'));
 	const file = join(root, 'main.ts');
 	writeFileSync(
@@ -492,9 +492,8 @@ test('maintenance repairs TSDoc tags from the current function signature and pre
 	);
 	assert.equal(maintainSrcFile(root, file), true);
 	const src = readFileSync(file, 'utf8');
-	assert.match(src, /\* @param fileName - Path to read\.\n \*\n \* @return - File contents\./);
+	assert.match(src, /\* @param wrongName - stale\n \* @param fileName - Path to read\.\n \* @returns - File contents\./);
 	assert.match(src, /\* @throws When reading fails\./);
-	assert.doesNotMatch(src, /wrongName/);
 	assert.equal(maintainSrcFile(root, file), false);
 });
 test('maintenance preserves managed-looking sections in files without imports', () => {

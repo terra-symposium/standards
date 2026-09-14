@@ -2,7 +2,6 @@
  * packages/quality/test/single-use.test.mjs
  * Verifies candidate discovery, semantic safety classification, cross-file
  * type inlining, import editing, report generation, and no-op boundaries.
- *
  * The fixtures intentionally exercise every classification branch. A finding
  * is only considered single-use when imports are excluded and exactly one
  * in-scope consumer remains.

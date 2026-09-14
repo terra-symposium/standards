@@ -17,9 +17,10 @@ import { readFileSync, readdirSync, realpathSync } from 'node:fs';
 import type { QualityCfg } from './runner.js';
 
 /*//////////////////////////////////////////////////
-CONFIG
+REGEX
 //////////////////////////////////////////////////*/
 
+const ENV_REGEX = /(^|\/)\.env(?:\.|$)/;
 export type SecurityFinding = { file?: string; message: string };
 
 /*//////////////////////////////////////////////////
@@ -55,10 +56,9 @@ export function securityFindings(cfg: QualityCfg): SecurityFinding[] {
 	const allNames = files.map((f) => displayPath(cfg, f));
 
 	// WALKTHROUGH
-	for (const file of allNames) if (/(^|\/)\.env(?:\.|$)/.test(file)) findings.push({ file, message: 'environment files must not be committed' });
+	for (const file of allNames) if (ENV_REGEX.test(file)) findings.push({ file, message: 'environment files must not be committed' });
 	for (const entry of readdirSync(cfg.root, { withFileTypes: true }))
-		if (entry.isFile() && /(^|\/)\.env(?:\.|$)/.test(entry.name) && (!visible || visible.has(join(cfg.root, entry.name))))
-			findings.push({ file: entry.name, message: 'environment files must not be committed' });
+		if (entry.isFile() && ENV_REGEX.test(entry.name) && (!visible || visible.has(join(cfg.root, entry.name)))) findings.push({ file: entry.name, message: 'environment files must not be committed' });
 	const forbiddenTerms = (settings.forbiddenTerms ?? []).map((t) => new RegExp(t, 'i'));
 	const forbiddenImports = settings.forbiddenImports ?? [];
 	const clientRoots = (settings.clientRoots ?? []).map((r) => join(cfg.root, r));

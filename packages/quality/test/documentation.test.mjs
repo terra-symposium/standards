@@ -2,7 +2,6 @@
  * packages/quality/test/documentation.test.mjs
  * Exercises documentation policy reporting, human-authored description audits,
  * source maintenance, scaffold insertion, and Prettier import protection.
- *
  * The fixtures distinguish structural automation from prose authorship: the
  * package may insert an empty scaffold, but it must never invent a description.
  */
@@ -49,7 +48,6 @@ void [privateHelper, publicHelper, arrowHelper, expressionHelper, documented];
 	assert.deepEqual(
 		findings.map((f) => [f.kind, f.name, f.severity]),
 		[
-			['file', '<file header>', 'warning'],
 			['type', 'MissingAlias', 'error'],
 			['type', 'MissingContract', 'error'],
 			['type', 'MissingClass', 'error'],
@@ -153,4 +151,24 @@ import { short } from 'short';
 	assert.equal((protectedSrc.match(/prettier-ignore/g) ?? []).length, 2);
 	assert.equal(protectLongImports(file, 80), false);
 	assert.equal(fixtureText(root, 'src/main.ts'), protectedSrc);
+});
+test('maintainSrcFile keeps the path and human description in one valid header block', () => {
+	const root = fixtureRoot('terra-quality-document-header-description-');
+	const file = fixtureFile(root, 'src/main.ts', `/**\n * src/main.ts\n * Reads the configured value for the calling workflow.\n */\nconst value = true;\nvoid value;\n`);
+	assert.equal(maintainSrcFile(root, file), true);
+	assert.equal(fixtureText(root, 'src/main.ts'), `/**\n * src/main.ts\n * Reads the configured value for the calling workflow.\n */\n\nconst value = true;\nvoid value;\n`);
+});
+test('maintainSrcFile heals orphaned duplicate header fragments and merges adjacent descriptions', () => {
+	const root = fixtureRoot('terra-quality-document-header-healing-');
+	const file = fixtureFile(
+		root,
+		'src/main.ts',
+		`/**\n * src/main.ts\n */\n\n* src/main.ts\n*/\n/** Meaningful coverage description. */\n\n/**\n * Explains the current architecture under test.\n */\n\nconst value = true;\nvoid value;\n`,
+	);
+	assert.equal(maintainSrcFile(root, file), true);
+	assert.equal(
+		fixtureText(root, 'src/main.ts'),
+		`/**\n * src/main.ts\n * Meaningful coverage description.\n * Explains the current architecture under test.\n */\n\nconst value = true;\nvoid value;\n`,
+	);
+	assert.equal(maintainSrcFile(root, file), false);
 });

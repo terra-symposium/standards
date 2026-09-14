@@ -11,8 +11,8 @@ IMPORTS
 // API
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { createQualityAnalysis, createQualityCfg, objectForwardingFindings } from '../dist/index.js';
-import { fixtureFile, fixtureRoot } from './support.mjs';
+import { createQualityAnalysis, createQualityCfg, fixObjectForwarding, objectForwardingFindings } from '../dist/index.js';
+import { fixtureFile, fixtureRoot, fixtureText } from './support.mjs';
 
 /*//////////////////////////////////////////////////
 TESTS
@@ -60,4 +60,16 @@ test('object forwarding accepts a shared analysis cache and handles multiple sou
 		findings.map((f) => f.source),
 		['first', 'second'],
 	);
+});
+test('object forwarding fixer removes only exact properties already covered by a preceding spread', () => {
+	const root = fixtureRoot('terra-quality-forwarding-fix-');
+	fixtureFile(
+		root,
+		'src/main.ts',
+		`send({ ...input, organizationId: input.organizationId, userId: input.userId });\nsend({ organizationId: input.organizationId, userId: input.userId, opportunities: input.opportunities });\n`,
+	);
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
+	assert.deepEqual(fixObjectForwarding(cfg), { fixed: 2, skipped: 1 });
+	assert.equal(fixtureText(root, 'src/main.ts'), `send({ ...input });\nsend({ organizationId: input.organizationId, userId: input.userId, opportunities: input.opportunities });\n`);
+	assert.equal(objectForwardingFindings(cfg).length, 1);
 });

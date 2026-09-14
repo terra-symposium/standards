@@ -11,7 +11,7 @@ IMPORTS
 // API
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { createQualityCfg, regexFindings, repeatedClassFindings, runTailwindCanonical, uiPatternFindings } from '../dist/index.js';
+import { createQualityCfg, fixRegexDedup, fixRepeatedClasses, regexFindings, repeatedClassFindings, runTailwindCanonical, uiPatternFindings } from '../dist/index.js';
 import { fixtureFile, fixtureRoot, fixtureText } from './support.mjs';
 
 /*//////////////////////////////////////////////////
@@ -67,6 +67,40 @@ test('regex deduplication inventories literals and RegExp constructors across co
 	]);
 	const stricter = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], regexDedup: { minimumCount: 5 } });
 	assert.deepEqual(regexFindings(stricter), []);
+});
+test('repeated-class fixer creates deterministic file-local CLASSES constants and leaves dynamic/HTML sources alone', () => {
+	const root = fixtureRoot('terra-quality-classes-fix-');
+	fixtureFile(
+		root,
+		'src/view.tsx',
+		`/*//////////////////////////////////////////////////\nCONFIG\n//////////////////////////////////////////////////*/\nexport const view = <><div className="rounded border bg-card" /><div class="rounded   border bg-card" /><div className="rounded border bg-card" /></>;\n`,
+	);
+	fixtureFile(root, 'src/notes.html', `<div class="rounded border bg-card"></div>\n<div class="rounded border bg-card"></div>\n<div class="rounded border bg-card"></div>\n`);
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.tsx', '.html'], repeatedClasses: {} });
+	assert.deepEqual(fixRepeatedClasses(cfg), { fixed: 3, skipped: 0 });
+	const src = fixtureText(root, 'src/view.tsx');
+	assert.match(src, /CLASSES/);
+	assert.match(src, /const ROUNDED_BORDER_BG_CARD_CLASS = 'rounded border bg-card';/);
+	assert.equal((src.match(/ROUNDED_BORDER_BG_CARD_CLASS/g) ?? []).length, 4);
+	assert.deepEqual(repeatedClassFindings(createQualityCfg({ root, sourceRoots: ['src/view.tsx'], extensions: ['.tsx'], repeatedClasses: {} })), []);
+	assert.match(fixtureText(root, 'src/notes.html'), /class="rounded border bg-card"/);
+});
+test('regex fixer deduplicates non-stateful literals per file and preserves stateful and cross-file findings', () => {
+	const root = fixtureRoot('terra-quality-regex-fix-');
+	fixtureFile(
+		root,
+		'src/view.ts',
+		`/*//////////////////////////////////////////////////\nCONFIG\n//////////////////////////////////////////////////*/\nconst first = /alpha/;\nconst second = /alpha/;\nconst stateful = /beta/g;\nconst statefulAgain = /beta/g;\nvoid [first, second, stateful, statefulAgain];\n`,
+	);
+	fixtureFile(root, 'src/other.ts', 'const other = /alpha/;\nvoid other;\n');
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], regexDedup: {} });
+	assert.deepEqual(fixRegexDedup(cfg), { fixed: 2, skipped: 0 });
+	const src = fixtureText(root, 'src/view.ts');
+	assert.match(src, /REGEX/);
+	assert.match(src, /const ALPHA_REGEX = \/alpha\//);
+	assert.equal((src.match(/ALPHA_REGEX/g) ?? []).length, 3);
+	assert.match(src, /\/beta\/g/);
+	assert.equal(regexFindings(cfg).length, 2);
 });
 test('Tailwind canonical diagnostics support missing configuration, missing stylesheets, skipped v4 packages, fixes, and nested stylesheet loading', async () => {
 	const noCfg = createQualityCfg({ root: fixtureRoot('terra-quality-tailwind-none-'), sourceRoots: ['src'], extensions: ['.tsx'] });

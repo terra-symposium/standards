@@ -11,15 +11,27 @@ IMPORTS
 import ts from 'typescript';
 import { displayPath, srcFiles } from './files.js';
 import { extname, relative, sep } from 'node:path';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, renameSync, unlinkSync, writeFileSync } from 'node:fs';
 
 // TYPES
 import type { QualityAnalysis, QualityCfg } from './runner.js';
 
 /*//////////////////////////////////////////////////
-CONFIG
+REGEX
 //////////////////////////////////////////////////*/
 
+const T_R_N_S_S_R_N_T_T_R_N_REGEX = /^\/\*\*[ \t]*\r?\n([\s\S]*?)\r?\n[ \t]*\*\/[ \t]*(?:\r?\n)*/;
+const R_N_REGEX = /\r?\n/;
+const T_T_REGEX = /^[ \t]*\*[ \t]?/;
+const S_REGEX = /^\s*/;
+const S_CLASS_2 = /^\s*(?:\/\/|\/\*|\*\/|\*)/;
+const S_CLASS_3 = /^\s*\* ?/;
+const S_W_REGEX = /^\s*@\w+/;
+const RETURNS_B_REGEX = /^@returns?\b/;
+const UFEFF_REGEX = /^\uFEFF/;
+const S_CLASS_4 = /\s*$/;
+const C_M_JS_JSX_TS_TSX_REGEX = /(?:^|[\\/])[^\\/]+\.(?:c|m)?(?:js|jsx|ts|tsx)$/;
+const S_CLASS_5 = /^\{[^}]+\}\s*/;
 const OPEN = `/*${'/'.repeat(50)}`;
 const CLOSE = `${'/'.repeat(50)}*/`;
 const SUPPORTED = new Set(['.cjs', '.cts', '.js', '.jsx', '.mjs', '.mts', '.ts', '.tsx']);
@@ -49,6 +61,98 @@ const DESCRIPTION_OPTIONAL_TAGS = new Set(['abstract', 'const', 'default', 'even
 /*//////////////////////////////////////////////////
 HELPERS
 //////////////////////////////////////////////////*/
+
+/**
+ * Writes a generated source update through a temporary file after validating
+ * that the candidate still has no TypeScript or JavaScript parse errors.
+ *
+ * @param fileName Source file to replace.
+ * @param src Candidate source text to validate and write.
+ * @return Nothing; throws before replacing the source when parsing fails.
+ */
+function writeValidatedSrc(fileName: string, src: string): boolean {
+	let result: ts.TranspileOutput;
+	try {
+		result = ts.transpileModule(src, { fileName, reportDiagnostics: true, compilerOptions: { allowJs: true, jsx: ts.JsxEmit.Preserve, module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ESNext } });
+	} catch {
+		return false;
+	}
+	if (result.diagnostics?.length) return false;
+	const temp = `${fileName}.${process.pid}.quality.tmp`;
+	try {
+		writeFileSync(temp, src);
+		renameSync(temp, fileName);
+	} finally {
+		try {
+			unlinkSync(temp);
+		} catch {
+			// The temporary file was renamed successfully.
+		}
+	}
+	return true;
+}
+
+/**
+ * Repairs broken duplicate header fragments left by interrupted comment edits.
+ * Only contiguous comments immediately following a valid path header are
+ * merged, so declaration documentation elsewhere in the file is untouched.
+ *
+ * @param src Source text whose leading header may contain broken fragments.
+ * @param path Canonical repository-relative path for the file header.
+ * @param eol Line-ending sequence to emit.
+ *
+ * @return Source with one valid path-and-description header when healing applies.
+ */
+function healHeaderFragments(src: string, path: string, eol: string): string {
+	const header = src.match(T_R_N_S_S_R_N_T_T_R_N_REGEX);
+	if (!header) return src;
+	const lines = header[1]!
+		.split(R_N_REGEX)
+		.map((l) => l.replace(T_T_REGEX, '').trim())
+		.filter(Boolean);
+	if (lines[0] !== path && lines[0] !== path.replace(/^.*\//, '')) return src;
+	const descriptions = lines.slice(1);
+	let cursor = header[0].length;
+	let rest = src.slice(cursor);
+	const orphanPattern = /^(?:[ \t]*\*[ \t]?[^\r\n]*\r?\n)+[ \t]*\*\/[ \t]*(?:\r?\n)*/;
+	const docPattern = /^\/\*\*(?:[ \t]*([^\r\n]*?)[ \t]*\*\/[ \t]*(?:\r?\n)*|[ \t]*\r?\n([\s\S]*?)\r?\n[ \t]*\*\/[ \t]*(?:\r?\n)*)/;
+	let changed = false;
+	while (true) {
+		const whitespace = rest.match(/^(?:\s*)/);
+		const prefix = whitespace?.[0] ?? '';
+		const orphan = rest.slice(prefix.length).match(orphanPattern);
+		if (orphan) {
+			const orphanLines = orphan[0]
+				.split(R_N_REGEX)
+				.map((l) =>
+					l
+						.replace(T_T_REGEX, '')
+						.replace(/[ \t]*\*\/?[ \t]*$/, '')
+						.trim(),
+				)
+				.map((l) => (l === '/' ? '' : l))
+				.filter(Boolean);
+			for (const line of orphanLines) if (line !== path && !descriptions.includes(line)) descriptions.push(line);
+			cursor += prefix.length + orphan[0].length;
+			rest = rest.slice(prefix.length + orphan[0].length);
+			changed = true;
+			continue;
+		}
+		const doc = rest.slice(prefix.length).match(docPattern);
+		if (!doc) break;
+		const docLines = (doc[1] ?? doc[2] ?? '')
+			.split(R_N_REGEX)
+			.map((l) => l.replace(T_T_REGEX, '').trim())
+			.filter(Boolean);
+		for (const line of docLines) if (line !== path && !descriptions.includes(line)) descriptions.push(line);
+		cursor += prefix.length + doc[0].length;
+		rest = rest.slice(prefix.length + doc[0].length);
+		changed = true;
+	}
+	if (!changed) return src;
+	const norm = ['/**', path, ...descriptions, ' */'].map((l, i, a) => (i === 0 || i === a.length - 1 ? l : ` * ${l}`)).join(eol);
+	return `${norm}${eol}${eol}${rest.replace(S_REGEX, '')}`;
+}
 
 /**
  * Selects the TypeScript parser mode for a JavaScript or TypeScript filename.
@@ -224,7 +328,7 @@ function literalSpans(src: string, fileName: string): { start: number; end: numb
  */
 function normCommentLayout(src: string, fileName: string, eol: string): string {
 	const spans = literalSpans(src, fileName);
-	const rawLines = src.split(/\r?\n/);
+	const rawLines = src.split(R_N_REGEX);
 	const nlineSize = src.includes('\r\n') ? 2 : 1;
 	let offset = 0;
 	const lines = rawLines.map((t) => {
@@ -269,7 +373,7 @@ function normCommentLayout(src: string, fileName: string, eol: string): string {
 			const prev = out.at(-1) ?? '';
 			let next = i + 1;
 			while (next < lines.length && !lines[next].text.trim() && !protectedLine(lines[next])) next++;
-			const adjacentComment = /^\s*(?:\/\/|\/\*|\*\/|\*)/.test(prev) || (next < lines.length && /^\s*(?:\/\/|\/\*|\*\/|\*)/.test(lines[next].text));
+			const adjacentComment = S_CLASS_2.test(prev) || (next < lines.length && S_CLASS_2.test(lines[next].text));
 			if (adjacentComment && out.length && out.at(-1) !== '') out.push('');
 			continue;
 		}
@@ -289,7 +393,7 @@ function normCommentLayout(src: string, fileName: string, eol: string): string {
 		if (l !== '') return true;
 		const prev = out[i - 1] ?? '';
 		const following = out[i + 1] ?? '';
-		const comment = (textVal: string): boolean => /^\s*(?:\/\/|\/\*|\*\/|\*)/.test(textVal);
+		const comment = (textVal: string): boolean => S_CLASS_2.test(textVal);
 		return comment(prev) || comment(following);
 	});
 	return `${compact.join(eol)}${eol}`;
@@ -338,20 +442,21 @@ function removeManagedSects(src: string, fileName: string): string {
  * @return Normalized TSDoc text; missing prose remains intentionally blank for agent-authored documentation.
  */
 function genFnDoc(n: ts.FunctionDeclaration, parsed: ts.SourceFile, eol: string, existing = ''): string {
+	if (existing.trim()) return existing;
 	const params = n.parameters.map((p, i) => (ts.isIdentifier(p.name) ? p.name.text : ts.isObjectBindingPattern(p.name) ? 'props' : `param${i + 1}`));
 	const body = existing
 		.slice(3, -2)
-		.split(/\r?\n/)
-		.map((l) => l.replace(/^\s*\* ?/, '').trim());
+		.split(R_N_REGEX)
+		.map((l) => l.replace(S_CLASS_3, '').trim());
 	while (body.length && !body.at(0)?.trim()) body.shift();
 	while (body.length && !body.at(-1)?.trim()) body.pop();
-	const firstTag = body.findIndex((l) => /^\s*@\w+/.test(l));
+	const firstTag = body.findIndex((l) => S_W_REGEX.test(l));
 	const summary = (firstTag < 0 ? body : body.slice(0, firstTag)).map((l) => l.trim());
 	while (summary.length && !summary.at(-1)?.trim()) summary.pop();
 	const tagLines = firstTag < 0 ? [] : body.slice(firstTag).filter((l) => l.trim());
 	const blocks: string[][] = [];
 	for (const line of tagLines) {
-		if (/^\s*@\w+/.test(line) || !blocks.length) blocks.push([line.trim()]);
+		if (S_W_REGEX.test(line) || !blocks.length) blocks.push([line.trim()]);
 		else blocks.at(-1)!.push(line);
 	}
 	const paramBlocks = new Map<string, string[]>();
@@ -363,8 +468,8 @@ function genFnDoc(n: ts.FunctionDeclaration, parsed: ts.SourceFile, eol: string,
 			paramBlocks.set(param[1]!.replace(/^\[|\]$/g, '').split('=')[0]!, block);
 			continue;
 		}
-		if (/^@returns?\b/.test(block[0] ?? '')) {
-			returnBlock = [`${block[0]!.replace(/^@returns?\b/, '@return')}`, ...block.slice(1)];
+		if (RETURNS_B_REGEX.test(block[0] ?? '')) {
+			returnBlock = [`${block[0]!.replace(RETURNS_B_REGEX, '@return')}`, ...block.slice(1)];
 			continue;
 		}
 		otherBlocks.push(block);
@@ -443,13 +548,19 @@ export function maintainSrcFile(root: string, fileName: string): boolean {
 	if (!SUPPORTED.has(extname(fileName))) return false;
 	const original = readFileSync(fileName, 'utf8');
 	const eol = original.includes('\r\n') ? '\r\n' : '\n';
-	let src = original.replace(/^\uFEFF/, '').replace(/^\s+/, '');
+	let src = original.replace(UFEFF_REGEX, '').replace(/^\s+/, '');
 	const path = relative(root, fileName).split(sep).join('/');
-	const header = `/**${eol} * ${path}${eol} */`;
-	const headerPattern = /^\/\*\*[ \t]*\r?\n[ \t]*\*[ \t]*(.+?)[ \t]*\r?\n[ \t]*\*\/[ \t]*(?:\r?\n)*/;
-	const existingHeader = src.match(headerPattern);
-	if (existingHeader && (existingHeader[1].includes('/') || /\.(?:c|m)?(?:js|ts)x?$/.test(existingHeader[1]))) {
-		src = src.replace(headerPattern, `${header}${eol}${eol}`);
+	src = healHeaderFragments(src, path, eol);
+	const existingHeader = src.match(T_R_N_S_S_R_N_T_T_R_N_REGEX);
+	const headerLines =
+		existingHeader?.[1]
+			.split(R_N_REGEX)
+			.map((l) => l.replace(T_T_REGEX, '').trim())
+			.filter(Boolean) ?? [];
+	const headerDescription = headerLines.slice(1);
+	const header = ['/**', path, ...headerDescription, ' */'].map((l, i) => (i === 0 ? l : i === headerDescription.length + 2 ? l : ` * ${l}`)).join(eol);
+	if (existingHeader && (headerLines[0]?.includes('/') || /\.(?:c|m)?(?:js|ts)x?$/.test(headerLines[0] ?? ''))) {
+		src = src.replace(T_R_N_S_S_R_N_T_T_R_N_REGEX, `${header}${eol}${eol}`);
 		const escapedPath = path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 		const duplicateHeader = new RegExp(`^(\\/\\*\\*\\r?\\n \\* ${escapedPath}\\r?\\n \\*\\/)(?:\\r?\\n)+\\1(?:\\r?\\n)+`);
 		src = src.replace(duplicateHeader, `$1${eol}${eol}`);
@@ -470,18 +581,17 @@ export function maintainSrcFile(root: string, fileName: string): boolean {
 		const prefix = src.slice(0, first.getStart(parsed));
 		const fenceStart = prefix.search(/\/\*\/{10,}[ \t]*\r?\n[ \t]*IMPORTS[ \t]*\r?\n[ \t]*\/{10,}\*\//);
 		const start = fenceStart >= 0 ? fenceStart : first.getStart(parsed);
-		src = `${src.slice(0, start).replace(/\s*$/, `${eol}${eol}`)}${block}${src.slice(last.end).replace(/^\s*/, eol)}`;
+		src = `${src.slice(0, start).replace(S_CLASS_4, `${eol}${eol}`)}${block}${src.slice(last.end).replace(S_REGEX, eol)}`;
 	}
 	src = organizeSrcSects(src, fileName, eol);
 	const norm = src
 		.replace(/^([ \t]*)\/\*\/{10,}[ \t]*$/gm, `$1${OPEN}`)
 		.replace(/^([ \t]*)\/{10,}\*\/[ \t]*$/gm, `$1${CLOSE}`)
-		.replace(/\s*$/, eol);
+		.replace(S_CLASS_4, eol);
 	const laidOut = normCommentLayout(norm, fileName, eol);
 	const n = original.startsWith('\uFEFF') ? `\uFEFF${laidOut}` : laidOut;
 	if (n === original) return false;
-	writeFileSync(fileName, n);
-	return true;
+	return writeValidatedSrc(fileName, n);
 }
 
 /**
@@ -513,11 +623,10 @@ export function protectLongImports(fileName: string, printWidth = 200): boolean 
 	let next = original;
 	for (const offset of [...insertions].sort((a, b) => b - a)) {
 		const nLine = original.indexOf('\n', offset);
-		const indent = original.slice(offset, nLine < 0 ? original.length : nLine).match(/^\s*/)?.[0] ?? '';
+		const indent = original.slice(offset, nLine < 0 ? original.length : nLine).match(S_REGEX)?.[0] ?? '';
 		next = `${next.slice(0, offset)}${indent}// prettier-ignore${eol}${next.slice(offset)}`;
 	}
-	writeFileSync(fileName, next);
-	return true;
+	return writeValidatedSrc(fileName, next);
 }
 
 /**
@@ -563,13 +672,13 @@ function documented(node: ts.Node, src: string): boolean {
 	// path-bearing TSDoc in the file; a declaration's own later TSDoc remains
 	// valid even when the file also has a header.
 	const blockStart = node.getFullStart() + doc.index!;
-	let prefix = src.slice(0, blockStart).replace(/^\uFEFF/, '');
+	let prefix = src.slice(0, blockStart).replace(UFEFF_REGEX, '');
 	if (prefix.startsWith('#!')) prefix = prefix.slice(prefix.indexOf('\n') + 1);
 	const docLines = doc[0]!
 		.slice(3, -2)
-		.split(/\r?\n/)
-		.map((l) => l.replace(/^\s*\* ?/, '').trim());
-	const isFileHeader = prefix.trim() === '' && docLines.some((l) => /(?:^|[\\/])[^\\/]+\.(?:c|m)?(?:js|jsx|ts|tsx)$/.test(l));
+		.split(R_N_REGEX)
+		.map((l) => l.replace(S_CLASS_3, '').trim());
+	const isFileHeader = prefix.trim() === '' && docLines.some((l) => C_M_JS_JSX_TS_TSX_REGEX.test(l));
 	return !isFileHeader;
 }
 
@@ -626,8 +735,8 @@ function tsdocLines(block: TSDocBlock): TSDocLine[] {
 	const body = block.text.slice(3, -2);
 	const lineSize = body.includes('\r\n') ? 2 : 1;
 	let offset = block.start + 3;
-	return body.split(/\r?\n/).map((l) => {
-		const result = { offset, text: l.replace(/^\s*\* ?/, '').trim() };
+	return body.split(R_N_REGEX).map((l) => {
+		const result = { offset, text: l.replace(S_CLASS_3, '').trim() };
 		offset += l.length + lineSize;
 		return result;
 	});
@@ -643,26 +752,10 @@ function tsdocLines(block: TSDocBlock): TSDocLine[] {
  */
 function fileHeaderBlock(src: string, blocks: TSDocBlock[]): TSDocBlock | undefined {
 	return blocks.find((b) => {
-		let prefix = src.slice(0, b.start).replace(/^\uFEFF/, '');
+		let prefix = src.slice(0, b.start).replace(UFEFF_REGEX, '');
 		if (prefix.startsWith('#!')) prefix = prefix.slice(prefix.indexOf('\n') + 1);
-		return prefix.trim() === '' && tsdocLines(b).some((l) => /(?:^|[\\/])[^\\/]+\.(?:c|m)?(?:js|jsx|ts|tsx)$/.test(l.text));
+		return prefix.trim() === '' && tsdocLines(b).some((l) => C_M_JS_JSX_TS_TSX_REGEX.test(l.text));
 	});
-}
-
-/**
- * Checks whether a file-header TSDoc block contains prose beyond its generated path line.
- *
- * @param block File-header TSDoc block to inspect.
- *
- * @return `true` when the header contains a meaningful description.
- */
-function hasFileDescription(block: TSDocBlock): boolean {
-	const prose = tsdocLines(block)
-		.map((l) => l.text)
-		.filter((l) => l && !l.startsWith('@'));
-	if (!prose.length) return false;
-	const firstIsPath = /(?:^|[\\/])[^\\/]+\.(?:c|m)?(?:js|jsx|ts|tsx)$/.test(prose[0]!);
-	return firstIsPath ? prose.slice(1).length > 0 : true;
 }
 
 /**
@@ -674,7 +767,7 @@ function hasFileDescription(block: TSDocBlock): boolean {
  * @return Tag description, or an empty string when only syntax is present.
  */
 function tagDescription(tag: string, content: string): string {
-	let description = content.trim().replace(/^\{[^}]+\}\s*/, '');
+	let description = content.trim().replace(S_CLASS_5, '');
 	if (tag.toLowerCase() === 'param' || tag.toLowerCase() === 'typeparam') description = description.replace(/^\[[^\]]+\]\s*/, '').replace(/^\S+\s*/, '');
 	return description.replace(/^[-:]\s*/, '').trim();
 }
@@ -699,7 +792,7 @@ function tsdocTagEntries(lines: TSDocLine[]): { tag: string; subject: string; de
 			n += 1;
 		}
 		const rawContent = content.join(' ').trim();
-		const subject = tag.toLowerCase() === 'param' || tag.toLowerCase() === 'typeparam' ? (rawContent.replace(/^\{[^}]+\}\s*/, '').split(/\s+/)[0] ?? '') : '';
+		const subject = tag.toLowerCase() === 'param' || tag.toLowerCase() === 'typeparam' ? (rawContent.replace(S_CLASS_5, '').split(/\s+/)[0] ?? '') : '';
 		entries.push({ tag, subject, description: tagDescription(tag, rawContent), offset: lines[idx]!.offset });
 		idx = n - 1;
 	}
@@ -707,7 +800,8 @@ function tsdocTagEntries(lines: TSDocLine[]): { tag: string; subject: string; de
 }
 
 /**
- * Audits file-header and existing TSDoc prose without inventing replacement text.
+ * Audits existing TSDoc prose without inventing replacement text. Generated file
+ * path headers are source metadata and are intentionally excluded from this audit.
  *
  * @param cfg Quality configuration used to render repository-relative paths.
  * @param file Absolute source path being inspected.
@@ -718,12 +812,8 @@ function tsdocTagEntries(lines: TSDocLine[]): { tag: string; subject: string; de
  */
 function descriptionFindingsForFile(cfg: QualityCfg, file: string, src: string, parsed: ts.SourceFile): DocumentationFinding[] {
 	const blocks = tsdocBlocks(src, parsed);
-	const header = fileHeaderBlock(src, blocks);
 	const findings: DocumentationFinding[] = [];
-	if (!header) findings.push(documentationCommentReport(file, parsed, 0, '<file header>', 'file', 'add a meaningful description to the mock-TSDoc at the top of this file', cfg));
-	else if (!hasFileDescription(header)) {
-		findings.push(documentationCommentReport(file, parsed, header.start, '<file header>', 'file', 'add a meaningful description after the file path in the mock-TSDoc header', cfg));
-	}
+	const header = fileHeaderBlock(src, blocks);
 	for (const block of blocks) {
 		if (block === header) continue;
 		const lines = tsdocLines(block);
@@ -851,6 +941,5 @@ export function documentSrcFile(cfg: QualityCfg, file: string): boolean {
 	if (!insertions.length) return false;
 	const eol = src.includes('\r\n') ? '\r\n' : '\n';
 	const updated = insertions.sort((a, b) => b - a).reduce((t, p) => `${t.slice(0, p)}/**${eol} *${eol} */${eol}${t.slice(p)}`, src);
-	writeFileSync(file, updated);
-	return true;
+	return writeValidatedSrc(file, updated);
 }

@@ -3,7 +3,6 @@
  * Verifies configuration normalization, check/autofix toggles, shared
  * analysis construction, CLI dispatch, subprocess status handling, formatter
  * batching, and the explicit command boundaries.
- *
  * Tool invocations use tiny executable fixtures that record their arguments.
  * This makes command wiring testable without installing or running a real
  * formatter, linter, compiler, or repository build.
@@ -165,10 +164,13 @@ test('runFormatter supports legacy and typed invocation forms, ignores Astro tar
 	runFormatter(cfg, ['--check', 'src/main.ts']);
 	let invocations = recordedCmds(root);
 	assert.deepEqual(invocations, [['--ignore-unknown', '--check', 'src/main.ts']]);
+	runFormatter(cfg, ['--write', 'src/main.ts']);
+	invocations = recordedCmds(root);
+	assert.deepEqual(invocations[1], ['--ignore-unknown', '--log-level', 'warn', '--write', 'src/main.ts']);
 	runFormatter(cfg, { fix: false, all: true, strict: false });
 	invocations = recordedCmds(root);
-	assert.deepEqual(invocations[1], ['--check', '--ignore-unknown', join(root, 'src/main.ts')]);
-	assert.equal(invocations.length, 2);
+	assert.deepEqual(invocations[2], ['--check', '--ignore-unknown', join(root, 'src/main.ts')]);
+	assert.equal(invocations.length, 3);
 });
 test('runFormatter divides more than five hundred source arguments into bounded subprocess batches', () => {
 	const root = fixtureRoot('terra-quality-formatter-batches-');

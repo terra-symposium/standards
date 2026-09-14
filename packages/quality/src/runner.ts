@@ -17,11 +17,11 @@ import { collapseInlineIfs } from './inline-if.js';
 import { collapseTypesAndObjects } from './collapse.js';
 import { dirname, relative, resolve, sep } from 'node:path';
 import { documentSrcFile, documentationFindings, maintainSrcFile, protectLongImports } from './documentation.js';
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { fixObjectForwarding, objectForwardingFindings } from './object-forwarding.js';
+import { fixRegexDedup, fixRepeatedClasses, regexFindings, repeatedClassFindings, uiPatternFindings } from './patterns.js';
 import { fixSingleUseTypes, writeSingleUseReport } from './single-use.js';
-import { objectForwardingFindings } from './object-forwarding.js';
-import { regexFindings, repeatedClassFindings, uiPatternFindings } from './patterns.js';
 import { securityFindings } from './security.js';
 import { spawnSync } from 'node:child_process';
 import { srcFiles, workingSrcFiles } from './files.js';
@@ -34,11 +34,14 @@ import { PROTECTED_IDENTIFIERS } from './naming.js';
 import type { DocumentationRequirements } from './documentation.js';
 
 /*//////////////////////////////////////////////////
-CONFIG
+REGEX
 //////////////////////////////////////////////////*/
 
-export type QualityCheckName = 'document' | 'format' | 'import' | 'name' | 'forward' | 'lint' | 'knip' | 'type' | 'recommend' | 'command' | 'diff' | 'alias';
-export type QualityAutofixName = 'document' | 'format' | 'name' | 'lint' | 'knip' | 'alias';
+const C_M_JS_TS_X_REGEX = /\.(?:c|m)?(?:js|ts)x?$/;
+const C_M_JS_TS_X_CLASS_2 = /\.(?:(?:c|m)?(?:js|ts)x?)$/;
+export type QualityCheckName =
+	'document' | 'format' | 'import' | 'name' | 'forward' | 'lint' | 'knip' | 'type' | 'recommend' | 'command' | 'diff' | 'alias' | 'security' | 'repeated-classes' | 'regex-dedup' | 'ui-patterns';
+export type QualityAutofixName = 'document' | 'format' | 'name' | 'lint' | 'knip' | 'alias' | 'forward' | 'repeatedClasses' | 'regexDedup';
 export type QualityCfg = {
 	root: string;
 	sourceRoots: string[];
@@ -232,11 +235,11 @@ function toolPath(cfg: QualityCfg, cfgd: string | undefined, fallback: string): 
  * @param name Short name identifying the quality stage.
  * @param detail Human-readable description of the work being performed.
  *
- * @return Nothing; the heading is written to standard output.
+ * @return Nothing; the heading is written to standard error with the other quality messages.
  */
 function qualityHeader(name: string, detail: string): void {
-	console.log(`\n=== ${name} ===`);
-	console.log(detail);
+	console.error(`\n=== ${name} ===`);
+	console.error(detail);
 }
 
 /**
@@ -258,13 +261,12 @@ function compactOutput(val: string): string[] {
  * Prints one-line output emitted by a quality subprocess.
  *
  * @param val Raw child-process output.
- * @param err Whether the output came from standard error.
  *
  * @return Nothing; each non-empty output line is printed once.
  */
-function printChildOutput(val: string | Buffer | null | undefined, err: boolean): void {
+function printChildOutput(val: string | Buffer | null | undefined): void {
 	if (!val) return;
-	for (const line of compactOutput(val.toString())) (err ? console.error : console.log)(`  ${line}`);
+	for (const line of compactOutput(val.toString())) console.error(`  ${line}`);
 }
 
 /**
@@ -276,12 +278,38 @@ function printChildOutput(val: string | Buffer | null | undefined, err: boolean)
  *
  * @return Child-process exit status, or `1` when spawning fails without a status.
  */
-function run(cfg: QualityCfg, cmd: string, args: string[]): number {
+function run(cfg: QualityCfg, cmd: string, args: string[], opts: { quietSuccess?: boolean } = {}): number {
 	const result = spawnSync(cmd, args, { cwd: cfg.root, stdio: ['inherit', 'pipe', 'pipe'], env: process.env });
-	printChildOutput(result.stdout, false);
-	printChildOutput(result.stderr, true);
+	if (!opts.quietSuccess || result.status) {
+		printChildOutput(result.stdout);
+		printChildOutput(result.stderr);
+	}
 	if (result.error) console.error(`  ${cmd} failed: ${result.error.message}`);
 	return result.status ?? 1;
+}
+
+/**
+ * Captures source text so automatic tools can report changed-file counts without
+ * replaying their successful per-file output.
+ *
+ * @param files Files modified by the automatic tool.
+ *
+ * @return Text snapshots keyed by absolute filename.
+ */
+function snapshotFiles(files: string[]): Map<string, string> {
+	return new Map(files.map((f) => [f, readFileSync(f, 'utf8')]));
+}
+
+/**
+ * Counts files whose contents differ from a prior snapshot.
+ *
+ * @param files Files to compare.
+ * @param before Initial file contents.
+ *
+ * @return Number of changed files.
+ */
+function changedFileCount(files: string[], before: Map<string, string>): number {
+	return files.filter((f) => before.get(f) !== readFileSync(f, 'utf8')).length;
 }
 
 /**
@@ -344,14 +372,16 @@ function runLint(cfg: QualityCfg, opts: QualityOptions, exhaustive = false): voi
 		...(opts.fix ? ['--fix'] : []),
 	];
 	let failed = false;
+	const before = opts.fix ? snapshotFiles(files) : undefined;
 	for (const filesBatch of batches(files)) {
-		const status = run(cfg, toolPath(cfg, cfg.tools?.eslint, 'eslint'), [...flags, ...filesBatch]);
+		const status = run(cfg, toolPath(cfg, cfg.tools?.eslint, 'eslint'), [...flags, ...filesBatch], { quietSuccess: opts.fix });
 		if (status) {
 			failed = true;
 			process.exitCode = status;
 		}
 	}
-	console.log(`  ${failed ? '✗ failed' : '✓ passed'}`);
+	if (before) console.error(`  fixed ${changedFileCount(files, before)} files`);
+	console.error(`  ${failed ? '✗ failed' : '✓ passed'}`);
 }
 
 /**
@@ -369,7 +399,7 @@ function runCfgdCmd(cfg: QualityCfg, name: string): void {
 	qualityHeader(`command:${name}`, `Running ${check.command} ${(check.args ?? []).join(' ')}`.trim());
 	const status = run(cfg, check.command, check.args ?? []);
 	if (status) process.exitCode = status;
-	console.log(`  ${status ? '✗ failed' : '✓ passed'}`);
+	console.error(`  ${status ? '✗ failed' : '✓ passed'}`);
 }
 
 /**
@@ -395,7 +425,7 @@ function runRecommendationCmds(cfg: QualityCfg): void {
 		if (!qualityRecommendationEnabled(cfg, check.name)) continue;
 		qualityHeader(`recommendation:${check.name}`, `Running ${check.command} ${(check.args ?? []).join(' ')}`.trim());
 		const status = run(cfg, check.command, check.args ?? []);
-		console.log(`  ${status ? '✗ failed (advisory)' : '✓ passed'}`);
+		console.error(`  ${status ? '✗ failed (advisory)' : '✓ passed'}`);
 	}
 }
 
@@ -412,7 +442,7 @@ function runProjectTypecheck(cfg: QualityCfg): void {
 		? run(cfg, cfg.typecheckCommand.command, cfg.typecheckCommand.args ?? [])
 		: run(cfg, toolPath(cfg, cfg.tools?.tsc, 'tsc'), ['--noEmit', '-p', cfg.tsconfig ?? 'tsconfig.json']);
 	if (status) process.exitCode = status;
-	console.log(`  ${status ? '✗ failed' : '✓ passed'}`);
+	console.error(`  ${status ? '✗ failed' : '✓ passed'}`);
 }
 
 /**
@@ -430,7 +460,7 @@ function runProjectTypecheck(cfg: QualityCfg): void {
 function repairMissingImports(cfg: QualityCfg, program: ts.Program, checker: ts.TypeChecker): void {
 	const candidates = new Map<string, ts.SourceFile[]>();
 	for (const source of program.getSourceFiles()) {
-		if (!source.fileName.startsWith(`${cfg.root}${sep}`) || !/\.(?:c|m)?(?:js|ts)x?$/.test(source.fileName)) continue;
+		if (!source.fileName.startsWith(`${cfg.root}${sep}`) || !C_M_JS_TS_X_REGEX.test(source.fileName)) continue;
 		const module = checker.getSymbolAtLocation(source);
 		for (const exported of module ? checker.getExportsOfModule(module) : []) {
 			const list = candidates.get(exported.name) ?? [];
@@ -449,7 +479,7 @@ function repairMissingImports(cfg: QualityCfg, program: ts.Program, checker: ts.
 
 	// WALKTHROUGH
 	for (const src of program.getSourceFiles()) {
-		if (!src.fileName.startsWith(`${cfg.root}${sep}`) || !/\.(?:c|m)?(?:js|ts)x?$/.test(src.fileName)) continue;
+		if (!src.fileName.startsWith(`${cfg.root}${sep}`) || !C_M_JS_TS_X_REGEX.test(src.fileName)) continue;
 		const missing = new Map<string, { source: ts.SourceFile; typeOnly: boolean }>();
 		const visit = (n: ts.Node): void => {
 			if (
@@ -507,7 +537,7 @@ function runKnip(cfg: QualityCfg, fix: boolean, exhaustive = false): void {
 		...(exhaustive ? [] : ['--no-exit-code']),
 	]);
 	if (status) process.exitCode = status;
-	console.log(`  ${status ? '✗ failed' : '✓ passed'}`);
+	console.error(`  ${status ? '✗ failed' : '✓ passed'}`);
 }
 
 /**
@@ -521,7 +551,7 @@ function runDiffCheck(cfg: QualityCfg): void {
 	qualityHeader('diff', 'Checking Git whitespace and patch errors');
 	const status = run(cfg, 'git', ['-c', 'core.pager=cat', 'diff', '--check']);
 	if (status) process.exitCode = status;
-	console.log(`  ${status ? '✗ failed' : '✓ passed'}`);
+	console.error(`  ${status ? '✗ failed' : '✓ passed'}`);
 }
 
 /**
@@ -534,7 +564,7 @@ function runDiffCheck(cfg: QualityCfg): void {
  */
 function printFindings<T>(findings: readonly T[], fmt: (finding: T) => string): void {
 	if (!findings.length) {
-		console.log('  ✓ clean');
+		console.error('  ✓ clean');
 		return;
 	}
 	console.warn(`  ${findings.length} finding${findings.length === 1 ? '' : 's'}:`);
@@ -552,9 +582,9 @@ function printFindings<T>(findings: readonly T[], fmt: (finding: T) => string): 
 function runGenericChecks(cfg: QualityCfg, analysis?: QualityAnalysis): void {
 	const checks = [
 		['security', cfg.security ? securityFindings(cfg) : []],
-		['repeated-classes', cfg.repeatedClasses ? repeatedClassFindings(cfg) : []],
+		['repeated-classes', cfg.repeatedClasses ? repeatedClassFindings(cfg, analysis) : []],
 		['regex-dedup', cfg.regexDedup ? regexFindings(cfg, analysis) : []],
-		['ui-patterns', cfg.uiPatterns ? uiPatternFindings(cfg) : []],
+		['ui-patterns', cfg.uiPatterns ? uiPatternFindings(cfg, analysis) : []],
 	] as const;
 	for (const [name, findings] of checks) {
 		qualityHeader(name, `Checking ${name.replace(/-/g, ' ')}`);
@@ -580,7 +610,7 @@ function fixNames(cfg: QualityCfg, all: boolean): void {
 	// reporting/import scope, but never apply symbol renames to it.
 	const allowed = new Set(filesFor(cfg, all).filter((f) => !isProtectedPath(f) && !f.endsWith('.astro')));
 	let program = ts.createProgram({
-		rootNames: srcFiles(cfg).filter((f) => /\.(?:(?:c|m)?(?:js|ts)x?)$/.test(f)),
+		rootNames: srcFiles(cfg).filter((f) => C_M_JS_TS_X_CLASS_2.test(f)),
 		options: {
 			allowNonTsExtensions: true,
 			allowJs: true,
@@ -597,7 +627,7 @@ function fixNames(cfg: QualityCfg, all: boolean): void {
 	// subsequent text span is anchored to the current file contents.
 	repairMissingImports(cfg, program, checker);
 	program = ts.createProgram({
-		rootNames: srcFiles(cfg).filter((f) => /\.(?:(?:c|m)?(?:js|ts)x?)$/.test(f)),
+		rootNames: srcFiles(cfg).filter((f) => C_M_JS_TS_X_CLASS_2.test(f)),
 		options: {
 			allowNonTsExtensions: true,
 			allowJs: true,
@@ -772,7 +802,7 @@ function fixNames(cfg: QualityCfg, all: boolean): void {
 	// inspecting import spans. Otherwise an import edit can land in the wrong
 	// token when a declaration changed length.
 	program = ts.createProgram({
-		rootNames: srcFiles(cfg).filter((f) => /\.(?:(?:c|m)?(?:js|ts)x?)$/.test(f)),
+		rootNames: srcFiles(cfg).filter((f) => C_M_JS_TS_X_CLASS_2.test(f)),
 		options: {
 			allowNonTsExtensions: true,
 			allowJs: true,
@@ -890,7 +920,7 @@ function runDocumentation(cfg: QualityCfg, opts: QualityOptions, args: string[],
 	const files = filesFor(cfg, opts.all);
 	const reqFiles = args.slice(1).filter((a) => !a.startsWith('-'));
 	const tgts = (reqFiles.length ? reqFiles : files).filter((f) => !f.endsWith('.astro'));
-	if (cmdOpts.fix) for (const file of tgts) if (/\.(?:c|m)?(?:js|ts)x?$/.test(file)) collapseInlineIfs(file);
+	if (cmdOpts.fix) for (const file of tgts) if (C_M_JS_TS_X_REGEX.test(file)) collapseInlineIfs(file);
 	if (cmdOpts.fix)
 		for (const file of tgts) {
 			maintainSrcFile(cfg.root, file);
@@ -928,7 +958,7 @@ export function runQualityCli(cfg: QualityCfg, args = process.argv.slice(2)): vo
 		const files = filesFor(cfg, opts.all);
 		const cmdOpts = { ...opts, fix: fix('format') };
 		const tgts = files.filter((f) => !f.endsWith('.astro'));
-		if (cmdOpts.fix) for (const file of tgts) if (/\.(?:c|m)?(?:js|ts)x?$/.test(file)) collapseInlineIfs(file);
+		if (cmdOpts.fix) for (const file of tgts) if (C_M_JS_TS_X_REGEX.test(file)) collapseInlineIfs(file);
 		if (cmdOpts.fix)
 			for (const file of tgts) {
 				maintainSrcFile(cfg.root, file);
@@ -956,7 +986,26 @@ export function runQualityCli(cfg: QualityCfg, args = process.argv.slice(2)): vo
 		return;
 	}
 	if (cmd === 'security' || cmd === 'repeated-classes' || cmd === 'regex-dedup' || cmd === 'ui-patterns') {
-		const findings = cmd === 'security' ? securityFindings(cfg) : cmd === 'repeated-classes' ? repeatedClassFindings(cfg) : cmd === 'regex-dedup' ? regexFindings(cfg) : uiPatternFindings(cfg);
+		if (cmd === 'repeated-classes' && fix('repeatedClasses')) {
+			const result = fixRepeatedClasses(cfg);
+			console.info(`  fixed ${result.fixed} class attributes${result.skipped ? `; ${result.skipped} left advisory` : ''}`);
+		}
+		if (cmd === 'regex-dedup' && fix('regexDedup')) {
+			const result = fixRegexDedup(cfg);
+			console.info(`  fixed ${result.fixed} regex literals${result.skipped ? `; ${result.skipped} left advisory` : ''}`);
+		}
+		if (cmd === 'security' || cmd === 'ui-patterns') {
+			const findings = cmd === 'security' ? securityFindings(cfg) : uiPatternFindings(cfg);
+			qualityHeader(cmd, `Checking ${cmd.replace(/-/g, ' ')}`);
+			printFindings(
+				findings as readonly GenericFinding[],
+				(finding) =>
+					`${'file' in finding ? `${finding.file}: ` : ''}${'message' in finding ? finding.message : 'value' in finding ? `${finding.count}x ${finding.value} (${finding.locations.join(', ')})` : 'source' in finding ? `${finding.count}x ${finding.source} (${finding.locations.join(', ')})` : finding.pattern}`,
+			);
+			if (findings.length) process.exitCode = 1;
+			return;
+		}
+		const findings = cmd === 'repeated-classes' ? repeatedClassFindings(cfg) : regexFindings(cfg);
 		qualityHeader(cmd, `Checking ${cmd.replace(/-/g, ' ')}`);
 		printFindings(
 			findings as readonly GenericFinding[],
@@ -991,6 +1040,19 @@ export function runQualityCli(cfg: QualityCfg, args = process.argv.slice(2)): vo
 		if (!opts.skipRecommendations) runRecommendationCmds(cfg);
 		if (fix('document') && qualityCheckEnabled(cfg, 'document')) runDocumentation(cfg, opts, ['document', ...(opts.all ? ['--all'] : []), '--quiet'], true);
 		const scoped = scopedCfg(cfg, opts.all);
+		if (fix('forward') && qualityCheckEnabled(cfg, 'forward')) {
+			const result = fixObjectForwarding(scoped);
+			if (result.fixed || result.skipped) console.info(`Forwarding fixer: ${result.fixed} exact duplicates removed${result.skipped ? `; ${result.skipped} advisory cases retained` : ''}.`);
+		}
+		if (fix('repeatedClasses') && qualityCheckEnabled(cfg, 'repeated-classes')) {
+			const result = fixRepeatedClasses(scoped);
+			if (result.fixed || result.skipped) console.info(`Class fixer: ${result.fixed} attributes replaced${result.skipped ? `; ${result.skipped} advisory cases retained` : ''}.`);
+		}
+		if (fix('regexDedup') && qualityCheckEnabled(cfg, 'regex-dedup')) {
+			const result = fixRegexDedup(scoped);
+			if (result.fixed || result.skipped) console.info(`Regex fixer: ${result.fixed} literals replaced${result.skipped ? `; ${result.skipped} advisory cases retained` : ''}.`);
+		}
+		if (opts.fix && qualityCheckEnabled(cfg, 'alias')) aliasFindings(scoped, true);
 		const analysis = createQualityAnalysis(scoped);
 		runGenericChecks(scoped, analysis);
 		if (qualityCheckEnabled(cfg, 'type') && cfg.tools?.tsc) {
@@ -1030,11 +1092,19 @@ export function runFormatter(cfg: QualityCfg, optsOrArgs: QualityOptions | strin
 	const suppliedArgs = (legacyArgs ? optsOrArgs : args).filter((a) => !['--all', '--warn', '--strict'].includes(a));
 	const hasMode = suppliedArgs.includes('--write') || suppliedArgs.includes('--check');
 	const hasIgnoreMode = suppliedArgs.some((a) => a.startsWith('--ignore-unknown'));
+	const hasLogLevel = suppliedArgs.includes('--log-level') || suppliedArgs.some((a) => a.startsWith('--log-level='));
 	const suppliedTgts = suppliedArgs.filter((a) => !a.startsWith('-') && !a.endsWith('.astro'));
-	const fmtArgs = [...(hasMode ? [] : [opts.fix ? '--write' : '--check']), ...(hasIgnoreMode ? [] : ['--ignore-unknown']), ...suppliedArgs, ...(suppliedTgts.length ? [] : filesFor(cfg, opts.all))];
+	const fmtArgs = [
+		...(hasMode ? [] : [opts.fix ? '--write' : '--check']),
+		...(hasIgnoreMode ? [] : ['--ignore-unknown']),
+		...(opts.fix && !hasLogLevel ? ['--log-level', 'warn'] : []),
+		...suppliedArgs,
+		...(suppliedTgts.length ? [] : filesFor(cfg, opts.all)),
+	];
 	const flags = fmtArgs.filter((a) => a.startsWith('-'));
 	const tgts = fmtArgs.filter((a) => !a.startsWith('-') && !a.endsWith('.astro'));
 	qualityHeader('format', `${opts.fix ? 'Fixing' : 'Checking'} formatting in ${tgts.length} source files`);
+	const before = opts.fix ? snapshotFiles(tgts) : undefined;
 	if (opts.fix) {
 		const knownFiles = filesFor(cfg, opts.all);
 		const directTgts = suppliedTgts.map((t) => resolve(cfg.root, t));
@@ -1043,13 +1113,14 @@ export function runFormatter(cfg: QualityCfg, optsOrArgs: QualityOptions | strin
 	}
 	let failed = false;
 	for (const tgtBatch of batches(tgts)) {
-		const status = run(cfg, toolPath(cfg, cfg.tools?.prettier, 'prettier'), [...flags, ...tgtBatch]);
+		const status = run(cfg, toolPath(cfg, cfg.tools?.prettier, 'prettier'), [...flags, ...tgtBatch], { quietSuccess: opts.fix });
 		if (status) {
 			failed = true;
 			process.exitCode = status;
 		}
 	}
-	console.log(`  ${failed ? '✗ failed' : '✓ passed'}`);
+	if (before) console.error(`  fixed ${changedFileCount(tgts, before)} files`);
+	console.error(`  ${failed ? '✗ failed' : '✓ passed'}`);
 }
 
 /**
@@ -1086,9 +1157,9 @@ export function runTypecheck(cfg: QualityCfg, args: string[] = []): void {
 		: ['--noEmit', '-p', cfg.tsconfig ?? 'tsconfig.json', ...suppliedFiles];
 	qualityHeader('typecheck', `Checking ${args.length ? 'the selected source files' : 'the configured TypeScript project'}`);
 	const result = spawnSync(toolPath(cfg, tsc, 'tsc'), compilerArgs, { cwd: cfg.root, stdio: ['inherit', 'pipe', 'pipe'] });
-	printChildOutput(result.stdout, false);
-	printChildOutput(result.stderr, true);
+	printChildOutput(result.stdout);
+	printChildOutput(result.stderr);
 	if (result.status) process.exitCode = result.status ?? 1;
-	console.log(`  ${result.status ? '✗ failed' : '✓ passed'}`);
+	console.error(`  ${result.status ? '✗ failed' : '✓ passed'}`);
 }
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) runQualityFromConfig();
+if (process.argv[1] && realpathSync(resolve(process.argv[1])) === realpathSync(fileURLToPath(import.meta.url))) runQualityFromConfig();

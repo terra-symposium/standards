@@ -1,7 +1,6 @@
 /**
  * packages/quality/test/support.mjs
  * Small, isolated fixture helpers shared by the quality-package tests.
- *
  * Every fixture is created beneath the operating system's temporary directory.
  * Tests therefore exercise real filesystem and process boundaries without
  * modifying the Terra Shared checkout or relying on one test's files.

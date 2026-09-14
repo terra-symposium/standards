@@ -97,7 +97,7 @@ test('protected path and filename predicates handle generated folders, declarati
 	assert.ok(PROTECTED_IDENTIFIERS.has('Request'));
 });
 test('declaration predicates distinguish repository-owned declarations, public contracts, parameter properties, and owning scopes', () => {
-	const source = `
+	const src = `
 const localValue = 1;
 export const publicValue = 2;
 function localFunction(parameter: string) { return parameter; }
@@ -111,7 +111,7 @@ export type PublicType = string;
 const expression = function namedExpression() { return true; };
 class WithProperty { constructor(readonly destination: string) {} }
 `;
-	const { file, nodes } = identifiers(source);
+	const { file, nodes } = identifiers(src);
 	const declaration = (name) => nodes.find((n) => n.text === name && n.parent.name === n);
 	for (const name of ['localValue', 'localFunction', 'LocalClass', 'LocalContract', 'LocalType', 'namedExpression']) assert.equal(isRenamableDeclaration(declaration(name)), true, name);
 	for (const name of ['publicValue', 'publicFunction', 'PublicClass', 'PublicContract', 'PublicType']) assert.equal(isRenamableDeclaration(declaration(name)), false, name);

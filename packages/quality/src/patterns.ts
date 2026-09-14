@@ -20,11 +20,13 @@ import { pathToFileURL } from 'node:url';
 import type { QualityAnalysis, QualityCfg } from './runner.js';
 
 /*//////////////////////////////////////////////////
-CONFIG
+REGEX
 //////////////////////////////////////////////////*/
 
+const TEST_TESTS_NODE_MODULES_DIST_BUILD_COVERAGE_REGEX = /(?:^|\/)(?:test|tests|node_modules|dist|build|coverage)(?:\/|$)/;
 export type RepeatedClassFinding = { value: string; count: number; locations: string[] };
 export type UiPatternFinding = { file: string; pattern: string };
+export type PatternFixResult = { fixed: number; skipped: number };
 
 /*//////////////////////////////////////////////////
 REGEX
@@ -43,23 +45,138 @@ HELPERS
  *
  * @return Repeated static class strings that meet the configured minimum count.
  */
-export function repeatedClassFindings(cfg: QualityCfg): RepeatedClassFinding[] {
+export function repeatedClassFindings(cfg: QualityCfg, analysis?: QualityAnalysis): RepeatedClassFinding[] {
 	const settings = cfg.repeatedClasses ?? {};
 	const minimum = settings.minimumCount ?? 3;
 	const exts = new Set(settings.extensions ?? ['.astro', '.html', '.js', '.jsx', '.ts', '.tsx']);
 	const ignored = new Set(['test', 'tests', ...(settings.ignoredDirectories ?? ['node_modules', 'dist', 'build', 'coverage'])]);
 	const vals = new Map<string, string[]>();
-	for (const file of srcFiles({ ...cfg, extensions: [...exts] })) {
+	for (const file of (analysis?.files ?? srcFiles({ ...cfg, extensions: [...exts] })).filter((f) => exts.has(f.slice(f.lastIndexOf('.'))))) {
 		if ([...ignored].some((d) => file.split('/').includes(d))) continue;
-		const source = readFileSync(file, 'utf8');
-		for (const match of source.matchAll(/\b(?:class|className)\s*=\s*(['"])([^'"\n]+)\1/g)) {
+		const src = analysis?.texts.get(file) ?? readFileSync(file, 'utf8');
+		for (const match of src.matchAll(/\b(?:class|className)\s*=\s*(['"])([^'"\n]+)\1/g)) {
 			const val = match[2].replace(/\s+/g, ' ').trim();
 			if (val.includes('{') || val.split(' ').length < 2) continue;
-			const location = `${displayPath(cfg, file)}:${source.slice(0, match.index ?? 0).split('\n').length}`;
+			const location = `${displayPath(cfg, file)}:${src.slice(0, match.index ?? 0).split('\n').length}`;
 			vals.set(val, [...(vals.get(val) ?? []), location]);
 		}
 	}
 	return [...vals.entries()].filter(([, l]) => l.length >= minimum).map(([v, l]) => ({ value: v, count: l.length, locations: l }));
+}
+
+/**
+ * Converts a static class string into a stable, collision-resistant constant identifier.
+ *
+ * @param val Normalized class string being named.
+ * @param used Identifiers already present in the file.
+ *
+ * @return Upper-case identifier suitable for a generated class constant.
+ */
+function classConstName(val: string, used: Set<string>): string {
+	const words = val
+		.split(/\s+/)
+		.map((t) => t.replace(/[^A-Za-z0-9]+/g, '_').replace(/^_+|_+$/g, ''))
+		.filter(Boolean);
+	let name = `${words.join('_') || 'SHARED'}_CLASS`.toUpperCase();
+	if (/^\d/.test(name)) name = `CLASS_${name}`;
+	if (name.length > 80)
+		name = `${name.slice(0, 70)}_${Math.abs([...val].reduce((n, c) => (n * 31 + c.charCodeAt(0)) | 0, 0))
+			.toString(36)
+			.toUpperCase()}`;
+	let suffix = 2;
+	while (used.has(name)) name = `${name}_${suffix++}`;
+	used.add(name);
+	return name;
+}
+
+/**
+ * Adds generated declarations to the existing CONFIG boundary without changing imports or prose.
+ *
+ * @param src Source text to update.
+ * @param label Generated subgroup label.
+ * @param declarations Constant declarations to insert.
+ *
+ * @return Source text containing the generated subgroup, or the original source when no CONFIG group exists.
+ */
+function insertCfgGroup(src: string, label: string, declarations: string[]): string {
+	if (!declarations.length) return src;
+	const cfg = /\/\*\/{10,}\r?\n[ \t]*CONFIG[ \t]*\r?\n[ \t]*\/{10,}\*\//.exec(src);
+	if (!cfg) return src;
+	const at = cfg.index + cfg[0].length;
+	const eol = src.includes('\r\n') ? '\r\n' : '\n';
+	const group = [`/*${'/'.repeat(50)}`, label, `${'/'.repeat(50)}*/`, ...declarations].join(eol);
+	return `${src.slice(0, at)}${eol}${group}${eol}${src.slice(at)}`;
+}
+
+/**
+ * Writes a generated JavaScript-family update only after TypeScript accepts its syntax.
+ * Astro files are validated structurally by the narrowly scoped attribute edits instead.
+ *
+ * @param file Source file to update.
+ * @param src Candidate source text.
+ *
+ * @return `true` when the candidate was written.
+ */
+function writePatternSrc(file: string, src: string): boolean {
+	if (!file.endsWith('.astro')) {
+		if (ts.transpileModule(src, { fileName: file, reportDiagnostics: true, compilerOptions: { allowJs: true, jsx: ts.JsxEmit.Preserve, target: ts.ScriptTarget.ESNext } }).diagnostics?.length)
+			return false;
+	}
+	writeFileSync(file, src);
+	return true;
+}
+
+/**
+ * Replaces repeated static class attributes with file-local constants in the CONFIG/CLASSES group.
+ * Dynamic expressions, HTML files, and files without an existing CONFIG boundary are left unchanged.
+ *
+ * @param cfg Quality configuration defining the class threshold and source scope.
+ * @param analysis Optional shared analysis context used for discovery.
+ *
+ * @return Counts of replacements made and candidates deliberately left advisory.
+ */
+export function fixRepeatedClasses(cfg: QualityCfg, analysis?: QualityAnalysis): PatternFixResult {
+	const settings = cfg.repeatedClasses ?? {};
+	const minimum = settings.minimumCount ?? 3;
+	const exts = new Set(settings.extensions ?? ['.astro', '.html', '.js', '.jsx', '.ts', '.tsx']);
+	let fixed = 0;
+	let skipped = 0;
+	for (const file of analysis?.files ?? srcFiles({ ...cfg, extensions: [...exts] })) {
+		if (!exts.has(file.slice(file.lastIndexOf('.'))) || TEST_TESTS_NODE_MODULES_DIST_BUILD_COVERAGE_REGEX.test(file)) continue;
+		if (file.endsWith('.html')) continue;
+		const source = analysis?.texts.get(file) ?? readFileSync(file, 'utf8');
+		const matches = [...source.matchAll(/\b(class|className)(\s*=\s*)(['"])([^'"\n]+)\3/g)].map((m) => ({ match: m, value: m[4]!.replace(/\s+/g, ' ').trim() }));
+		const groups = new Map<string, typeof matches>();
+		for (const entry of matches) if (!entry.value.includes('{') && entry.value.split(' ').length >= 2) groups.set(entry.value, [...(groups.get(entry.value) ?? []), entry]);
+		const candidates = [...groups.entries()].filter(([, e]) => e.length >= minimum);
+		if (!candidates.length) continue;
+		const used = new Set<string>();
+		const parsed = analysis?.sources.get(file) ?? ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+		parsed.forEachChild((n) => {
+			if (!ts.isVariableStatement(n)) return;
+			for (const declaration of n.declarationList.declarations) if (ts.isIdentifier(declaration.name)) used.add(declaration.name.text);
+		});
+		const declarations: string[] = [];
+		const edits: Array<{ start: number; end: number; replacement: string }> = [];
+		for (const [val, entries] of candidates) {
+			const name = classConstName(val, used);
+			declarations.push(`const ${name} = '${val.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}';`);
+			for (const { match } of entries) edits.push({ start: match.index!, end: match.index! + match[0].length, replacement: `${match[1]}${match[2]}{${name}}` });
+			fixed += entries.length;
+		}
+		let updated = source;
+		for (const edit of edits.sort((a, b) => b.start - a.start)) updated = `${updated.slice(0, edit.start)}${edit.replacement}${updated.slice(edit.end)}`;
+		const withGroup = insertCfgGroup(updated, 'CLASSES', declarations);
+		const candidateCount = candidates.reduce((n, [, e]) => n + e.length, 0);
+		if (withGroup === updated) {
+			fixed -= candidateCount;
+			skipped += candidateCount;
+		} else if (!writePatternSrc(file, withGroup)) {
+			fixed -= candidateCount;
+			skipped += candidateCount;
+		}
+	}
+	return { fixed, skipped };
 }
 
 /**
@@ -69,17 +186,19 @@ export function repeatedClassFindings(cfg: QualityCfg): RepeatedClassFinding[] {
  *
  * @return Matching file/pattern pairs that should use shared UI primitives.
  */
-export function uiPatternFindings(cfg: QualityCfg): UiPatternFinding[] {
+export function uiPatternFindings(cfg: QualityCfg, analysis?: QualityAnalysis): UiPatternFinding[] {
 	const settings = cfg.uiPatterns ?? {};
 	const patterns = (settings.forbidden ?? []).map((p) => [p, new RegExp(p, 'm')] as const);
 	const exts = settings.extensions ?? ['.astro', '.html', '.jsx', '.tsx'];
 	const ignored = new Set(settings.ignoredFiles ?? []);
-	return srcFiles({ ...cfg, extensions: exts }).flatMap((f) => {
-		const name = displayPath(cfg, f);
-		if (ignored.has(name)) return [];
-		const src = readFileSync(f, 'utf8');
-		return patterns.filter(([, p]) => p.test(src)).map(([p]) => ({ file: name, pattern: p }));
-	});
+	return (analysis?.files ?? srcFiles({ ...cfg, extensions: exts }))
+		.filter((f) => exts.includes(f.slice(f.lastIndexOf('.'))))
+		.flatMap((f) => {
+			const name = displayPath(cfg, f);
+			if (ignored.has(name)) return [];
+			const src = analysis?.texts.get(f) ?? readFileSync(f, 'utf8');
+			return patterns.filter(([, p]) => p.test(src)).map(([p]) => ({ file: name, pattern: p }));
+		});
 }
 
 /*//////////////////////////////////////////////////
@@ -287,4 +406,63 @@ export function regexFindings(cfg: QualityCfg, analysis?: QualityAnalysis): Rege
 		visit(ast);
 	}
 	return [...vals.entries()].filter(([, l]) => l.length >= minimum).map(([s, l]) => ({ source: s, count: l.length, locations: l }));
+}
+
+/**
+ * Replaces duplicate non-stateful regular-expression literals with file-local CONFIG/REGEX constants.
+ * Stateful expressions and constructor calls remain advisory because shared identity can alter lastIndex behavior.
+ *
+ * @param cfg Quality configuration defining the regex threshold and source scope.
+ * @param analysis Optional shared analysis context used for discovery.
+ *
+ * @return Counts of literal replacements made and candidates left advisory.
+ */
+export function fixRegexDedup(cfg: QualityCfg, analysis?: QualityAnalysis): PatternFixResult {
+	const settings = cfg.regexDedup ?? {};
+	const minimum = settings.minimumCount ?? 2;
+	const exts = new Set(settings.extensions ?? ['.js', '.jsx', '.mjs', '.ts', '.tsx', '.mts', '.cts']);
+	let fixed = 0;
+	let skipped = 0;
+	for (const file of analysis?.files ?? srcFiles({ ...cfg, extensions: [...exts] })) {
+		if (!exts.has(file.slice(file.lastIndexOf('.'))) || TEST_TESTS_NODE_MODULES_DIST_BUILD_COVERAGE_REGEX.test(file)) continue;
+		const source = analysis?.texts.get(file) ?? readFileSync(file, 'utf8');
+		const parsed = analysis?.sources.get(file) ?? ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+		const groups = new Map<string, ts.RegularExpressionLiteral[]>();
+		const visit = (node: ts.Node): void => {
+			if (ts.isRegularExpressionLiteral(node)) {
+				const text = node.getText(parsed);
+				const flags = text.slice(text.lastIndexOf('/') + 1);
+				if (!flags.includes('g') && !flags.includes('y')) groups.set(text, [...(groups.get(text) ?? []), node]);
+			}
+			ts.forEachChild(node, visit);
+		};
+		visit(parsed);
+		const candidates = [...groups.entries()].filter(([, n]) => n.length >= minimum);
+		if (!candidates.length) continue;
+		const used = new Set<string>();
+		parsed.forEachChild((n) => {
+			if (!ts.isVariableStatement(n)) return;
+			for (const declaration of n.declarationList.declarations) if (ts.isIdentifier(declaration.name)) used.add(declaration.name.text);
+		});
+		const declarations: string[] = [];
+		const edits: Array<{ start: number; end: number; replacement: string }> = [];
+		for (const [literal, nodes] of candidates) {
+			const name = classConstName(literal.replace(/\W+/g, '_'), used).replace(/_CLASS$/, '_REGEX');
+			declarations.push(`const ${name} = ${literal};`);
+			for (const node of nodes) edits.push({ start: node.getStart(parsed), end: node.end, replacement: name });
+			fixed += nodes.length;
+		}
+		let updated = source;
+		for (const edit of edits.sort((a, b) => b.start - a.start)) updated = `${updated.slice(0, edit.start)}${edit.replacement}${updated.slice(edit.end)}`;
+		const withGroup = insertCfgGroup(updated, 'REGEX', declarations);
+		const candidateCount = candidates.reduce((n, [, v]) => n + v.length, 0);
+		if (withGroup === updated) {
+			fixed -= candidateCount;
+			skipped += candidateCount;
+		} else if (!writePatternSrc(file, withGroup)) {
+			fixed -= candidateCount;
+			skipped += candidateCount;
+		}
+	}
+	return { fixed, skipped };
 }
