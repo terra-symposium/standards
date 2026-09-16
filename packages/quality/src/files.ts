@@ -42,7 +42,7 @@ export function srcFiles(cfg: QualityCfg): string[] {
 	// Quality stages can rename or generate source files. Do not reuse a stale
 	// inventory after a discovered path disappears (for example, naming moves a
 	// legacy page into its canonical route directory).
-	if (cached && cached.every((file) => existsSync(file))) return cached;
+	if (cached && cached.every((f) => existsSync(f))) return cached;
 	if (cached) fileCache.delete(cacheKey);
 	const roots = [...cfg.sourceRoots, ...(cfg.includeRoots ?? [])];
 	const exts = new Set(cfg.extensions);

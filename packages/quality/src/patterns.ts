@@ -54,6 +54,9 @@ export function repeatedClassFindings(cfg: QualityCfg, analysis?: QualityAnalysi
 	for (const file of (analysis?.files ?? srcFiles({ ...cfg, extensions: [...exts] })).filter((f) => exts.has(f.slice(f.lastIndexOf('.'))))) {
 		if ([...ignored].some((d) => file.split('/').includes(d))) continue;
 		const src = analysis?.texts.get(file) ?? readFileSync(file, 'utf8');
+		// Markup embedded in a template literal is generated data, not a live
+		// attribute. The text-only inventory cannot safely rewrite it.
+		if (src.includes('`')) continue;
 		const vals = new Map<string, string[]>();
 		for (const match of src.matchAll(/\b(?:class|className)\s*=\s*(['"])([^'"\n]+)\1/g)) {
 			const val = match[2].replace(/\s+/g, ' ').trim();
@@ -61,7 +64,7 @@ export function repeatedClassFindings(cfg: QualityCfg, analysis?: QualityAnalysi
 			const location = `${displayPath(cfg, file)}:${src.slice(0, match.index ?? 0).split('\n').length}`;
 			vals.set(val, [...(vals.get(val) ?? []), location]);
 		}
-		findings.push(...[...vals.entries()].filter(([, l]) => l.length >= minimum).map(([value, locations]) => ({ value, count: locations.length, locations })));
+		findings.push(...[...vals.entries()].filter(([, l]) => l.length >= minimum).map(([v, l]) => ({ value: v, count: l.length, locations: l })));
 	}
 	return findings;
 }
@@ -89,6 +92,25 @@ function classConstName(val: string, used: Set<string>): string {
 	while (used.has(name)) name = `${name}_${suffix++}`;
 	used.add(name);
 	return name;
+}
+
+/**
+ * Determines whether a source offset is inside a JavaScript template literal.
+ * Template-generated markup is data, so replacing its class text with a source
+ * identifier would change the generated markup rather than reference a value.
+ *
+ * @param src Source text containing the candidate match.
+ * @param offset Candidate offset in the source text.
+ *
+ * @return Whether the offset is enclosed by an unescaped backtick.
+ */
+function isInsideTemplateLiteral(src: string, offset: number): boolean {
+	let open = false;
+	for (let i = 0; i < offset; i++) {
+		if (src[i] !== '`' || (i > 0 && src[i - 1] === '\\')) continue;
+		open = !open;
+	}
+	return open;
 }
 
 /**
@@ -165,14 +187,24 @@ export function fixRepeatedClasses(cfg: QualityCfg, analysis?: QualityAnalysis):
 	for (const file of analysis?.files ?? srcFiles({ ...cfg, extensions: [...exts] })) {
 		if (!exts.has(file.slice(file.lastIndexOf('.'))) || TEST_TESTS_NODE_MODULES_DIST_BUILD_COVERAGE_REGEX.test(file)) continue;
 		if (file.endsWith('.html')) continue;
-		const source = analysis?.texts.get(file) ?? readFileSync(file, 'utf8');
-		const matches = [...source.matchAll(/\b(class|className)(\s*=\s*)(['"])([^'"\n]+)\3/g)].map((m) => ({ match: m, value: m[4]!.replace(/\s+/g, ' ').trim() }));
+		const src = analysis?.texts.get(file) ?? readFileSync(file, 'utf8');
+		// A text matcher cannot safely distinguish live JSX/HTML attributes from
+		// markup nested in template literals (including nested interpolations).
+		// Leave those files advisory rather than risking a literal `{CONST}` being
+		// written into generated output.
+		if (src.includes('`')) {
+			skipped += 1;
+			continue;
+		}
+		const matches = [...src.matchAll(/\b(class|className)(\s*=\s*)(['"])([^'"\n]+)\3/g)]
+			.filter((m) => !isInsideTemplateLiteral(src, m.index ?? 0))
+			.map((m) => ({ match: m, value: m[4]!.replace(/\s+/g, ' ').trim() }));
 		const groups = new Map<string, typeof matches>();
 		for (const entry of matches) if (!entry.value.includes('{') && entry.value.split(' ').length >= 2) groups.set(entry.value, [...(groups.get(entry.value) ?? []), entry]);
 		const candidates = [...groups.entries()].filter(([, e]) => e.length >= minimum);
 		if (!candidates.length) continue;
 		const used = new Set<string>();
-		const parsed = analysis?.sources.get(file) ?? ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+		const parsed = analysis?.sources.get(file) ?? ts.createSourceFile(file, src, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
 		parsed.forEachChild((n) => {
 			if (!ts.isVariableStatement(n)) return;
 			for (const declaration of n.declarationList.declarations) if (ts.isIdentifier(declaration.name)) used.add(declaration.name.text);
@@ -185,7 +217,7 @@ export function fixRepeatedClasses(cfg: QualityCfg, analysis?: QualityAnalysis):
 			for (const { match } of entries) edits.push({ start: match.index!, end: match.index! + match[0].length, replacement: `${match[1]}${match[2]}{${name}}` });
 			fixed += entries.length;
 		}
-		let updated = source;
+		let updated = src;
 		for (const edit of edits.sort((a, b) => b.start - a.start)) updated = `${updated.slice(0, edit.start)}${edit.replacement}${updated.slice(edit.end)}`;
 		const withGroup = insertCfgGroup(updated, 'CLASSES', declarations, file);
 		const candidateCount = candidates.reduce((n, [, e]) => n + e.length, 0);
@@ -426,7 +458,7 @@ export function regexFindings(cfg: QualityCfg, analysis?: QualityAnalysis): Rege
 			ts.forEachChild(node, visit);
 		};
 		visit(ast);
-		findings.push(...[...vals.entries()].filter(([, l]) => l.length >= minimum).map(([source, locations]) => ({ source, count: locations.length, locations })));
+		findings.push(...[...vals.entries()].filter(([, l]) => l.length >= minimum).map(([s, l]) => ({ source: s, count: l.length, locations: l })));
 	}
 	return findings;
 }
@@ -448,8 +480,8 @@ export function fixRegexDedup(cfg: QualityCfg, analysis?: QualityAnalysis): Patt
 	let skipped = 0;
 	for (const file of analysis?.files ?? srcFiles({ ...cfg, extensions: [...exts] })) {
 		if (!exts.has(file.slice(file.lastIndexOf('.'))) || TEST_TESTS_NODE_MODULES_DIST_BUILD_COVERAGE_REGEX.test(file)) continue;
-		const source = analysis?.texts.get(file) ?? readFileSync(file, 'utf8');
-		const parsed = analysis?.sources.get(file) ?? ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+		const src = analysis?.texts.get(file) ?? readFileSync(file, 'utf8');
+		const parsed = analysis?.sources.get(file) ?? ts.createSourceFile(file, src, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
 		const groups = new Map<string, ts.RegularExpressionLiteral[]>();
 		const visit = (node: ts.Node): void => {
 			if (ts.isRegularExpressionLiteral(node)) {
@@ -472,11 +504,15 @@ export function fixRegexDedup(cfg: QualityCfg, analysis?: QualityAnalysis): Patt
 			const name = classConstName(literal.replace(/\W+/g, '_'), used).replace(/_CLASS$/, '_REGEX');
 			const flags = literal.slice(literal.lastIndexOf('/') + 1);
 			const stateful = flags.includes('g') || flags.includes('y');
-			declarations.push(`const ${name} = ${stateful ? `() => ${literal}` : literal};`);
-			for (const node of nodes) edits.push({ start: node.getStart(parsed), end: node.end, replacement: stateful ? `${name}()` : name });
+			if (stateful) {
+				skipped += nodes.length;
+				continue;
+			}
+			declarations.push(`const ${name} = ${literal};`);
+			for (const node of nodes) edits.push({ start: node.getStart(parsed), end: node.end, replacement: name });
 			fixed += nodes.length;
 		}
-		let updated = source;
+		let updated = src;
 		for (const edit of edits.sort((a, b) => b.start - a.start)) updated = `${updated.slice(0, edit.start)}${edit.replacement}${updated.slice(edit.end)}`;
 		const withGroup = insertCfgGroup(updated, 'REGEX', declarations, file);
 		const candidateCount = candidates.reduce((n, [, v]) => n + v.length, 0);

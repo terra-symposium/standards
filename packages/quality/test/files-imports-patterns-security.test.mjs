@@ -158,8 +158,8 @@ test('UI pattern detection applies configured extensions and ignored repository-
 	});
 	const findings = uiPatternFindings(cfg);
 	assert.equal(findings.length, 2);
-	assert.deepEqual(findings.map((finding) => finding.file), ['src/notes.html', 'src/visible.tsx']);
-	assert.ok(findings.every((finding) => String(finding.pattern) === '/<button\\b/m'));
+	assert.deepEqual(findings.map((f) => f.file), ['src/notes.html', 'src/visible.tsx']);
+	assert.ok(findings.every((f) => String(f.pattern) === '/<button\\b/m'));
 });
 
 test('regex deduplication inventories literals and RegExp constructors across configured source files', () => {
@@ -185,8 +185,8 @@ test('regex deduplication inventories literals and RegExp constructors across co
 });
 
 test('Tailwind canonical diagnostics support missing configuration, missing stylesheets, skipped v4 packages, fixes, and nested stylesheet loading', async () => {
-	const noConfig = createQualityCfg({ root: fixtureRoot('terra-quality-tailwind-none-'), sourceRoots: ['src'], extensions: ['.tsx'] });
-	assert.equal(await runTailwindCanonical(noConfig), 0);
+	const noCfg = createQualityCfg({ root: fixtureRoot('terra-quality-tailwind-none-'), sourceRoots: ['src'], extensions: ['.tsx'] });
+	assert.equal(await runTailwindCanonical(noCfg), 0);
 
 	const missingStylesheetRoot = fixtureRoot('terra-quality-tailwind-missing-style-');
 	fixtureFile(missingStylesheetRoot, 'package.json', '{}');
@@ -207,7 +207,7 @@ test('Tailwind canonical diagnostics support missing configuration, missing styl
 	return { canonicalizeCandidates(candidates) { return candidates.map((candidate) => candidate === 'text-muted' ? 'text-foreground' : candidate); } };
 }\n`,
 	);
-	const source = fixtureFile(
+	const src = fixtureFile(
 		root,
 		'src/view.tsx',
 		`export const view = <div className="text-muted" />;
@@ -222,7 +222,7 @@ void [view, template, composed];
 	assert.equal(fixtureText(root, 'src/view.tsx').split('text-muted').length - 1, 1, 'the dynamic interpolation remains intentionally untouched');
 	assert.equal(fixtureText(root, 'src/view.tsx').split('text-foreground').length - 1, 4);
 	assert.equal(await runTailwindCanonical(cfg), 0);
-	assert.ok(source.endsWith('void [view, template, composed];\n'));
+	assert.ok(src.endsWith('void [view, template, composed];\n'));
 });
 
 test('Tailwind canonical diagnostics cleanly skip a package without the unstable v4 API', async () => {
@@ -255,7 +255,7 @@ test('security checks detect environment files, forbidden terms/imports, client 
 	});
 	const findings = securityFindings(cfg);
 	assert.deepEqual(
-		findings.map((finding) => finding.message),
+		findings.map((f) => f.message),
 		[
 			'environment files must not be committed',
 			'forbidden term matches /password/i',
@@ -265,7 +265,7 @@ test('security checks detect environment files, forbidden terms/imports, client 
 			'process.env access is outside an allowed runtime root',
 		],
 	);
-	assert.deepEqual(findings.map((finding) => finding.file), ['.env.local', 'src/client/view.ts', 'src/client/view.ts', 'src/client/view.ts', 'src/server/view.ts', 'src/server/view.ts']);
+	assert.deepEqual(findings.map((f) => f.file), ['.env.local', 'src/client/view.ts', 'src/client/view.ts', 'src/client/view.ts', 'src/server/view.ts', 'src/server/view.ts']);
 });
 
 test('security checks honor tracked visibility and runtime-root exceptions in a Git worktree', () => {

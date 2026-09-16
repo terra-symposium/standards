@@ -271,6 +271,10 @@ export function renameId(name: string, kind: RenameKind = {}): string {
  * @return Callback rename context when the parameter is safely concise-able; otherwise `undefined`.
  */
 function callbackKind(n: ts.Identifier): RenameKind | undefined {
+	// JSX component bindings and explicit destructuring aliases encode syntax or
+	// public property names; shortening them can produce invalid JSX or change
+	// the inferred shape of a discriminated union.
+	if (/^[A-Z]/.test(n.text) || (ts.isBindingElement(n.parent) && n.parent.propertyName)) return undefined;
 	const param = ts.findAncestor(n, ts.isParameter);
 	if (!param) return undefined;
 	const callback = ts.findAncestor(
@@ -580,8 +584,8 @@ export function aliasFindings(cfg: QualityCfg, analysisOrFix: QualityAnalysis | 
 		}
 	}
 	const findings: AliasFinding[] = [];
-	for (const source of program.getSourceFiles()) {
-		if (!files.includes(source.fileName)) continue;
+	for (const src of program.getSourceFiles()) {
+		if (!files.includes(src.fileName)) continue;
 		const aliases: Array<{ statement: ts.Statement; name: ts.Identifier; symbol: ts.Symbol; replacement: string; kind: 'const' | 'type' }> = [];
 		const inspect = (node: ts.Node): void => {
 			if (
@@ -602,15 +606,17 @@ export function aliasFindings(cfg: QualityCfg, analysisOrFix: QualityAnalysis | 
 					: undefined;
 				if (
 					tgt &&
+					!ts.isPropertyAccessExpression(tgt) &&
+					!ts.isElementAccessExpression(tgt) &&
 					symbol &&
 					targetSymbol &&
 					symbol !== targetSymbol &&
-					!tgt.getText(source).includes('?.') &&
+					!tgt.getText(src).includes('?.') &&
 					!exportedSymbols.has(symbol) &&
 					!exportedNames.has(name.text) &&
 					!node.modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword)
 				)
-					aliases.push({ statement: node, name, symbol, replacement: tgt.getText(source), kind: 'const' });
+					aliases.push({ statement: node, name, symbol, replacement: tgt.getText(src), kind: 'const' });
 			}
 			if (ts.isTypeAliasDeclaration(node) && node.typeParameters === undefined && ts.isTypeReferenceNode(node.type) && node.type.typeArguments === undefined) {
 				const symbol = checker.getSymbolAtLocation(node.name);
@@ -621,13 +627,13 @@ export function aliasFindings(cfg: QualityCfg, analysisOrFix: QualityAnalysis | 
 					symbol !== targetSymbol &&
 					!exportedSymbols.has(symbol) &&
 					!exportedNames.has(node.name.text) &&
-					!externallyReferenced(files, srcTexts, source.fileName, node.name.text)
+					!externallyReferenced(files, srcTexts, src.fileName, node.name.text)
 				)
-					aliases.push({ statement: node, name: node.name, symbol, replacement: node.type.getText(source), kind: 'type' });
+					aliases.push({ statement: node, name: node.name, symbol, replacement: node.type.getText(src), kind: 'type' });
 			}
 			ts.forEachChild(node, inspect);
 		};
-		inspect(source);
+		inspect(src);
 		if (!aliases.length) continue;
 		const edits: Array<{ start: number; end: number; text: string }> = [];
 		const symbols = new Map(aliases.map((a) => [a.symbol, a]));
@@ -641,18 +647,18 @@ export function aliasFindings(cfg: QualityCfg, analysisOrFix: QualityAnalysis | 
 				const alias = symbols.get(symbol as ts.Symbol);
 				if (alias && node !== alias.name)
 					edits.push({
-						start: node.getStart(source),
+						start: node.getStart(src),
 						end: node.end,
 						text: ts.isShorthandPropertyAssignment(node.parent) && node.parent.name === node ? `${node.text}: ${alias.replacement}` : alias.replacement,
 					});
 			}
 			ts.forEachChild(node, visit);
 		};
-		visit(source);
+		visit(src);
 		for (const alias of aliases) {
 			findings.push({
-				file: displayPath(cfg, source.fileName),
-				line: source.getLineAndCharacterOfPosition(alias.name.getStart(source)).line + 1,
+				file: displayPath(cfg, src.fileName),
+				line: src.getLineAndCharacterOfPosition(alias.name.getStart(src)).line + 1,
 				kind: alias.kind,
 				name: alias.name.text,
 				replacement: alias.replacement,
@@ -660,9 +666,9 @@ export function aliasFindings(cfg: QualityCfg, analysisOrFix: QualityAnalysis | 
 			edits.push({ start: alias.statement.getFullStart(), end: alias.statement.end, text: '' });
 		}
 		if (fix) {
-			const original = readFileSync(source.fileName, 'utf8');
+			const original = readFileSync(src.fileName, 'utf8');
 			const updated = edits.sort((a, b) => b.start - a.start).reduce((t, e) => `${t.slice(0, e.start)}${e.text}${t.slice(e.end)}`, original);
-			if (updated !== original) writeFileSync(source.fileName, updated);
+			if (updated !== original) writeFileSync(src.fileName, updated);
 		}
 	}
 	return findings;

@@ -14,7 +14,7 @@ IMPORTS
 // API
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { createQualityCfg, fixSingleUseTypes, singleUseFindings, writeSingleUseReport } from '../dist/index.js';
+import { createQualityCfg, fixSingleUseDeclarations, fixSingleUseTypes, singleUseFindings, writeSingleUseReport } from '../dist/index.js';
 import { existsSync, readFileSync } from 'node:fs';
 import { fixtureFile, fixtureRoot, fixtureText } from './support.mjs';
 import { join } from 'node:path';
@@ -63,7 +63,7 @@ void twice;
 	for (const name of ['pureObject', 'pureArray', 'pureString', 'pureNumber', 'pureTrue', 'pureFalse', 'pureNull']) assert.equal(findings.get(name).decision, 'INLINE', name);
 	for (const name of ['runtimeCall', 'runtimeNew', 'runtimeAwait', 'arrowFunction', 'expressionFunction', 'helper', 'publicHelper']) assert.equal(findings.get(name).decision, 'KEEP', name);
 	assert.equal(findings.get('reviewExpression').decision, 'REVIEW');
-	assert.equal(findings.get('largeLiteral').decision, 'REVIEW');
+	assert.equal(findings.get('largeLiteral').decision, 'INLINE');
 	assert.equal(findings.get('noInitializer').decision, 'REVIEW');
 	assert.equal(findings.get('InlineType').decision, 'INLINE');
 	assert.equal(findings.get('InlineInterface').decision, 'INLINE');
@@ -105,7 +105,7 @@ void [payload, result];
 	assert.match(consumer, /const result: \{ ok: boolean; \}/);
 	assert.equal(fixSingleUseTypes(cfg), 0);
 });
-test('single-use type fixing leaves reused aliases and pure single-use variables unchanged', () => {
+test('single-use fixing leaves reused aliases unchanged and inlines pure single-use variables', () => {
 	const root = fixtureRoot('terra-quality-single-use-no-fix-');
 	const file = fixtureFile(
 		root,
@@ -114,15 +114,38 @@ test('single-use type fixing leaves reused aliases and pure single-use variables
 const first: Reused = { value: 'a' };
 const second: Reused = { value: 'b' };
 const pure = { value: true };
-void [first, second, pure];
+const pureArray = ['one', 'two'];
+const sharedItem = { value: true };
+void [first, second, pure, pureArray];
+void { sharedItem, nested: { ...sharedItem } };
 `,
 	);
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
-	const before = fixtureText(root, 'src/main.ts');
+	assert.equal(fixSingleUseDeclarations(cfg), 1);
+	const updated = fixtureText(root, 'src/main.ts');
+	assert.equal(updated.includes('const pure ='), false);
+	assert.equal(updated.includes('const pureArray ='), false);
+	assert.equal(updated.includes('const sharedItem ='), true);
+	assert.match(updated, /void \[first, second, \(\{ value: true \}\), \(\['one', 'two'\]\)\]/);
 	assert.equal(fixSingleUseTypes(cfg), 0);
-	assert.equal(fixtureText(root, 'src/main.ts'), before);
-	assert.equal(singleUseFindings(cfg).find((f) => f.name === 'pure').decision, 'INLINE', 'variable declarations are recommendations only, never type-fix candidates');
 	assert.equal(file.endsWith('src/main.ts'), true);
+});
+test('single-use fixing discovers nested literals wrapped with const assertions', () => {
+	const root = fixtureRoot('terra-quality-single-use-nested-');
+	fixtureFile(
+		root,
+		'src/main.ts',
+		`export function View() {
+		const improvementCards = [{ key: 'one' }, { key: 'two' }] as const;
+		return improvementCards.map((card) => card.key).join(',');
+	}
+`,
+	);
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
+	assert.deepEqual(singleUseFindings(cfg).map((finding) => finding.name), ['improvementCards']);
+	assert.equal(fixSingleUseDeclarations(cfg), 1);
+	assert.equal(fixtureText(root, 'src/main.ts').includes('const improvementCards'), false);
+	assert.match(fixtureText(root, 'src/main.ts'), /return \(\[\{ key: 'one' \}, \{ key: 'two' \}\] as const\)\.map/);
 });
 test('single-use report writes stable JSON and Markdown inventories with all decision sections', () => {
 	const root = fixtureRoot('terra-quality-single-use-report-');

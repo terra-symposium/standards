@@ -21,7 +21,7 @@ import { existsSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { fixObjectForwarding, objectForwardingFindings } from './object-forwarding.js';
 import { fixRegexDedup, fixRepeatedClasses, regexFindings, repeatedClassFindings, uiPatternFindings } from './patterns.js';
-import { fixSingleUseTypes, writeSingleUseReport } from './single-use.js';
+import { fixSingleUseDeclarations, writeSingleUseReport } from './single-use.js';
 import { securityFindings } from './security.js';
 import { spawnSync } from 'node:child_process';
 import { srcFiles, workingSrcFiles } from './files.js';
@@ -246,13 +246,13 @@ function qualityHeader(name: string, detail: string): void {
  * Renders compact progress for a file-processing quality section.
  *
  * @param label Section operation being performed.
- * @param current Number of files completed.
+ * @param curr Number of files completed.
  * @param total Number of files in the section.
  *
  * @return Nothing; progress is written to standard error.
  */
-function qualityProgress(label: string, current: number, total: number): void {
-	const completed = Math.min(Math.max(current, 0), total);
+function qualityProgress(label: string, curr: number, total: number): void {
+	const completed = Math.min(Math.max(curr, 0), total);
 	const width = 24;
 	const filled = total ? Math.round((completed / total) * width) : width;
 	const line = `  ${label} [${'='.repeat(filled)}${' '.repeat(width - filled)}] ${completed}/${total}`;
@@ -422,15 +422,29 @@ function runLint(cfg: QualityCfg, opts: QualityOptions, exhaustive = false): voi
  *
  * @return Number of unused function declarations removed.
  */
-function fixUnusedFunctions(cfg: QualityCfg, all: boolean): number {
+function fixUnusedFns(cfg: QualityCfg, all: boolean): number {
 	const files = filesFor(cfg, all).filter((f) => /\.(?:cjs|js|jsx|mjs|ts|tsx)$/.test(f));
 	let fixed = 0;
 	for (const filesBatch of batches(files)) {
-		const result = spawnSync(toolPath(cfg, cfg.tools?.eslint, 'eslint'), ['--format', 'json', '--no-warn-ignored', ...filesBatch], {
+		const result = spawnSync(
+			toolPath(cfg, cfg.tools?.eslint, 'eslint'),
+			[
+				'--cache',
+				'--cache-strategy',
+				'content',
+				'--cache-location',
+				'node_modules/.cache/eslint',
+				'--format',
+				'json',
+				'--no-warn-ignored',
+				...filesBatch,
+			],
+			{
 			cwd: cfg.root,
 			encoding: 'utf8',
 			env: process.env,
-		});
+			},
+		);
 		let reports: Array<{ filePath: string; messages: Array<{ ruleId?: string; line: number; column: number }> }> = [];
 		try {
 			reports = JSON.parse(result.stdout || '[]') as typeof reports;
@@ -438,8 +452,8 @@ function fixUnusedFunctions(cfg: QualityCfg, all: boolean): number {
 			continue;
 		}
 		for (const report of reports) {
-			const source = readFileSync(report.filePath, 'utf8');
-			const ast = ts.createSourceFile(report.filePath, source, ts.ScriptTarget.Latest, true, C_M_JS_TS_X_CLASS_2.test(report.filePath) && report.filePath.endsWith('x') ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
+			const src = readFileSync(report.filePath, 'utf8');
+			const ast = ts.createSourceFile(report.filePath, src, ts.ScriptTarget.Latest, true, C_M_JS_TS_X_CLASS_2.test(report.filePath) && report.filePath.endsWith('x') ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
 			const starts = new Set(
 				report.messages
 					.filter((m) => m.ruleId === 'unused-imports/no-unused-vars')
@@ -449,20 +463,20 @@ function fixUnusedFunctions(cfg: QualityCfg, all: boolean): number {
 			const visit = (node: ts.Node): void => {
 				if (ts.isFunctionDeclaration(node) && node.name && starts.has(node.name.getStart(ast)) && !node.modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword)) {
 					let start = node.getStart(ast);
-					const comments = ts.getLeadingCommentRanges(source, node.getFullStart()) ?? [];
+					const comments = ts.getLeadingCommentRanges(src, node.getFullStart()) ?? [];
 					const attached = comments.at(-1);
-					if (attached?.kind === ts.SyntaxKind.MultiLineCommentTrivia && source.slice(attached.end, start).trim() === '' && source.slice(attached.pos, attached.pos + 3) === '/**') start = attached.pos;
+					if (attached?.kind === ts.SyntaxKind.MultiLineCommentTrivia && src.slice(attached.end, start).trim() === '' && src.slice(attached.pos, attached.pos + 3) === '/**') start = attached.pos;
 					let end = node.end;
-					while (source[end] === ' ' || source[end] === '\t') end++;
-					if (source.slice(end, end + 2) === '\r\n') end += 2;
-					else if (source[end] === '\n') end++;
+					while (src[end] === ' ' || src[end] === '\t') end++;
+					if (src.slice(end, end + 2) === '\r\n') end += 2;
+					else if (src[end] === '\n') end++;
 					edits.push({ start, end });
 				}
 				ts.forEachChild(node, visit);
 			};
 			visit(ast);
 			if (!edits.length) continue;
-			let updated = source;
+			let updated = src;
 			for (const edit of edits.sort((a, b) => b.start - a.start)) updated = `${updated.slice(0, edit.start)}${updated.slice(edit.end)}`;
 			const diagnostics = ts.transpileModule(updated, { fileName: report.filePath, reportDiagnostics: true, compilerOptions: { allowJs: true, jsx: ts.JsxEmit.Preserve, target: ts.ScriptTarget.ESNext } }).diagnostics ?? [];
 			if (diagnostics.some((d) => d.category === ts.DiagnosticCategory.Error)) continue;
@@ -527,11 +541,20 @@ function runRecommendationCmds(cfg: QualityCfg): void {
  */
 function runProjectTypecheck(cfg: QualityCfg): void {
 	qualityHeader('typecheck', 'Checking the configured project type boundary');
-	const status = cfg.typecheckCommand
-		? run(cfg, cfg.typecheckCommand.command, cfg.typecheckCommand.args ?? [])
-		: run(cfg, toolPath(cfg, cfg.tools?.tsc, 'tsc'), ['--noEmit', '-p', cfg.tsconfig ?? 'tsconfig.json']);
-	if (status) process.exitCode = status;
-	console.error(`  ${status ? '✗ failed' : '✓ passed'}`);
+	if (!cfg.typecheckCommand) {
+		const status = run(cfg, toolPath(cfg, cfg.tools?.tsc, 'tsc'), ['--noEmit', '-p', cfg.tsconfig ?? 'tsconfig.json']);
+		if (status) process.exitCode = status;
+		console.error(`  ${status ? '✗ failed' : '✓ passed'}`);
+		return;
+	}
+	const result = spawnSync(cfg.typecheckCommand.command, cfg.typecheckCommand.args ?? [], { cwd: cfg.root, stdio: ['inherit', 'pipe', 'pipe'], env: process.env });
+	const output = `${result.stdout ?? ''}\n${result.stderr ?? ''}`;
+	printChildOutput(result.stdout);
+	printChildOutput(result.stderr);
+	const diagnosticsReported = /\berror\s+ts\(\d+\)/u.test(output) || /-\s+[1-9]\d*\s+errors?\b/u.test(output);
+	const status = result.status ?? 1;
+	if (status || diagnosticsReported) process.exitCode = status || 1;
+	console.error(`  ${status || diagnosticsReported ? '✗ failed' : '✓ passed'}`);
 }
 
 /**
@@ -571,8 +594,15 @@ function repairMissingImports(cfg: QualityCfg, program: ts.Program, checker: ts.
 		if (!src.fileName.startsWith(`${cfg.root}${sep}`) || !C_M_JS_TS_X_REGEX.test(src.fileName)) continue;
 		const missing = new Map<string, { source: ts.SourceFile; typeOnly: boolean }>();
 		const visit = (n: ts.Node): void => {
+			const intrinsicJsxTag = ts.isIdentifier(n) && (ts.isJsxOpeningLikeElement(n.parent) || ts.isJsxClosingElement(n.parent)) && n.parent.tagName === n && /^[a-z]/.test(n.text);
+			const propertyName =
+				ts.isIdentifier(n) &&
+				(('name' in n.parent && (n.parent as { name?: ts.Node }).name === n) ||
+					('propertyName' in n.parent && (n.parent as { propertyName?: ts.Node }).propertyName === n));
 			if (
 				ts.isIdentifier(n) &&
+				!intrinsicJsxTag &&
+				!propertyName &&
 				!checker.getSymbolAtLocation(n) &&
 				!ts.isPropertyAccessExpression(n.parent) &&
 				!ts.isPropertyAccessChain(n.parent) &&
@@ -622,8 +652,8 @@ function repairMissingImports(cfg: QualityCfg, program: ts.Program, checker: ts.
 function runKnip(cfg: QualityCfg, fix: boolean, exhaustive = false): void {
 	qualityHeader('knip', `${fix ? 'Fixing and checking' : 'Checking'} unused files, exports, dependencies, and reachability`);
 	const knip = toolPath(cfg, cfg.tools?.knip, 'knip');
-	if (fix) run(cfg, knip, ['--fix', '--allow-remove-files', '--no-exit-code'], { quietSuccess: true });
-	const status = run(cfg, knip, exhaustive ? [] : ['--include', 'unresolved,nsExports,nsTypes,cycles', '--no-exit-code']);
+	if (fix) run(cfg, knip, ['--fix', '--allow-remove-files', '--no-exit-code', '--no-config-hints'], { quietSuccess: true });
+	const status = run(cfg, knip, exhaustive ? ['--no-config-hints'] : ['--include', 'unresolved,nsExports,nsTypes,cycles', '--no-exit-code', '--no-config-hints']);
 	if (status) process.exitCode = status;
 	console.error(`  ${status ? '✗ failed' : '✓ passed'}`);
 }
@@ -706,12 +736,19 @@ function fixNames(cfg: QualityCfg, all: boolean): void {
 		const astroCfg = { ...cfg, sourceRoots: [file] };
 		const findings = namingFindings(astroCfg);
 		let updated = body;
-		const replacements = new Map(findings.map((finding) => [finding.name, finding.suggestion]));
+		const replacements = new Map(findings.map((f) => [f.name, f.suggestion]));
 		for (const [name, suggestion] of replacements) {
 			const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 			updated = updated.replace(new RegExp(`\\b${escaped}\\b`, 'g'), suggestion);
 		}
-		if (updated !== body) writeFileSync(file, `${source.slice(0, offset)}${updated}${source.slice(offset + body.length)}`);
+		let nextSource = updated === body ? source : `${source.slice(0, offset)}${updated}${source.slice(offset + body.length)}`;
+		for (const [name, suggestion] of replacements) {
+			if (name === suggestion) continue;
+			const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+			const callback = new RegExp(`\\.map\\(\\s*(\\(\\s*)?(\\{\\s*${escaped}\\s*\\}|${escaped})\\s*\\)?\\s*=>\\s*\\(([\\s\\S]*?)\\)\\s*\\)`, 'g');
+			nextSource = nextSource.replace(callback, (match) => match.replace(new RegExp(`\\b${escaped}\\b`, 'g'), suggestion));
+		}
+		if (nextSource !== source) writeFileSync(file, nextSource);
 	}
 	let program = ts.createProgram({
 		rootNames: srcFiles(cfg).filter((f) => C_M_JS_TS_X_CLASS_2.test(f)),
@@ -750,13 +787,17 @@ function fixNames(cfg: QualityCfg, all: boolean): void {
 	const canonical = (symbol: ts.Symbol | undefined): ts.Symbol | undefined => (symbol && symbol.flags & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(symbol) : symbol);
 	const identifierSymbol = (n: ts.Identifier): ts.Symbol | undefined =>
 		canonical(ts.isShorthandPropertyAssignment(n.parent) ? (checker.getShorthandAssignmentValueSymbol(n.parent) ?? checker.getSymbolAtLocation(n)) : checker.getSymbolAtLocation(n));
+	const isPropertyName = (n: ts.Identifier): boolean =>
+		(ts.isPropertyAccessExpression(n.parent) && n.parent.name === n) ||
+		(ts.isQualifiedName(n.parent) && n.parent.right === n) ||
+		((ts.isPropertyAssignment(n.parent) || ts.isMethodDeclaration(n.parent) || ts.isMethodSignature(n.parent)) && n.parent.name === n);
 	const hasInitShadow = (n: ts.Identifier): boolean => {
 		if (!ts.isVariableDeclaration(n.parent) || !n.parent.initializer) return false;
 		const tgt = checker.getSymbolAtLocation(n);
 		let found = false;
 		const visit = (child: ts.Node): void => {
 			if (found || child === n) return;
-			if (ts.isIdentifier(child) && child.text === n.text && checker.getSymbolAtLocation(child) === tgt) found = true;
+			if (ts.isIdentifier(child) && !isPropertyName(child) && child.text === n.text && checker.getSymbolAtLocation(child) === tgt) found = true;
 			ts.forEachChild(child, visit);
 		};
 		visit(n.parent.initializer);
@@ -768,7 +809,7 @@ function fixNames(cfg: QualityCfg, all: boolean): void {
 		let found = false;
 		const visit = (child: ts.Node): void => {
 			if (found || child === n) return;
-			if (ts.isIdentifier(child) && child.text === n.text && checker.getSymbolAtLocation(child) !== tgt) found = true;
+			if (ts.isIdentifier(child) && !isPropertyName(child) && child.text === n.text && checker.getSymbolAtLocation(child) !== tgt) found = true;
 			ts.forEachChild(child, visit);
 		};
 		visit(n.parent.initializer);
@@ -779,7 +820,7 @@ function fixNames(cfg: QualityCfg, all: boolean): void {
 		let found = false;
 		const visit = (child: ts.Node): void => {
 			if (found) return;
-			if (ts.isIdentifier(child)) {
+			if (ts.isIdentifier(child) && !isPropertyName(child)) {
 				const symbol = checker.getSymbolAtLocation(child);
 				for (const declaration of symbol?.declarations ?? []) {
 					const name = 'name' in declaration && ts.isIdentifier(declaration.name as ts.Node) ? (declaration.name as ts.Identifier) : undefined;
@@ -850,8 +891,6 @@ function fixNames(cfg: QualityCfg, all: boolean): void {
 		};
 		inspect(src);
 	}
-	const hasDescCollision = (scope: ts.Node, suggestion: string): boolean =>
-		[...renameSafetyByScope.entries()].some(([c, s]) => c !== scope && c.getStart() >= scope.getStart() && c.end <= scope.end && s.declared.has(suggestion));
 	for (const src of program.getSourceFiles()) {
 		if (!allowed.has(src.fileName)) continue;
 		const inspect = (n: ts.Node): void => {
@@ -859,7 +898,7 @@ function fixNames(cfg: QualityCfg, all: boolean): void {
 				const suggestion = renameDeclaration(n);
 				if (hasInitRenameCollision(n, suggestion) || hasInitConsumerCollision(n, suggestion)) return;
 				const safety = renameSafetyByScope.get(declarationScope(n));
-				if (!isCallbackDeclaration(n) && (safety?.declared.has(suggestion) || (safety?.proposals.get(suggestion) ?? 0) > 1 || hasDescCollision(declarationScope(n), suggestion))) return;
+				if (!isCallbackDeclaration(n) && (safety?.declared.has(suggestion) || (safety?.proposals.get(suggestion) ?? 0) > 1)) return;
 				const symbol = suggestion === n.text ? undefined : identifierSymbol(n);
 				if (symbol && (!exported.has(symbol) || cfg.renameExports === true)) replacements.set(symbol, suggestion);
 			}
@@ -1084,7 +1123,7 @@ export function runQualityCli(cfg: QualityCfg, args = process.argv.slice(2)): vo
 	}
 	if (cmd === 'single-use') {
 		qualityHeader('single-use', `${opts.fix ? 'Fixing and checking' : 'Checking'} single-use declarations`);
-		if (opts.fix) fixSingleUseTypes(cfg);
+		if (opts.fix) fixSingleUseDeclarations(cfg);
 		const findings = writeSingleUseReport(cfg);
 		printFindings(findings, (finding) => `Single-use ${finding.decision}: ${finding.file}:${finding.line} ${finding.name} — ${finding.reason}`);
 		return;
@@ -1158,14 +1197,14 @@ export function runQualityCli(cfg: QualityCfg, args = process.argv.slice(2)): vo
 		if (opts.fix && qualityCheckEnabled(cfg, 'lint')) {
 			let removed = 0;
 			for (let round = 0; round < 5; round++) {
-				const count = fixUnusedFunctions(cfg, opts.all);
+				const count = fixUnusedFns(cfg, opts.all);
 				removed += count;
 				if (!count) break;
 			}
 			if (removed) console.info(`Unused declaration fixer: ${removed} function${removed === 1 ? '' : 's'} removed.`);
 		}
 		if (qualityCheckEnabled(cfg, 'lint')) runLint(cfg, { ...opts, fix: fix('lint') }, true);
-		if (qualityCheckEnabled(cfg, 'document') && documentationFindings(scopedCfg(cfg, opts.all)).some((finding) => finding.severity === 'error'))
+		if (qualityCheckEnabled(cfg, 'document') && documentationFindings(scopedCfg(cfg, opts.all)).some((f) => f.severity === 'error'))
 			runDocumentation(cfg, opts, ['document', ...(opts.all ? ['--all'] : []), '--quiet'], true);
 		if (fix('format') && qualityCheckEnabled(cfg, 'format')) runFormatter(cfg, { ...opts, fix: true }, opts.all ? [] : filesFor(cfg, false));
 		if (opts.fix && qualityCheckEnabled(cfg, 'alias')) aliasFindings(scoped, true);
@@ -1210,8 +1249,8 @@ export function runFormatter(cfg: QualityCfg, optsOrArgs: QualityOptions | strin
 	const hasMode = suppliedArgs.includes('--write') || suppliedArgs.includes('--check');
 	const hasIgnoreMode = suppliedArgs.some((a) => a.startsWith('--ignore-unknown'));
 	const hasLogLevel = suppliedArgs.includes('--log-level') || suppliedArgs.some((a) => a.startsWith('--log-level='));
-	const suppliedTgts = suppliedArgs.filter((a, idx) => a !== 'warn' || suppliedArgs[idx - 1] !== '--log-level').filter((a) => !a.startsWith('-') && !a.endsWith('.astro'));
-	const discoveredTgts = suppliedTgts.length ? [] : filesFor(cfg, opts.all).filter((file) => !file.endsWith('.astro'));
+	const suppliedTgts = suppliedArgs.filter((a, i) => a !== 'warn' || suppliedArgs[i - 1] !== '--log-level').filter((a) => !a.startsWith('-') && !a.endsWith('.astro'));
+	const discoveredTgts = suppliedTgts.length ? [] : filesFor(cfg, opts.all).filter((f) => !f.endsWith('.astro'));
 	const fmtArgs = [
 		...(hasMode ? [] : [opts.fix ? '--write' : '--check']),
 		...(hasIgnoreMode ? [] : ['--ignore-unknown']),

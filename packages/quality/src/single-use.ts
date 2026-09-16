@@ -31,6 +31,17 @@ const isCandidateStatement = (s: ts.Statement): boolean =>
 	ts.isInterfaceDeclaration(s) ||
 	ts.isFunctionDeclaration(s) ||
 	(ts.isVariableStatement(s) && s.declarationList.declarations.length === 1 && ts.isIdentifier(s.declarationList.declarations[0]?.name));
+const unwrapInitializer = (expression: ts.Expression): ts.Expression => {
+	let current = expression;
+	while (
+		ts.isAsExpression(current) ||
+		ts.isTypeAssertionExpression(current) ||
+		ts.isParenthesizedExpression(current) ||
+		ts.isSatisfiesExpression(current)
+	)
+		current = current.expression;
+	return current;
+};
 const isImportNode = (n: ts.Node): boolean => {
 	const src = n.getSourceFile();
 	if (src.statements.some((s) => ts.isImportDeclaration(s) && n.getStart(src) >= s.getStart(src) && n.getEnd() <= s.getEnd())) return true;
@@ -75,25 +86,40 @@ function programFor(cfg: QualityCfg): ts.Program {
  */
 function collect(cfg: QualityCfg, program: ts.Program, checker: ts.TypeChecker): { candidates: Candidate[]; references: Map<ts.Symbol, Reference[]> } {
 	const candidates: Candidate[] = [];
+	const declarationByLocation = new Map<string, Candidate>();
 	const references = new Map<ts.Symbol, Reference[]>();
 	const roots = [...cfg.sourceRoots, ...(cfg.includeRoots ?? [])];
 	const inScope = (file: string): boolean => roots.some((r) => file === r || file.startsWith(`${r}/`));
 	for (const source of program.getSourceFiles()) {
 		if (!inScope(source.fileName) || !C_M_JS_JSX_TS_TSX_REGEX.test(source.fileName)) continue;
-		for (const statement of source.statements) {
-			if (!isCandidateStatement(statement)) continue;
+		const visitCandidates = (node: ts.Node): void => {
+			if (!isCandidateStatement(node as ts.Statement)) {
+				ts.forEachChild(node, visitCandidates);
+				return;
+			}
+			const statement = node as ts.Statement;
 			const name =
 				ts.isTypeAliasDeclaration(statement) || ts.isInterfaceDeclaration(statement) || ts.isFunctionDeclaration(statement)
 					? statement.name
 					: ts.isVariableStatement(statement)
 						? statement.declarationList.declarations[0]?.name
 						: undefined;
-			if (!name || !ts.isIdentifier(name)) continue;
+			if (!name || !ts.isIdentifier(name)) {
+				ts.forEachChild(node, visitCandidates);
+				return;
+			}
 			const symbol = canonical(checker, checker.getSymbolAtLocation(name));
-			if (!symbol) continue;
+			if (!symbol) {
+				ts.forEachChild(node, visitCandidates);
+				return;
+			}
 			const kind = ts.isTypeAliasDeclaration(statement) ? 'type' : ts.isInterfaceDeclaration(statement) ? 'interface' : ts.isFunctionDeclaration(statement) ? 'function' : 'variable';
-			candidates.push({ file: source.fileName, source, statement, name, symbol, kind });
-		}
+			const candidate = { file: source.fileName, source, statement, name, symbol, kind } satisfies Candidate;
+			candidates.push(candidate);
+			declarationByLocation.set(`${source.fileName}:${name.getStart(source)}`, candidate);
+			ts.forEachChild(node, visitCandidates);
+		};
+		visitCandidates(source);
 	}
 	const candidateSymbols = new Set(candidates.map((c) => c.symbol));
 	for (const src of program.getSourceFiles()) {
@@ -107,9 +133,10 @@ function collect(cfg: QualityCfg, program: ts.Program, checker: ts.TypeChecker):
 						break;
 					}
 				}
-				const symbol = canonical(checker, checker.getSymbolAtLocation(node));
+				const shorthandSymbol = ts.isShorthandPropertyAssignment(node.parent) ? checker.getShorthandAssignmentValueSymbol(node.parent) : undefined;
+				const symbol = canonical(checker, shorthandSymbol ?? checker.getSymbolAtLocation(node));
 				if (!importUse && symbol && candidateSymbols.has(symbol)) {
-					const declaration = candidates.find((c) => c.symbol === symbol && c.source === src && c.name.getStart(c.source) === node.getStart(src));
+					const declaration = declarationByLocation.get(`${src.fileName}:${node.getStart(src)}`);
 					if (!declaration) references.set(symbol, [...(references.get(symbol) ?? []), { file: src.fileName, source: src, node }]);
 				}
 			}
@@ -134,17 +161,18 @@ function classify(candidate: Candidate): [SingleUseFinding['decision'], string] 
 	const declaration = ts.isVariableStatement(candidate.statement) ? candidate.statement.declarationList.declarations[0]! : undefined;
 	if (!declaration) return ['REVIEW', 'declaration has no inlineable initializer'];
 	if (!declaration.initializer) return ['REVIEW', 'declaration has no inlineable initializer'];
-	if (ts.isArrowFunction(declaration.initializer) || ts.isFunctionExpression(declaration.initializer)) return ['KEEP', 'callable or rendering boundary'];
-	if (declaration.initializer.getText(candidate.source).length > 800) return ['REVIEW', 'large declaration; preserve readability'];
-	if (ts.isAwaitExpression(declaration.initializer) || ts.isCallExpression(declaration.initializer) || ts.isNewExpression(declaration.initializer)) return ['KEEP', 'runtime/workflow boundary'];
+	const initializer = unwrapInitializer(declaration.initializer);
+	if (ts.isArrowFunction(initializer) || ts.isFunctionExpression(initializer)) return ['KEEP', 'callable or rendering boundary'];
+	if (ts.isAwaitExpression(initializer) || ts.isCallExpression(initializer) || ts.isNewExpression(initializer)) return ['KEEP', 'runtime/workflow boundary'];
 	if (
-		ts.isObjectLiteralExpression(declaration.initializer) ||
-		ts.isArrayLiteralExpression(declaration.initializer) ||
-		ts.isStringLiteral(declaration.initializer) ||
-		ts.isNumericLiteral(declaration.initializer) ||
-		[ts.SyntaxKind.TrueKeyword, ts.SyntaxKind.FalseKeyword, ts.SyntaxKind.NullKeyword].includes(declaration.initializer.kind)
+		ts.isObjectLiteralExpression(initializer) ||
+		ts.isArrayLiteralExpression(initializer) ||
+		ts.isStringLiteral(initializer) ||
+		ts.isNumericLiteral(initializer) ||
+		[ts.SyntaxKind.TrueKeyword, ts.SyntaxKind.FalseKeyword, ts.SyntaxKind.NullKeyword].includes(initializer.kind)
 	)
 		return ['INLINE', 'pure single-use data'];
+	if (declaration.initializer.getText(candidate.source).length > 800) return ['REVIEW', 'large declaration; preserve readability'];
 	return ['REVIEW', 'single-use expression requires semantic review'];
 }
 
@@ -167,7 +195,7 @@ function typeUses(cfg: QualityCfg, candidate: Candidate, program: ts.Program): R
 			if (
 				ts.isIdentifier(node) &&
 				node.text === candidate.name.text &&
-				node.getStart(src) !== candidate.name.getStart(candidate.source) &&
+				!(src === candidate.source && node.getStart(src) === candidate.name.getStart(candidate.source)) &&
 				!isImportNode(node) &&
 				(ts.isTypeReferenceNode(node.parent) || ts.isExpressionWithTypeArguments(node.parent))
 			)
@@ -224,30 +252,43 @@ function importEdit(reference: Reference, checker: ts.TypeChecker, tgt: ts.Symbo
 }
 
 /**
- * Inlines single-use type aliases and interfaces, including cross-file imports.
+ * Inlines single-use type aliases, interfaces, and pure data declarations.
  *
  * @param cfg Quality configuration defining the source scope and files to rewrite.
  *
  * @return Number of files containing edits, including declaration and consumer files.
  */
-export function fixSingleUseTypes(cfg: QualityCfg): number {
+export function fixSingleUseDeclarations(cfg: QualityCfg): number {
 	const program = programFor(cfg);
 	const checker = program.getTypeChecker();
 	const { candidates, references: refs } = collect(cfg, program, checker);
 	const edits = new Map<string, { start: number; end: number; text: string }[]>();
 	for (const c of candidates) {
 		const uses = c.kind === 'type' || c.kind === 'interface' ? typeUses(cfg, c, program) : (refs.get(c.symbol) ?? []).filter((r) => !isImportNode(r.node));
-		if ((c.kind !== 'type' && c.kind !== 'interface') || uses.length !== 1) continue;
+		if (uses.length !== 1) continue;
+		const canInlineData =
+			c.kind === 'variable' &&
+			classify(c)[0] === 'INLINE' &&
+			ts.isVariableStatement(c.statement) &&
+			c.statement.declarationList.flags & ts.NodeFlags.Const &&
+			c.statement.declarationList.declarations[0]?.type === undefined;
+		if ((c.kind !== 'type' && c.kind !== 'interface' && !canInlineData) || uses.length !== 1) continue;
 		const ref = uses[0]!;
 		const replacement = ts.isTypeAliasDeclaration(c.statement)
 			? c.statement.type.getText(c.source)
 			: ts.isInterfaceDeclaration(c.statement)
 				? `{ ${c.statement.members.map((m) => m.getText(c.source)).join(' ')} }`
-				: '';
+				: ts.isVariableStatement(c.statement)
+					? c.statement.declarationList.declarations[0]!.initializer?.getText(c.source) ?? ''
+					: '';
+		if (!replacement) continue;
+		const inlineReplacement = c.kind === 'variable' ? `(${replacement})` : replacement;
 		const tgtEdits = edits.get(ref.file) ?? [];
-		tgtEdits.push({ start: ref.node.getStart(ref.source), end: ref.node.getEnd(), text: replacement });
-		const removedImport = importEdit(ref, checker, c.symbol);
-		if (removedImport) tgtEdits.push({ ...removedImport, text: '' });
+		tgtEdits.push({ start: ref.node.getStart(ref.source), end: ref.node.getEnd(), text: inlineReplacement });
+		if (c.kind === 'type' || c.kind === 'interface') {
+			const removedImport = importEdit(ref, checker, c.symbol);
+			if (removedImport) tgtEdits.push({ ...removedImport, text: '' });
+		}
 		edits.set(ref.file, tgtEdits);
 		edits.set(c.file, [...(edits.get(c.file) ?? []), { start: c.statement.getStart(c.source), end: c.statement.getEnd(), text: '' }]);
 	}
@@ -260,6 +301,15 @@ export function fixSingleUseTypes(cfg: QualityCfg): number {
 	}
 	return edits.size;
 }
+
+/**
+ * Backwards-compatible name for callers that previously fixed only type declarations.
+ *
+ * @param cfg Quality configuration defining the source scope and files to rewrite.
+ *
+ * @return Number of files containing edits.
+ */
+export const fixSingleUseTypes = fixSingleUseDeclarations;
 
 /**
  * Writes JSON and Markdown inventories of current single-use recommendations.
