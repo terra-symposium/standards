@@ -14,7 +14,7 @@ IMPORTS
 // API
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { createQualityCfg, fixSingleUseDeclarations, fixSingleUseTypes, singleUseFindings, writeSingleUseReport } from '../dist/index.js';
+import { createQualityCfg, fixSingleUseDeclarations, singleUseFindings, writeSingleUseReport } from '../dist/index.js';
 import { existsSync, readFileSync } from 'node:fs';
 import { fixtureFile, fixtureRoot, fixtureText } from './support.mjs';
 import { join } from 'node:path';
@@ -95,7 +95,7 @@ void [payload, result];
 `,
 	);
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
-	assert.equal(fixSingleUseTypes(cfg), 2);
+	assert.equal(fixSingleUseDeclarations(cfg), 2);
 	assert.equal(fixtureText(root, 'src/types.ts').includes('Payload'), false);
 	assert.equal(fixtureText(root, 'src/types.ts').includes('Result'), false);
 	const consumer = fixtureText(root, 'src/consumer.ts');
@@ -103,7 +103,7 @@ void [payload, result];
 	assert.equal(consumer.includes('import type { Result }'), false);
 	assert.match(consumer, /const payload: \{ value: string \}/);
 	assert.match(consumer, /const result: \{ ok: boolean; \}/);
-	assert.equal(fixSingleUseTypes(cfg), 0);
+	assert.equal(fixSingleUseDeclarations(cfg), 0);
 });
 test('single-use fixing leaves reused aliases unchanged and inlines pure single-use variables', () => {
 	const root = fixtureRoot('terra-quality-single-use-no-fix-');
@@ -127,7 +127,7 @@ void { sharedItem, nested: { ...sharedItem } };
 	assert.equal(updated.includes('const pureArray ='), false);
 	assert.equal(updated.includes('const sharedItem ='), true);
 	assert.match(updated, /void \[first, second, \(\{ value: true \}\), \(\['one', 'two'\]\)\]/);
-	assert.equal(fixSingleUseTypes(cfg), 0);
+	assert.equal(fixSingleUseDeclarations(cfg), 0);
 	assert.equal(file.endsWith('src/main.ts'), true);
 });
 test('single-use fixing discovers nested literals wrapped with const assertions', () => {
@@ -142,7 +142,7 @@ test('single-use fixing discovers nested literals wrapped with const assertions'
 `,
 	);
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
-	assert.deepEqual(singleUseFindings(cfg).map((finding) => finding.name), ['improvementCards']);
+	assert.deepEqual(singleUseFindings(cfg).map((f) => f.name), ['improvementCards']);
 	assert.equal(fixSingleUseDeclarations(cfg), 1);
 	assert.equal(fixtureText(root, 'src/main.ts').includes('const improvementCards'), false);
 	assert.match(fixtureText(root, 'src/main.ts'), /return \(\[\{ key: 'one' \}, \{ key: 'two' \}\] as const\)\.map/);

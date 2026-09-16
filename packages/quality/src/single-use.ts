@@ -31,16 +31,17 @@ const isCandidateStatement = (s: ts.Statement): boolean =>
 	ts.isInterfaceDeclaration(s) ||
 	ts.isFunctionDeclaration(s) ||
 	(ts.isVariableStatement(s) && s.declarationList.declarations.length === 1 && ts.isIdentifier(s.declarationList.declarations[0]?.name));
-const unwrapInitializer = (expression: ts.Expression): ts.Expression => {
-	let current = expression;
+
+const unwrapInit = (expr: ts.Expression): ts.Expression => {
+	let curr = expr;
 	while (
-		ts.isAsExpression(current) ||
-		ts.isTypeAssertionExpression(current) ||
-		ts.isParenthesizedExpression(current) ||
-		ts.isSatisfiesExpression(current)
+		ts.isAsExpression(curr) ||
+		ts.isTypeAssertionExpression(curr) ||
+		ts.isParenthesizedExpression(curr) ||
+		ts.isSatisfiesExpression(curr)
 	)
-		current = current.expression;
-	return current;
+		curr = curr.expression;
+	return curr;
 };
 const isImportNode = (n: ts.Node): boolean => {
 	const src = n.getSourceFile();
@@ -161,15 +162,15 @@ function classify(candidate: Candidate): [SingleUseFinding['decision'], string] 
 	const declaration = ts.isVariableStatement(candidate.statement) ? candidate.statement.declarationList.declarations[0]! : undefined;
 	if (!declaration) return ['REVIEW', 'declaration has no inlineable initializer'];
 	if (!declaration.initializer) return ['REVIEW', 'declaration has no inlineable initializer'];
-	const initializer = unwrapInitializer(declaration.initializer);
-	if (ts.isArrowFunction(initializer) || ts.isFunctionExpression(initializer)) return ['KEEP', 'callable or rendering boundary'];
-	if (ts.isAwaitExpression(initializer) || ts.isCallExpression(initializer) || ts.isNewExpression(initializer)) return ['KEEP', 'runtime/workflow boundary'];
+	const init = unwrapInit(declaration.initializer);
+	if (ts.isArrowFunction(init) || ts.isFunctionExpression(init)) return ['KEEP', 'callable or rendering boundary'];
+	if (ts.isAwaitExpression(init) || ts.isCallExpression(init) || ts.isNewExpression(init)) return ['KEEP', 'runtime/workflow boundary'];
 	if (
-		ts.isObjectLiteralExpression(initializer) ||
-		ts.isArrayLiteralExpression(initializer) ||
-		ts.isStringLiteral(initializer) ||
-		ts.isNumericLiteral(initializer) ||
-		[ts.SyntaxKind.TrueKeyword, ts.SyntaxKind.FalseKeyword, ts.SyntaxKind.NullKeyword].includes(initializer.kind)
+		ts.isObjectLiteralExpression(init) ||
+		ts.isArrayLiteralExpression(init) ||
+		ts.isStringLiteral(init) ||
+		ts.isNumericLiteral(init) ||
+		[ts.SyntaxKind.TrueKeyword, ts.SyntaxKind.FalseKeyword, ts.SyntaxKind.NullKeyword].includes(init.kind)
 	)
 		return ['INLINE', 'pure single-use data'];
 	if (declaration.initializer.getText(candidate.source).length > 800) return ['REVIEW', 'large declaration; preserve readability'];
@@ -309,7 +310,6 @@ export function fixSingleUseDeclarations(cfg: QualityCfg): number {
  *
  * @return Number of files containing edits.
  */
-export const fixSingleUseTypes = fixSingleUseDeclarations;
 
 /**
  * Writes JSON and Markdown inventories of current single-use recommendations.

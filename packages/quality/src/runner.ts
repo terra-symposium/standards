@@ -17,7 +17,7 @@ import { collapseInlineIfs } from './inline-if.js';
 import { collapseTypesAndObjects } from './collapse.js';
 import { dirname, relative, resolve, sep } from 'node:path';
 import { documentSrcFile, documentationFindings, maintainSrcFile, protectLongImports } from './documentation.js';
-import { existsSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { fixObjectForwarding, objectForwardingFindings } from './object-forwarding.js';
 import { fixRegexDedup, fixRepeatedClasses, regexFindings, repeatedClassFindings, uiPatternFindings } from './patterns.js';
@@ -226,7 +226,27 @@ function toolPath(cfg: QualityCfg, cfgd: string | undefined, fallback: string): 
 	if (cfgd && (cfgd.includes('/') || cfgd.includes('\\'))) return cfgd;
 	const executable = cfgd ?? fallback;
 	const local = resolve(cfg.root, 'node_modules', '.bin', executable);
-	return existsSync(local) ? local : executable;
+	if (existsSync(local)) return local;
+
+	// pnpm can omit workspace-level .bin links when dependencies are isolated in
+	// a child package. Resolve the executable from the store instead of silently
+	// falling through to a globally installed tool with a different version.
+	const packageName = executable === 'tsc' ? 'typescript' : executable;
+	const store = resolve(cfg.root, 'node_modules', '.pnpm');
+	if (existsSync(store)) {
+		for (const entry of readdirSync(store).filter((n) => n.startsWith(`${packageName}@`))) {
+			const packageRoot = resolve(store, entry, 'node_modules', packageName);
+			if (!existsSync(packageRoot)) continue;
+			try {
+				const manifest = JSON.parse(readFileSync(resolve(packageRoot, 'package.json'), 'utf8')) as { bin?: string | Record<string, string> };
+				const bin = typeof manifest.bin === 'string' ? manifest.bin : manifest.bin?.[executable] ?? manifest.bin?.[packageName];
+				if (bin && existsSync(resolve(packageRoot, bin))) return resolve(packageRoot, bin);
+			} catch {
+				// Ignore malformed or partially installed store entries and keep searching.
+			}
+		}
+	}
+	return executable;
 }
 
 /**
@@ -533,6 +553,50 @@ function runRecommendationCmds(cfg: QualityCfg): void {
 }
 
 /**
+ * Loads a configured TypeScript project and returns the same syntactic and
+ * semantic diagnostics exposed by TypeScript language services.
+ *
+ * @param cfg Quality configuration containing the project path.
+ *
+ * @return Project diagnostics, including a configuration diagnostic when the
+ * project cannot be parsed.
+ */
+function projectTypeDiagnostics(cfg: QualityCfg): readonly ts.Diagnostic[] {
+	if (!cfg.tsconfig) return [];
+	const cfgFileName = resolve(cfg.root, cfg.tsconfig);
+	const config = ts.readConfigFile(cfgFileName, ts.sys.readFile);
+	if (config.error) return [config.error];
+	const parsed = ts.parseJsonConfigFileContent(config.config, ts.sys, dirname(cfgFileName), undefined, cfgFileName);
+	if (parsed.errors.length) return parsed.errors;
+	const program = ts.createProgram({
+		rootNames: parsed.fileNames,
+		options: { ...parsed.options, noEmit: true },
+	});
+	return ts.getPreEmitDiagnostics(program);
+}
+
+/**
+ * Prints TypeScript diagnostics with source locations where available.
+ *
+ * @param cfg Quality configuration defining the repository root.
+ * @param diagnostics Diagnostics returned by the TypeScript project.
+ *
+ * @return Nothing; diagnostics are written to standard error.
+ */
+function printTypeDiagnostics(cfg: QualityCfg, diagnostics: readonly ts.Diagnostic[]): void {
+	for (const d of diagnostics) {
+		const msg = ts.flattenDiagnosticMessageText(d.messageText, '\n');
+		if (!d.file || d.start === undefined) {
+			console.error(`  ${msg}`);
+			continue;
+		}
+		const position = d.file.getLineAndCharacterOfPosition(d.start);
+		const file = relative(cfg.root, d.file.fileName);
+		console.error(`  ${file}:${position.line + 1}:${position.character + 1} ${msg}`);
+	}
+}
+
+/**
  * Runs the configured project typecheck command or the default TypeScript compiler invocation.
  *
  * @param cfg Quality configuration containing compiler and project settings.
@@ -541,6 +605,14 @@ function runRecommendationCmds(cfg: QualityCfg): void {
  */
 function runProjectTypecheck(cfg: QualityCfg): void {
 	qualityHeader('typecheck', 'Checking the configured project type boundary');
+	if (!cfg.typecheckCommand && cfg.tsconfig) {
+		const diagnostics = projectTypeDiagnostics(cfg);
+		printTypeDiagnostics(cfg, diagnostics);
+		const failed = diagnostics.some((d) => d.category === ts.DiagnosticCategory.Error);
+		if (failed) process.exitCode = 1;
+		console.error(`  ${failed ? '✗ failed' : '✓ passed'}`);
+		return;
+	}
 	if (!cfg.typecheckCommand) {
 		const status = run(cfg, toolPath(cfg, cfg.tools?.tsc, 'tsc'), ['--noEmit', '-p', cfg.tsconfig ?? 'tsconfig.json']);
 		if (status) process.exitCode = status;
@@ -741,14 +813,14 @@ function fixNames(cfg: QualityCfg, all: boolean): void {
 			const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 			updated = updated.replace(new RegExp(`\\b${escaped}\\b`, 'g'), suggestion);
 		}
-		let nextSource = updated === body ? source : `${source.slice(0, offset)}${updated}${source.slice(offset + body.length)}`;
+		let nSrc = updated === body ? source : `${source.slice(0, offset)}${updated}${source.slice(offset + body.length)}`;
 		for (const [name, suggestion] of replacements) {
 			if (name === suggestion) continue;
 			const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 			const callback = new RegExp(`\\.map\\(\\s*(\\(\\s*)?(\\{\\s*${escaped}\\s*\\}|${escaped})\\s*\\)?\\s*=>\\s*\\(([\\s\\S]*?)\\)\\s*\\)`, 'g');
-			nextSource = nextSource.replace(callback, (match) => match.replace(new RegExp(`\\b${escaped}\\b`, 'g'), suggestion));
+			nSrc = nSrc.replace(callback, (match) => match.replace(new RegExp(`\\b${escaped}\\b`, 'g'), suggestion));
 		}
-		if (nextSource !== source) writeFileSync(file, nextSource);
+		if (nSrc !== source) writeFileSync(file, nSrc);
 	}
 	let program = ts.createProgram({
 		rootNames: srcFiles(cfg).filter((f) => C_M_JS_TS_X_CLASS_2.test(f)),
@@ -823,8 +895,8 @@ function fixNames(cfg: QualityCfg, all: boolean): void {
 			if (ts.isIdentifier(child) && !isPropertyName(child)) {
 				const symbol = checker.getSymbolAtLocation(child);
 				for (const declaration of symbol?.declarations ?? []) {
-					const name = 'name' in declaration && ts.isIdentifier(declaration.name as ts.Node) ? (declaration.name as ts.Identifier) : undefined;
-					if (name && name !== n && renameDeclaration(name) === suggestion) {
+					const decl = 'name' in declaration && ts.isIdentifier(declaration.name as ts.Node) ? (declaration.name as ts.Identifier) : undefined;
+					if (decl && decl !== n && renameDeclaration(decl) === suggestion) {
 						found = true;
 						return;
 					}
@@ -1116,9 +1188,9 @@ export function runQualityCli(cfg: QualityCfg, args = process.argv.slice(2)): vo
 		return;
 	}
 	if (cmd === 'domain') {
-		const name = args[args.indexOf('domain') + 1];
-		if (!name) throw new Error('Pass a quality domain name.');
-		runCfgdCmd(cfg, name);
+		const n = args[args.indexOf('domain') + 1];
+		if (!n) throw new Error('Pass a quality domain name.');
+		runCfgdCmd(cfg, n);
 		return;
 	}
 	if (cmd === 'single-use') {
@@ -1298,6 +1370,10 @@ export function runFormatter(cfg: QualityCfg, optsOrArgs: QualityOptions | strin
 export function runTypecheck(cfg: QualityCfg, args: string[] = []): void {
 	if (cfg.typecheckCommand) {
 		if (!args.length) runProjectTypecheck(cfg);
+		return;
+	}
+	if (!args.length && cfg.tsconfig) {
+		runProjectTypecheck(cfg);
 		return;
 	}
 	const tsc = cfg.tools?.tsc ?? 'tsc';
