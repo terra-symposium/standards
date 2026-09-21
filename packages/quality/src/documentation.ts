@@ -769,22 +769,22 @@ function removeDetachedTSDoc(src: string, fileName: string): string {
 	const parsed = ts.createSourceFile(fileName, src, ts.ScriptTarget.Latest, true, documentationScriptKind(fileName));
 	const blocks = tsdocBlocks(src, parsed);
 	if (!blocks.length) return src;
-	const byStart = new Map(blocks.map((block) => [block.start, block]));
+	const byStart = new Map(blocks.map((b) => [b.start, b]));
 	const keep = new Set<number>();
 	const header = fileHeaderBlock(src, blocks);
 	if (header) keep.add(header.start);
 	const visit = (node: ts.Node): void => {
 		if (isDocumentableNode(node)) {
 			const leading = ts.getLeadingCommentRanges(src, node.getFullStart()) ?? [];
-			const docs = leading.map((range) => byStart.get(range.pos)).filter((block): block is TSDocBlock => Boolean(block));
+			const docs = leading.map((r) => byStart.get(r.pos)).filter((b): b is TSDocBlock => Boolean(b));
 			const final = docs.at(-1);
 			if (final) keep.add(final.start);
 		}
 		ts.forEachChild(node, visit);
 	};
 	visit(parsed);
-	const removals = blocks.filter((block) => !keep.has(block.start)).sort((a, b) => b.start - a.start);
-	return removals.reduce((text, block) => `${text.slice(0, block.start)}${text.slice(block.end)}`, src);
+	const removals = blocks.filter((b) => !keep.has(b.start)).sort((a, b) => b.start - a.start);
+	return removals.reduce((t, b) => `${t.slice(0, b.start)}${t.slice(b.end)}`, src);
 }
 
 /**

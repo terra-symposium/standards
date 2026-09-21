@@ -187,8 +187,8 @@ test('runFormatter divides large source arguments into bounded subprocess batche
 test('runTypecheck honors custom command ownership and does not invoke it for a scoped file-only request', () => {
 	const root = fixtureRoot('terra-quality-typecheck-');
 	const marker = join(root, 'typecheck-ran.txt');
-	const command = { command: process.execPath, args: ['-e', `require('node:fs').writeFileSync(${JSON.stringify(marker)}, 'ran')`] };
-	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], typecheckCommand: command });
+	const cmd = { command: process.execPath, args: ['-e', `require('node:fs').writeFileSync(${JSON.stringify(marker)}, 'ran')`] };
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], typecheckCommand: cmd });
 	runTypecheck(cfg, ['src/main.ts']);
 	assert.equal(existsSync(marker), false);
 	runTypecheck(cfg);
@@ -197,12 +197,12 @@ test('runTypecheck honors custom command ownership and does not invoke it for a 
 test('CLI domain dispatch runs enabled commands, skips disabled commands, and rejects unknown domains', () => {
 	const root = fixtureRoot('terra-quality-domain-api-');
 	const marker = join(root, 'domain-ran.txt');
-	const command = { name: 'fixture', command: process.execPath, args: ['-e', `require('node:fs').writeFileSync(${JSON.stringify(marker)}, 'ran')`] };
-	const cfg = createQualityCfg({ root, sourceRoots: [], extensions: ['.ts'], qualityCommands: [command] });
+	const cmd = { name: 'fixture', command: process.execPath, args: ['-e', `require('node:fs').writeFileSync(${JSON.stringify(marker)}, 'ran')`] };
+	const cfg = createQualityCfg({ root, sourceRoots: [], extensions: ['.ts'], qualityCommands: [cmd] });
 	runQualityCli(cfg, ['domain', 'fixture']);
 	assert.equal(readFileSync(marker, 'utf8'), 'ran');
 	fixtureFile(root, 'domain-ran.txt', 'reset');
-	const disabled = createQualityCfg({ root, sourceRoots: [], extensions: ['.ts'], qualityCommands: [command], enabledCommands: { fixture: false } });
+	const disabled = createQualityCfg({ root, sourceRoots: [], extensions: ['.ts'], qualityCommands: [cmd], enabledCommands: { fixture: false } });
 	runQualityCli(disabled, ['domain', 'fixture']);
 	assert.equal(readFileSync(marker, 'utf8'), 'reset');
 	assert.throws(() => runQualityCli(cfg, ['domain', 'missing']), /Unknown quality domain/);

@@ -21,7 +21,13 @@ test('exports the shared boundary lifecycle and HOC', () => {
 });
 test('captures component metadata and exposes reset-key recovery state', () => {
 	const reports = [];
-	const boundary = new ErrorBoundary({ className: 'p-4', 'data-testid': 'boundary', fallback: () => React.createElement('div'), onError: (reportedErr, report) => reports.push({ error: reportedErr, ...report }), resetKey: 'first' });
+	const boundary = new ErrorBoundary({
+		className: 'p-4',
+		'data-testid': 'boundary',
+		fallback: () => React.createElement('div'),
+		onError: (reportedErr, report) => reports.push({ error: reportedErr, ...report }),
+		resetKey: 'first',
+	});
 	const err = new Error('broken');
 	assert.deepEqual(ErrorBoundary.getDerivedStateFromError(err), { error: err });
 	boundary.componentDidCatch(err, { componentStack: '\n    at Panel' });

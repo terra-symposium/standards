@@ -15,7 +15,15 @@ CONFIG
 //////////////////////////////////////////////////*/
 
 export type ErrorReporter = (err: Error, report: { name: string; componentStack: string | null }) => void;
-export type ErrorBoundaryProps = { children?: React.ReactNode; className?: string; 'data-testid'?: string; fallback?: (err: Error) => React.ReactNode; name?: string; resetKey?: string; onError?: ErrorReporter };
+export type ErrorBoundaryProps = {
+	children?: React.ReactNode;
+	className?: string;
+	'data-testid'?: string;
+	fallback?: (err: Error) => React.ReactNode;
+	name?: string;
+	resetKey?: string;
+	onError?: ErrorReporter;
+};
 export type ErrorBoundaryState = { error: Error | null };
 
 /*//////////////////////////////////////////////////
@@ -56,7 +64,19 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
 		if (prev.resetKey !== this.props.resetKey && this.state.error) this.setState({ error: null });
 	}
 	render(): React.ReactNode {
-		const content = !this.state.error ? this.props.children : this.props.fallback ? this.props.fallback(this.state.error) : <div role="alert">An unexpected error occurred while rendering this section.</div>;
-		return this.props.className || this.props['data-testid'] ? <div className={this.props.className} data-testid={this.props['data-testid']}>{content}</div> : content;
+		const content = !this.state.error ? (
+			this.props.children
+		) : this.props.fallback ? (
+			this.props.fallback(this.state.error)
+		) : (
+			<div role="alert">An unexpected error occurred while rendering this section.</div>
+		);
+		return this.props.className || this.props['data-testid'] ? (
+			<div className={this.props.className} data-testid={this.props['data-testid']}>
+				{content}
+			</div>
+		) : (
+			content
+		);
 	}
 }

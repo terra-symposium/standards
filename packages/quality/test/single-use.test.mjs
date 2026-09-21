@@ -133,7 +133,7 @@ void { sharedItem, nested: { ...sharedItem } };
 
 test('single-use mutation removes the declaration TSDoc with the declaration', () => {
 	const root = fixtureRoot('terra-quality-single-use-tsdoc-');
-	const file = fixtureFile(
+	fixtureFile(
 		root,
 		'src/main.ts',
 		`/** This comment belongs to the inlined value. */

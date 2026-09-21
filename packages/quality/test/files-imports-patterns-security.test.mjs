@@ -45,14 +45,7 @@ test('source discovery handles nested roots, include roots, exclusions, direct f
 	fixtureFile(root, 'src/ignored/generated.ts', 'export const generated = true;\n');
 	fixtureFile(root, 'include/index.js', 'export const included = true;\n');
 	fixtureFile(root, 'include/notes.md', '# not source\n');
-	const cfg = createQualityCfg({
-		root,
-		sourceRoots: ['src'],
-		includeRoots: ['include'],
-		extensions: ['.ts', '.js'],
-		skippedDirectories: ['ignored'],
-		skippedFiles: ['src/nested/skip.ts'],
-	});
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], includeRoots: ['include'], extensions: ['.ts', '.js'], skippedDirectories: ['ignored'], skippedFiles: ['src/nested/skip.ts'] });
 	assert.deepEqual(srcFiles(cfg), [main, join(root, 'include/index.js'), join(root, 'src/nested/keep.ts')].sort());
 	const beforeNewFile = srcFiles(cfg);
 	fixtureFile(root, 'src/new.ts', 'export const newFile = true;\n');
@@ -91,7 +84,10 @@ test('path utilities distinguish files, directories, missing paths, and reposito
 
 test('import validation resolves relative, aliased, index, asset, export, dynamic, and require imports', () => {
 	const root = fixtureRoot('terra-quality-imports-');
-	fixtureFile(root, 'src/main.ts', `
+	fixtureFile(
+		root,
+		'src/main.ts',
+		`
 import { local } from './local';
 import { alias } from '@/alias';
 export { indexed } from './folder';
@@ -102,7 +98,8 @@ import './unsupported.txt';
 const dynamic = import(moduleName);
 const twoArgRequire = require('./not-static', moduleName);
 void [local, alias, indexed, lazy, asset, dynamic, twoArgRequire];
-`);
+`,
+	);
 	fixtureFile(root, 'src/local.ts', 'export const local = true;\n');
 	fixtureFile(root, 'src/alias.ts', 'export const alias = true;\n');
 	fixtureFile(root, 'src/folder/index.ts', 'export const indexed = true;\n');
@@ -114,12 +111,16 @@ void [local, alias, indexed, lazy, asset, dynamic, twoArgRequire];
 
 test('import validation respects external prefixes, explicit unsupported extensions, and missing index targets', () => {
 	const root = fixtureRoot('terra-quality-import-policy-');
-	fixtureFile(root, 'src/main.ts', `
+	fixtureFile(
+		root,
+		'src/main.ts',
+		`
 import external from '~/external';
 import './missing.css';
 import './missing.txt';
 void external;
-`);
+`,
+	);
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], aliases: { '~/': 'vendor/' }, externalPrefixes: ['~/'] });
 	assert.deepEqual(checkImports(cfg), [{ importer: 'src/main.ts', specifier: './missing.css' }]);
 });
@@ -132,12 +133,7 @@ test('repeated-class detection normalizes whitespace and ignores dynamic, one-wo
 	fixtureFile(root, 'src/dynamic.tsx', `<div className={classes} /><div className="rounded {conditional}" />\n`);
 	fixtureFile(root, 'src/test/fixture.tsx', `<div className="rounded border bg-card" />\n`);
 	fixtureFile(root, 'src/generated/fixture.tsx', `<div className="rounded border bg-card" />\n`);
-	const cfg = createQualityCfg({
-		root,
-		sourceRoots: ['src'],
-		extensions: ['.tsx'],
-		repeatedClasses: { minimumCount: 4, ignoredDirectories: ['generated'] },
-	});
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.tsx'], repeatedClasses: { minimumCount: 4, ignoredDirectories: ['generated'] } });
 	assert.deepEqual(repeatedClassFindings(cfg), []);
 	const defaultCfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.tsx'], repeatedClasses: {} });
 	const findings = repeatedClassFindings(defaultCfg);
@@ -158,7 +154,10 @@ test('UI pattern detection applies configured extensions and ignored repository-
 	});
 	const findings = uiPatternFindings(cfg);
 	assert.equal(findings.length, 2);
-	assert.deepEqual(findings.map((f) => f.file), ['src/notes.html', 'src/visible.tsx']);
+	assert.deepEqual(
+		findings.map((f) => f.file),
+		['src/notes.html', 'src/visible.tsx'],
+	);
 	assert.ok(findings.every((f) => String(f.pattern) === '/<button\\b/m'));
 });
 
@@ -169,12 +168,7 @@ test('regex deduplication inventories literals and RegExp constructors across co
 	fixtureFile(root, 'src/three.ts', `const first = /alpha/;\nvoid first;\n`);
 	fixtureFile(root, 'src/ignored.ts', `const first = /alpha/;\nvoid first;\n`);
 	fixtureFile(root, 'src/tests/test.ts', `const first = /alpha/;\nvoid first;\n`);
-	const cfg = createQualityCfg({
-		root,
-		sourceRoots: ['src'],
-		extensions: ['.ts'],
-		regexDedup: { ignoredFiles: ['src/ignored.ts'], minimumCount: 2 },
-	});
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], regexDedup: { ignoredFiles: ['src/ignored.ts'], minimumCount: 2 } });
 	const findings = regexFindings(cfg);
 	assert.deepEqual(findings, [
 		{ source: 'alpha', count: 3, locations: ['src/one.ts:1', 'src/two.ts:1', 'src/three.ts:1'] },
@@ -246,12 +240,7 @@ test('security checks detect environment files, forbidden terms/imports, client 
 		root,
 		sourceRoots: ['src'],
 		extensions: ['.ts'],
-		security: {
-			forbiddenTerms: ['password'],
-			forbiddenImports: ['forbidden-package'],
-			clientRoots: ['src/client'],
-			allowProcessEnvRoots: ['src/runtime'],
-		},
+		security: { forbiddenTerms: ['password'], forbiddenImports: ['forbidden-package'], clientRoots: ['src/client'], allowProcessEnvRoots: ['src/runtime'] },
 	});
 	const findings = securityFindings(cfg);
 	assert.deepEqual(
@@ -265,7 +254,10 @@ test('security checks detect environment files, forbidden terms/imports, client 
 			'process.env access is outside an allowed runtime root',
 		],
 	);
-	assert.deepEqual(findings.map((f) => f.file), ['.env.local', 'src/client/view.ts', 'src/client/view.ts', 'src/client/view.ts', 'src/server/view.ts', 'src/server/view.ts']);
+	assert.deepEqual(
+		findings.map((f) => f.file),
+		['.env.local', 'src/client/view.ts', 'src/client/view.ts', 'src/client/view.ts', 'src/server/view.ts', 'src/server/view.ts'],
+	);
 });
 
 test('security checks honor tracked visibility and runtime-root exceptions in a Git worktree', () => {
