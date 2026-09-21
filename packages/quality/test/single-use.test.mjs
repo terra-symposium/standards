@@ -14,7 +14,7 @@ IMPORTS
 // API
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { createQualityCfg, fixSingleUseDeclarations, singleUseFindings, writeSingleUseReport } from '../dist/index.js';
+import { createQualityCfg, cssSingleUseFindings, fixSingleUseDeclarations, singleUseFindings, writeSingleUseReport } from '../dist/index.js';
 import { existsSync, readFileSync } from 'node:fs';
 import { fixtureFile, fixtureRoot, fixtureText } from './support.mjs';
 import { join } from 'node:path';
@@ -130,6 +130,22 @@ void { sharedItem, nested: { ...sharedItem } };
 	assert.equal(fixSingleUseDeclarations(cfg), 0);
 	assert.equal(file.endsWith('src/main.ts'), true);
 });
+
+test('single-use mutation removes the declaration TSDoc with the declaration', () => {
+	const root = fixtureRoot('terra-quality-single-use-tsdoc-');
+	const file = fixtureFile(
+		root,
+		'src/main.ts',
+		`/** This comment belongs to the inlined value. */
+const pure = { value: true };
+void pure;
+`,
+	);
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
+	assert.equal(fixSingleUseDeclarations(cfg), 1);
+	assert.doesNotMatch(fixtureText(root, 'src/main.ts'), /This comment belongs to the inlined value/);
+	assert.match(fixtureText(root, 'src/main.ts'), /void \(\{ value: true \}\);/);
+});
 test('single-use fixing discovers nested literals wrapped with const assertions', () => {
 	const root = fixtureRoot('terra-quality-single-use-nested-');
 	fixtureFile(
@@ -142,7 +158,10 @@ test('single-use fixing discovers nested literals wrapped with const assertions'
 `,
 	);
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
-	assert.deepEqual(singleUseFindings(cfg).map((f) => f.name), ['improvementCards']);
+	assert.deepEqual(
+		singleUseFindings(cfg).map((f) => f.name),
+		['improvementCards'],
+	);
 	assert.equal(fixSingleUseDeclarations(cfg), 1);
 	assert.equal(fixtureText(root, 'src/main.ts').includes('const improvementCards'), false);
 	assert.match(fixtureText(root, 'src/main.ts'), /return \(\[\{ key: 'one' \}, \{ key: 'two' \}\] as const\)\.map/);
@@ -170,4 +189,14 @@ test('single-use report writes stable JSON and Markdown inventories with all dec
 	assert.match(markdown, /## KEEP \(0\)/);
 	assert.match(markdown, /## REVIEW \(0\)/);
 	assert.match(markdown, /`src\/main\.ts:1` \*\*Payload\*\*/);
+});
+
+test('single-use analysis warns for CSS classes with one source-level consumer', () => {
+	const root = fixtureRoot('terra-quality-single-use-css-');
+	fixtureFile(root, 'src/styles.css', `.single-use { color: red; }\n.inline-only { color: purple; }\n.shared { color: blue; }\n@media (min-width: 40rem) { .single-use { color: green; } }\n`);
+	fixtureFile(root, 'src/view.tsx', `<div className='single-use'>One</div>\n<div className='inline-only'>Inline</div>\n<div className='shared'>A</div>\n<div className='shared'>B</div>\n`);
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.tsx'] });
+	assert.deepEqual(cssSingleUseFindings(cfg), [
+		{ file: 'src/styles.css', line: 2, name: 'inline-only', decision: 'INLINE', reason: 'single-use direct CSS class should be inlined at its consumer', uses: 1, selector: '.inline-only' },
+	]);
 });

@@ -14,7 +14,10 @@ IMPORTS
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createQualityCfg, documentSrcFile, documentationFindings, maintainSrcFile, protectLongImports } from '../dist/index.js';
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { fixtureFile, fixtureRoot, fixtureText } from './support.mjs';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 
 /*//////////////////////////////////////////////////
 TESTS
@@ -170,5 +173,31 @@ test('maintainSrcFile heals orphaned duplicate header fragments and merges adjac
 		fixtureText(root, 'src/main.ts'),
 		`/**\n * src/main.ts\n * Meaningful coverage description.\n * Explains the current architecture under test.\n */\n\nconst value = true;\nvoid value;\n`,
 	);
+	assert.equal(maintainSrcFile(root, file), false);
+});
+
+test('maintenance removes detached TSDoc and keeps only the final block for a symbol', () => {
+	const root = mkdtempSync(join(tmpdir(), 'terra-quality-detached-tsdoc-'));
+	const file = join(root, 'src.ts');
+	writeFileSync(
+		file,
+		`/**
+ * src.ts
+ * Source header.
+ */
+
+/** Stale description from a removed declaration. */
+/** Final description for the helper. */
+function read() { return true; }
+
+/** This comment has no symbol after a mutation. */
+`,
+	);
+	assert.equal(maintainSrcFile(root, file), true);
+	const src = readFileSync(file, 'utf8');
+	assert.match(src, /Final description for the helper/);
+	assert.doesNotMatch(src, /Stale description from a removed declaration/);
+	assert.doesNotMatch(src, /This comment has no symbol/);
+	assert.equal((src.match(/Final description for the helper/g) ?? []).length, 1);
 	assert.equal(maintainSrcFile(root, file), false);
 });

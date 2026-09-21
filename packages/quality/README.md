@@ -1,5 +1,11 @@
 # `@terra-symposium/quality`
 
+> **SOURCE-OF-TRUTH WARNING — READ BEFORE EDITING**
+>
+> This directory is the source repository for the published `@terra-symposium/quality` package. When a quality rule or fixer is wrong, edit the implementation and tests here, commit the change, push `terra-shared`, and release/update the package from that pushed commit. Do **not** patch `node_modules`, a generated `dist` copy, a lockfile-only install, or a consumer repository and call the problem fixed: those changes cannot update every repository. Consumer repositories are downstream verification targets only.
+
+The required workflow is: **edit `packages/quality/src` and `packages/quality/test` → build and test here → commit and push this repository → publish/version the package → update consumers → rerun their quality checks**. If the shared source change is not pushed, the fix is not complete.
+
 ## Introduction
 
 This package provides one consistent quality entry point for Terra Symposium repositories. A repository describes its source scope, tools, policies, and commands in one `quality.json`; the package coordinates source checks and repository commands in a predictable order.
@@ -121,6 +127,20 @@ Each rule is independent. `functions` covers all named functions. `exportedFunct
 - **Terms:** “Forwarding” is syntactic repetition, not proof that two object types are identical. “Projection” is an intentionally narrower object made from a larger one.
 - **Configure:** Toggle it with `enabledChecks.forward`. It has no autofix. It supports JavaScript and TypeScript object literals and ignores common persistence/mutation names such as `insert`, `upsert`, `update`, `set`, and `assign`.
 - **Ideology:** Prefer direct forwarding when a function intentionally accepts the same object. Keep explicit projections at API, persistence, authorization, redaction, schema, and versioning boundaries. The check is advisory because syntax cannot determine those contracts safely.
+
+### DB-shaped projections
+
+- **Does:** `db-shapes` reports object literals that copy database-shaped `snake_case` row fields into another object, including wrapped reads such as `String(row.id)`. It scans returned, assigned, and `.map()` results, including Astro frontmatter.
+- **Terms:** A DB-shaped projection is an identity or near-identity row remap. Direct insert/update payloads are excluded because those objects intentionally describe writes. Adapter names do not suppress findings; an intentional boundary adapter must be explicitly annotated with `@terra-quality db-shape-adapter`.
+- **Configure:** The check is enabled by default and can be toggled with `enabledChecks.db-shapes`. Run `terra-quality db-shapes --all --warn` for an advisory-only scan. It never autofixes source files.
+- **Ideology:** Keep Supabase rows and internal server/read models in DB-native `snake_case`. Make UI, provider, redaction, normalization, and computed transformations explicit at named boundaries.
+
+### Single-use declarations and CSS classes
+
+- **Does:** `single-use` reports declarations with one source consumer and warns when a class selector in a configured stylesheet has exactly one source-level consumer. CSS findings include the stylesheet line, selector, and consumer count.
+- **Terms:** A CSS single-use finding is advisory. It may contain responsive, pseudo-class, descendant, or stateful behavior that needs review before moving its declarations to an element's inline style.
+- **Configure:** The check uses `sourceRoots` and scans `.css` files there even when `extensions` is TypeScript-only. `tailwindCanonical.stylesheet` is also scanned when configured. Run `terra-quality single-use --all --warn` for a read-only inventory.
+- **Ideology:** Keep shared presentation in CSS and Tailwind utilities; keep one-off presentation close to the element it serves when the inline style preserves the behavior.
 
 ### Lint
 

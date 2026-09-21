@@ -1,5 +1,13 @@
 # @terra-symposium/quality
 
+## 0.4.32
+
+### Patch Changes
+
+- Resolve repository-local tools from pnpm stores and include TypeScript project language-service diagnostics in quality runs.
+- 5b24ce2: Add AST-safe automatic fixers for exact object forwarding, repeated class literals, and non-stateful duplicate regular expressions. Reuse one cached analysis context across repository checks and keep unsafe or semantic findings advisory.
+- Remove detached and superseded TSDoc after source mutations, and make the shared package source-of-truth workflow explicit.
+
 ## 0.4.1
 
 ### Patch Changes

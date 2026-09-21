@@ -117,6 +117,7 @@ function healHeaderFragments(src: string, path: string, eol: string): string {
 	const orphanPattern = /^(?:[ \t]*\*[ \t]?[^\r\n]*\r?\n)+[ \t]*\*\/[ \t]*(?:\r?\n)*/;
 	const docPattern = /^\/\*\*(?:[ \t]*([^\r\n]*?)[ \t]*\*\/[ \t]*(?:\r?\n)*|[ \t]*\r?\n([\s\S]*?)\r?\n[ \t]*\*\/[ \t]*(?:\r?\n)*)/;
 	let changed = false;
+	let healedOrphanFragment = false;
 	while (true) {
 		const whitespace = rest.match(/^(?:\s*)/);
 		const prefix = whitespace?.[0] ?? '';
@@ -136,10 +137,11 @@ function healHeaderFragments(src: string, path: string, eol: string): string {
 			cursor += prefix.length + orphan[0].length;
 			rest = rest.slice(prefix.length + orphan[0].length);
 			changed = true;
+			healedOrphanFragment = true;
 			continue;
 		}
 		const doc = rest.slice(prefix.length).match(docPattern);
-		if (!doc) break;
+		if (!doc || !healedOrphanFragment) break;
 		const docLines = (doc[1] ?? doc[2] ?? '')
 			.split(R_N_REGEX)
 			.map((l) => l.replace(T_T_REGEX, '').trim())
@@ -551,6 +553,7 @@ export function maintainSrcFile(root: string, fileName: string): boolean {
 	let src = original.replace(UFEFF_REGEX, '').replace(/^\s+/, '');
 	const path = relative(root, fileName).split(sep).join('/');
 	src = healHeaderFragments(src, path, eol);
+	src = removeDetachedTSDoc(src, fileName);
 	const existingHeader = src.match(T_R_N_S_S_R_N_T_T_R_N_REGEX);
 	const headerLines =
 		existingHeader?.[1]
@@ -722,6 +725,66 @@ function tsdocBlocks(src: string, parsed: ts.SourceFile): TSDocBlock[] {
 		if (text.startsWith('/**')) blocks.push({ start: scanner.getTokenPos(), end: scanner.getTextPos(), text });
 	}
 	return blocks;
+}
+
+/**
+ * Returns whether a node can own a TSDoc block under the source-maintenance policy.
+ * Expression statements and imports are deliberately excluded so comments left
+ * behind by a mutation cannot be reassigned to unrelated syntax.
+ *
+ * @param node AST node to classify.
+ *
+ * @return `true` when the node represents a documented symbol.
+ */
+function isDocumentableNode(node: ts.Node): boolean {
+	return (
+		ts.isClassDeclaration(node) ||
+		ts.isEnumDeclaration(node) ||
+		ts.isInterfaceDeclaration(node) ||
+		ts.isTypeAliasDeclaration(node) ||
+		ts.isFunctionDeclaration(node) ||
+		ts.isVariableStatement(node) ||
+		ts.isMethodDeclaration(node) ||
+		ts.isGetAccessorDeclaration(node) ||
+		ts.isSetAccessorDeclaration(node) ||
+		ts.isPropertyDeclaration(node) ||
+		ts.isPropertySignature(node) ||
+		ts.isMethodSignature(node) ||
+		ts.isConstructorDeclaration(node) ||
+		ts.isParameter(node)
+	);
+}
+
+/**
+ * Removes TSDoc blocks that no longer belong to a symbol and keeps only the
+ * nearest TSDoc block when a mutation leaves several blocks before one symbol.
+ * File headers remain owned by the source file rather than by its first node.
+ *
+ * @param src Source text to clean.
+ * @param fileName Filename used to parse the source.
+ *
+ * @return Source text without detached or superseded TSDoc blocks.
+ */
+function removeDetachedTSDoc(src: string, fileName: string): string {
+	const parsed = ts.createSourceFile(fileName, src, ts.ScriptTarget.Latest, true, documentationScriptKind(fileName));
+	const blocks = tsdocBlocks(src, parsed);
+	if (!blocks.length) return src;
+	const byStart = new Map(blocks.map((block) => [block.start, block]));
+	const keep = new Set<number>();
+	const header = fileHeaderBlock(src, blocks);
+	if (header) keep.add(header.start);
+	const visit = (node: ts.Node): void => {
+		if (isDocumentableNode(node)) {
+			const leading = ts.getLeadingCommentRanges(src, node.getFullStart()) ?? [];
+			const docs = leading.map((range) => byStart.get(range.pos)).filter((block): block is TSDocBlock => Boolean(block));
+			const final = docs.at(-1);
+			if (final) keep.add(final.start);
+		}
+		ts.forEachChild(node, visit);
+	};
+	visit(parsed);
+	const removals = blocks.filter((block) => !keep.has(block.start)).sort((a, b) => b.start - a.start);
+	return removals.reduce((text, block) => `${text.slice(0, block.start)}${text.slice(block.end)}`, src);
 }
 
 /**
