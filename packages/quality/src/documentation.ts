@@ -624,11 +624,17 @@ export function maintainSrcFile(root: string, fileName: string): boolean {
 	}
 	src = organizeSrcSects(src, fileName, eol);
 	src = removeEmptyManagedSects(src, fileName);
+	const postOrganizationHeader = src.match(T_R_N_S_S_R_N_T_T_R_N_REGEX)?.[0] ?? '';
+	const postOrganizationBody = postOrganizationHeader ? src.slice(postOrganizationHeader.length) : src;
+	src = `${postOrganizationHeader}${removeDetachedTSDoc(postOrganizationBody, fileName)}`;
 	const norm = src
 		.replace(/^([ \t]*)\/\*\/{10,}[ \t]*$/gm, `$1${OPEN}`)
 		.replace(/^([ \t]*)\/{10,}\*\/[ \t]*$/gm, `$1${CLOSE}`)
 		.replace(S_CLASS_4, eol);
-	const laidOut = normCommentLayout(norm, fileName, eol);
+	const formatted = normCommentLayout(norm, fileName, eol);
+	const finalHeader = formatted.match(T_R_N_S_S_R_N_T_T_R_N_REGEX)?.[0] ?? '';
+	const finalBody = finalHeader ? formatted.slice(finalHeader.length) : formatted;
+	const laidOut = `${finalHeader}${removeAdjacentTSDocBlocks(finalBody)}`;
 	const n = original.startsWith('\uFEFF') ? `\uFEFF${laidOut}` : laidOut;
 	if (n === original) return false;
 	return writeValidatedSrc(fileName, n);
@@ -825,7 +831,12 @@ function removeDetachedTSDoc(src: string, fileName: string): string {
 	const comments = sourceCommentRanges(src, parsed);
 	const blocks = comments.filter((comment) => comment.text.startsWith('/**')).map((comment) => ({ start: comment.start, end: comment.end, text: comment.text }));
 	if (!comments.length) return src;
-	const byStart = new Map(blocks.map((b) => [b.start, b]));
+	const adjacent = new Set<number>();
+	for (let i = 0; i < blocks.length - 1; i++) {
+		const current = blocks[i]!;
+		const next = blocks[i + 1]!;
+		if (!src.slice(current.end, next.start).trim()) adjacent.add(current.start);
+	}
 	const keep = new Set<number>();
 	const superseded = new Set<number>();
 	const attached = new Set<number>();
@@ -836,7 +847,9 @@ function removeDetachedTSDoc(src: string, fileName: string): string {
 			for (const range of [...(ts.getLeadingCommentRanges(src, node.getFullStart()) ?? []), ...(ts.getTrailingCommentRanges(src, node.end) ?? [])]) attached.add(range.pos);
 		if (isDocumentableNode(node)) {
 			const leading = ts.getLeadingCommentRanges(src, node.getFullStart()) ?? [];
-			const docs = leading.map((r) => byStart.get(r.pos)).filter((b): b is TSDocBlock => Boolean(b));
+			const docs = leading
+				.filter((r) => src.slice(r.pos, r.end).startsWith('/**'))
+				.map((r) => ({ start: r.pos, end: r.end, text: src.slice(r.pos, r.end) }));
 			const final = docs.at(-1);
 			if (final) {
 				keep.add(final.start);
@@ -846,8 +859,24 @@ function removeDetachedTSDoc(src: string, fileName: string): string {
 		ts.forEachChild(node, visit);
 	};
 	visit(parsed);
-	const removals = comments.filter((comment) => comment.text.startsWith('/**') ? superseded.has(comment.start) || !keep.has(comment.start) : !attached.has(comment.start)).sort((a, b) => b.start - a.start);
+	const removals = comments.filter((comment) => comment.text.startsWith('/**' ) ? adjacent.has(comment.start) || superseded.has(comment.start) || !keep.has(comment.start) : !attached.has(comment.start)).sort((a, b) => b.start - a.start);
 	return removals.reduce((t, b) => `${t.slice(0, b.start)}${t.slice(b.end)}`, src);
+}
+
+/**
+ * Removes earlier blocks from a contiguous TSDoc chain after source re-layout.
+ *
+ * @param src Source text whose adjacent TSDoc blocks should be collapsed.
+ * @return Source with only the final block in each contiguous chain.
+ */
+function removeAdjacentTSDocBlocks(src: string): string {
+	let next = src;
+	let previous = '';
+	while (next !== previous) {
+		previous = next;
+		next = next.replace(/\/\*\*[\s\S]*?\*\/(?:[ \t]*\r?\n[ \t]*)+(?=\/\*\*)/g, '');
+	}
+	return next;
 }
 
 /**
