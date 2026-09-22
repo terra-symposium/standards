@@ -161,6 +161,13 @@ test('maintainSrcFile keeps the path and human description in one valid header b
 	assert.equal(maintainSrcFile(root, file), true);
 	assert.equal(fixtureText(root, 'src/main.ts'), `/**\n * src/main.ts\n * Reads the configured value for the calling workflow.\n */\n\nconst value = true;\nvoid value;\n`);
 });
+test('maintainSrcFile expands a compact file comment into a path header', () => {
+	const root = fixtureRoot('terra-quality-document-compact-header-');
+	const file = fixtureFile(root, 'src/main.ts', '/** Runtime contract for the shared shadcn component size scale. */\nconst size = 8;\nvoid size;\n');
+	assert.equal(maintainSrcFile(root, file), true);
+	assert.equal(fixtureText(root, 'src/main.ts'), `/**\n * src/main.ts\n * Runtime contract for the shared shadcn component size scale.\n */\n\nconst size = 8;\nvoid size;\n`);
+	assert.equal(maintainSrcFile(root, file), false);
+});
 test('maintainSrcFile heals orphaned duplicate header fragments and merges adjacent descriptions', () => {
 	const root = fixtureRoot('terra-quality-document-header-healing-');
 	const file = fixtureFile(
@@ -199,6 +206,20 @@ function read() { return true; }
 	assert.doesNotMatch(src, /Stale description from a removed declaration/);
 	assert.doesNotMatch(src, /This comment has no symbol/);
 	assert.equal((src.match(/Final description for the helper/g) ?? []).length, 1);
+	assert.equal(maintainSrcFile(root, file), false);
+});
+
+test('maintenance removes superseded TSDoc after a managed section marker', () => {
+	const root = fixtureRoot('terra-quality-detached-tsdoc-section-');
+	const file = fixtureFile(
+		root,
+		'src/main.ts',
+		`/** src/main.ts */\n\n/*//////////////////////////////////////////////////\nHELPERS\n//////////////////////////////////////////////////*/\n\n/** Stale description from a removed declaration. */\n\n/** Final description for the helper. */\nfunction read() { return true; }\n`,
+	);
+	assert.equal(maintainSrcFile(root, file), true);
+	const src = fixtureText(root, 'src/main.ts');
+	assert.match(src, /Final description for the helper/);
+	assert.doesNotMatch(src, /Stale description from a removed declaration/);
 	assert.equal(maintainSrcFile(root, file), false);
 });
 

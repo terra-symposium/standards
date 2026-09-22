@@ -1,5 +1,11 @@
 # @terra-symposium/quality
 
+## 0.4.34
+
+### Patch Changes
+
+- Normalize compact file headers with their repository path and remove superseded TSDoc after section organization.
+
 ## 0.4.33
 
 ### Patch Changes

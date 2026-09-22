@@ -21,6 +21,7 @@ REGEX
 //////////////////////////////////////////////////*/
 
 const T_R_N_S_S_R_N_T_T_R_N_REGEX = /^\/\*\*[ \t]*\r?\n([\s\S]*?)\r?\n[ \t]*\*\/[ \t]*(?:\r?\n)*/;
+const COMPACT_TSDOC_HEADER_REGEX = /^\/\*\*[ \t]+([^\r\n]*?)[ \t]*\*\/[ \t]*(?:\r?\n)*/;
 const R_N_REGEX = /\r?\n/;
 const T_T_REGEX = /^[ \t]*\*[ \t]?/;
 const S_REGEX = /^\s*/;
@@ -587,18 +588,21 @@ export function maintainSrcFile(root: string, fileName: string): boolean {
 	src = removeDetachedTSDoc(src, fileName);
 	src = removeEmptyManagedSects(src, fileName);
 	const existingHeader = src.match(T_R_N_S_S_R_N_T_T_R_N_REGEX);
+	const compactHeader = existingHeader ? null : src.match(COMPACT_TSDOC_HEADER_REGEX);
 	const headerLines =
 		existingHeader?.[1]
 			.split(R_N_REGEX)
 			.map((l) => l.replace(T_T_REGEX, '').trim())
-			.filter(Boolean) ?? [];
-	const headerDescription = headerLines.slice(1);
+			.filter(Boolean) ?? (compactHeader?.[1].trim() ? [compactHeader[1].trim()] : []);
+	const headerDescription = existingHeader ? headerLines.slice(1) : headerLines;
 	const header = ['/**', path, ...headerDescription, ' */'].map((l, i) => (i === 0 ? l : i === headerDescription.length + 2 ? l : ` * ${l}`)).join(eol);
 	if (existingHeader && (headerLines[0]?.includes('/') || /\.(?:c|m)?(?:js|ts)x?$/.test(headerLines[0] ?? ''))) {
 		src = src.replace(T_R_N_S_S_R_N_T_T_R_N_REGEX, `${header}${eol}${eol}`);
 		const escapedPath = path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 		const duplicateHeader = new RegExp(`^(\\/\\*\\*\\r?\\n \\* ${escapedPath}\\r?\\n \\*\\/)(?:\\r?\\n)+\\1(?:\\r?\\n)+`);
 		src = src.replace(duplicateHeader, `$1${eol}${eol}`);
+	} else if (compactHeader) {
+		src = src.replace(COMPACT_TSDOC_HEADER_REGEX, `${header}${eol}${eol}`);
 	} else if (!src.startsWith('#!') && !src.startsWith('/**')) src = `${header}${eol}${eol}${src}`;
 	const parsed = ts.createSourceFile(fileName, src, ts.ScriptTarget.Latest, true, srcKind(fileName));
 	const imports = parsed.statements.filter((n): n is ts.ImportDeclaration => ts.isImportDeclaration(n) && !selfImportConflicts(parsed, n));
@@ -823,6 +827,7 @@ function removeDetachedTSDoc(src: string, fileName: string): string {
 	if (!comments.length) return src;
 	const byStart = new Map(blocks.map((b) => [b.start, b]));
 	const keep = new Set<number>();
+	const superseded = new Set<number>();
 	const attached = new Set<number>();
 	const header = fileHeaderBlock(src, blocks) ?? topLevelTSDocBlock(src, blocks);
 	if (header) keep.add(header.start);
@@ -833,12 +838,15 @@ function removeDetachedTSDoc(src: string, fileName: string): string {
 			const leading = ts.getLeadingCommentRanges(src, node.getFullStart()) ?? [];
 			const docs = leading.map((r) => byStart.get(r.pos)).filter((b): b is TSDocBlock => Boolean(b));
 			const final = docs.at(-1);
-			if (final) keep.add(final.start);
+			if (final) {
+				keep.add(final.start);
+				for (const prior of docs.slice(0, -1)) superseded.add(prior.start);
+			}
 		}
 		ts.forEachChild(node, visit);
 	};
 	visit(parsed);
-	const removals = comments.filter((comment) => comment.text.startsWith('/**') ? !keep.has(comment.start) : !attached.has(comment.start)).sort((a, b) => b.start - a.start);
+	const removals = comments.filter((comment) => comment.text.startsWith('/**') ? superseded.has(comment.start) || !keep.has(comment.start) : !attached.has(comment.start)).sort((a, b) => b.start - a.start);
 	return removals.reduce((t, b) => `${t.slice(0, b.start)}${t.slice(b.end)}`, src);
 }
 
