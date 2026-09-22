@@ -1,6 +1,6 @@
 {
 	"name": "@terra-symposium/quality",
-	"version": "0.4.32",
+	"version": "0.4.33",
 	"description": "Configurable quality checks and maintenance tooling for Terra Symposium repositories",
 	"type": "module",
 	"engines": {

@@ -1,5 +1,11 @@
 # @terra-symposium/quality
 
+## 0.4.33
+
+### Patch Changes
+
+- Remove detached ordinary comments and comment-only managed sections during source maintenance, including orphan documentation discovered through AST trivia around template literals.
+
 ## 0.4.32
 
 ### Patch Changes

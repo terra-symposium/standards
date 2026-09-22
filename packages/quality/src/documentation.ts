@@ -434,6 +434,37 @@ function removeManagedSects(src: string, fileName: string): string {
 }
 
 /**
+ * Removes managed sections whose body contains only comments and whitespace.
+ *
+ * @param src Source text containing possible managed sections.
+ * @param fileName Filename used to protect section-shaped text inside literals.
+ *
+ * @return Source text without empty managed sections.
+ */
+function removeEmptyManagedSects(src: string, fileName: string): string {
+	const spans = literalSpans(src, fileName);
+	const comments = sourceCommentRanges(src, ts.createSourceFile(fileName, src, ts.ScriptTarget.Latest, true, documentationScriptKind(fileName)));
+	const isLiteral = (position: number): boolean => spans.some((span) => position >= span.start && position < span.end);
+	const sectionPattern = /^[ \t]*\/\*\/{10,}[ \t]*\r?\n[ \t]*(IMPORTS|CONFIG|HELPERS)[ \t]*\r?\n[ \t]*\/{10,}\*\/[ \t]*(?:\r?\n)?/gm;
+	const sections = [...src.matchAll(sectionPattern)]
+		.filter((m) => !isLiteral(m.index ?? 0))
+		.map((m) => ({ start: m.index ?? 0, end: (m.index ?? 0) + m[0].length, label: m[1]! }));
+	const removals: { start: number; end: number }[] = [];
+	for (let index = 0; index < sections.length; index += 1) {
+		const section = sections[index]!;
+		const bodyEnd = sections[index + 1]?.start ?? src.length;
+		let body = src.slice(section.end, bodyEnd);
+		const bodyStart = section.end;
+		const edits = comments
+			.filter((comment) => comment.start >= bodyStart && comment.end <= bodyEnd)
+			.sort((a, b) => b.start - a.start);
+		for (const comment of edits) body = `${body.slice(0, comment.start - bodyStart)}${body.slice(comment.end - bodyStart)}`;
+		if (!body.trim()) removals.push({ start: section.start, end: bodyEnd });
+	}
+	return removals.sort((a, b) => b.start - a.start).reduce((text, removal) => `${text.slice(0, removal.start)}${text.slice(removal.end)}`, src);
+}
+
+/**
  * Rebuilds a function's TSDoc layout while preserving existing summary and tag prose.
  *
  * @param n Function declaration whose current parameter list controls required parameter tags.
@@ -554,6 +585,7 @@ export function maintainSrcFile(root: string, fileName: string): boolean {
 	const path = relative(root, fileName).split(sep).join('/');
 	src = healHeaderFragments(src, path, eol);
 	src = removeDetachedTSDoc(src, fileName);
+	src = removeEmptyManagedSects(src, fileName);
 	const existingHeader = src.match(T_R_N_S_S_R_N_T_T_R_N_REGEX);
 	const headerLines =
 		existingHeader?.[1]
@@ -587,6 +619,7 @@ export function maintainSrcFile(root: string, fileName: string): boolean {
 		src = `${src.slice(0, start).replace(S_CLASS_4, `${eol}${eol}`)}${block}${src.slice(last.end).replace(S_REGEX, eol)}`;
 	}
 	src = organizeSrcSects(src, fileName, eol);
+	src = removeEmptyManagedSects(src, fileName);
 	const norm = src
 		.replace(/^([ \t]*)\/\*\/{10,}[ \t]*$/gm, `$1${OPEN}`)
 		.replace(/^([ \t]*)\/{10,}\*\/[ \t]*$/gm, `$1${CLOSE}`)
@@ -716,15 +749,33 @@ function documentationNodeName(node: ts.Node): string {
  *
  * @return TSDoc blocks with their source offsets and original text.
  */
-function tsdocBlocks(src: string, parsed: ts.SourceFile): TSDocBlock[] {
+function sourceCommentRanges(src: string, parsed: ts.SourceFile): { start: number; end: number; kind: ts.CommentKind; text: string }[] {
+	const ranges = new Map<number, { start: number; end: number; kind: ts.CommentKind; text: string }>();
+	const add = (range: ts.CommentRange): void => {
+		const text = src.slice(range.pos, range.end);
+		if (!text.startsWith('//') && !text.startsWith('/*')) return;
+		ranges.set(range.pos, { start: range.pos, end: range.end, kind: range.kind, text });
+	};
 	const scanner = ts.createScanner(ts.ScriptTarget.Latest, false, parsed.languageVariant, src);
-	const blocks: TSDocBlock[] = [];
 	for (let token = scanner.scan(); token !== ts.SyntaxKind.EndOfFileToken; token = scanner.scan()) {
-		if (token !== ts.SyntaxKind.MultiLineCommentTrivia) continue;
 		const text = scanner.getTokenText();
-		if (text.startsWith('/**')) blocks.push({ start: scanner.getTokenPos(), end: scanner.getTextPos(), text });
+		if (text.startsWith('//') || text.startsWith('/*')) add({ pos: scanner.getTokenPos(), end: scanner.getTextPos(), kind: token as ts.CommentKind });
 	}
-	return blocks;
+	const visit = (node: ts.Node): void => {
+		if (node.kind !== ts.SyntaxKind.EndOfFileToken) {
+			for (const range of ts.getLeadingCommentRanges(src, node.getFullStart()) ?? []) add(range);
+			for (const range of ts.getTrailingCommentRanges(src, node.end) ?? []) add(range);
+		}
+		ts.forEachChild(node, visit);
+	};
+	visit(parsed);
+	return [...ranges.values()].sort((a, b) => a.start - b.start);
+}
+
+function tsdocBlocks(src: string, parsed: ts.SourceFile): TSDocBlock[] {
+	return sourceCommentRanges(src, parsed)
+		.filter((comment) => comment.text.startsWith('/**'))
+		.map((comment) => ({ start: comment.start, end: comment.end, text: comment.text }));
 }
 
 /**
@@ -767,13 +818,17 @@ function isDocumentableNode(node: ts.Node): boolean {
  */
 function removeDetachedTSDoc(src: string, fileName: string): string {
 	const parsed = ts.createSourceFile(fileName, src, ts.ScriptTarget.Latest, true, documentationScriptKind(fileName));
-	const blocks = tsdocBlocks(src, parsed);
-	if (!blocks.length) return src;
+	const comments = sourceCommentRanges(src, parsed);
+	const blocks = comments.filter((comment) => comment.text.startsWith('/**')).map((comment) => ({ start: comment.start, end: comment.end, text: comment.text }));
+	if (!comments.length) return src;
 	const byStart = new Map(blocks.map((b) => [b.start, b]));
 	const keep = new Set<number>();
+	const attached = new Set<number>();
 	const header = fileHeaderBlock(src, blocks);
 	if (header) keep.add(header.start);
 	const visit = (node: ts.Node): void => {
+		if (node.kind !== ts.SyntaxKind.EndOfFileToken)
+			for (const range of [...(ts.getLeadingCommentRanges(src, node.getFullStart()) ?? []), ...(ts.getTrailingCommentRanges(src, node.end) ?? [])]) attached.add(range.pos);
 		if (isDocumentableNode(node)) {
 			const leading = ts.getLeadingCommentRanges(src, node.getFullStart()) ?? [];
 			const docs = leading.map((r) => byStart.get(r.pos)).filter((b): b is TSDocBlock => Boolean(b));
@@ -783,7 +838,7 @@ function removeDetachedTSDoc(src: string, fileName: string): string {
 		ts.forEachChild(node, visit);
 	};
 	visit(parsed);
-	const removals = blocks.filter((b) => !keep.has(b.start)).sort((a, b) => b.start - a.start);
+	const removals = comments.filter((comment) => comment.text.startsWith('/**') ? !keep.has(comment.start) : !attached.has(comment.start)).sort((a, b) => b.start - a.start);
 	return removals.reduce((t, b) => `${t.slice(0, b.start)}${t.slice(b.end)}`, src);
 }
 

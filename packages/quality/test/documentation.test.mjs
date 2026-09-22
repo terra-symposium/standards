@@ -201,3 +201,106 @@ function read() { return true; }
 	assert.equal((src.match(/Final description for the helper/g) ?? []).length, 1);
 	assert.equal(maintainSrcFile(root, file), false);
 });
+
+test('maintenance removes detached TSDoc discovered through AST trivia around template literals', () => {
+	const root = fixtureRoot('terra-quality-detached-comments-template-');
+	const file = fixtureFile(
+		root,
+		'src/main.ts',
+		`/** src/main.ts */
+function before(count: number) {
+		return \`${'${count}'} trust evidence\`;
+}
+
+/**
+ * Returns trust diagnosis priority.
+ *
+ * @param params Validated options controlling the operation.
+ *
+ * @return The trust diagnosis priority result.
+ */
+
+/**
+ * Returns build opportunity trust diagnosis.
+ *
+ * @param params Validated options controlling the operation.
+ *
+ * @return The constructed build opportunity trust diagnosis.
+ */
+
+/**
+ * Returns trust priority for candidate.
+ *
+ * @param params Validated options controlling the operation.
+ *
+ * @return The trust priority for candidate result.
+ */
+
+/** The real helper documentation. */
+function after() { return true; }
+void [before, after];
+`,
+	);
+	assert.equal(maintainSrcFile(root, file), true);
+	const src = readFileSync(file, 'utf8');
+	assert.doesNotMatch(src, /Returns trust diagnosis priority/);
+	assert.doesNotMatch(src, /Returns build opportunity trust diagnosis/);
+	assert.doesNotMatch(src, /Returns trust priority for candidate/);
+	assert.match(src, /The real helper documentation/);
+	assert.match(src, /\$\{count\} trust evidence/);
+});
+
+test('maintenance removes comment-only managed sections and groups while preserving literal text', () => {
+	const root = fixtureRoot('terra-quality-empty-sections-');
+	const file = fixtureFile(
+		root,
+		'src/main.ts',
+		`/** src/main.ts */
+/*//////////////////////////////////////////////////
+IMPORTS
+//////////////////////////////////////////////////*/
+// API
+// TYPES
+
+/*//////////////////////////////////////////////////
+CONFIG
+//////////////////////////////////////////////////*/
+// stale configuration notes
+
+/*//////////////////////////////////////////////////
+HELPERS
+//////////////////////////////////////////////////*/
+const literal = '/*//////////////////////////////////////////////////\\nIMPORTS\\n//////////////////////////////////////////////////*/';
+const value = true;
+void [literal, value];
+`,
+	);
+	assert.equal(maintainSrcFile(root, file), true);
+	const src = readFileSync(file, 'utf8');
+	assert.doesNotMatch(src, /\/\*\/{10,}\s*\r?\n\s*IMPORTS\s*\r?\n\s*\/{10,}\*\//);
+	assert.doesNotMatch(src, /stale configuration notes/);
+	assert.match(src, /const literal/);
+	assert.match(src, /const value/);
+});
+
+test('maintenance removes detached ordinary comments but keeps comments owned by syntax and literals', () => {
+	const root = fixtureRoot('terra-quality-detached-ordinary-comments-');
+	const file = fixtureFile(
+		root,
+		'src/main.ts',
+		`/** src/main.ts */
+// Keep this comment with the helper.
+function helper() { return true; }
+const literal = \`// This is literal text\n/** This is also literal text */\`;
+
+// This comment belongs to nothing.
+/* This block belongs to nothing. */
+`,
+	);
+	assert.equal(maintainSrcFile(root, file), true);
+	const src = readFileSync(file, 'utf8');
+	assert.match(src, /Keep this comment with the helper/);
+	assert.match(src, /This is literal text/);
+	assert.doesNotMatch(src, /This comment belongs to nothing/);
+	assert.doesNotMatch(src, /This block belongs to nothing/);
+});
