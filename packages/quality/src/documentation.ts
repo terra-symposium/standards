@@ -824,7 +824,7 @@ function removeDetachedTSDoc(src: string, fileName: string): string {
 	const byStart = new Map(blocks.map((b) => [b.start, b]));
 	const keep = new Set<number>();
 	const attached = new Set<number>();
-	const header = fileHeaderBlock(src, blocks);
+	const header = fileHeaderBlock(src, blocks) ?? topLevelTSDocBlock(src, blocks);
 	if (header) keep.add(header.start);
 	const visit = (node: ts.Node): void => {
 		if (node.kind !== ts.SyntaxKind.EndOfFileToken)
@@ -873,6 +873,23 @@ function fileHeaderBlock(src: string, blocks: TSDocBlock[]): TSDocBlock | undefi
 		let prefix = src.slice(0, b.start).replace(UFEFF_REGEX, '');
 		if (prefix.startsWith('#!')) prefix = prefix.slice(prefix.indexOf('\n') + 1);
 		return prefix.trim() === '' && tsdocLines(b).some((l) => C_M_JS_JSX_TS_TSX_REGEX.test(l.text));
+	});
+}
+
+/**
+ * Finds the first top-level TSDoc block, including compact file comments that
+ * do not contain the generated path header.
+ *
+ * @param src Source text to inspect.
+ * @param blocks TSDoc blocks found in the source.
+ *
+ * @return The first top-level TSDoc block, or `undefined` when none exists.
+ */
+function topLevelTSDocBlock(src: string, blocks: TSDocBlock[]): TSDocBlock | undefined {
+	return blocks.find((block) => {
+		let prefix = src.slice(0, block.start).replace(UFEFF_REGEX, '');
+		if (prefix.startsWith('#!')) prefix = prefix.slice(prefix.indexOf('\n') + 1);
+		return prefix.trim() === '';
 	});
 }
 
