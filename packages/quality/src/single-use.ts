@@ -9,8 +9,8 @@ IMPORTS
 
 // API
 import ts from 'typescript';
-import { join, relative, resolve } from 'node:path';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { join, relative } from 'node:path';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { srcFiles } from './files.js';
 
 // TYPES
@@ -22,21 +22,25 @@ REGEX
 
 const C_M_JS_JSX_TS_TSX_REGEX = /\.(?:c|m)?(?:js|jsx|ts|tsx)$/;
 export type SingleUseFinding = { file: string; line: number; name: string; decision: 'INLINE' | 'KEEP' | 'REVIEW'; reason: string };
-export type CssSingleUseFinding = { file: string; line: number; name: string; decision: 'INLINE'; reason: string; uses: number; selector: string };
-export type SingleUseReportFinding = SingleUseFinding | CssSingleUseFinding;
 type Candidate = { file: string; source: ts.SourceFile; statement: ts.Statement; name: ts.Identifier; symbol: ts.Symbol; kind: 'type' | 'interface' | 'variable' | 'function' };
 type Reference = { file: string; source: ts.SourceFile; node: ts.Identifier };
+const isExported = (s: ts.Statement): boolean => ts.canHaveModifiers(s) && ts.getModifiers(s)?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword) === true;
 const canonical = (c: ts.TypeChecker, s: ts.Symbol | undefined): ts.Symbol | undefined => (s && s.flags & ts.SymbolFlags.Alias ? c.getAliasedSymbol(s) : s);
 const isCandidateStatement = (s: ts.Statement): boolean =>
 	ts.isTypeAliasDeclaration(s) ||
 	ts.isInterfaceDeclaration(s) ||
 	ts.isFunctionDeclaration(s) ||
 	(ts.isVariableStatement(s) && s.declarationList.declarations.length === 1 && ts.isIdentifier(s.declarationList.declarations[0]?.name));
-
-const unwrapInit = (expr: ts.Expression): ts.Expression => {
-	let curr = expr;
-	while (ts.isAsExpression(curr) || ts.isTypeAssertionExpression(curr) || ts.isParenthesizedExpression(curr) || ts.isSatisfiesExpression(curr)) curr = curr.expression;
-	return curr;
+const unwrapInitializer = (expression: ts.Expression): ts.Expression => {
+	let current = expression;
+	while (
+		ts.isAsExpression(current) ||
+		ts.isTypeAssertionExpression(current) ||
+		ts.isParenthesizedExpression(current) ||
+		ts.isSatisfiesExpression(current)
+	)
+		current = current.expression;
+	return current;
 };
 const isImportNode = (n: ts.Node): boolean => {
 	const src = n.getSourceFile();
@@ -87,7 +91,7 @@ function collect(cfg: QualityCfg, program: ts.Program, checker: ts.TypeChecker):
 	const roots = [...cfg.sourceRoots, ...(cfg.includeRoots ?? [])];
 	const inScope = (file: string): boolean => roots.some((r) => file === r || file.startsWith(`${r}/`));
 	for (const source of program.getSourceFiles()) {
-		if (!inScope(source.fileName) || source.isDeclarationFile || !C_M_JS_JSX_TS_TSX_REGEX.test(source.fileName)) continue;
+		if (!inScope(source.fileName) || !C_M_JS_JSX_TS_TSX_REGEX.test(source.fileName)) continue;
 		const visitCandidates = (node: ts.Node): void => {
 			if (!isCandidateStatement(node as ts.Statement)) {
 				ts.forEachChild(node, visitCandidates);
@@ -119,11 +123,10 @@ function collect(cfg: QualityCfg, program: ts.Program, checker: ts.TypeChecker):
 	}
 	const candidateSymbols = new Set(candidates.map((c) => c.symbol));
 	for (const src of program.getSourceFiles()) {
-		if (!inScope(src.fileName) || src.isDeclarationFile || !C_M_JS_JSX_TS_TSX_REGEX.test(src.fileName)) continue;
+		if (!inScope(src.fileName) || !C_M_JS_JSX_TS_TSX_REGEX.test(src.fileName)) continue;
 		const visit = (node: ts.Node): void => {
 			if (ts.isIdentifier(node)) {
 				let importUse = false;
-				const exportUse = ts.isExportSpecifier(node.parent);
 				for (let parent: ts.Node | undefined = node.parent; parent && !ts.isSourceFile(parent); parent = parent.parent) {
 					if (ts.isImportDeclaration(parent)) {
 						importUse = true;
@@ -132,7 +135,7 @@ function collect(cfg: QualityCfg, program: ts.Program, checker: ts.TypeChecker):
 				}
 				const shorthandSymbol = ts.isShorthandPropertyAssignment(node.parent) ? checker.getShorthandAssignmentValueSymbol(node.parent) : undefined;
 				const symbol = canonical(checker, shorthandSymbol ?? checker.getSymbolAtLocation(node));
-				if (!importUse && !exportUse && symbol && candidateSymbols.has(symbol)) {
+				if (!importUse && symbol && candidateSymbols.has(symbol)) {
 					const declaration = declarationByLocation.get(`${src.fileName}:${node.getStart(src)}`);
 					if (!declaration) references.set(symbol, [...(references.get(symbol) ?? []), { file: src.fileName, source: src, node }]);
 				}
@@ -153,12 +156,24 @@ function collect(cfg: QualityCfg, program: ts.Program, checker: ts.TypeChecker):
  */
 function classify(candidate: Candidate): [SingleUseFinding['decision'], string] {
 	if (candidate.kind === 'type' || candidate.kind === 'interface') return ['INLINE', 'single-use type can be inlined at its only consumer'];
-	if (candidate.kind === 'function') return ['INLINE', 'single-use function can be inlined at its only consumer'];
+	if (isExported(candidate.statement)) return ['KEEP', 'exported declaration/public contract'];
+	if (candidate.kind === 'function') return ['KEEP', 'callable or rendering boundary'];
 	const declaration = ts.isVariableStatement(candidate.statement) ? candidate.statement.declarationList.declarations[0]! : undefined;
-	if (!declaration?.initializer) return ['INLINE', 'single-use declaration must be collapsed at its only consumer'];
-	const init = unwrapInit(declaration.initializer);
-	if (ts.isArrowFunction(init) || ts.isFunctionExpression(init)) return ['INLINE', 'single-use function can be inlined at its only consumer'];
-	return ['INLINE', 'single-use declaration can be inlined at its only consumer'];
+	if (!declaration) return ['REVIEW', 'declaration has no inlineable initializer'];
+	if (!declaration.initializer) return ['REVIEW', 'declaration has no inlineable initializer'];
+	const initializer = unwrapInitializer(declaration.initializer);
+	if (ts.isArrowFunction(initializer) || ts.isFunctionExpression(initializer)) return ['KEEP', 'callable or rendering boundary'];
+	if (ts.isAwaitExpression(initializer) || ts.isCallExpression(initializer) || ts.isNewExpression(initializer)) return ['KEEP', 'runtime/workflow boundary'];
+	if (
+		ts.isObjectLiteralExpression(initializer) ||
+		ts.isArrayLiteralExpression(initializer) ||
+		ts.isStringLiteral(initializer) ||
+		ts.isNumericLiteral(initializer) ||
+		[ts.SyntaxKind.TrueKeyword, ts.SyntaxKind.FalseKeyword, ts.SyntaxKind.NullKeyword].includes(initializer.kind)
+	)
+		return ['INLINE', 'pure single-use data'];
+	if (declaration.initializer.getText(candidate.source).length > 800) return ['REVIEW', 'large declaration; preserve readability'];
+	return ['REVIEW', 'single-use expression requires semantic review'];
 }
 
 /**
@@ -212,161 +227,6 @@ export function singleUseFindings(cfg: QualityCfg): SingleUseFinding[] {
 }
 
 /**
- * Removes CSS comments without changing line offsets used by diagnostics.
- *
- * @param css Stylesheet source text.
- *
- * @return CSS source with comment characters replaced by spaces.
- */
-function maskCssComments(css: string): string {
-	return css.replace(/\/\*[\s\S]*?\*\//g, (comment) => comment.replace(/[^\r\n]/g, ' '));
-}
-
-/**
- * Collects source files that can contain class attributes or class-list calls.
- * CSS itself is intentionally excluded from consumer counts.
- *
- * @param cfg Quality configuration defining source roots and exclusions.
- *
- * @return Absolute source paths eligible for CSS class-use counting.
- */
-function cssConsumerFiles(cfg: QualityCfg): string[] {
-	const exts = new Set([...cfg.extensions, '.astro', '.html', '.js', '.jsx', '.mjs', '.cjs', '.ts', '.tsx', '.mts', '.cts']);
-	return srcFiles({ ...cfg, extensions: [...exts] }).filter((f) => !f.endsWith('.css'));
-}
-
-/**
- * Counts literal class-name consumers while avoiding ordinary prose and
- * identifiers that happen to share a CSS class name. The matcher covers HTML/
- * Astro attributes, JSX className expressions, class-list mutations, and the
- * common `cn`/`clsx` helper boundary.
- *
- * @param cfg Quality configuration defining source roots and exclusions.
- * @param name CSS class name to find.
- *
- * @return Number of source-level consumers of the class.
- */
-function cssClassUseCount(cfg: QualityCfg, name: string): number {
-	const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-	const token = new RegExp(`(?<![A-Za-z0-9_-])${escaped}(?![A-Za-z0-9_-])`, 'g');
-	let count = 0;
-	for (const file of cssConsumerFiles(cfg)) {
-		const src = readFileSync(file, 'utf8');
-		for (const match of src.matchAll(token)) {
-			const offset = match.index ?? 0;
-			const ctx = src.slice(Math.max(0, offset - 180), offset + name.length);
-			if (/\b(?:class|className|bodyClass)\s*=|\bclassList\.(?:add|remove|toggle)\s*\(|\b(?:cn|clsx)\s*\(/.test(ctx)) count += 1;
-		}
-	}
-	return count;
-}
-
-/**
- * Resolves CSS files inside configured roots plus the configured canonical
- * stylesheet. The canonical stylesheet is included even when repositories use
- * a TypeScript-only `extensions` list.
- *
- * @param cfg Quality configuration defining source roots and exclusions.
- *
- * @return Sorted absolute CSS paths in scope.
- */
-function cssFiles(cfg: QualityCfg): string[] {
-	const roots = [...cfg.sourceRoots, ...(cfg.includeRoots ?? [])];
-	const discovered = srcFiles({ ...cfg, extensions: ['.css'] });
-	const cfgd = cfg.tailwindCanonical?.stylesheet ? [resolve(cfg.root, cfg.tailwindCanonical.stylesheet)] : [];
-	return [...new Set([...discovered, ...cfgd].filter((f) => existsSync(f)))].filter((f) => {
-		return roots.some((r) => f === r || f.startsWith(`${r}/`)) || cfgd.includes(f);
-	});
-}
-
-/**
- * Walks stylesheet blocks while preserving whether a selector is nested inside
- * a responsive or conditional at-rule. A class used in those contexts cannot
- * be faithfully represented by one inline style declaration.
- *
- * @param css Comment-masked stylesheet source.
- *
- * @return Selectors and their source offsets, including non-inline contexts.
- */
-function cssBlocks(css: string): Array<{ selector: string; offset: number; nonInlineContext: boolean }> {
-	const blocks: Array<{ selector: string; offset: number; nonInlineContext: boolean }> = [];
-	const ctx: boolean[] = [];
-	let segmentStart = 0;
-	let quote: string | undefined;
-	for (let i = 0; i < css.length; i += 1) {
-		const char = css[i];
-		if (quote) {
-			if (char === '\\') i += 1;
-			else if (char === quote) quote = undefined;
-			continue;
-		}
-		if (char === '"' || char === "'") {
-			quote = char;
-			continue;
-		}
-		if (char === '{') {
-			const rawSelector = css.slice(segmentStart, i).trim();
-			const selectorOffset = segmentStart + css.slice(segmentStart, i).search(/\S/);
-			const parentNonInline = ctx.some(Boolean);
-			const atRule = rawSelector.startsWith('@');
-			const nonInlineAtRule = /^@(media|supports|container|document|starting-style)\b/i.test(rawSelector);
-			if (rawSelector && !atRule && selectorOffset >= segmentStart) blocks.push({ selector: rawSelector, offset: selectorOffset, nonInlineContext: parentNonInline });
-			ctx.push(parentNonInline || nonInlineAtRule);
-			segmentStart = i + 1;
-			continue;
-		}
-		if (char === '}') {
-			ctx.pop();
-			segmentStart = i + 1;
-			continue;
-		}
-		if (char === ';' && ctx.length === 0) segmentStart = i + 1;
-	}
-	return blocks;
-}
-
-/**
- * Reports CSS class selectors that have exactly one source-level consumer.
- * These are advisory findings because CSS selectors can include responsive,
- * pseudo-class, descendant, and stateful behavior that should be reviewed
- * before moving declarations to an element's style attribute.
- *
- * @param cfg Quality configuration defining the source roots and stylesheet.
- *
- * @return CSS single-use recommendations with stylesheet locations.
- */
-export function cssSingleUseFindings(cfg: QualityCfg): CssSingleUseFinding[] {
-	const findings: CssSingleUseFinding[] = [];
-	const ignored = new Set(['dark', 'light', 'is-active']);
-	for (const file of cssFiles(cfg)) {
-		const css = readFileSync(file, 'utf8');
-		const masked = maskCssComments(css);
-		const seen = new Map<string, { line: number; selectors: Set<string>; unsafe: boolean }>();
-		for (const block of cssBlocks(masked)) {
-			const { selector, offset: selectorOffset } = block;
-			for (const classMatch of selector.matchAll(/\.([A-Za-z_][\w-]*)/g)) {
-				const name = classMatch[1];
-				if (!name || ignored.has(name)) continue;
-				const existing = seen.get(name);
-				if (existing) {
-					existing.selectors.add(selector);
-					existing.unsafe ||= block.nonInlineContext;
-					continue;
-				}
-				seen.set(name, { line: masked.slice(0, selectorOffset + (classMatch.index ?? 0)).split('\n').length, selectors: new Set([selector]), unsafe: block.nonInlineContext });
-			}
-		}
-		for (const [name, location] of seen) {
-			const uses = cssClassUseCount(cfg, name);
-			const selector = `.${name}`;
-			if (uses !== 1 || location.unsafe || location.selectors.size !== 1 || !location.selectors.has(selector)) continue;
-			findings.push({ file: relative(cfg.root, file), line: location.line, name, decision: 'INLINE', reason: 'single-use direct CSS class should be inlined at its consumer', uses, selector });
-		}
-	}
-	return findings.sort((a, b) => a.file.localeCompare(b.file) || a.line - b.line || a.name.localeCompare(b.name));
-}
-
-/**
  * Finds the source span of an imported named binding that refers to a target symbol.
  *
  * @param reference Consumer reference whose import statement may be edited.
@@ -392,77 +252,7 @@ function importEdit(reference: Reference, checker: ts.TypeChecker, tgt: ts.Symbo
 }
 
 /**
- * Builds the expression that replaces a single-use declaration at its consumer.
- * Function declarations become named function expressions so their parameters,
- * closures, async/generator modifiers, and return behavior remain intact.
- *
- * @param candidate Single-use declaration selected for inlining.
- *
- * @return Source text for the consumer expression, or `null` when the declaration cannot be collapsed.
- */
-function inlineReplacement(candidate: Candidate): string | null {
-	if (ts.isTypeAliasDeclaration(candidate.statement)) return `(${candidate.statement.type.getText(candidate.source)})`;
-	if (ts.isInterfaceDeclaration(candidate.statement)) return `({ ${candidate.statement.members.map((m) => m.getText(candidate.source)).join(' ')} })`;
-	if (ts.isFunctionDeclaration(candidate.statement)) {
-		if (!candidate.statement.body) return null;
-		const src = candidate.statement
-			.getText(candidate.source)
-			.replace(/^export\s+default\s+/, '')
-			.replace(/^export\s+/, '')
-			.replace(/^declare\s+/, '');
-		return `(${src})`;
-	}
-	if (ts.isVariableStatement(candidate.statement)) {
-		const init = candidate.statement.declarationList.declarations[0]?.initializer;
-		return init ? `(${init.getText(candidate.source)})` : null;
-	}
-	return null;
-}
-
-/**
- * Returns the edit span for a reference, expanding shorthand object properties
- * so that an inlined expression remains valid JavaScript/TypeScript syntax.
- *
- * @param reference Single consumer reference.
- * @param replacement Replacement expression.
- *
- * @return Source edit for the consumer reference.
- */
-function jsxInlineCall(reference: Reference, replacement: string): { start: number; end: number; text: string } | null {
-	const opening = reference.node.parent;
-	if (!ts.isJsxOpeningElement(opening) && !ts.isJsxSelfClosingElement(opening)) return null;
-	if (opening.tagName !== reference.node) return null;
-	const selfClosing = ts.isJsxSelfClosingElement(opening);
-	const element = selfClosing ? opening : ts.isJsxElement(opening.parent) ? opening.parent : null;
-	if (!element) return null;
-	const propertyName = (attr: ts.JsxAttribute): string => JSON.stringify(attr.name.getText(reference.source));
-	const attrs = opening.attributes.properties.map((a) => {
-		if (ts.isJsxSpreadAttribute(a)) return `...${a.expression.getText(reference.source)}`;
-		if (!a.initializer) return `${propertyName(a)}: true`;
-		if (ts.isStringLiteral(a.initializer)) return `${propertyName(a)}: ${JSON.stringify(a.initializer.text)}`;
-		if (ts.isJsxExpression(a.initializer)) return `${propertyName(a)}: ${a.initializer.expression?.getText(reference.source) ?? 'undefined'}`;
-		return `${propertyName(a)}: ${a.initializer.getText(reference.source)}`;
-	});
-	if (!selfClosing && ts.isJsxElement(element) && element.children.length) {
-		attrs.push(`children: <>${element.children.map((c) => c.getText(reference.source)).join('')}</>`);
-	}
-	const call = `React.createElement(${replacement} as React.ElementType, { ${attrs.join(', ')} } as Record<string, unknown>)`;
-	const text = ts.isJsxElement(element.parent) || ts.isJsxFragment(element.parent) ? `{${call}}` : call;
-	return { start: element.getStart(reference.source), end: element.getEnd(), text };
-}
-
-function referenceEdit(reference: Reference, replacement: string): { start: number; end: number; text: string } {
-	const jsxEdit = jsxInlineCall(reference, replacement);
-	if (jsxEdit) return jsxEdit;
-	const parent = reference.node.parent;
-	if (ts.isShorthandPropertyAssignment(parent)) {
-		return { start: parent.getStart(reference.source), end: parent.getEnd(), text: `${reference.node.getText(reference.source)}: ${replacement}` };
-	}
-	return { start: reference.node.getStart(reference.source), end: reference.node.getEnd(), text: replacement };
-}
-
-/**
- * Inlines every single-use declaration that has an expression or function body.
+ * Inlines single-use type aliases, interfaces, and pure data declarations.
  *
  * @param cfg Quality configuration defining the source scope and files to rewrite.
  *
@@ -473,31 +263,34 @@ export function fixSingleUseDeclarations(cfg: QualityCfg): number {
 	const checker = program.getTypeChecker();
 	const { candidates, references: refs } = collect(cfg, program, checker);
 	const edits = new Map<string, { start: number; end: number; text: string }[]>();
-	const pending: Array<{ refFile: string; reference: { start: number; end: number; text: string }; edits: { file: string; start: number; end: number; text: string }[] }> = [];
 	for (const c of candidates) {
 		const uses = c.kind === 'type' || c.kind === 'interface' ? typeUses(cfg, c, program) : (refs.get(c.symbol) ?? []).filter((r) => !isImportNode(r.node));
 		if (uses.length !== 1) continue;
+		const canInlineData =
+			c.kind === 'variable' &&
+			classify(c)[0] === 'INLINE' &&
+			ts.isVariableStatement(c.statement) &&
+			c.statement.declarationList.flags & ts.NodeFlags.Const &&
+			c.statement.declarationList.declarations[0]?.type === undefined;
+		if ((c.kind !== 'type' && c.kind !== 'interface' && !canInlineData) || uses.length !== 1) continue;
 		const ref = uses[0]!;
-		const replacement = inlineReplacement(c);
+		const replacement = ts.isTypeAliasDeclaration(c.statement)
+			? c.statement.type.getText(c.source)
+			: ts.isInterfaceDeclaration(c.statement)
+				? `{ ${c.statement.members.map((m) => m.getText(c.source)).join(' ')} }`
+				: ts.isVariableStatement(c.statement)
+					? c.statement.declarationList.declarations[0]!.initializer?.getText(c.source) ?? ''
+					: '';
 		if (!replacement) continue;
-		const reference = referenceEdit(ref, replacement);
-		const candidateEdits = [{ file: ref.file, ...reference }];
-		const removedImport = importEdit(ref, checker, c.symbol);
-		if (removedImport) candidateEdits.push({ file: ref.file, ...removedImport, text: '' });
-		candidateEdits.push({ file: c.file, start: c.statement.getFullStart(), end: c.statement.getEnd(), text: '' });
-		pending.push({ refFile: ref.file, reference, edits: candidateEdits });
-	}
-	const selected: typeof pending = [];
-	for (const candidate of [...pending].sort((l, r) => {
-		const leftSize = l.reference.end - l.reference.start;
-		const rightSize = r.reference.end - r.reference.start;
-		return leftSize - rightSize || l.reference.start - r.reference.start;
-	})) {
-		const overlaps = selected.some((e) => candidate.edits.some((c) => e.edits.some((e) => e.file === c.file && c.start < e.end && e.start < c.end)));
-		if (!overlaps) selected.push(candidate);
-	}
-	for (const candidate of selected) {
-		for (const edit of candidate.edits) edits.set(edit.file, [...(edits.get(edit.file) ?? []), { start: edit.start, end: edit.end, text: edit.text }]);
+		const inlineReplacement = c.kind === 'variable' ? `(${replacement})` : replacement;
+		const tgtEdits = edits.get(ref.file) ?? [];
+		tgtEdits.push({ start: ref.node.getStart(ref.source), end: ref.node.getEnd(), text: inlineReplacement });
+		if (c.kind === 'type' || c.kind === 'interface') {
+			const removedImport = importEdit(ref, checker, c.symbol);
+			if (removedImport) tgtEdits.push({ ...removedImport, text: '' });
+		}
+		edits.set(ref.file, tgtEdits);
+		edits.set(c.file, [...(edits.get(c.file) ?? []), { start: c.statement.getStart(c.source), end: c.statement.getEnd(), text: '' }]);
 	}
 	for (const [file, fileEdits] of edits) {
 		const src = readFileSync(file, 'utf8');
@@ -516,6 +309,7 @@ export function fixSingleUseDeclarations(cfg: QualityCfg): number {
  *
  * @return Number of files containing edits.
  */
+export const fixSingleUseTypes = fixSingleUseDeclarations;
 
 /**
  * Writes JSON and Markdown inventories of current single-use recommendations.
@@ -524,8 +318,8 @@ export function fixSingleUseDeclarations(cfg: QualityCfg): number {
  *
  * @return The findings written to both report formats.
  */
-export function writeSingleUseReport(cfg: QualityCfg): SingleUseReportFinding[] {
-	const findings: SingleUseReportFinding[] = [...singleUseFindings(cfg), ...cssSingleUseFindings(cfg)];
+export function writeSingleUseReport(cfg: QualityCfg): SingleUseFinding[] {
+	const findings = singleUseFindings(cfg);
 	const docs = join(cfg.root, 'docs', 'quality');
 	mkdirSync(docs, { recursive: true });
 	const genAt = new Date().toISOString();

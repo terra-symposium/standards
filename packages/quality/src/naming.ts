@@ -18,10 +18,6 @@ import type { QualityAnalysis, QualityCfg } from './runner.js';
 /*//////////////////////////////////////////////////
 CONFIG
 //////////////////////////////////////////////////*/
-/*//////////////////////////////////////////////////
-REGEX
-//////////////////////////////////////////////////*/
-const A_Z_REGEX = /^[A-Z]/;
 
 type RenameKind = { numericIndex?: boolean; callback?: boolean; reserved?: string[] };
 export const IDENTIFIER_REPLACEMENTS = replacementMap([
@@ -207,7 +203,7 @@ function renderIdentifier(original: string, tokens: string[]): string {
 	if (/^[A-Z][A-Z0-9_]*$/.test(original)) return tokens.join(original.includes('_') ? '_' : '').toUpperCase();
 	if (original.includes('_')) return tokens.join('_');
 	if (original.includes('-')) return tokens.join('-');
-	if (A_Z_REGEX.test(original)) return tokens.map((t) => t.charAt(0).toUpperCase() + t.slice(1)).join('');
+	if (/^[A-Z]/.test(original)) return tokens.map((t) => t.charAt(0).toUpperCase() + t.slice(1)).join('');
 	return tokens.map((t, i) => (i === 0 ? t.toLowerCase() : t.charAt(0).toUpperCase() + t.slice(1))).join('');
 }
 
@@ -268,7 +264,7 @@ export function renameId(name: string, kind: RenameKind = {}): string {
 }
 
 /**
- * Determines whether an identifier parameter belongs to a collection or rendering callback.
+ * Determines whether an identifier parameter belongs to an inline or named callback.
  *
  * @param n Parameter identifier to classify.
  *
@@ -278,7 +274,7 @@ function callbackKind(n: ts.Identifier): RenameKind | undefined {
 	// JSX component bindings and explicit destructuring aliases encode syntax or
 	// public property names; shortening them can produce invalid JSX or change
 	// the inferred shape of a discriminated union.
-	if (A_Z_REGEX.test(n.text) || (ts.isBindingElement(n.parent) && n.parent.propertyName)) return undefined;
+	if (/^[A-Z]/.test(n.text) || (ts.isBindingElement(n.parent) && n.parent.propertyName)) return undefined;
 	const param = ts.findAncestor(n, ts.isParameter);
 	if (!param) return undefined;
 	const callback = ts.findAncestor(
@@ -286,12 +282,10 @@ function callbackKind(n: ts.Identifier): RenameKind | undefined {
 		(n): n is ts.ArrowFunction | ts.FunctionExpression | ts.FunctionDeclaration => ts.isArrowFunction(n) || ts.isFunctionExpression(n) || ts.isFunctionDeclaration(n),
 	);
 	if (!callback) return undefined;
-	const isCollectionCallback =
+	const isInlineCallback =
 		!ts.isFunctionDeclaration(callback) &&
 		ts.isCallExpression(callback.parent) &&
-		callback.parent.arguments.includes(callback as ts.Expression) &&
-		ts.isPropertyAccessExpression(callback.parent.expression) &&
-		CALLBACK_METHODS.has(callback.parent.expression.name.text);
+		callback.parent.arguments.includes(callback as ts.Expression);
 	let isNamedCallback = false;
 	if (ts.isFunctionDeclaration(callback) && callback.name) {
 		const scan = (n: ts.Node): void => {
@@ -334,7 +328,7 @@ function callbackKind(n: ts.Identifier): RenameKind | undefined {
 		scan(callback.parent);
 	}
 	const isJsxCallback = ts.isJsxExpression(callback.parent) && callback.parent.expression === callback && ts.isJsxAttribute(callback.parent.parent);
-	if (!isCollectionCallback && !isNamedCallback && !isJsxCallback) return undefined;
+	if (!isInlineCallback && !isNamedCallback && !isJsxCallback) return undefined;
 	const declarations: ts.Identifier[] = [];
 	const collectBinding = (name: ts.BindingName): void => {
 		if (ts.isIdentifier(name)) declarations.push(name);
@@ -359,11 +353,11 @@ function callbackKind(n: ts.Identifier): RenameKind | undefined {
 }
 
 /**
- * Returns whether a declaration belongs to a configured collection callback.
+ * Returns whether a declaration belongs to a supported callback.
  *
  * @param node Identifier declaration to inspect.
  *
- * @return `true` when the declaration is a supported collection callback parameter.
+ * @return `true` when the declaration is a supported callback parameter.
  */
 export function isCallbackDeclaration(node: ts.Identifier): boolean {
 	return callbackKind(node) !== undefined;

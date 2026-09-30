@@ -14,10 +14,7 @@ IMPORTS
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createQualityCfg, documentSrcFile, documentationFindings, maintainSrcFile, protectLongImports } from '../dist/index.js';
-import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { fixtureFile, fixtureRoot, fixtureText } from './support.mjs';
-import { join } from 'node:path';
-import { tmpdir } from 'node:os';
 
 /*//////////////////////////////////////////////////
 TESTS
@@ -161,12 +158,31 @@ test('maintainSrcFile keeps the path and human description in one valid header b
 	assert.equal(maintainSrcFile(root, file), true);
 	assert.equal(fixtureText(root, 'src/main.ts'), `/**\n * src/main.ts\n * Reads the configured value for the calling workflow.\n */\n\nconst value = true;\nvoid value;\n`);
 });
-test('maintainSrcFile expands a compact file comment into a path header', () => {
-	const root = fixtureRoot('terra-quality-document-compact-header-');
-	const file = fixtureFile(root, 'src/main.ts', '/** Runtime contract for the shared shadcn component size scale. */\nconst size = 8;\nvoid size;\n');
+test('maintainSrcFile prefixes a prose-only leading header with the canonical path', () => {
+	const root = fixtureRoot('terra-quality-document-header-prose-only-');
+	const file = fixtureFile(root, 'src/main.ts', `/** Dashboard surface loaders and primary intelligence refresh workflows. */\nconst value = true;\nvoid value;\n`);
 	assert.equal(maintainSrcFile(root, file), true);
-	assert.equal(fixtureText(root, 'src/main.ts'), `/**\n * src/main.ts\n * Runtime contract for the shared shadcn component size scale.\n */\n\nconst size = 8;\nvoid size;\n`);
+	assert.equal(fixtureText(root, 'src/main.ts'), `/**\n * src/main.ts\n * Dashboard surface loaders and primary intelligence refresh workflows.\n */\n\nconst value = true;\nvoid value;\n`);
+});
+test('maintainSrcFile deduplicates repeated type imports across maintenance runs', () => {
+	const root = fixtureRoot('terra-quality-import-deduplication-');
+	const file = fixtureFile(
+		root,
+		'src/main.ts',
+		`import { createAdminClient } from '@/lib/auth.server';
+import type { createAdminClient } from '../../lib/auth.server';
+import type { createAdminClient } from '../../lib/auth.server';
+import type { createAdminClient } from '../../lib/auth.server';
+
+const admin = createAdminClient();
+void admin;
+`,
+	);
+	assert.equal(maintainSrcFile(root, file), true);
+	const first = fixtureText(root, 'src/main.ts');
+	assert.equal((first.match(/import type \{ createAdminClient \}/g) ?? []).length, 1);
 	assert.equal(maintainSrcFile(root, file), false);
+	assert.equal(fixtureText(root, 'src/main.ts'), first);
 });
 test('maintainSrcFile heals orphaned duplicate header fragments and merges adjacent descriptions', () => {
 	const root = fixtureRoot('terra-quality-document-header-healing-');
@@ -181,147 +197,4 @@ test('maintainSrcFile heals orphaned duplicate header fragments and merges adjac
 		`/**\n * src/main.ts\n * Meaningful coverage description.\n * Explains the current architecture under test.\n */\n\nconst value = true;\nvoid value;\n`,
 	);
 	assert.equal(maintainSrcFile(root, file), false);
-});
-
-test('maintenance removes detached TSDoc and keeps only the final block for a symbol', () => {
-	const root = mkdtempSync(join(tmpdir(), 'terra-quality-detached-tsdoc-'));
-	const file = join(root, 'src.ts');
-	writeFileSync(
-		file,
-		`/**
- * src.ts
- * Source header.
- */
-
-/** Stale description from a removed declaration. */
-/** Final description for the helper. */
-function read() { return true; }
-
-/** This comment has no symbol after a mutation. */
-`,
-	);
-	assert.equal(maintainSrcFile(root, file), true);
-	const src = readFileSync(file, 'utf8');
-	assert.match(src, /Final description for the helper/);
-	assert.doesNotMatch(src, /Stale description from a removed declaration/);
-	assert.doesNotMatch(src, /This comment has no symbol/);
-	assert.equal((src.match(/Final description for the helper/g) ?? []).length, 1);
-	assert.equal(maintainSrcFile(root, file), false);
-});
-
-test('maintenance removes superseded TSDoc after a managed section marker', () => {
-	const root = fixtureRoot('terra-quality-detached-tsdoc-section-');
-	const file = fixtureFile(
-		root,
-		'src/main.ts',
-		`/** src/main.ts */\n\n/*//////////////////////////////////////////////////\nHELPERS\n//////////////////////////////////////////////////*/\n\n/** Stale description from a removed declaration. */\n\n/** Final description for the helper. */\nfunction read() { return true; }\n`,
-	);
-	assert.equal(maintainSrcFile(root, file), true);
-	const src = fixtureText(root, 'src/main.ts');
-	assert.match(src, /Final description for the helper/);
-	assert.doesNotMatch(src, /Stale description from a removed declaration/);
-	assert.equal(maintainSrcFile(root, file), false);
-});
-
-test('maintenance removes detached TSDoc discovered through AST trivia around template literals', () => {
-	const root = fixtureRoot('terra-quality-detached-comments-template-');
-	const file = fixtureFile(
-		root,
-		'src/main.ts',
-		`/** src/main.ts */
-function before(count: number) {
-		return \`${'${count}'} trust evidence\`;
-}
-
-/**
- * Returns trust diagnosis priority.
- *
- * @param params Validated options controlling the operation.
- *
- * @return The trust diagnosis priority result.
- */
-
-/**
- * Returns build opportunity trust diagnosis.
- *
- * @param params Validated options controlling the operation.
- *
- * @return The constructed build opportunity trust diagnosis.
- */
-
-/**
- * Returns trust priority for candidate.
- *
- * @param params Validated options controlling the operation.
- *
- * @return The trust priority for candidate result.
- */
-
-/** The real helper documentation. */
-function after() { return true; }
-void [before, after];
-`,
-	);
-	assert.equal(maintainSrcFile(root, file), true);
-	const src = readFileSync(file, 'utf8');
-	assert.doesNotMatch(src, /Returns trust diagnosis priority/);
-	assert.doesNotMatch(src, /Returns build opportunity trust diagnosis/);
-	assert.doesNotMatch(src, /Returns trust priority for candidate/);
-	assert.match(src, /The real helper documentation/);
-	assert.match(src, /\$\{count\} trust evidence/);
-});
-
-test('maintenance removes comment-only managed sections and groups while preserving literal text', () => {
-	const root = fixtureRoot('terra-quality-empty-sections-');
-	const file = fixtureFile(
-		root,
-		'src/main.ts',
-		`/** src/main.ts */
-/*//////////////////////////////////////////////////
-IMPORTS
-//////////////////////////////////////////////////*/
-// API
-// TYPES
-
-/*//////////////////////////////////////////////////
-CONFIG
-//////////////////////////////////////////////////*/
-// stale configuration notes
-
-/*//////////////////////////////////////////////////
-HELPERS
-//////////////////////////////////////////////////*/
-const literal = '/*//////////////////////////////////////////////////\\nIMPORTS\\n//////////////////////////////////////////////////*/';
-const value = true;
-void [literal, value];
-`,
-	);
-	assert.equal(maintainSrcFile(root, file), true);
-	const src = readFileSync(file, 'utf8');
-	assert.doesNotMatch(src, /\/\*\/{10,}\s*\r?\n\s*IMPORTS\s*\r?\n\s*\/{10,}\*\//);
-	assert.doesNotMatch(src, /stale configuration notes/);
-	assert.match(src, /const literal/);
-	assert.match(src, /const value/);
-});
-
-test('maintenance removes detached ordinary comments but keeps comments owned by syntax and literals', () => {
-	const root = fixtureRoot('terra-quality-detached-ordinary-comments-');
-	const file = fixtureFile(
-		root,
-		'src/main.ts',
-		`/** src/main.ts */
-// Keep this comment with the helper.
-function helper() { return true; }
-const literal = \`// This is literal text\n/** This is also literal text */\`;
-
-// This comment belongs to nothing.
-/* This block belongs to nothing. */
-`,
-	);
-	assert.equal(maintainSrcFile(root, file), true);
-	const src = readFileSync(file, 'utf8');
-	assert.match(src, /Keep this comment with the helper/);
-	assert.match(src, /This is literal text/);
-	assert.doesNotMatch(src, /This comment belongs to nothing/);
-	assert.doesNotMatch(src, /This block belongs to nothing/);
 });

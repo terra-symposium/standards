@@ -4,7 +4,6 @@
  */
 
 export * from './collapse.js';
-export * from './db-shapes.js';
 export * from './files.js';
 export * from './imports.js';
 export * from './inline-if.js';

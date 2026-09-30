@@ -187,8 +187,8 @@ test('runFormatter divides large source arguments into bounded subprocess batche
 test('runTypecheck honors custom command ownership and does not invoke it for a scoped file-only request', () => {
 	const root = fixtureRoot('terra-quality-typecheck-');
 	const marker = join(root, 'typecheck-ran.txt');
-	const cmd = { command: process.execPath, args: ['-e', `require('node:fs').writeFileSync(${JSON.stringify(marker)}, 'ran')`] };
-	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], typecheckCommand: cmd });
+	const command = { command: process.execPath, args: ['-e', `require('node:fs').writeFileSync(${JSON.stringify(marker)}, 'ran')`] };
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], typecheckCommand: command });
 	runTypecheck(cfg, ['src/main.ts']);
 	assert.equal(existsSync(marker), false);
 	runTypecheck(cfg);
@@ -197,12 +197,12 @@ test('runTypecheck honors custom command ownership and does not invoke it for a 
 test('CLI domain dispatch runs enabled commands, skips disabled commands, and rejects unknown domains', () => {
 	const root = fixtureRoot('terra-quality-domain-api-');
 	const marker = join(root, 'domain-ran.txt');
-	const cmd = { name: 'fixture', command: process.execPath, args: ['-e', `require('node:fs').writeFileSync(${JSON.stringify(marker)}, 'ran')`] };
-	const cfg = createQualityCfg({ root, sourceRoots: [], extensions: ['.ts'], qualityCommands: [cmd] });
+	const command = { name: 'fixture', command: process.execPath, args: ['-e', `require('node:fs').writeFileSync(${JSON.stringify(marker)}, 'ran')`] };
+	const cfg = createQualityCfg({ root, sourceRoots: [], extensions: ['.ts'], qualityCommands: [command] });
 	runQualityCli(cfg, ['domain', 'fixture']);
 	assert.equal(readFileSync(marker, 'utf8'), 'ran');
 	fixtureFile(root, 'domain-ran.txt', 'reset');
-	const disabled = createQualityCfg({ root, sourceRoots: [], extensions: ['.ts'], qualityCommands: [cmd], enabledCommands: { fixture: false } });
+	const disabled = createQualityCfg({ root, sourceRoots: [], extensions: ['.ts'], qualityCommands: [command], enabledCommands: { fixture: false } });
 	runQualityCli(disabled, ['domain', 'fixture']);
 	assert.equal(readFileSync(marker, 'utf8'), 'reset');
 	assert.throws(() => runQualityCli(cfg, ['domain', 'missing']), /Unknown quality domain/);
@@ -252,6 +252,31 @@ test('CLI lint and Knip branches pass their focused flags and autofix policy to 
 	]);
 	runQualityCli(cfg, ['knip', '--all', '--warn']);
 	assert.deepEqual(recordedCmds(root, 'knip-args.jsonl').at(-1), ['--include', 'unresolved,nsExports,nsTypes,cycles', '--no-exit-code']);
+});
+test('dead-code reports private unused functions and removes only the proven declaration', () => {
+	const root = fixtureRoot('terra-quality-dead-code-');
+	const source = fixtureFile(root, 'src/main.ts', 'function unused() { return 1; }\nfunction used() { return 2; }\nconsole.log(used());\n');
+	const eslint = fixtureFile(
+		root,
+		'bin/eslint-dead-code.mjs',
+		`#!/usr/bin/env node
+import { readFileSync } from 'node:fs';
+const file = ${JSON.stringify(source)};
+const text = readFileSync(file, 'utf8');
+process.stdout.write(JSON.stringify(text.includes('function unused') ? [{ filePath: file, messages: [{ ruleId: 'unused-imports/no-unused-vars', line: 1, column: 10 }] }] : []));
+`,
+		0o755,
+	);
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], tools: { eslint } });
+	resetExitCode();
+	runQualityCli(cfg, ['dead-code', '--all', '--warn']);
+	assert.equal(process.exitCode, 1);
+	assert.match(readFileSync(source, 'utf8'), /function unused/);
+	resetExitCode();
+	runQualityCli(cfg, ['dead-code', '--all']);
+	assert.equal(process.exitCode, 0);
+	assert.doesNotMatch(readFileSync(source, 'utf8'), /function unused/);
+	assert.match(readFileSync(source, 'utf8'), /function used/);
 });
 test('CLI recommendation execution is opt-in per invocation and recommendation failures remain non-blocking', () => {
 	const root = fixtureRoot('terra-quality-recommendations-');

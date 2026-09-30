@@ -21,7 +21,6 @@ REGEX
 //////////////////////////////////////////////////*/
 
 const T_R_N_S_S_R_N_T_T_R_N_REGEX = /^\/\*\*[ \t]*\r?\n([\s\S]*?)\r?\n[ \t]*\*\/[ \t]*(?:\r?\n)*/;
-const COMPACT_TSDOC_HEADER_REGEX = /^\/\*\*[ \t]+([^\r\n]*?)[ \t]*\*\/[ \t]*(?:\r?\n)*/;
 const R_N_REGEX = /\r?\n/;
 const T_T_REGEX = /^[ \t]*\*[ \t]?/;
 const S_REGEX = /^\s*/;
@@ -118,7 +117,6 @@ function healHeaderFragments(src: string, path: string, eol: string): string {
 	const orphanPattern = /^(?:[ \t]*\*[ \t]?[^\r\n]*\r?\n)+[ \t]*\*\/[ \t]*(?:\r?\n)*/;
 	const docPattern = /^\/\*\*(?:[ \t]*([^\r\n]*?)[ \t]*\*\/[ \t]*(?:\r?\n)*|[ \t]*\r?\n([\s\S]*?)\r?\n[ \t]*\*\/[ \t]*(?:\r?\n)*)/;
 	let changed = false;
-	let healedOrphanFragment = false;
 	while (true) {
 		const whitespace = rest.match(/^(?:\s*)/);
 		const prefix = whitespace?.[0] ?? '';
@@ -138,11 +136,10 @@ function healHeaderFragments(src: string, path: string, eol: string): string {
 			cursor += prefix.length + orphan[0].length;
 			rest = rest.slice(prefix.length + orphan[0].length);
 			changed = true;
-			healedOrphanFragment = true;
 			continue;
 		}
 		const doc = rest.slice(prefix.length).match(docPattern);
-		if (!doc || !healedOrphanFragment) break;
+		if (!doc) break;
 		const docLines = (doc[1] ?? doc[2] ?? '')
 			.split(R_N_REGEX)
 			.map((l) => l.replace(T_T_REGEX, '').trim())
@@ -435,37 +432,6 @@ function removeManagedSects(src: string, fileName: string): string {
 }
 
 /**
- * Removes managed sections whose body contains only comments and whitespace.
- *
- * @param src Source text containing possible managed sections.
- * @param fileName Filename used to protect section-shaped text inside literals.
- *
- * @return Source text without empty managed sections.
- */
-function removeEmptyManagedSects(src: string, fileName: string): string {
-	const spans = literalSpans(src, fileName);
-	const comments = sourceCommentRanges(src, ts.createSourceFile(fileName, src, ts.ScriptTarget.Latest, true, documentationScriptKind(fileName)));
-	const isLiteral = (position: number): boolean => spans.some((span) => position >= span.start && position < span.end);
-	const sectionPattern = /^[ \t]*\/\*\/{10,}[ \t]*\r?\n[ \t]*(IMPORTS|CONFIG|HELPERS)[ \t]*\r?\n[ \t]*\/{10,}\*\/[ \t]*(?:\r?\n)?/gm;
-	const sections = [...src.matchAll(sectionPattern)]
-		.filter((m) => !isLiteral(m.index ?? 0))
-		.map((m) => ({ start: m.index ?? 0, end: (m.index ?? 0) + m[0].length, label: m[1]! }));
-	const removals: { start: number; end: number }[] = [];
-	for (let index = 0; index < sections.length; index += 1) {
-		const section = sections[index]!;
-		const bodyEnd = sections[index + 1]?.start ?? src.length;
-		let body = src.slice(section.end, bodyEnd);
-		const bodyStart = section.end;
-		const edits = comments
-			.filter((comment) => comment.start >= bodyStart && comment.end <= bodyEnd)
-			.sort((a, b) => b.start - a.start);
-		for (const comment of edits) body = `${body.slice(0, comment.start - bodyStart)}${body.slice(comment.end - bodyStart)}`;
-		if (!body.trim()) removals.push({ start: section.start, end: bodyEnd });
-	}
-	return removals.sort((a, b) => b.start - a.start).reduce((text, removal) => `${text.slice(0, removal.start)}${text.slice(removal.end)}`, src);
-}
-
-/**
  * Rebuilds a function's TSDoc layout while preserving existing summary and tag prose.
  *
  * @param n Function declaration whose current parameter list controls required parameter tags.
@@ -584,25 +550,22 @@ export function maintainSrcFile(root: string, fileName: string): boolean {
 	const eol = original.includes('\r\n') ? '\r\n' : '\n';
 	let src = original.replace(UFEFF_REGEX, '').replace(/^\s+/, '');
 	const path = relative(root, fileName).split(sep).join('/');
+	src = src.replace(/^\/\*\*[ \t]+([^\r\n]*?)\s*\*\/[ \t]*(?:\r?\n)*/, (_match, description: string) => `/**${eol} * ${description}${eol} */${eol}`);
 	src = healHeaderFragments(src, path, eol);
-	src = removeDetachedTSDoc(src, fileName);
-	src = removeEmptyManagedSects(src, fileName);
 	const existingHeader = src.match(T_R_N_S_S_R_N_T_T_R_N_REGEX);
-	const compactHeader = existingHeader ? null : src.match(COMPACT_TSDOC_HEADER_REGEX);
 	const headerLines =
 		existingHeader?.[1]
 			.split(R_N_REGEX)
 			.map((l) => l.replace(T_T_REGEX, '').trim())
-			.filter(Boolean) ?? (compactHeader?.[1].trim() ? [compactHeader[1].trim()] : []);
-	const headerDescription = existingHeader ? headerLines.slice(1) : headerLines;
+			.filter(Boolean) ?? [];
+	const hasPathHeader = headerLines[0]?.includes('/') || /\.(?:c|m)?(?:js|ts)x?$/.test(headerLines[0] ?? '');
+	const headerDescription = hasPathHeader ? headerLines.slice(1) : headerLines;
 	const header = ['/**', path, ...headerDescription, ' */'].map((l, i) => (i === 0 ? l : i === headerDescription.length + 2 ? l : ` * ${l}`)).join(eol);
-	if (existingHeader && (headerLines[0]?.includes('/') || /\.(?:c|m)?(?:js|ts)x?$/.test(headerLines[0] ?? ''))) {
+	if (existingHeader) {
 		src = src.replace(T_R_N_S_S_R_N_T_T_R_N_REGEX, `${header}${eol}${eol}`);
 		const escapedPath = path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 		const duplicateHeader = new RegExp(`^(\\/\\*\\*\\r?\\n \\* ${escapedPath}\\r?\\n \\*\\/)(?:\\r?\\n)+\\1(?:\\r?\\n)+`);
 		src = src.replace(duplicateHeader, `$1${eol}${eol}`);
-	} else if (compactHeader) {
-		src = src.replace(COMPACT_TSDOC_HEADER_REGEX, `${header}${eol}${eol}`);
 	} else if (!src.startsWith('#!') && !src.startsWith('/**')) src = `${header}${eol}${eol}${src}`;
 	const parsed = ts.createSourceFile(fileName, src, ts.ScriptTarget.Latest, true, srcKind(fileName));
 	const imports = parsed.statements.filter((n): n is ts.ImportDeclaration => ts.isImportDeclaration(n) && !selfImportConflicts(parsed, n));
@@ -613,7 +576,13 @@ export function maintainSrcFile(root: string, fileName: string): boolean {
 		const comp = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
 		const render = (label: ImportGroup): string[] => {
 			const entries = groups[label].sort((a, b) => comp(a.text, b.text) || comp(a.source, b.source));
-			return entries.length ? [`// ${label}`, ...entries.map((e) => e.text), ''] : [];
+			const seen = new Set<string>();
+			const uniqueEntries = entries.filter((entry) => {
+				if (seen.has(entry.text)) return false;
+				seen.add(entry.text);
+				return true;
+			});
+			return uniqueEntries.length ? [`// ${label}`, ...uniqueEntries.map((e) => e.text), ''] : [];
 		};
 		const sortedGroups = (Object.keys(groups) as ImportGroup[]).sort(comp);
 		const block = `${OPEN}${eol}IMPORTS${eol}${CLOSE}${eol}${sortedGroups.flatMap(render).join(eol)}`;
@@ -623,18 +592,11 @@ export function maintainSrcFile(root: string, fileName: string): boolean {
 		src = `${src.slice(0, start).replace(S_CLASS_4, `${eol}${eol}`)}${block}${src.slice(last.end).replace(S_REGEX, eol)}`;
 	}
 	src = organizeSrcSects(src, fileName, eol);
-	src = removeEmptyManagedSects(src, fileName);
-	const postOrganizationHeader = src.match(T_R_N_S_S_R_N_T_T_R_N_REGEX)?.[0] ?? '';
-	const postOrganizationBody = postOrganizationHeader ? src.slice(postOrganizationHeader.length) : src;
-	src = `${postOrganizationHeader}${removeDetachedTSDoc(postOrganizationBody, fileName)}`;
 	const norm = src
 		.replace(/^([ \t]*)\/\*\/{10,}[ \t]*$/gm, `$1${OPEN}`)
 		.replace(/^([ \t]*)\/{10,}\*\/[ \t]*$/gm, `$1${CLOSE}`)
 		.replace(S_CLASS_4, eol);
-	const formatted = normCommentLayout(norm, fileName, eol);
-	const finalHeader = formatted.match(T_R_N_S_S_R_N_T_T_R_N_REGEX)?.[0] ?? '';
-	const finalBody = finalHeader ? formatted.slice(finalHeader.length) : formatted;
-	const laidOut = `${finalHeader}${removeAdjacentTSDocBlocks(finalBody)}`;
+	const laidOut = normCommentLayout(norm, fileName, eol);
 	const n = original.startsWith('\uFEFF') ? `\uFEFF${laidOut}` : laidOut;
 	if (n === original) return false;
 	return writeValidatedSrc(fileName, n);
@@ -759,124 +721,15 @@ function documentationNodeName(node: ts.Node): string {
  *
  * @return TSDoc blocks with their source offsets and original text.
  */
-function sourceCommentRanges(src: string, parsed: ts.SourceFile): { start: number; end: number; kind: ts.CommentKind; text: string }[] {
-	const ranges = new Map<number, { start: number; end: number; kind: ts.CommentKind; text: string }>();
-	const add = (range: ts.CommentRange): void => {
-		const text = src.slice(range.pos, range.end);
-		if (!text.startsWith('//') && !text.startsWith('/*')) return;
-		ranges.set(range.pos, { start: range.pos, end: range.end, kind: range.kind, text });
-	};
-	const scanner = ts.createScanner(ts.ScriptTarget.Latest, false, parsed.languageVariant, src);
-	for (let token = scanner.scan(); token !== ts.SyntaxKind.EndOfFileToken; token = scanner.scan()) {
-		const text = scanner.getTokenText();
-		if (text.startsWith('//') || text.startsWith('/*')) add({ pos: scanner.getTokenPos(), end: scanner.getTextPos(), kind: token as ts.CommentKind });
-	}
-	const visit = (node: ts.Node): void => {
-		if (node.kind !== ts.SyntaxKind.EndOfFileToken) {
-			for (const range of ts.getLeadingCommentRanges(src, node.getFullStart()) ?? []) add(range);
-			for (const range of ts.getTrailingCommentRanges(src, node.end) ?? []) add(range);
-		}
-		ts.forEachChild(node, visit);
-	};
-	visit(parsed);
-	return [...ranges.values()].sort((a, b) => a.start - b.start);
-}
-
 function tsdocBlocks(src: string, parsed: ts.SourceFile): TSDocBlock[] {
-	return sourceCommentRanges(src, parsed)
-		.filter((comment) => comment.text.startsWith('/**'))
-		.map((comment) => ({ start: comment.start, end: comment.end, text: comment.text }));
-}
-
-/**
- * Returns whether a node can own a TSDoc block under the source-maintenance policy.
- * Expression statements and imports are deliberately excluded so comments left
- * behind by a mutation cannot be reassigned to unrelated syntax.
- *
- * @param node AST node to classify.
- *
- * @return `true` when the node represents a documented symbol.
- */
-function isDocumentableNode(node: ts.Node): boolean {
-	return (
-		ts.isClassDeclaration(node) ||
-		ts.isEnumDeclaration(node) ||
-		ts.isInterfaceDeclaration(node) ||
-		ts.isTypeAliasDeclaration(node) ||
-		ts.isFunctionDeclaration(node) ||
-		ts.isVariableStatement(node) ||
-		ts.isMethodDeclaration(node) ||
-		ts.isGetAccessorDeclaration(node) ||
-		ts.isSetAccessorDeclaration(node) ||
-		ts.isPropertyDeclaration(node) ||
-		ts.isPropertySignature(node) ||
-		ts.isMethodSignature(node) ||
-		ts.isConstructorDeclaration(node) ||
-		ts.isParameter(node)
-	);
-}
-
-/**
- * Removes TSDoc blocks that no longer belong to a symbol and keeps only the
- * nearest TSDoc block when a mutation leaves several blocks before one symbol.
- * File headers remain owned by the source file rather than by its first node.
- *
- * @param src Source text to clean.
- * @param fileName Filename used to parse the source.
- *
- * @return Source text without detached or superseded TSDoc blocks.
- */
-function removeDetachedTSDoc(src: string, fileName: string): string {
-	const parsed = ts.createSourceFile(fileName, src, ts.ScriptTarget.Latest, true, documentationScriptKind(fileName));
-	const comments = sourceCommentRanges(src, parsed);
-	const blocks = comments.filter((comment) => comment.text.startsWith('/**')).map((comment) => ({ start: comment.start, end: comment.end, text: comment.text }));
-	if (!comments.length) return src;
-	const adjacent = new Set<number>();
-	for (let i = 0; i < blocks.length - 1; i++) {
-		const current = blocks[i]!;
-		const next = blocks[i + 1]!;
-		if (!src.slice(current.end, next.start).trim()) adjacent.add(current.start);
+	const scanner = ts.createScanner(ts.ScriptTarget.Latest, false, parsed.languageVariant, src);
+	const blocks: TSDocBlock[] = [];
+	for (let token = scanner.scan(); token !== ts.SyntaxKind.EndOfFileToken; token = scanner.scan()) {
+		if (token !== ts.SyntaxKind.MultiLineCommentTrivia) continue;
+		const text = scanner.getTokenText();
+		if (text.startsWith('/**')) blocks.push({ start: scanner.getTokenPos(), end: scanner.getTextPos(), text });
 	}
-	const keep = new Set<number>();
-	const superseded = new Set<number>();
-	const attached = new Set<number>();
-	const header = fileHeaderBlock(src, blocks) ?? topLevelTSDocBlock(src, blocks);
-	if (header) keep.add(header.start);
-	const visit = (node: ts.Node): void => {
-		if (node.kind !== ts.SyntaxKind.EndOfFileToken)
-			for (const range of [...(ts.getLeadingCommentRanges(src, node.getFullStart()) ?? []), ...(ts.getTrailingCommentRanges(src, node.end) ?? [])]) attached.add(range.pos);
-		if (isDocumentableNode(node)) {
-			const leading = ts.getLeadingCommentRanges(src, node.getFullStart()) ?? [];
-			const docs = leading
-				.filter((r) => src.slice(r.pos, r.end).startsWith('/**'))
-				.map((r) => ({ start: r.pos, end: r.end, text: src.slice(r.pos, r.end) }));
-			const final = docs.at(-1);
-			if (final) {
-				keep.add(final.start);
-				for (const prior of docs.slice(0, -1)) superseded.add(prior.start);
-			}
-		}
-		ts.forEachChild(node, visit);
-	};
-	visit(parsed);
-	const removals = comments.filter((comment) => comment.text.startsWith('/**' ) ? adjacent.has(comment.start) || superseded.has(comment.start) || !keep.has(comment.start) : !attached.has(comment.start)).sort((a, b) => b.start - a.start);
-	return removals.reduce((t, b) => `${t.slice(0, b.start)}${t.slice(b.end)}`, src);
-}
-
-/**
- * Removes earlier blocks from a contiguous TSDoc chain after source re-layout.
- *
- * @param src Source text whose adjacent TSDoc blocks should be collapsed.
- * @return Source with only the final block in each contiguous chain.
- */
-function removeAdjacentTSDocBlocks(src: string): string {
-	let next = src;
-	let previous = '';
-	while (next !== previous) {
-		previous = next;
-		next = next.replace(/\/\*\*[\s\S]*?\*\/(?:[ \t]*\r?\n[ \t]*)+(?=\/\*\*)/g, '');
-	}
-	return next;
+	return blocks;
 }
 
 /**
@@ -910,23 +763,6 @@ function fileHeaderBlock(src: string, blocks: TSDocBlock[]): TSDocBlock | undefi
 		let prefix = src.slice(0, b.start).replace(UFEFF_REGEX, '');
 		if (prefix.startsWith('#!')) prefix = prefix.slice(prefix.indexOf('\n') + 1);
 		return prefix.trim() === '' && tsdocLines(b).some((l) => C_M_JS_JSX_TS_TSX_REGEX.test(l.text));
-	});
-}
-
-/**
- * Finds the first top-level TSDoc block, including compact file comments that
- * do not contain the generated path header.
- *
- * @param src Source text to inspect.
- * @param blocks TSDoc blocks found in the source.
- *
- * @return The first top-level TSDoc block, or `undefined` when none exists.
- */
-function topLevelTSDocBlock(src: string, blocks: TSDocBlock[]): TSDocBlock | undefined {
-	return blocks.find((block) => {
-		let prefix = src.slice(0, block.start).replace(UFEFF_REGEX, '');
-		if (prefix.startsWith('#!')) prefix = prefix.slice(prefix.indexOf('\n') + 1);
-		return prefix.trim() === '';
 	});
 }
 
@@ -969,6 +805,40 @@ function tsdocTagEntries(lines: TSDocLine[]): { tag: string; subject: string; de
 		idx = n - 1;
 	}
 	return entries;
+}
+
+/**
+ * Determines whether a function exposes a value through its return type or body.
+ *
+ * @param node Function declaration whose return contract is being checked.
+ * @return `true` when callers can receive a value rather than only completion.
+ */
+function returnsValue(node: ts.FunctionDeclaration): boolean {
+	const returnType = node.type?.getText().replace(/\s+/g, '') ?? '';
+	if (returnType === 'void' || returnType === 'Promise<void>') return false;
+	if (node.type) return true;
+	let valueReturn = false;
+	const visit = (child: ts.Node): void => {
+		if (valueReturn) return;
+		if (ts.isReturnStatement(child) && child.expression) valueReturn = true;
+		ts.forEachChild(child, visit);
+	};
+	if (node.body) visit(node.body);
+	return valueReturn;
+}
+
+/**
+ * Finds the TSDoc block directly attached to a declaration.
+ *
+ * @param src Source text containing the declaration and its comments.
+ * @param node Declaration whose leading documentation is required.
+ * @return The attached TSDoc block, or `undefined` when the declaration is undocumented.
+ */
+function documentationBlockFor(src: string, node: ts.Node): TSDocBlock | undefined {
+	const ranges = ts.getLeadingCommentRanges(src, node.getStart()) ?? [];
+	const range = ranges.at(-1);
+	if (!range || range.kind !== ts.SyntaxKind.MultiLineCommentTrivia || !src.slice(range.pos, range.end).startsWith('/**')) return undefined;
+	return { start: range.pos, end: range.end, text: src.slice(range.pos, range.end) };
 }
 
 /**
@@ -1061,7 +931,23 @@ function documentationFindingsForFile(cfg: QualityCfg, file: string, requirement
 		if (requirements.types && isType && !documented(node, src)) findings.push(documentationReport(file, parsed, node, documentationNodeName(node), 'type', 'add TSDoc for this type', cfg));
 		if (ts.isFunctionDeclaration(node)) {
 			const needsDoc = requirements.functions || (requirements.exportedFunctions && exported(node));
-			if (needsDoc && !documented(node, src)) findings.push(documentationReport(file, parsed, node, documentationNodeName(node), 'function', 'add TSDoc for this function', cfg));
+			if (needsDoc) {
+				if (!documented(node, src)) {
+					findings.push(documentationReport(file, parsed, node, documentationNodeName(node), 'function', 'add TSDoc for this function', cfg));
+				} else {
+					const block = documentationBlockFor(src, node);
+					if (block) {
+						const entries = tsdocTagEntries(tsdocLines(block));
+						const documentedParams = new Set(entries.filter((entry) => entry.tag.toLowerCase() === 'param').map((entry) => entry.subject));
+						for (const parameter of node.parameters) {
+							const name = parameter.name.getText(parsed);
+							if (!documentedParams.has(name)) findings.push(documentationReport(file, parsed, node, `@param ${name}`, 'param', `document the ${name} parameter`, cfg));
+						}
+						const hasReturnTag = entries.some((entry) => ['return', 'returns'].includes(entry.tag.toLowerCase()));
+						if (returnsValue(node) && !hasReturnTag) findings.push(documentationReport(file, parsed, node, '@return', 'return', 'document the value returned by this function', cfg));
+					}
+				}
+			}
 		}
 		if (requirements.noInlineFunctions && (ts.isArrowFunction(node) || ts.isFunctionExpression(node)))
 			findings.push(documentationReport(file, parsed, node, documentationNodeName(node), 'inline', 'move this function to a named declaration', cfg));

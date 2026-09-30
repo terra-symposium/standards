@@ -123,28 +123,30 @@ class WithProperty { constructor(readonly destination: string) {} }
 	assert.equal(declarationScope(declaration('localValue')), file);
 	assert.equal(renameDeclaration(param), 'param');
 });
-test('callback declaration APIs classify only supported collection and event-handler callbacks', () => {
+test('callback declaration APIs classify inline helper, collection, and event-handler callbacks', () => {
 	const src = `
 const mapped = values.map((customer, index) => customer.id + index);
+const rendered = problemRendererPair('hint', (block) => <_ProblemHint block={block} />);
 const ordinary = (customer) => customer.id;
 function handle(customer: string) { return customer; }
 const view = <button onClick={(event) => handle(event.type)}>Open</button>;
-void [mapped, ordinary, handle, view];
+void [mapped, rendered, ordinary, handle, view];
 `;
 	const file = ts.createSourceFile('fixture.tsx', src, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
 	const callbacks = [];
 	const visit = (node) => {
-		if (ts.isIdentifier(node) && ['customer', 'index', 'event'].includes(node.text) && ts.isParameter(node.parent)) callbacks.push(node);
+		if (ts.isIdentifier(node) && ['block', 'customer', 'index', 'event'].includes(node.text) && ts.isParameter(node.parent)) callbacks.push(node);
 		ts.forEachChild(node, visit);
 	};
 	visit(file);
-	assert.equal(callbacks.length, 5);
+	assert.equal(callbacks.length, 6);
 	const supported = callbacks.filter((n) => isCallbackDeclaration(n));
-	assert.equal(supported.length, 4);
+	assert.equal(supported.length, 5);
 	assert.equal(renameDeclaration(supported[0]), 'c');
 	assert.equal(renameDeclaration(supported[1]), 'i');
-	assert.equal(renameDeclaration(supported[2]), 'c');
-	assert.equal(renameDeclaration(supported[3]), 'e');
+	assert.equal(renameDeclaration(supported[2]), 'b');
+	assert.equal(renameDeclaration(supported[3]), 'c');
+	assert.equal(renameDeclaration(supported[4]), 'e');
 });
 test('alias analysis finds local const/property/element and type aliases while preserving public, optional, mutable, multi-declaration, generic, and externally referenced aliases', () => {
 	const root = fixtureRoot('terra-quality-alias-api-');
