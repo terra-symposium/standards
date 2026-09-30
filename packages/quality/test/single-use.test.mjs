@@ -14,8 +14,7 @@ IMPORTS
 // API
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { createQualityCfg, fixSingleUseDeclarations, fixSingleUseTypes, singleUseFindings, writeSingleUseReport } from '../dist/index.js';
-import { existsSync, readFileSync } from 'node:fs';
+import { createQualityCfg, fixSingleUseDeclarations, fixSingleUseTypes, singleUseFindings } from '../dist/index.js';
 import { fixtureFile, fixtureRoot, fixtureText } from './support.mjs';
 import { join } from 'node:path';
 
@@ -146,28 +145,4 @@ test('single-use fixing discovers nested literals wrapped with const assertions'
 	assert.equal(fixSingleUseDeclarations(cfg), 1);
 	assert.equal(fixtureText(root, 'src/main.ts').includes('const improvementCards'), false);
 	assert.match(fixtureText(root, 'src/main.ts'), /return \(\[\{ key: 'one' \}, \{ key: 'two' \}\] as const\)\.map/);
-});
-test('single-use report writes stable JSON and Markdown inventories with all decision sections', () => {
-	const root = fixtureRoot('terra-quality-single-use-report-');
-	fixtureFile(root, 'src/main.ts', "type Payload = { value: string };\nconst payload: Payload = { value: 'ok' };\n");
-	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
-	const findings = writeSingleUseReport(cfg);
-	assert.deepEqual(
-		findings.map((f) => f.name),
-		['Payload'],
-	);
-	const jsonPath = join(root, 'docs', 'quality', 'single-use-declarations.json');
-	const markdownPath = join(root, 'docs', 'quality', 'single-use-declarations.md');
-	assert.equal(existsSync(jsonPath), true);
-	assert.equal(existsSync(markdownPath), true);
-	const json = JSON.parse(readFileSync(jsonPath, 'utf8'));
-	assert.match(json.generatedAt, /^\d{4}-\d{2}-\d{2}T/);
-	assert.deepEqual(json.scope, [join(root, 'src')]);
-	assert.deepEqual(json.findings, findings);
-	const markdown = readFileSync(markdownPath, 'utf8');
-	assert.match(markdown, /^# Single-use declaration recommendations/m);
-	assert.match(markdown, /## INLINE \(1\)/);
-	assert.match(markdown, /## KEEP \(0\)/);
-	assert.match(markdown, /## REVIEW \(0\)/);
-	assert.match(markdown, /`src\/main\.ts:1` \*\*Payload\*\*/);
 });

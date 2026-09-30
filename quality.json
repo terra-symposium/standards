@@ -10,8 +10,5 @@
 	"qualityCommands": [
 		{ "name": "build", "command": "pnpm", "args": ["run", "build"] },
 		{ "name": "test", "command": "pnpm", "args": ["run", "test"] }
-	],
-	"recommendationCommands": [
-		{ "name": "single-use-declarations", "command": "node", "args": ["packages/quality/dist/runner.js", "single-use", "--all"] }
 	]
 }

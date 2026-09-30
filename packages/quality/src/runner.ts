@@ -21,7 +21,7 @@ import { existsSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { fixObjectForwarding, objectForwardingFindings } from './object-forwarding.js';
 import { fixRegexDedup, fixRepeatedClasses, regexFindings, repeatedClassFindings, uiPatternFindings } from './patterns.js';
-import { fixSingleUseDeclarations, writeSingleUseReport } from './single-use.js';
+import { fixSingleUseDeclarations, singleUseFindings } from './single-use.js';
 import { securityFindings } from './security.js';
 import { spawnSync } from 'node:child_process';
 import { srcFiles, workingSrcFiles } from './files.js';
@@ -1163,7 +1163,7 @@ export function runQualityCli(cfg: QualityCfg, args = process.argv.slice(2)): vo
 	if (cmd === 'single-use') {
 		qualityHeader('single-use', `${opts.fix ? 'Fixing and checking' : 'Checking'} single-use declarations`);
 		if (opts.fix) fixSingleUseDeclarations(cfg);
-		const findings = writeSingleUseReport(cfg);
+		const findings = singleUseFindings(cfg);
 		printFindings(findings, (finding) => `Single-use ${finding.decision}: ${finding.file}:${finding.line} ${finding.name} — ${finding.reason}`);
 		return;
 	}

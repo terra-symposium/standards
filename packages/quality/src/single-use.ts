@@ -9,8 +9,8 @@ IMPORTS
 
 // API
 import ts from 'typescript';
-import { join, relative } from 'node:path';
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { relative } from 'node:path';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { srcFiles } from './files.js';
 
 // TYPES
@@ -310,24 +310,3 @@ export function fixSingleUseDeclarations(cfg: QualityCfg): number {
  * @return Number of files containing edits.
  */
 export const fixSingleUseTypes = fixSingleUseDeclarations;
-
-/**
- * Writes JSON and Markdown inventories of current single-use recommendations.
- *
- * @param cfg Quality configuration whose root receives the generated quality reports.
- *
- * @return The findings written to both report formats.
- */
-export function writeSingleUseReport(cfg: QualityCfg): SingleUseFinding[] {
-	const findings = singleUseFindings(cfg);
-	const docs = join(cfg.root, 'docs', 'quality');
-	mkdirSync(docs, { recursive: true });
-	const genAt = new Date().toISOString();
-	writeFileSync(join(docs, 'single-use-declarations.json'), `${JSON.stringify({ generatedAt: genAt, scope: cfg.sourceRoots, findings }, null, 2)}\n`);
-	const groups = (['INLINE', 'KEEP', 'REVIEW'] as const).map((d) => ({ decision: d, entries: findings.filter((f) => f.decision === d) }));
-	writeFileSync(
-		join(docs, 'single-use-declarations.md'),
-		`# Single-use declaration recommendations\n\nGenerated ${genAt.slice(0, 10)}.\n\n${groups.map(({ decision: d, entries: e }) => `## ${d} (${e.length})\n\n${e.length ? e.map((e) => `- \`${e.file}:${e.line}\` **${e.name}** — ${e.reason}`).join('\n') : '_None._'}`).join('\n\n')}\n`,
-	);
-	return findings;
-}
