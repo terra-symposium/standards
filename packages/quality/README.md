@@ -16,12 +16,7 @@ The package supports single-package repositories, monorepos, CI, pre-commit hook
 
 ### Installation
 
-Install the package as a development dependency. GitHub Packages requires the scope registry and a read-capable token:
-
-```ini
-@terra-symposium:registry=https://npm.pkg.github.com
-//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}
-```
+Install the package as a development dependency from the public npm registry; no registry configuration or read token is needed:
 
 ```sh
 pnpm add -D @terra-symposium/quality

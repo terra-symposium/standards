@@ -1,6 +1,6 @@
 # Terra Shared
 
-Private shared foundations for Terra Symposium repositories.
+Shared foundations for Terra Symposium repositories.
 
 ## Packages
 
@@ -8,7 +8,7 @@ Private shared foundations for Terra Symposium repositories.
 - `@terra-symposium/error-boundaries` — framework-neutral React error-boundary lifecycle and adapters.
 - `@terra-symposium/reporting` — reusable Playwright evidence fixtures, spreadsheets, and slideshows.
 
-Both packages are published to GitHub Packages. Consumers provide `NODE_AUTH_TOKEN` at install time and pin released versions in their lockfiles.
+Both packages are published publicly to the npm registry. Consumers can install them without a registry token; publishing from CI uses the repository `NPM_TOKEN` secret.
 
 Repository-specific paths, framework entrypoints, visual fallback components, security manifests, and deployment checks stay in the consuming repository.
 

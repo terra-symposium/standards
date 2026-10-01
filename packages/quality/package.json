@@ -9,15 +9,15 @@
 	"main": "./dist/index.js",
 	"types": "./dist/index.d.ts",
 	"bin": {
-		"terra-quality": "./dist/runner.js"
+		"terra-quality": "dist/runner.js"
 	},
 	"publishConfig": {
-		"registry": "https://npm.pkg.github.com",
+		"registry": "https://registry.npmjs.org",
 		"access": "public"
 	},
 	"repository": {
 		"type": "git",
-		"url": "https://github.com/Terra-Symposium/terra-shared.git"
+		"url": "git+https://github.com/Terra-Symposium/terra-shared.git"
 	},
 	"exports": {
 		".": "./dist/index.js",
