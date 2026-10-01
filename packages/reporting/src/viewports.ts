@@ -34,8 +34,6 @@ export type VisualViewport = { name: string; height: number; width: number };
 HELPERS
 //////////////////////////////////////////////////*/
 
-const ALIASES: Record<string, string> = { computer: 'xl', default: 'xl', desktop: 'xl', phone: 'mobile', tablet: 'md', wide: '2xl' };
-
 /**
  * Resolves an environment selection or alias list against an application catalog.
  *
@@ -53,7 +51,7 @@ export const resolveVisualViewports = (raw = process.env.PW_VIEWPORTS, catalog: 
 			: selection
 					.split(/[\s,]+/)
 					.filter(Boolean)
-					.map((n) => (names.includes(n) ? n : ALIASES[n] || n));
+					.map((n) => (names.includes(n) ? n : { computer: 'xl', default: 'xl', desktop: 'xl', phone: 'mobile', tablet: 'md', wide: '2xl' }[n] || n));
 	const unique = selected.filter((n, i) => selected.indexOf(n) === i);
 	const invalid = unique.filter((n) => !names.includes(n));
 	if (invalid.length) throw new Error(`Unknown PW_VIEWPORTS value(s): ${invalid.join(', ')}. Use default, all, or ${names.join(', ')}.`);

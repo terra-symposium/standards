@@ -22,6 +22,10 @@ import { DOCUMENTATION_DESCRIPTION_NOTICE } from '../dist/index.js';
 test('consolidated quality modules expose their behavior from the public package entrypoint', () => {
 	for (const check of [aliasFindings, createQualityAnalysis, documentationFindings, regexFindings, runTailwindCanonical]) assert.equal(typeof check, 'function');
 });
+test('the published runtime dependency stays within the supported TypeScript API major', () => {
+	const manifest = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
+	assert.equal(manifest.dependencies.typescript, '^5.0.0');
+});
 test('documentation warnings identify missing summary and tag descriptions without generating prose', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-doc-warnings-'));
 	const file = join(root, 'main.ts');

@@ -18,6 +18,10 @@ import { pathToFileURL } from 'node:url';
 
 // TYPES
 import type { QualityAnalysis, QualityCfg } from './runner.js';
+/*//////////////////////////////////////////////////
+REGEX
+//////////////////////////////////////////////////*/
+const S_G_REGEX = () => /\s+/g;
 
 /*//////////////////////////////////////////////////
 REGEX
@@ -49,24 +53,22 @@ export function repeatedClassFindings(cfg: QualityCfg, analysis?: QualityAnalysi
 	const settings = cfg.repeatedClasses ?? {};
 	const minimum = settings.minimumCount ?? 3;
 	const exts = new Set(settings.extensions ?? ['.astro', '.html', '.js', '.jsx', '.ts', '.tsx']);
-	const ignored = new Set(['test', 'tests', ...(settings.ignoredDirectories ?? ['node_modules', 'dist', 'build', 'coverage'])]);
-	const findings: RepeatedClassFinding[] = [];
+	const ignored = new Set(['test', 'tests', 'generated', 'node_modules', 'dist', 'build', 'coverage', ...(settings.ignoredDirectories ?? [])]);
+	const vals = new Map<string, string[]>();
 	for (const file of (analysis?.files ?? srcFiles({ ...cfg, extensions: [...exts] })).filter((f) => exts.has(f.slice(f.lastIndexOf('.'))))) {
 		if ([...ignored].some((d) => file.split('/').includes(d))) continue;
 		const src = analysis?.texts.get(file) ?? readFileSync(file, 'utf8');
 		// Markup embedded in a template literal is generated data, not a live
 		// attribute. The text-only inventory cannot safely rewrite it.
 		if (src.includes('`')) continue;
-		const vals = new Map<string, string[]>();
 		for (const match of src.matchAll(/\b(?:class|className)\s*=\s*(['"])([^'"\n]+)\1/g)) {
-			const val = match[2].replace(/\s+/g, ' ').trim();
+			const val = match[2].replace(S_G_REGEX(), ' ').trim();
 			if (val.includes('{') || val.split(' ').length < 2) continue;
 			const location = `${displayPath(cfg, file)}:${src.slice(0, match.index ?? 0).split('\n').length}`;
 			vals.set(val, [...(vals.get(val) ?? []), location]);
 		}
-		findings.push(...[...vals.entries()].filter(([, l]) => l.length >= minimum).map(([v, l]) => ({ value: v, count: l.length, locations: l })));
 	}
-	return findings;
+	return [...vals.entries()].filter(([, l]) => l.length >= minimum).map(([v, l]) => ({ value: v, count: l.length, locations: l.sort((l, r) => l.localeCompare(r, undefined, { numeric: true })) }));
 }
 
 /**
@@ -198,7 +200,7 @@ export function fixRepeatedClasses(cfg: QualityCfg, analysis?: QualityAnalysis):
 		}
 		const matches = [...src.matchAll(/\b(class|className)(\s*=\s*)(['"])([^'"\n]+)\3/g)]
 			.filter((m) => !isInsideTemplateLiteral(src, m.index ?? 0))
-			.map((m) => ({ match: m, value: m[4]!.replace(/\s+/g, ' ').trim() }));
+			.map((m) => ({ match: m, value: m[4]!.replace(S_G_REGEX(), ' ').trim() }));
 		const groups = new Map<string, typeof matches>();
 		for (const entry of matches) if (!entry.value.includes('{') && entry.value.split(' ').length >= 2) groups.set(entry.value, [...(groups.get(entry.value) ?? []), entry]);
 		const candidates = [...groups.entries()].filter(([, e]) => e.length >= minimum);
@@ -441,31 +443,63 @@ export function regexFindings(cfg: QualityCfg, analysis?: QualityAnalysis): Rege
 	const exts = new Set(settings.extensions ?? ['.js', '.jsx', '.mjs', '.ts', '.tsx', '.mts', '.cts']);
 	const ignored = new Set(settings.ignoredFiles ?? []);
 	const minimum = settings.minimumCount ?? 2;
-	const findings: RegexFinding[] = [];
+	const findings = new Map<string, string[]>();
 	for (const file of (analysis?.files ?? srcFiles({ ...cfg, extensions: [...exts] })).filter(
 		(c) => exts.has(c.slice(c.lastIndexOf('.'))) && !c.split('/').includes('test') && !c.split('/').includes('tests'),
 	)) {
 		if (ignored.has(displayPath(cfg, file))) continue;
 		const src = analysis?.texts.get(file) ?? readFileSync(file, 'utf8');
 		const ast = analysis?.sources.get(file) ?? ts.createSourceFile(file, src, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
-		const vals = new Map<string, string[]>();
 		const visit = (node: ts.Node): void => {
-			const val = ts.isRegularExpressionLiteral(node) ? node.getText(ast) : '';
+			const gen = genRegexDeclaration(node, ast);
+			const val = gen ? '' : regexSrc(node, ast);
 			if (val) {
 				const location = `${displayPath(cfg, file)}:${ast.getLineAndCharacterOfPosition(node.getStart(ast)).line + 1}`;
-				vals.set(val, [...(vals.get(val) ?? []), location]);
+				findings.set(val, [...(findings.get(val) ?? []), location]);
 			}
 			ts.forEachChild(node, visit);
 		};
 		visit(ast);
-		findings.push(...[...vals.entries()].filter(([, l]) => l.length >= minimum).map(([s, l]) => ({ source: s, count: l.length, locations: l })));
 	}
-	return findings;
+	return [...findings.entries()]
+		.filter(([, l]) => l.length >= minimum)
+		.map(([s, l]) => ({ source: s, count: l.length, locations: l.sort((l, r) => l.localeCompare(r, undefined, { numeric: true })) }));
+}
+
+function regexSrc(node: ts.Node, src: ts.SourceFile): string {
+	if (ts.isRegularExpressionLiteral(node)) {
+		const literal = node.getText(src);
+		const end = literal.lastIndexOf('/');
+		const pattern = literal.slice(1, end);
+		const flags = literal.slice(end + 1);
+		return flags ? `${pattern}/${flags}` : pattern;
+	}
+	if (ts.isNewExpression(node) && ts.isIdentifier(node.expression) && node.expression.text === 'RegExp') {
+		const [pattern, flags] = node.arguments ?? [];
+		if ((ts.isStringLiteral(pattern) || ts.isNoSubstitutionTemplateLiteral(pattern)) && (!flags || ts.isStringLiteral(flags)))
+			return flags ? `${pattern.getText(src)}, ${flags.getText(src)}` : pattern.getText(src);
+	}
+	return '';
+}
+
+function genRegexDeclaration(node: ts.Node, src: ts.SourceFile): boolean {
+	if (!ts.isRegularExpressionLiteral(node)) return false;
+	let declaration: ts.VariableDeclaration | undefined;
+	for (let curr: ts.Node | undefined = node; curr && !ts.isSourceFile(curr); curr = curr.parent) {
+		if (ts.isVariableDeclaration(curr)) {
+			declaration = curr;
+			break;
+		}
+	}
+	if (!declaration || !ts.isIdentifier(declaration.name) || !declaration.name.text.endsWith('_REGEX')) return false;
+	const before = src.text.slice(0, declaration.getStart(src));
+	const sections = [...before.matchAll(/\/\*\/{10,}\r?\n[ \t]*([A-Z][A-Z _-]*)[ \t]*\r?\n[ \t]*\/{10,}\*\//g)];
+	return sections.at(-1)?.[1] === 'REGEX';
 }
 
 /**
- * Replaces duplicate non-stateful regular-expression literals with file-local CONFIG/REGEX constants.
- * Stateful expressions and constructor calls remain advisory because shared identity can alter lastIndex behavior.
+ * Replaces duplicate regular-expression literals with file-local CONFIG/REGEX constants.
+ * Stateful expressions use factories so each occurrence receives a fresh RegExp instance.
  *
  * @param cfg Quality configuration defining the regex threshold and source scope.
  * @param analysis Optional shared analysis context used for discovery.
@@ -504,12 +538,8 @@ export function fixRegexDedup(cfg: QualityCfg, analysis?: QualityAnalysis): Patt
 			const name = classConstName(literal.replace(/\W+/g, '_'), used).replace(/_CLASS$/, '_REGEX');
 			const flags = literal.slice(literal.lastIndexOf('/') + 1);
 			const stateful = flags.includes('g') || flags.includes('y');
-			if (stateful) {
-				skipped += nodes.length;
-				continue;
-			}
-			declarations.push(`const ${name} = ${literal};`);
-			for (const node of nodes) edits.push({ start: node.getStart(parsed), end: node.end, replacement: name });
+			declarations.push(`const ${name} = ${stateful ? `() => ${literal}` : literal};`);
+			for (const node of nodes) edits.push({ start: node.getStart(parsed), end: node.end, replacement: stateful ? `${name}()` : name });
 			fixed += nodes.length;
 		}
 		let updated = src;

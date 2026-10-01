@@ -15,13 +15,17 @@ import { readFileSync, renameSync, unlinkSync, writeFileSync } from 'node:fs';
 
 // TYPES
 import type { QualityAnalysis, QualityCfg } from './runner.js';
+/*//////////////////////////////////////////////////
+REGEX
+//////////////////////////////////////////////////*/
+const R_N_REGEX = /\r?\n/;
+const S_S_G_REGEX = () => /\/\*\*[\s\S]*?\*\//g;
 
 /*//////////////////////////////////////////////////
 REGEX
 //////////////////////////////////////////////////*/
 
 const T_R_N_S_S_R_N_T_T_R_N_REGEX = /^\/\*\*[ \t]*\r?\n([\s\S]*?)\r?\n[ \t]*\*\/[ \t]*(?:\r?\n)*/;
-const R_N_REGEX = /\r?\n/;
 const T_T_REGEX = /^[ \t]*\*[ \t]?/;
 const S_REGEX = /^\s*/;
 const S_CLASS_2 = /^\s*(?:\/\/|\/\*|\*\/|\*)/;
@@ -477,13 +481,13 @@ function genFnDoc(n: ts.FunctionDeclaration, parsed: ts.SourceFile, eol: string,
 	if (!content.length || content.at(-1) !== '') content.push('');
 	for (const name of params) content.push(...(paramBlocks.get(name) ?? [`@param ${name}`]));
 	for (const [name, block] of paramBlocks) if (!params.includes(name)) content.push(...block);
-	if (returnBlock || returnsValue(n)) {
+	if (returnBlock || returnsVal(n)) {
 		if (content.at(-1) !== '') content.push('');
 		content.push(...(returnBlock ?? ['@return']));
 	}
 	for (const block of otherBlocks) content.push('', ...block);
-	const normalized = ['/**', ...content.map((l) => (l ? ` * ${l}` : ' *')), ' */'].join(eol);
-	return existing === normalized ? existing : normalized;
+	const norm = ['/**', ...content.map((l) => (l ? ` * ${l}` : ' *')), ' */'].join(eol);
+	return existing === norm ? existing : norm;
 }
 
 /**
@@ -500,7 +504,7 @@ function statementText(n: ts.Statement, parsed: ts.SourceFile, src: string, eol:
 	const leading = src.slice(n.getFullStart(), n.getStart(parsed)).trim();
 	const text = src.slice(n.getStart(parsed), n.end);
 	if (!ts.isFunctionDeclaration(n)) return [leading, text].filter(Boolean).join(eol);
-	const docs = [...leading.matchAll(/\/\*\*[\s\S]*?\*\//g)];
+	const docs = [...leading.matchAll(S_S_G_REGEX())];
 	const doc = docs.at(-1);
 	const gen = genFnDoc(n, parsed, eol, doc?.[0]);
 	if (doc?.index !== undefined) return [`${leading.slice(0, doc.index)}${gen}${leading.slice(doc.index + doc[0].length)}`.trim(), text].filter(Boolean).join(eol);
@@ -517,7 +521,7 @@ function statementText(n: ts.Statement, parsed: ts.SourceFile, src: string, eol:
  * @return Source text with canonical CONFIG and HELPERS sections.
  */
 function organizeSrcSects(src: string, fileName: string, eol: string): string {
-	if ([...src.matchAll(/\/\*\/{10,}\s*\n\s*([A-Z][A-Z _-]*)\s*\n\s*\/{10,}\*\//g)].some((match) => !['IMPORTS', 'CONFIG', 'HELPERS'].includes(match[1]!.trim()))) return src;
+	if ([...src.matchAll(/\/\*\/{10,}\s*\n\s*([A-Z][A-Z _-]*)\s*\n\s*\/{10,}\*\//g)].some((m) => !['IMPORTS', 'CONFIG', 'HELPERS'].includes(m[1]!.trim()))) return src;
 	const withoutManagedSections = removeManagedSects(src, fileName);
 	const parsed = ts.createSourceFile(fileName, withoutManagedSections, ts.ScriptTarget.Latest, true, srcKind(fileName));
 	const imports = parsed.statements.filter(ts.isImportDeclaration);
@@ -554,7 +558,7 @@ export function maintainSrcFile(root: string, fileName: string): boolean {
 	const eol = original.includes('\r\n') ? '\r\n' : '\n';
 	let src = original.replace(UFEFF_REGEX, '').replace(/^\s+/, '');
 	const path = relative(root, fileName).split(sep).join('/');
-	src = src.replace(/^\/\*\*[ \t]+([^\r\n]*?)\s*\*\/[ \t]*(?:\r?\n)*/, (_match, description: string) => `/**${eol} * ${description}${eol} */${eol}`);
+	src = src.replace(/^\/\*\*[ \t]+([^\r\n]*?)\s*\*\/[ \t]*(?:\r?\n)*/, (_match, d: string) => `/**${eol} * ${d}${eol} */${eol}`);
 	src = healHeaderFragments(src, path, eol);
 	const existingHeader = src.match(T_R_N_S_S_R_N_T_T_R_N_REGEX);
 	const headerLines =
@@ -581,9 +585,9 @@ export function maintainSrcFile(root: string, fileName: string): boolean {
 		const render = (label: ImportGroup): string[] => {
 			const entries = groups[label].sort((a, b) => comp(a.text, b.text) || comp(a.source, b.source));
 			const seen = new Set<string>();
-			const uniqueEntries = entries.filter((entry) => {
-				if (seen.has(entry.text)) return false;
-				seen.add(entry.text);
+			const uniqueEntries = entries.filter((e) => {
+				if (seen.has(e.text)) return false;
+				seen.add(e.text);
 				return true;
 			});
 			return uniqueEntries.length ? [`// ${label}`, ...uniqueEntries.map((e) => e.text), ''] : [];
@@ -609,12 +613,17 @@ export function maintainSrcFile(root: string, fileName: string): boolean {
 /** Removes generated section scaffolding and empty or detached TSDoc after source edits. */
 export function removeNonCodeComments(fileName: string): boolean {
 	if (!SUPPORTED.has(extname(fileName))) return false;
-	const source = readFileSync(fileName, 'utf8');
-	const original = source.replace(/(^|\n)([ \t]*(?:CONFIG|TESTS|HELPERS|IMPORTS)[ \t]*\r?\n[ \t]*\/{10,}\*\/[ \t]*(?=\r?\n|$))/g, (match, prefix: string, _fragment: string, offset: number) => {
-		const precedingLine = source.slice(0, offset + prefix.length).trimEnd().split(/\r?\n/).at(-1)?.trim();
-		return precedingLine && /^\/\*\/{10,}$/.test(precedingLine) ? match : prefix;
+	const src = readFileSync(fileName, 'utf8');
+	const original = src.replace(/(^|\n)([ \t]*(?:CONFIG|TESTS|HELPERS|IMPORTS)[ \t]*\r?\n[ \t]*\/{10,}\*\/[ \t]*(?=\r?\n|$))/g, (m, p: string, _fragment: string, o: number) => {
+		const precedingLine = src
+			.slice(0, o + p.length)
+			.trimEnd()
+			.split(R_N_REGEX)
+			.at(-1)
+			?.trim();
+		return precedingLine && /^\/\*\/{10,}$/.test(precedingLine) ? m : p;
 	});
-	if (original !== source) writeValidatedSrc(fileName, original);
+	if (original !== src) writeValidatedSrc(fileName, original);
 	const parsed = ts.createSourceFile(fileName, original, ts.ScriptTarget.Latest, true, srcKind(fileName));
 	const removals: { start: number; end: number }[] = [];
 	const nodeStarts: number[] = [];
@@ -644,15 +653,22 @@ export function removeNonCodeComments(fileName: string): boolean {
 		if (token === ts.SyntaxKind.SingleLineCommentTrivia || token === ts.SyntaxKind.MultiLineCommentTrivia)
 			comments.push({ start: scanner.getTokenPos(), end: scanner.getTextPos(), text: scanner.getTokenText() });
 	for (const block of tsdocBlocks(original, parsed)) {
-		if (block.text.replace(/^\/\*\*|\*\/$/g, '').replace(/^\s*\* ?/gm, '').trim()) continue;
-		const followingDeclaration = nodeStarts.filter((start) => start >= block.end).sort((a, b) => a - b)[0];
-		if ((followingDeclaration === undefined || !/^\s*$/.test(original.slice(block.end, followingDeclaration))) && !fileHeaderBlock(original, [block])) removals.push({ start: block.start, end: block.end });
+		if (
+			block.text
+				.replace(/^\/\*\*|\*\/$/g, '')
+				.replace(/^\s*\* ?/gm, '')
+				.trim()
+		)
+			continue;
+		const followingDeclaration = nodeStarts.filter((s) => s >= block.end).sort((a, b) => a - b)[0];
+		if ((followingDeclaration === undefined || !/^\s*$/.test(original.slice(block.end, followingDeclaration))) && !fileHeaderBlock(original, [block]))
+			removals.push({ start: block.start, end: block.end });
 	}
-	const headings = comments.filter(({ text }) => /^\/\*\/{10,}/.test(text) || /^\/\/\s*[A-Z][A-Z _-]*\s*$/.test(text));
-	for (const [index, heading] of headings.entries()) {
+	const headings = comments.filter(({ text: t }) => /^\/\*\/{10,}/.test(t) || /^\/\/\s*[A-Z][A-Z _-]*\s*$/.test(t));
+	for (const [idx, heading] of headings.entries()) {
 		const section = heading.text.startsWith('/*');
-		const next = headings.slice(index + 1).find((candidate) => candidate.text.startsWith('/*') === section)?.start ?? original.length;
-		if (!codeStarts.some((start) => start >= heading.end && start < next)) removals.push({ start: heading.start, end: heading.end });
+		const n = headings.slice(idx + 1).find((c) => c.text.startsWith('/*') === section)?.start ?? original.length;
+		if (!codeStarts.some((s) => s >= heading.end && s < n)) removals.push({ start: heading.start, end: heading.end });
 	}
 	if (!removals.length) return false;
 	let updated = original;
@@ -731,7 +747,7 @@ function documentationSupported(fileName: string): boolean {
  */
 function documented(node: ts.Node, src: string): boolean {
 	const leading = src.slice(node.getFullStart(), node.getStart());
-	const docs = [...leading.matchAll(/\/\*\*[\s\S]*?\*\//g)];
+	const docs = [...leading.matchAll(S_S_G_REGEX())];
 	const doc = docs.at(-1);
 	if (!doc) return false;
 	// The generated file header is source-level metadata, not documentation for
@@ -872,18 +888,18 @@ function tsdocTagEntries(lines: TSDocLine[]): { tag: string; subject: string; de
  * @param node Function declaration whose return contract is being checked.
  * @return `true` when callers can receive a value rather than only completion.
  */
-function returnsValue(node: ts.FunctionDeclaration): boolean {
+function returnsVal(node: ts.FunctionDeclaration): boolean {
 	const returnType = node.type?.getText().replace(/\s+/g, '') ?? '';
 	if (returnType === 'void' || returnType === 'Promise<void>') return false;
 	if (node.type) return true;
-	let valueReturn = false;
+	let valReturn = false;
 	const visit = (child: ts.Node): void => {
-		if (valueReturn) return;
-		if (ts.isReturnStatement(child) && child.expression) valueReturn = true;
+		if (valReturn) return;
+		if (ts.isReturnStatement(child) && child.expression) valReturn = true;
 		ts.forEachChild(child, visit);
 	};
 	if (node.body) visit(node.body);
-	return valueReturn;
+	return valReturn;
 }
 
 /**
@@ -997,13 +1013,13 @@ function documentationFindingsForFile(cfg: QualityCfg, file: string, requirement
 					const block = documentationBlockFor(src, node);
 					if (block) {
 						const entries = tsdocTagEntries(tsdocLines(block));
-						const documentedParams = new Set(entries.filter((entry) => entry.tag.toLowerCase() === 'param').map((entry) => entry.subject));
-						for (const parameter of node.parameters) {
-							const name = parameter.name.getText(parsed);
+						const documentedParams = new Set(entries.filter((e) => e.tag.toLowerCase() === 'param').map((e) => e.subject));
+						for (const param of node.parameters) {
+							const name = param.name.getText(parsed);
 							if (!documentedParams.has(name)) findings.push(documentationReport(file, parsed, node, `@param ${name}`, 'param', `document the ${name} parameter`, cfg));
 						}
-						const hasReturnTag = entries.some((entry) => ['return', 'returns'].includes(entry.tag.toLowerCase()));
-						if (returnsValue(node) && !hasReturnTag) findings.push(documentationReport(file, parsed, node, '@return', 'return', 'document the value returned by this function', cfg));
+						const hasReturnTag = entries.some((e) => ['return', 'returns'].includes(e.tag.toLowerCase()));
+						if (returnsVal(node) && !hasReturnTag) findings.push(documentationReport(file, parsed, node, '@return', 'return', 'document the value returned by this function', cfg));
 					}
 				}
 			}

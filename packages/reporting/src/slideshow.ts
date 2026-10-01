@@ -9,26 +9,17 @@ IMPORTS
 
 // API
 import fs from 'node:fs';
-import { createRequire } from 'node:module';
 import path from 'node:path';
 import sharp from 'sharp';
+import { createRequire } from 'node:module';
+import { neutralizeApplicationMetadata } from './metadata.js';
 
 // TYPES
 import type { VisualResult } from './core.js';
-import { neutralizeApplicationMetadata } from './metadata.js';
 
 /*//////////////////////////////////////////////////
 CONFIG
 //////////////////////////////////////////////////*/
-
-/** Minimal slide surface used by the writer's runtime-compatible adapter. */
-type PresentationSlide = {
-	background: { color: string };
-	addText: (text: string, options: Record<string, unknown>) => void;
-	addShape: (shape: string, options: Record<string, unknown>) => void;
-	addImage: (options: Record<string, unknown>) => void;
-	addNotes: (notes: string) => void;
-};
 
 /** Minimal presentation surface required from the slideshow library. */
 type Presentation = {
@@ -38,24 +29,17 @@ type Presentation = {
 	subject: string;
 	title: string;
 	ShapeType: { line: string; roundRect: string };
-	addSlide: () => PresentationSlide;
+	addSlide: () => /** Minimal slide surface used by the writer's runtime-compatible adapter. */ {
+		background: { color: string };
+		addText: (text: string, options: Record<string, unknown>) => void;
+		addShape: (shape: string, options: Record<string, unknown>) => void;
+		addImage: (options: Record<string, unknown>) => void;
+		addNotes: (notes: string) => void;
+	};
 	writeFile: (options: { fileName: string }) => Promise<string>;
 };
-
-type PresentationConstructor = new () => Presentation;
-
-// The runtime package is CommonJS while NodeNext exposes its constructor through a namespace type.
-const require = createRequire(import.meta.url);
-const PptxGenJS = require('pptxgenjs') as PresentationConstructor;
-
 const COLOURS = { accent: '1F4E78', ink: '16202A', line: 'D8DEE6', muted: '52606D', surface: 'F5F7FA' };
 type ImgReview = { cues: string[]; height: number; width: number };
-type PreviewImg = { data: string; height: number; width: number };
-
-/*//////////////////////////////////////////////////
-HELPERS
-//////////////////////////////////////////////////*/
-
 /**
  * Derives visual-review prompts from screenshot dimensions and test diagnostics.
  *
@@ -76,7 +60,6 @@ const reviewImg = async (file: string, r: VisualResult): Promise<ImgReview> => {
 	if (!cues.length) cues.push('Inspect alignment, text wrapping, control density, whitespace, and visual hierarchy for issues not covered by assertions.');
 	return { cues, height, width };
 };
-
 /**
  * Fits an image into a bounded slide region while preserving its aspect ratio.
  *
@@ -94,21 +77,19 @@ const fitImg = (width: number, height: number, x: number, y: number, maxWidth: n
 	const fittedHeight = height * scale;
 	return { h: fittedHeight, w: fittedWidth, x: x + (maxWidth - fittedWidth) / 2, y: y + (maxHeight - fittedHeight) / 2 };
 };
-
 /**
  * Crops a tall screenshot into a slide-friendly preview while retaining the original in notes.
  *
  * @param file Screenshot path to preview.
  * @returns Base64 image data and preview dimensions.
  */
-const previewImg = async (file: string): Promise<PreviewImg> => {
+const previewImg = async (file: string): Promise<{ data: string; height: number; width: number }> => {
 	const metadata = await sharp(file).metadata();
 	const width = metadata.width || 1;
 	const height = Math.min(metadata.height || 1, Math.max(1, Math.round(width / 0.38)));
 	const data = await sharp(file).extract({ height, left: 0, top: 0, width }).png().toBuffer();
 	return { data: `data:image/png;base64,${data.toString('base64')}`, height, width };
 };
-
 /**
  * Sorts responsive results by their rendered viewport width.
  *
@@ -116,7 +97,6 @@ const previewImg = async (file: string): Promise<PreviewImg> => {
  * @returns Numeric viewport width, or a final sort value when unavailable.
  */
 const viewportWidth = (r: VisualResult): number => Number.parseInt(r.viewportSize.split('×')[0] || '', 10) || Number.MAX_SAFE_INTEGER;
-
 /**
  * Builds the visible review copy and diagnostics for one result.
  *
@@ -131,7 +111,6 @@ const slideCopy = (r: VisualResult, review: ImgReview): string => {
 	if (r.terminalErrors) lines.push('', `Terminal: ${r.terminalErrors}`);
 	return lines.join('\n');
 };
-
 /**
  * Adds a single-result slide with its screenshot and review prompts.
  *
@@ -166,7 +145,6 @@ const addSingleViewportSlide = async (presentation: Presentation, r: VisualResul
 	slide.addText(slideCopy(r, review), { color: COLOURS.muted, fit: 'shrink', fontFace: 'Aptos', fontSize: 9, margin: 0.02, x: 9.12, y: 1.58, w: 3.55, h: 5.05 });
 	slide.addNotes(`Screenshot: ${path.resolve(r.screenshot)}\n\n${slideCopy(r, review)}`);
 };
-
 /**
  * Adds a responsive comparison slide for results sharing one test identity.
  *
@@ -225,10 +203,8 @@ const addResponsiveSlide = async (presentation: Presentation, group: readonly Vi
 	}
 	slide.addNotes(notes.join('\n\n'));
 };
-
 /**  Optional visible and metadata overrides for a slideshow artifact. */
 export type SlideshowOptions = { title?: string; author?: string; company?: string; subject?: string };
-
 /**
  * Writes screenshot-backed results as single-viewport or responsive review slides.
  *
@@ -238,15 +214,16 @@ export type SlideshowOptions = { title?: string; author?: string; company?: stri
  * @returns A promise that resolves after the slideshow has been written.
  */
 export const writeSlideshow = async (file: string, results: readonly VisualResult[], opts: SlideshowOptions = {}): Promise<void> => {
-	const presentation = new PptxGenJS();
+	const presentation = new /* The runtime package is CommonJS while NodeNext exposes its constructor through a namespace type. */ (
+		createRequire(import.meta.url)('pptxgenjs') as new () => Presentation
+	)();
 	presentation.layout = 'LAYOUT_WIDE';
 	presentation.author = opts.author || 'Test evidence reporter';
 	presentation.company = opts.company || 'Test evidence';
 	presentation.subject = opts.subject || 'Screenshot evidence and UI review prompts';
 	presentation.title = opts.title || 'Test evidence slideshow';
-	const screenshotResults = results.filter((r) => r.screenshot && fs.existsSync(r.screenshot));
 	const groups = new Map<string, VisualResult[]>();
-	for (const r of screenshotResults) {
+	for (const r of results.filter((r) => r.screenshot && fs.existsSync(r.screenshot))) {
 		const key = [r.project, r.file, r.groups, r.title].join('|');
 		groups.set(key, [...(groups.get(key) || []), r]);
 	}

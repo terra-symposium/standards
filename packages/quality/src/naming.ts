@@ -18,6 +18,10 @@ import type { QualityAnalysis, QualityCfg } from './runner.js';
 /*//////////////////////////////////////////////////
 CONFIG
 //////////////////////////////////////////////////*/
+/*//////////////////////////////////////////////////
+REGEX
+//////////////////////////////////////////////////*/
+const A_Z_REGEX = /^[A-Z]/;
 
 type RenameKind = { numericIndex?: boolean; callback?: boolean; reserved?: string[] };
 export const IDENTIFIER_REPLACEMENTS = replacementMap([
@@ -203,7 +207,7 @@ function renderIdentifier(original: string, tokens: string[]): string {
 	if (/^[A-Z][A-Z0-9_]*$/.test(original)) return tokens.join(original.includes('_') ? '_' : '').toUpperCase();
 	if (original.includes('_')) return tokens.join('_');
 	if (original.includes('-')) return tokens.join('-');
-	if (/^[A-Z]/.test(original)) return tokens.map((t) => t.charAt(0).toUpperCase() + t.slice(1)).join('');
+	if (A_Z_REGEX.test(original)) return tokens.map((t) => t.charAt(0).toUpperCase() + t.slice(1)).join('');
 	return tokens.map((t, i) => (i === 0 ? t.toLowerCase() : t.charAt(0).toUpperCase() + t.slice(1))).join('');
 }
 
@@ -274,7 +278,7 @@ function callbackKind(n: ts.Identifier): RenameKind | undefined {
 	// JSX component bindings and explicit destructuring aliases encode syntax or
 	// public property names; shortening them can produce invalid JSX or change
 	// the inferred shape of a discriminated union.
-	if (/^[A-Z]/.test(n.text) || (ts.isBindingElement(n.parent) && n.parent.propertyName)) return undefined;
+	if (A_Z_REGEX.test(n.text) || (ts.isBindingElement(n.parent) && n.parent.propertyName)) return undefined;
 	const param = ts.findAncestor(n, ts.isParameter);
 	if (!param) return undefined;
 	const callback = ts.findAncestor(
@@ -282,10 +286,7 @@ function callbackKind(n: ts.Identifier): RenameKind | undefined {
 		(n): n is ts.ArrowFunction | ts.FunctionExpression | ts.FunctionDeclaration => ts.isArrowFunction(n) || ts.isFunctionExpression(n) || ts.isFunctionDeclaration(n),
 	);
 	if (!callback) return undefined;
-	const isInlineCallback =
-		!ts.isFunctionDeclaration(callback) &&
-		ts.isCallExpression(callback.parent) &&
-		callback.parent.arguments.includes(callback as ts.Expression);
+	const isInlineCallback = !ts.isFunctionDeclaration(callback) && ts.isCallExpression(callback.parent) && callback.parent.arguments.includes(callback as ts.Expression);
 	let isNamedCallback = false;
 	if (ts.isFunctionDeclaration(callback) && callback.name) {
 		const scan = (n: ts.Node): void => {
@@ -604,8 +605,6 @@ export function aliasFindings(cfg: QualityCfg, analysisOrFix: QualityAnalysis | 
 					: undefined;
 				if (
 					tgt &&
-					!ts.isPropertyAccessExpression(tgt) &&
-					!ts.isElementAccessExpression(tgt) &&
 					symbol &&
 					targetSymbol &&
 					symbol !== targetSymbol &&

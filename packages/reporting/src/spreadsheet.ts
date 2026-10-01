@@ -7,10 +7,19 @@
 IMPORTS
 //////////////////////////////////////////////////*/
 
-import ExcelJS from 'exceljs';
+// API
 import fs from 'node:fs';
-import { diagnosticCount, orderedFiles, resultsForFile, statusCounts, statusLabel, type ReportRun, type VisualResult, VISUAL_STATUSES } from './core.js';
+import { diagnosticCount, orderedFiles, resultsForFile, statusCounts, statusLabel } from './core.js';
 import { neutralizeApplicationMetadata } from './metadata.js';
+
+// COMPONENTS
+import ExcelJS from 'exceljs';
+
+// DATA
+import { VISUAL_STATUSES } from './core.js';
+
+// TYPES
+import type { ReportRun, VisualResult } from './core.js';
 
 /*//////////////////////////////////////////////////
 CONFIG
@@ -23,13 +32,6 @@ const STATUS_STYLES: Record<string, { fill: string; font: string }> = {
 	interrupted: { fill: 'FFFEE2E2', font: 'FF991B1B' },
 	skipped: { fill: 'FFFEF3C7', font: 'FF92400E' },
 };
-
-const RESULT_HEADINGS = ['Project', 'Groups', 'Test title', 'Viewport', 'Viewport size', 'Status', 'Duration (ms)', 'Retries', 'Error', 'Browser errors', 'Terminal errors', 'Evidence'];
-
-/*//////////////////////////////////////////////////
-HELPERS
-//////////////////////////////////////////////////*/
-
 /**
  * Applies the shared header layout to a worksheet.
  *
@@ -44,7 +46,6 @@ const styleHeader = (sheet: ExcelJS.Worksheet): void => {
 	sheet.getRow(1).alignment = { vertical: 'middle' };
 	sheet.getRow(1).height = 22;
 };
-
 /**
  * Applies the status label and its semantic color treatment to a cell.
  *
@@ -65,7 +66,6 @@ const styleStatus = (cell: ExcelJS.Cell, status: string): void => {
 		top: { color: { argb: style.font }, style: 'thin' },
 	};
 };
-
 /**
  * Adds one feature-file result sheet, including available screenshot evidence.
  *
@@ -76,7 +76,7 @@ const styleStatus = (cell: ExcelJS.Cell, status: string): void => {
  */
 const addResultSheet = (book: ExcelJS.Workbook, name: string, vals: readonly VisualResult[]): void => {
 	const sheet = book.addWorksheet(name);
-	sheet.addRow(RESULT_HEADINGS);
+	sheet.addRow(['Project', 'Groups', 'Test title', 'Viewport', 'Viewport size', 'Status', 'Duration (ms)', 'Retries', 'Error', 'Browser errors', 'Terminal errors', 'Evidence']);
 	styleHeader(sheet);
 	for (const val of vals) {
 		const row = sheet.addRow([
@@ -109,7 +109,6 @@ const addResultSheet = (book: ExcelJS.Workbook, name: string, vals: readonly Vis
 		sheet.addImage(book.addImage({ buffer: img as unknown as ExcelJS.Image['buffer'], extension: 'png' }), { editAs: 'oneCell', ext: size, tl: { col: 11, row: row.number - 1 } });
 	}
 };
-
 /**
  * Adds the file-level status summary for the run.
  *
@@ -127,7 +126,6 @@ const addSummary = (book: ExcelJS.Workbook, run: ReportRun): void => {
 	styleHeader(sheet);
 	sheet.columns = [{ width: 32 }, ...Array.from({ length: 6 }, () => ({ width: 14 }))];
 };
-
 /**
  * Adds project configuration and status totals for the run.
  *
@@ -146,7 +144,6 @@ const addProjects = (book: ExcelJS.Workbook, run: ReportRun): void => {
 	styleHeader(sheet);
 	for (const row of sheet.getRows(2, sheet.rowCount) || []) row.alignment = { vertical: 'top', wrapText: true };
 };
-
 /**
  * Adds run-level terminal diagnostics, including an explicit empty-run row.
  *
@@ -157,13 +154,12 @@ const addProjects = (book: ExcelJS.Workbook, run: ReportRun): void => {
 const addDiagnostics = (book: ExcelJS.Workbook, run: ReportRun): void => {
 	const sheet = book.addWorksheet('Run diagnostics');
 	sheet.addRow(['Source', 'Message']);
-	for (const value of run.runDiagnostics) sheet.addRow(['Terminal', value]);
+	for (const val of run.runDiagnostics) sheet.addRow(['Terminal', val]);
 	if (!run.runDiagnostics.length) sheet.addRow(['Run', 'No run-level diagnostics captured.']);
 	sheet.columns = [{ width: 18 }, { width: 120 }];
 	styleHeader(sheet);
 	for (const row of sheet.getRows(2, sheet.rowCount) || []) row.alignment = { vertical: 'top', wrapText: true };
 };
-
 /**
  * Writes the neutral spreadsheet artifact for a normalized report run.
  *

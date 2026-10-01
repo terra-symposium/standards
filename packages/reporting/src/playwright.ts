@@ -8,13 +8,20 @@ IMPORTS
 //////////////////////////////////////////////////*/
 
 // API
-import { test as base } from '@playwright/test';
 import fs from 'node:fs';
 import path from 'node:path';
+import { baseVisualProjectName, projectViewportName, viewportSizeLabel } from './viewports.js';
+import { diagnosticCount, normalizeVisualStatus } from './core.js';
+import { test as base } from '@playwright/test';
 import { writeSlideshow } from './slideshow.js';
-import { diagnosticCount, normalizeVisualStatus, type ProjectDefinition, type ReportRun, type VisualResult } from './core.js';
-import { baseVisualProjectName, projectViewportName, viewportSizeLabel, VISUAL_VIEWPORTS, type ViewportCatalog } from './viewports.js';
 import { writeSpreadsheet } from './spreadsheet.js';
+
+// DATA
+import { VISUAL_VIEWPORTS } from './viewports.js';
+
+// TYPES
+import type { ProjectDefinition, ReportRun, VisualResult } from './core.js';
+import type { ViewportCatalog } from './viewports.js';
 
 /*//////////////////////////////////////////////////
 CONFIG
@@ -82,13 +89,12 @@ export type ReportingOptions = {
 	reportFile?: string;
 	slideshowFile?: string;
 };
-
 type ReporterAttachment = { body?: Buffer; contentType?: string; name?: string; path?: string };
-type DiagnosticRec = { level?: string; message?: string; url?: string };
 
 /*//////////////////////////////////////////////////
 HELPERS
 //////////////////////////////////////////////////*/
+
 /**
  * Removes terminal color escapes before diagnostics enter an artifact.
  * @param value Terminal output that may contain ANSI escape sequences.
@@ -108,7 +114,7 @@ export const parseDiagnostics = (raw: string): string[] => {
 		if (!Array.isArray(parsed)) return [];
 		return parsed.flatMap((v: unknown) => {
 			if (!v || typeof v !== 'object') return [];
-			const rec = v as DiagnosticRec;
+			const rec = v as { level?: string; message?: string; url?: string };
 			return rec.message ? [`${rec.level || 'diagnostic'}: ${rec.message}${rec.url ? ` (${rec.url})` : ''}`] : [];
 		});
 	} catch {
@@ -177,9 +183,15 @@ const testIdentity = (
 	const fullTitlePath = test.titlePath();
 	const fileIdx = fullTitlePath.findIndex((v) => v.endsWith(file));
 	const titlePath = fullTitlePath.slice(fileIdx >= 0 ? fileIdx + 1 : 0);
-	const title = titlePath.pop() || test.title;
 	const viewport = projectViewportName(cfgdProject, viewportCatalog);
-	return { file, groups: titlePath.join(' › '), project: baseVisualProjectName(cfgdProject, viewportCatalog), title, viewport, viewportSize: viewportSizeLabel(viewport, viewportCatalog) };
+	return {
+		file,
+		groups: titlePath.join(' › '),
+		project: baseVisualProjectName(cfgdProject, viewportCatalog),
+		title: titlePath.pop() || test.title,
+		viewport,
+		viewportSize: viewportSizeLabel(viewport, viewportCatalog),
+	};
 };
 
 /**
@@ -189,11 +201,12 @@ const testIdentity = (
  * @returns A filesystem-safe screenshot filename.
  */
 const screenshotName = (result: VisualResult, idx: number): string => {
-	const slug = `${result.project}-${result.file}-${result.title}-${result.viewport}`
-		.replace(/[^a-z0-9_-]+/gi, '-')
-		.replace(/^-+|-+$/g, '')
-		.toLowerCase();
-	return `${String(idx + 1).padStart(4, '0')}-${slug || 'screenshot'}.png`;
+	return `${String(idx + 1).padStart(4, '0')}-${
+		`${result.project}-${result.file}-${result.title}-${result.viewport}`
+			.replace(/[^a-z0-9_-]+/gi, '-')
+			.replace(/^-+|-+$/g, '')
+			.toLowerCase() || 'screenshot'
+	}.png`;
 };
 
 /**
@@ -223,6 +236,8 @@ export default class ProgressReporter {
 	private readonly completedTests = new Set<string>();
 
 	/**
+	 * Creates a reporter that writes application-specific visual test artifacts.
+	 *
 	 * @param opts Application-specific reporter configuration.
 	 */
 	constructor(opts: ReportingOptions = {}) {
@@ -300,11 +315,9 @@ export default class ProgressReporter {
 	 */
 	onTestEnd(test: import('@playwright/test/reporter').TestCase, result: import('@playwright/test/reporter').TestResult): void {
 		this.completedTests.add(test.id);
-		const cfgdProject = test.parent.project()?.name || test.titlePath().find((v) => v.startsWith('root-')) || 'unknown';
-		const identity = testIdentity(test, cfgdProject, this.options.viewportCatalog);
 		const screenshot = screenshotAttachment(result.attachments);
 		this.results.push({
-			...identity,
+			...testIdentity(test, test.parent.project()?.name || test.titlePath().find((v) => v.startsWith('root-')) || 'unknown', this.options.viewportCatalog),
 			browserErrors: diagnosticText(result.attachments, 'browser-diagnostics').join('\n'),
 			duration: result.duration,
 			error: result.error?.message?.split('\n')[0] || '',
@@ -324,9 +337,8 @@ export default class ProgressReporter {
 	async onEnd(): Promise<void> {
 		for (const [id, test] of this.expectedTests) {
 			if (this.completedTests.has(id)) continue;
-			const cfgdProject = test.parent.project()?.name || test.titlePath().find((v) => v.startsWith('root-')) || 'unknown';
 			this.results.push({
-				...testIdentity(test, cfgdProject, this.options.viewportCatalog),
+				...testIdentity(test, test.parent.project()?.name || test.titlePath().find((v) => v.startsWith('root-')) || 'unknown', this.options.viewportCatalog),
 				browserErrors: '',
 				duration: 0,
 				error: 'Test did not start because an upstream dependency failed or the run was interrupted.',
@@ -348,5 +360,4 @@ export default class ProgressReporter {
 		process.stdout.write(`Test spreadsheet: ${spreadsheet}\nTest slideshow: ${slideshow}\n`);
 	}
 }
-
 export { diagnosticCount };

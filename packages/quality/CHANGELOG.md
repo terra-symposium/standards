@@ -5,6 +5,7 @@
 ### Patch Changes
 
 - Limit post-inline import and comment maintenance to source files changed by the single-use fixer.
+- Restrict the TypeScript runtime dependency to the supported 5.x API.
 
 ## 0.4.36
 

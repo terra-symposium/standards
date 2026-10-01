@@ -166,7 +166,10 @@ test('maintainSrcFile prefixes a prose-only leading header with the canonical pa
 });
 test('final comment cleanup removes detached TSDoc and generated grouping comments only', () => {
 	const root = fixtureRoot('terra-quality-non-code-comments-');
-	const file = fixtureFile(root, 'src/main.ts', `/** src/main.ts */
+	const file = fixtureFile(
+		root,
+		'src/main.ts',
+		`/** src/main.ts */
 /*//////////////////////////////////////////////////
 IMPORTS
 //////////////////////////////////////////////////*/
@@ -184,17 +187,21 @@ export function readConfig(path: string): string {
 const destination = '/home';
 void [readConfig, destination];
 // EMPTY GROUP
-`);
+`,
+	);
 	assert.equal(removeNonCodeComments(file), true);
-	const cleaned = fixtureText(root, 'src/main.ts');
-	assert.match(cleaned, /IMPORTS|CONFIG|\/\/ API/);
-	assert.doesNotMatch(cleaned, /\/\*\* \*\/|EMPTY GROUP/);
-	assert.match(cleaned, /Reads the configured file from disk/);
-	assert.match(cleaned, /preserves the caller's original destination/);
+	const c = fixtureText(root, 'src/main.ts');
+	assert.match(c, /IMPORTS|CONFIG|\/\/ API/);
+	assert.doesNotMatch(c, /\/\*\* \*\/|EMPTY GROUP/);
+	assert.match(c, /Reads the configured file from disk/);
+	assert.match(c, /preserves the caller's original destination/);
 });
 test('maintenance preserves custom populated sections and cleanup removes only empty headings', () => {
 	const root = fixtureRoot('terra-quality-custom-sections-');
-	const file = fixtureFile(root, 'src/main.ts', `/** src/main.ts */
+	const file = fixtureFile(
+		root,
+		'src/main.ts',
+		`/** src/main.ts */
 import { readFileSync } from 'node:fs';
 /*//////////////////////////////////////////////////
 REGRESSIONS CONTRACTS
@@ -202,7 +209,8 @@ REGRESSIONS CONTRACTS
 // TESTS
 export const contract = readFileSync('fixture', 'utf8');
 // EMPTY GROUP
-`);
+`,
+	);
 	maintainSrcFile(root, file);
 	assert.match(fixtureText(root, 'src/main.ts'), /REGRESSIONS CONTRACTS/);
 	assert.equal(removeNonCodeComments(file), true);

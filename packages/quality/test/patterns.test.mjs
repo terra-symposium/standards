@@ -29,7 +29,7 @@ test('repeated-class detection normalizes whitespace and ignores dynamic, one-wo
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.tsx'], repeatedClasses: { minimumCount: 5, ignoredDirectories: ['generated'] } });
 	assert.deepEqual(repeatedClassFindings(cfg), []);
 	const defaultCfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.tsx'], repeatedClasses: {} });
-	assert.deepEqual(repeatedClassFindings(defaultCfg), []);
+	assert.deepEqual(repeatedClassFindings(defaultCfg), [{ value: 'rounded border bg-card', count: 4, locations: ['src/one.tsx:1', 'src/one.tsx:2', 'src/two.tsx:1', 'src/two.tsx:2'] }]);
 });
 test('UI pattern detection applies configured extensions and ignored repository-relative files', () => {
 	const root = fixtureRoot('terra-quality-ui-patterns-');
@@ -59,7 +59,10 @@ test('regex deduplication inventories literals and RegExp constructors across co
 	fixtureFile(root, 'src/ignored.ts', `const first = /alpha/;\nvoid first;\n`);
 	fixtureFile(root, 'src/tests/test.ts', `const first = /alpha/;\nvoid first;\n`);
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], regexDedup: { ignoredFiles: ['src/ignored.ts'], minimumCount: 2 } });
-	assert.deepEqual(regexFindings(cfg), []);
+	assert.deepEqual(regexFindings(cfg), [
+		{ source: 'alpha', count: 3, locations: ['src/one.ts:1', 'src/three.ts:1', 'src/two.ts:1'] },
+		{ source: "'constructor'", count: 2, locations: ['src/one.ts:2', 'src/two.ts:2'] },
+	]);
 	const stricter = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], regexDedup: { minimumCount: 5 } });
 	assert.deepEqual(regexFindings(stricter), []);
 });

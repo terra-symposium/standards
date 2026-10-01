@@ -15,6 +15,10 @@ import { srcFiles } from './files.js';
 
 // TYPES
 import type { QualityCfg } from './runner.js';
+/*//////////////////////////////////////////////////
+REGEX
+//////////////////////////////////////////////////*/
+const S_REGEX = /^\s*$/;
 
 /*//////////////////////////////////////////////////
 REGEX
@@ -26,7 +30,7 @@ type Candidate = { file: string; source: ts.SourceFile; statement: ts.Statement;
 type Reference = { file: string; source: ts.SourceFile; node: ts.Identifier };
 const canonical = (c: ts.TypeChecker, s: ts.Symbol | undefined): ts.Symbol | undefined => (s && s.flags & ts.SymbolFlags.Alias ? c.getAliasedSymbol(s) : s);
 const isCandidateStatement = (s: ts.Statement): boolean => {
-	if (ts.canHaveModifiers(s) && ts.getModifiers(s)?.some((modifier) => modifier.kind === ts.SyntaxKind.DeclareKeyword)) return false;
+	if (ts.canHaveModifiers(s) && ts.getModifiers(s)?.some((m) => m.kind === ts.SyntaxKind.DeclareKeyword)) return false;
 	return (
 		ts.isTypeAliasDeclaration(s) ||
 		ts.isInterfaceDeclaration(s) ||
@@ -53,7 +57,7 @@ HELPERS
  * @return TypeScript program configured for repository JavaScript and TypeScript sources.
  */
 function programFor(cfg: QualityCfg): ts.Program {
-	const paths = Object.fromEntries(Object.entries(cfg.aliases ?? {}).map(([prefix, target]) => [prefix.endsWith('*') ? prefix : `${prefix}*`, [target.endsWith('*') ? target : `${target}*`]]));
+	const paths = Object.fromEntries(Object.entries(cfg.aliases ?? {}).map(([p, t]) => [p.endsWith('*') ? p : `${p}*`, [t.endsWith('*') ? t : `${t}*`]]));
 	return ts.createProgram({
 		rootNames: srcFiles(cfg).filter((f) => C_M_JS_JSX_TS_TSX_REGEX.test(f)),
 		options: {
@@ -81,7 +85,7 @@ function programFor(cfg: QualityCfg): ts.Program {
 function inSingleUseScope(cfg: QualityCfg, file: string): boolean {
 	const roots = [...cfg.sourceRoots, ...(cfg.includeRoots ?? [])];
 	const skipped = cfg.singleUse?.skippedDirectories ?? [];
-	return roots.some((root) => file === root || file.startsWith(`${root}${sep}`)) && !skipped.some((directory) => file === directory || file.startsWith(`${directory}${sep}`));
+	return roots.some((r) => file === r || file.startsWith(`${r}${sep}`)) && !skipped.some((d) => file === d || file.startsWith(`${d}${sep}`));
 }
 
 /**
@@ -93,7 +97,7 @@ function inSingleUseScope(cfg: QualityCfg, file: string): boolean {
  * @return `true` when the file is in a configured source root.
  */
 function inSingleUseRoots(cfg: QualityCfg, file: string): boolean {
-	return [...cfg.sourceRoots, ...(cfg.includeRoots ?? [])].some((root) => file === root || file.startsWith(`${root}${sep}`));
+	return [...cfg.sourceRoots, ...(cfg.includeRoots ?? [])].some((r) => file === r || file.startsWith(`${r}${sep}`));
 }
 
 /**
@@ -159,10 +163,7 @@ function collect(cfg: QualityCfg, program: ts.Program, checker: ts.TypeChecker):
 					}
 				}
 				const shorthandSymbol = ts.isShorthandPropertyAssignment(node.parent) ? checker.getShorthandAssignmentValueSymbol(node.parent) : undefined;
-				const symbol = canonical(
-					checker,
-					shorthandSymbol ?? checker.getSymbolAtLocation(node) ?? (ts.isTypeQueryNode(node.parent) ? checker.getSymbolAtLocation(node.parent) : undefined),
-				);
+				const symbol = canonical(checker, shorthandSymbol ?? checker.getSymbolAtLocation(node) ?? (ts.isTypeQueryNode(node.parent) ? checker.getSymbolAtLocation(node.parent) : undefined));
 				if (!importUse && symbol && candidateSymbols.has(symbol)) {
 					const declaration = declarationByLocation.get(`${src.fileName}:${node.getStart(src)}`);
 					const candidate = candidateBySymbol.get(symbol);
@@ -202,13 +203,13 @@ function typeUses(cfg: QualityCfg, c: Candidate, program: ts.Program): Reference
 	for (const src of program.getSourceFiles()) {
 		if (src.isDeclarationFile || !inSingleUseRoots(cfg, src.fileName) || !C_M_JS_JSX_TS_TSX_REGEX.test(src.fileName)) continue;
 		const visit = (n: ts.Node): void => {
-			const target = ts.isIdentifier(n) ? referenceTarget(n) : n;
+			const tgt = ts.isIdentifier(n) ? referenceTgt(n) : n;
 			if (
 				ts.isIdentifier(n) &&
 				n.text === c.name.text &&
 				!(src.fileName === c.file && n.getStart(src) === c.name.getStart(c.source)) &&
 				!ts.isExportSpecifier(n.parent) &&
-				(ts.isTypeReferenceNode(target) || ts.isExpressionWithTypeArguments(target))
+				(ts.isTypeReferenceNode(tgt) || ts.isExpressionWithTypeArguments(tgt))
 			)
 				uses.push({ file: src.fileName, source: src, node: n });
 			ts.forEachChild(n, visit);
@@ -227,42 +228,47 @@ function typeUses(cfg: QualityCfg, c: Candidate, program: ts.Program): Reference
  * @return `true` when inlining would replace a module export with an expression.
  */
 function hasExportSpecifier(candidate: Candidate, checker: ts.TypeChecker): boolean {
-	if (ts.canHaveModifiers(candidate.statement) && ts.getModifiers(candidate.statement)?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword)) return true;
-	return candidate.source.statements.some(statement =>
-		ts.isExportDeclaration(statement) && statement.exportClause && ts.isNamedExports(statement.exportClause) &&
-		statement.exportClause.elements.some(specifier => canonical(checker, checker.getSymbolAtLocation(specifier.propertyName ?? specifier.name)) === candidate.symbol),
+	if (ts.canHaveModifiers(candidate.statement) && ts.getModifiers(candidate.statement)?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword)) return true;
+	return candidate.source.statements.some(
+		(s) =>
+			ts.isExportDeclaration(s) &&
+			s.exportClause &&
+			ts.isNamedExports(s.exportClause) &&
+			s.exportClause.elements.some((s) => canonical(checker, checker.getSymbolAtLocation(s.propertyName ?? s.name)) === candidate.symbol),
 	);
 }
 
 /** Keeps exported bindings that are imported from Astro frontmatter outside the TypeScript program. */
 function hasAstroConsumer(candidate: Candidate, cfg: QualityCfg, program: ts.Program): boolean {
-	if (!ts.canHaveModifiers(candidate.statement) || !ts.getModifiers(candidate.statement)?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword)) return false;
-	return srcFiles(cfg).filter((file) => file.endsWith('.astro')).some((file) => {
-		const match = readFileSync(file, 'utf8').match(/^---\s*\r?\n([\s\S]*?)\r?\n---/);
-		if (!match) return false;
-		const source = ts.createSourceFile(file, match[1]!, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
-		return source.statements.some((statement) => {
-			if (!ts.isImportDeclaration(statement) || !ts.isStringLiteral(statement.moduleSpecifier)) return false;
-			const bindings = statement.importClause?.namedBindings;
-			if (!bindings || !ts.isNamedImports(bindings) || !bindings.elements.some((element) => (element.propertyName ?? element.name).text === candidate.name.text)) return false;
-			const resolved = ts.resolveModuleName(statement.moduleSpecifier.text, file, program.getCompilerOptions(), ts.sys).resolvedModule?.resolvedFileName;
-			return resolved === candidate.file;
+	if (!ts.canHaveModifiers(candidate.statement) || !ts.getModifiers(candidate.statement)?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword)) return false;
+	return srcFiles(cfg)
+		.filter((f) => f.endsWith('.astro'))
+		.some((f) => {
+			const match = readFileSync(f, 'utf8').match(/^---\s*\r?\n([\s\S]*?)\r?\n---/);
+			if (!match) return false;
+			const src = ts.createSourceFile(f, match[1]!, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+			return src.statements.some((s) => {
+				if (!ts.isImportDeclaration(s) || !ts.isStringLiteral(s.moduleSpecifier)) return false;
+				const bindings = s.importClause?.namedBindings;
+				if (!bindings || !ts.isNamedImports(bindings) || !bindings.elements.some((e) => (e.propertyName ?? e.name).text === candidate.name.text)) return false;
+				const resolved = ts.resolveModuleName(s.moduleSpecifier.text, f, program.getCompilerOptions(), ts.sys).resolvedModule?.resolvedFileName;
+				return resolved === candidate.file;
+			});
 		});
-	});
 }
 
 /** Keeps imported type names in scope when an inline would discard their annotation. */
 function hasImportedTypeAnnotation(candidate: Candidate, checker: ts.TypeChecker): boolean {
 	if (candidate.kind !== 'variable' || !ts.isVariableStatement(candidate.statement)) return false;
-	return candidate.statement.declarationList.declarations.some((declaration) => {
-		if (!declaration.type) return false;
+	return candidate.statement.declarationList.declarations.some((d) => {
+		if (!d.type) return false;
 		let imported = false;
 		const inspect = (node: ts.Node): void => {
 			const symbol = ts.isIdentifier(node) ? checker.getSymbolAtLocation(node) : undefined;
 			if (symbol?.flags && symbol.flags & ts.SymbolFlags.Alias) imported = true;
 			ts.forEachChild(node, inspect);
 		};
-		inspect(declaration.type);
+		inspect(d.type);
 		return imported;
 	});
 }
@@ -278,21 +284,21 @@ function hasImportedTypeAnnotation(candidate: Candidate, checker: ts.TypeChecker
  */
 function crossFileTypeSafe(candidate: Candidate, reference: Reference, checker: ts.TypeChecker): boolean {
 	if (candidate.file === reference.file) return true;
-	let safe = true;
+	let s = true;
 	const visit = (node: ts.Node): void => {
 		if (ts.isTypeReferenceNode(node)) {
 			const symbol = checker.getSymbolAtLocation(node.typeName);
 			const declaration = symbol?.declarations?.[0];
-			if (declaration && !ts.isTypeParameterDeclaration(declaration) && declaration.getSourceFile().fileName !== reference.file && declaration.getSourceFile().isDeclarationFile === false) safe = false;
+			if (declaration && !ts.isTypeParameterDeclaration(declaration) && declaration.getSourceFile().fileName !== reference.file && declaration.getSourceFile().isDeclarationFile === false) s = false;
 		}
 		ts.forEachChild(node, visit);
 	};
 	if (ts.isTypeAliasDeclaration(candidate.statement)) visit(candidate.statement.type);
 	if (ts.isInterfaceDeclaration(candidate.statement)) {
-		for (const member of candidate.statement.members) visit(member);
+		for (const mem of candidate.statement.members) visit(mem);
 		for (const clause of candidate.statement.heritageClauses ?? []) visit(clause);
 	}
-	return safe;
+	return s;
 }
 
 /**
@@ -321,8 +327,8 @@ function containsAwait(candidate: Candidate): boolean {
 		if (ts.isAwaitExpression(node)) found = true;
 		ts.forEachChild(node, visit);
 	};
-	const initializer = candidate.statement.declarationList.declarations[0]?.initializer;
-	if (initializer) visit(initializer);
+	const init = candidate.statement.declarationList.declarations[0]?.initializer;
+	if (init) visit(init);
 	return found;
 }
 
@@ -335,15 +341,15 @@ function containsAwait(candidate: Candidate): boolean {
  */
 function crossFileVariableSafe(candidate: Candidate): boolean {
 	if (candidate.kind !== 'variable' || !ts.isVariableStatement(candidate.statement)) return false;
-	const initializer = candidate.statement.declarationList.declarations[0]?.initializer;
-	if (!initializer) return false;
-	let safe = true;
+	const init = candidate.statement.declarationList.declarations[0]?.initializer;
+	if (!init) return false;
+	let s = true;
 	const visit = (node: ts.Node): void => {
-		if (ts.isIdentifier(node) && !((ts.isPropertyAssignment(node.parent) && node.parent.name === node) || (ts.isMethodDeclaration(node.parent) && node.parent.name === node))) safe = false;
+		if (ts.isIdentifier(node) && !((ts.isPropertyAssignment(node.parent) && node.parent.name === node) || (ts.isMethodDeclaration(node.parent) && node.parent.name === node))) s = false;
 		ts.forEachChild(node, visit);
 	};
-	visit(initializer);
-	return safe;
+	visit(init);
+	return s;
 }
 
 /**
@@ -354,13 +360,12 @@ function crossFileVariableSafe(candidate: Candidate): boolean {
  * @return `true` when the reference is used as a write target.
  */
 function isWriteReference(reference: Reference): boolean {
-	let target: ts.Node = reference.node;
-	while (target.parent && ((ts.isPropertyAccessExpression(target.parent) && target.parent.expression === target) || (ts.isElementAccessExpression(target.parent) && target.parent.expression === target))) target = target.parent;
-	const parent = target.parent;
+	let tgt: ts.Node = reference.node;
+	while (tgt.parent && ((ts.isPropertyAccessExpression(tgt.parent) && tgt.parent.expression === tgt) || (ts.isElementAccessExpression(tgt.parent) && tgt.parent.expression === tgt))) tgt = tgt.parent;
 	return (
-		(ts.isPrefixUnaryExpression(parent) || ts.isPostfixUnaryExpression(parent)) && [ts.SyntaxKind.PlusPlusToken, ts.SyntaxKind.MinusMinusToken].includes(parent.operator) ||
-		(ts.isBinaryExpression(parent) && parent.left === target && parent.operatorToken.kind >= ts.SyntaxKind.FirstAssignment && parent.operatorToken.kind <= ts.SyntaxKind.LastAssignment) ||
-		ts.isDeleteExpression(parent)
+		((ts.isPrefixUnaryExpression(tgt.parent) || ts.isPostfixUnaryExpression(tgt.parent)) && [ts.SyntaxKind.PlusPlusToken, ts.SyntaxKind.MinusMinusToken].includes(tgt.parent.operator)) ||
+		(ts.isBinaryExpression(tgt.parent) && tgt.parent.left === tgt && tgt.parent.operatorToken.kind >= ts.SyntaxKind.FirstAssignment && tgt.parent.operatorToken.kind <= ts.SyntaxKind.LastAssignment) ||
+		ts.isDeleteExpression(tgt.parent)
 	);
 }
 
@@ -373,6 +378,12 @@ function isWriteReference(reference: Reference): boolean {
  */
 function isExportSpecifierReference(reference: Reference): boolean {
 	return ts.isExportSpecifier(reference.node.parent);
+}
+
+function isDocumentedCallable(candidate: Candidate): boolean {
+	if (!ts.isVariableStatement(candidate.statement)) return ts.isFunctionDeclaration(candidate.statement) && ts.getJSDocCommentsAndTags(candidate.statement).length > 0;
+	const init = candidate.statement.declarationList.declarations[0]?.initializer;
+	return Boolean(init && (ts.isArrowFunction(init) || ts.isFunctionExpression(init)) && ts.getJSDocCommentsAndTags(candidate.statement).length);
 }
 
 /**
@@ -388,6 +399,7 @@ export function singleUseFindings(cfg: QualityCfg): SingleUseFinding[] {
 	const { candidates, references } = collect(cfg, program, checker);
 	return candidates.flatMap((c) => {
 		if (hasExportSpecifier(c, checker) || hasAstroConsumer(c, cfg, program)) return [];
+		if (isDocumentedCallable(c)) return [];
 		const uses = c.kind === 'type' || c.kind === 'interface' ? typeUses(cfg, c, program) : (references.get(c.symbol) ?? []).filter((r) => !isImportNode(r.node) && !isExportSpecifierReference(r));
 		if (uses.length !== 1) return [];
 		const use = uses[0]!;
@@ -436,17 +448,11 @@ function importEdit(reference: Reference, checker: ts.TypeChecker, tgt: ts.Symbo
  *
  * @return A TypeScript function type preserving declared parameters and result.
  */
-function functionType(statement: ts.FunctionDeclaration): string {
-	const parameters = statement.parameters.map((parameter) =>
-		ts.factory.createParameterDeclaration(
-			undefined,
-			parameter.dotDotDotToken,
-			parameter.name,
-			parameter.questionToken,
-			parameter.type ?? ts.factory.createKeywordTypeNode(ts.SyntaxKind.UnknownKeyword),
-		),
+function fnType(statement: ts.FunctionDeclaration): string {
+	const params = statement.parameters.map((p) =>
+		ts.factory.createParameterDeclaration(undefined, p.dotDotDotToken, p.name, p.questionToken, p.type ?? ts.factory.createKeywordTypeNode(ts.SyntaxKind.UnknownKeyword)),
 	);
-	const type = ts.factory.createFunctionTypeNode(statement.typeParameters, parameters, statement.type ?? ts.factory.createKeywordTypeNode(ts.SyntaxKind.UnknownKeyword));
+	const type = ts.factory.createFunctionTypeNode(statement.typeParameters, params, statement.type ?? ts.factory.createKeywordTypeNode(ts.SyntaxKind.UnknownKeyword));
 	return ts.createPrinter().printNode(ts.EmitHint.Unspecified, type, statement.getSourceFile());
 }
 
@@ -460,19 +466,18 @@ function functionType(statement: ts.FunctionDeclaration): string {
  * @return JSX replacement edit, or `null` when the reference is not a JSX tag.
  */
 function jsxInlineEdit(ref: Reference, replacement: string, reactName: string, componentType?: string): { start: number; end: number; text: string } | null {
-	const opening = ref.node.parent;
-	if ((!ts.isJsxOpeningElement(opening) && !ts.isJsxSelfClosingElement(opening)) || opening.tagName !== ref.node) return null;
-	const el = ts.isJsxSelfClosingElement(opening) ? opening : ts.isJsxElement(opening.parent) ? opening.parent : null;
+	if ((!ts.isJsxOpeningElement(ref.node.parent) && !ts.isJsxSelfClosingElement(ref.node.parent)) || ref.node.parent.tagName !== ref.node) return null;
+	const el = ts.isJsxSelfClosingElement(ref.node.parent) ? ref.node.parent : ts.isJsxElement(ref.node.parent.parent) ? ref.node.parent.parent : null;
 	if (!el) return null;
-	const props = opening.attributes.properties.map((attr) => {
-		if (ts.isJsxSpreadAttribute(attr)) return `...${attr.expression.getText(ref.source)}`;
-		const name = JSON.stringify(attr.name.getText(ref.source));
-		if (!attr.initializer) return `${name}: true`;
-		if (ts.isStringLiteral(attr.initializer)) return `${name}: ${JSON.stringify(attr.initializer.text)}`;
-		if (ts.isJsxExpression(attr.initializer)) return `${name}: ${attr.initializer.expression?.getText(ref.source) ?? 'undefined'}`;
-		return `${name}: ${attr.initializer.getText(ref.source)}`;
+	const props = ref.node.parent.attributes.properties.map((a) => {
+		if (ts.isJsxSpreadAttribute(a)) return `...${a.expression.getText(ref.source)}`;
+		const name = JSON.stringify(a.name.getText(ref.source));
+		if (!a.initializer) return `${name}: true`;
+		if (ts.isStringLiteral(a.initializer)) return `${name}: ${JSON.stringify(a.initializer.text)}`;
+		if (ts.isJsxExpression(a.initializer)) return `${name}: ${a.initializer.expression?.getText(ref.source) ?? 'undefined'}`;
+		return `${name}: ${a.initializer.getText(ref.source)}`;
 	});
-	if (ts.isJsxElement(el) && el.children.length) props.push(`children: <>${el.children.map((child) => child.getText(ref.source)).join('')}</>`);
+	if (ts.isJsxElement(el) && el.children.length) props.push(`children: <>${el.children.map((c) => c.getText(ref.source)).join('')}</>`);
 	const call = `${reactName}(${componentType ? `(${replacement} as ${componentType})` : replacement}, { ${props.join(', ')} })`;
 	const nested = ts.isJsxElement(el.parent) || ts.isJsxFragment(el.parent);
 	return { start: el.getStart(ref.source), end: el.getEnd(), text: nested ? `{${call}}` : call };
@@ -485,15 +490,11 @@ function jsxInlineEdit(ref: Reference, replacement: string, reactName: string, c
  *
  * @return Largest qualified/property access expression containing the identifier.
  */
-function referenceTarget(node: ts.Identifier): ts.Node {
-	let target: ts.Node = node;
-	while (target.parent && ((ts.isQualifiedName(target.parent) && target.parent.right === target) || (ts.isPropertyAccessExpression(target.parent) && target.parent.name === target))) target = target.parent;
-	if (
-		target.parent &&
-		((ts.isTypeReferenceNode(target.parent) && target.parent.typeName === target) || (ts.isExpressionWithTypeArguments(target.parent) && target.parent.expression === target))
-	)
-		target = target.parent;
-	return target;
+function referenceTgt(node: ts.Identifier): ts.Node {
+	let tgt: ts.Node = node;
+	while (tgt.parent && ((ts.isQualifiedName(tgt.parent) && tgt.parent.right === tgt) || (ts.isPropertyAccessExpression(tgt.parent) && tgt.parent.name === tgt))) tgt = tgt.parent;
+	if (tgt.parent && ((ts.isTypeReferenceNode(tgt.parent) && tgt.parent.typeName === tgt) || (ts.isExpressionWithTypeArguments(tgt.parent) && tgt.parent.expression === tgt))) tgt = tgt.parent;
+	return tgt;
 }
 
 /**
@@ -506,18 +507,20 @@ function referenceTarget(node: ts.Identifier): ts.Node {
  * @return Expanded type text, or `null` when generic arity does not match.
  */
 function inlineGenericType(declaration: ts.TypeAliasDeclaration | ts.InterfaceDeclaration, reference: ts.TypeReferenceNode, type: ts.TypeNode): string | null {
-	const parameters = declaration.typeParameters ?? [];
+	const params = declaration.typeParameters ?? [];
 	const arguments_ = reference.typeArguments ?? [];
-	if (parameters.length !== arguments_.length) return null;
-	const substitutions = new Map(parameters.map((parameter, index) => [parameter.name.text, arguments_[index]!]));
-	const transformed = ts.transform(type, [context => {
-		const visit: ts.Visitor = node => {
-			if (ts.isTypeReferenceNode(node) && ts.isIdentifier(node.typeName) && substitutions.has(node.typeName.text)) return substitutions.get(node.typeName.text)!;
-			if (ts.isTypeQueryNode(node) && ts.isIdentifier(node.exprName) && substitutions.has(node.exprName.text)) return substitutions.get(node.exprName.text)!;
-			return ts.visitEachChild(node, visit, context);
-		};
-		return root => ts.visitNode(root, visit) as ts.TypeNode;
-	}]);
+	if (params.length !== arguments_.length) return null;
+	const substitutions = new Map(params.map((p, i) => [p.name.text, arguments_[i]!]));
+	const transformed = ts.transform(type, [
+		(ctx) => {
+			const visit: ts.Visitor = (node) => {
+				if (ts.isTypeReferenceNode(node) && ts.isIdentifier(node.typeName) && substitutions.has(node.typeName.text)) return substitutions.get(node.typeName.text)!;
+				if (ts.isTypeQueryNode(node) && ts.isIdentifier(node.exprName) && substitutions.has(node.exprName.text)) return substitutions.get(node.exprName.text)!;
+				return ts.visitEachChild(node, visit, ctx);
+			};
+			return (root) => ts.visitNode(root, visit) as ts.TypeNode;
+		},
+	]);
 	const result = ts.createPrinter().printNode(ts.EmitHint.Unspecified, transformed.transformed[0]!, declaration.getSourceFile());
 	transformed.dispose();
 	return `(${result})`;
@@ -548,7 +551,7 @@ function fnExpr(statement: ts.FunctionDeclaration): string | null {
  * @return Inline source text, or `null` when the declaration has no replacement.
  */
 function replacementFor(c: Candidate, ref: Reference, checker: ts.TypeChecker): string | null {
-	const typeReference = referenceTarget(ref.node);
+	const typeReference = referenceTgt(ref.node);
 	if ((ts.isTypeAliasDeclaration(c.statement) || ts.isInterfaceDeclaration(c.statement)) && ts.isTypeReferenceNode(typeReference)) {
 		if (ts.isTypeAliasDeclaration(c.statement)) return inlineGenericType(c.statement, typeReference, c.statement.type);
 		const interfaceType = ts.factory.createTypeLiteralNode(c.statement.members);
@@ -557,57 +560,60 @@ function replacementFor(c: Candidate, ref: Reference, checker: ts.TypeChecker): 
 	if (ts.isTypeAliasDeclaration(c.statement)) return c.statement.typeParameters?.length ? null : `(${c.statement.type.getText(c.source)})`;
 	if (ts.isInterfaceDeclaration(c.statement)) {
 		if (c.statement.typeParameters?.length) return null;
-		const members = `{ ${c.statement.members.map((member) => member.getText(c.source)).join(' ')} }`;
-		const bases = c.statement.heritageClauses?.flatMap((clause) => clause.types.map((type) => type.getText(c.source))) ?? [];
-		return bases.length ? `(${[...bases, members].join(' & ')})` : `(${members})`;
+		const mems = `{ ${c.statement.members.map((m) => m.getText(c.source)).join(' ')} }`;
+		const bases = c.statement.heritageClauses?.flatMap((v) => v.types.map((t) => t.getText(c.source))) ?? [];
+		return bases.length ? `(${[...bases, mems].join(' & ')})` : `(${mems})`;
 	}
 	if (ts.isFunctionDeclaration(c.statement)) {
-		if (ts.isTypeQueryNode(ref.node.parent)) return functionType(c.statement);
+		if (ts.isTypeQueryNode(ref.node.parent)) return fnType(c.statement);
 		return fnExpr(c.statement);
 	}
 	if (!ts.isVariableStatement(c.statement)) return null;
-	const initializer = c.statement.declarationList.declarations[0]?.initializer;
-	if (initializer && ts.isTypeQueryNode(ref.node.parent)) {
-		const inferredType = checker.typeToTypeNode(checker.getTypeAtLocation(initializer), undefined, ts.NodeBuilderFlags.NoTruncation);
+	const init = c.statement.declarationList.declarations[0]?.initializer;
+	if (init && ts.isTypeQueryNode(ref.node.parent)) {
+		const inferredType = checker.typeToTypeNode(checker.getTypeAtLocation(init), undefined, ts.NodeBuilderFlags.NoTruncation);
 		return inferredType ? ts.createPrinter().printNode(ts.EmitHint.Unspecified, inferredType, ref.source) : null;
 	}
-	return initializer ? `(${initializer.getText(c.source)})` : 'undefined';
+	return init ? `(${init.getText(c.source)})` : 'undefined';
 }
 
 /**
  * Finds a collision-free local name for React's createElement import.
  *
- * @param source Consumer source file.
+ * @param src Consumer source file.
  *
  * @return An identifier that does not occur in the consumer.
  */
-function reactCreateElementName(source: ts.SourceFile): string {
+function reactCreateElementName(src: ts.SourceFile): string {
 	let name = '__terraQualityCreateElement';
-	while (source.text.includes(name)) name += '_';
+	while (src.text.includes(name)) name += '_';
 	return name;
 }
 
 /**
  * Places an injected React import after existing imports or the file header.
  *
- * @param source Consumer source file.
+ * @param src Consumer source file.
  *
  * @return Source offset for the generated import.
  */
-function reactImportPosition(source: ts.SourceFile): number {
-	const imports = source.statements.filter(ts.isImportDeclaration);
+function reactImportPos(src: ts.SourceFile): number {
+	const imports = src.statements.filter(ts.isImportDeclaration);
 	if (imports.length) return imports[imports.length - 1]!.end;
-	return source.statements[0]?.getStart(source) ?? 0;
+	return src.statements[0]?.getStart(src) ?? 0;
 }
 
 function attachedComments(c: Candidate): { start: number; end: number; text: string }[] {
 	const start = c.statement.getFullStart();
 	const end = c.statement.getStart(c.source);
 	const ranges = ts.getLeadingCommentRanges(c.source.text, start) ?? [];
-	return ranges.filter((range, index) => range.end <= end && /^\s*$/.test(c.source.text.slice(range.end, ranges[index + 1]?.pos ?? end))).filter((range) => {
-		const value = c.source.text.slice(range.pos, range.end);
-		return !(/^\s*$/.test(c.source.text.slice(0, range.pos)) && /^\/\*\*\s*(?:\*\s*)?[\w./-]+\.[cm]?[jt]sx?\b/.test(value)) && !/^\/\*\/{10,}/.test(value) && !/^\/\/\s*[A-Z][A-Z _-]*\s*$/.test(value);
-	}).map((range) => ({ start: range.pos, end: range.end, text: c.source.text.slice(range.pos, range.end) }));
+	return ranges
+		.filter((r, i) => r.end <= end && S_REGEX.test(c.source.text.slice(r.end, ranges[i + 1]?.pos ?? end)))
+		.filter((r) => {
+			const val = c.source.text.slice(r.pos, r.end);
+			return !(S_REGEX.test(c.source.text.slice(0, r.pos)) && /^\/\*\*\s*(?:\*\s*)?[\w./-]+\.[cm]?[jt]sx?\b/.test(val)) && !/^\/\*\/{10,}/.test(val) && !/^\/\/\s*[A-Z][A-Z _-]*\s*$/.test(val);
+		})
+		.map((r) => ({ start: r.pos, end: r.end, text: c.source.text.slice(r.pos, r.end) }));
 }
 
 function discardedDeclarationComments(c: Candidate): string[] {
@@ -639,6 +645,7 @@ function fixSingleUsePass(cfg: QualityCfg, changedFiles: Set<string>): number {
 	const pending: { fileEdits: { file: string; start: number; end: number; text: string }[]; referenceLength: number; nestedReference: boolean; jsxFile?: string }[] = [];
 	for (const c of candidates) {
 		if (hasExportSpecifier(c, checker) || hasAstroConsumer(c, cfg, program)) continue;
+		if (isDocumentedCallable(c)) continue;
 		const uses = c.kind === 'type' || c.kind === 'interface' ? typeUses(cfg, c, program) : (refs.get(c.symbol) ?? []).filter((r) => !isImportNode(r.node) && !isExportSpecifierReference(r));
 		if (uses.length !== 1) continue;
 		const ref = uses[0]!;
@@ -652,18 +659,19 @@ function fixSingleUsePass(cfg: QualityCfg, changedFiles: Set<string>): number {
 		if (hasImportedTypeAnnotation(c, checker)) continue;
 		if (
 			c.kind === 'variable' &&
-			candidates.some((outer) => {
-				if (outer === c || outer.kind !== 'function' || outer.file !== c.file || ref.file !== outer.file) return false;
-				if (ref.node.getStart(ref.source) < outer.statement.getStart(outer.source) || ref.node.getEnd() > outer.statement.getEnd()) return false;
-				const outerUses = (refs.get(outer.symbol) ?? []).filter((use) => !isImportNode(use.node) && !isExportSpecifierReference(use));
-				return outerUses.length === 1 && outer.file === outerUses[0]!.file && inSingleUseScope(cfg, outerUses[0]!.file);
+			candidates.some((o) => {
+				if (o === c || o.kind !== 'function' || o.file !== c.file || ref.file !== o.file) return false;
+				if (ref.node.getStart(ref.source) < o.statement.getStart(o.source) || ref.node.getEnd() > o.statement.getEnd()) return false;
+				const outerUses = (refs.get(o.symbol) ?? []).filter((u) => !isImportNode(u.node) && !isExportSpecifierReference(u));
+				return outerUses.length === 1 && o.file === outerUses[0]!.file && inSingleUseScope(cfg, outerUses[0]!.file);
 			})
-		) continue;
+		)
+			continue;
 		const replacement = replacementFor(c, ref, checker);
 		if (!replacement) continue;
 		const comments = attachedComments(c);
-		const commentTexts = [...comments.map(({ text: value }) => value), ...discardedDeclarationComments(c)];
-		const inlineReplacement = commentTexts.length ? `${commentTexts.map((value) => value.startsWith('//') ? `/* ${value.slice(2).trim()} */` : value).join(' ')} ${replacement}` : replacement;
+		const commentTexts = [...comments.map(({ text: val }) => val), ...discardedDeclarationComments(c)];
+		const inlineReplacement = commentTexts.length ? `${commentTexts.map((v) => (v.startsWith('//') ? `/* ${v.slice(2).trim()} */` : v)).join(' ')} ${replacement}` : replacement;
 		const candidateEdits: { file: string; start: number; end: number; text: string }[] = [];
 		for (const comment of comments) candidateEdits.push({ file: c.file, start: comment.start, end: comment.end, text: '' });
 		const componentType = ts.isFunctionDeclaration(c.statement) && c.statement.parameters[0]?.type ? `React.ComponentType<${c.statement.parameters[0].type.getText(c.source)}>` : undefined;
@@ -675,39 +683,35 @@ function fixSingleUsePass(cfg: QualityCfg, changedFiles: Set<string>): number {
 		} else if (ts.isShorthandPropertyAssignment(ref.node.parent)) {
 			candidateEdits.push({ file: ref.file, start: ref.node.getStart(ref.source), end: ref.node.getEnd(), text: `${ref.node.text}: ${inlineReplacement}` });
 		} else {
-			const target = ts.isTypeQueryNode(ref.node.parent) ? ref.node.parent : referenceTarget(ref.node);
-			candidateEdits.push({ file: ref.file, start: target.getStart(ref.source), end: target.getEnd(), text: inlineReplacement });
+			const tgt = ts.isTypeQueryNode(ref.node.parent) ? ref.node.parent : referenceTgt(ref.node);
+			candidateEdits.push({ file: ref.file, start: tgt.getStart(ref.source), end: tgt.getEnd(), text: inlineReplacement });
 		}
 		const removedImport = importEdit(ref, checker, c.symbol);
 		if (removedImport) candidateEdits.push({ file: ref.file, ...removedImport, text: '' });
 		candidateEdits.push({ file: c.file, start: c.statement.getStart(c.source), end: c.statement.getEnd(), text: '' });
-		const referenceEdit = candidateEdits.find((edit) => edit.file === ref.file && edit.end > edit.start)!;
+		const referenceEdit = candidateEdits.find((e) => e.file === ref.file && e.end > e.start)!;
 		const nestedReference = candidates.some(
-			(other) => other !== c && other.source === ref.source && ref.node.getStart(ref.source) >= other.statement.getStart(ref.source) && ref.node.getEnd() <= other.statement.getEnd(),
+			(o) => o !== c && o.source === ref.source && ref.node.getStart(ref.source) >= o.statement.getStart(ref.source) && ref.node.getEnd() <= o.statement.getEnd(),
 		);
 		pending.push({ fileEdits: candidateEdits, referenceLength: referenceEdit.end - referenceEdit.start, nestedReference, jsxFile });
 	}
 	const selected: typeof pending = [];
-	for (const candidate of pending.sort((left, right) => Number(right.nestedReference) - Number(left.nestedReference) || left.referenceLength - right.referenceLength)) {
-		const overlaps = selected.some((selectedCandidate) =>
-			candidate.fileEdits.some((candidateEdit) =>
-				selectedCandidate.fileEdits.some((selectedEdit) => selectedEdit.file === candidateEdit.file && candidateEdit.start < selectedEdit.end && selectedEdit.start < candidateEdit.end),
-			),
-		);
+	for (const candidate of pending.sort((l, r) => Number(r.nestedReference) - Number(l.nestedReference) || l.referenceLength - r.referenceLength)) {
+		const overlaps = selected.some((s) => candidate.fileEdits.some((c) => s.fileEdits.some((s) => s.file === c.file && c.start < s.end && s.start < c.end)));
 		if (overlaps) continue;
 		selected.push(candidate);
 	}
 	for (const candidate of selected) for (const edit of candidate.fileEdits) edits.set(edit.file, [...(edits.get(edit.file) ?? []), { start: edit.start, end: edit.end, text: edit.text }]);
-	for (const file of new Set(selected.flatMap((candidate) => (candidate.jsxFile ? [candidate.jsxFile] : [])))) {
+	for (const file of new Set(selected.flatMap((c) => (c.jsxFile ? [c.jsxFile] : [])))) {
 		const source = program.getSourceFile(file)!;
-		const position = reactImportPosition(source);
-		edits.set(file, [...(edits.get(file) ?? []), { start: position, end: position, text: `${position ? '\n' : ''}import { createElement as ${reactCreateElementName(source)} } from 'react';\n` }]);
+		const pos = reactImportPos(source);
+		edits.set(file, [...(edits.get(file) ?? []), { start: pos, end: pos, text: `${pos ? '\n' : ''}import { createElement as ${reactCreateElementName(source)} } from 'react';\n` }]);
 	}
 	const updates: { file: string; text: string }[] = [];
 	for (const [file, fileEdits] of edits) {
 		const src = readFileSync(file, 'utf8');
 		const ascending = [...fileEdits].sort((a, b) => a.start - b.start || a.end - b.end);
-		if (ascending.some((edit, index) => edit.end > edit.start && index > 0 && ascending[index - 1]!.end > ascending[index - 1]!.start && edit.start < ascending[index - 1]!.end)) continue;
+		if (ascending.some((e, i) => e.end > e.start && i > 0 && ascending[i - 1]!.end > ascending[i - 1]!.start && e.start < ascending[i - 1]!.end)) continue;
 		const updated = ascending.reverse().reduce((t, e) => t.slice(0, e.start) + e.text + t.slice(e.end), src);
 		if (updated === src) continue;
 		const parsed = ts.createSourceFile(
@@ -722,7 +726,7 @@ function fixSingleUsePass(cfg: QualityCfg, changedFiles: Set<string>): number {
 			const diagnostic = parseDiagnostics[0]!;
 			const offset = diagnostic.start ?? 0;
 			throw new Error(
-				`Single-use inline produced invalid syntax in ${relative(cfg.root, file)} near ${JSON.stringify(updated.slice(Math.max(0, offset - 100), Math.min(updated.length, offset + 140)))}: ${parseDiagnostics.map((item) => ts.flattenDiagnosticMessageText(item.messageText, '\n')).join('; ')}`,
+				`Single-use inline produced invalid syntax in ${relative(cfg.root, file)} near ${JSON.stringify(updated.slice(Math.max(0, offset - 100), Math.min(updated.length, offset + 140)))}: ${parseDiagnostics.map((i) => ts.flattenDiagnosticMessageText(i.messageText, '\n')).join('; ')}`,
 			);
 		}
 		updates.push({ file, text: updated });

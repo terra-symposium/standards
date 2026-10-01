@@ -32,6 +32,13 @@ import { PROTECTED_IDENTIFIERS } from './naming.js';
 
 // TYPES
 import type { DocumentationRequirements } from './documentation.js';
+/*//////////////////////////////////////////////////
+REGEX
+//////////////////////////////////////////////////*/
+const CJS_JS_JSX_MJS_TS_TSX_REGEX = /\.(?:cjs|js|jsx|mjs|ts|tsx)$/;
+const G_REGEX = () => /-/g;
+const G_CLASS_2 = () => /[.*+?^${}()|[\]\\]/g;
+const C_M_JS_TS_REGEX = /\.(?:c|m)?(?:js|ts)$/;
 
 /*//////////////////////////////////////////////////
 REGEX
@@ -361,7 +368,7 @@ function changedFileCount(cfg: QualityCfg, files: string[], before: Map<string, 
  * @return Ordered batches covering the input values.
  */
 function batches<T>(vals: T[], size = 100): T[][] {
-	return Array.from({ length: Math.ceil(vals.length / size) }, (_, idx) => vals.slice(idx * size, (idx + 1) * size));
+	return Array.from({ length: Math.ceil(vals.length / size) }, (_, i) => vals.slice(i * size, (i + 1) * size));
 }
 
 /**
@@ -441,17 +448,13 @@ function runLint(cfg: QualityCfg, opts: QualityOptions, exhaustive = false): voi
  * @return Number of unused function declarations removed.
  */
 function fixUnusedFns(cfg: QualityCfg, all: boolean): number {
-	const files = filesFor(cfg, all).filter((f) => /\.(?:cjs|js|jsx|mjs|ts|tsx)$/.test(f));
+	const files = filesFor(cfg, all).filter((f) => CJS_JS_JSX_MJS_TS_TSX_REGEX.test(f));
 	let fixed = 0;
 	for (const filesBatch of batches(files)) {
 		const result = spawnSync(
 			toolPath(cfg, cfg.tools?.eslint, 'eslint'),
 			['--cache', '--cache-strategy', 'content', '--cache-location', 'node_modules/.cache/eslint', '--format', 'json', '--no-warn-ignored', ...filesBatch],
-			{
-				cwd: cfg.root,
-				encoding: 'utf8',
-				env: process.env,
-			},
+			{ cwd: cfg.root, encoding: 'utf8', env: process.env },
 		);
 		let reports: Array<{ filePath: string; messages: Array<{ ruleId?: string; line: number; column: number }> }> = [];
 		try {
@@ -499,18 +502,14 @@ function fixUnusedFns(cfg: QualityCfg, all: boolean): number {
 	return fixed;
 }
 
-type UnusedFunctionFinding = { file: string; line: number; name: string };
+type UnusedFnFinding = { file: string; line: number; name: string };
 
 /** Reports private function declarations that ESLint proves have no references. */
-function unusedFunctionFindings(cfg: QualityCfg, all: boolean): UnusedFunctionFinding[] {
-	const files = filesFor(cfg, all).filter((f) => /\.(?:cjs|js|jsx|mjs|ts|tsx)$/.test(f));
-	const findings: UnusedFunctionFinding[] = [];
+function unusedFnFindings(cfg: QualityCfg, all: boolean): UnusedFnFinding[] {
+	const files = filesFor(cfg, all).filter((f) => CJS_JS_JSX_MJS_TS_TSX_REGEX.test(f));
+	const findings: UnusedFnFinding[] = [];
 	for (const filesBatch of batches(files)) {
-		const result = spawnSync(toolPath(cfg, cfg.tools?.eslint, 'eslint'), ['--format', 'json', '--no-warn-ignored', ...filesBatch], {
-			cwd: cfg.root,
-			encoding: 'utf8',
-			env: process.env,
-		});
+		const result = spawnSync(toolPath(cfg, cfg.tools?.eslint, 'eslint'), ['--format', 'json', '--no-warn-ignored', ...filesBatch], { cwd: cfg.root, encoding: 'utf8', env: process.env });
 		let reports: Array<{ filePath: string; messages: Array<{ ruleId?: string; line: number; column: number }> }> = [];
 		try {
 			reports = JSON.parse(result.stdout || '[]') as typeof reports;
@@ -756,11 +755,11 @@ function runGenericChecks(cfg: QualityCfg, analysis?: QualityAnalysis): void {
 		['ui-patterns', cfg.uiPatterns ? uiPatternFindings(cfg, analysis) : []],
 	] as const;
 	for (const [name, findings] of checks) {
-		qualityHeader(name, `Checking ${name.replace(/-/g, ' ')}`);
+		qualityHeader(name, `Checking ${name.replace(G_REGEX(), ' ')}`);
 		printFindings(
 			findings as readonly GenericFinding[],
-			(finding) =>
-				`${'file' in finding ? `${finding.file}: ` : ''}${'message' in finding ? finding.message : 'value' in finding ? `${finding.count}x ${finding.value} (${finding.locations.join(', ')})` : 'source' in finding ? `${finding.count}x ${finding.source} (${finding.locations.join(', ')})` : finding.pattern}`,
+			(f) =>
+				`${'file' in f ? `${f.file}: ` : ''}${'message' in f ? f.message : 'value' in f ? `${f.count}x ${f.value} (${f.locations.join(', ')})` : 'source' in f ? `${f.count}x ${f.source} (${f.locations.join(', ')})` : f.pattern}`,
 		);
 		if (findings.length && (name === 'security' || name === 'ui-patterns')) process.exitCode = 1;
 	}
@@ -789,17 +788,17 @@ function fixNames(cfg: QualityCfg, all: boolean): void {
 		let updated = body;
 		const replacements = new Map(findings.map((f) => [f.name, f.suggestion]));
 		for (const [name, suggestion] of replacements) {
-			const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+			const escaped = name.replace(G_CLASS_2(), '\\$&');
 			updated = updated.replace(new RegExp(`\\b${escaped}\\b`, 'g'), suggestion);
 		}
-		let nextSource = updated === body ? source : `${source.slice(0, offset)}${updated}${source.slice(offset + body.length)}`;
+		let nSrc = updated === body ? source : `${source.slice(0, offset)}${updated}${source.slice(offset + body.length)}`;
 		for (const [name, suggestion] of replacements) {
 			if (name === suggestion) continue;
-			const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+			const escaped = name.replace(G_CLASS_2(), '\\$&');
 			const callback = new RegExp(`\\.map\\(\\s*(\\(\\s*)?(\\{\\s*${escaped}\\s*\\}|${escaped})\\s*\\)?\\s*=>\\s*\\(([\\s\\S]*?)\\)\\s*\\)`, 'g');
-			nextSource = nextSource.replace(callback, (match) => match.replace(new RegExp(`\\b${escaped}\\b`, 'g'), suggestion));
+			nSrc = nSrc.replace(callback, (m) => m.replace(new RegExp(`\\b${escaped}\\b`, 'g'), suggestion));
 		}
-		if (nextSource !== source) writeFileSync(file, nextSource);
+		if (nSrc !== source) writeFileSync(file, nSrc);
 	}
 	let program = ts.createProgram({
 		rootNames: srcFiles(cfg).filter((f) => C_M_JS_TS_X_CLASS_2.test(f)),
@@ -1114,7 +1113,7 @@ function runDocumentation(cfg: QualityCfg, opts: QualityOptions, args: string[],
 	const files = filesFor(cfg, opts.all);
 	const reqFiles = args.slice(1).filter((a) => !a.startsWith('-'));
 	const tgts = (reqFiles.length ? reqFiles : files).filter((f) => !f.endsWith('.astro'));
-	if (cmdOpts.fix) for (const file of tgts) if (/\.(?:c|m)?(?:js|ts)$/.test(file)) collapseInlineIfs(file);
+	if (cmdOpts.fix) for (const file of tgts) if (C_M_JS_TS_REGEX.test(file)) collapseInlineIfs(file);
 	if (cmdOpts.fix)
 		for (const file of tgts) {
 			maintainSrcFile(cfg.root, file);
@@ -1152,7 +1151,7 @@ export function runQualityCli(cfg: QualityCfg, args = process.argv.slice(2)): vo
 		const files = filesFor(cfg, opts.all);
 		const cmdOpts = { ...opts, fix: fix('format') };
 		const tgts = files.filter((f) => !f.endsWith('.astro'));
-		if (cmdOpts.fix) for (const file of tgts) if (/\.(?:c|m)?(?:js|ts)$/.test(file)) collapseInlineIfs(file);
+		if (cmdOpts.fix) for (const file of tgts) if (C_M_JS_TS_REGEX.test(file)) collapseInlineIfs(file);
 		if (cmdOpts.fix)
 			for (const file of tgts) {
 				maintainSrcFile(cfg.root, file);
@@ -1176,7 +1175,7 @@ export function runQualityCli(cfg: QualityCfg, args = process.argv.slice(2)): vo
 		qualityHeader('single-use', `${opts.fix ? 'Fixing and checking' : 'Checking'} single-use declarations`);
 		if (opts.fix) fixSingleUseDeclarations(cfg);
 		const findings = singleUseFindings(cfg);
-		printFindings(findings, (finding) => `Single-use ${finding.decision}: ${finding.file}:${finding.line} ${finding.name} — ${finding.reason}`);
+		printFindings(findings, (f) => `Single-use ${f.decision}: ${f.file}:${f.line} ${f.name} — ${f.reason}`);
 		return;
 	}
 	if (cmd === 'dead-code') {
@@ -1190,7 +1189,7 @@ export function runQualityCli(cfg: QualityCfg, args = process.argv.slice(2)): vo
 			}
 			if (removed) console.error(`  removed ${removed} private function${removed === 1 ? '' : 's'}`);
 		}
-		const findings = unusedFunctionFindings(cfg, opts.all);
+		const findings = unusedFnFindings(cfg, opts.all);
 		for (const finding of findings) console.error(`  - Unused function: ${finding.file}:${finding.line} ${finding.name}`);
 		if (findings.length) process.exitCode = 1;
 		return;
@@ -1206,21 +1205,21 @@ export function runQualityCli(cfg: QualityCfg, args = process.argv.slice(2)): vo
 		}
 		if (cmd === 'security' || cmd === 'ui-patterns') {
 			const findings = cmd === 'security' ? securityFindings(cfg) : uiPatternFindings(cfg);
-			qualityHeader(cmd, `Checking ${cmd.replace(/-/g, ' ')}`);
+			qualityHeader(cmd, `Checking ${cmd.replace(G_REGEX(), ' ')}`);
 			printFindings(
 				findings as readonly GenericFinding[],
-				(finding) =>
-					`${'file' in finding ? `${finding.file}: ` : ''}${'message' in finding ? finding.message : 'value' in finding ? `${finding.count}x ${finding.value} (${finding.locations.join(', ')})` : 'source' in finding ? `${finding.count}x ${finding.source} (${finding.locations.join(', ')})` : finding.pattern}`,
+				(f) =>
+					`${'file' in f ? `${f.file}: ` : ''}${'message' in f ? f.message : 'value' in f ? `${f.count}x ${f.value} (${f.locations.join(', ')})` : 'source' in f ? `${f.count}x ${f.source} (${f.locations.join(', ')})` : f.pattern}`,
 			);
 			if (findings.length) process.exitCode = 1;
 			return;
 		}
 		const findings = cmd === 'repeated-classes' ? repeatedClassFindings(cfg) : regexFindings(cfg);
-		qualityHeader(cmd, `Checking ${cmd.replace(/-/g, ' ')}`);
+		qualityHeader(cmd, `Checking ${cmd.replace(G_REGEX(), ' ')}`);
 		printFindings(
 			findings as readonly GenericFinding[],
-			(finding) =>
-				`${'file' in finding ? `${finding.file}: ` : ''}${'message' in finding ? finding.message : 'value' in finding ? `${finding.count}x ${finding.value} (${finding.locations.join(', ')})` : 'source' in finding ? `${finding.count}x ${finding.source} (${finding.locations.join(', ')})` : finding.pattern}`,
+			(f) =>
+				`${'file' in f ? `${f.file}: ` : ''}${'message' in f ? f.message : 'value' in f ? `${f.count}x ${f.value} (${f.locations.join(', ')})` : 'source' in f ? `${f.count}x ${f.source} (${f.locations.join(', ')})` : f.pattern}`,
 		);
 		if (findings.length) process.exitCode = 1;
 		return;
@@ -1346,7 +1345,7 @@ export function runFormatter(cfg: QualityCfg, optsOrArgs: QualityOptions | strin
 		const knownFiles = suppliedTgts.length ? srcFiles(cfg) : filesFor(cfg, opts.all);
 		const directTgts = suppliedTgts.map((t) => resolve(cfg.root, t));
 		const collapseTgts = directTgts.length ? knownFiles.filter((f) => directTgts.some((t) => resolve(f) === t || resolve(f).startsWith(`${t}${sep}`))) : knownFiles;
-		for (const file of collapseTgts) if (/\.(?:c|m)?(?:js|ts)$/.test(file)) collapseTypesAndObjects(file);
+		for (const file of collapseTgts) if (C_M_JS_TS_REGEX.test(file)) collapseTypesAndObjects(file);
 	}
 	let failed = false;
 	let completed = 0;
