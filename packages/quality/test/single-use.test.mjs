@@ -104,7 +104,8 @@ void twice;
 	for (const name of ['pureObject', 'pureArray', 'pureString', 'pureNumber', 'pureTrue', 'pureFalse', 'pureNull', 'noInitializer', 'InlineType', 'InlineInterface'])
 		assert.ok(findings.has(name), name);
 	for (const name of ['pureObject', 'pureArray', 'pureString', 'pureNumber', 'pureTrue', 'pureFalse', 'pureNull']) assert.equal(findings.get(name).decision, 'INLINE', name);
-	for (const name of ['runtimeCall', 'runtimeNew', 'arrowFunction', 'expressionFunction', 'helper', 'publicHelper', 'reviewExpression', 'largeLiteral', 'noInitializer']) assert.equal(findings.get(name).decision, 'INLINE', name);
+	for (const name of ['runtimeCall', 'runtimeNew', 'arrowFunction', 'expressionFunction', 'helper', 'reviewExpression', 'largeLiteral', 'noInitializer']) assert.equal(findings.get(name).decision, 'INLINE', name);
+	assert.equal(findings.has('publicHelper'), false);
 	assert.equal(findings.has('runtimeAwait'), false);
 	assert.equal(findings.get('InlineType').decision, 'INLINE');
 	assert.equal(findings.get('InlineInterface').decision, 'INLINE');
@@ -119,12 +120,10 @@ test('single-use analysis counts cross-file consumers but ignores import syntax 
 	fixtureFile(root, 'included/consumer.ts', 'const included = true;\nvoid included;\n');
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], includeRoots: ['included'], extensions: ['.ts'], aliases: { '@/': 'src/' } });
 	const findings = singleUseFindings(cfg);
-	assert.deepEqual(findings.map((f) => f.name).sort(), ['Payload', 'data', 'included', 'payload']);
-	assert.equal(findings.find((f) => f.name === 'Payload').file, 'src/types.ts');
-	assert.equal(findings.find((f) => f.name === 'data').file, 'src/types.ts');
+	assert.deepEqual(findings.map((finding) => finding.name), ['included']);
 	assert.equal(findings.some((finding) => finding.name === 'API_KEY'), false);
 });
-test('single-use type fixing inlines aliases and interfaces, removes only the corresponding imports, and reports changed files', () => {
+test('single-use type fixing preserves exported aliases and interfaces as public contracts', () => {
 	const root = fixtureRoot('terra-quality-single-use-fix-');
 	fixtureFile(root, 'src/types.ts', `export type Payload = { value: string };\nexport interface Result { ok: boolean; }\n`);
 	fixtureFile(
@@ -139,15 +138,15 @@ void [payload, result];
 	);
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
 	const changedFiles = new Set();
-	assert.equal(fixSingleUseDeclarations(cfg, changedFiles), 2);
-	assert.deepEqual([...changedFiles].map((file) => file.slice(root.length + 1)).sort(), ['src/consumer.ts', 'src/types.ts']);
-	assert.equal(fixtureText(root, 'src/types.ts').includes('Payload'), false);
-	assert.equal(fixtureText(root, 'src/types.ts').includes('Result'), false);
+	assert.equal(fixSingleUseDeclarations(cfg, changedFiles), 0);
+	assert.deepEqual([...changedFiles], []);
+	assert.match(fixtureText(root, 'src/types.ts'), /export type Payload/);
+	assert.match(fixtureText(root, 'src/types.ts'), /export interface Result/);
 	const consumer = fixtureText(root, 'src/consumer.ts');
-	assert.match(consumer, /import type \{ Extra \} from '\.\/types';/);
-	assert.equal(consumer.includes('import type { Result }'), false);
-	assert.match(consumer, /void \[\(\{ value: 'ok' \}\), \(\{ ok: true \}\)\]/);
-	assert.doesNotMatch(consumer, /const payload|const result/);
+	assert.match(consumer, /import type \{ Payload, Extra \} from '\.\/types';/);
+	assert.match(consumer, /import type \{ Result \} from '\.\/types';/);
+	assert.match(consumer, /const payload: Payload/);
+	assert.match(consumer, /const result: Result/);
 	assert.equal(fixSingleUseTypes(cfg), 0);
 });
 test('single-use type fixing substitutes generic alias and interface arguments', () => {
@@ -155,10 +154,10 @@ test('single-use type fixing substitutes generic alias and interface arguments',
 	fixtureFile(root, 'src/types.ts', `export type Prepared<T> = { value: T };\nexport interface Wrapped<T> { item: T; }\n`);
 	fixtureFile(root, 'src/consumer.ts', `import type { Prepared, Wrapped } from './types';\nconst prepared: Prepared<string> = { value: 'ready' };\nconst wrapped: Wrapped<number> = { item: 1 };\nvoid [prepared, prepared, wrapped, wrapped];\n`);
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
-	assert.equal(fixSingleUseDeclarations(cfg), 2);
+	assert.equal(fixSingleUseDeclarations(cfg), 0);
 	const consumer = fixtureText(root, 'src/consumer.ts');
-	assert.match(consumer, /const prepared: \(\{\s*value: string;/);
-	assert.match(consumer, /const wrapped: \(\{\s*item: number;/);
+	assert.match(consumer, /const prepared: Prepared<string>/);
+	assert.match(consumer, /const wrapped: Wrapped<number>/);
 	const parsed = ts.createSourceFile('consumer.ts', consumer, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
 	assert.equal(parsed.parseDiagnostics.length, 0);
 });
@@ -167,9 +166,9 @@ test('single-use type fixing expands generic references through namespace import
 	fixtureFile(root, 'src/types.ts', `export type Prepared<T> = { value: T };\n`);
 	fixtureFile(root, 'src/consumer.ts', `import * as Types from './types';\nconst prepared: Types.Prepared<string> = { value: 'ready' };\nvoid [prepared, prepared];\n`);
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
-	assert.equal(fixSingleUseDeclarations(cfg), 2);
+	assert.equal(fixSingleUseDeclarations(cfg), 0);
 	const consumer = fixtureText(root, 'src/consumer.ts');
-	assert.match(consumer, /const prepared: \(\{\s*value: string;/);
+	assert.match(consumer, /const prepared: Types\.Prepared<string>/);
 	const parsed = ts.createSourceFile('consumer.ts', consumer, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
 	assert.equal(parsed.parseDiagnostics.length, 0);
 });
@@ -197,6 +196,15 @@ void { sharedItem, nested: { ...sharedItem } };
 	assert.match(updated, /void \[\(\{ value: 'a' \}\), \(\{ value: 'b' \}\), \(\{ value: true \}\), \(\['one', 'two'\]\)\]/);
 	assert.equal(fixSingleUseTypes(cfg), 0);
 	assert.equal(file.endsWith('src/main.ts'), true);
+});
+test('single-use fixing leaves typed variables that depend on imported types intact', () => {
+	const root = fixtureRoot('terra-quality-single-use-imported-type-');
+	fixtureFile(root, 'src/types.ts', `export type ReportRun = { results: string[] };\n`);
+	fixtureFile(root, 'src/main.ts', `import type { ReportRun } from './types.js';\nconst run: ReportRun = { results: [] };\nwrite(run);\nexport function record(value: ReportRun): void { void value; }\n`);
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
+	assert.equal(fixSingleUseDeclarations(cfg), 0);
+	assert.match(fixtureText(root, 'src/main.ts'), /import type \{ ReportRun \}/);
+	assert.match(fixtureText(root, 'src/main.ts'), /const run: ReportRun/);
 });
 test('single-use fixing discovers nested literals wrapped with const assertions', () => {
 	const root = fixtureRoot('terra-quality-single-use-nested-');
@@ -248,6 +256,13 @@ test('single-use fixing preserves exported functions consumed by Astro frontmatt
 	assert.equal(fixSingleUseDeclarations(cfg), 0);
 	assert.match(fixtureText(root, 'src/admin.tsx'), /export function AdminPage/);
 });
+test('single-use fixing never inlines a public export merely because it has one in-file consumer', () => {
+	const root = fixtureRoot('terra-quality-single-use-public-export-');
+	fixtureFile(root, 'src/main.ts', `export function parseReport() { return { ok: true }; }\nwrite(parseReport());\n`);
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
+	assert.equal(fixSingleUseDeclarations(cfg), 0);
+	assert.match(fixtureText(root, 'src/main.ts'), /export function parseReport/);
+});
 test('single-use fixing never removes a multi-use explicit-any compatibility alias', () => {
 	const root = fixtureRoot('terra-quality-single-use-any-alias-');
 	fixtureFile(root, 'src/main.ts', `type UncheckedActionRow = any;\nconst first = rows.map((row: UncheckedActionRow) => row.id);\nconst second = rows.filter((row: UncheckedActionRow) => row.active);\nvoid [first, second];\n`);
@@ -267,7 +282,7 @@ test('single-use scope exclusions are rule-specific and every reported declarati
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts', '.tsx'], singleUse: { skippedDirectories: ['src/components'] } });
 	const findings = singleUseFindings(cfg);
 	assert.equal(findings.some((finding) => finding.file.startsWith('src/components/')), false);
-	assert.equal(findings.some((finding) => finding.name === 'value' && finding.decision === 'INLINE'), true);
+	assert.equal(findings.some((finding) => finding.name === 'value' && finding.decision === 'INLINE'), false);
 	assert.equal(findings.some((finding) => finding.name === 'SharedByComponents'), false);
 	assert.equal(findings.every((finding) => finding.decision === 'INLINE'), true);
 });

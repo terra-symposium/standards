@@ -171,7 +171,7 @@ test('final comment cleanup removes detached TSDoc and generated grouping commen
 IMPORTS
 //////////////////////////////////////////////////*/
 // API
-/** */
+/${'** */'}
 import { readFileSync } from 'node:fs';
 /*//////////////////////////////////////////////////
 CONFIG

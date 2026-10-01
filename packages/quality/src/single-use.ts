@@ -219,7 +219,7 @@ function typeUses(cfg: QualityCfg, c: Candidate, program: ts.Program): Reference
 }
 
 /**
- * Checks whether a declaration is re-exported through a local export list.
+ * Checks whether a declaration is part of the module's public exports.
  *
  * @param candidate Declaration whose exported binding is being checked.
  * @param checker TypeScript type checker used to resolve export specifiers.
@@ -227,6 +227,7 @@ function typeUses(cfg: QualityCfg, c: Candidate, program: ts.Program): Reference
  * @return `true` when inlining would replace a module export with an expression.
  */
 function hasExportSpecifier(candidate: Candidate, checker: ts.TypeChecker): boolean {
+	if (ts.canHaveModifiers(candidate.statement) && ts.getModifiers(candidate.statement)?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword)) return true;
 	return candidate.source.statements.some(statement =>
 		ts.isExportDeclaration(statement) && statement.exportClause && ts.isNamedExports(statement.exportClause) &&
 		statement.exportClause.elements.some(specifier => canonical(checker, checker.getSymbolAtLocation(specifier.propertyName ?? specifier.name)) === candidate.symbol),
@@ -247,6 +248,22 @@ function hasAstroConsumer(candidate: Candidate, cfg: QualityCfg, program: ts.Pro
 			const resolved = ts.resolveModuleName(statement.moduleSpecifier.text, file, program.getCompilerOptions(), ts.sys).resolvedModule?.resolvedFileName;
 			return resolved === candidate.file;
 		});
+	});
+}
+
+/** Keeps imported type names in scope when an inline would discard their annotation. */
+function hasImportedTypeAnnotation(candidate: Candidate, checker: ts.TypeChecker): boolean {
+	if (candidate.kind !== 'variable' || !ts.isVariableStatement(candidate.statement)) return false;
+	return candidate.statement.declarationList.declarations.some((declaration) => {
+		if (!declaration.type) return false;
+		let imported = false;
+		const inspect = (node: ts.Node): void => {
+			const symbol = ts.isIdentifier(node) ? checker.getSymbolAtLocation(node) : undefined;
+			if (symbol?.flags && symbol.flags & ts.SymbolFlags.Alias) imported = true;
+			ts.forEachChild(node, inspect);
+		};
+		inspect(declaration.type);
+		return imported;
 	});
 }
 
@@ -381,6 +398,7 @@ export function singleUseFindings(cfg: QualityCfg): SingleUseFinding[] {
 		if ((c.kind === 'type' || c.kind === 'interface') && containsExplicitAny(c)) return [];
 		if (c.kind === 'variable' && containsAwait(c)) return [];
 		if (c.kind === 'variable' && isWriteReference(use)) return [];
+		if (hasImportedTypeAnnotation(c, checker)) return [];
 		const [decision, reason] = classify(c);
 		return [{ file: relative(cfg.root, c.file), line: c.source.getLineAndCharacterOfPosition(c.name.getStart(c.source)).line + 1, name: c.name.text, decision, reason }];
 	});
@@ -631,6 +649,7 @@ function fixSingleUsePass(cfg: QualityCfg, changedFiles: Set<string>): number {
 		if ((c.kind === 'type' || c.kind === 'interface') && containsExplicitAny(c)) continue;
 		if (c.kind === 'variable' && containsAwait(c)) continue;
 		if (c.kind === 'variable' && isWriteReference(ref)) continue;
+		if (hasImportedTypeAnnotation(c, checker)) continue;
 		if (
 			c.kind === 'variable' &&
 			candidates.some((outer) => {

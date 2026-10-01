@@ -255,20 +255,9 @@ test('the fixing quality command runs single-use and final comment cleanup in on
 	const root = fixtureRoot('terra-quality-one-pass-');
 	fixtureFile(
 		root,
-		'src/value.ts',
-		`/** src/value.ts */
-/*//////////////////////////////////////////////////
-CONFIG
-//////////////////////////////////////////////////*/
-export type Value = string;
-`,
-	);
-	fixtureFile(
-		root,
 		'src/view.ts',
 		`/** src/view.ts */
-import type { Value } from './value.js';
-const value: Value = 'ready';
+const value = 'ready';
 void value;
 CONFIG
 //////////////////////////////////////////////////*/
@@ -302,9 +291,7 @@ CONFIG
 	resetExitCode();
 	runQualityCli(cfg, ['quality', '--all', '--skip-commands', '--skip-recommendations']);
 	assert.match(fixtureText(root, 'src/view.ts'), /void \('ready'\)/);
-	assert.doesNotMatch(fixtureText(root, 'src/view.ts'), /import type/);
 	assert.doesNotMatch(fixtureText(root, 'src/view.ts'), /CONFIG|\/{10,}/);
-	assert.doesNotMatch(fixtureText(root, 'src/value.ts'), /CONFIG|\/{10,}/);
 	assert.match(fixtureText(root, 'src/untouched.ts'), /CONFIG/);
 });
 test('dead-code reports private unused functions and removes only the proven declaration', () => {
