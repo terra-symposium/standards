@@ -718,11 +718,14 @@ function fixSingleUsePass(cfg: QualityCfg, changedFiles: Set<string>): number {
  *
  * @return Number of files changed across all passes.
  */
-export function fixSingleUseDeclarations(cfg: QualityCfg): number {
+export function fixSingleUseDeclarations(cfg: QualityCfg, changedFileNames?: Set<string>): number {
 	const changedFiles = new Set<string>();
 	for (let pass = 0; pass < 1000; pass++) {
 		const changed = fixSingleUsePass(cfg, changedFiles);
-		if (changed === 0) return changedFiles.size;
+		if (changed === 0) {
+			for (const file of changedFiles) changedFileNames?.add(file);
+			return changedFiles.size;
+		}
 	}
 	throw new Error('Single-use inlining exceeded 1000 passes; check for a rewrite that does not converge.');
 }

@@ -139,7 +139,9 @@ void [payload, result];
 `,
 	);
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
-	assert.equal(fixSingleUseTypes(cfg), 2);
+	const changedFiles = new Set();
+	assert.equal(fixSingleUseDeclarations(cfg, changedFiles), 2);
+	assert.deepEqual([...changedFiles].map((file) => file.slice(root.length + 1)).sort(), ['src/consumer.ts', 'src/types.ts']);
 	assert.equal(fixtureText(root, 'src/types.ts').includes('Payload'), false);
 	assert.equal(fixtureText(root, 'src/types.ts').includes('Result'), false);
 	const consumer = fixtureText(root, 'src/consumer.ts');

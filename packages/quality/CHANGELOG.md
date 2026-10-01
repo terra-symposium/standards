@@ -1,5 +1,25 @@
 # @terra-symposium/quality
 
+## 0.4.37
+
+### Patch Changes
+
+- Limit post-inline import and comment maintenance to source files changed by the single-use fixer.
+
+## 0.4.36
+
+### Patch Changes
+
+- Normalize imports and remove detached section fragments immediately after single-use fixes, including interrupted one-line fixer output.
+
+## 0.4.35
+
+### Patch Changes
+
+- Expand one-line TSDoc blocks with missing parameter and return scaffolds while preserving existing tag content.
+- Report missing parameter and return documentation for documented functions whose signatures expose those contracts.
+- Inline all single-use declarations with syntax-checked, context-aware rewrites and support a rule-specific skipped-directory list.
+
 ## 0.4.33
 
 ### Patch Changes

@@ -442,7 +442,6 @@ function removeManagedSects(src: string, fileName: string): string {
  * @return Normalized TSDoc text; missing prose remains intentionally blank for agent-authored documentation.
  */
 function genFnDoc(n: ts.FunctionDeclaration, parsed: ts.SourceFile, eol: string, existing = ''): string {
-	if (existing.trim()) return existing;
 	const params = n.parameters.map((p, i) => (ts.isIdentifier(p.name) ? p.name.text : ts.isObjectBindingPattern(p.name) ? 'props' : `param${i + 1}`));
 	const body = existing
 		.slice(3, -2)
@@ -477,10 +476,14 @@ function genFnDoc(n: ts.FunctionDeclaration, parsed: ts.SourceFile, eol: string,
 	const content = [...summary];
 	if (!content.length || content.at(-1) !== '') content.push('');
 	for (const name of params) content.push(...(paramBlocks.get(name) ?? [`@param ${name}`]));
-	if (content.at(-1) !== '') content.push('');
-	content.push(...(returnBlock ?? ['@return']));
+	for (const [name, block] of paramBlocks) if (!params.includes(name)) content.push(...block);
+	if (returnBlock || returnsValue(n)) {
+		if (content.at(-1) !== '') content.push('');
+		content.push(...(returnBlock ?? ['@return']));
+	}
 	for (const block of otherBlocks) content.push('', ...block);
-	return ['/**', ...content.map((l) => (l ? ` * ${l}` : ' *')), ' */'].join(eol);
+	const normalized = ['/**', ...content.map((l) => (l ? ` * ${l}` : ' *')), ' */'].join(eol);
+	return existing === normalized ? existing : normalized;
 }
 
 /**
@@ -606,7 +609,12 @@ export function maintainSrcFile(root: string, fileName: string): boolean {
 /** Removes generated section scaffolding and empty or detached TSDoc after source edits. */
 export function removeNonCodeComments(fileName: string): boolean {
 	if (!SUPPORTED.has(extname(fileName))) return false;
-	const original = readFileSync(fileName, 'utf8');
+	const source = readFileSync(fileName, 'utf8');
+	const original = source.replace(/(^|\n)([ \t]*(?:CONFIG|TESTS|HELPERS|IMPORTS)[ \t]*\r?\n[ \t]*\/{10,}\*\/[ \t]*(?=\r?\n|$))/g, (match, prefix: string, _fragment: string, offset: number) => {
+		const precedingLine = source.slice(0, offset + prefix.length).trimEnd().split(/\r?\n/).at(-1)?.trim();
+		return precedingLine && /^\/\*\/{10,}$/.test(precedingLine) ? match : prefix;
+	});
+	if (original !== source) writeValidatedSrc(fileName, original);
 	const parsed = ts.createSourceFile(fileName, original, ts.ScriptTarget.Latest, true, srcKind(fileName));
 	const removals: { start: number; end: number }[] = [];
 	const nodeStarts: number[] = [];

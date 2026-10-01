@@ -1242,8 +1242,9 @@ export function runQualityCli(cfg: QualityCfg, args = process.argv.slice(2)): vo
 		return;
 	}
 	if (cmd === 'quality' || cmd === 'quality:all' || cmd === 'quality:baseline') {
+		const inlinedFiles = new Set<string>();
 		if (opts.fix) {
-			const inlined = fixSingleUseDeclarations(cfg);
+			const inlined = fixSingleUseDeclarations(cfg, inlinedFiles);
 			if (inlined) console.info(`Single-use fixer: ${inlined} declaration${inlined === 1 ? '' : 's'} inlined.`);
 		}
 		if (opts.fix && qualityCheckEnabled(cfg, 'alias')) aliasFindings(cfg, true);
@@ -1290,7 +1291,10 @@ export function runQualityCli(cfg: QualityCfg, args = process.argv.slice(2)): vo
 		runQuality(cfg, true, opts.all, analysis);
 		if (qualityCheckEnabled(cfg, 'diff')) runDiffCheck(cfg);
 		if (opts.fix) {
-			for (const file of filesFor(cfg, opts.all)) removeNonCodeComments(file);
+			for (const file of inlinedFiles) {
+				maintainSrcFile(cfg.root, file);
+				removeNonCodeComments(file);
+			}
 			if (qualityCheckEnabled(cfg, 'diff')) runDiffCheck(cfg);
 		}
 	}

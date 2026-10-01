@@ -286,7 +286,7 @@ void alpha; void beta;
 	);
 	assert.equal(maintainSrcFile(root, file), true);
 	const src = readFileSync(file, 'utf8');
-	assert.match(src, /^\/\*\* test \*\//);
+	assert.match(src, /^\/\*\*\n \* src\/main\.ts\n \* test\n \*\//);
 	assert.ok(src.indexOf("from 'alpha'") < src.indexOf("from 'beta'"));
 	assert.ok(src.indexOf('// API') < src.indexOf('// COMPONENTS'));
 	assert.ok(src.indexOf('// COMPONENTS') < src.indexOf('// DATA'));
@@ -469,20 +469,20 @@ function empty(enabled: boolean): void { void enabled; }
 	const src = readFileSync(file, 'utf8');
 	assert.ok(src.includes('/**\n *\n * @param fileName\n *\n * @return\n */\nfunction specifiers'));
 	assert.equal(src.match(/Existing documentation/g)?.length, 1);
-	assert.match(src, /\/\*\* Existing documentation\. \*\/\nfunction documented/);
-	assert.match(src, /\/\*\* \*\/\nfunction empty/);
+	assert.match(src, /\* Existing documentation\.\n \*\n \* @param value\n \*\n \* @return/);
+	assert.match(src, /\* @param enabled\n \*\//);
 	assert.equal(maintainSrcFile(root, file), false);
 });
-test('maintenance preserves summary-only TSDoc without adding tags', () => {
+test('maintenance expands one-line TSDoc with parameter and return scaffolds', () => {
 	const dir = mkdtempSync(join(tmpdir(), 'terra-quality-tsdoc-summary-'));
 	const file = join(dir, 'src.ts');
-	writeFileSync(file, "import fs from 'node:fs';\n/** Handles create client. */\nfunction createClient() { return fs.existsSync('.'); }\n");
+	writeFileSync(file, "import fs from 'node:fs';\n/** Handles create client. */\nfunction createClient(path: string): boolean { return fs.existsSync(path); }\n");
 	maintainSrcFile(dir, file);
 	const src = readFileSync(file, 'utf8');
-	assert.ok(src.includes('/** Handles create client. */\nfunction createClient'));
-	assert.doesNotMatch(src, /Handles create client\.\n \*\n \*\n \* @return/);
+	assert.match(src, /\* Handles create client\.\n \*\n \* @param path\n \*\n \* @return/);
+	assert.equal(maintainSrcFile(dir, file), false);
 });
-test('maintenance preserves existing TSDoc tags instead of generating or repairing them', () => {
+test('maintenance preserves existing TSDoc prose and tag descriptions while adding missing tags', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-tsdoc-'));
 	const file = join(root, 'main.ts');
 	writeFileSync(
@@ -491,7 +491,9 @@ test('maintenance preserves existing TSDoc tags instead of generating or repairi
 	);
 	assert.equal(maintainSrcFile(root, file), true);
 	const src = readFileSync(file, 'utf8');
-	assert.match(src, /\* @param wrongName - stale\n \* @param fileName - Path to read\.\n \* @returns - File contents\./);
+	assert.match(src, /\* @param fileName - Path to read\./);
+	assert.match(src, /\* @param wrongName - stale/);
+	assert.match(src, /\* @return - File contents\./);
 	assert.match(src, /\* @throws When reading fails\./);
 	assert.equal(maintainSrcFile(root, file), false);
 });
@@ -502,8 +504,9 @@ test('maintenance preserves managed-looking sections in files without imports', 
 const VALUE = true;
 `;
 	writeFileSync(file, src);
+	assert.equal(maintainSrcFile(root, file), true);
+	assert.match(readFileSync(file, 'utf8'), /^\/\*\*\n \* main\.ts\n \*\//);
 	assert.equal(maintainSrcFile(root, file), false);
-	assert.equal(readFileSync(file, 'utf8'), src);
 });
 test('maintenance normalizes section, group, and line-comment whitespace without duplicate empty sections', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-comment-layout-'));
