@@ -670,7 +670,11 @@ function fixSingleUsePass(cfg: QualityCfg, changedFiles: Set<string>): number {
 	}
 	const selected: typeof pending = [];
 	for (const candidate of pending.sort((left, right) => Number(right.nestedReference) - Number(left.nestedReference) || left.referenceLength - right.referenceLength)) {
-		const overlaps = selected.some((existing) => candidate.fileEdits.some((edit) => existing.fileEdits.some((other) => other.file === edit.file && edit.start < other.end && other.start < edit.end)));
+		const overlaps = selected.some((selectedCandidate) =>
+			candidate.fileEdits.some((candidateEdit) =>
+				selectedCandidate.fileEdits.some((selectedEdit) => selectedEdit.file === candidateEdit.file && candidateEdit.start < selectedEdit.end && selectedEdit.start < candidateEdit.end),
+			),
+		);
 		if (overlaps) continue;
 		selected.push(candidate);
 	}
@@ -737,4 +741,6 @@ export function fixSingleUseDeclarations(cfg: QualityCfg, changedFileNames?: Set
  *
  * @return Number of files containing edits.
  */
-export const fixSingleUseTypes = fixSingleUseDeclarations;
+export function fixSingleUseTypes(cfg: QualityCfg): number {
+	return fixSingleUseDeclarations(cfg);
+}

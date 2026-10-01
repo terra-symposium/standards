@@ -263,7 +263,7 @@ CONFIG
 export type Value = string;
 `,
 	);
-	const consumer = fixtureFile(
+	fixtureFile(
 		root,
 		'src/view.ts',
 		`/** src/view.ts */

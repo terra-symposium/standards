@@ -17,7 +17,6 @@ import test from 'node:test';
 import ts from 'typescript';
 import { createQualityCfg, fixSingleUseDeclarations, fixSingleUseTypes, singleUseFindings } from '../dist/index.js';
 import { fixtureFile, fixtureRoot, fixtureText } from './support.mjs';
-import { join } from 'node:path';
 
 test('inlining carries attached prose and keeps populated section headings', () => {
 	const root = fixtureRoot('terra-quality-single-use-comments-');
