@@ -16,7 +16,7 @@ import { checkImports } from './imports.js';
 import { collapseInlineIfs } from './inline-if.js';
 import { collapseTypesAndObjects } from './collapse.js';
 import { dirname, relative, resolve, sep } from 'node:path';
-import { documentSrcFile, documentationFindings, maintainSrcFile, protectLongImports } from './documentation.js';
+import { documentSrcFile, documentationFindings, maintainSrcFile, protectLongImports, removeNonCodeComments } from './documentation.js';
 import { existsSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { fixObjectForwarding, objectForwardingFindings } from './object-forwarding.js';
@@ -40,7 +40,23 @@ REGEX
 const C_M_JS_TS_X_REGEX = /\.(?:c|m)?(?:js|ts)x?$/;
 const C_M_JS_TS_X_CLASS_2 = /\.(?:(?:c|m)?(?:js|ts)x?)$/;
 export type QualityCheckName =
-	'document' | 'format' | 'import' | 'name' | 'forward' | 'lint' | 'knip' | 'dead-code' | 'type' | 'recommend' | 'command' | 'diff' | 'alias' | 'security' | 'repeated-classes' | 'regex-dedup' | 'ui-patterns';
+	| 'document'
+	| 'format'
+	| 'import'
+	| 'name'
+	| 'forward'
+	| 'lint'
+	| 'knip'
+	| 'dead-code'
+	| 'type'
+	| 'recommend'
+	| 'command'
+	| 'diff'
+	| 'alias'
+	| 'security'
+	| 'repeated-classes'
+	| 'regex-dedup'
+	| 'ui-patterns';
 export type QualityAutofixName = 'document' | 'format' | 'name' | 'lint' | 'knip' | 'alias' | 'forward' | 'repeatedClasses' | 'regexDedup';
 export type QualityCfg = {
 	root: string;
@@ -51,6 +67,7 @@ export type QualityCfg = {
 	externalPrefixes?: string[];
 	skippedDirectories?: string[];
 	skippedFiles?: string[];
+	singleUse?: { skippedDirectories?: string[] };
 	protectedIdentifiers?: string[];
 	renameExports?: boolean;
 	qualityCommands?: { name: string; command: string; args?: string[] }[];
@@ -159,7 +176,7 @@ export function qualityAutofixEnabled(cfg: QualityCfg, check: QualityAutofixName
  *
  * @return `true` when command checks and this command are enabled.
  */
-export function qualityCommandEnabled(cfg: QualityCfg, name: string): boolean {
+export function qualityCmdEnabled(cfg: QualityCfg, name: string): boolean {
 	return qualityCheckEnabled(cfg, 'command') && cfg.enabledCommands?.[name] !== false;
 }
 
@@ -205,6 +222,7 @@ export function createQualityCfg(cfg: QualityCfg): QualityCfg {
 		includeRoots: (cfg.includeRoots ?? []).map((p) => resolve(cfg.root, p)),
 		skippedDirectories: [...new Set([...defaultSkipped, ...(cfg.skippedDirectories ?? [])])],
 		skippedFiles: (cfg.skippedFiles ?? []).map((p) => resolve(cfg.root, p)),
+		singleUse: { ...cfg.singleUse, skippedDirectories: (cfg.singleUse?.skippedDirectories ?? []).map((p) => resolve(cfg.root, p)) },
 		aliases: cfg.aliases ?? {},
 		protectedIdentifiers: cfg.protectedIdentifiers ?? [],
 		lintRoots: (cfg.lintRoots ?? []).map((p) => resolve(cfg.root, p)),
@@ -428,21 +446,11 @@ function fixUnusedFns(cfg: QualityCfg, all: boolean): number {
 	for (const filesBatch of batches(files)) {
 		const result = spawnSync(
 			toolPath(cfg, cfg.tools?.eslint, 'eslint'),
-			[
-				'--cache',
-				'--cache-strategy',
-				'content',
-				'--cache-location',
-				'node_modules/.cache/eslint',
-				'--format',
-				'json',
-				'--no-warn-ignored',
-				...filesBatch,
-			],
+			['--cache', '--cache-strategy', 'content', '--cache-location', 'node_modules/.cache/eslint', '--format', 'json', '--no-warn-ignored', ...filesBatch],
 			{
-			cwd: cfg.root,
-			encoding: 'utf8',
-			env: process.env,
+				cwd: cfg.root,
+				encoding: 'utf8',
+				env: process.env,
 			},
 		);
 		let reports: Array<{ filePath: string; messages: Array<{ ruleId?: string; line: number; column: number }> }> = [];
@@ -453,12 +461,14 @@ function fixUnusedFns(cfg: QualityCfg, all: boolean): number {
 		}
 		for (const report of reports) {
 			const src = readFileSync(report.filePath, 'utf8');
-			const ast = ts.createSourceFile(report.filePath, src, ts.ScriptTarget.Latest, true, C_M_JS_TS_X_CLASS_2.test(report.filePath) && report.filePath.endsWith('x') ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
-			const starts = new Set(
-				report.messages
-					.filter((m) => m.ruleId === 'unused-imports/no-unused-vars')
-					.map((m) => ast.getPositionOfLineAndCharacter(m.line - 1, m.column - 1)),
+			const ast = ts.createSourceFile(
+				report.filePath,
+				src,
+				ts.ScriptTarget.Latest,
+				true,
+				C_M_JS_TS_X_CLASS_2.test(report.filePath) && report.filePath.endsWith('x') ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
 			);
+			const starts = new Set(report.messages.filter((m) => m.ruleId === 'unused-imports/no-unused-vars').map((m) => ast.getPositionOfLineAndCharacter(m.line - 1, m.column - 1)));
 			const edits: Array<{ start: number; end: number }> = [];
 			const visit = (node: ts.Node): void => {
 				if (ts.isFunctionDeclaration(node) && node.name && starts.has(node.name.getStart(ast)) && !node.modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword)) {
@@ -478,7 +488,9 @@ function fixUnusedFns(cfg: QualityCfg, all: boolean): number {
 			if (!edits.length) continue;
 			let updated = src;
 			for (const edit of edits.sort((a, b) => b.start - a.start)) updated = `${updated.slice(0, edit.start)}${updated.slice(edit.end)}`;
-			const diagnostics = ts.transpileModule(updated, { fileName: report.filePath, reportDiagnostics: true, compilerOptions: { allowJs: true, jsx: ts.JsxEmit.Preserve, target: ts.ScriptTarget.ESNext } }).diagnostics ?? [];
+			const diagnostics =
+				ts.transpileModule(updated, { fileName: report.filePath, reportDiagnostics: true, compilerOptions: { allowJs: true, jsx: ts.JsxEmit.Preserve, target: ts.ScriptTarget.ESNext } }).diagnostics ??
+				[];
 			if (diagnostics.some((d) => d.category === ts.DiagnosticCategory.Error)) continue;
 			writeFileSync(report.filePath, updated);
 			fixed += edits.length;
@@ -507,12 +519,14 @@ function unusedFunctionFindings(cfg: QualityCfg, all: boolean): UnusedFunctionFi
 		}
 		for (const report of reports) {
 			const src = readFileSync(report.filePath, 'utf8');
-			const ast = ts.createSourceFile(report.filePath, src, ts.ScriptTarget.Latest, true, C_M_JS_TS_X_CLASS_2.test(report.filePath) && report.filePath.endsWith('x') ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
-			const starts = new Set(
-				report.messages
-					.filter((m) => m.ruleId === 'unused-imports/no-unused-vars')
-					.map((m) => ast.getPositionOfLineAndCharacter(m.line - 1, m.column - 1)),
+			const ast = ts.createSourceFile(
+				report.filePath,
+				src,
+				ts.ScriptTarget.Latest,
+				true,
+				C_M_JS_TS_X_CLASS_2.test(report.filePath) && report.filePath.endsWith('x') ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
 			);
+			const starts = new Set(report.messages.filter((m) => m.ruleId === 'unused-imports/no-unused-vars').map((m) => ast.getPositionOfLineAndCharacter(m.line - 1, m.column - 1)));
 			const visit = (node: ts.Node): void => {
 				if (ts.isFunctionDeclaration(node) && node.name && starts.has(node.name.getStart(ast)) && !node.modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword)) {
 					const line = ast.getLineAndCharacterOfPosition(node.name.getStart(ast)).line + 1;
@@ -535,7 +549,7 @@ function unusedFunctionFindings(cfg: QualityCfg, all: boolean): UnusedFunctionFi
  * @return Nothing; command failures are reflected in the process exit code.
  */
 function runCfgdCmd(cfg: QualityCfg, name: string): void {
-	if (!qualityCommandEnabled(cfg, name)) return;
+	if (!qualityCmdEnabled(cfg, name)) return;
 	const check = cfg.qualityCommands?.find((c) => c.name === name);
 	if (!check) throw new Error(`Unknown quality domain: ${name}`);
 	qualityHeader(`command:${name}`, `Running ${check.command} ${(check.args ?? []).join(' ')}`.trim());
@@ -552,7 +566,7 @@ function runCfgdCmd(cfg: QualityCfg, name: string): void {
  * @return Nothing; command failures are reflected in the process exit code.
  */
 function runCfgdCmds(cfg: QualityCfg): void {
-	for (const check of cfg.qualityCommands ?? []) if (qualityCommandEnabled(cfg, check.name)) runCfgdCmd(cfg, check.name);
+	for (const check of cfg.qualityCommands ?? []) if (qualityCmdEnabled(cfg, check.name)) runCfgdCmd(cfg, check.name);
 }
 
 /**
@@ -635,9 +649,7 @@ function repairMissingImports(cfg: QualityCfg, program: ts.Program, checker: ts.
 		const visit = (n: ts.Node): void => {
 			const intrinsicJsxTag = ts.isIdentifier(n) && (ts.isJsxOpeningLikeElement(n.parent) || ts.isJsxClosingElement(n.parent)) && n.parent.tagName === n && /^[a-z]/.test(n.text);
 			const propertyName =
-				ts.isIdentifier(n) &&
-				(('name' in n.parent && (n.parent as { name?: ts.Node }).name === n) ||
-					('propertyName' in n.parent && (n.parent as { propertyName?: ts.Node }).propertyName === n));
+				ts.isIdentifier(n) && (('name' in n.parent && (n.parent as { name?: ts.Node }).name === n) || ('propertyName' in n.parent && (n.parent as { propertyName?: ts.Node }).propertyName === n));
 			if (
 				ts.isIdentifier(n) &&
 				!intrinsicJsxTag &&
@@ -1230,6 +1242,10 @@ export function runQualityCli(cfg: QualityCfg, args = process.argv.slice(2)): vo
 		return;
 	}
 	if (cmd === 'quality' || cmd === 'quality:all' || cmd === 'quality:baseline') {
+		if (opts.fix) {
+			const inlined = fixSingleUseDeclarations(cfg);
+			if (inlined) console.info(`Single-use fixer: ${inlined} declaration${inlined === 1 ? '' : 's'} inlined.`);
+		}
 		if (opts.fix && qualityCheckEnabled(cfg, 'alias')) aliasFindings(cfg, true);
 		if (fix('name') && qualityCheckEnabled(cfg, 'name')) {
 			const namingScope = scopedCfg(cfg, opts.all);
@@ -1273,6 +1289,10 @@ export function runQualityCli(cfg: QualityCfg, args = process.argv.slice(2)): vo
 		if (!opts.skipRecommendations) runRecommendationCmds(cfg);
 		runQuality(cfg, true, opts.all, analysis);
 		if (qualityCheckEnabled(cfg, 'diff')) runDiffCheck(cfg);
+		if (opts.fix) {
+			for (const file of filesFor(cfg, opts.all)) removeNonCodeComments(file);
+			if (qualityCheckEnabled(cfg, 'diff')) runDiffCheck(cfg);
+		}
 	}
 }
 
@@ -1284,7 +1304,7 @@ export function runQualityCli(cfg: QualityCfg, args = process.argv.slice(2)): vo
  *
  * @return Nothing; command failures are reflected in the process exit code.
  */
-export function runQualityFromConfig(file?: string, args = process.argv.slice(2)): void {
+export function runQualityFromCfg(file?: string, args = process.argv.slice(2)): void {
 	runQualityCli(loadQualityCfg(file), args);
 }
 
@@ -1381,4 +1401,4 @@ export function runTypecheck(cfg: QualityCfg, args: string[] = []): void {
 	if (result.status) process.exitCode = result.status ?? 1;
 	console.error(`  ${result.status ? '✗ failed' : '✓ passed'}`);
 }
-if (process.argv[1] && realpathSync(resolve(process.argv[1])) === realpathSync(fileURLToPath(import.meta.url))) runQualityFromConfig();
+if (process.argv[1] && realpathSync(resolve(process.argv[1])) === realpathSync(fileURLToPath(import.meta.url))) runQualityFromCfg();

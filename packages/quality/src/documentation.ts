@@ -514,6 +514,7 @@ function statementText(n: ts.Statement, parsed: ts.SourceFile, src: string, eol:
  * @return Source text with canonical CONFIG and HELPERS sections.
  */
 function organizeSrcSects(src: string, fileName: string, eol: string): string {
+	if ([...src.matchAll(/\/\*\/{10,}\s*\n\s*([A-Z][A-Z _-]*)\s*\n\s*\/{10,}\*\//g)].some((match) => !['IMPORTS', 'CONFIG', 'HELPERS'].includes(match[1]!.trim()))) return src;
 	const withoutManagedSections = removeManagedSects(src, fileName);
 	const parsed = ts.createSourceFile(fileName, withoutManagedSections, ts.ScriptTarget.Latest, true, srcKind(fileName));
 	const imports = parsed.statements.filter(ts.isImportDeclaration);
@@ -600,6 +601,56 @@ export function maintainSrcFile(root: string, fileName: string): boolean {
 	const n = original.startsWith('\uFEFF') ? `\uFEFF${laidOut}` : laidOut;
 	if (n === original) return false;
 	return writeValidatedSrc(fileName, n);
+}
+
+/** Removes generated section scaffolding and empty or detached TSDoc after source edits. */
+export function removeNonCodeComments(fileName: string): boolean {
+	if (!SUPPORTED.has(extname(fileName))) return false;
+	const original = readFileSync(fileName, 'utf8');
+	const parsed = ts.createSourceFile(fileName, original, ts.ScriptTarget.Latest, true, srcKind(fileName));
+	const removals: { start: number; end: number }[] = [];
+	const nodeStarts: number[] = [];
+	const codeStarts: number[] = [];
+	const inspect = (node: ts.Node): void => {
+		codeStarts.push(node.getStart(parsed));
+		if (ts.isVariableStatement(node)) nodeStarts.push(node.getStart(parsed));
+		if (
+			ts.isClassLike(node) ||
+			ts.isFunctionLike(node) ||
+			ts.isVariableDeclaration(node) ||
+			ts.isTypeAliasDeclaration(node) ||
+			ts.isInterfaceDeclaration(node) ||
+			ts.isEnumDeclaration(node) ||
+			ts.isModuleDeclaration(node) ||
+			ts.isPropertyDeclaration(node) ||
+			ts.isMethodDeclaration(node) ||
+			ts.isParameter(node)
+		)
+			nodeStarts.push(node.getStart(parsed));
+		ts.forEachChild(node, inspect);
+	};
+	inspect(parsed);
+	const comments: { start: number; end: number; text: string }[] = [];
+	const scanner = ts.createScanner(ts.ScriptTarget.Latest, false, parsed.languageVariant, original);
+	for (let token = scanner.scan(); token !== ts.SyntaxKind.EndOfFileToken; token = scanner.scan())
+		if (token === ts.SyntaxKind.SingleLineCommentTrivia || token === ts.SyntaxKind.MultiLineCommentTrivia)
+			comments.push({ start: scanner.getTokenPos(), end: scanner.getTextPos(), text: scanner.getTokenText() });
+	for (const block of tsdocBlocks(original, parsed)) {
+		if (block.text.replace(/^\/\*\*|\*\/$/g, '').replace(/^\s*\* ?/gm, '').trim()) continue;
+		const followingDeclaration = nodeStarts.filter((start) => start >= block.end).sort((a, b) => a - b)[0];
+		if ((followingDeclaration === undefined || !/^\s*$/.test(original.slice(block.end, followingDeclaration))) && !fileHeaderBlock(original, [block])) removals.push({ start: block.start, end: block.end });
+	}
+	const headings = comments.filter(({ text }) => /^\/\*\/{10,}/.test(text) || /^\/\/\s*[A-Z][A-Z _-]*\s*$/.test(text));
+	for (const [index, heading] of headings.entries()) {
+		const section = heading.text.startsWith('/*');
+		const next = headings.slice(index + 1).find((candidate) => candidate.text.startsWith('/*') === section)?.start ?? original.length;
+		if (!codeStarts.some((start) => start >= heading.end && start < next)) removals.push({ start: heading.start, end: heading.end });
+	}
+	if (!removals.length) return false;
+	let updated = original;
+	for (const { start, end } of removals.sort((a, b) => b.start - a.start)) updated = `${updated.slice(0, start)}${updated.slice(end)}`;
+	updated = updated.replace(/\n{3,}/g, '\n\n');
+	return updated === original ? false : writeValidatedSrc(fileName, updated);
 }
 
 /**

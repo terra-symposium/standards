@@ -1,11 +1,9 @@
 /**
  * packages/quality/test/runner.test.mjs
- * Verifies configuration normalization, check/autofix toggles, shared
- * analysis construction, CLI dispatch, subprocess status handling, formatter
- * batching, and the explicit command boundaries.
+ * Verifies configuration normalization, check/autofix toggles, shared analysis construction,
+ * CLI dispatch, subprocess status handling, formatter batching, and the explicit command boundaries.
  * Tool invocations use tiny executable fixtures that record their arguments.
- * This makes command wiring testable without installing or running a real
- * formatter, linter, compiler, or repository build.
+ * This makes command wiring testable without installing or running a real formatter, linter, compiler, or repository build.
  */
 
 /*//////////////////////////////////////////////////
@@ -16,7 +14,7 @@ IMPORTS
 import assert from 'node:assert/strict';
 import test from 'node:test';
 // prettier-ignore
-import { createQualityAnalysis, createQualityCfg, loadQualityCfg, qualityAutofixEnabled, qualityCheckEnabled, qualityCommandEnabled, qualityRecommendationEnabled, runFormatter, runQuality, runQualityCli, runQualityFromConfig, runTypecheck } from '../dist/index.js';
+import { createQualityAnalysis, createQualityCfg, loadQualityCfg, qualityAutofixEnabled, qualityCheckEnabled, qualityCmdEnabled, qualityRecommendationEnabled, runFormatter, runQuality, runQualityCli, runQualityFromCfg, runTypecheck } from '../dist/index.js';
 import { existsSync, readFileSync } from 'node:fs';
 import { fixtureFile, fixtureRoot, fixtureText, resetExitCode } from './support.mjs';
 import { join } from 'node:path';
@@ -135,12 +133,12 @@ test('configuration toggles default to enabled and honor explicit category, item
 	assert.equal(qualityAutofixEnabled(cfg, 'name'), false);
 	assert.equal(qualityAutofixEnabled(cfg, 'format', false), false);
 	assert.equal(qualityAutofixEnabled(cfg, 'format'), true);
-	assert.equal(qualityCommandEnabled(cfg, 'build'), false);
-	assert.equal(qualityCommandEnabled(cfg, 'test'), false);
+	assert.equal(qualityCmdEnabled(cfg, 'build'), false);
+	assert.equal(qualityCmdEnabled(cfg, 'test'), false);
 	assert.equal(qualityRecommendationEnabled(cfg, 'migration'), false);
 	assert.equal(qualityRecommendationEnabled(cfg, 'architecture'), false);
 	const enabled = createQualityCfg({ root: cfg.root, sourceRoots: [], extensions: ['.ts'], qualityCommands: [], recommendationCommands: [] });
-	assert.equal(qualityCommandEnabled(enabled, 'build'), true);
+	assert.equal(qualityCmdEnabled(enabled, 'build'), true);
 	assert.equal(qualityRecommendationEnabled(enabled, 'architecture'), true);
 });
 test('createQualityAnalysis caches all selected source text and only creates AST entries for JavaScript/TypeScript files', () => {
@@ -207,7 +205,7 @@ test('CLI domain dispatch runs enabled commands, skips disabled commands, and re
 	assert.equal(readFileSync(marker, 'utf8'), 'reset');
 	assert.throws(() => runQualityCli(cfg, ['domain', 'missing']), /Unknown quality domain/);
 });
-test('runQualityFromConfig loads JSON and reaches the same explicit domain boundary as an in-memory configuration', () => {
+test('runQualityFromCfg loads JSON and reaches the same explicit domain boundary as an in-memory configuration', () => {
 	const root = fixtureRoot('terra-quality-from-config-');
 	const marker = join(root, 'from-config.txt');
 	const cfg = fixtureFile(
@@ -219,7 +217,7 @@ test('runQualityFromConfig loads JSON and reaches the same explicit domain bound
 			qualityCommands: [{ name: 'fixture', command: process.execPath, args: ['-e', `require('node:fs').writeFileSync(${JSON.stringify(marker)}, 'ran')`] }],
 		}),
 	);
-	runQualityFromConfig(cfg, ['domain', 'fixture']);
+	runQualityFromCfg(cfg, ['domain', 'fixture']);
 	assert.equal(readFileSync(marker, 'utf8'), 'ran');
 });
 test('runQuality honors disabled findings categories without leaking a failure status', () => {
@@ -247,11 +245,62 @@ test('CLI lint and Knip branches pass their focused flags and autofix policy to 
 	]);
 	runQualityCli(cfg, ['knip', '--all']);
 	assert.deepEqual(recordedCmds(root, 'knip-args.jsonl'), [
-		['--fix', '--allow-remove-files', '--no-exit-code'],
-		['--include', 'unresolved,nsExports,nsTypes,cycles', '--no-exit-code'],
+		['--fix', '--allow-remove-files', '--no-exit-code', '--no-config-hints'],
+		['--include', 'unresolved,nsExports,nsTypes,cycles', '--no-exit-code', '--no-config-hints'],
 	]);
 	runQualityCli(cfg, ['knip', '--all', '--warn']);
-	assert.deepEqual(recordedCmds(root, 'knip-args.jsonl').at(-1), ['--include', 'unresolved,nsExports,nsTypes,cycles', '--no-exit-code']);
+	assert.deepEqual(recordedCmds(root, 'knip-args.jsonl').at(-1), ['--include', 'unresolved,nsExports,nsTypes,cycles', '--no-exit-code', '--no-config-hints']);
+});
+test('the fixing quality command runs single-use and final comment cleanup in one pass', () => {
+	const root = fixtureRoot('terra-quality-one-pass-');
+	fixtureFile(
+		root,
+		'src/value.ts',
+		`/** src/value.ts */
+/*//////////////////////////////////////////////////
+CONFIG
+//////////////////////////////////////////////////*/
+export type Value = string;
+`,
+	);
+	const consumer = fixtureFile(
+		root,
+		'src/view.ts',
+		`/** src/view.ts */
+import type { Value } from './value.js';
+const value: Value = 'ready';
+void value;
+`,
+	);
+	const cfg = createQualityCfg({
+		root,
+		sourceRoots: ['src'],
+		extensions: ['.ts'],
+		enabledChecks: {
+			document: false,
+			format: false,
+			import: false,
+			name: false,
+			forward: false,
+			lint: false,
+			knip: false,
+			'dead-code': false,
+			type: false,
+			recommend: false,
+			command: false,
+			diff: false,
+			alias: false,
+			security: false,
+			'repeated-classes': false,
+			'regex-dedup': false,
+			'ui-patterns': false,
+		},
+	});
+	resetExitCode();
+	runQualityCli(cfg, ['quality', '--all', '--skip-commands', '--skip-recommendations']);
+	assert.match(fixtureText(root, 'src/view.ts'), /void \('ready'\)/);
+	assert.doesNotMatch(fixtureText(root, 'src/view.ts'), /import type/);
+	assert.doesNotMatch(fixtureText(root, 'src/value.ts'), /CONFIG|\/{10,}/);
 });
 test('dead-code reports private unused functions and removes only the proven declaration', () => {
 	const root = fixtureRoot('terra-quality-dead-code-');

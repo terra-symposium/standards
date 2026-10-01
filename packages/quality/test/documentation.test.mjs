@@ -13,7 +13,7 @@ IMPORTS
 // API
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { createQualityCfg, documentSrcFile, documentationFindings, maintainSrcFile, protectLongImports } from '../dist/index.js';
+import { createQualityCfg, documentSrcFile, documentationFindings, maintainSrcFile, protectLongImports, removeNonCodeComments } from '../dist/index.js';
 import { fixtureFile, fixtureRoot, fixtureText } from './support.mjs';
 
 /*//////////////////////////////////////////////////
@@ -163,6 +163,52 @@ test('maintainSrcFile prefixes a prose-only leading header with the canonical pa
 	const file = fixtureFile(root, 'src/main.ts', `/** Dashboard surface loaders and primary intelligence refresh workflows. */\nconst value = true;\nvoid value;\n`);
 	assert.equal(maintainSrcFile(root, file), true);
 	assert.equal(fixtureText(root, 'src/main.ts'), `/**\n * src/main.ts\n * Dashboard surface loaders and primary intelligence refresh workflows.\n */\n\nconst value = true;\nvoid value;\n`);
+});
+test('final comment cleanup removes detached TSDoc and generated grouping comments only', () => {
+	const root = fixtureRoot('terra-quality-non-code-comments-');
+	const file = fixtureFile(root, 'src/main.ts', `/** src/main.ts */
+/*//////////////////////////////////////////////////
+IMPORTS
+//////////////////////////////////////////////////*/
+// API
+/** */
+import { readFileSync } from 'node:fs';
+/*//////////////////////////////////////////////////
+CONFIG
+//////////////////////////////////////////////////*/
+/** Reads the configured file from disk. */
+export function readConfig(path: string): string {
+	return readFileSync(path, 'utf8');
+}
+// preserves the caller's original destination
+const destination = '/home';
+void [readConfig, destination];
+// EMPTY GROUP
+`);
+	assert.equal(removeNonCodeComments(file), true);
+	const cleaned = fixtureText(root, 'src/main.ts');
+	assert.match(cleaned, /IMPORTS|CONFIG|\/\/ API/);
+	assert.doesNotMatch(cleaned, /\/\*\* \*\/|EMPTY GROUP/);
+	assert.match(cleaned, /Reads the configured file from disk/);
+	assert.match(cleaned, /preserves the caller's original destination/);
+});
+test('maintenance preserves custom populated sections and cleanup removes only empty headings', () => {
+	const root = fixtureRoot('terra-quality-custom-sections-');
+	const file = fixtureFile(root, 'src/main.ts', `/** src/main.ts */
+import { readFileSync } from 'node:fs';
+/*//////////////////////////////////////////////////
+REGRESSIONS CONTRACTS
+//////////////////////////////////////////////////*/
+// TESTS
+export const contract = readFileSync('fixture', 'utf8');
+// EMPTY GROUP
+`);
+	maintainSrcFile(root, file);
+	assert.match(fixtureText(root, 'src/main.ts'), /REGRESSIONS CONTRACTS/);
+	assert.equal(removeNonCodeComments(file), true);
+	const result = fixtureText(root, 'src/main.ts');
+	assert.match(result, /REGRESSIONS CONTRACTS|\/\/ TESTS/);
+	assert.doesNotMatch(result, /EMPTY GROUP/);
 });
 test('maintainSrcFile deduplicates repeated type imports across maintenance runs', () => {
 	const root = fixtureRoot('terra-quality-import-deduplication-');

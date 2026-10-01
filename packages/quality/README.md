@@ -131,6 +131,17 @@ Each rule is independent. `functions` covers all named functions. `exportedFunct
 - **Configure:** Set `tools.knip` and `autofix.knip` for supported Knip fixes. A separate Knip JSON file is not required for invocation. Disable Knip when entry-point metadata is incomplete.
 - **Ideology:** Dead-code cleanup should be evidence-led. Review generated files, dynamic imports, plugins, and framework conventions before deletion.
 
+### Single-use
+
+- **Does:** The fixing `quality` run automatically inlines declarations with exactly one in-scope consumer, including types, interfaces, functions, and variables. Rewrites are syntax-checked before source files are written. The final source pass removes generated section/group comments and detached TSDoc while preserving declaration documentation and meaningful inline comments.
+- **Configure:** Use `singleUse.skippedDirectories` for repository-owned component or shared-code directories that should remain out of this rule without disabling other quality checks. `quality --warn` checks without changing files.
+
+```json
+{ "singleUse": { "skippedDirectories": ["src/components"] } }
+```
+
+- **Ideology:** Keep single-use implementation details at their consumer; reserve reusable modules for code with multiple consumers.
+
 ### Type
 
 - **Does:** Runs configured source and project TypeScript checks.
