@@ -1,0 +1,28 @@
+---
+title: Troubleshooting
+description: Resolve common Terra Quality configuration and run issues.
+---
+
+## `quality.json` was not found
+
+Run the CLI from the directory containing `quality.json`. The CLI defaults to that file in the current working directory.
+
+## No files were selected
+
+Confirm `sourceRoots` and `extensions`. Default mode selects changed and untracked Git files; use `--all` to scan the full configured scope. Check default generated-directory exclusions and your `skippedFiles` entries.
+
+## A configured tool cannot be found
+
+Install the tool in the consuming repository. Terra Quality does not install tools. For a command name, it checks the repository's `node_modules/.bin` before using the configured name. A configured path containing a slash is used as given.
+
+## Commands run from the wrong directory
+
+Set `root` to the repository root. Configured quality and recommendation commands run with `root` as their working directory.
+
+## Review-only output is desired
+
+Use `--warn` or disable a specific autofix under `autofix`. Review public API and behavior changes even when the proposed edit is mechanically safe.
+
+## An import is intentionally external
+
+Add a narrow prefix to `externalPrefixes`, or configure an internal mapping with `aliases`. Avoid a broad exemption that could hide broken local imports.

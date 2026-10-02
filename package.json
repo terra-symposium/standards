@@ -14,6 +14,9 @@
 		"quality:all": "node packages/quality/dist/runner.js quality --all --skip-commands --skip-recommendations",
 		"prequality:check": "pnpm --filter @terra-symposium/quality build && pnpm --filter @terra-symposium/error-boundaries build",
 		"quality:check": "node packages/quality/dist/runner.js quality --all --warn --skip-commands --skip-recommendations",
+		"docs:dev": "pnpm --filter @terra-symposium/docs dev",
+		"docs:build": "pnpm --filter @terra-symposium/docs build",
+		"docs:preview": "pnpm --filter @terra-symposium/docs preview",
 		"release": "changeset publish"
 	},
 	"devDependencies": {

@@ -1,0 +1,16 @@
+---
+title: Contributing
+description: Build, test, and update Terra Shared packages and documentation.
+---
+
+This is a pnpm workspace. From the repository root:
+
+```sh
+pnpm install --frozen-lockfile
+pnpm build
+pnpm test
+```
+
+Work on the docs site with `pnpm docs:dev`; build it with `pnpm docs:build` and preview with `pnpm docs:preview`.
+
+Package API changes use Changesets. Add a changeset for publishable package changes; documentation-only updates do not need a package version bump. When changing quality behavior, keep the schema, examples, CLI behavior, and check guides aligned. The quality package's `test/README.md` documents its test coverage contract.

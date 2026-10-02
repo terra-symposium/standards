@@ -19,6 +19,7 @@
       "properties": { "skippedDirectories": { "type": "array", "items": { "type": "string" } } },
       "additionalProperties": false
     },
+    "renameExports": { "type": "boolean" },
     "protectedIdentifiers": { "type": "array", "items": { "type": "string" } },
     "enabledChecks": { "$ref": "#/$defs/toggles" },
     "autofix": { "$ref": "#/$defs/toggles" },

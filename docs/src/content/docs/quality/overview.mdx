@@ -1,0 +1,26 @@
+---
+title: Quality runner overview
+description: How Terra Quality scopes work, selects checks, fixes files, and reports findings.
+---
+
+`@terra-symposium/quality` coordinates source analysis and repository commands. It does not install your formatter, linter, type checker, test runner, or build tool. Your repository owns those tools and their native configuration.
+
+## Run lifecycle
+
+1. The CLI reads `quality.json`; paths resolve relative to that file or its explicit `root`.
+2. It finds files under `sourceRoots`, applying extensions and exclusions. Normal `quality` mode selects changed and untracked Git files; `--all` selects the full configured source set.
+3. Built-in AST checks inspect JavaScript and TypeScript. Configured tools and commands run as child processes when enabled.
+4. In fix mode, enabled transforms may write changes. `--warn` disables autofixes.
+
+## Defaults and limits
+
+- Checks are enabled unless `enabledChecks` sets them to `false`.
+- Autofixes are enabled unless `autofix` sets them to `false`; `--warn` disables fixes for one invocation.
+- Common generated directories such as `.git`, `node_modules`, `dist`, `build`, `coverage`, `.next`, and `.astro` are skipped by default.
+- Build and test commands are opt-in through `qualityCommands`.
+- Advisory `recommendationCommands` do not fail the run based on subprocess status.
+- Syntax and policy checks cannot prove runtime behavior, security, or whether a projection is intentional.
+
+The quality pipeline also performs structural cleanup such as inlining single-use declarations and collapsing supported inline conditionals and type/object layouts. These transformations are part of quality/format workflow rather than separately named quality checks; see the [single-use guide](/quality/checks/single-use/) and formatter behavior.
+
+See [checks](/quality/checks/document/) for individual behavior, [CLI commands](/quality/commands/) for modes, and [configuration](/quality/configuration/) for every field.

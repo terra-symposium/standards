@@ -1,0 +1,10 @@
+---
+title: Regex deduplication
+description: Detect duplicate regular-expression sources and consolidate supported literals.
+---
+
+**Toggle:** `enabledChecks.regex-dedup` plus `regexDedup` config · **Fix:** `autofix.regexDedup` · **Command:** `regex-dedup`
+
+Detects duplicate regex literals and supported constructor patterns. Safe fixes can extract file-local, non-stateful duplicates into `CONFIG` or `REGEX` constants. Set `sharedModule` to a repository-relative `.mjs` path to enable cross-file ESM factories, with a matching `.d.mts` declaration. Without it, fixes remain file-local.
+
+Configure `minimumCount`, `extensions`, and `ignoredFiles`. Stateful regex flags and incompatible CommonJS consumers remain advisory because sharing can change behavior.

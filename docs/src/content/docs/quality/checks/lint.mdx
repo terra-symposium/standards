@@ -1,0 +1,10 @@
+---
+title: Lint
+description: Invoke repository-configured ESLint on selected files.
+---
+
+**Toggle:** `enabledChecks.lint` · **Fix:** `autofix.lint`
+
+Invokes ESLint and propagates its exit status. Fix mode passes ESLint's fix option. The package coordinates ESLint; it does not define or install your lint rules.
+
+Set `tools.eslint` and optional `lintRoots`. Use native ESLint configuration for project-specific plugins and rules. Avoid broad automatic fixes for rules requiring product or security judgment.

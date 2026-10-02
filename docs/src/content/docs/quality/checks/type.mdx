@@ -1,0 +1,10 @@
+---
+title: Type
+description: Run selected-source or project-wide TypeScript checks.
+---
+
+**Toggle:** `enabledChecks.type` · **Fix:** none · **Command:** `types`
+
+Type checking can target selected source files or run the configured TypeScript project. Project checks can inspect files beyond the changed-file set.
+
+Configure `tools.tsc`, `tsconfig`, `typecheckRoots`, and `typecheckExtensions`. `typecheckCommand` can run a repository-owned executable and args. Types help make invalid states harder to represent but do not replace runtime validation at untrusted boundaries.

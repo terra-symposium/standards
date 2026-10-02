@@ -1,0 +1,10 @@
+---
+title: Single-use declarations
+description: Find declarations with one in-scope consumer and optionally inline them.
+---
+
+**Focused command:** `single-use` · **Fix:** included in the fixing quality pass
+
+Counts consumers in the configured analysis scope and handles types, interfaces, functions, and variables. The fixing run can inline declarations with exactly one in-scope consumer. Rewrites are syntax-checked before files are written; generated grouping comments and detached TSDoc are cleaned while declaration docs and meaningful inline comments are preserved.
+
+Set `singleUse.skippedDirectories` to exempt component or shared-code folders without disabling other quality checks. `--warn` checks without edits. One consumer in the analysis scope does not prove a declaration is conceptually private; review API and framework conventions.

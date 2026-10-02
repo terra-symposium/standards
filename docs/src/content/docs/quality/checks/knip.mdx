@@ -1,0 +1,10 @@
+---
+title: Knip
+description: Find unused files, exports, dependencies, and unreachable code with Knip.
+---
+
+**Toggle:** `enabledChecks.knip` · **Fix:** `autofix.knip` · **Command:** `knip`
+
+Invokes Knip for unused files, exports, dependencies, and reachability. A finding means Knip cannot reach an item from its configured entry points and project model. Dynamic imports, plugins, and framework conventions can make that model incomplete.
+
+Set `tools.knip` and use Knip's native config where needed. Disable or scope the check when entry-point metadata is incomplete; review deletion suggestions.

@@ -1,0 +1,10 @@
+---
+title: Security
+description: Portable checks for environment files, client secrets, imports, terms, and runtime boundaries.
+---
+
+**Toggle:** `enabledChecks.security` plus a `security` config object · **Fix:** none · **Command:** `security`
+
+Reports committed or root-level environment files, environment-file loaders, secret-shaped environment access in client roots, forbidden imports and terms, and process-environment access outside allowed runtime roots. Security findings fail the run.
+
+Configure `security.forbiddenTerms`, `security.forbiddenImports`, `security.clientRoots`, and `security.allowProcessEnvRoots`. Roots are repository paths. This is a portable guardrail, not proof that an application is secure.

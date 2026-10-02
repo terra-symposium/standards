@@ -1,0 +1,10 @@
+---
+title: UI patterns
+description: Report configured UI patterns that should use shared primitives.
+---
+
+**Toggle:** `enabledChecks.ui-patterns` plus `uiPatterns` config · **Fix:** none · **Command:** `ui-patterns`
+
+Searches configured extensions for forbidden UI pattern strings and reports matches. It does not rewrite components because selecting the right shared primitive is a design decision.
+
+Configure `uiPatterns.forbidden`, `extensions`, and `ignoredFiles`. Keep patterns specific enough to catch duplication without flagging intentional exceptions.

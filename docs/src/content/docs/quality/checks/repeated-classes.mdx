@@ -1,0 +1,10 @@
+---
+title: Repeated classes
+description: Detect and optionally extract repeated static class strings.
+---
+
+**Toggle:** `enabledChecks.repeated-classes` plus `repeatedClasses` config · **Fix:** `autofix.repeatedClasses` · **Command:** `repeated-classes`
+
+Counts repeated static class strings within configured extensions. The safe fix can extract repeated file-local literals into `CONFIG` or `CLASSES` constants. Dynamic class expressions and cross-file design decisions stay advisory.
+
+Configure `minimumCount`, `extensions`, and `ignoredDirectories`. When repetition indicates a shared UI primitive, move it into the appropriate component or design-system abstraction.

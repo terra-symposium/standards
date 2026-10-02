@@ -1,0 +1,53 @@
+---
+title: CLI commands and workflows
+description: Choose Terra Quality modes for local development, CI, and focused checks.
+---
+
+Run the executable installed with `@terra-symposium/quality`:
+
+```sh
+npx terra-quality [command] [options]
+```
+
+The runner reads `quality.json` from the current working directory. Run `terra-quality --help` for the CLI usage.
+
+## Quality mode
+
+```sh
+terra-quality
+terra-quality quality --all
+terra-quality quality --warn --all
+```
+
+Normal quality mode selects changed and untracked files in Git; `--all` scans every configured source file. Fix mode may apply safe configured transforms. `--warn` makes the run review-only. `--strict` makes naming errors fail. `--skip-commands` skips required commands, while `--skip-recommendations` skips advisory commands.
+
+## Focused commands
+
+| Command | Purpose |
+| --- | --- |
+| `document` | Check/maintain documentation structure. |
+| `format` | Format selected source files. |
+| `lint` | Invoke ESLint. |
+| `knip` | Check unused files, exports, dependencies, and reachability. |
+| `types` | Run the configured type boundary. |
+| `single-use` | Find or inline declarations with one in-scope consumer. |
+| `dead-code` | Inspect private unused function declarations. |
+| `security` | Check environment, client-boundary, import, and term policies. |
+| `repeated-classes` | Detect or safely extract repeated static class strings. |
+| `regex-dedup` | Detect or consolidate duplicate regex patterns. |
+| `ui-patterns` | Check configured UI pattern strings. |
+| `domain <name>` | Run a configured quality command by name. |
+
+## Suggested scripts
+
+```json
+{
+  "scripts": {
+    "quality": "terra-quality",
+    "quality:all": "terra-quality quality --all",
+    "quality:check": "terra-quality quality --all --warn"
+  }
+}
+```
+
+Use fix mode for local deterministic cleanup. In CI, `--all --warn` checks the full scope without editing files. Keep configured build and test commands enabled unless another workflow step runs them.

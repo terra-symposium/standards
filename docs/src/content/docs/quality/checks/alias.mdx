@@ -1,0 +1,10 @@
+---
+title: Alias
+description: Find unnecessary compatibility aliases and repair supported references.
+---
+
+**Toggle:** `enabledChecks.alias` · **Fix:** `autofix.alias`
+
+Reports compatibility aliases where the original identifier can be used directly. Supported fixes update references and imports while considering collisions and public contracts. Ambiguous cases remain findings.
+
+Use it to retire temporary internal indirection. Review exported names and compatibility guarantees before enabling export-affecting cleanup.

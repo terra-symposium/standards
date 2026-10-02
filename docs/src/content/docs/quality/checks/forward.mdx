@@ -1,0 +1,10 @@
+---
+title: Object forwarding
+description: Identify repeated property forwarding and distinguish it from intentional projections.
+---
+
+**Toggle:** `enabledChecks.forward` · **Fix:** `autofix.forward`
+
+Finds object literals forwarding at least three properties from one source, such as `userId: input.userId`. A safe fix removes exact redundant properties after an existing spread. Whole-object replacement and projections remain advisory.
+
+“Forwarding” is syntactic repetition, not proof two objects have the same contract. A “projection” intentionally selects a subset. Keep explicit projections at persistence, authorization, redaction, schema, versioning, and API boundaries. Common mutation names such as `insert`, `update`, `upsert`, `set`, and `assign` are ignored.

@@ -2,6 +2,16 @@
 
 Shared foundations for Terra Symposium repositories.
 
+## Documentation
+
+The Starlight documentation site lives in [`docs/`](docs/). It includes an external-consumer setup guide, a full `quality.json` reference, explanations of each quality check, CLI workflows, and package guides.
+
+```sh
+pnpm docs:dev
+pnpm docs:build
+pnpm docs:preview
+```
+
 ## Packages
 
 - `@terra-symposium/quality` — configurable AST checks, naming rules, maintenance orchestration, and repository quality CLI.
