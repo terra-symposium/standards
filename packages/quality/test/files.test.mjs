@@ -38,6 +38,16 @@ test('source discovery handles nested roots, include roots, exclusions, direct f
 	assert.deepEqual(srcFiles(createQualityCfg({ root, sourceRoots: [main], extensions: ['.ts'] })), [main]);
 	assert.deepEqual(srcFiles(createQualityCfg({ root, sourceRoots: ['does-not-exist'], extensions: ['.ts'] })), []);
 });
+test('excludeTests omits test and spec files from quality source discovery', () => {
+	const root = fixtureRoot('terra-quality-exclude-tests-');
+	const implementation = fixtureFile(root, 'src/feature.ts', 'export const feature = true;\n');
+	fixtureFile(root, 'src/feature.test.ts', 'export const testFeature = true;\n');
+	fixtureFile(root, 'src/feature.spec.tsx', 'export const specFeature = true;\n');
+	const withTests = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts', '.tsx'] });
+	const withoutTests = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts', '.tsx'], excludeTests: true });
+	assert.equal(srcFiles(withTests).length, 3);
+	assert.deepEqual(srcFiles(withoutTests), [implementation]);
+});
 test('working-tree discovery includes modified and untracked sources but excludes ignored files', () => {
 	const root = fixtureRoot('terra-quality-working-files-');
 	fixtureFile(root, '.gitignore', 'src/ignored.ts\n');

@@ -72,7 +72,9 @@ Omitted `enabledChecks` entries remain enabled. Omitted autofix entries remain e
 }
 ```
 
-These booleans are independent. `types` covers classes, enums, interfaces, and type aliases. `functions` covers named function declarations. `exportedFunctions` can cover exported named functions when `functions` is false. `noInlineFunctions` reports arrow functions and function expressions. The fixer can add blank scaffolding, not prose.
+These booleans are independent. `types` covers classes, enums, interfaces, and type aliases. `functions` covers named function declarations. `exportedFunctions` can cover exported named functions when `functions` is false. A required function must include a specific, substantive `@param` description for every parameter; absent tags, empty tags, and placeholder or generic text fail. The checker uses basic heuristics to catch boilerplate, so maintainers still need to review prose for accuracy. `noInlineFunctions` reports arrow functions and function expressions. The fixer can add blank scaffolding, not prose.
+
+Set `excludeTests` to `true` when a quality run should omit filenames ending in `.test.*` or `.spec.*`; test commands remain an independent choice under `qualityCommands`.
 
 ## Tools and type checks
 

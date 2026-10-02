@@ -14,6 +14,7 @@
     "externalPrefixes": { "type": "array", "items": { "type": "string" } },
     "skippedDirectories": { "type": "array", "items": { "type": "string" } },
     "skippedFiles": { "type": "array", "items": { "type": "string" } },
+    "excludeTests": { "type": "boolean", "description": "Exclude files ending in .test.* and .spec.* from configured quality source scans." },
     "singleUse": {
       "type": "object",
       "properties": { "skippedDirectories": { "type": "array", "items": { "type": "string" } } },
@@ -30,8 +31,8 @@
           "type": "object",
           "properties": {
             "types": { "type": "boolean" },
-            "functions": { "type": "boolean" },
-            "exportedFunctions": { "type": "boolean" },
+            "functions": { "type": "boolean", "description": "Require TSDoc for named functions, including substantive descriptions for every parameter." },
+            "exportedFunctions": { "type": "boolean", "description": "Require TSDoc for exported named functions, including substantive descriptions for every parameter." },
             "noInlineFunctions": { "type": "boolean" }
           },
           "additionalProperties": false

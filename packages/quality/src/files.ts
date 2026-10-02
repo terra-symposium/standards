@@ -37,7 +37,7 @@ HELPERS
  * @return Sorted absolute paths for files that belong to the configured source scope.
  */
 export function srcFiles(cfg: QualityCfg): string[] {
-	const cacheKey = JSON.stringify([cfg.root, cfg.sourceRoots, cfg.includeRoots ?? [], cfg.extensions, cfg.skippedDirectories ?? [], cfg.skippedFiles ?? []]);
+	const cacheKey = JSON.stringify([cfg.root, cfg.sourceRoots, cfg.includeRoots ?? [], cfg.extensions, cfg.skippedDirectories ?? [], cfg.skippedFiles ?? [], cfg.excludeTests ?? false]);
 	const cached = fileCache.get(cacheKey);
 	// Quality stages can rename or generate source files. Do not reuse a stale
 	// inventory after a discovered path disappears (for example, naming moves a
@@ -47,11 +47,12 @@ export function srcFiles(cfg: QualityCfg): string[] {
 	const roots = [...cfg.sourceRoots, ...(cfg.includeRoots ?? [])];
 	const exts = new Set(cfg.extensions);
 	const skipped = new Set(cfg.skippedDirectories ?? []);
+	const testFile = (file: string): boolean => cfg.excludeTests === true && /(?:^|\.)(?:test|spec)\.[^/]+$/u.test(file.replace(/\\/g, '/'));
 	const files: string[] = [];
 	const walk = (dir: string): void => {
 		if (!existsSync(dir)) return;
 		if (statSync(dir).isFile()) {
-			if (exts.has(dir.slice(dir.lastIndexOf('.'))) && !cfg.skippedFiles?.includes(dir)) files.push(dir);
+			if (exts.has(dir.slice(dir.lastIndexOf('.'))) && !cfg.skippedFiles?.includes(dir) && !testFile(dir)) files.push(dir);
 			return;
 		}
 		for (const e of readdirSync(dir, { withFileTypes: true })) {
@@ -59,7 +60,8 @@ export function srcFiles(cfg: QualityCfg): string[] {
 				if (!skipped.has(e.name)) walk(join(dir, e.name));
 				continue;
 			}
-			if (exts.has(e.name.slice(e.name.lastIndexOf('.'))) && !cfg.skippedFiles?.includes(join(dir, e.name))) files.push(join(dir, e.name));
+			const file = join(dir, e.name);
+			if (exts.has(e.name.slice(e.name.lastIndexOf('.'))) && !cfg.skippedFiles?.includes(file) && !testFile(file)) files.push(file);
 		}
 	};
 	for (const root of roots) walk(root);

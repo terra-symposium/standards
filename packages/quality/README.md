@@ -85,7 +85,7 @@ Every check below uses the same description format: what it does, its terminolog
 { "documentation": { "required": { "types": true, "functions": true, "exportedFunctions": true, "noInlineFunctions": false } } }
 ```
 
-Each rule is independent. `functions` covers all named functions. `exportedFunctions` can cover only exported functions when `functions` is false. `noInlineFunctions` reports inline functions and asks for named declarations; it has no safe autofix. `autofix.document` controls document edits. `maintain` remains a compatibility alias for `document`.
+Each rule is independent. `functions` covers all named functions. `exportedFunctions` can cover only exported functions when `functions` is false. A required function's TSDoc must describe every parameter with specific prose; missing tags and empty, placeholder, or generic descriptions fail the check. `noInlineFunctions` reports inline functions and asks for named declarations; it has no safe autofix. `autofix.document` controls document edits. `maintain` remains a compatibility alias for `document`.
 
 - **Ideology:** Documentation should describe stable public intent and current signatures, not invent prose. Generated tags are a useful baseline; humans should replace placeholders at public boundaries.
 

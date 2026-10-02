@@ -79,6 +79,38 @@ export function useDashboardConfigurationDialog(initialConfigure: string | undef
 		],
 	);
 });
+test('required function parameters need substantive TSDoc descriptions', () => {
+	const root = fixtureRoot('terra-quality-required-param-descriptions-');
+	fixtureFile(
+		root,
+		'src/main.ts',
+		`/** Checks a function with no parameter tag. */
+export function missing(value: string) { return value; }
+/** Checks an empty parameter tag.
+ * @param value
+ */
+export function empty(value: string) { return value; }
+/** Checks placeholder parameter prose.
+ * @param value TODO: add a description.
+ */
+export function placeholder(value: string) { return value; }
+/** Checks a useful parameter description.
+ * @param value Text entered by the user before the form is submitted.
+ */
+export function valid(value: string) { return value; }
+`,
+	);
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], documentation: { required: { exportedFunctions: true } } });
+	const findings = documentationFindings(cfg).filter((f) => f.severity === 'error' && f.kind === 'param');
+	assert.deepEqual(
+		findings.map(({ file: f, name: n, reason: r }) => [f, n, r]),
+		[
+			['src/main.ts', '@param value', 'document the value parameter with a substantive description'],
+			['src/main.ts', '@param value', 'add a substantive description for the value parameter'],
+			['src/main.ts', '@param value', 'add a substantive description for the value parameter'],
+		],
+	);
+});
 test('documentation findings recognize the props scaffold for destructured parameters', () => {
 	const root = fixtureRoot('terra-quality-destructured-function-doc-');
 	fixtureFile(

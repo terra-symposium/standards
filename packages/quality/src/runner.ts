@@ -79,6 +79,7 @@ export type QualityCfg = {
 	externalPrefixes?: string[];
 	skippedDirectories?: string[];
 	skippedFiles?: string[];
+	excludeTests?: boolean;
 	singleUse?: { skippedDirectories?: string[] };
 	protectedIdentifiers?: string[];
 	renameExports?: boolean;

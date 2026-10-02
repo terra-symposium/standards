@@ -5,7 +5,7 @@ description: Source headers, declaration documentation, section layout, and whit
 
 **Toggle:** `enabledChecks.document` · **Fix:** `autofix.document` · **Command:** `document`
 
-Maintains source headers, import grouping, section layout, whitespace, and TSDoc shape. It can scaffold minimal TSDoc tags to satisfy a configured documentation policy, but does not invent prose.
+Maintains source headers, import grouping, section layout, whitespace, and TSDoc shape. It can scaffold minimal TSDoc tags to satisfy a configured documentation policy, but does not invent prose. When function documentation is required, each `@param` tag must include a specific description; missing, empty, placeholder, and generic descriptions fail.
 
 ```json
 {
@@ -17,7 +17,7 @@ Maintains source headers, import grouping, section layout, whitespace, and TSDoc
 
 “Types” means classes, enums, interfaces, and type aliases. “Functions” means named function declarations. `exportedFunctions` can require only exported named functions when `functions` is false. `noInlineFunctions` reports arrow functions and function expressions and has no safe autofix. `maintain` remains a compatibility alias for `document`.
 
-Generated placeholders are scaffolding. Replace them with descriptions of stable public intent and current signatures.
+Generated placeholders are scaffolding. Replace them with descriptions of stable public intent, current signatures, and what each parameter represents. The description check uses heuristics for empty and boilerplate text and cannot judge whether prose accurately describes program behavior.
 
 **Before** — the public function has no meaningful summary:
 

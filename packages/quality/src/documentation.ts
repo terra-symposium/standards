@@ -15,6 +15,10 @@ import { readFileSync, renameSync, unlinkSync, writeFileSync } from 'node:fs';
 
 // TYPES
 import type { QualityAnalysis, QualityCfg } from './runner.js';
+/*//////////////////////////////////////////////////
+REGEX
+//////////////////////////////////////////////////*/
+const S_G_REGEX = () => /\s+/g;
 
 /*//////////////////////////////////////////////////
 REGEX
@@ -935,6 +939,28 @@ function tagDescription(tag: string, content: string): string {
 }
 
 /**
+ * Rejects parameter text that is empty, placeholder prose, or too generic to explain the argument.
+ *
+ * @param description Prose following the parameter name in a TSDoc tag.
+ *
+ * @return `true` when the text gives a specific, non-placeholder description.
+ */
+function hasSubstantiveParamDescription(description: string): boolean {
+	const norm = description
+		.trim()
+		.replace(/[.!?]+$/, '')
+		.replace(S_G_REGEX(), ' ');
+	if (
+		!norm ||
+		/^(?:todo|tbd|fixme|placeholder)\b/i.test(norm) ||
+		/^(?:description|param(?:eter)?|the param(?:eter)?|value|the value|input|input value|the input|argument|the argument)[.!?]*$/i.test(norm)
+	)
+		return false;
+	const words = norm.match(/[\p{L}\p{N}_-]+/gu) ?? [];
+	return words.length >= 3 && norm.length >= 12;
+}
+
+/**
  * Parses TSDoc tags and joins continuation lines with their leading tag line.
  *
  * @param lines Normalized TSDoc content lines.
@@ -969,7 +995,7 @@ function tsdocTagEntries(lines: TSDocLine[]): { tag: string; subject: string; de
  * @return `true` when callers can receive a value rather than only completion.
  */
 function returnsVal(node: ts.FunctionDeclaration): boolean {
-	const returnType = node.type?.getText().replace(/\s+/g, '') ?? '';
+	const returnType = node.type?.getText().replace(S_G_REGEX(), '') ?? '';
 	if (returnType === 'void' || returnType === 'Promise<void>') return false;
 	if (node.type) return true;
 	let valReturn = false;
@@ -1093,10 +1119,13 @@ function documentationFindingsForFile(cfg: QualityCfg, file: string, requirement
 					const block = documentationBlockFor(src, node);
 					if (block) {
 						const entries = tsdocTagEntries(tsdocLines(block));
-						const documentedParams = new Set(entries.filter((e) => e.tag.toLowerCase() === 'param').map((e) => e.subject));
+						const documentedParams = entries.filter((e) => e.tag.toLowerCase() === 'param');
 						for (const [idx, param] of node.parameters.entries()) {
 							const name = fnParamName(param, idx);
-							if (!documentedParams.has(name)) findings.push(documentationReport(file, parsed, node, `@param ${name}`, 'param', `document the ${name} parameter`, cfg));
+							const entry = documentedParams.find((c) => c.subject === name);
+							if (!entry) findings.push(documentationReport(file, parsed, node, `@param ${name}`, 'param', `document the ${name} parameter with a substantive description`, cfg));
+							else if (!hasSubstantiveParamDescription(entry.description))
+								findings.push(documentationReport(file, parsed, node, `@param ${name}`, 'param', `add a substantive description for the ${name} parameter`, cfg));
 						}
 						const hasReturnTag = entries.some((e) => ['return', 'returns'].includes(e.tag.toLowerCase()));
 						if (returnsVal(node) && !hasReturnTag) findings.push(documentationReport(file, parsed, node, '@return', 'return', 'document the value returned by this function', cfg));
