@@ -21,6 +21,7 @@ CONFIG
 //////////////////////////////////////////////////*/
 
 const MODULE_EXTS = ['', '.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs', '.mts', '.cts', '.astro', '.mdx', '.json', '.css', '.scss', '.svg', '.png', '.jpg', '.jpeg', '.webp'];
+/** Describes an import that cannot be resolved within the repository. */
 export type ImportFailure = { importer: string; specifier: string };
 
 /*//////////////////////////////////////////////////

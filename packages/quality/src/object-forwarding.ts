@@ -20,7 +20,11 @@ import type { QualityAnalysis, QualityCfg } from './runner.js';
 TYPES
 //////////////////////////////////////////////////*/
 
+/** Identifies destructured objects that can be forwarded more directly. */
 export type ObjectForwardingFinding = { file: string; line: number; column: number; callee: string; source: string; properties: string[]; recommendation: string };
+/**
+ * Counts successful automatic rewrites and cases that require manual review.
+ */
 export type ObjectForwardingFixResult = { fixed: number; skipped: number };
 
 /*//////////////////////////////////////////////////

@@ -89,6 +89,7 @@ export type ReportingOptions = {
 	reportFile?: string;
 	slideshowFile?: string;
 };
+/** Playwright attachment metadata consumed by the shared visual reporter. */
 type ReporterAttachment = { body?: Buffer; contentType?: string; name?: string; path?: string };
 
 /*//////////////////////////////////////////////////

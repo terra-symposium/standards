@@ -39,6 +39,7 @@ type Presentation = {
 	writeFile: (options: { fileName: string }) => Promise<string>;
 };
 const COLOURS = { accent: '1F4E78', ink: '16202A', line: 'D8DEE6', muted: '52606D', surface: 'F5F7FA' };
+/** Screenshot dimensions and review cues derived from a visual test result. */
 type ImgReview = { cues: string[]; height: number; width: number };
 /**
  * Derives visual-review prompts from screenshot dimensions and test diagnostics.

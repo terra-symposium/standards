@@ -21,6 +21,7 @@ REGEX
 //////////////////////////////////////////////////*/
 
 const ENV_REGEX = /(^|\/)\.env(?:\.|$)/;
+/** A security audit result with an optional affected path. */
 export type SecurityFinding = { file?: string; message: string };
 
 /*//////////////////////////////////////////////////

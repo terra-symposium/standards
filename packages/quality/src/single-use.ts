@@ -9,15 +9,17 @@ IMPORTS
 
 // API
 import ts from 'typescript';
-import { relative, sep } from 'node:path';
 import { readFileSync, writeFileSync } from 'node:fs';
+import { relative, sep } from 'node:path';
 import { srcFiles } from './files.js';
 
 // TYPES
 import type { QualityCfg } from './runner.js';
+
 /*//////////////////////////////////////////////////
 REGEX
 //////////////////////////////////////////////////*/
+
 const S_REGEX = /^\s*$/;
 
 /*//////////////////////////////////////////////////
@@ -25,8 +27,11 @@ REGEX
 //////////////////////////////////////////////////*/
 
 const C_M_JS_JSX_TS_TSX_REGEX = /\.(?:c|m)?(?:js|jsx|ts|tsx)$/;
+/** Findings describing whether a single-use declaration is safe to inline. */
 export type SingleUseFinding = { file: string; line: number; name: string; decision: 'INLINE' | 'KEEP' | 'REVIEW'; reason: string };
+/** Parsed declaration and binding details required to evaluate one inlining candidate. */
 type Candidate = { file: string; source: ts.SourceFile; statement: ts.Statement; name: ts.Identifier; symbol: ts.Symbol; kind: 'type' | 'interface' | 'variable' | 'function' };
+/** One resolved reference to a declaration candidate. */
 type Reference = { file: string; source: ts.SourceFile; node: ts.Identifier };
 const canonical = (c: ts.TypeChecker, s: ts.Symbol | undefined): ts.Symbol | undefined => (s && s.flags & ts.SymbolFlags.Alias ? c.getAliasedSymbol(s) : s);
 const isCandidateStatement = (s: ts.Statement): boolean => {
@@ -238,7 +243,15 @@ function hasExportSpecifier(candidate: Candidate, checker: ts.TypeChecker): bool
 	);
 }
 
-/** Keeps exported bindings that are imported from Astro frontmatter outside the TypeScript program. */
+/**
+ * Keeps exported bindings that are imported from Astro frontmatter outside the TypeScript program.
+ *
+ * @param candidate Declaration candidate whose consumers should be checked.
+ * @param cfg Quality configuration containing source paths and repository boundaries.
+ * @param program TypeScript program used to resolve references outside source files.
+ *
+ * @return `true` when Astro frontmatter can consume the candidate outside the program.
+ */
 function hasAstroConsumer(candidate: Candidate, cfg: QualityCfg, program: ts.Program): boolean {
 	if (!ts.canHaveModifiers(candidate.statement) || !ts.getModifiers(candidate.statement)?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword)) return false;
 	return srcFiles(cfg)
@@ -257,7 +270,14 @@ function hasAstroConsumer(candidate: Candidate, cfg: QualityCfg, program: ts.Pro
 		});
 }
 
-/** Keeps imported type names in scope when an inline would discard their annotation. */
+/**
+ * Keeps imported type names in scope when an inline would discard their annotation.
+ *
+ * @param candidate Declaration candidate that may contain referenced imported types.
+ * @param checker Type checker used to resolve candidate type annotations.
+ *
+ * @return `true` when inlining would preserve imported type names in scope.
+ */
 function hasImportedTypeAnnotation(candidate: Candidate, checker: ts.TypeChecker): boolean {
 	if (candidate.kind !== 'variable' || !ts.isVariableStatement(candidate.statement)) return false;
 	return candidate.statement.declarationList.declarations.some((d) => {
@@ -319,7 +339,13 @@ function containsExplicitAny(candidate: Candidate): boolean {
 	return found;
 }
 
-/** Rejects initializers whose await would be moved into an unrelated callback. */
+/**
+ * Rejects initializers whose await would be moved into an unrelated callback.
+ *
+ * @param candidate Declaration candidate whose initializer should be inspected.
+ *
+ * @return `true` when the initializer contains an `await` expression.
+ */
 function containsAwait(candidate: Candidate): boolean {
 	if (!ts.isVariableStatement(candidate.statement)) return false;
 	let found = false;
@@ -379,7 +405,11 @@ function isWriteReference(reference: Reference): boolean {
 function isExportSpecifierReference(reference: Reference): boolean {
 	return ts.isExportSpecifier(reference.node.parent);
 }
-
+/** Checks whether a candidate callable has TSDoc that inlining must preserve.
+ * @param candidate Candidate declaration whose leading comments should be inspected.
+ *
+ * @return `true` when the callable has an attached documentation comment.
+ */
 function isDocumentedCallable(candidate: Candidate): boolean {
 	if (!ts.isVariableStatement(candidate.statement)) return ts.isFunctionDeclaration(candidate.statement) && ts.getJSDocCommentsAndTags(candidate.statement).length > 0;
 	const init = candidate.statement.declarationList.declarations[0]?.initializer;
@@ -462,6 +492,7 @@ function fnType(statement: ts.FunctionDeclaration): string {
  * @param ref Single JSX component reference.
  * @param replacement Inline function or component expression.
  * @param reactName Local import alias for React's createElement function.
+ * @param componentType Component type text used to construct the JSX opening tag.
  *
  * @return JSX replacement edit, or `null` when the reference is not a JSX tag.
  */
@@ -486,6 +517,7 @@ function jsxInlineEdit(ref: Reference, replacement: string, reactName: string, c
 /**
  * Expands a property or namespace access when the declaration is its right-hand identifier.
  *
+ * @param node Identifier node whose property or namespace access should be expanded.
  * @param n Identifier reference to expand.
  *
  * @return Largest qualified/property access expression containing the identifier.
@@ -547,6 +579,7 @@ function fnExpr(statement: ts.FunctionDeclaration): string | null {
  *
  * @param c Candidate selected for inlining.
  * @param ref Single consumer location.
+ * @param checker Type checker used to resolve symbols and preserve type correctness.
  *
  * @return Inline source text, or `null` when the declaration has no replacement.
  */
@@ -602,7 +635,11 @@ function reactImportPos(src: ts.SourceFile): number {
 	if (imports.length) return imports[imports.length - 1]!.end;
 	return src.statements[0]?.getStart(src) ?? 0;
 }
-
+/** Finds the source comments attached to a declaration candidate.
+ * @param c Candidate declaration whose comment ranges should be returned.
+ *
+ * @return Attached comments with their source offsets and original text.
+ */
 function attachedComments(c: Candidate): { start: number; end: number; text: string }[] {
 	const start = c.statement.getFullStart();
 	const end = c.statement.getStart(c.source);
@@ -615,7 +652,11 @@ function attachedComments(c: Candidate): { start: number; end: number; text: str
 		})
 		.map((r) => ({ start: r.pos, end: r.end, text: c.source.text.slice(r.pos, r.end) }));
 }
-
+/** Finds comments that would be lost if a candidate declaration were removed.
+ * @param c Candidate declaration whose comments need to be preserved.
+ *
+ * @return Comment text that cannot safely be discarded during inlining.
+ */
 function discardedDeclarationComments(c: Candidate): string[] {
 	if (!ts.isVariableStatement(c.statement)) return [];
 	const declaration = c.statement.declarationList.declarations[0];
@@ -634,6 +675,7 @@ function discardedDeclarationComments(c: Candidate): string[] {
  * Inlines every single-use declaration and validates each rewritten source file.
  *
  * @param cfg Quality configuration defining the source scope and files to rewrite.
+ * @param changedFiles Changed source paths that constrain the inlining analysis.
  *
  * @return Number of files containing edits, including declaration and consumer files.
  */
@@ -742,6 +784,7 @@ function fixSingleUsePass(cfg: QualityCfg, changedFiles: Set<string>): number {
  * Repeats single-use inlining until nested edits have been applied in separate valid passes.
  *
  * @param cfg Quality configuration defining the source scope and files to rewrite.
+ * @param changedFileNames Changed filenames used to constrain the analysis and edits.
  *
  * @return Number of files changed across all passes.
  */

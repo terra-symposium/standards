@@ -32,9 +32,11 @@ import { PROTECTED_IDENTIFIERS } from './naming.js';
 
 // TYPES
 import type { DocumentationRequirements } from './documentation.js';
+
 /*//////////////////////////////////////////////////
 REGEX
 //////////////////////////////////////////////////*/
+
 const CJS_JS_JSX_MJS_TS_TSX_REGEX = /\.(?:cjs|js|jsx|mjs|ts|tsx)$/;
 const G_REGEX = () => /-/g;
 const G_CLASS_2 = () => /[.*+?^${}()|[\]\\]/g;
@@ -46,6 +48,7 @@ REGEX
 
 const C_M_JS_TS_X_REGEX = /\.(?:c|m)?(?:js|ts)x?$/;
 const C_M_JS_TS_X_CLASS_2 = /\.(?:(?:c|m)?(?:js|ts)x?)$/;
+/** Regular expressions used to classify supported JavaScript and TypeScript source files. */
 export type QualityCheckName =
 	| 'document'
 	| 'format'
@@ -64,7 +67,9 @@ export type QualityCheckName =
 	| 'repeated-classes'
 	| 'regex-dedup'
 	| 'ui-patterns';
+/** Check identifiers accepted by the shared quality runner. */
 export type QualityAutofixName = 'document' | 'format' | 'name' | 'lint' | 'knip' | 'alias' | 'forward' | 'repeatedClasses' | 'regexDedup';
+/** Autofix stages exposed by the shared quality runner. */
 export type QualityCfg = {
 	root: string;
 	sourceRoots: string[];
@@ -98,8 +103,13 @@ export type QualityCfg = {
 	typecheckCommand?: { command: string; args?: string[] };
 	tools?: { prettier?: string; tsc?: string; eslint?: string; knip?: string };
 };
+/** Shared source files, text, parsed syntax trees, and type information for one run. */
 export type QualityAnalysis = { files: string[]; texts: Map<string, string>; sources: Map<string, ts.SourceFile>; program: ts.Program; checker: ts.TypeChecker };
+/**
+ * Options that control quality scope, autofixes, and optional check stages.
+ */
 export type QualityOptions = { fix: boolean; all: boolean; strict: boolean; skipCommands?: boolean; skipRecommendations?: boolean };
+/** Finding shape accepted by the shared console reporting helpers. */
 type GenericFinding =
 	{ file?: string; message: string } | { value: string; count: number; locations: string[] } | { source: string; count: number; locations: string[] } | { file: string; pattern: string };
 const ANSI_ESCAPE = new RegExp(`${String.fromCharCode(27)}\\[[0-?]*[ -/]*[@-~]`, 'g');
@@ -322,6 +332,7 @@ function printChildOutput(val: string | Buffer | null | undefined): void {
  * @param cfg Quality configuration defining the subprocess working directory.
  * @param cmd Executable path or command name.
  * @param args Arguments passed to the executable.
+ * @param opts Execution settings controlling environment inheritance and output handling.
  *
  * @return Child-process exit status, or `1` when spawning fails without a status.
  */
@@ -339,6 +350,7 @@ function run(cfg: QualityCfg, cmd: string, args: string[], opts: { quietSuccess?
  * Captures source text so automatic tools can report changed-file counts without
  * replaying their successful per-file output.
  *
+ * @param cfg Normalized quality configuration used to identify repository paths.
  * @param files Files modified by the automatic tool.
  *
  * @return Text snapshots keyed by absolute filename.
@@ -350,6 +362,7 @@ function snapshotFiles(cfg: QualityCfg, files: string[]): Map<string, string> {
 /**
  * Counts files whose contents differ from a prior snapshot.
  *
+ * @param cfg Normalized quality configuration used to identify repository paths.
  * @param files Files to compare.
  * @param before Initial file contents.
  *
@@ -501,10 +514,17 @@ function fixUnusedFns(cfg: QualityCfg, all: boolean): number {
 	}
 	return fixed;
 }
-
+/** Removes private function declarations that ESLint proves have no references. */
 type UnusedFnFinding = { file: string; line: number; name: string };
 
-/** Reports private function declarations that ESLint proves have no references. */
+/**
+ * Reports private function declarations that ESLint proves have no references.
+ *
+ * @param cfg Quality configuration defining repository paths and source roots.
+ * @param all Whether to inspect all configured files instead of changed files.
+ *
+ * @return Findings for private function declarations with no references.
+ */
 function unusedFnFindings(cfg: QualityCfg, all: boolean): UnusedFnFinding[] {
 	const files = filesFor(cfg, all).filter((f) => CJS_JS_JSX_MJS_TS_TSX_REGEX.test(f));
 	const findings: UnusedFnFinding[] = [];

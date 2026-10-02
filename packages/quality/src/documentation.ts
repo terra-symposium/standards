@@ -15,9 +15,11 @@ import { readFileSync, renameSync, unlinkSync, writeFileSync } from 'node:fs';
 
 // TYPES
 import type { QualityAnalysis, QualityCfg } from './runner.js';
+
 /*//////////////////////////////////////////////////
 REGEX
 //////////////////////////////////////////////////*/
+
 const R_N_REGEX = /\r?\n/;
 const S_S_G_REGEX = () => /\/\*\*[\s\S]*?\*\//g;
 
@@ -39,14 +41,20 @@ const S_CLASS_5 = /^\{[^}]+\}\s*/;
 const OPEN = `/*${'/'.repeat(50)}`;
 const CLOSE = `${'/'.repeat(50)}*/`;
 const SUPPORTED = new Set(['.cjs', '.cts', '.js', '.jsx', '.mjs', '.mts', '.ts', '.tsx']);
+/** Import categories used to keep generated source imports predictable. */
 type ImportGroup = 'API' | 'COMPONENTS' | 'DATA' | 'TYPES';
+/**
+ * Source section labels used when arranging configuration and helper declarations.
+ */
 type SrcGroup = 'CONFIG' | 'HELPERS';
+/** Controls which declaration and parameter documentation the checker requires. */
 export type DocumentationRequirements = { types?: boolean; functions?: boolean; exportedFunctions?: boolean; noInlineFunctions?: boolean };
 
 /*//////////////////////////////////////////////////
 DOCUMENTATION
 //////////////////////////////////////////////////*/
 
+/** A documentation audit result with a precise source location and severity. */
 export type DocumentationFinding = {
 	file: string;
 	line: number;
@@ -57,7 +65,11 @@ export type DocumentationFinding = {
 	severity: 'warning' | 'error';
 };
 export const DOCUMENTATION_DESCRIPTION_NOTICE = 'Ask an agent for meaningful documentation prose; this check only reports missing descriptions and never generates them in bulk.';
+/** Source offsets and text for one parsed TSDoc block. */
 type TSDocBlock = { start: number; end: number; text: string };
+/**
+ * Source offset and normalized text for one line inside a TSDoc block.
+ */
 type TSDocLine = { offset: number; text: string };
 const DESCRIPTION_OPTIONAL_TAGS = new Set(['abstract', 'const', 'default', 'event', 'hideconstructor', 'internal', 'package', 'private', 'protected', 'public', 'readonly', 'sealed', 'virtual']);
 
@@ -71,6 +83,7 @@ HELPERS
  *
  * @param fileName Source file to replace.
  * @param src Candidate source text to validate and write.
+ *
  * @return Nothing; throws before replacing the source when parsing fails.
  */
 function writeValidatedSrc(fileName: string, src: string): boolean {
@@ -231,6 +244,7 @@ function importGroup(name: string): ImportGroup {
  */
 function groupedImports(parsed: ts.SourceFile, imports: ts.ImportDeclaration[]): Record<ImportGroup, { source: string; text: string }[]> {
 	const groups: Record<ImportGroup, { source: string; text: string }[]> = { API: [], COMPONENTS: [], DATA: [], TYPES: [] };
+	/** Import statement metadata after merging compatible declarations. */
 	type MergedImport = { group: ImportGroup; source: string; module: string; typeOnly: boolean; defaultName?: string; namespace?: string; named: Set<string> };
 	const merged = new Map<string, MergedImport>();
 	const get = (group: ImportGroup, n: ts.ImportDeclaration, typeOnly: boolean) => {
@@ -445,6 +459,8 @@ function removeManagedSects(src: string, fileName: string): string {
 /**
  * Rebuilds a function's TSDoc layout while preserving existing summary and tag prose.
  *
+ * @param p Parameter declaration whose source-level name should be retained.
+ * @param i Zero-based position used to name destructured or unnamed parameters.
  * @param n Function declaration whose current parameter list controls required parameter tags.
  * @param parsed Source file containing the declaration.
  * @param eol Line-ending sequence to emit.
@@ -455,7 +471,14 @@ function removeManagedSects(src: string, fileName: string): string {
 function fnParamName(p: ts.ParameterDeclaration, i: number): string {
 	return ts.isIdentifier(p.name) ? p.name.text : ts.isObjectBindingPattern(p.name) ? 'props' : `param${i + 1}`;
 }
-
+/** Builds a normalized TSDoc block while preserving prose already written by an author.
+ * @param n Function declaration whose parameters and return type determine required tags.
+ * @param parsed Parsed source file used to inspect the function's syntax.
+ * @param eol Line ending used when rendering the replacement comment.
+ * @param existing Existing TSDoc block whose summaries and tag descriptions must be retained.
+ *
+ * @return Normalized TSDoc text with existing author prose preserved.
+ */
 function genFnDoc(n: ts.FunctionDeclaration, parsed: ts.SourceFile, eol: string, existing = ''): string {
 	const params = n.parameters.map(fnParamName);
 	const body = existing
@@ -501,7 +524,15 @@ function genFnDoc(n: ts.FunctionDeclaration, parsed: ts.SourceFile, eol: string,
 	return existing === norm ? existing : norm;
 }
 
-/** Adds missing parameter and return tags to existing function TSDoc without inventing prose. */
+/**
+ * Adds missing parameter and return tags to existing function TSDoc without inventing prose.
+ *
+ * @param src Source text containing function declarations and their TSDoc blocks.
+ * @param fileName Source path used to select the TypeScript parser mode.
+ * @param eol Line ending to use for rewritten documentation blocks.
+ *
+ * @return Source text with parameter and return tags added to documented functions.
+ */
 function maintainFnDocs(src: string, fileName: string, eol: string): string {
 	const parsed = ts.createSourceFile(fileName, src, ts.ScriptTarget.Latest, true, srcKind(fileName));
 	const updates: { start: number; end: number; text: string }[] = [];
@@ -646,7 +677,13 @@ export function maintainSrcFile(root: string, fileName: string): boolean {
 	return writeValidatedSrc(fileName, n);
 }
 
-/** Removes generated section scaffolding and empty or detached TSDoc after source edits. */
+/**
+ * Removes generated section scaffolding and empty or detached TSDoc after source edits.
+ *
+ * @param fileName Absolute path of the source file to clean after edits.
+ *
+ * @return `true` when comments were removed and the updated file was written.
+ */
 export function removeNonCodeComments(fileName: string): boolean {
 	if (!SUPPORTED.has(extname(fileName))) return false;
 	const src = readFileSync(fileName, 'utf8');
@@ -928,6 +965,7 @@ function tsdocTagEntries(lines: TSDocLine[]): { tag: string; subject: string; de
  * Determines whether a function exposes a value through its return type or body.
  *
  * @param node Function declaration whose return contract is being checked.
+ *
  * @return `true` when callers can receive a value rather than only completion.
  */
 function returnsVal(node: ts.FunctionDeclaration): boolean {
@@ -949,6 +987,7 @@ function returnsVal(node: ts.FunctionDeclaration): boolean {
  *
  * @param src Source text containing the declaration and its comments.
  * @param node Declaration whose leading documentation is required.
+ *
  * @return The attached TSDoc block, or `undefined` when the declaration is undocumented.
  */
 function documentationBlockFor(src: string, node: ts.Node): TSDocBlock | undefined {
@@ -1049,9 +1088,8 @@ function documentationFindingsForFile(cfg: QualityCfg, file: string, requirement
 		if (ts.isFunctionDeclaration(node)) {
 			const needsDoc = requirements.functions || (requirements.exportedFunctions && exported(node));
 			if (needsDoc) {
-				if (!documented(node, src)) {
-					findings.push(documentationReport(file, parsed, node, documentationNodeName(node), 'function', 'add TSDoc for this function', cfg));
-				} else {
+				if (!documented(node, src)) findings.push(documentationReport(file, parsed, node, documentationNodeName(node), 'function', 'add TSDoc for this function', cfg));
+				else {
 					const block = documentationBlockFor(src, node);
 					if (block) {
 						const entries = tsdocTagEntries(tsdocLines(block));
