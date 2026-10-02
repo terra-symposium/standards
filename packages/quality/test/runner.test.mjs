@@ -108,6 +108,20 @@ test('createQualityCfg applies defaults and resolves every repository-relative p
 	])
 		assert.ok(cfg.skippedDirectories.includes(dir), dir);
 });
+test('CLI help exits before default quality dispatch or any configured autofix can run', () => {
+	const root = fixtureRoot('terra-quality-cli-help-');
+	const source = 'const value = true;\nvoid value;\n';
+	fixtureFile(root, 'src/main.ts', source);
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
+
+	resetExitCode();
+	runQualityCli(cfg, ['--help']);
+	assert.equal(fixtureText(root, 'src/main.ts'), source);
+	runQualityCli(cfg, ['quality', '--help']);
+	assert.equal(fixtureText(root, 'src/main.ts'), source);
+	assert.equal(process.exitCode, 0);
+	resetExitCode();
+});
 test('loadQualityCfg resolves a quality file root relative to the configuration file', () => {
 	const root = fixtureRoot('terra-quality-load-config-');
 	const cfgDir = join(root, 'config');
@@ -232,6 +246,56 @@ test('runQuality honors disabled findings categories without leaking a failure s
 	assert.deepEqual(result.forwarding, []);
 	assert.deepEqual(result.documentation, []);
 	assert.equal(process.exitCode, 0);
+});
+test('quality autofix fills missing TSDoc tags then reports blank prose for agent assistance', () => {
+	const root = fixtureRoot('terra-quality-tsdoc-quality-run-');
+	fixtureFile(
+		root,
+		'src/main.ts',
+		`import type { DashboardConfigure } from './types.js';
+/** Keeps Dialog state local while accepting legacy dashboard URLs as one-time open requests. */
+export function useDashboardConfigurationDialog(initialConfigure: DashboardConfigure | undefined, allowed: readonly DashboardConfigure[]) {
+	return { configure: initialConfigure, allowed };
+}
+`,
+	);
+	fixtureFile(root, 'src/unrelated.ts', 'function privateHelper() { return true; }\n');
+	const cfg = createQualityCfg({
+		root,
+		sourceRoots: ['src'],
+		extensions: ['.ts'],
+		documentation: { required: { exportedFunctions: true } },
+		enabledChecks: {
+			import: false,
+			name: false,
+			alias: false,
+			forward: false,
+			lint: false,
+			knip: false,
+			format: false,
+			type: false,
+			command: false,
+			recommend: false,
+			diff: false,
+			security: false,
+			'repeated-classes': false,
+			'regex-dedup': false,
+			'ui-patterns': false,
+		},
+	});
+	resetExitCode();
+	runQualityCli(cfg, ['quality', '--all', '--skip-commands', '--skip-recommendations']);
+	const src = fixtureText(root, 'src/main.ts');
+	assert.match(src, /@param initialConfigure\n \* @param allowed\n \*\n \* @return/);
+	assert.equal(fixtureText(root, 'src/unrelated.ts'), 'function privateHelper() { return true; }\n');
+	const findings = runQuality(cfg).documentation;
+	assert.deepEqual(findings.map((finding) => [finding.kind, finding.name, finding.severity]), [
+		['param', '@param initialConfigure', 'warning'],
+		['param', '@param allowed', 'warning'],
+		['return', '@return', 'warning'],
+	]);
+	assert.equal(process.exitCode, 0);
+	resetExitCode();
 });
 test('CLI lint and Knip branches pass their focused flags and autofix policy to configured tools', () => {
 	const root = fixtureRoot('terra-quality-tool-branches-');

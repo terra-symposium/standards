@@ -57,7 +57,7 @@ export type DocumentationFinding = {
 	severity: 'warning' | 'error';
 };
 export const DOCUMENTATION_DESCRIPTION_NOTICE =
-	'Documentation descriptions must be meaningful and agentically authored; this check only reports missing prose and never generates descriptions in bulk.';
+	'Ask an agent for meaningful documentation prose; this check only reports missing descriptions and never generates them in bulk.';
 type TSDocBlock = { start: number; end: number; text: string };
 type TSDocLine = { offset: number; text: string };
 const DESCRIPTION_OPTIONAL_TAGS = new Set(['abstract', 'const', 'default', 'event', 'hideconstructor', 'internal', 'package', 'private', 'protected', 'public', 'readonly', 'sealed', 'virtual']);
@@ -75,13 +75,17 @@ HELPERS
  * @return Nothing; throws before replacing the source when parsing fails.
  */
 function writeValidatedSrc(fileName: string, src: string): boolean {
-	let result: ts.TranspileOutput;
 	try {
-		result = ts.transpileModule(src, { fileName, reportDiagnostics: true, compilerOptions: { allowJs: true, jsx: ts.JsxEmit.Preserve, module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ESNext } });
+		if (/\.d\.[cm]?ts$/.test(fileName)) {
+			const parsed = ts.createSourceFile(fileName, src, ts.ScriptTarget.Latest, true, srcKind(fileName));
+			if ((parsed as ts.SourceFile & { parseDiagnostics: readonly ts.Diagnostic[] }).parseDiagnostics.length) return false;
+		} else {
+			const result = ts.transpileModule(src, { fileName, reportDiagnostics: true, compilerOptions: { allowJs: true, jsx: ts.JsxEmit.Preserve, module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ESNext } });
+			if (result.diagnostics?.length) return false;
+		}
 	} catch {
 		return false;
 	}
-	if (result.diagnostics?.length) return false;
 	const temp = `${fileName}.${process.pid}.quality.tmp`;
 	try {
 		writeFileSync(temp, src);
@@ -445,8 +449,12 @@ function removeManagedSects(src: string, fileName: string): string {
  *
  * @return Normalized TSDoc text; missing prose remains intentionally blank for agent-authored documentation.
  */
+function functionParamName(parameter: ts.ParameterDeclaration, index: number): string {
+	return ts.isIdentifier(parameter.name) ? parameter.name.text : ts.isObjectBindingPattern(parameter.name) ? 'props' : `param${index + 1}`;
+}
+
 function genFnDoc(n: ts.FunctionDeclaration, parsed: ts.SourceFile, eol: string, existing = ''): string {
-	const params = n.parameters.map((p, i) => (ts.isIdentifier(p.name) ? p.name.text : ts.isObjectBindingPattern(p.name) ? 'props' : `param${i + 1}`));
+	const params = n.parameters.map(functionParamName);
 	const body = existing
 		.slice(3, -2)
 		.split(R_N_REGEX)
@@ -490,6 +498,30 @@ function genFnDoc(n: ts.FunctionDeclaration, parsed: ts.SourceFile, eol: string,
 	return existing === norm ? existing : norm;
 }
 
+/** Adds missing parameter and return tags to existing function TSDoc without inventing prose. */
+function maintainFunctionDocs(src: string, fileName: string, eol: string): string {
+	const parsed = ts.createSourceFile(fileName, src, ts.ScriptTarget.Latest, true, srcKind(fileName));
+	const updates: { start: number; end: number; text: string }[] = [];
+	const functions: ts.FunctionDeclaration[] = [];
+	const visit = (node: ts.Node): void => {
+		if (ts.isFunctionDeclaration(node)) functions.push(node);
+		ts.forEachChild(node, visit);
+	};
+	visit(parsed);
+	for (const node of functions) {
+		const leading = src.slice(node.getFullStart(), node.getStart(parsed));
+		const doc = [...leading.matchAll(S_S_G_REGEX())].at(-1);
+		if (!doc || doc.index === undefined) continue;
+		const start = node.getFullStart() + doc.index;
+		const indentation = src.slice(src.lastIndexOf('\n', start - 1) + 1, start);
+		const text = genFnDoc(node, parsed, eol, doc[0]).replace(/\r?\n/g, `${eol}${indentation}`);
+		if (text !== doc[0]) {
+			updates.push({ start, end: start + doc[0].length, text });
+		}
+	}
+	return updates.sort((a, b) => b.start - a.start).reduce((current, update) => `${current.slice(0, update.start)}${update.text}${current.slice(update.end)}`, src);
+}
+
 /**
  * Renders a top-level statement with its existing comments and normalized function documentation.
  *
@@ -521,6 +553,7 @@ function statementText(n: ts.Statement, parsed: ts.SourceFile, src: string, eol:
  * @return Source text with canonical CONFIG and HELPERS sections.
  */
 function organizeSrcSects(src: string, fileName: string, eol: string): string {
+	src = maintainFunctionDocs(src, fileName, eol);
 	if ([...src.matchAll(/\/\*\/{10,}\s*\n\s*([A-Z][A-Z _-]*)\s*\n\s*\/{10,}\*\//g)].some((m) => !['IMPORTS', 'CONFIG', 'HELPERS'].includes(m[1]!.trim()))) return src;
 	const withoutManagedSections = removeManagedSects(src, fileName);
 	const parsed = ts.createSourceFile(fileName, withoutManagedSections, ts.ScriptTarget.Latest, true, srcKind(fileName));
@@ -797,14 +830,20 @@ function documentationNodeName(node: ts.Node): string {
  * @return TSDoc blocks with their source offsets and original text.
  */
 function tsdocBlocks(src: string, parsed: ts.SourceFile): TSDocBlock[] {
-	const scanner = ts.createScanner(ts.ScriptTarget.Latest, false, parsed.languageVariant, src);
-	const blocks: TSDocBlock[] = [];
-	for (let token = scanner.scan(); token !== ts.SyntaxKind.EndOfFileToken; token = scanner.scan()) {
-		if (token !== ts.SyntaxKind.MultiLineCommentTrivia) continue;
-		const text = scanner.getTokenText();
-		if (text.startsWith('/**')) blocks.push({ start: scanner.getTokenPos(), end: scanner.getTextPos(), text });
-	}
-	return blocks;
+	const blocks = new Map<number, TSDocBlock>();
+	const add = (ranges: ts.CommentRange[] | undefined): void => {
+		for (const range of ranges ?? []) {
+			const text = src.slice(range.pos, range.end);
+			if (text.startsWith('/**')) blocks.set(range.pos, { start: range.pos, end: range.end, text });
+		}
+	};
+	const visit = (node: ts.Node): void => {
+		add(ts.getLeadingCommentRanges(src, node.getFullStart()));
+		add(ts.getTrailingCommentRanges(src, node.end));
+		ts.forEachChild(node, visit);
+	};
+	visit(parsed);
+	return [...blocks.values()].sort((left, right) => left.start - right.start);
 }
 
 /**
@@ -910,7 +949,7 @@ function returnsVal(node: ts.FunctionDeclaration): boolean {
  * @return The attached TSDoc block, or `undefined` when the declaration is undocumented.
  */
 function documentationBlockFor(src: string, node: ts.Node): TSDocBlock | undefined {
-	const ranges = ts.getLeadingCommentRanges(src, node.getStart()) ?? [];
+	const ranges = ts.getLeadingCommentRanges(src, node.getFullStart()) ?? [];
 	const range = ranges.at(-1);
 	if (!range || range.kind !== ts.SyntaxKind.MultiLineCommentTrivia || !src.slice(range.pos, range.end).startsWith('/**')) return undefined;
 	return { start: range.pos, end: range.end, text: src.slice(range.pos, range.end) };
@@ -1014,8 +1053,8 @@ function documentationFindingsForFile(cfg: QualityCfg, file: string, requirement
 					if (block) {
 						const entries = tsdocTagEntries(tsdocLines(block));
 						const documentedParams = new Set(entries.filter((e) => e.tag.toLowerCase() === 'param').map((e) => e.subject));
-						for (const param of node.parameters) {
-							const name = param.name.getText(parsed);
+						for (const [index, param] of node.parameters.entries()) {
+							const name = functionParamName(param, index);
 							if (!documentedParams.has(name)) findings.push(documentationReport(file, parsed, node, `@param ${name}`, 'param', `document the ${name} parameter`, cfg));
 						}
 						const hasReturnTag = entries.some((e) => ['return', 'returns'].includes(e.tag.toLowerCase()));

@@ -1132,6 +1132,12 @@ function runDocumentation(cfg: QualityCfg, opts: QualityOptions, args: string[],
  * @return Nothing; command failures are reflected in the process exit code.
  */
 export function runQualityCli(cfg: QualityCfg, args = process.argv.slice(2)): void {
+	if (args.includes('--help') || args.includes('-h')) {
+		console.info('Usage: terra-quality <command> [options]');
+		console.info('Commands include quality, document, format, lint, knip, types, single-use, dead-code, security, and domain.');
+		console.info('Options: --all, --warn, --strict, --skip-commands, --skip-recommendations.');
+		return;
+	}
 	const cmd = args.find((a) => !a.startsWith('-')) ?? 'quality';
 	const opts: QualityOptions = {
 		fix: !args.includes('--warn'),
@@ -1279,8 +1285,11 @@ export function runQualityCli(cfg: QualityCfg, args = process.argv.slice(2)): vo
 			if (removed) console.info(`Unused declaration fixer: ${removed} function${removed === 1 ? '' : 's'} removed.`);
 		}
 		if (qualityCheckEnabled(cfg, 'lint')) runLint(cfg, { ...opts, fix: fix('lint') }, true);
-		if (qualityCheckEnabled(cfg, 'document') && documentationFindings(scopedCfg(cfg, opts.all)).some((f) => f.severity === 'error'))
-			runDocumentation(cfg, opts, ['document', ...(opts.all ? ['--all'] : []), '--quiet'], true);
+		if (qualityCheckEnabled(cfg, 'document')) {
+			const documentationIssues = documentationFindings(scopedCfg(cfg, opts.all)).filter((f) => f.severity === 'error');
+			if (documentationIssues.length)
+				runDocumentation(cfg, opts, ['document', ...new Set(documentationIssues.map((f) => resolve(cfg.root, f.file))), '--quiet'], true);
+		}
 		if (fix('format') && qualityCheckEnabled(cfg, 'format')) runFormatter(cfg, { ...opts, fix: true }, opts.all ? [] : filesFor(cfg, false));
 		if (opts.fix && qualityCheckEnabled(cfg, 'alias')) aliasFindings(scoped, true);
 		const analysis = createQualityAnalysis(scoped);

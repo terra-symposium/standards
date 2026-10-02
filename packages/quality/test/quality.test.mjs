@@ -47,8 +47,8 @@ function read(value: string): string { return value; }
 	const findings = documentationFindings(cfg);
 	assert.deepEqual(new Set(findings.map((f) => f.kind)), new Set(['summary', 'param', 'return']));
 	assert.ok(findings.every((f) => f.severity === 'warning'));
-	assert.match(DOCUMENTATION_DESCRIPTION_NOTICE, /agentically authored/);
-	assert.match(DOCUMENTATION_DESCRIPTION_NOTICE, /never generates descriptions in bulk/);
+	assert.match(DOCUMENTATION_DESCRIPTION_NOTICE, /Ask an agent/);
+	assert.match(DOCUMENTATION_DESCRIPTION_NOTICE, /never generates them in bulk/);
 });
 
 /*//////////////////////////////////////////////////
@@ -485,6 +485,46 @@ test('maintenance expands one-line TSDoc with parameter and return scaffolds', (
 	const src = readFileSync(file, 'utf8');
 	assert.match(src, /\* Handles create client\.\n \*\n \* @param path\n \*\n \* @return/);
 	assert.equal(maintainSrcFile(dir, file), false);
+});
+test('maintenance adds missing tags to existing one-line TSDoc without imports or across custom sections', () => {
+	for (const [prefix, body] of [
+		[
+			'no-imports',
+			`/** Describes the value. */
+export function readValue(name: string) { return name; }
+/** Renders the selected label. */
+export function renderLabel({ label }: { label: string }) { return label; }
+`,
+		],
+		[
+			'custom-section',
+			`import { readFileSync } from 'node:fs';
+/*//////////////////////////////////////////////////
+COMPONENTS
+//////////////////////////////////////////////////*/
+/** Describes the value. */
+export function readValue(name: string) { return readFileSync(name, 'utf8'); }
+`,
+		],
+		[
+			'nested-module',
+			`declare module 'astro:actions' {
+	/** Provides a minimal action declaration. */
+	export function defineAction(options: { handler: (input: unknown) => unknown }): unknown;
+}
+`,
+		],
+	]) {
+		const root = mkdtempSync(join(tmpdir(), `terra-quality-tsdoc-${prefix}-`));
+		const file = join(root, prefix === 'nested-module' ? 'main.d.ts' : 'main.ts');
+		writeFileSync(file, body);
+		assert.equal(maintainSrcFile(root, file), true, prefix);
+		const src = readFileSync(file, 'utf8');
+		if (prefix === 'nested-module') assert.match(src, /\t\/\*\*\n\t \* Provides a minimal action declaration\.\n\t \*\n\t \* @param options\n\t \*\n\t \* @return\n\t \*\//);
+		else assert.match(src, /\* Describes the value\.\n \*\n \* @param name\n \*\n \* @return/);
+		if (prefix === 'no-imports') assert.match(src, /\* Renders the selected label\.\n \*\n \* @param props\n \*\n \* @return/);
+		assert.equal(maintainSrcFile(root, file), false, prefix);
+	}
 });
 test('maintenance preserves existing TSDoc prose and tag descriptions while adding missing tags', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-tsdoc-'));

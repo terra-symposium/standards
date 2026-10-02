@@ -1,5 +1,18 @@
 # @terra-symposium/quality
 
+## 0.4.39
+
+### Patch Changes
+
+- Make CLI help exit before quality dispatch so help requests cannot run checks or autofixes.
+
+## 0.4.38
+
+### Patch Changes
+
+- Detect TSDoc attached to declarations and scaffold missing parameter and return tags during quality autofix.
+- Report missing TSDoc descriptions with explicit agent-authorship guidance without generating prose.
+
 ## 0.4.37
 
 ### Patch Changes

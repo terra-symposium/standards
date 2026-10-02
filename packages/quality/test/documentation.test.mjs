@@ -58,6 +58,45 @@ void [privateHelper, publicHelper, arrowHelper, expressionHelper, documented];
 		],
 	);
 });
+test('documentation findings detect missing tags on one-line TSDoc attached to an exported function', () => {
+	const root = fixtureRoot('terra-quality-one-line-function-doc-');
+	fixtureFile(
+		root,
+		'src/main.ts',
+		`/** Keeps Dialog state local while accepting legacy dashboard URLs as one-time open requests. */
+export function useDashboardConfigurationDialog(initialConfigure: string | undefined, allowed: readonly string[]) {
+	return { configure: initialConfigure, allowed };
+}
+`,
+	);
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], documentation: { required: { exportedFunctions: true } } });
+	assert.deepEqual(
+		documentationFindings(cfg).map((finding) => [finding.kind, finding.name, finding.severity]),
+		[
+			['param', '@param initialConfigure', 'error'],
+			['param', '@param allowed', 'error'],
+			['return', '@return', 'error'],
+		],
+	);
+});
+test('documentation findings recognize the props scaffold for destructured parameters', () => {
+	const root = fixtureRoot('terra-quality-destructured-function-doc-');
+	fixtureFile(
+		root,
+		'src/main.ts',
+		`/** Renders the selected label. */
+export function renderLabel({ label }: { label: string }) { return label; }
+`,
+	);
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], documentation: { required: { exportedFunctions: true } } });
+	assert.deepEqual(
+		documentationFindings(cfg).map((finding) => [finding.kind, finding.name]),
+		[
+			['param', '@param props'],
+			['return', '@return'],
+		],
+	);
+});
 test('documentation description audits report missing prose while accepting documented tags and optional tags', () => {
 	const root = fixtureRoot('terra-quality-documentation-descriptions-');
 	fixtureFile(
@@ -84,7 +123,7 @@ const commentText = '/** @param fake */';
 void [read, incomplete, commentText];
 `,
 	);
-	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], documentation: { required: { functions: true } } });
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
 	const findings = documentationFindings(cfg);
 	assert.deepEqual(
 		findings.map((f) => [f.kind, f.name, f.reason]),
@@ -95,6 +134,36 @@ void [read, incomplete, commentText];
 		],
 	);
 	assert.ok(findings.every((f) => f.severity === 'warning'));
+});
+test('documentation description audit continues after nested template expressions and ignores comment-shaped string content', () => {
+	const root = fixtureRoot('terra-quality-documentation-after-template-');
+	fixtureFile(
+		root,
+		'src/main.mjs',
+		[
+			"const selectedGroup = 'suite';",
+			"const value = `before ${selectedGroup.replace(/[.*]/g, '\\\\$&')} after`;",
+			"const nested = `outer ${selectedGroup ? `inner ${selectedGroup}` : 'none'}`;",
+			"const example = '/** @param hidden */';",
+			'void [value, nested, example];',
+			'/**',
+			' *',
+			' * @param value',
+			' *',
+			' * @return',
+			' */',
+			'function read(input) { return `${value}${input}`; }',
+		].join('\n'),
+	);
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.mjs'] });
+	assert.deepEqual(
+		documentationFindings(cfg).map((finding) => [finding.kind, finding.name]),
+		[
+			['summary', '<TSDoc summary>'],
+			['param', '@param value'],
+			['return', '@return'],
+		],
+	);
 });
 test('documentation audits recognize a BOM and shebang before a generated file header', () => {
 	const root = fixtureRoot('terra-quality-documentation-header-');
