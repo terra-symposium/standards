@@ -87,7 +87,7 @@ export type QualityCfg = {
 	tailwindCanonical?: { stylesheet: string; sourceRoots?: string[] };
 	security?: { forbiddenTerms?: string[]; forbiddenImports?: string[]; clientRoots?: string[]; allowProcessEnvRoots?: string[] };
 	repeatedClasses?: { minimumCount?: number; extensions?: string[]; ignoredDirectories?: string[] };
-	regexDedup?: { extensions?: string[]; ignoredFiles?: string[]; minimumCount?: number };
+	regexDedup?: { extensions?: string[]; ignoredFiles?: string[]; minimumCount?: number; sharedModule?: string };
 	uiPatterns?: { forbidden?: string[]; ignoredFiles?: string[]; extensions?: string[] };
 	tsconfig?: string;
 	oneLineImports?: boolean;
@@ -1287,8 +1287,7 @@ export function runQualityCli(cfg: QualityCfg, args = process.argv.slice(2)): vo
 		if (qualityCheckEnabled(cfg, 'lint')) runLint(cfg, { ...opts, fix: fix('lint') }, true);
 		if (qualityCheckEnabled(cfg, 'document')) {
 			const documentationIssues = documentationFindings(scopedCfg(cfg, opts.all)).filter((f) => f.severity === 'error');
-			if (documentationIssues.length)
-				runDocumentation(cfg, opts, ['document', ...new Set(documentationIssues.map((f) => resolve(cfg.root, f.file))), '--quiet'], true);
+			if (documentationIssues.length) runDocumentation(cfg, opts, ['document', ...new Set(documentationIssues.map((f) => resolve(cfg.root, f.file))), '--quiet'], true);
 		}
 		if (fix('format') && qualityCheckEnabled(cfg, 'format')) runFormatter(cfg, { ...opts, fix: true }, opts.all ? [] : filesFor(cfg, false));
 		if (opts.fix && qualityCheckEnabled(cfg, 'alias')) aliasFindings(scoped, true);

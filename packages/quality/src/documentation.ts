@@ -56,8 +56,7 @@ export type DocumentationFinding = {
 	reason: string;
 	severity: 'warning' | 'error';
 };
-export const DOCUMENTATION_DESCRIPTION_NOTICE =
-	'Ask an agent for meaningful documentation prose; this check only reports missing descriptions and never generates them in bulk.';
+export const DOCUMENTATION_DESCRIPTION_NOTICE = 'Ask an agent for meaningful documentation prose; this check only reports missing descriptions and never generates them in bulk.';
 type TSDocBlock = { start: number; end: number; text: string };
 type TSDocLine = { offset: number; text: string };
 const DESCRIPTION_OPTIONAL_TAGS = new Set(['abstract', 'const', 'default', 'event', 'hideconstructor', 'internal', 'package', 'private', 'protected', 'public', 'readonly', 'sealed', 'virtual']);
@@ -80,7 +79,11 @@ function writeValidatedSrc(fileName: string, src: string): boolean {
 			const parsed = ts.createSourceFile(fileName, src, ts.ScriptTarget.Latest, true, srcKind(fileName));
 			if ((parsed as ts.SourceFile & { parseDiagnostics: readonly ts.Diagnostic[] }).parseDiagnostics.length) return false;
 		} else {
-			const result = ts.transpileModule(src, { fileName, reportDiagnostics: true, compilerOptions: { allowJs: true, jsx: ts.JsxEmit.Preserve, module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ESNext } });
+			const result = ts.transpileModule(src, {
+				fileName,
+				reportDiagnostics: true,
+				compilerOptions: { allowJs: true, jsx: ts.JsxEmit.Preserve, module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ESNext },
+			});
 			if (result.diagnostics?.length) return false;
 		}
 	} catch {
@@ -449,12 +452,12 @@ function removeManagedSects(src: string, fileName: string): string {
  *
  * @return Normalized TSDoc text; missing prose remains intentionally blank for agent-authored documentation.
  */
-function functionParamName(parameter: ts.ParameterDeclaration, index: number): string {
-	return ts.isIdentifier(parameter.name) ? parameter.name.text : ts.isObjectBindingPattern(parameter.name) ? 'props' : `param${index + 1}`;
+function fnParamName(p: ts.ParameterDeclaration, i: number): string {
+	return ts.isIdentifier(p.name) ? p.name.text : ts.isObjectBindingPattern(p.name) ? 'props' : `param${i + 1}`;
 }
 
 function genFnDoc(n: ts.FunctionDeclaration, parsed: ts.SourceFile, eol: string, existing = ''): string {
-	const params = n.parameters.map(functionParamName);
+	const params = n.parameters.map(fnParamName);
 	const body = existing
 		.slice(3, -2)
 		.split(R_N_REGEX)
@@ -499,16 +502,16 @@ function genFnDoc(n: ts.FunctionDeclaration, parsed: ts.SourceFile, eol: string,
 }
 
 /** Adds missing parameter and return tags to existing function TSDoc without inventing prose. */
-function maintainFunctionDocs(src: string, fileName: string, eol: string): string {
+function maintainFnDocs(src: string, fileName: string, eol: string): string {
 	const parsed = ts.createSourceFile(fileName, src, ts.ScriptTarget.Latest, true, srcKind(fileName));
 	const updates: { start: number; end: number; text: string }[] = [];
-	const functions: ts.FunctionDeclaration[] = [];
+	const fns: ts.FunctionDeclaration[] = [];
 	const visit = (node: ts.Node): void => {
-		if (ts.isFunctionDeclaration(node)) functions.push(node);
+		if (ts.isFunctionDeclaration(node)) fns.push(node);
 		ts.forEachChild(node, visit);
 	};
 	visit(parsed);
-	for (const node of functions) {
+	for (const node of fns) {
 		const leading = src.slice(node.getFullStart(), node.getStart(parsed));
 		const doc = [...leading.matchAll(S_S_G_REGEX())].at(-1);
 		if (!doc || doc.index === undefined) continue;
@@ -519,7 +522,7 @@ function maintainFunctionDocs(src: string, fileName: string, eol: string): strin
 			updates.push({ start, end: start + doc[0].length, text });
 		}
 	}
-	return updates.sort((a, b) => b.start - a.start).reduce((current, update) => `${current.slice(0, update.start)}${update.text}${current.slice(update.end)}`, src);
+	return updates.sort((a, b) => b.start - a.start).reduce((c, u) => `${c.slice(0, u.start)}${u.text}${c.slice(u.end)}`, src);
 }
 
 /**
@@ -553,7 +556,7 @@ function statementText(n: ts.Statement, parsed: ts.SourceFile, src: string, eol:
  * @return Source text with canonical CONFIG and HELPERS sections.
  */
 function organizeSrcSects(src: string, fileName: string, eol: string): string {
-	src = maintainFunctionDocs(src, fileName, eol);
+	src = maintainFnDocs(src, fileName, eol);
 	if ([...src.matchAll(/\/\*\/{10,}\s*\n\s*([A-Z][A-Z _-]*)\s*\n\s*\/{10,}\*\//g)].some((m) => !['IMPORTS', 'CONFIG', 'HELPERS'].includes(m[1]!.trim()))) return src;
 	const withoutManagedSections = removeManagedSects(src, fileName);
 	const parsed = ts.createSourceFile(fileName, withoutManagedSections, ts.ScriptTarget.Latest, true, srcKind(fileName));
@@ -843,7 +846,7 @@ function tsdocBlocks(src: string, parsed: ts.SourceFile): TSDocBlock[] {
 		ts.forEachChild(node, visit);
 	};
 	visit(parsed);
-	return [...blocks.values()].sort((left, right) => left.start - right.start);
+	return [...blocks.values()].sort((l, r) => l.start - r.start);
 }
 
 /**
@@ -1053,8 +1056,8 @@ function documentationFindingsForFile(cfg: QualityCfg, file: string, requirement
 					if (block) {
 						const entries = tsdocTagEntries(tsdocLines(block));
 						const documentedParams = new Set(entries.filter((e) => e.tag.toLowerCase() === 'param').map((e) => e.subject));
-						for (const [index, param] of node.parameters.entries()) {
-							const name = functionParamName(param, index);
+						for (const [idx, param] of node.parameters.entries()) {
+							const name = fnParamName(param, idx);
 							if (!documentedParams.has(name)) findings.push(documentationReport(file, parsed, node, `@param ${name}`, 'param', `document the ${name} parameter`, cfg));
 						}
 						const hasReturnTag = entries.some((e) => ['return', 'returns'].includes(e.tag.toLowerCase()));

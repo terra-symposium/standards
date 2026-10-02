@@ -110,15 +110,15 @@ test('createQualityCfg applies defaults and resolves every repository-relative p
 });
 test('CLI help exits before default quality dispatch or any configured autofix can run', () => {
 	const root = fixtureRoot('terra-quality-cli-help-');
-	const source = 'const value = true;\nvoid value;\n';
-	fixtureFile(root, 'src/main.ts', source);
+	const src = 'const value = true;\nvoid value;\n';
+	fixtureFile(root, 'src/main.ts', src);
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
 
 	resetExitCode();
 	runQualityCli(cfg, ['--help']);
-	assert.equal(fixtureText(root, 'src/main.ts'), source);
+	assert.equal(fixtureText(root, 'src/main.ts'), src);
 	runQualityCli(cfg, ['quality', '--help']);
-	assert.equal(fixtureText(root, 'src/main.ts'), source);
+	assert.equal(fixtureText(root, 'src/main.ts'), src);
 	assert.equal(process.exitCode, 0);
 	resetExitCode();
 });
@@ -288,12 +288,14 @@ export function useDashboardConfigurationDialog(initialConfigure: DashboardConfi
 	const src = fixtureText(root, 'src/main.ts');
 	assert.match(src, /@param initialConfigure\n \* @param allowed\n \*\n \* @return/);
 	assert.equal(fixtureText(root, 'src/unrelated.ts'), 'function privateHelper() { return true; }\n');
-	const findings = runQuality(cfg).documentation;
-	assert.deepEqual(findings.map((finding) => [finding.kind, finding.name, finding.severity]), [
-		['param', '@param initialConfigure', 'warning'],
-		['param', '@param allowed', 'warning'],
-		['return', '@return', 'warning'],
-	]);
+	assert.deepEqual(
+		runQuality(cfg).documentation.map((f) => [f.kind, f.name, f.severity]),
+		[
+			['param', '@param initialConfigure', 'warning'],
+			['param', '@param allowed', 'warning'],
+			['return', '@return', 'warning'],
+		],
+	);
 	assert.equal(process.exitCode, 0);
 	resetExitCode();
 });

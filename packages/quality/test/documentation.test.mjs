@@ -71,7 +71,7 @@ export function useDashboardConfigurationDialog(initialConfigure: string | undef
 	);
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], documentation: { required: { exportedFunctions: true } } });
 	assert.deepEqual(
-		documentationFindings(cfg).map((finding) => [finding.kind, finding.name, finding.severity]),
+		documentationFindings(cfg).map((f) => [f.kind, f.name, f.severity]),
 		[
 			['param', '@param initialConfigure', 'error'],
 			['param', '@param allowed', 'error'],
@@ -90,7 +90,7 @@ export function renderLabel({ label }: { label: string }) { return label; }
 	);
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], documentation: { required: { exportedFunctions: true } } });
 	assert.deepEqual(
-		documentationFindings(cfg).map((finding) => [finding.kind, finding.name]),
+		documentationFindings(cfg).map((f) => [f.kind, f.name]),
 		[
 			['param', '@param props'],
 			['return', '@return'],
@@ -157,7 +157,7 @@ test('documentation description audit continues after nested template expression
 	);
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.mjs'] });
 	assert.deepEqual(
-		documentationFindings(cfg).map((finding) => [finding.kind, finding.name]),
+		documentationFindings(cfg).map((f) => [f.kind, f.name]),
 		[
 			['summary', '<TSDoc summary>'],
 			['param', '@param value'],

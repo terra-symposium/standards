@@ -1,5 +1,11 @@
 # @terra-symposium/quality
 
+## 0.4.40
+
+### Patch Changes
+
+- Support safe cross-file regex deduplication through an opt-in shared ESM registry.
+
 ## 0.4.39
 
 ### Patch Changes

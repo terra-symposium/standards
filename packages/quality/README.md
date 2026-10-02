@@ -180,7 +180,7 @@ Each rule is independent. `functions` covers all named functions. `exportedFunct
 ### Repeated classes, regexes, and UI patterns
 
 - **Does:** `repeated-classes` reports repeated static class strings, `regex-dedup` reports exact duplicate regular-expression sources, and `ui-patterns` reports configurable UI patterns that should use shared primitives.
-- **Configure:** Set `repeatedClasses`, `regexDedup`, and `uiPatterns` in `quality.json`; all three checks accept repository-relative extensions, exclusions, and thresholds. Normal quality mode safely extracts repeated file-local class literals into `CONFIG`/`CLASSES` constants and non-stateful duplicate regex literals into `CONFIG`/`REGEX` constants. Set `autofix.repeatedClasses` or `autofix.regexDedup` to `false` for review-only output; dynamic classes, HTML, stateful regexes, and cross-file candidates remain advisory.
+- **Configure:** Set `repeatedClasses`, `regexDedup`, and `uiPatterns` in `quality.json`; all three checks accept repository-relative extensions, exclusions, and thresholds. Normal quality mode safely extracts repeated file-local class literals into `CONFIG`/`CLASSES` constants and non-stateful duplicate regex literals into `CONFIG`/`REGEX` constants. Set `regexDedup.sharedModule` to a repository-relative `.mjs` path to consolidate supported duplicates across ESM files into generated factories, with a matching `.d.mts` declaration. Without it, regex fixes remain file-local. Set `autofix.repeatedClasses` or `autofix.regexDedup` to `false` for review-only output; dynamic classes and incompatible CommonJS consumers remain advisory.
 
 ### Object forwarding
 
