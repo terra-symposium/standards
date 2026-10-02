@@ -11,5 +11,7 @@
 	"qualityCommands": [
 		{ "name": "build", "command": "pnpm", "args": ["run", "build"] },
 		{ "name": "test", "command": "pnpm", "args": ["run", "test"] }
-	]
+	],
+	"documentation": {"required":{"types":true,"functions":true,"exportedFunctions":true,"noInlineFunctions":false}},
+	"enabledChecks": {"format":true,"lint":true,"knip":true,"type":true,"recommend":true,"name":true,"alias":true}
 }
