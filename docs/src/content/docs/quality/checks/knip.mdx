@@ -8,3 +8,17 @@ description: Find unused files, exports, dependencies, and unreachable code with
 Invokes Knip for unused files, exports, dependencies, and reachability. A finding means Knip cannot reach an item from its configured entry points and project model. Dynamic imports, plugins, and framework conventions can make that model incomplete.
 
 Set `tools.knip` and use Knip's native config where needed. Disable or scope the check when entry-point metadata is incomplete; review deletion suggestions.
+
+**Before** — a dependency is declared but never imported:
+
+```json
+{ "dependencies": { "unused-helper": "^1.0.0", "zod": "^4.0.0" } }
+```
+
+**After** — after verifying it is not used through dynamic loading or a plugin, remove the unused entry:
+
+```json
+{ "dependencies": { "zod": "^4.0.0" } }
+```
+
+Knip reports reachability; review the finding before removing code or dependencies.

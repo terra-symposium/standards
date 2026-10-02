@@ -8,3 +8,18 @@ description: Portable checks for environment files, client secrets, imports, ter
 Reports committed or root-level environment files, environment-file loaders, secret-shaped environment access in client roots, forbidden imports and terms, and process-environment access outside allowed runtime roots. Security findings fail the run.
 
 Configure `security.forbiddenTerms`, `security.forbiddenImports`, `security.clientRoots`, and `security.allowProcessEnvRoots`. Roots are repository paths. This is a portable guardrail, not proof that an application is secure.
+
+**Before** — client code reads a secret-shaped variable:
+
+```ts
+const token = import.meta.env.API_SECRET;
+```
+
+**After** — keep the secret on the server and expose only the operation the client needs:
+
+```ts
+const response = await fetch('/api/account');
+const account = await response.json();
+```
+
+The appropriate server/API design depends on the application; the quality check reports the boundary violation and does not rewrite it.

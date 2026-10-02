@@ -8,3 +8,21 @@ description: Report configured UI patterns that should use shared primitives.
 Searches configured extensions for forbidden UI pattern strings and reports matches. It does not rewrite components because selecting the right shared primitive is a design decision.
 
 Configure `uiPatterns.forbidden`, `extensions`, and `ignoredFiles`. Keep patterns specific enough to catch duplication without flagging intentional exceptions.
+
+For example, configure a repeated bespoke button class as a forbidden pattern:
+
+```json
+{ "uiPatterns": { "forbidden": ["className=\\\"legacy-button\\\""] } }
+```
+
+**Before** — the flagged pattern appears in the source:
+
+```tsx
+<button className="legacy-button">Save</button>
+```
+
+**After** — replace it with the repository's approved shared primitive (illustrative API):
+
+```tsx
+<PrimaryButton>Save</PrimaryButton>
+```

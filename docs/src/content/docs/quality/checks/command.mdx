@@ -8,3 +8,22 @@ description: Run explicit repository-owned quality commands such as build and te
 Runs subprocesses declared in `qualityCommands` and propagates their status. The runner does not infer how to limit them to changed files. Each item has a unique `name`, executable `command`, and optional string-array `args`; commands run from `root`.
 
 Use `enabledCommands` for per-command switches, `--skip-commands` for a one-run skip, or `enabledChecks.command: false` to disable the category. Document service and credential requirements in your workflow.
+
+**Before** — only static checks run because no repository commands are declared:
+
+```json
+{ "qualityCommands": [] }
+```
+
+**After** — add explicit build and test commands so a normal quality run includes them:
+
+```json
+{
+  "qualityCommands": [
+    { "name": "build", "command": "pnpm", "args": ["run", "build"] },
+    { "name": "test", "command": "pnpm", "args": ["run", "test"] }
+  ]
+}
+```
+
+Run one configured command with `npx terra-quality domain test`.
