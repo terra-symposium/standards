@@ -8,3 +8,21 @@ description: Run optional advisory repository commands without blocking delivery
 Runs `recommendationCommands` after primary checks and shows their output. A recommendation subprocess status does not fail the quality run, which suits migration hints and cleanup reports.
 
 Items use the `name`, `command`, optional `args` shape. Any changes a recommendation makes are governed by that command's own contract. Use `--skip-recommendations` to skip for one run.
+
+**Before** — a cleanup report is not part of the quality workflow:
+
+```json
+{ "recommendationCommands": [] }
+```
+
+**After** — add a non-blocking advisory command:
+
+```json
+{
+  "recommendationCommands": [
+    { "name": "dependency-report", "command": "pnpm", "args": ["run", "dependency-report"] }
+  ]
+}
+```
+
+The output is shown, but a nonzero recommendation status does not fail the quality run.

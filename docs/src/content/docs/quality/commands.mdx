@@ -11,15 +11,45 @@ npx terra-quality [command] [options]
 
 The runner reads `quality.json` from the current working directory. Run `terra-quality --help` for the CLI usage.
 
-## Quality mode
+## Choose a run mode
 
 ```sh
-terra-quality
-terra-quality quality --all
-terra-quality quality --warn --all
+npx terra-quality
+npx terra-quality quality --warn
+npx terra-quality quality --all
+npx terra-quality quality --all --warn
 ```
 
-Normal quality mode selects changed and untracked files in Git; `--all` scans every configured source file. Fix mode may apply safe configured transforms. `--warn` makes the run review-only. `--strict` makes naming errors fail. `--skip-commands` skips required commands, while `--skip-recommendations` skips advisory commands.
+The two options control separate things: default scope is changed/untracked files, `--all` expands scope to all configured source files; default mode allows configured autofixes, `--warn` makes the run review-only.
+
+| Invocation | Files checked | Writes source changes? | Configured build/test commands |
+| --- | --- | --- | --- |
+| `npx terra-quality` | Changed and untracked | Yes, for enabled safe fixes | Run |
+| `npx terra-quality quality --warn` | Changed and untracked | No | Run |
+| `npx terra-quality quality --all` | All configured source files | Yes, for enabled safe fixes | Run |
+| `npx terra-quality quality --all --warn` | All configured source files | No | Run |
+| `npx terra-quality quality --all --warn --skip-commands` | All configured source files | No | Skipped |
+
+`--warn` suppresses autofixes, including autofixes enabled in `quality.json`. To disable one fixer permanently, set its key under `autofix` to `false`. The `--strict` option makes naming errors fail. `--skip-recommendations` skips advisory commands for one run.
+
+## Example workflows
+
+```sh
+# Local feedback on the files you changed; safe configured fixes are allowed.
+npx terra-quality
+
+# Review changed files without modifying them.
+npx terra-quality quality --warn
+
+# CI: check the whole repository without writing. Keep command checks enabled
+# here unless build and tests are already run in separate CI steps.
+npx terra-quality quality --all --warn
+
+# Static-only CI step when build and tests run elsewhere.
+npx terra-quality quality --all --warn --skip-commands --skip-recommendations
+```
+
+Changed-file mode needs a Git worktree. If you run from a source archive or want a complete scan, add `--all`.
 
 ## Focused commands
 

@@ -1,0 +1,33 @@
+---
+title: Quality checks
+description: Browse Terra Quality checks by what they inspect and change.
+---
+
+Each check guide explains its scope, configuration, limits, and a before/after example. Run the full [quality pipeline](/quality/commands/) or invoke a supported focused command.
+
+## Source quality
+
+- [Document](/quality/checks/document/) — required TSDoc and source layout.
+- [Format](/quality/checks/format/) — Prettier and canonical layout.
+- [Import validation](/quality/checks/import/) — unresolved local modules.
+- [Name](/quality/checks/name/) — consistent, concise identifiers.
+- [Lint](/quality/checks/lint/) — repository-configured ESLint rules.
+- [Knip](/quality/checks/knip/) — unused files, exports, dependencies, and reachability.
+- [Type](/quality/checks/type/) — TypeScript source or project checks.
+- [Diff](/quality/checks/diff/) — Git whitespace errors.
+
+## Refactoring and maintenance
+
+- [Object forwarding](/quality/checks/forward/) — repeated property forwarding.
+- [Alias](/quality/checks/alias/) — unnecessary local aliases.
+- [Single-use declarations](/quality/checks/single-use/) — declarations with one in-scope consumer.
+- [Dead code](/quality/checks/dead-code/) — private unused functions.
+
+## Repository policies and patterns
+
+- [Security](/quality/checks/security/) — environment, client-boundary, import, and term policies.
+- [Repeated classes](/quality/checks/repeated-classes/) — repeated static class strings.
+- [Regex deduplication](/quality/checks/regex-dedup/) — duplicate regular-expression sources.
+- [UI patterns](/quality/checks/ui-patterns/) — configured patterns to replace with shared primitives.
+- [Command](/quality/checks/command/) — required repository-owned commands.
+- [Recommend](/quality/checks/recommend/) — optional advisory commands.
