@@ -1,5 +1,11 @@
 # @terra-symposium/quality
 
+## 0.4.42
+
+### Patch Changes
+
+- 8a9bdd4: Make alias findings and autofixes preserve property snapshots, mutable bindings, and lexical scope.
+
 ## 0.4.40
 
 ### Patch Changes
