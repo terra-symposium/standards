@@ -148,7 +148,7 @@ void [mapped, rendered, ordinary, handle, view];
 	assert.equal(renameDeclaration(supported[3]), 'c');
 	assert.equal(renameDeclaration(supported[4]), 'e');
 });
-test('alias analysis finds local const/property/element and type aliases while preserving public, optional, mutable, multi-declaration, generic, and externally referenced aliases', () => {
+test('alias analysis keeps only stable local identifier and type aliases', () => {
 	const root = fixtureRoot('terra-quality-alias-api-');
 	fixtureFile(
 		root,
@@ -163,9 +163,12 @@ const first = base, second = base;
 export const publicAlias = base;
 interface Contract { value: boolean; }
 type LocalAlias = Contract;
+type InternalAlias = Contract;
 export type PublicTypeAlias = Contract;
 type GenericAlias<T> = Contract;
+const typedValue: InternalAlias = { value: true };
 void [localAlias, propertyAlias, elementAlias, optionalAlias, mutableAlias, first, second, publicAlias];
+void typedValue;
 `,
 	);
 	fixtureFile(root, 'src/consumer.ts', `import type { LocalAlias } from './main';\nconst value: LocalAlias = { value: true };\nvoid value;\n`);
@@ -175,8 +178,7 @@ void [localAlias, propertyAlias, elementAlias, optionalAlias, mutableAlias, firs
 		findings.map((f) => [f.kind, f.name, f.replacement]),
 		[
 			['const', 'localAlias', 'base'],
-			['const', 'propertyAlias', 'base.value'],
-			['const', 'elementAlias', "base['value']"],
+			['type', 'InternalAlias', 'Contract'],
 		],
 	);
 });
@@ -206,6 +208,45 @@ void [value, shorthand, indexed];
 	assert.match(updated, /let indexed = base\['value'\];/);
 	assert.deepEqual(aliasFindings(cfg), []);
 	assert.equal(file.endsWith('src/main.ts'), true);
+});
+test('alias analysis preserves property snapshots and mutable roots', () => {
+	const root = fixtureRoot('terra-quality-alias-snapshots-');
+	fixtureFile(
+		root,
+		'src/main.ts',
+		`const state = { value: 1 };
+const propertySnapshot = state.value;
+const elementSnapshot = state['value'];
+let current = state;
+const mutableRootSnapshot = current;
+state.value = 2;
+current = { value: 3 };
+export const result = [propertySnapshot, elementSnapshot, mutableRootSnapshot, state.value, current.value];
+`,
+	);
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
+	assert.deepEqual(aliasFindings(cfg, true), []);
+	assert.match(fixtureText(root, 'src/main.ts'), /const propertySnapshot = state\.value;/);
+	assert.match(fixtureText(root, 'src/main.ts'), /const elementSnapshot = state\['value'\];/);
+	assert.match(fixtureText(root, 'src/main.ts'), /const mutableRootSnapshot = current;/);
+});
+test('alias autofix skips bindings shadowed at any replacement reference', () => {
+	const root = fixtureRoot('terra-quality-alias-shadow-');
+	fixtureFile(
+		root,
+		'src/main.ts',
+		`const base = { source: 'outer' };
+const alias = base;
+function read(base: { source: string }) {
+  return alias.source + base.source;
+}
+void read;
+`,
+	);
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
+	assert.deepEqual(aliasFindings(cfg, true), []);
+	assert.match(fixtureText(root, 'src/main.ts'), /const alias = base;/);
+	assert.match(fixtureText(root, 'src/main.ts'), /return alias\.source \+ base\.source;/);
 });
 test('naming findings use shared analysis, report severity by replacement kind, and preserve protected declarations', () => {
 	const root = fixtureRoot('terra-quality-naming-');

@@ -110,6 +110,13 @@ Each rule is independent. `functions` covers all named functions. `exportedFunct
 - **Configure:** Use `protectedIdentifiers` for stable names. Set `autofix.name` to `false` for review-only output.
 - **Ideology:** Names should be consistent where the transformation is unambiguous. Protect public API names, domain vocabulary, and intentional abbreviations.
 
+### Alias
+
+- **Does:** Finds removable aliases to stable local identifiers and simple, unexported type aliases. Property and element reads are treated as snapshots and are never inlined. Const aliases are only reported when their target is a local `const` binding and every use resolves to that same binding, so autofix cannot change behavior through reassignment or shadowing.
+- **Terms:** “Stable local binding” means a non-imported local variable declared with `const`, including a const destructuring binding. The check does not infer that object properties or computed values remain unchanged over time.
+- **Configure:** Enable or disable the independent `alias` check through `enabledChecks`. Autofix is limited to findings whose replacement binding is provably safe at every use site.
+- **Ideology:** An alias can preserve a value at a particular point in time. Only remove bindings when doing so cannot change the value read or resolve to a different declaration.
+
 ### Forward
 
 - **Does:** Finds call-site objects that repeat at least three properties from one source object, such as `userId: input.userId`. It recommends passing the source directly when everything is forwarded, or spreading it while retaining explicit overrides.
