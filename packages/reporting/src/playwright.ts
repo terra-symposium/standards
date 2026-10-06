@@ -27,6 +27,9 @@ import type { ViewportCatalog } from './viewports.js';
 CONFIG
 //////////////////////////////////////////////////*/
 
+/** Browser diagnostic captured by the reusable page fixture. */
+export type BrowserDiagnostic = { level: string; message: string; url?: string };
+
 /*//////////////////////////////////////////////////
 FIXTURES
 //////////////////////////////////////////////////*/
@@ -34,7 +37,7 @@ FIXTURES
 /** Playwright fixture that records browser console, page, and request failures. */
 export const diagnosticsTest = base.extend({
 	page: async ({ page, context: ctx }, use, info): Promise<void> => {
-		const diagnostics: { level: string; message: string; url?: string }[] = [];
+		const diagnostics: BrowserDiagnostic[] = [];
 		const observe = (tgt: typeof page): void => {
 			tgt.on('console', (m) => {
 				if (!['error', 'warning'].includes(m.type())) return;
@@ -60,23 +63,6 @@ export const diagnosticsTest = base.extend({
 	},
 });
 
-/** Playwright fixture that captures a full-page screenshot after each test. */
-export const visualTest = diagnosticsTest.extend({
-	page: async ({ page }, use, info): Promise<void> => {
-		try {
-			await use(page);
-		} finally {
-			try {
-				const screenshot = info.outputPath('visual.png');
-				await page.screenshot({ fullPage: true, path: screenshot });
-				await info.attach('visual', { contentType: 'image/png', path: screenshot });
-			} catch (err) {
-				await info.attach('visual-error', { body: Buffer.from(err instanceof Error ? err.message : String(err)), contentType: 'text/plain' });
-			}
-		}
-	},
-});
-
 /** Application-specific paths and catalog settings for the shared reporter. */
 export type ReportingOptions = {
 	featureFiles?: readonly string[];
@@ -85,7 +71,11 @@ export type ReportingOptions = {
 	outputRoot?: string;
 	reportFile?: string;
 	slideshowFile?: string;
+	supplementalResultsFile?: string;
 };
+
+/** Describes a Playwright attachment passed to the shared reporter. */
+type ReporterAttachment = { body?: Buffer; contentType?: string; name?: string; path?: string };
 
 /*//////////////////////////////////////////////////
 HELPERS
@@ -126,6 +116,45 @@ export const parseDiagnostics = (raw: string): string[] => {
 const terminalText = (chunk: string | Buffer): string => stripAnsi(chunk.toString('utf8')).trim();
 
 /**
+ * Identifies terminal output that should be retained as diagnostic evidence.
+ * @param value Normalized terminal output.
+ * @returns Whether the output contains a diagnostic keyword.
+ */
+const isTerminalDiagnostic = (val: string): boolean => /\b(?:error|errors|failed|failure|exception|warning|warn|timeout|requestfailed|pageerror)\b/i.test(val);
+
+/**
+ * Reads an inline or file-backed Playwright attachment.
+ * @param attachment Attachment metadata supplied by Playwright.
+ * @returns Attachment text, or an empty string when it is unavailable.
+ */
+const readAttachment = (attachment: ReporterAttachment): string => {
+	if (attachment.body) return attachment.body.toString('utf8');
+	if (attachment.path && fs.existsSync(attachment.path)) return fs.readFileSync(attachment.path, 'utf8');
+	return '';
+};
+
+/**
+ * Extracts one named JSON diagnostic attachment.
+ * @param attachments Attachments emitted for one test result.
+ * @param name Diagnostic attachment name to locate.
+ * @returns Parsed diagnostic lines from the matching attachment.
+ */
+const diagnosticText = (attachments: readonly ReporterAttachment[], name: string): string[] => {
+	const attachment = attachments.find((v) => v.name === name && v.contentType === 'application/json');
+	const raw = attachment ? readAttachment(attachment) : '';
+	if (!raw) return [];
+	return parseDiagnostics(raw);
+};
+
+/**
+ * Resolves the path of a captured screenshot attachment.
+ * @param attachments Attachments emitted for one test result.
+ * @returns Screenshot path, or an empty string when no screenshot exists.
+ */
+const screenshotAttachment = (attachments: readonly ReporterAttachment[]): ReporterAttachment | undefined =>
+	attachments.find((v) => ['visual', 'screenshot'].includes(v.name || '') && v.contentType === 'image/png');
+
+/**
  * Creates the framework-neutral identity fields shared by all result records.
  * @param test Playwright test identity.
  * @param configuredProject Configured Playwright project name.
@@ -143,18 +172,116 @@ const testIdentity = (
 	const titlePath = fullTitlePath.slice(fileIdx >= 0 ? fileIdx + 1 : 0);
 	const viewport = projectViewportName(cfgdProject, viewportCatalog);
 	return {
-		file,
-		groups: titlePath.join(' › '),
-		project: baseVisualProjectName(cfgdProject, viewportCatalog),
-		title: titlePath.pop() || test.title,
+		file: redactEvidence(file),
+		groups: redactEvidence(titlePath.join(' › ')),
+		project: redactEvidence(baseVisualProjectName(cfgdProject, viewportCatalog)),
+		title: redactEvidence(titlePath.pop() || test.title),
 		viewport,
 		viewportSize: viewportSizeLabel(viewport, viewportCatalog),
 	};
 };
 
+/**
+ * Generates a stable filename for a copied screenshot.
+ * @param result Result whose identity contributes to the filename.
+ * @param index Result position used to keep duplicate names distinct.
+ * @returns A filesystem-safe screenshot filename.
+ */
+const screenshotName = (result: VisualResult, idx: number): string => {
+	return `${String(idx + 1).padStart(4, '0')}-${
+		`${result.project}-${result.file}-${result.title}-${result.viewport}`
+			.replace(/[^a-z0-9_-]+/gi, '-')
+			.replace(/^-+|-+$/g, '')
+			.toLowerCase() || 'screenshot'
+	}.png`;
+};
+
+/**
+ * Copies captured screenshots into the timestamped run directory.
+ * @param results Results whose screenshot paths should be relocated.
+ * @param runDirectory Timestamped output directory for the current run.
+ * @returns Results with copied screenshot paths.
+ */
+const copyScreenshots = (results: readonly VisualResult[], runDir: string): VisualResult[] => {
+	const imgs = path.join(runDir, 'images');
+	fs.mkdirSync(imgs, { recursive: true });
+	return results.map((r, i) => {
+		if (!r.screenshot || !fs.existsSync(r.screenshot)) return r;
+		const dest = path.join(imgs, screenshotName(r, i));
+		fs.copyFileSync(r.screenshot, dest);
+		return { ...r, screenshot: dest };
+	});
+};
+
+/** Redacts personal identifiers and configured secrets from report text. */
+const redactEvidence = (val: unknown): string => {
+	let text = Array.from(stripAnsi(String(val ?? '')))
+		.filter((c) => {
+			const code = c.codePointAt(0) ?? 0;
+			return code === 9 || code === 10 || code === 13 || (code > 31 && code !== 0xfffe && code !== 0xffff);
+		})
+		.join('')
+		.replace(/[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}/g, '[redacted email]')
+		.replace(/\b[\da-f]{8}(?:-[\da-f]{4}){3}-[\da-f]{12}\b/gi, '[redacted id]');
+	for (const [name, secret] of Object.entries(process.env)) {
+		if (secret && /(?:secret|token|password|credential|private.?key|api.?key|publishable.?key|service[_-]?role.?key)/i.test(name)) text = text.replaceAll(secret, '[redacted secret]');
+	}
+	return text.replaceAll(process.cwd(), '[workspace]');
+};
+
+/** Converts an optional structured results file into the shared row model. */
+const supplementalResults = (file: string): { results: VisualResult[]; diagnostics: string[] } => {
+	const unavailable = (err: string): VisualResult => ({
+		browserErrors: '',
+		duration: 0,
+		error: err,
+		file: path.basename(file),
+		groups: 'Supplemental results',
+		project: 'supplemental',
+		retry: 0,
+		screenshot: '',
+		status: 'interrupted',
+		terminalErrors: '',
+		title: 'Structured supplemental results unavailable',
+		visual: 'No visual surface',
+		viewport: 'supplemental',
+		viewportSize: 'N/A',
+	});
+	if (!fs.existsSync(file)) return { results: [unavailable(`Supplemental results file was not found: ${file}`)], diagnostics: [] };
+	try {
+		const payload = JSON.parse(fs.readFileSync(file, 'utf8')) as { complete?: unknown; results?: unknown; runDiagnostics?: unknown };
+		const rows = Array.isArray(payload.results) ? payload.results : [];
+		const results = rows.map((v): VisualResult => {
+			const row = v && typeof v === 'object' ? (v as Record<string, unknown>) : {};
+			return {
+				browserErrors: '',
+				duration: Number(row.duration ?? row.duration_ms ?? 0) || 0,
+				error: redactEvidence(row.error),
+				file: redactEvidence(row.file || path.basename(file)),
+				groups: redactEvidence(row.groups || row.file || 'Supplemental results'),
+				project: redactEvidence(row.project || 'supplemental'),
+				retry: Number(row.retry ?? 0) || 0,
+				screenshot: '',
+				status: normalizeVisualStatus(String(row.status || 'failed')),
+				terminalErrors: '',
+				title: redactEvidence(row.title || 'Untitled supplemental result'),
+				visual: 'No visual surface',
+				viewport: 'supplemental',
+				viewportSize: 'N/A',
+			};
+		});
+		const diagnostics = Array.isArray(payload.runDiagnostics) ? payload.runDiagnostics.map(redactEvidence) : [];
+		if (payload.complete === false) results.unshift(unavailable('The supplemental test run reported an incomplete result inventory.'));
+		return { results, diagnostics };
+	} catch (err) {
+		return { results: [unavailable(`Could not read supplemental results: ${err instanceof Error ? err.message : String(err)}`)], diagnostics: [] };
+	}
+};
+
 /** Creates the reusable Playwright reporter with application-specific output configuration. */
 export default class ProgressReporter {
-	private readonly options: Required<Pick<ReportingOptions, 'featureFiles' | 'projects' | 'viewportCatalog' | 'outputRoot' | 'reportFile' | 'slideshowFile'>>;
+	private readonly options: Required<Pick<ReportingOptions, 'featureFiles' | 'projects' | 'viewportCatalog' | 'outputRoot' | 'reportFile' | 'slideshowFile'>> &
+		Pick<ReportingOptions, 'supplementalResultsFile'>;
 	private readonly results: VisualResult[] = [];
 	private readonly terminalDiagnostics = new Map<object, string[]>();
 	private readonly runDiagnostics: string[] = [];
@@ -174,34 +301,8 @@ export default class ProgressReporter {
 			outputRoot: opts.outputRoot || 'test-results/visual',
 			reportFile: opts.reportFile || 'report.xlsx',
 			slideshowFile: opts.slideshowFile || 'report.pptx',
+			supplementalResultsFile: opts.supplementalResultsFile,
 		};
-	}
-
-	/** Extracts one named JSON diagnostic attachment. */
-	private diagnosticText(attachments: readonly { body?: Buffer; contentType?: string; name?: string; path?: string }[], name: string): string[] {
-		const raw = attachments.find((v) => v.name === name && v.contentType === 'application/json');
-		const content = raw?.body?.toString('utf8') ?? (raw?.path && fs.existsSync(raw.path) ? fs.readFileSync(raw.path, 'utf8') : '');
-		return content ? parseDiagnostics(content) : [];
-	}
-
-	/** Copies captured screenshots into the timestamped run directory. */
-	private copyScreenshots(runDir: string): VisualResult[] {
-		const imgs = path.join(runDir, 'images');
-		fs.mkdirSync(imgs, { recursive: true });
-		return this.results.map((r, i) => {
-			if (!r.screenshot || !fs.existsSync(r.screenshot)) return r;
-			const dest = path.join(
-				imgs,
-				`${String(i + 1).padStart(4, '0')}-${
-					`${r.project}-${r.file}-${r.title}-${r.viewport}`
-						.replace(/[^a-z0-9_-]+/gi, '-')
-						.replace(/^-+|-+$/g, '')
-						.toLowerCase() || 'screenshot'
-				}.png`,
-			);
-			fs.copyFileSync(r.screenshot, dest);
-			return { ...r, screenshot: dest };
-		});
 	}
 
 	/**
@@ -215,6 +316,20 @@ export default class ProgressReporter {
 		suite: Parameters<NonNullable<import('@playwright/test/reporter').Reporter['onBegin']>>[1],
 	): void {
 		for (const test of suite.allTests()) this.expectedTests.set(test.id, test);
+		if (!this.options.featureFiles.length || !this.options.projects.length) {
+			const projectFiles = new Map<string, Set<string>>();
+			const files = new Set<string>();
+			for (const test of suite.allTests()) {
+				const file = path.basename(test.location.file);
+				const cfgd = test.parent.project()?.name || test.titlePath().find((v) => v.startsWith('root-')) || 'unknown';
+				const project = baseVisualProjectName(cfgd, this.options.viewportCatalog);
+				files.add(file);
+				projectFiles.set(project, new Set([...(projectFiles.get(project) || []), file]));
+			}
+			if (!this.options.featureFiles.length) this.options.featureFiles = [...files];
+			if (!this.options.projects.length)
+				this.options.projects = [...projectFiles].map(([n, c]) => ({ name: n, configuredFiles: [...c] }));
+		}
 	}
 
 	/**
@@ -243,7 +358,7 @@ export default class ProgressReporter {
 	 */
 	onStdOut(chunk: string | Buffer, test?: object, result?: object): void {
 		const val = terminalText(chunk);
-		if (!val || !/\b(?:error|errors|failed|failure|exception|warning|warn|timeout|requestfailed|pageerror)\b/i.test(val)) return;
+		if (!val || !isTerminalDiagnostic(val)) return;
 		if (!test || !result) {
 			this.runDiagnostics.push(val);
 			return;
@@ -268,16 +383,22 @@ export default class ProgressReporter {
 	 */
 	onTestEnd(test: import('@playwright/test/reporter').TestCase, result: import('@playwright/test/reporter').TestResult): void {
 		this.completedTests.add(test.id);
-		const screenshot = result.attachments.find((v) => v.name === 'visual' && v.contentType === 'image/png')?.path || '';
+		const attachment = screenshotAttachment(result.attachments);
+		let screenshot = attachment?.path || '';
+		if (!screenshot && attachment?.body) {
+			screenshot = path.resolve(`test-results/playwright-output/${test.id.replace(/[^a-z0-9_-]/gi, '-')}-screenshot.png`);
+			fs.mkdirSync(path.dirname(screenshot), { recursive: true });
+			fs.writeFileSync(screenshot, attachment.body);
+		}
 		this.results.push({
 			...testIdentity(test, test.parent.project()?.name || test.titlePath().find((v) => v.startsWith('root-')) || 'unknown', this.options.viewportCatalog),
-			browserErrors: this.diagnosticText(result.attachments, 'browser-diagnostics').join('\n'),
+			browserErrors: redactEvidence(diagnosticText(result.attachments, 'browser-diagnostics').join('\n')),
 			duration: result.duration,
-			error: result.error?.message?.split('\n')[0] || '',
+			error: redactEvidence(result.error?.message?.split('\n')[0] || ''),
 			retry: result.retry,
 			screenshot,
 			status: normalizeVisualStatus(result.status),
-			terminalErrors: this.terminalDiagnostics.get(result)?.join('\n') || '',
+			terminalErrors: redactEvidence(this.terminalDiagnostics.get(result)?.join('\n') || ''),
 			visual: screenshot ? 'Embedded' : result.attachments.some((v) => v.name === 'visual-error') ? 'Capture failed' : 'No visual surface',
 		});
 		this.terminalDiagnostics.delete(result);
@@ -288,6 +409,7 @@ export default class ProgressReporter {
 	 * @returns A promise that resolves after both report artifacts are written.
 	 */
 	async onEnd(): Promise<void> {
+		if (process.argv.includes('--list')) return;
 		for (const [id, test] of this.expectedTests) {
 			if (this.completedTests.has(id)) continue;
 			this.results.push({
@@ -304,11 +426,25 @@ export default class ProgressReporter {
 		}
 		const runDir = path.resolve(this.options.outputRoot, new Date().toISOString().replace(/[:.]/g, '-'));
 		fs.mkdirSync(runDir, { recursive: true });
-		const results = this.copyScreenshots(runDir);
+		const browserResults = copyScreenshots(this.results, runDir);
+		const supplemental = this.options.supplementalResultsFile ? supplementalResults(path.resolve(this.options.supplementalResultsFile)) : { results: [], diagnostics: [] };
+		const results = [...browserResults, ...supplemental.results];
+		const run: ReportRun = {
+			featureFiles: [...new Set([...this.options.featureFiles, ...supplemental.results.map((r) => r.file)])],
+			projects: [
+				...this.options.projects,
+			...[...supplemental.results.reduce((p, r) => {
+					p.set(r.project, new Set([...(p.get(r.project) || []), r.file]));
+					return p;
+				}, new Map<string, Set<string>>())].map(([n, c]) => ({ name: n, configuredFiles: [...c] })),
+			],
+			results,
+			runDiagnostics: [...this.runDiagnostics.map(redactEvidence), ...supplemental.diagnostics],
+		};
 		const spreadsheet = path.join(runDir, this.options.reportFile);
 		const slideshow = path.join(runDir, this.options.slideshowFile);
-		await writeSpreadsheet(spreadsheet, { featureFiles: this.options.featureFiles, projects: this.options.projects, results, runDiagnostics: this.runDiagnostics } satisfies ReportRun);
-		await writeSlideshow(slideshow, results);
+		await writeSpreadsheet(spreadsheet, run);
+		await writeSlideshow(slideshow, browserResults);
 		process.stdout.write(`Test spreadsheet: ${spreadsheet}\nTest slideshow: ${slideshow}\n`);
 	}
 }

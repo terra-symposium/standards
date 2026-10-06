@@ -1,0 +1,13 @@
+# @terra-symposium/reporting
+
+## 0.2.1
+
+### Patch Changes
+
+- Remove a duplicate Playwright fixture alias and sanitize control characters in evidence text.
+
+## 0.2.0
+
+### Minor Changes
+
+- Add a shared responsive Playwright config helper that runs regular projects at all six default viewports, captures full-page screenshots, and produces consolidated responsive slides and spreadsheet results.

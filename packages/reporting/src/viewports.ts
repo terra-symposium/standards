@@ -3,6 +3,10 @@
  * Responsive viewport selection and Playwright project naming helpers.
  */
 
+import type { PlaywrightTestConfig } from '@playwright/test';
+import fs from 'node:fs';
+import path from 'node:path';
+
 /*//////////////////////////////////////////////////
 CONFIG
 //////////////////////////////////////////////////*/
@@ -44,7 +48,7 @@ HELPERS
  */
 export const resolveVisualViewports = (raw = process.env.PW_VIEWPORTS, catalog: ViewportCatalog = VISUAL_VIEWPORTS): VisualViewport[] => {
 	const names = Object.keys(catalog);
-	const selection = raw?.trim().toLowerCase() || 'default';
+	const selection = raw?.trim().toLowerCase() || 'all';
 	const selected =
 		selection === 'all'
 			? names
@@ -105,4 +109,80 @@ export const baseVisualProjectName = (projectName: string, catalog: ViewportCata
 export const viewportSizeLabel = (viewport: string, catalog: ViewportCatalog = VISUAL_VIEWPORTS): string => {
 	const size = catalog[viewport] || catalog.xl || VISUAL_VIEWPORTS.xl;
 	return `${size.width}×${size.height}`;
+};
+
+/** Options for the shared responsive Playwright configuration helper. */
+export type ResponsivePlaywrightOptions = {
+	/** Project names that represent manual, single-run browser captures. */
+	singleRunProjects?: readonly string[];
+	/** Disposable Playwright output directory, separate from timestamped reports. */
+	outputDir?: string;
+	/** Parent directory for timestamped reports and their shared images folder. */
+	outputRoot?: string;
+	/** Optional structured results file to add to the workbook exactly once. */
+	supplementalResultsFile?: string;
+};
+
+/**
+ * Expands every regular Playwright project across Terra's shared responsive viewport set.
+ *
+ * Setup projects (projects referenced as dependencies, setup-named projects, or projects
+ * matching a `.setup.*` file) run once. Manual browser capture projects can be listed in
+ * `singleRunProjects`. The helper adds full-page automatic screenshots and the shared
+ * evidence reporter while preserving any other configured reporters.
+ *
+ * @param config Existing Playwright configuration.
+ * @param opts Shared matrix and reporting options.
+ * @returns Configuration with responsive projects, native screenshots, and reporting.
+ */
+export const withResponsivePlaywright = <T extends PlaywrightTestConfig>(cfg: T, opts: ResponsivePlaywrightOptions = {}): T => {
+	const viewports = resolveVisualViewports();
+	const sharedDistCandidates = [
+		path.resolve(process.cwd(), 'node_modules/@terra-symposium/reporting/dist'),
+		path.resolve(process.cwd(), 'dist'),
+		path.resolve(process.cwd(), 'packages/reporting/dist'),
+	];
+	const sharedDist = sharedDistCandidates.find((c) => fs.existsSync(c)) || sharedDistCandidates[0];
+	const resolvedSharedDist = fs.existsSync(sharedDist) ? fs.realpathSync(sharedDist) : sharedDist;
+	const external = [...(cfg.build?.external || []), path.join(resolvedSharedDist, '**')];
+	const projects = (cfg.projects || []) as Array<{
+		dependencies?: readonly string[];
+		name?: string;
+		testMatch?: unknown;
+		use?: Record<string, unknown>;
+	}>;
+	const dependencyProjects = new Set(projects.flatMap((p) => p.dependencies || []));
+	const singleRun = new Set(opts.singleRunProjects || []);
+	const isSetup = (project: (typeof projects)[number], idx: number): boolean => {
+		const name = project.name || `project-${idx + 1}`;
+		const match = Array.isArray(project.testMatch) ? project.testMatch : [project.testMatch];
+		const matchText = match.map((e) => (e instanceof RegExp ? e.source : String(e || ''))).join(' ');
+		return dependencyProjects.has(name) || /setup/i.test(name) || /\.setup\.[cm]?[jt]sx?/i.test(matchText);
+	};
+	const responsiveProjects = projects.flatMap((p, i) => {
+		const baseName = p.name || `project-${i + 1}`;
+		if (isSetup(p, i) || singleRun.has(baseName)) return [p];
+		return viewports.map((v) => ({
+			...p,
+			name: visualProjectName(baseName, v, viewports),
+			use: { ...(p.use || {}), viewport: { width: v.width, height: v.height }, screenshot: { mode: 'on', fullPage: true, caret: 'initial' } },
+		}));
+	});
+	const cfgdReporters = cfg.reporter ? (Array.isArray(cfg.reporter) ? cfg.reporter : [cfg.reporter]) : [];
+	const reportingOpts = { outputRoot: opts.outputRoot, supplementalResultsFile: opts.supplementalResultsFile };
+	const reporters = [
+		...cfgdReporters.filter((r) => {
+			const name = Array.isArray(r) ? r[0] : r;
+			return !(typeof name === 'string' && name.includes('@terra-symposium/reporting/playwright'));
+		}),
+		['@terra-symposium/reporting/playwright', reportingOpts],
+	];
+	return {
+		...cfg,
+		build: { ...(cfg.build || {}), external },
+		outputDir: opts.outputDir || 'test-results/playwright-output',
+		projects: responsiveProjects,
+		reporter: reporters,
+		use: { ...(cfg.use || {}), screenshot: { mode: 'on', fullPage: true, caret: 'initial' } },
+	} as T;
 };
