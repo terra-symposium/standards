@@ -29,10 +29,11 @@ export function collapseInlineIfs(fileName: string): boolean {
 	const visit = (node: ts.Node): void => {
 		if (ts.isIfStatement(node) && ts.isBlock(node.thenStatement) && node.thenStatement.statements.length === 1) {
 			const statement = node.thenStatement.statements[0]!;
-			const safeStatement = ts.isExpressionStatement(statement) || ts.isReturnStatement(statement) || ts.isThrowStatement(statement) || ts.isBreakStatement(statement) || ts.isContinueStatement(statement);
+			const sStatement =
+				ts.isExpressionStatement(statement) || ts.isReturnStatement(statement) || ts.isThrowStatement(statement) || ts.isBreakStatement(statement) || ts.isContinueStatement(statement);
 			const danglingElse = Boolean(node.elseStatement && ts.isIfStatement(statement) && !statement.elseStatement);
 			const body = src.slice(node.thenStatement.getStart(parsed) + 1, node.thenStatement.end - 1);
-			if (safeStatement && !danglingElse && !body.includes('//') && !body.includes('/*')) {
+			if (sStatement && !danglingElse && !body.includes('//') && !body.includes('/*')) {
 				edits.push({ start: node.thenStatement.getStart(parsed), end: statement.getStart(parsed), text: '' });
 				edits.push({ start: statement.end, end: node.thenStatement.end, text: '' });
 			}

@@ -27,9 +27,6 @@ import type { ViewportCatalog } from './viewports.js';
 CONFIG
 //////////////////////////////////////////////////*/
 
-/** Browser diagnostic captured by the reusable page fixture. */
-export type BrowserDiagnostic = { level: string; message: string; url?: string };
-
 /*//////////////////////////////////////////////////
 FIXTURES
 //////////////////////////////////////////////////*/
@@ -37,7 +34,7 @@ FIXTURES
 /** Playwright fixture that records browser console, page, and request failures. */
 export const diagnosticsTest = base.extend({
 	page: async ({ page, context: ctx }, use, info): Promise<void> => {
-		const diagnostics: BrowserDiagnostic[] = [];
+		const diagnostics: { level: string; message: string; url?: string }[] = [];
 		const observe = (tgt: typeof page): void => {
 			tgt.on('console', (m) => {
 				if (!['error', 'warning'].includes(m.type())) return;

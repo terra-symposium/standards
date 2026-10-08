@@ -544,10 +544,13 @@ test('maintenance preserves existing TSDoc prose and tag descriptions while addi
 test('maintenance preserves managed-looking sections in files without imports', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-sections-'));
 	const file = join(root, 'main.ts');
-	const src = `/** main.ts */
+
+	writeFileSync(
+		file,
+		`/** main.ts */
 const VALUE = true;
-`;
-	writeFileSync(file, src);
+`,
+	);
 	assert.equal(maintainSrcFile(root, file), true);
 	assert.match(readFileSync(file, 'utf8'), /^\/\*\*\n \* main\.ts\n \*\//);
 	assert.equal(maintainSrcFile(root, file), false);
@@ -674,11 +677,11 @@ test('naming applies whole-word image aliases and prefix-only state aliases', ()
 test('naming leaves Astro frontmatter, framework properties, and markup unchanged', () => {
 	const root = mkdtempSync(join(tmpdir(), 'quality-naming-astro-'));
 	mkdirSync(join(root, 'src'));
-	const source = '---\nconst error = new Error("x");\nconsole.log(error);\nconst message = "Salesphere user";\nconst user = Astro.locals.user;\n---\n<Component error={error} />\n<p>{message}</p>\n';
-	writeFileSync(join(root, 'src', 'Page.astro'), source);
+	const src = '---\nconst error = new Error("x");\nconsole.log(error);\nconst message = "Salesphere user";\nconst user = Astro.locals.user;\n---\n<Component error={error} />\n<p>{message}</p>\n';
+	writeFileSync(join(root, 'src', 'Page.astro'), src);
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.astro'] });
 	runQualityCli(cfg, ['naming', '--all']);
-	assert.equal(readFileSync(join(root, 'src', 'Page.astro'), 'utf8'), source);
+	assert.equal(readFileSync(join(root, 'src', 'Page.astro'), 'utf8'), src);
 });
 test('naming preserves shorthand property keys while renaming their values', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-'));

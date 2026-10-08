@@ -234,12 +234,11 @@ function tokenCase(original: string, replacement: string): string {
  * @return A concise available callback alias.
  */
 export function callbackAlias(name: string, reserved: string[] = []): string {
-	const configured = CALLBACK_ALIASES[name.toLowerCase() as keyof typeof CALLBACK_ALIASES];
-	if (!configured) return name;
-	const preferred = configured;
-	if (!reserved.includes(preferred)) return preferred;
+	const cfgd = CALLBACK_ALIASES[name.toLowerCase() as keyof typeof CALLBACK_ALIASES];
+	if (!cfgd) return name;
+	if (!reserved.includes(cfgd)) return cfgd;
 	for (const fallback of ['v', 'r', 'x', 'd', 'n', 'e', 'c', 's']) if (!reserved.includes(fallback)) return fallback;
-	return preferred;
+	return cfgd;
 }
 
 /**
@@ -465,10 +464,9 @@ export function isRenamableDeclaration(n: ts.Identifier): boolean {
  * @return The nearest function-like scope, or the source file when no function owns it.
  */
 export function declarationScope(n: ts.Identifier): ts.Node {
-	const declaration = n.parent;
 	const isOuterDeclarationName =
-		(ts.isFunctionDeclaration(declaration) || ts.isClassDeclaration(declaration) || ts.isInterfaceDeclaration(declaration) || ts.isTypeAliasDeclaration(declaration)) && declaration.name === n;
-	let scope: ts.Node = isOuterDeclarationName ? declaration.parent : declaration;
+		(ts.isFunctionDeclaration(n.parent) || ts.isClassDeclaration(n.parent) || ts.isInterfaceDeclaration(n.parent) || ts.isTypeAliasDeclaration(n.parent)) && n.parent.name === n;
+	let scope: ts.Node = isOuterDeclarationName ? n.parent.parent : n.parent;
 	while (!ts.isSourceFile(scope)) {
 		if (
 			ts.isArrowFunction(scope) ||

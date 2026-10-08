@@ -18,6 +18,11 @@ import type { QualityAnalysis, QualityCfg } from './runner.js';
 /*//////////////////////////////////////////////////
 REGEX
 //////////////////////////////////////////////////*/
+const TYPE_S_REGEX = /^type\s+/;
+
+/*//////////////////////////////////////////////////
+REGEX
+//////////////////////////////////////////////////*/
 const R_N_REGEX = /\r?\n/;
 const S_S_G_REGEX = () => /\/\*\*[\s\S]*?\*\//g;
 
@@ -240,25 +245,27 @@ export function duplicateImportFindings(files: string[]): DuplicateImportFinding
 		const seen = new Set<string>();
 		for (const declaration of parsed.statements.filter(ts.isImportDeclaration)) {
 			if (!declaration.importClause || !ts.isStringLiteral(declaration.moduleSpecifier)) continue;
-			const module = declaration.moduleSpecifier.text;
-			const clause = declaration.importClause;
 			const keys: string[] = [];
-			if (clause.name) keys.push(`${module}|${importGroup(clause.name.text)}|${clause.isTypeOnly ? 'type' : 'value'}|default:${clause.name.text}`);
-			if (clause.namedBindings && ts.isNamespaceImport(clause.namedBindings)) {
-				const binding = clause.namedBindings.name.text;
-				keys.push(`${module}|${importGroup(binding)}|${clause.isTypeOnly ? 'type' : 'value'}|namespace:${binding}`);
+			if (declaration.importClause.name)
+				keys.push(
+					`${declaration.moduleSpecifier.text}|${importGroup(declaration.importClause.name.text)}|${declaration.importClause.isTypeOnly ? 'type' : 'value'}|default:${declaration.importClause.name.text}`,
+				);
+			if (declaration.importClause.namedBindings && ts.isNamespaceImport(declaration.importClause.namedBindings)) {
+				keys.push(
+					`${declaration.moduleSpecifier.text}|${importGroup(declaration.importClause.namedBindings.name.text)}|${declaration.importClause.isTypeOnly ? 'type' : 'value'}|namespace:${declaration.importClause.namedBindings.name.text}`,
+				);
 			}
-			if (clause.namedBindings && ts.isNamedImports(clause.namedBindings)) {
-				for (const element of clause.namedBindings.elements) {
-					const typeOnly = clause.isTypeOnly || element.isTypeOnly;
+			if (declaration.importClause.namedBindings && ts.isNamedImports(declaration.importClause.namedBindings)) {
+				for (const element of declaration.importClause.namedBindings.elements) {
+					const typeOnly = declaration.importClause.isTypeOnly || element.isTypeOnly;
 					const group = typeOnly ? 'TYPES' : importGroup(element.name.text);
-					const binding = element.getText(parsed).replace(/^type\s+/, '');
-					keys.push(`${module}|${group}|${typeOnly ? 'type' : 'value'}|${binding}`);
+					const binding = element.getText(parsed).replace(TYPE_S_REGEX, '');
+					keys.push(`${declaration.moduleSpecifier.text}|${group}|${typeOnly ? 'type' : 'value'}|${binding}`);
 				}
 			}
 			if (keys.some((key) => seen.has(key))) {
 				const { line } = parsed.getLineAndCharacterOfPosition(declaration.getStart(parsed));
-				findings.push({ file, line: line + 1, module });
+				findings.push({ file, line: line + 1, module: declaration.moduleSpecifier.text });
 			}
 			for (const key of keys) seen.add(key);
 		}
@@ -300,7 +307,7 @@ function groupedImports(parsed: ts.SourceFile, imports: ts.ImportDeclaration[]):
 			for (const el of n.importClause.namedBindings.elements) {
 				const elTypeOnly = n.importClause.isTypeOnly || el.isTypeOnly;
 				const group = elTypeOnly ? 'TYPES' : importGroup(el.name.text);
-				get(group, n, elTypeOnly).named.add(el.getText(parsed).replace(/^type\s+/, ''));
+				get(group, n, elTypeOnly).named.add(el.getText(parsed).replace(TYPE_S_REGEX, ''));
 			}
 		}
 	}
@@ -735,10 +742,12 @@ export function removeNonCodeComments(fileName: string): boolean {
 			comments.push({ start: scanner.getTokenPos(), end: scanner.getTextPos(), text: scanner.getTokenText() });
 	for (const block of tsdocBlocks(original, parsed)) {
 		const followingDeclaration = nodeStarts.filter((s) => s >= block.end).sort((a, b) => a - b)[0];
-		const detached = followingDeclaration === undefined || !/^\s*$/.test(original.slice(block.end, followingDeclaration));
-		const empty = !block.text.replace(/^\/\*\*|\*\/$/g, '').replace(/^\s*\* ?/gm, '').trim();
-		if ((detached || empty) && !fileHeaderBlock(original, [block]))
-			removals.push({ start: block.start, end: block.end });
+		const detached = followingDeclaration === undefined || !S_REGEX.test(original.slice(block.end, followingDeclaration));
+		const empty = !block.text
+			.replace(/^\/\*\*|\*\/$/g, '')
+			.replace(/^\s*\* ?/gm, '')
+			.trim();
+		if ((detached || empty) && !fileHeaderBlock(original, [block])) removals.push({ start: block.start, end: block.end });
 	}
 	const headings = comments.filter(({ text: t }) => /^\/\*\/{10,}/.test(t) || /^\/\/\s*[A-Z][A-Z _-]*\s*$/.test(t));
 	for (const [idx, heading] of headings.entries()) {
@@ -1029,7 +1038,7 @@ function descriptionFindingsForFile(cfg: QualityCfg, file: string, src: string, 
 			ts.isVariableStatement(node)
 		)
 			for (const range of ts.getLeadingCommentRanges(src, node.getFullStart()) ?? [])
-				if (src.slice(range.pos, range.end).startsWith('/**') && /^\s*$/.test(src.slice(range.end, node.getStart(parsed)))) attached.add(range.pos);
+				if (src.slice(range.pos, range.end).startsWith('/**') && S_REGEX.test(src.slice(range.end, node.getStart(parsed)))) attached.add(range.pos);
 		ts.forEachChild(node, markAttached);
 	};
 	markAttached(parsed);

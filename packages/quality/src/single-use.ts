@@ -16,28 +16,22 @@ import { qualityProgress } from './progress.js';
 
 // TYPES
 import type { QualityCfg } from './runner.js';
+
 /*//////////////////////////////////////////////////
 REGEX
 //////////////////////////////////////////////////*/
+
 const S_REGEX = /^\s*$/;
+const C_M_JS_JSX_TS_TSX_REGEX = /\.(?:c|m)?(?:js|jsx|ts|tsx)$/;
 
 /*//////////////////////////////////////////////////
-REGEX
+HELPERS
 //////////////////////////////////////////////////*/
 
-const C_M_JS_JSX_TS_TSX_REGEX = /\.(?:c|m)?(?:js|jsx|ts|tsx)$/;
-const reportProgress = (label: string, index: number, total: number): void => {
-	if (index === 0 || index === total || index % Math.max(1, Math.ceil(total / 20)) === 0) qualityProgress(label, index, total);
+const reportProgress = (label: string, idx: number, total: number): void => {
+	if (idx === 0 || idx === total || idx % Math.max(1, Math.ceil(total / 20)) === 0) qualityProgress(label, idx, total);
 };
-export type SingleUseFinding = {
-	file: string;
-	line: number;
-	name: string;
-	decision: 'INLINE' | 'REVIEW';
-	autofixable: boolean;
-	reason: string;
-	agentAction: string;
-};
+export type SingleUseFinding = { file: string; line: number; name: string; decision: 'INLINE' | 'REVIEW'; autofixable: boolean; reason: string; agentAction: string };
 type Candidate = { file: string; source: ts.SourceFile; statement: ts.Statement; name: ts.Identifier; symbol: ts.Symbol; kind: 'type' | 'interface' | 'variable' | 'function' };
 type Reference = { file: string; source: ts.SourceFile; node: ts.Identifier };
 const rejectedInlineCandidates = new Map<string, string>();
@@ -58,10 +52,6 @@ const isImportNode = (n: ts.Node): boolean => {
 	for (let parent: ts.Node | undefined = n.parent; parent && !ts.isSourceFile(parent); parent = parent.parent) if (ts.isImportDeclaration(parent)) return true;
 	return false;
 };
-
-/*//////////////////////////////////////////////////
-HELPERS
-//////////////////////////////////////////////////*/
 
 /**
  * Creates the TypeScript program used to identify declarations and their consumers.
@@ -132,10 +122,10 @@ function collect(cfg: QualityCfg, program: ts.Program, checker: ts.TypeChecker):
 	const declarationByLocation = new Map<string, Candidate>();
 	const candidateBySymbol = new Map<ts.Symbol, Candidate>();
 	const references = new Map<ts.Symbol, Reference[]>();
-	const scopedSources = program.getSourceFiles().filter((source) => !source.isDeclarationFile && inSingleUseScope(cfg, source.fileName) && C_M_JS_JSX_TS_TSX_REGEX.test(source.fileName));
-	reportProgress('Single-use declaration scan:', 0, scopedSources.length);
-	for (const [sourceIndex, source] of scopedSources.entries()) {
-		reportProgress('Single-use declaration scan:', sourceIndex + 1, scopedSources.length);
+	const scopedSrcs = program.getSourceFiles().filter((source) => !source.isDeclarationFile && inSingleUseScope(cfg, source.fileName) && C_M_JS_JSX_TS_TSX_REGEX.test(source.fileName));
+	reportProgress('Single-use declaration scan:', 0, scopedSrcs.length);
+	for (const [sourceIndex, source] of scopedSrcs.entries()) {
+		reportProgress('Single-use declaration scan:', sourceIndex + 1, scopedSrcs.length);
 		const visitCandidates = (node: ts.Node): void => {
 			if (!isCandidateStatement(node as ts.Statement)) {
 				ts.forEachChild(node, visitCandidates);
@@ -167,21 +157,33 @@ function collect(cfg: QualityCfg, program: ts.Program, checker: ts.TypeChecker):
 		visitCandidates(source);
 	}
 	const candidateSymbols = new Set(candidates.map((c) => c.symbol));
-	const referenceSources = program.getSourceFiles().filter((source) => !source.isDeclarationFile && inSingleUseRoots(cfg, source.fileName) && C_M_JS_JSX_TS_TSX_REGEX.test(source.fileName));
+	const referenceSrcs = program.getSourceFiles().filter((source) => !source.isDeclarationFile && inSingleUseRoots(cfg, source.fileName) && C_M_JS_JSX_TS_TSX_REGEX.test(source.fileName));
 	const requiredExports = new Map<ts.Symbol, ts.Symbol>();
-	for (const src of referenceSources) {
+	for (const src of referenceSrcs) {
 		const visitRequires = (node: ts.Node): void => {
-			if (ts.isVariableDeclaration(node) && ts.isObjectBindingPattern(node.name) && node.initializer && ts.isCallExpression(node.initializer) && ts.isIdentifier(node.initializer.expression) && node.initializer.expression.text === 'require' && node.initializer.arguments.length === 1 && ts.isStringLiteral(node.initializer.arguments[0]!)) {
-				const resolved = ts.resolveModuleName(node.initializer.arguments[0].text, src.fileName, program.getCompilerOptions(), ts.sys).resolvedModule;
-				const moduleSource = resolved && program.getSourceFile(resolved.resolvedFileName);
-				const moduleSymbol = moduleSource && checker.getSymbolAtLocation(moduleSource);
+			if (
+				ts.isVariableDeclaration(node) &&
+				ts.isObjectBindingPattern(node.name) &&
+				node.initializer &&
+				ts.isCallExpression(node.initializer) &&
+				ts.isIdentifier(node.initializer.expression) &&
+				node.initializer.expression.text === 'require' &&
+				node.initializer.arguments.length === 1 &&
+				ts.isStringLiteral(node.initializer.arguments[0]!)
+			) {
+				const moduleSpecifier = node.initializer.arguments[0]!;
+				const moduleSrc = program.getSourceFile(ts.resolveModuleName(moduleSpecifier.text, src.fileName, program.getCompilerOptions(), ts.sys).resolvedModule?.resolvedFileName ?? '');
+				const moduleSymbol = moduleSrc && checker.getSymbolAtLocation(moduleSrc);
 				if (moduleSymbol) {
 					const exports = checker.getExportsOfModule(moduleSymbol);
 					for (const element of node.name.elements) {
 						if (!ts.isIdentifier(element.name) || element.dotDotDotToken) continue;
 						const exportName = element.propertyName && ts.isIdentifier(element.propertyName) ? element.propertyName.text : element.name.text;
 						const localSymbol = canonical(checker, checker.getSymbolAtLocation(element.name));
-						const exportSymbol = canonical(checker, exports.find((item) => item.name === exportName));
+						const exportSymbol = canonical(
+							checker,
+							exports.find((i) => i.name === exportName),
+						);
 						if (localSymbol && exportSymbol && candidateSymbols.has(exportSymbol)) requiredExports.set(localSymbol, exportSymbol);
 					}
 				}
@@ -190,9 +192,9 @@ function collect(cfg: QualityCfg, program: ts.Program, checker: ts.TypeChecker):
 		};
 		visitRequires(src);
 	}
-	reportProgress('Single-use reference scan:', 0, referenceSources.length);
-	for (const [sourceIndex, src] of referenceSources.entries()) {
-		reportProgress('Single-use reference scan:', sourceIndex + 1, referenceSources.length);
+	reportProgress('Single-use reference scan:', 0, referenceSrcs.length);
+	for (const [sourceIndex, src] of referenceSrcs.entries()) {
+		reportProgress('Single-use reference scan:', sourceIndex + 1, referenceSrcs.length);
 		const visit = (node: ts.Node): void => {
 			if (ts.isIdentifier(node)) {
 				if (ts.isBindingElement(node.parent)) {
@@ -233,7 +235,7 @@ function collect(cfg: QualityCfg, program: ts.Program, checker: ts.TypeChecker):
 function classify(candidate: Candidate): [SingleUseFinding['decision'], string] {
 	if (candidate.kind === 'function') return ['REVIEW', 'inlining a function can change its identity, closure, stack, or component behavior'];
 	if (candidate.kind === 'variable') {
-		if (!initializerSafeToInline(candidate)) return ['REVIEW', 'initializer is not a side-effect-free primitive constant'];
+		if (!initSafeToInline(candidate)) return ['REVIEW', 'initializer is not a side-effect-free primitive constant'];
 		return ['INLINE', 'side-effect-free primitive constant has one in-scope consumer'];
 	}
 	return ['INLINE', `${candidate.kind} declaration has one in-scope consumer`];
@@ -259,10 +261,9 @@ function singleUseAgentAction(candidate: Candidate, use: Reference, canInline: b
 		return 'Keep the binding because its only use is a write target. Do not substitute its initializer unless the same writable location and mutation semantics are preserved.';
 	if (reason.includes('imported type annotation'))
 		return 'Keep the binding and its imported type annotation together; only inline after preserving the annotation and confirming the affected typecheck.';
-	if (reason.includes('explicit any'))
-		return 'Keep the named type boundary unless it can be inlined without introducing explicit any; verify the consumer with typecheck.';
-	const reactSource = /\.(?:tsx|jsx)$/.test(candidate.source.fileName);
-	const invariants = reactSource
+	if (reason.includes('explicit any')) return 'Keep the named type boundary unless it can be inlined without introducing explicit any; verify the consumer with typecheck.';
+	const reactSrc = /\.(?:tsx|jsx)$/.test(candidate.source.fileName);
+	const invariants = reactSrc
 		? 'evaluation order and timing, closure capture, identity, writes, React hook order, and observable effects'
 		: 'evaluation order and timing, closure capture, identity, writes, and observable effects';
 	return `Inline the initializer at its sole use only if ${invariants} remain unchanged. Otherwise retain the binding for the concrete semantic reason reported above and verify the focused behavior.`;
@@ -279,8 +280,8 @@ function singleUseAgentAction(candidate: Candidate, use: Reference, canInline: b
  */
 function typeReferences(candidate: Candidate, references: Map<ts.Symbol, Reference[]>): Reference[] {
 	return (references.get(candidate.symbol) ?? []).filter((reference) => {
-		const target = referenceTgt(reference.node);
-		return !isExportSpecifierReference(reference) && (ts.isTypeReferenceNode(target) || ts.isExpressionWithTypeArguments(target));
+		const tgt = referenceTgt(reference.node);
+		return !isExportSpecifierReference(reference) && (ts.isTypeReferenceNode(tgt) || ts.isExpressionWithTypeArguments(tgt));
 	});
 }
 
@@ -295,10 +296,12 @@ function typeReferences(candidate: Candidate, references: Map<ts.Symbol, Referen
 /** Collects Astro frontmatter and markup consumers once for an analysis run. */
 function astroConsumersFor(cfg: QualityCfg, program: ts.Program): Set<string> {
 	const astroFiles = srcFiles(cfg).filter((path) => path.endsWith('.astro'));
-	const signature = astroFiles.map((file) => {
-		const stats = statSync(file);
-		return `${file}:${stats.mtimeMs}:${stats.size}`;
-	}).join('\n');
+	const signature = astroFiles
+		.map((f) => {
+			const stats = statSync(f);
+			return `${f}:${stats.mtimeMs}:${stats.size}`;
+		})
+		.join('\n');
 	let cached = astroConsumerCache.get(cfg);
 	if (!cached || cached.signature !== signature) {
 		const consumers = new Set<string>();
@@ -315,18 +318,17 @@ function astroConsumersFor(cfg: QualityCfg, program: ts.Program): Set<string> {
 				const resolved = ts.resolveModuleName(statement.moduleSpecifier.text, f, program.getCompilerOptions(), ts.sys).resolvedModule?.resolvedFileName;
 				if (!resolved) continue;
 				for (const imported of bindings.elements) {
-					const exportName = (imported.propertyName ?? imported.name).text;
 					if (!markup.includes(imported.name.text)) {
 						let used = false;
 						const inspect = (node: ts.Node): void => {
 							if (node === statement || used) return;
-						if (ts.isIdentifier(node) && node.text === imported.name.text && !isImportNode(node)) used = true;
+							if (ts.isIdentifier(node) && node.text === imported.name.text && !isImportNode(node)) used = true;
 							ts.forEachChild(node, inspect);
 						};
 						for (const bodyStatement of src.statements) inspect(bodyStatement);
 						if (!used) continue;
 					}
-					consumers.add(`${resolved}\u0000${exportName}`);
+					consumers.add(`${resolved}\u0000${(imported.propertyName ?? imported.name).text}`);
 				}
 			}
 		}
@@ -342,7 +344,7 @@ function hasAstroConsumer(candidate: Candidate, consumers: Set<string>): boolean
 }
 
 /** Keeps explicitly configured module contracts out of single-consumer cleanup. */
-function isConfiguredPublicContract(cfg: QualityCfg, candidate: Candidate, checker: ts.TypeChecker): boolean {
+function isCfgdPublicContract(cfg: QualityCfg, candidate: Candidate, checker: ts.TypeChecker): boolean {
 	const file = relative(cfg.root, candidate.file).split(sep).join('/');
 	if (!cfg.frameworkEntryExports?.[file]?.includes(candidate.name.text)) return false;
 	const moduleSymbol = checker.getSymbolAtLocation(candidate.source);
@@ -351,20 +353,21 @@ function isConfiguredPublicContract(cfg: QualityCfg, candidate: Candidate, check
 }
 
 /** Preserves a React identity hook or interval handle whose one use is required by lifecycle semantics. */
-function isRequiredLifecycleValue(candidate: Candidate, use: Reference): boolean {
+function isRequiredLifecycleVal(candidate: Candidate, use: Reference): boolean {
 	if (candidate.kind !== 'variable' || !ts.isVariableStatement(candidate.statement)) return false;
-	const initializer = candidate.statement.declarationList.declarations[0]?.initializer;
-	if (!initializer || !ts.isCallExpression(initializer)) return false;
-	const hookCall = ts.isIdentifier(initializer.expression) && initializer.expression.text === 'useId';
+	const init = candidate.statement.declarationList.declarations[0]?.initializer;
+	if (!init || !ts.isCallExpression(init)) return false;
+	const hookCall = ts.isIdentifier(init.expression) && init.expression.text === 'useId';
 	const intervalCall =
-		ts.isPropertyAccessExpression(initializer.expression) &&
-		ts.isIdentifier(initializer.expression.expression) &&
-		initializer.expression.expression.text === 'window' &&
-		initializer.expression.name.text === 'setInterval';
+		ts.isPropertyAccessExpression(init.expression) && ts.isIdentifier(init.expression.expression) && init.expression.expression.text === 'window' && init.expression.name.text === 'setInterval';
 	if (hookCall) return true;
 	if (!intervalCall || !ts.isCallExpression(use.node.parent)) return false;
-	const cleanup = use.node.parent;
-	return ts.isPropertyAccessExpression(cleanup.expression) && ts.isIdentifier(cleanup.expression.expression) && cleanup.expression.expression.text === 'window' && cleanup.expression.name.text === 'clearInterval';
+	return (
+		ts.isPropertyAccessExpression(use.node.parent.expression) &&
+		ts.isIdentifier(use.node.parent.expression.expression) &&
+		use.node.parent.expression.expression.text === 'window' &&
+		use.node.parent.expression.name.text === 'clearInterval'
+	);
 }
 
 /** Keeps imported type names in scope when an inline would discard their annotation. */
@@ -443,7 +446,7 @@ function containsAwait(candidate: Candidate): boolean {
 }
 
 /** Rejects expressions whose timing, hook order, or observable identity can change when moved. */
-function initializerSafeToInline(candidate: Candidate): boolean {
+function initSafeToInline(candidate: Candidate): boolean {
 	if (candidate.kind !== 'variable' || !ts.isVariableStatement(candidate.statement)) return true;
 	const declaration = candidate.statement.declarationList.declarations[0];
 	const init = declaration?.initializer;
@@ -495,6 +498,17 @@ function isWriteReference(reference: Reference): boolean {
 	);
 }
 
+/** Preserves saved values used to restore mutable object or property state. */
+function isStateRestorationReference(reference: Reference): boolean {
+	return (
+		ts.isBinaryExpression(reference.node.parent) &&
+		reference.node.parent.right === reference.node &&
+		reference.node.parent.operatorToken.kind >= ts.SyntaxKind.FirstAssignment &&
+		reference.node.parent.operatorToken.kind <= ts.SyntaxKind.LastAssignment &&
+		(ts.isPropertyAccessExpression(reference.node.parent.left) || ts.isElementAccessExpression(reference.node.parent.left))
+	);
+}
+
 /**
  * Identifies a reference that only re-exports an imported binding.
  *
@@ -520,15 +534,16 @@ export function singleUseFindings(cfg: QualityCfg): SingleUseFinding[] {
 	const astroConsumers = astroConsumersFor(cfg, program);
 	const findings: SingleUseFinding[] = [];
 	reportProgress('Single-use classification:', 0, candidates.length);
-	for (const [candidateIndex, c] of candidates.entries()) {
-		reportProgress('Single-use classification:', candidateIndex + 1, candidates.length);
-		if (isConfiguredPublicContract(cfg, c, checker)) continue;
+	for (const [candidateIdx, c] of candidates.entries()) {
+		reportProgress('Single-use classification:', candidateIdx + 1, candidates.length);
+		if (isCfgdPublicContract(cfg, c, checker)) continue;
 		const uses = c.kind === 'type' || c.kind === 'interface' ? typeReferences(c, references) : (references.get(c.symbol) ?? []).filter((r) => !isImportNode(r.node) && !isExportSpecifierReference(r));
 		if (uses.length !== 1) continue;
 		const use = uses[0]!;
 		if (!inSingleUseScope(cfg, use.file)) continue;
-		if (isRequiredLifecycleValue(c, use)) continue;
-		let [initialDecision, reason] = classify(c);
+		if (isRequiredLifecycleVal(c, use)) continue;
+		const [initialDecision, initialReason] = classify(c);
+		let reason = initialReason;
 		let canInline = initialDecision === 'INLINE';
 		if (hasAstroConsumer(c, astroConsumers)) continue;
 		if (c.kind === 'function') [canInline, reason] = [false, 'inlining a function can change its identity, closure, stack, or component behavior'];
@@ -536,20 +551,22 @@ export function singleUseFindings(cfg: QualityCfg): SingleUseFinding[] {
 		else if ((c.kind === 'type' || c.kind === 'interface') && !crossFileTypeSafe(c, use, checker)) [canInline, reason] = [false, 'type depends on declarations that are not available at the consumer'];
 		else if ((c.kind === 'type' || c.kind === 'interface') && containsExplicitAny(c)) [canInline, reason] = [false, 'inlining would introduce explicit any'];
 		else if (c.kind === 'variable' && containsAwait(c)) [canInline, reason] = [false, 'inlining would move await into another evaluation context'];
-		else if (c.kind === 'variable' && !initializerSafeToInline(c)) [canInline, reason] = [false, 'inlining could change evaluation timing, hook order, or side effects'];
+		else if (c.kind === 'variable' && !initSafeToInline(c)) [canInline, reason] = [false, 'inlining could change evaluation timing, hook order, or side effects'];
+		else if (c.kind === 'variable' && isStateRestorationReference(use)) [canInline, reason] = [false, 'inlining would discard a saved value needed to restore mutable state'];
 		else if (c.kind === 'variable' && isWriteReference(use)) [canInline, reason] = [false, 'the sole reference is a write target'];
-		else if (c.kind === 'variable' && (ts.isJsxOpeningElement(use.node.parent) || ts.isJsxSelfClosingElement(use.node.parent))) [canInline, reason] = [false, 'this is a standalone JSX component; keep its component identity and declaration boundary, or export it from its definition if it is a module-level component'];
+		else if (c.kind === 'variable' && (ts.isJsxOpeningElement(use.node.parent) || ts.isJsxSelfClosingElement(use.node.parent)))
+			[canInline, reason] = [false, 'this is a standalone JSX component; keep its component identity and declaration boundary, or export it from its definition if it is a module-level component'];
 		else if (hasImportedTypeAnnotation(c, checker)) [canInline, reason] = [false, 'inlining would remove a required imported type annotation'];
 		const decision: SingleUseFinding['decision'] = canInline ? 'INLINE' : 'REVIEW';
 		const rejectedReason = rejectedInlineCandidates.get(`${c.file}:${c.name.text}`);
 		findings.push({
-				file: relative(cfg.root, c.file),
-				line: c.source.getLineAndCharacterOfPosition(c.name.getStart(c.source)).line + 1,
-				name: c.name.text,
-				decision: rejectedReason ? 'REVIEW' : decision,
-				autofixable: !rejectedReason && decision === 'INLINE',
-				reason: rejectedReason ?? reason,
-				agentAction: singleUseAgentAction(c, use, !rejectedReason && canInline, rejectedReason ?? reason),
+			file: relative(cfg.root, c.file),
+			line: c.source.getLineAndCharacterOfPosition(c.name.getStart(c.source)).line + 1,
+			name: c.name.text,
+			decision: rejectedReason ? 'REVIEW' : decision,
+			autofixable: !rejectedReason && decision === 'INLINE',
+			reason: rejectedReason ?? reason,
+			agentAction: singleUseAgentAction(c, use, !rejectedReason && canInline, rejectedReason ?? reason),
 		});
 	}
 	return findings;
@@ -770,66 +787,69 @@ function discardedDeclarationComments(c: Candidate): string[] {
 }
 
 /** Rejects a batch when its edited files gain TypeScript errors. */
-function filesWithNewTypeErrors(program: ts.Program, updates: Map<string, string>): Set<string> {
+function filesWithNewTypeErrs(program: ts.Program, updates: Map<string, string>): Set<string> {
 	const files = [...updates.keys()];
 	const total = files.length * 2;
 	qualityProgress('TypeScript validation', 0, total);
-	const options = program.getCompilerOptions();
-	const host = ts.createCompilerHost(options);
-	const originalGetSourceFile = host.getSourceFile.bind(host);
+	const opts = program.getCompilerOptions();
+	const host = ts.createCompilerHost(opts);
+	const originalGetSrcFile = host.getSourceFile.bind(host);
 	const originalDiagnostics: ts.Diagnostic[] = [];
 	for (const [fileIndex, file] of files.entries()) {
 		const sourceFile = program.getSourceFile(file);
 		if (sourceFile) originalDiagnostics.push(...ts.getPreEmitDiagnostics(program, sourceFile));
 		qualityProgress('TypeScript validation', fileIndex + 1, total);
 	}
-	const virtualFiles = new Map([...updates].map(([file, text]) => [file, text]));
-	host.getSourceFile = (fileName, languageVersion, onError, shouldCreateNewSourceFile) => {
+	const virtualFiles = new Map([...updates].map(([f, text]) => [f, text]));
+	host.getSourceFile = (fileName, langVersion, onErr, shouldCreateNewSrcFile) => {
 		const text = virtualFiles.get(fileName);
-		const scriptKind = fileName.endsWith('.tsx') ? ts.ScriptKind.TSX : fileName.endsWith('.jsx') ? ts.ScriptKind.JSX : fileName.endsWith('.js') || fileName.endsWith('.mjs') || fileName.endsWith('.cjs') ? ts.ScriptKind.JS : ts.ScriptKind.TS;
-		return text === undefined
-			? originalGetSourceFile(fileName, languageVersion, onError, shouldCreateNewSourceFile)
-			: ts.createSourceFile(fileName, text, languageVersion, true, scriptKind);
+		const scriptKind = fileName.endsWith('.tsx')
+			? ts.ScriptKind.TSX
+			: fileName.endsWith('.jsx')
+				? ts.ScriptKind.JSX
+				: fileName.endsWith('.js') || fileName.endsWith('.mjs') || fileName.endsWith('.cjs')
+					? ts.ScriptKind.JS
+					: ts.ScriptKind.TS;
+		return text === undefined ? originalGetSrcFile(fileName, langVersion, onErr, shouldCreateNewSrcFile) : ts.createSourceFile(fileName, text, langVersion, true, scriptKind);
 	};
 	host.readFile = (fileName) => virtualFiles.get(fileName) ?? ts.sys.readFile(fileName);
 	const originalFileExists = host.fileExists.bind(host);
 	host.fileExists = (fileName) => virtualFiles.has(fileName) || originalFileExists(fileName);
-	const updatedProgram = ts.createProgram({ rootNames: program.getRootFileNames(), options, host });
+	const updatedProgram = ts.createProgram({ rootNames: program.getRootFileNames(), options: opts, host });
 	const diagnosticKey = (diagnostic: ts.Diagnostic): string => `${diagnostic.code}:${ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n')}`;
-	const previousCounts = new Map<string, Map<string, number>>();
+	const prevCounts = new Map<string, Map<string, number>>();
 	for (const diagnostic of originalDiagnostics) {
 		if (diagnostic.category !== ts.DiagnosticCategory.Error || !diagnostic.file) continue;
 		const file = diagnostic.file.fileName;
-		const counts = previousCounts.get(file) ?? new Map<string, number>();
+		const counts = prevCounts.get(file) ?? new Map<string, number>();
 		const key = diagnosticKey(diagnostic);
 		counts.set(key, (counts.get(key) ?? 0) + 1);
-		previousCounts.set(file, counts);
+		prevCounts.set(file, counts);
 	}
-	const currentCounts = new Map<string, Map<string, number>>();
+	const currCounts = new Map<string, Map<string, number>>();
 	for (const [fileIndex, file] of files.entries()) {
 		const sourceFile = updatedProgram.getSourceFile(file);
 		if (sourceFile) {
 			for (const diagnostic of ts.getPreEmitDiagnostics(updatedProgram, sourceFile)) {
 				if (diagnostic.category !== ts.DiagnosticCategory.Error || !diagnostic.file) continue;
-				const diagnosticFile = diagnostic.file.fileName;
-				const counts = currentCounts.get(diagnosticFile) ?? new Map<string, number>();
+				const counts = currCounts.get(diagnostic.file.fileName) ?? new Map<string, number>();
 				const key = diagnosticKey(diagnostic);
 				counts.set(key, (counts.get(key) ?? 0) + 1);
-				currentCounts.set(diagnosticFile, counts);
+				currCounts.set(diagnostic.file.fileName, counts);
 			}
 		}
 		qualityProgress('TypeScript validation', files.length + fileIndex + 1, total);
 	}
-	const introducedErrors = [...currentCounts].some(([file, after]) => {
-		const before = previousCounts.get(file) ?? new Map<string, number>();
+	const introducedErrs = [...currCounts].some(([f, after]) => {
+		const before = prevCounts.get(f) ?? new Map<string, number>();
 		return [...after].some(([key, count]) => count > (before.get(key) ?? 0));
 	});
-	return introducedErrors ? new Set(updates.keys()) : new Set();
+	return introducedErrs ? new Set(updates.keys()) : new Set();
 }
 
 /** Returns whether a proposed batch adds any TypeScript error in an edited file. */
 export function deadCodeEditsIntroduceTypeErrors(program: ts.Program, updates: Map<string, string>): boolean {
-	return filesWithNewTypeErrors(program, updates).size > 0;
+	return filesWithNewTypeErrs(program, updates).size > 0;
 }
 
 /**
@@ -847,19 +867,20 @@ function fixSingleUsePass(cfg: QualityCfg, changedFiles: Set<string>): number {
 	const edits = new Map<string, { start: number; end: number; text: string }[]>();
 	const pending: { fileEdits: { file: string; start: number; end: number; text: string }[]; referenceLength: number; nestedReference: boolean; candidateKey: string; jsxFile?: string }[] = [];
 	for (const c of candidates) {
-		if (hasAstroConsumer(c, astroConsumers) || isConfiguredPublicContract(cfg, c, checker)) continue;
+		if (hasAstroConsumer(c, astroConsumers) || isCfgdPublicContract(cfg, c, checker)) continue;
 		const uses = c.kind === 'type' || c.kind === 'interface' ? typeReferences(c, refs) : (refs.get(c.symbol) ?? []).filter((r) => !isImportNode(r.node) && !isExportSpecifierReference(r));
 		if (uses.length !== 1) continue;
 		const ref = uses[0]!;
 		if (!inSingleUseScope(cfg, ref.file)) continue;
-		if (isRequiredLifecycleValue(c, ref)) continue;
+		if (isRequiredLifecycleVal(c, ref)) continue;
 		if (c.kind === 'variable' && (ts.isJsxOpeningElement(ref.node.parent) || ts.isJsxSelfClosingElement(ref.node.parent))) continue;
 		if (c.kind === 'function') continue;
 		if (c.kind === 'variable' && c.file !== ref.file && !crossFileVariableSafe(c)) continue;
 		if ((c.kind === 'type' || c.kind === 'interface') && !crossFileTypeSafe(c, ref, checker)) continue;
 		if ((c.kind === 'type' || c.kind === 'interface') && containsExplicitAny(c)) continue;
 		if (c.kind === 'variable' && containsAwait(c)) continue;
-		if (c.kind === 'variable' && !initializerSafeToInline(c)) continue;
+		if (c.kind === 'variable' && !initSafeToInline(c)) continue;
+		if (c.kind === 'variable' && isStateRestorationReference(ref)) continue;
 		if (c.kind === 'variable' && isWriteReference(ref)) continue;
 		if (hasImportedTypeAnnotation(c, checker)) continue;
 		if (
@@ -909,7 +930,7 @@ function fixSingleUsePass(cfg: QualityCfg, changedFiles: Set<string>): number {
 	let remaining = selected;
 	while (remaining.length) {
 		edits.clear();
-		const jsxFiles = new Set(remaining.flatMap((candidate) => (candidate.jsxFile ? [candidate.jsxFile] : [])));
+		const jsxFiles = new Set(remaining.flatMap((c) => (c.jsxFile ? [c.jsxFile] : [])));
 		for (const candidate of remaining) for (const edit of candidate.fileEdits) edits.set(edit.file, [...(edits.get(edit.file) ?? []), edit]);
 		for (const file of jsxFiles) {
 			const source = program.getSourceFile(file)!;
@@ -936,13 +957,13 @@ function fixSingleUsePass(cfg: QualityCfg, changedFiles: Set<string>): number {
 			if ((parsed as ts.SourceFile & { parseDiagnostics: readonly ts.Diagnostic[] }).parseDiagnostics.length) invalidFiles.add(file);
 		}
 		if (!invalidFiles.size) break;
-		const rejected = remaining.filter((candidate) => candidate.fileEdits.some((edit) => invalidFiles.has(edit.file)) || (candidate.jsxFile && invalidFiles.has(candidate.jsxFile)));
+		const rejected = remaining.filter((c) => c.fileEdits.some((edit) => invalidFiles.has(edit.file)) || (c.jsxFile && invalidFiles.has(c.jsxFile)));
 		for (const candidate of rejected)
 			rejectedInlineCandidates.set(
 				candidate.candidateKey,
-				`the combined inline in ${[...invalidFiles].map((file) => relative(cfg.root, file)).join(', ')} would produce invalid syntax; resolve this candidate manually`,
+				`the combined inline in ${[...invalidFiles].map((f) => relative(cfg.root, f)).join(', ')} would produce invalid syntax; resolve this candidate manually`,
 			);
-		remaining = remaining.filter((candidate) => !rejected.includes(candidate));
+		remaining = remaining.filter((c) => !rejected.includes(c));
 	}
 	const updates: { file: string; text: string }[] = [];
 	for (const [file, fileEdits] of edits) {

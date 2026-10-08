@@ -203,8 +203,7 @@ const addResponsiveSlide = async (presentation: Presentation, group: readonly Vi
 	}
 	slide.addNotes(notes.join('\n\n'));
 };
-/**  Optional visible and metadata overrides for a slideshow artifact. */
-export type SlideshowOptions = { title?: string; author?: string; company?: string; subject?: string };
+
 /**
  * Writes screenshot-backed results as single-viewport or responsive review slides.
  *
@@ -213,7 +212,7 @@ export type SlideshowOptions = { title?: string; author?: string; company?: stri
  * @param opts Optional visible title and document metadata overrides.
  * @returns A promise that resolves after the slideshow has been written.
  */
-export const writeSlideshow = async (file: string, results: readonly VisualResult[], opts: SlideshowOptions = {}): Promise<void> => {
+export const writeSlideshow = async (file: string, results: readonly VisualResult[], opts: { title?: string; author?: string; company?: string; subject?: string } = {}): Promise<void> => {
 	const presentation = new /* The runtime package is CommonJS while NodeNext exposes its constructor through a namespace type. */ (
 		createRequire(import.meta.url)('pptxgenjs') as new () => Presentation
 	)();

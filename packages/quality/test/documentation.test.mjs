@@ -82,11 +82,18 @@ export function useDashboardConfigurationDialog(initialConfigure: string | undef
 
 test('documentation findings warn for detached TSDoc and accept declaration and file-header comments', () => {
 	const root = fixtureRoot('terra-quality-detached-tsdoc-');
-	fixtureFile(root, 'src/main.ts', `/** src/main.ts */
+	fixtureFile(
+		root,
+		'src/main.ts',
+		`/** src/main.ts */
 /** Describes a declaration that was removed. */
-`);
+`,
+	);
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
-	assert.deepEqual(documentationFindings(cfg).map(({ kind, name, severity }) => [kind, name, severity]), [['orphan', '<detached TSDoc>', 'warning']]);
+	assert.deepEqual(
+		documentationFindings(cfg).map(({ kind, name, severity }) => [kind, name, severity]),
+		[['orphan', '<detached TSDoc>', 'warning']],
+	);
 	assert.equal(removeNonCodeComments(`${root}/src/main.ts`), true);
 	assert.doesNotMatch(fixtureText(root, 'src/main.ts'), /Describes a declaration that was removed/);
 });

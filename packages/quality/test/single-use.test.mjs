@@ -105,7 +105,7 @@ void transformed;
 
 test('single-use analysis blocks hook calls and other effectful initializers', () => {
 	const root = fixtureRoot('terra-quality-single-use-effects-');
-	const file = fixtureFile(
+	fixtureFile(
 		root,
 		'src/view.tsx',
 		`import { useMemo } from 'react';
@@ -249,14 +249,12 @@ test('single-use type fixing preserves grouped imports when several bindings are
 	assert.doesNotMatch(consumer, /: (?:First|Second|Third)\b/);
 	assert.equal(ts.createSourceFile('consumer.ts', consumer, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS).parseDiagnostics.length, 0);
 	const diagnostics = ts.getPreEmitDiagnostics(
-		ts.createProgram([`${root}/src/types.ts`, `${root}/src/consumer.ts`], {
-			module: ts.ModuleKind.ESNext,
-			moduleResolution: ts.ModuleResolutionKind.Bundler,
-			strict: true,
-			noEmit: true,
-		}),
+		ts.createProgram([`${root}/src/types.ts`, `${root}/src/consumer.ts`], { module: ts.ModuleKind.ESNext, moduleResolution: ts.ModuleResolutionKind.Bundler, strict: true, noEmit: true }),
 	);
-	assert.deepEqual(diagnostics.map((diagnostic) => ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n')), []);
+	assert.deepEqual(
+		diagnostics.map((diagnostic) => ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n')),
+		[],
+	);
 });
 
 test('single-use type analysis distinguishes same-named declarations by resolved symbol', () => {
@@ -266,7 +264,10 @@ test('single-use type analysis distinguishes same-named declarations by resolved
 	fixtureFile(root, 'src/consumer.ts', `import type { Payload } from './second';\nconst payload: Payload = { second: 1 };\nvoid payload;\n`);
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
 	const findings = singleUseFindings(cfg).filter((finding) => finding.name === 'Payload');
-	assert.deepEqual(findings.map(({ file }) => file), ['src/second.ts']);
+	assert.deepEqual(
+		findings.map(({ file: f }) => f),
+		['src/second.ts'],
+	);
 	assert.equal(fixSingleUseDeclarations(cfg), 2);
 	assert.match(fixtureText(root, 'src/first.ts'), /export type Payload/);
 	assert.doesNotMatch(fixtureText(root, 'src/second.ts'), /export type Payload/);
@@ -402,7 +403,10 @@ test('single-use analysis preserves an aliased export consumed by Astro frontmat
 	fixtureFile(root, 'src/consumer.ts', `import { APP_LABEL } from './constants';\nexport const label = APP_LABEL;\n`);
 	fixtureFile(root, 'src/page.astro', `---\nimport { APP_LABEL as PageLabel } from './constants';\n---\n<h1>{PageLabel}</h1>\n`);
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts', '.astro'] });
-	assert.equal(singleUseFindings(cfg).some((finding) => finding.name === 'APP_LABEL'), false);
+	assert.equal(
+		singleUseFindings(cfg).some((finding) => finding.name === 'APP_LABEL'),
+		false,
+	);
 	assert.equal(fixSingleUseDeclarations(cfg), 0);
 	assert.equal(fixtureText(root, 'src/constants.ts'), `export const APP_LABEL = 'Salesphere';\n`);
 });
