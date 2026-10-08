@@ -122,6 +122,7 @@ export type QualityCfg = {
 	repeatedClasses?: { minimumCount?: number; extensions?: string[]; ignoredDirectories?: string[] };
 	regexDedup?: { extensions?: string[]; ignoredFiles?: string[]; minimumCount?: number; sharedModule?: string };
 	uiPatterns?: { forbidden?: string[]; ignoredFiles?: string[]; extensions?: string[] };
+	singleUse?: { skippedDirectories?: string[] };
 	tsconfig?: string;
 	oneLineImports?: boolean;
 	prettierPrintWidth?: number;
@@ -261,6 +262,7 @@ export function createQualityCfg(cfg: QualityCfg): QualityCfg {
 		sourceRoots: cfg.sourceRoots.map((p) => resolve(cfg.root, p)),
 		includeRoots: (cfg.includeRoots ?? []).map((p) => resolve(cfg.root, p)),
 		skippedDirectories: [...new Set([...defaultSkipped, ...(cfg.skippedDirectories ?? [])])],
+		singleUse: { skippedDirectories: (cfg.singleUse?.skippedDirectories ?? []).map((p) => resolve(cfg.root, p)) },
 		skippedFiles: (cfg.skippedFiles ?? []).map((p) => resolve(cfg.root, p)),
 		aliases: cfg.aliases ?? {},
 		protectedIdentifiers: cfg.protectedIdentifiers ?? [],
@@ -1340,6 +1342,7 @@ function runDeadCodeReadOnly(cfg: QualityCfg, all: boolean): void {
 			root: tempRoot,
 			sourceRoots: cfg.sourceRoots.map((path) => relative(cfg.root, path)),
 			includeRoots: (cfg.includeRoots ?? []).map((path) => relative(cfg.root, path)),
+			singleUse: { skippedDirectories: (cfg.singleUse?.skippedDirectories ?? []).map((path) => relative(cfg.root, path)) },
 			skippedFiles: (cfg.skippedFiles ?? []).map((path) => relative(cfg.root, path)),
 			lintRoots: (cfg.lintRoots ?? []).map((path) => relative(cfg.root, path)),
 			typecheckRoots: (cfg.typecheckRoots ?? []).map((path) => relative(cfg.root, path)),

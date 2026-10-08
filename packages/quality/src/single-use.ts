@@ -96,6 +96,11 @@ function inSingleUseScope(cfg: QualityCfg, file: string): boolean {
 	return roots.some((r) => file === r || file.startsWith(`${r}${sep}`));
 }
 
+/** Excludes configured directories from single-use candidate analysis. */
+function isSingleUseCandidate(cfg: QualityCfg, file: string): boolean {
+	return inSingleUseScope(cfg, file) && !(cfg.singleUse?.skippedDirectories ?? []).some((directory) => file === directory || file.startsWith(`${directory}${sep}`));
+}
+
 /**
  * Checks whether a file can contribute references, including files skipped as declaration candidates.
  *
@@ -122,7 +127,7 @@ function collect(cfg: QualityCfg, program: ts.Program, checker: ts.TypeChecker):
 	const declarationByLocation = new Map<string, Candidate>();
 	const candidateBySymbol = new Map<ts.Symbol, Candidate>();
 	const references = new Map<ts.Symbol, Reference[]>();
-	const scopedSrcs = program.getSourceFiles().filter((source) => !source.isDeclarationFile && inSingleUseScope(cfg, source.fileName) && C_M_JS_JSX_TS_TSX_REGEX.test(source.fileName));
+	const scopedSrcs = program.getSourceFiles().filter((source) => !source.isDeclarationFile && isSingleUseCandidate(cfg, source.fileName) && C_M_JS_JSX_TS_TSX_REGEX.test(source.fileName));
 	reportProgress('Single-use declaration scan:', 0, scopedSrcs.length);
 	for (const [sourceIndex, source] of scopedSrcs.entries()) {
 		reportProgress('Single-use declaration scan:', sourceIndex + 1, scopedSrcs.length);

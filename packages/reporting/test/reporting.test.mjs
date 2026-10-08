@@ -51,7 +51,7 @@ const result = (overrides = {}) => ({
 TESTS
 //////////////////////////////////////////////////*/
 
-/** Covers status normalization, diagnostics, file ordering, and viewport aliases. */
+// Covers status normalization, diagnostics, file ordering, and viewport aliases.
 test('normalizes result summaries and viewport project names', () => {
 	const vals = [result(), result({ status: 'failed' }), result({ status: 'interrupted', file: 'other.spec.ts' })];
 	assert.deepEqual(statusCounts(vals), { passed: 1, failed: 1, timedOut: 0, skipped: 0, interrupted: 1 });
@@ -80,7 +80,7 @@ test('normalizes result summaries and viewport project names', () => {
 	]);
 });
 
-/** Covers neutral spreadsheet/slideshow metadata, embedded evidence, and empty runs. */
+// Covers neutral spreadsheet/slideshow metadata, embedded evidence, and empty runs.
 test('writes neutral spreadsheet and slideshow artifacts', async () => {
 	const root = await fs.mkdtemp(path.join(os.tmpdir(), 'terra-reporting-'));
 	const { default: sharp } = await import('sharp');
