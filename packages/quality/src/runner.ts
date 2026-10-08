@@ -597,7 +597,9 @@ function collectEslintReports(cfg: QualityCfg, all: boolean): EslintReport[] {
 function parseEslintReports(result: ReturnType<typeof spawnSync>, files: string[]): EslintReport[] {
 	if (result.error) throw new Error(`ESLint dead-code detector failed: ${result.error.message}`);
 	if (result.status !== 0 && result.status !== 1)
-		throw new Error(`ESLint dead-code detector exited ${result.status ?? 'without a status'} for ${files.length} source files: ${compactOutput(result.stderr?.toString() ?? '').join(' ')}`);
+		throw new Error(
+			`ESLint dead-code detector exited ${result.status ?? 'without a status'} for ${files.length} source files (${files.slice(0, 3).map((file) => relative(process.cwd(), file)).join(', ')}${files.length > 3 ? ', …' : ''}): ${compactOutput(result.stderr?.toString() ?? '').join(' ')}`,
+		);
 	try {
 		const reports = JSON.parse(result.stdout?.toString() || '') as unknown;
 		if (!Array.isArray(reports)) throw new Error('expected a JSON array');
@@ -1294,8 +1296,14 @@ function runDeadCodeReadOnly(cfg: QualityCfg, all: boolean): void {
 			'pnpm-workspace.yaml',
 			'quality.json',
 			'knip.json',
+			'eslint.config.js',
 			'eslint.config.mjs',
+			'eslint.config.cjs',
+			'eslint.config.ts',
+			'eslint.config.mts',
+			'eslint.config.cts',
 			'tailwind.config.mjs',
+			'tailwind.preset.ts',
 			'postcss.config.mjs',
 			'tsconfig.json',
 			'tsconfig.eslint.json',

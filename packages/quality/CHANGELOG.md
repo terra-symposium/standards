@@ -1,5 +1,11 @@
 # @terra-symposium/quality
 
+## 0.4.48
+
+### Patch Changes
+
+- Copy TypeScript ESLint configs and their Tailwind preset into read-only dead-code previews so ESLint can load the repository configuration.
+
 ## 0.4.47
 
 ### Patch Changes
