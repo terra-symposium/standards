@@ -65,6 +65,7 @@ const CLI_COMMANDS = new Set([
 ]);
 const CLI_FLAGS = new Set(['--all', '--warn', '--strict', '--skip-commands', '--skip-recommendations', '--help', '-h', '--version', '-v']);
 const TOOL_OUTPUT_MAX_BUFFER = 64 * 1024 * 1024;
+const ESLINT_BATCH_SIZE = 10;
 
 /*//////////////////////////////////////////////////
 REGEX
@@ -426,7 +427,7 @@ function runLint(cfg: QualityCfg, opts: QualityOptions, exhaustive = false, dead
 	const before = opts.fix ? snapshotFiles(cfg, files) : undefined;
 	let completed = 0;
 	qualityProgress('ESLint', completed, files.length);
-	for (const filesBatch of batches(files)) {
+	for (const filesBatch of batches(files, ESLINT_BATCH_SIZE)) {
 		const status = run(cfg, toolPath(cfg, cfg.tools?.eslint, 'eslint'), [...flags, ...filesBatch], { quietSuccess: opts.fix });
 		completed += filesBatch.length;
 		qualityProgress('ESLint', completed, files.length);

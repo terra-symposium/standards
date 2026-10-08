@@ -1,5 +1,17 @@
 # @terra-symposium/quality
 
+## 0.4.45
+
+### Patch Changes
+
+- Set the npm package homepage to https://terra-symposium-quality.netlify.app/.
+
+## 0.4.44
+
+### Patch Changes
+
+- Run ESLint in ten-file batches so long full-source checks update progress more frequently.
+
 ## 0.4.43
 
 ### Patch Changes

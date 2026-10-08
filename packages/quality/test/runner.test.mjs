@@ -391,6 +391,18 @@ test('CLI lint applies its autofix policy while the Knip audit remains read-only
 	runQualityCli(cfg, ['knip', '--all', '--warn']);
 	assert.deepEqual(recordedCmds(root, 'knip-args.jsonl').at(-1), ['--reporter', 'json', '--no-config-hints']);
 });
+test('CLI lint updates progress after each ten-file ESLint batch', () => {
+	const root = fixtureRoot('terra-quality-lint-batches-');
+	const eslint = recordingCmd(root, 'eslint-args.jsonl', 'bin/record-eslint.mjs');
+	for (let idx = 0; idx < 11; idx += 1) fixtureFile(root, `src/file-${String(idx).padStart(2, '0')}.ts`, 'export {}\n');
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], tools: { eslint } });
+	runQualityCli(cfg, ['lint', '--all', '--warn']);
+	const invocations = recordedCmds(root, 'eslint-args.jsonl');
+	assert.equal(invocations.length, 2);
+	assert.equal(invocations[0].filter((arg) => arg.endsWith('.ts')).length, 10);
+	assert.equal(invocations[1].filter((arg) => arg.endsWith('.ts')).length, 1);
+	resetExitCode();
+});
 test('quality:all reports duplicate imports read-only and consolidates them idempotently in autofix mode', () => {
 	const root = fixtureRoot('terra-quality-import-dedup-cli-');
 	const source = fixtureFile(
