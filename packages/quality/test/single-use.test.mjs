@@ -431,6 +431,19 @@ test('single-use analysis includes exports unless an external framework consumer
 	assert.equal(fixSingleUseDeclarations(cfg), 0);
 	assert.match(fixtureText(root, 'src/main.ts'), /export function parseReport/);
 });
+test('package entry exports are preserved without exempting private declarations in the same module', () => {
+	const root = fixtureRoot('terra-quality-single-use-package-entry-');
+	fixtureFile(root, 'src/main.ts', `export function parseReport() { return { ok: true }; }\nfunction formatInternal() { return 'ready'; }\nwrite(parseReport(), formatInternal());\n`);
+	fixtureFile(root, 'package.json', JSON.stringify({ exports: { '.': './dist/main.js' } }));
+	fixtureFile(root, 'tsconfig.json', JSON.stringify({ compilerOptions: { rootDir: 'src', outDir: 'dist' }, include: ['src'] }));
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
+	assert.deepEqual(
+		singleUseFindings(cfg).map(({ name }) => name),
+		['formatInternal'],
+	);
+	assert.equal(fixSingleUseDeclarations(cfg), 0);
+	assert.match(fixtureText(root, 'src/main.ts'), /export function parseReport/);
+});
 test('single-use fixing never removes a multi-use explicit-any compatibility alias', () => {
 	const root = fixtureRoot('terra-quality-single-use-any-alias-');
 	fixtureFile(

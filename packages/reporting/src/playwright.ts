@@ -87,7 +87,6 @@ export type ReportingOptions = {
 	slideshowFile?: string;
 };
 
-
 /*//////////////////////////////////////////////////
 HELPERS
 //////////////////////////////////////////////////*/
@@ -179,12 +178,7 @@ export default class ProgressReporter {
 	}
 
 	/** Extracts one named JSON diagnostic attachment. */
-	private diagnosticText(attachments: readonly ({
-    body?: Buffer;
-    contentType?: string;
-    name?: string;
-    path?: string;
-})[], name: string): string[] {
+	private diagnosticText(attachments: readonly { body?: Buffer; contentType?: string; name?: string; path?: string }[], name: string): string[] {
 		const raw = attachments.find((v) => v.name === name && v.contentType === 'application/json');
 		const content = raw?.body?.toString('utf8') ?? (raw?.path && fs.existsSync(raw.path) ? fs.readFileSync(raw.path, 'utf8') : '');
 		return content ? parseDiagnostics(content) : [];

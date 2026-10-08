@@ -9,7 +9,7 @@ IMPORTS
 
 // API
 import ts from 'typescript';
-import { relative, sep } from 'node:path';
+import { dirname, join, relative, sep } from 'node:path';
 import { readFileSync, statSync, writeFileSync } from 'node:fs';
 import { srcFiles } from './files.js';
 import { qualityProgress } from './progress.js';
@@ -357,6 +357,48 @@ function isCfgdPublicContract(cfg: QualityCfg, candidate: Candidate, checker: ts
 	return Boolean(exported && canonical(checker, exported) === candidate.symbol);
 }
 
+/** Keeps declarations exported by a package entrypoint out of local single-use advice. */
+function isPackageEntryExport(cfg: QualityCfg, candidate: Candidate, checker: ts.TypeChecker): boolean {
+	const moduleSymbol = checker.getSymbolAtLocation(candidate.source);
+	const exported = moduleSymbol && checker.getExportsOfModule(moduleSymbol).find((symbol) => symbol.name === candidate.name.text);
+	if (!exported || canonical(checker, exported) !== candidate.symbol) return false;
+
+	for (let dir = dirname(candidate.file); dir.startsWith(cfg.root); dir = dirname(dir)) {
+		const manifestPath = join(dir, 'package.json');
+		if (!statSync(manifestPath, { throwIfNoEntry: false })?.isFile()) continue;
+		try {
+			const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as { exports?: unknown; main?: string; module?: string; types?: string; typings?: string };
+			const tgts: string[] = [];
+			const collectTgts = (val: unknown): void => {
+				if (typeof val === 'string') tgts.push(val);
+				else if (Array.isArray(val)) val.forEach(collectTgts);
+				else if (val && typeof val === 'object') Object.values(val).forEach(collectTgts);
+			};
+			collectTgts(manifest.exports);
+			if (tgts.length === 0) tgts.push(...[manifest.main, manifest.module, manifest.types, manifest.typings].filter((v): v is string => Boolean(v)));
+			const relFile = relative(dir, candidate.file).split(sep).join('/');
+			for (const tgt of tgts) {
+				const norm = tgt.replace(/^\.\//, '').replace(/\.(?:m|c)?(?:js|jsx|ts|tsx|d\.ts)$/, '');
+				if (norm === relFile.replace(C_M_JS_JSX_TS_TSX_REGEX, '')) return true;
+				const tsconfigPath = join(dir, 'tsconfig.json');
+				if (!statSync(tsconfigPath, { throwIfNoEntry: false })?.isFile()) continue;
+				const parsed = ts.readConfigFile(tsconfigPath, ts.sys.readFile);
+				if (parsed.error) continue;
+				const { rootDir, outDir } = ts.parseJsonConfigFileContent(parsed.config, ts.sys, dir).options;
+				if (!rootDir || !outDir) continue;
+				const outputFile = relative(dir, join(outDir, `${relative(rootDir, candidate.file).replace(C_M_JS_JSX_TS_TSX_REGEX, '')}.js`))
+					.split(sep)
+					.join('/');
+				if (norm === outputFile.replace(C_M_JS_JSX_TS_TSX_REGEX, '')) return true;
+			}
+			return false;
+		} catch {
+			return false;
+		}
+	}
+	return false;
+}
+
 /** Preserves a React identity hook or interval handle whose one use is required by lifecycle semantics. */
 function isRequiredLifecycleVal(candidate: Candidate, use: Reference): boolean {
 	if (candidate.kind !== 'variable' || !ts.isVariableStatement(candidate.statement)) return false;
@@ -541,7 +583,7 @@ export function singleUseFindings(cfg: QualityCfg): SingleUseFinding[] {
 	reportProgress('Single-use classification:', 0, candidates.length);
 	for (const [candidateIdx, c] of candidates.entries()) {
 		reportProgress('Single-use classification:', candidateIdx + 1, candidates.length);
-		if (isCfgdPublicContract(cfg, c, checker)) continue;
+		if (isCfgdPublicContract(cfg, c, checker) || isPackageEntryExport(cfg, c, checker)) continue;
 		const uses = c.kind === 'type' || c.kind === 'interface' ? typeReferences(c, references) : (references.get(c.symbol) ?? []).filter((r) => !isImportNode(r.node) && !isExportSpecifierReference(r));
 		if (uses.length !== 1) continue;
 		const use = uses[0]!;
@@ -872,7 +914,7 @@ function fixSingleUsePass(cfg: QualityCfg, changedFiles: Set<string>): number {
 	const edits = new Map<string, { start: number; end: number; text: string }[]>();
 	const pending: { fileEdits: { file: string; start: number; end: number; text: string }[]; referenceLength: number; nestedReference: boolean; candidateKey: string; jsxFile?: string }[] = [];
 	for (const c of candidates) {
-		if (hasAstroConsumer(c, astroConsumers) || isCfgdPublicContract(cfg, c, checker)) continue;
+		if (hasAstroConsumer(c, astroConsumers) || isCfgdPublicContract(cfg, c, checker) || isPackageEntryExport(cfg, c, checker)) continue;
 		const uses = c.kind === 'type' || c.kind === 'interface' ? typeReferences(c, refs) : (refs.get(c.symbol) ?? []).filter((r) => !isImportNode(r.node) && !isExportSpecifierReference(r));
 		if (uses.length !== 1) continue;
 		const ref = uses[0]!;
