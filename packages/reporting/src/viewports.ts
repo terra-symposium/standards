@@ -6,6 +6,9 @@
 import type { PlaywrightTestConfig } from '@playwright/test';
 import fs from 'node:fs';
 import path from 'node:path';
+import { readLoadTestingConfig } from './load-testing.js';
+
+import type { LoadTestingConfig } from './core.js';
 
 /*//////////////////////////////////////////////////
 CONFIG
@@ -121,6 +124,10 @@ export type ResponsivePlaywrightOptions = {
 	outputRoot?: string;
 	/** Optional structured results file to add to the workbook exactly once. */
 	supplementalResultsFile?: string;
+	/** Optional path to the repository's quality.json; defaults to the current directory. */
+	qualityConfigFile?: string;
+	/** Explicit timing settings that override matching quality.json values. */
+	loadTesting?: LoadTestingConfig;
 };
 
 /**
@@ -137,6 +144,7 @@ export type ResponsivePlaywrightOptions = {
  */
 export const withResponsivePlaywright = <T extends PlaywrightTestConfig>(cfg: T, opts: ResponsivePlaywrightOptions = {}): T => {
 	const viewports = resolveVisualViewports();
+	const loadTesting = readLoadTestingConfig(opts.qualityConfigFile, opts.loadTesting);
 	const sharedDistCandidates = [
 		path.resolve(process.cwd(), 'node_modules/@terra-symposium/reporting/dist'),
 		path.resolve(process.cwd(), 'dist'),
@@ -169,7 +177,7 @@ export const withResponsivePlaywright = <T extends PlaywrightTestConfig>(cfg: T,
 		}));
 	});
 	const cfgdReporters = cfg.reporter ? (Array.isArray(cfg.reporter) ? cfg.reporter : [cfg.reporter]) : [];
-	const reportingOpts = { outputRoot: opts.outputRoot, supplementalResultsFile: opts.supplementalResultsFile };
+	const reportingOpts = { outputRoot: opts.outputRoot, supplementalResultsFile: opts.supplementalResultsFile, qualityConfigFile: opts.qualityConfigFile, loadTesting };
 	const reporters = [
 		...cfgdReporters.filter((r) => {
 			const name = Array.isArray(r) ? r[0] : r;
@@ -179,6 +187,7 @@ export const withResponsivePlaywright = <T extends PlaywrightTestConfig>(cfg: T,
 	];
 	return {
 		...cfg,
+		metadata: { ...(cfg.metadata || {}), terraLoadTestingEnabled: loadTesting.enabled },
 		build: { ...(cfg.build || {}), external },
 		outputDir: opts.outputDir || 'test-results/playwright-output',
 		projects: responsiveProjects,

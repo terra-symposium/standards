@@ -10,6 +10,7 @@ IMPORTS
 // API
 import fs from 'node:fs';
 import { diagnosticCount, orderedFiles, resultsForFile, statusCounts, statusLabel } from './core.js';
+import { loadGradeCounts } from './load-testing.js';
 import { neutralizeApplicationMetadata } from './metadata.js';
 
 // COMPONENTS
@@ -31,6 +32,11 @@ const STATUS_STYLES: Record<string, { fill: string; font: string }> = {
 	timedOut: { fill: 'FFFEE2E2', font: 'FF991B1B' },
 	interrupted: { fill: 'FFFEE2E2', font: 'FF991B1B' },
 	skipped: { fill: 'FFFEF3C7', font: 'FF92400E' },
+};
+const LOAD_STYLES: Record<string, { fill: string; font: string }> = {
+	pass: { fill: 'FFDCEFE0', font: 'FF166534' },
+	warning: { fill: 'FFFEF3C7', font: 'FF92400E' },
+	fail: { fill: 'FFFEE2E2', font: 'FF991B1B' },
 };
 /**
  * Applies the shared header layout to a worksheet.
@@ -66,6 +72,14 @@ const styleStatus = (cell: ExcelJS.Cell, status: string): void => {
 		top: { color: { argb: style.font }, style: 'thin' },
 	};
 };
+/** Applies a timing grade and its semantic color treatment to a cell. */
+const styleLoadGrade = (cell: ExcelJS.Cell, grade: string): void => {
+	const style = LOAD_STYLES[grade] || LOAD_STYLES.fail;
+	cell.value = grade;
+	cell.fill = { fgColor: { argb: style.fill }, pattern: 'solid', type: 'pattern' };
+	cell.font = { bold: true, color: { argb: style.font } };
+	cell.alignment = { horizontal: 'center', vertical: 'middle' };
+};
 /**
  * Adds one feature-file result sheet, including available screenshot evidence.
  *
@@ -75,11 +89,12 @@ const styleStatus = (cell: ExcelJS.Cell, status: string): void => {
  * @returns Nothing; the workbook is mutated in place.
  */
 const resultSheetName = (book: ExcelJS.Workbook, src: string): string => {
-	const base = [...src]
-		.map((c) => ('\\/:*?[]'.includes(c) ? '_' : c))
-		.join('')
-		.replace(/^'+|'+$/g, '')
-		.slice(0, 31) || 'Results';
+	const base =
+		[...src]
+			.map((c) => ('\\/:*?[]'.includes(c) ? '_' : c))
+			.join('')
+			.replace(/^'+|'+$/g, '')
+			.slice(0, 31) || 'Results';
 	const reserved = new Set(['summary', 'projects', 'run diagnostics']);
 	const used = new Set([...book.worksheets.map((s) => s.name.toLowerCase()), ...reserved]);
 	let name = base;
@@ -90,10 +105,44 @@ const resultSheetName = (book: ExcelJS.Workbook, src: string): string => {
 	}
 	return name;
 };
-const addResultSheet = (book: ExcelJS.Workbook, name: string, vals: readonly VisualResult[]): void => {
+const resultLoadGrade = (val: VisualResult): string => {
+	const counts = loadGradeCounts(val.loadMeasurements || []);
+	return counts.fail ? 'fail' : counts.warning ? 'warning' : counts.pass ? 'pass' : '';
+};
+const addResultSheet = (book: ExcelJS.Workbook, name: string, vals: readonly VisualResult[], loadEnabled: boolean): void => {
 	const sheet = book.addWorksheet(resultSheetName(book, name));
-	sheet.addRow(['Project', 'Groups', 'Test title', 'Viewport', 'Viewport size', 'Status', 'Duration (ms)', 'Retries', 'Error', 'Browser errors', 'Terminal errors', 'Evidence']);
+	sheet.addRow([
+		'Project',
+		'Groups',
+		'Test title',
+		'Viewport',
+		'Viewport size',
+		'Status',
+		...(loadEnabled ? ['Load grade'] : []),
+		'Duration (ms)',
+		'Retries',
+		'Error',
+		'Browser errors',
+		'Terminal errors',
+		'Evidence',
+	]);
 	styleHeader(sheet);
+	if (loadEnabled)
+		sheet.columns = [
+			{ width: 18 },
+			{ width: 24 },
+			{ width: 42 },
+			{ width: 12 },
+			{ width: 14 },
+			{ width: 12 },
+			{ width: 12 },
+			{ width: 14 },
+			{ width: 8 },
+			{ width: 28 },
+			{ width: 14 },
+			{ width: 14 },
+			{ width: 18 },
+		];
 	for (const val of vals) {
 		const row = sheet.addRow([
 			val.project,
@@ -102,6 +151,7 @@ const addResultSheet = (book: ExcelJS.Workbook, name: string, vals: readonly Vis
 			val.viewport,
 			val.viewportSize,
 			statusLabel(val.status),
+			...(loadEnabled ? [resultLoadGrade(val)] : []),
 			val.duration,
 			val.retry,
 			val.error,
@@ -110,11 +160,14 @@ const addResultSheet = (book: ExcelJS.Workbook, name: string, vals: readonly Vis
 			val.visual === 'Embedded' ? '' : val.visual,
 		]);
 		row.alignment = { vertical: 'top' };
-		row.getCell(7).numFmt = '0';
-		row.getCell(8).numFmt = '0';
+		const durationColumn = loadEnabled ? 8 : 7;
+		const retryColumn = loadEnabled ? 9 : 8;
+		row.getCell(durationColumn).numFmt = '0';
+		row.getCell(retryColumn).numFmt = '0';
 		styleStatus(row.getCell(6), val.status);
-		if (val.browserErrors) row.getCell(10).note = val.browserErrors;
-		if (val.terminalErrors) row.getCell(11).note = val.terminalErrors;
+		if (loadEnabled && resultLoadGrade(val)) styleLoadGrade(row.getCell(7), resultLoadGrade(val));
+		if (val.browserErrors) row.getCell(loadEnabled ? 11 : 10).note = val.browserErrors;
+		if (val.terminalErrors) row.getCell(loadEnabled ? 12 : 11).note = val.terminalErrors;
 		if (!val.screenshot || !fs.existsSync(val.screenshot)) continue;
 		const img = fs.readFileSync(val.screenshot);
 		const width = img.readUInt32BE(16);
@@ -122,7 +175,7 @@ const addResultSheet = (book: ExcelJS.Workbook, name: string, vals: readonly Vis
 		const scale = Math.min(180 / width, 135 / height);
 		const size = { height: Math.round(height * scale), width: Math.round(width * scale) };
 		row.height = Math.ceil(size.height * 0.75) + 6;
-		sheet.addImage(book.addImage({ buffer: img as unknown as ExcelJS.Image['buffer'], extension: 'png' }), { editAs: 'oneCell', ext: size, tl: { col: 11, row: row.number - 1 } });
+		sheet.addImage(book.addImage({ buffer: img as unknown as ExcelJS.Image['buffer'], extension: 'png' }), { editAs: 'oneCell', ext: size, tl: { col: loadEnabled ? 12 : 11, row: row.number - 1 } });
 	}
 };
 /**
@@ -132,15 +185,46 @@ const addResultSheet = (book: ExcelJS.Workbook, name: string, vals: readonly Vis
  * @param run Normalized report run to summarize.
  * @returns Nothing; the workbook is mutated in place.
  */
-const addSummary = (book: ExcelJS.Workbook, run: ReportRun): void => {
+const addSummary = (book: ExcelJS.Workbook, run: ReportRun, loadEnabled: boolean): void => {
 	const sheet = book.addWorksheet('Summary');
-	sheet.addRow(['File', 'Passed', 'Failed', 'Timed out', 'Skipped', 'Interrupted', 'Total']);
+	sheet.addRow(['File', 'Passed', 'Failed', 'Timed out', 'Skipped', 'Interrupted', 'Total', ...(loadEnabled ? ['Load passes', 'Load warnings', 'Load failures'] : [])]);
 	for (const file of orderedFiles(run)) {
-		const counts = statusCounts(resultsForFile(run, file));
-		sheet.addRow([file, ...VISUAL_STATUSES.map((s) => counts[s]), VISUAL_STATUSES.reduce((t, s) => t + counts[s], 0)]);
+		const vals = resultsForFile(run, file);
+		const counts = statusCounts(vals);
+		const loadCounts = loadGradeCounts(vals.flatMap((result) => result.loadMeasurements || []));
+		sheet.addRow([file, ...VISUAL_STATUSES.map((s) => counts[s]), VISUAL_STATUSES.reduce((t, s) => t + counts[s], 0), ...(loadEnabled ? [loadCounts.pass, loadCounts.warning, loadCounts.fail] : [])]);
 	}
 	styleHeader(sheet);
-	sheet.columns = [{ width: 32 }, ...Array.from({ length: 6 }, () => ({ width: 14 }))];
+	sheet.columns = [{ width: 32 }, ...Array.from({ length: loadEnabled ? 9 : 6 }, () => ({ width: 14 }))];
+};
+
+/** Adds a row for every timed test, page navigation, and named operation. */
+const addLoadTimings = (book: ExcelJS.Workbook, results: readonly VisualResult[]): void => {
+	const sheet = book.addWorksheet('Load timings');
+	sheet.addRow(['File', 'Test title', 'Project', 'Viewport', 'Kind', 'Measurement', 'Duration (ms)', 'Warn at (ms)', 'Fail at (ms)', 'Grade']);
+	for (const result of results) {
+		for (const measurement of result.loadMeasurements || []) {
+			const row = sheet.addRow([
+				result.file,
+				result.title,
+				result.project,
+				result.viewport,
+				measurement.kind,
+				measurement.name,
+				measurement.durationMs,
+				measurement.budget.warnMs,
+				measurement.budget.failMs,
+				measurement.grade,
+			]);
+			row.getCell(7).numFmt = '0.0';
+			row.getCell(8).numFmt = '0';
+			row.getCell(9).numFmt = '0';
+			styleLoadGrade(row.getCell(10), measurement.grade);
+			row.alignment = { vertical: 'top' };
+		}
+	}
+	sheet.columns = [{ width: 32 }, { width: 42 }, { width: 24 }, { width: 12 }, { width: 14 }, { width: 42 }, { width: 16 }, { width: 16 }, { width: 16 }, { width: 14 }];
+	styleHeader(sheet);
 };
 /**
  * Adds project configuration and status totals for the run.
@@ -184,14 +268,16 @@ const addDiagnostics = (book: ExcelJS.Workbook, run: ReportRun): void => {
  * @returns A promise that resolves after the workbook has been written.
  */
 export const writeSpreadsheet = async (file: string, run: ReportRun): Promise<void> => {
+	const loadEnabled = run.loadTestingEnabled ?? run.results.some((result) => !!result.loadMeasurements?.length);
 	const book = new ExcelJS.Workbook();
 	book.creator = 'Test evidence reporter';
 	book.lastModifiedBy = 'Test evidence reporter';
 	book.title = 'Test evidence spreadsheet';
 	book.subject = 'Test evidence and diagnostics';
 	book.description = 'Spreadsheet evidence from an automated test run.';
-	addSummary(book, run);
-	for (const fileName of orderedFiles(run)) addResultSheet(book, fileName, resultsForFile(run, fileName));
+	addSummary(book, run, loadEnabled);
+	for (const fileName of orderedFiles(run)) addResultSheet(book, fileName, resultsForFile(run, fileName), loadEnabled);
+	if (loadEnabled) addLoadTimings(book, run.results);
 	addProjects(book, run);
 	addDiagnostics(book, run);
 	book.views = [{ x: 0, y: 0, width: 19200, height: 10800, visibility: 'visible', activeTab: 0, firstSheet: 0 }];

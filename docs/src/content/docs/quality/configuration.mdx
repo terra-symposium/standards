@@ -105,6 +105,28 @@ Native tool configuration remains available for project-specific rules and plugi
 
 Commands run from `root` and inherit the calling process environment. The runner does not provision services or credentials.
 
+## Test load budgets
+
+`loadTesting` configures timing checks used by `@terra-symposium/reporting`. Timing is enabled by default with a warning threshold of 2 seconds and a failure threshold of 5 seconds. A measurement at or below the warning threshold passes; exceeding the warning threshold is graded as a warning; exceeding the failure threshold fails the reported Playwright run.
+
+```json
+{
+  "loadTesting": {
+    "enabled": true,
+    "defaultBudget": { "warnMs": 2000, "failMs": 5000 },
+    "testBudgets": {
+      "tests/dashboard.spec.ts::Dashboard loads": { "warnMs": 5000, "failMs": 10000 }
+    },
+    "operationBudgets": {
+      "bulk import": { "warnMs": 5000, "failMs": 12000 },
+      "page load: /reports": { "warnMs": 3000, "failMs": 7000 }
+    }
+  }
+}
+```
+
+Budget values are milliseconds. Test keys use `<repo-relative test file>::<full title path>`; operation keys match the measurement name. A test or measurement can supply a local override, which takes precedence over a matching configured budget, then the default. Set `loadTesting.enabled` to `false` to disable new timing capture, grading, report sections, and enforcement while retaining existing reporting behavior. Repos adopting the updated reporter can add this opt-out without changing their test source.
+
 ## Security policy
 
 ```json

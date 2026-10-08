@@ -12,21 +12,21 @@ IMPORTS
 // API
 import ts from 'typescript';
 import { aliasFindings, declarationScope, isCallbackDeclaration, isProtectedPath, isRenamableDeclaration, namingFindings, renameDeclaration, renameId } from './naming.js';
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { checkImports } from './imports.js';
 import { collapseInlineIfs } from './inline-if.js';
 import { collapseTypesAndObjects } from './collapse.js';
-import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
+import { copyFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
+import { deadCodeEditsIntroduceTypeErrors, deadCodeTypeProgram, fixSingleUseDeclarations, singleUseFindings } from './single-use.js';
 import { documentSrcFile, documentationFindings, duplicateImportFindings, maintainSrcFile, protectLongImports } from './documentation.js';
-import { cpSync, copyFileSync, existsSync, mkdtempSync, mkdirSync, readFileSync, realpathSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { fixObjectForwarding, objectForwardingFindings } from './object-forwarding.js';
 import { fixRegexDedup, fixRepeatedClasses, regexFindings, repeatedClassFindings, uiPatternFindings } from './patterns.js';
-import { deadCodeEditsIntroduceTypeErrors, deadCodeTypeProgram, fixSingleUseDeclarations, singleUseFindings } from './single-use.js';
+import { qualityProgress } from './progress.js';
 import { securityFindings } from './security.js';
 import { spawnSync } from 'node:child_process';
-import { tmpdir } from 'node:os';
 import { srcFiles, workingSrcFiles } from './files.js';
-import { qualityProgress } from './progress.js';
+import { tmpdir } from 'node:os';
 
 // DATA
 import { DOCUMENTATION_DESCRIPTION_NOTICE } from './documentation.js';
@@ -34,15 +34,18 @@ import { PROTECTED_IDENTIFIERS } from './naming.js';
 
 // TYPES
 import type { DocumentationRequirements } from './documentation.js';
+
 /*//////////////////////////////////////////////////
 REGEX
 //////////////////////////////////////////////////*/
+
 const R_N_REGEX = /\r?\n/;
 const SHARED_REGEX = /\/\*|\/\//;
 
 /*//////////////////////////////////////////////////
 REGEX
 //////////////////////////////////////////////////*/
+
 const CJS_JS_JSX_MJS_TS_TSX_REGEX = /\.(?:cjs|js|jsx|mjs|ts|tsx)$/;
 const G_REGEX = () => /-/g;
 const C_M_JS_TS_REGEX = /\.(?:c|m)?(?:js|ts)$/;
@@ -79,6 +82,9 @@ REGEX
 
 const C_M_JS_TS_X_REGEX = /\.(?:c|m)?(?:js|ts)x?$/;
 const C_M_JS_TS_X_CLASS_2 = /\.(?:(?:c|m)?(?:js|ts)x?)$/;
+/**
+ *
+ */
 export type QualityCheckName =
 	| 'document'
 	| 'format'
@@ -97,7 +103,13 @@ export type QualityCheckName =
 	| 'repeated-classes'
 	| 'regex-dedup'
 	| 'ui-patterns';
+/**
+ *
+ */
 export type QualityAutofixName = 'document' | 'format' | 'name' | 'lint' | 'knip' | 'dead-code' | 'alias' | 'forward' | 'repeatedClasses' | 'regexDedup';
+/**
+ *
+ */
 export type QualityCfg = {
 	root: string;
 	sourceRoots: string[];
@@ -131,9 +143,24 @@ export type QualityCfg = {
 	typecheckExtensions?: string[];
 	typecheckCommand?: { command: string; args?: string[] };
 	tools?: { prettier?: string; tsc?: string; eslint?: string; knip?: string };
+	loadTesting?: {
+		enabled?: boolean;
+		defaultBudget?: { warnMs?: number; failMs?: number };
+		testBudgets?: Record<string, { warnMs?: number; failMs?: number }>;
+		operationBudgets?: Record<string, { warnMs?: number; failMs?: number }>;
+	};
 };
+/**
+ *
+ */
 export type QualityAnalysis = { files: string[]; texts: Map<string, string>; sources: Map<string, ts.SourceFile>; program: ts.Program; checker: ts.TypeChecker };
+/**
+ *
+ */
 export type QualityOptions = { fix: boolean; all: boolean; strict: boolean; skipCommands?: boolean; skipRecommendations?: boolean };
+/**
+ *
+ */
 type GenericFinding =
 	{ file?: string; message: string } | { value: string; count: number; locations: string[] } | { source: string; count: number; locations: string[] } | { file: string; pattern: string };
 const ANSI_ESCAPE = new RegExp(`${String.fromCharCode(27)}\\[[0-?]*[ -/]*[@-~]`, 'g');
@@ -334,6 +361,7 @@ function printChildOutput(val: string | Buffer | null | undefined): void {
  * @param cfg Quality configuration defining the subprocess working directory.
  * @param cmd Executable path or command name.
  * @param args Arguments passed to the executable.
+ * @param opts
  *
  * @return Child-process exit status, or `1` when spawning fails without a status.
  */
@@ -351,6 +379,7 @@ function run(cfg: QualityCfg, cmd: string, args: string[], opts: { quietSuccess?
  * Captures source text so automatic tools can report changed-file counts without
  * replaying their successful per-file output.
  *
+ * @param cfg
  * @param files Files modified by the automatic tool.
  *
  * @return Text snapshots keyed by absolute filename.
@@ -362,6 +391,7 @@ function snapshotFiles(cfg: QualityCfg, files: string[]): Map<string, string> {
 /**
  * Counts files whose contents differ from a prior snapshot.
  *
+ * @param cfg
  * @param files Files to compare.
  * @param before Initial file contents.
  *
@@ -413,6 +443,7 @@ function scopedCfg(cfg: QualityCfg, all: boolean): QualityCfg {
  * @param cfg Quality configuration defining the repository and ESLint executable.
  * @param opts CLI options controlling scope and autofix.
  * @param exhaustive Whether warnings should fail the run.
+ * @param deadCodeCoordinated
  *
  * @return Nothing; failures are reflected in the process exit code.
  */
@@ -456,6 +487,8 @@ function runLint(cfg: QualityCfg, opts: QualityOptions, exhaustive = false, dead
  * variables whose initializers may have side effects.
  *
  * @param cfg Quality configuration defining the repository and ESLint executable.
+ * @param reports
+ * @param changedFiles
  * @param all Whether every configured source file should be inspected.
  *
  * @return Number of unused function declarations removed.
@@ -532,7 +565,13 @@ function fixUnusedDeclarations(cfg: QualityCfg, reports: EslintReport[], changed
 	return fixed;
 }
 
-/** Accepts only initializers whose evaluation has no observable effects. */
+/**
+ * Accepts only initializers whose evaluation has no observable effects.
+ *
+ * @param node
+ *
+ * @return
+ */
 function isPureUnusedInit(node: ts.Expression): boolean {
 	if (
 		ts.isStringLiteralLike(node) ||
@@ -553,13 +592,31 @@ function isPureUnusedInit(node: ts.Expression): boolean {
 		return node.properties.every((property) => ts.isPropertyAssignment(property) && !ts.isComputedPropertyName(property.name) && isPureUnusedInit(property.initializer));
 	return false;
 }
-
+/**
+ *
+ */
 type EslintReport = { filePath: string; messages: Array<{ ruleId?: string; line: number; column: number; message?: string }> };
+/**
+ *
+ */
 type DeadCodeFinding = { rule: string; file: string; line: number; name: string; severity: 'error' | 'warning'; autofixable: boolean; reason: string; agentAction: string };
+/**
+ *
+ */
 type KnipItem = { name: string; line?: number };
+/**
+ *
+ */
 type KnipIssue = { file: string; [kind: string]: string | KnipItem[] };
 
-/** Runs ESLint's machine-readable pass once for the selected source files. */
+/**
+ * Runs ESLint's machine-readable pass once for the selected source files.
+ *
+ * @param cfg
+ * @param all
+ *
+ * @return
+ */
 function collectEslintReports(cfg: QualityCfg, all: boolean): EslintReport[] {
 	const files = filesFor(cfg, all).filter((f) => CJS_JS_JSX_MJS_TS_TSX_REGEX.test(f));
 	const reports: EslintReport[] = [];
@@ -582,7 +639,14 @@ function collectEslintReports(cfg: QualityCfg, all: boolean): EslintReport[] {
 	return reports;
 }
 
-/** Parses ESLint JSON and fails closed when the detector cannot provide a trustworthy result. */
+/**
+ * Parses ESLint JSON and fails closed when the detector cannot provide a trustworthy result.
+ *
+ * @param result
+ * @param files
+ *
+ * @return
+ */
 function parseEslintReports(result: ReturnType<typeof spawnSync>, files: string[]): EslintReport[] {
 	if (result.error) throw new Error(`ESLint dead-code detector failed: ${result.error.message}`);
 	if (result.status !== 0 && result.status !== 1)
@@ -617,7 +681,14 @@ function parseEslintReports(result: ReturnType<typeof spawnSync>, files: string[
 	}
 }
 
-/** Reports unused private declarations, classifying only proven-safe removals as autofixable. */
+/**
+ * Reports unused private declarations, classifying only proven-safe removals as autofixable.
+ *
+ * @param cfg
+ * @param reports
+ *
+ * @return
+ */
 function unusedDeclarationFindings(cfg: QualityCfg, reports: EslintReport[]): DeadCodeFinding[] {
 	const findings: DeadCodeFinding[] = [];
 	for (const report of reports) {
@@ -856,7 +927,13 @@ function repairMissingImports(cfg: QualityCfg, program: ts.Program, checker: ts.
 	}
 }
 
-/** Runs Knip once and validates its complete machine-readable issue inventory. */
+/**
+ * Runs Knip once and validates its complete machine-readable issue inventory.
+ *
+ * @param cfg
+ *
+ * @return
+ */
 function readKnipIssues(cfg: QualityCfg): KnipIssue[] {
 	const knip = toolPath(cfg, cfg.tools?.knip, 'knip');
 	const result = spawnSync(knip, ['--reporter', 'json', '--no-config-hints'], { cwd: cfg.root, encoding: 'utf8', env: process.env, maxBuffer: TOOL_OUTPUT_MAX_BUFFER });
@@ -886,7 +963,15 @@ function readKnipIssues(cfg: QualityCfg): KnipIssue[] {
 	return issues;
 }
 
-/** Rejects malformed, missing, or out-of-repository paths in Knip's inventory. */
+/**
+ * Rejects malformed, missing, or out-of-repository paths in Knip's inventory.
+ *
+ * @param cfg
+ * @param path
+ * @param label
+ *
+ * @return
+ */
 function assertKnipPath(cfg: QualityCfg, path: string, label: string): string {
 	const absolute = resolve(cfg.root, path);
 	const rel = relative(cfg.root, absolute);
@@ -898,7 +983,11 @@ function assertKnipPath(cfg: QualityCfg, path: string, label: string): string {
 	if (realRelative === '..' || realRelative.startsWith(`..${sep}`) || isAbsolute(realRelative)) throw new Error(`Knip returned a ${label} symlink outside the repository: ${path}`);
 	return absolute;
 }
-
+/**
+ *
+ * @param cfg
+ * @returns
+ */
 function collectKnipFindings(cfg: QualityCfg): DeadCodeFinding[] {
 	const issues = readKnipIssues(cfg);
 	const importedConsumers = importedExportConsumers(cfg);
@@ -931,7 +1020,13 @@ function collectKnipFindings(cfg: QualityCfg): DeadCodeFinding[] {
 	}
 	return findings;
 }
-
+/**
+ *
+ * @param cfg
+ * @param file
+ * @param name
+ * @returns
+ */
 function isFrameworkEntryExport(cfg: QualityCfg, file: string, name: string): boolean {
 	const publicRoute = !basename(file).startsWith('_');
 	return Object.entries(cfg.frameworkEntryExports ?? {}).some(([pattern, names]) => {
@@ -942,14 +1037,23 @@ function isFrameworkEntryExport(cfg: QualityCfg, file: string, name: string): bo
 		return pathMatches && names.includes(name);
 	});
 }
-
+/**
+ *
+ * @param file
+ * @returns
+ */
 function deadCodeScriptKind(file: string): ts.ScriptKind {
 	if (/\.tsx$/i.test(file)) return ts.ScriptKind.TSX;
 	if (/\.jsx$/i.test(file)) return ts.ScriptKind.JSX;
 	if (/\.(?:c|m)?js$/i.test(file)) return ts.ScriptKind.JS;
 	return ts.ScriptKind.TS;
 }
-
+/**
+ *
+ * @param file
+ * @param name
+ * @returns
+ */
 function knipExportCanBeMadePrivate(file: string, name: string): boolean {
 	if (!existsSync(file) || file.endsWith('.astro')) return false;
 	const srcText = readFileSync(file, 'utf8');
@@ -969,7 +1073,12 @@ function knipExportCanBeMadePrivate(file: string, name: string): boolean {
 	return false;
 }
 
-/** Removes only an unused export modifier that Knip identifies precisely. */
+/**
+ * Removes only an unused export modifier that Knip identifies precisely.
+ *
+ * @param cfg
+ * @param changedFiles
+ */
 function fixKnipExports(cfg: QualityCfg, changedFiles: Set<string>): void {
 	const issues = readKnipIssues(cfg);
 	const importedConsumers = importedExportConsumers(cfg);
@@ -1015,13 +1124,12 @@ function fixKnipExports(cfg: QualityCfg, changedFiles: Set<string>): void {
 			const declaration = ast.statements.find((statement) => {
 				if (!ts.canHaveModifiers(statement) || !ts.getModifiers(statement as ts.HasModifiers)?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword)) return false;
 				if (ts.getModifiers(statement as ts.HasModifiers)?.some((modifier) => modifier.kind === ts.SyntaxKind.DefaultKeyword)) return false;
-				if (ts.isVariableStatement(statement)) {
+				if (ts.isVariableStatement(statement))
 					return (
 						statement.declarationList.declarations.length === 1 &&
 						ts.isIdentifier(statement.declarationList.declarations[0]!.name) &&
 						statement.declarationList.declarations[0]!.name.text === finding.name
 					);
-				}
 				return 'name' in statement && statement.name && ts.isIdentifier(statement.name) && statement.name.text === finding.name;
 			});
 			if (!declaration || (finding.line && declaration.getStart(ast) > ast.getPositionOfLineAndCharacter(finding.line - 1, 0))) continue;
@@ -1042,7 +1150,11 @@ function fixKnipExports(cfg: QualityCfg, changedFiles: Set<string>): void {
 
 /** Finds export names that configured source files import and actually reference. */
 const importedExportConsumerCache = new WeakMap<QualityCfg, { signature: string; consumers: Map<string, Set<string>> }>();
-
+/**
+ *
+ * @param cfg
+ * @returns
+ */
 function importedExportConsumers(cfg: QualityCfg): Map<string, Set<string>> {
 	const srcFiles = filesFor(cfg, true).filter((path) => C_M_JS_TS_X_CLASS_2.test(path) || path.endsWith('.astro'));
 	const signature = srcFiles
@@ -1111,7 +1223,14 @@ function importedExportConsumers(cfg: QualityCfg): Map<string, Set<string>> {
 	importedExportConsumerCache.set(cfg, { signature, consumers });
 	return consumers;
 }
-
+/**
+ *
+ * @param onBatch
+ * @param original
+ * @param program
+ * @param proposed
+ * @returns
+ */
 function acceptTypeSafeEdits(
 	program: ts.Program,
 	proposed: Map<string, string>,
@@ -1143,7 +1262,10 @@ function acceptTypeSafeEdits(
 		rejected,
 	};
 }
-
+/**
+ *
+ * @param findings
+ */
 function printDeadCodeFindings(findings: DeadCodeFinding[]): void {
 	if (!findings.length) {
 		console.error('  ✓ dead-code checks passed; no autofixable findings or manual warnings remain');
@@ -1161,7 +1283,17 @@ function printDeadCodeFindings(findings: DeadCodeFinding[]): void {
 	if (errs.length) process.exitCode = 1;
 }
 
-/** Runs every dead-code detector through one fix-and-verify boundary. */
+/**
+ * Runs every dead-code detector through one fix-and-verify boundary.
+ *
+ * @param cfg
+ * @param fix
+ * @param all
+ * @param verify
+ * @param emit
+ *
+ * @return
+ */
 function runDeadCode(cfg: QualityCfg, fix: boolean, all: boolean, verify = true, emit = true): DeadCodeFinding[] {
 	if (emit) qualityHeader('dead-code', `${fix ? 'Fixing safe cases and checking' : 'Read-only check of'} unused files, exports, declarations, and single-use code`);
 	const changedFiles = new Set<string>();
@@ -1358,7 +1490,12 @@ function runDeadCodeReadOnly(cfg: QualityCfg, all: boolean): void {
 		rmSync(tempRoot, { recursive: true, force: true });
 	}
 }
-
+/**
+ *
+ * @param all
+ * @param cfg
+ * @param fix
+ */
 function runDeadCodeCmd(cfg: QualityCfg, fix: boolean, all: boolean): void {
 	if (fix) runDeadCode(cfg, true, all);
 	else runDeadCodeReadOnly(cfg, all);
@@ -1924,7 +2061,7 @@ export function runQualityCli(cfg: QualityCfg, args = process.argv.slice(2)): vo
 			const repeated = duplicateImportFindings(filesFor(cfg, opts.all));
 			for (const file of new Set(repeated.map((finding) => finding.file))) maintainSrcFile(cfg.root, file);
 		}
-		runQuality(cfg, true, opts.all, analysis);
+		runQuality(cfg, opts.strict, opts.all, analysis);
 		if (qualityCheckEnabled(cfg, 'diff')) runDiffCheck(cfg);
 		if (opts.fix && qualityCheckEnabled(cfg, 'diff')) runDiffCheck(cfg);
 	}
@@ -1947,7 +2084,11 @@ export function runQualityFromCfg(file?: string, args = process.argv.slice(2)): 
 	runQualityCli(loadQualityCfg(file), args);
 }
 
-/** Reject unknown commands and flags before loading configuration or invoking a fixer. */
+/**
+ * Reject unknown commands and flags before loading configuration or invoking a fixer.
+ *
+ * @param args
+ */
 function validCliArgs(args: string[]): void {
 	const cmd = args.find((arg) => !arg.startsWith('-')) ?? 'quality';
 	const unknownFlags = args.filter((arg) => arg.startsWith('-') && !CLI_FLAGS.has(arg));

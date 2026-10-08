@@ -214,12 +214,20 @@ test('the executable handles help without a config and rejects unknown commands 
 test('loadQualityCfg resolves a quality file root relative to the configuration file', () => {
 	const root = fixtureRoot('terra-quality-load-config-');
 	const cfgDir = join(root, 'config');
-	const cfgPath = fixtureFile(root, 'config/quality.json', JSON.stringify({ root: '..', sourceRoots: ['src'], extensions: ['.ts'] }));
+	const cfgPath = fixtureFile(
+		root,
+		'config/quality.json',
+		JSON.stringify({ root: '..', sourceRoots: ['src'], extensions: ['.ts'], loadTesting: { enabled: false, defaultBudget: { warnMs: 3000, failMs: 7000 } } }),
+	);
 	const cfg = loadQualityCfg(cfgPath);
 	assert.equal(cfg.root, root);
 	assert.deepEqual(cfg.sourceRoots, [join(root, 'src')]);
 	assert.deepEqual(cfg.extensions, ['.ts']);
+	assert.deepEqual(cfg.loadTesting, { enabled: false, defaultBudget: { warnMs: 3000, failMs: 7000 } });
 	assert.equal(cfgDir, join(root, 'config'));
+	const schema = JSON.parse(readFileSync(join(process.cwd(), 'quality.schema.json'), 'utf8'));
+	assert.ok(schema.properties.loadTesting);
+	assert.ok(schema.$defs.loadBudget);
 });
 test('configuration toggles default to enabled and honor explicit category, item, CLI, and recommendation disables', () => {
 	const cfg = createQualityCfg({

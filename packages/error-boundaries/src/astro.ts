@@ -7,7 +7,13 @@
 CONFIG
 //////////////////////////////////////////////////*/
 
+/**
+ *
+ */
 export type ErrorStatus = 400 | 401 | 403 | 404 | 500 | 502 | 503;
+/**
+ *
+ */
 export type ErrorStatusCopy = { title: string; description: string };
 export const ERROR_STATUS_COPY: Readonly<Record<ErrorStatus, ErrorStatusCopy>> = Object.freeze({
 	400: { title: 'Bad Request', description: 'The server could not understand the request due to invalid syntax.' },
@@ -23,7 +29,13 @@ export const ERROR_STATUS_COPY: Readonly<Record<ErrorStatus, ErrorStatusCopy>> =
 FUNCTIONS
 //////////////////////////////////////////////////*/
 
-/** Resolves unknown status values to the safe internal-server-error response. */
+/**
+ * Resolves unknown status values to the safe internal-server-error response.
+ *
+ * @param status
+ *
+ * @return
+ */
 export function errorStatusCopy(status: number): ErrorStatusCopy {
 	return ERROR_STATUS_COPY[status as ErrorStatus] ?? { title: 'Unknown Error', description: 'Something went wrong.' };
 }

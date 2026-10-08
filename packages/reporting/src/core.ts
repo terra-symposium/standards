@@ -13,6 +13,35 @@ export const VISUAL_STATUSES = ['passed', 'failed', 'timedOut', 'skipped', 'inte
 /** A normalized Playwright result status used by both output writers. */
 export type VisualStatus = (typeof VISUAL_STATUSES)[number];
 
+/** Load budget grades emitted by the shared timing reporter. */
+export const LOAD_GRADES = ['pass', 'warning', 'fail'] as const;
+
+/** Grade assigned to one elapsed-time measurement. */
+export type LoadGrade = (typeof LOAD_GRADES)[number];
+
+/** Kind of work timed by the load reporter. */
+export type LoadMeasurementKind = 'test' | 'page' | 'operation';
+
+/** Warning and hard-failure thresholds for one measured item, in milliseconds. */
+export type LoadBudget = { warnMs: number; failMs: number };
+
+/** Partial budget accepted for per-test or per-operation overrides. */
+export type LoadBudgetOverride = Partial<LoadBudget>;
+
+/** Input measurement accepted from a fixture or a supplemental test runner. */
+export type LoadMeasurementInput = { name: string; kind: LoadMeasurementKind; durationMs: number; budget?: LoadBudgetOverride };
+
+/** Normalized timing measurement rendered in report artifacts. */
+export type LoadMeasurement = LoadMeasurementInput & { budget: LoadBudget; grade: LoadGrade };
+
+/** Optional repo-level load testing settings read from quality.json. */
+export type LoadTestingConfig = {
+	enabled?: boolean;
+	defaultBudget?: LoadBudgetOverride;
+	testBudgets?: Record<string, LoadBudgetOverride>;
+	operationBudgets?: Record<string, LoadBudgetOverride>;
+};
+
 /*//////////////////////////////////////////////////
 TYPES
 //////////////////////////////////////////////////*/
@@ -36,13 +65,24 @@ export type VisualResult = {
 	visual: string;
 	viewport: string;
 	viewportSize: string;
+	/** Timings collected for this test; absent for legacy/direct writer inputs. */
+	loadMeasurements?: readonly LoadMeasurement[];
+	/** Stable repo-relative key used to match per-test load budgets. */
+	loadTestId?: string;
 };
 
 /** Playwright project files used to populate the project summary sheet. */
 export type ProjectDefinition = { name: string; configuredFiles: readonly string[] };
 
 /** All normalized evidence and run-level diagnostics for one report directory. */
-export type ReportRun = { results: readonly VisualResult[]; runDiagnostics: readonly string[]; featureFiles: readonly string[]; projects: readonly ProjectDefinition[] };
+export type ReportRun = {
+	results: readonly VisualResult[];
+	runDiagnostics: readonly string[];
+	featureFiles: readonly string[];
+	projects: readonly ProjectDefinition[];
+	/** Whether the reporter should render load timing sections, including an empty summary. */
+	loadTestingEnabled?: boolean;
+};
 
 /*//////////////////////////////////////////////////
 HELPERS

@@ -21,6 +21,9 @@ CONFIG
 //////////////////////////////////////////////////*/
 
 const MODULE_EXTS = ['', '.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs', '.mts', '.cts', '.astro', '.mdx', '.json', '.css', '.scss', '.svg', '.png', '.jpg', '.jpeg', '.webp'];
+/**
+ *
+ */
 export type ImportFailure = { importer: string; specifier: string };
 
 /*//////////////////////////////////////////////////

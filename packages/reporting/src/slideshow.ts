@@ -12,6 +12,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import sharp from 'sharp';
 import { createRequire } from 'node:module';
+import { loadGradeCounts } from './load-testing.js';
 import { neutralizeApplicationMetadata } from './metadata.js';
 
 // TYPES
@@ -107,8 +108,21 @@ const viewportWidth = (r: VisualResult): number => Number.parseInt(r.viewportSiz
  * @param review Screenshot review cues to include.
  * @returns Text shown beside the screenshot and in speaker notes.
  */
+const resultLoadGrade = (r: VisualResult): string => {
+	const counts = loadGradeCounts(r.loadMeasurements || []);
+	return counts.fail ? 'fail' : counts.warning ? 'warning' : counts.pass ? 'pass' : '';
+};
 const slideCopy = (r: VisualResult, review: ImgReview): string => {
-	const lines = [`${r.project} · ${r.viewport} · ${r.viewportSize}`, r.groups || r.file, `Status: ${r.status}${r.duration ? ` · ${r.duration} ms` : ''}`, '', ...review.cues.map((c) => `• ${c}`)];
+	const grade = resultLoadGrade(r);
+	const measurements = r.loadMeasurements || [];
+	const lines = [
+		`${r.project} · ${r.viewport} · ${r.viewportSize}`,
+		r.groups || r.file,
+		`Status: ${r.status}${r.duration ? ` · ${r.duration} ms` : ''}${grade ? ` · Load: ${grade}` : ''}`,
+		...measurements.map((item) => `Load ${item.kind}: ${item.name} — ${item.durationMs.toFixed(1)} ms (${item.grade}; warn ${item.budget.warnMs} / fail ${item.budget.failMs} ms)`),
+		'',
+		...review.cues.map((c) => `• ${c}`),
+	];
 	if (r.error) lines.push('', `Test error: ${r.error}`);
 	if (r.browserErrors) lines.push('', `Browser: ${r.browserErrors}`);
 	if (r.terminalErrors) lines.push('', `Terminal: ${r.terminalErrors}`);
@@ -161,7 +175,8 @@ const addResponsiveSlide = async (presentation: Presentation, group: readonly Vi
 		const x = 0.38 + col * (width + gap);
 		const y = 1.02 + row * (height + gap);
 		slide.addShape(presentation.ShapeType.roundRect, { fill: { color: 'FFFFFF' }, line: { color: COLOURS.line, width: 1 }, x, y, w: width, h: height, rectRadius: 0.04 });
-		slide.addText(`${r.viewport} · ${r.viewportSize} · ${r.status}`, {
+		const loadGrade = resultLoadGrade(r);
+		slide.addText(`${r.viewport} · ${r.viewportSize} · ${r.status}${loadGrade ? ` · Load ${loadGrade}` : ''}`, {
 			bold: true,
 			color: COLOURS.accent,
 			fontFace: 'Aptos',
@@ -184,8 +199,68 @@ const addResponsiveSlide = async (presentation: Presentation, group: readonly Vi
 	}
 	slide.addNotes(notes.join('\n\n'));
 };
-/**  Optional visible and metadata overrides for a slideshow artifact. */
-export type SlideshowOptions = { title?: string; author?: string; company?: string; subject?: string };
+/** Optional visible and metadata overrides for a slideshow artifact. */
+export type SlideshowOptions = { title?: string; author?: string; company?: string; subject?: string; loadTestingEnabled?: boolean };
+/**
+ *
+ */
+type LoadRow = { result: VisualResult; measurement: NonNullable<VisualResult['loadMeasurements']>[number] };
+/** Adds a run-level load summary slide and names the slowest measurements. */
+const addLoadSummarySlide = (presentation: Presentation, results: readonly VisualResult[]): void => {
+	const measurements: LoadRow[] = results.flatMap((result) => (result.loadMeasurements || []).map((measurement) => ({ result, measurement })));
+	const counts = loadGradeCounts(measurements.map(({ measurement }) => measurement));
+	const slowest = [...measurements].sort((a, b) => b.measurement.durationMs - a.measurement.durationMs).slice(0, 6);
+	const slide = presentation.addSlide();
+	slide.background = { color: COLOURS.surface };
+	slide.addText('Load timing summary', { bold: true, color: COLOURS.ink, fontFace: 'Aptos Display', fontSize: 26, margin: 0, x: 0.55, y: 0.45, w: 12.2, h: 0.5 });
+	slide.addText(`${measurements.length} measurements   ·   ${counts.pass} pass   ·   ${counts.warning} warning   ·   ${counts.fail} fail`, {
+		bold: true,
+		color: COLOURS.accent,
+		fontFace: 'Aptos',
+		fontSize: 17,
+		margin: 0,
+		x: 0.58,
+		y: 1.28,
+		w: 12.1,
+		h: 0.35,
+	});
+	slide.addText(
+		slowest.length
+			? `Slowest measurements\n${slowest.map(({ result, measurement }) => `${measurement.grade.toUpperCase()}  ${measurement.durationMs.toFixed(1)} ms  ${result.file} · ${result.title} · ${measurement.name}`).join('\n')}`
+			: 'No load measurements were collected.',
+		{ color: COLOURS.ink, fontFace: 'Aptos', fontSize: 13, fit: 'shrink', margin: 0.08, valign: 'mid', x: 0.58, y: 2.05, w: 12.1, h: 4.3 },
+	);
+};
+/** Adds paginated slides containing every individual test, page, and operation measurement. */
+const addLoadDetailSlides = (presentation: Presentation, results: readonly VisualResult[]): number => {
+	const measurements: LoadRow[] = results.flatMap((result) => (result.loadMeasurements || []).map((measurement) => ({ result, measurement })));
+	const pageSize = 12;
+	const pages = Math.max(1, Math.ceil(measurements.length / pageSize));
+	for (let page = 0; page < pages; page += 1) {
+		const lines = measurements
+			.slice(page * pageSize, (page + 1) * pageSize)
+			.map(
+				({ result, measurement }) =>
+					`${measurement.grade.toUpperCase().padEnd(7)} ${measurement.durationMs.toFixed(1).padStart(9)} ms  ${measurement.kind.padEnd(9)} ${result.file} · ${result.title} · ${measurement.name}  [warn ${measurement.budget.warnMs} / fail ${measurement.budget.failMs} ms]`,
+			);
+		const slide = presentation.addSlide();
+		slide.background = { color: COLOURS.surface };
+		slide.addText(`Load timing details ${page + 1}/${pages}`, { bold: true, color: COLOURS.ink, fontFace: 'Aptos Display', fontSize: 22, margin: 0, x: 0.55, y: 0.4, w: 12.2, h: 0.45 });
+		slide.addText(lines.join('\n') || 'No load measurements were collected.', {
+			color: COLOURS.ink,
+			fontFace: 'Aptos',
+			fontSize: 11,
+			fit: 'shrink',
+			margin: 0.08,
+			valign: 'mid',
+			x: 0.55,
+			y: 1.05,
+			w: 12.2,
+			h: 5.95,
+		});
+	}
+	return pages;
+};
 /**
  * Writes screenshot-backed results as single-viewport or responsive review slides.
  *
@@ -195,6 +270,7 @@ export type SlideshowOptions = { title?: string; author?: string; company?: stri
  * @returns A promise that resolves after the slideshow has been written.
  */
 export const writeSlideshow = async (file: string, results: readonly VisualResult[], opts: SlideshowOptions = {}): Promise<void> => {
+	const loadEnabled = opts.loadTestingEnabled ?? results.some((result) => !!result.loadMeasurements?.length);
 	const presentation = new /* The runtime package is CommonJS while NodeNext exposes its constructor through a namespace type. */ (
 		createRequire(import.meta.url)('pptxgenjs') as new () => Presentation
 	)();
@@ -203,12 +279,16 @@ export const writeSlideshow = async (file: string, results: readonly VisualResul
 	presentation.company = opts.company || 'Test evidence';
 	presentation.subject = opts.subject || 'Screenshot evidence and UI review prompts';
 	presentation.title = opts.title || 'Test evidence slideshow';
+	let slideNumber = 0;
+	if (loadEnabled) {
+		addLoadSummarySlide(presentation, results);
+		slideNumber += 1;
+	}
 	const groups = new Map<string, VisualResult[]>();
 	for (const r of results) {
 		const key = [r.project, r.file, r.groups, r.title].join('|');
 		groups.set(key, [...(groups.get(key) || []), r]);
 	}
-	let slideNumber = 0;
 	for (const group of groups.values()) {
 		const byViewport = new Map<string, VisualResult>();
 		for (const result of group) {
@@ -224,6 +304,7 @@ export const writeSlideshow = async (file: string, results: readonly VisualResul
 		slide.addText('Test evidence slideshow', { align: 'center', bold: true, color: COLOURS.accent, fontFace: 'Aptos Display', fontSize: 30, x: 0.8, y: 2.6, w: 11.7, h: 0.6 });
 		slide.addText('No browser test results were collected in this run.', { align: 'center', color: COLOURS.muted, fontFace: 'Aptos', fontSize: 16, x: 1.2, y: 3.35, w: 10.9, h: 0.5 });
 	}
+	if (loadEnabled) addLoadDetailSlides(presentation, results);
 	await presentation.writeFile({ fileName: file });
 	await neutralizeApplicationMetadata(file);
 };

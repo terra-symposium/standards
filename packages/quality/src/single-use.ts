@@ -10,9 +10,9 @@ IMPORTS
 // API
 import ts from 'typescript';
 import { dirname, join, relative, sep } from 'node:path';
+import { qualityProgress } from './progress.js';
 import { readFileSync, statSync, writeFileSync } from 'node:fs';
 import { srcFiles } from './files.js';
-import { qualityProgress } from './progress.js';
 
 // TYPES
 import type { QualityCfg } from './runner.js';
@@ -31,8 +31,17 @@ HELPERS
 const reportProgress = (label: string, idx: number, total: number): void => {
 	if (idx === 0 || idx === total || idx % Math.max(1, Math.ceil(total / 20)) === 0) qualityProgress(label, idx, total);
 };
+/**
+ *
+ */
 export type SingleUseFinding = { file: string; line: number; name: string; decision: 'INLINE' | 'REVIEW'; autofixable: boolean; reason: string; agentAction: string };
+/**
+ *
+ */
 type Candidate = { file: string; source: ts.SourceFile; statement: ts.Statement; name: ts.Identifier; symbol: ts.Symbol; kind: 'type' | 'interface' | 'variable' | 'function' };
+/**
+ *
+ */
 type Reference = { file: string; source: ts.SourceFile; node: ts.Identifier };
 const rejectedInlineCandidates = new Map<string, string>();
 const astroConsumerCache = new WeakMap<QualityCfg, { signature: string; consumers: Set<string> }>();
@@ -78,7 +87,13 @@ function programFor(cfg: QualityCfg): ts.Program {
 	});
 }
 
-/** Creates the shared TypeScript program used to validate a complete dead-code edit batch. */
+/**
+ * Creates the shared TypeScript program used to validate a complete dead-code edit batch.
+ *
+ * @param cfg
+ *
+ * @return
+ */
 export function deadCodeTypeProgram(cfg: QualityCfg): ts.Program {
 	return programFor(cfg);
 }
@@ -96,7 +111,14 @@ function inSingleUseScope(cfg: QualityCfg, file: string): boolean {
 	return roots.some((r) => file === r || file.startsWith(`${r}${sep}`));
 }
 
-/** Excludes configured directories from single-use candidate analysis. */
+/**
+ * Excludes configured directories from single-use candidate analysis.
+ *
+ * @param cfg
+ * @param file
+ *
+ * @return
+ */
 function isSingleUseCandidate(cfg: QualityCfg, file: string): boolean {
 	return inSingleUseScope(cfg, file) && !(cfg.singleUse?.skippedDirectories ?? []).some((directory) => file === directory || file.startsWith(`${directory}${sep}`));
 }
@@ -245,7 +267,14 @@ function classify(candidate: Candidate): [SingleUseFinding['decision'], string] 
 	}
 	return ['INLINE', `${candidate.kind} declaration has one in-scope consumer`];
 }
-
+/**
+ *
+ * @param canInline
+ * @param candidate
+ * @param reason
+ * @param use
+ * @returns
+ */
 function singleUseAgentAction(candidate: Candidate, use: Reference, canInline: boolean, reason: string): string {
 	if (canInline) return 'Run the canonical dead-code autofix, then verify the inlined type/value remains equivalent and rerun the affected test or typecheck.';
 	if (candidate.kind === 'function') {
@@ -277,6 +306,8 @@ function singleUseAgentAction(candidate: Candidate, use: Reference, canInline: b
 /**
  * Finds type-position references to a candidate declaration across the configured source scope.
  *
+ * @param candidate
+ * @param references
  * @param cfg Quality configuration defining the source roots to scan.
  * @param c Type alias or interface whose consumers should be located.
  * @param program TypeScript program containing the source files to inspect.
@@ -298,7 +329,14 @@ function typeReferences(candidate: Candidate, references: Map<ts.Symbol, Referen
  *
  * @return `true` when inlining would replace a module export with an expression.
  */
-/** Collects Astro frontmatter and markup consumers once for an analysis run. */
+/**
+ * Collects Astro frontmatter and markup consumers once for an analysis run.
+ *
+ * @param cfg
+ * @param program
+ *
+ * @return
+ */
 function astroConsumersFor(cfg: QualityCfg, program: ts.Program): Set<string> {
 	const astroFiles = srcFiles(cfg).filter((path) => path.endsWith('.astro'));
 	const signature = astroFiles
@@ -343,12 +381,27 @@ function astroConsumersFor(cfg: QualityCfg, program: ts.Program): Set<string> {
 	return cached.consumers;
 }
 
-/** Keeps exported bindings that are imported from Astro frontmatter outside the TypeScript program. */
+/**
+ * Keeps exported bindings that are imported from Astro frontmatter outside the TypeScript program.
+ *
+ * @param candidate
+ * @param consumers
+ *
+ * @return
+ */
 function hasAstroConsumer(candidate: Candidate, consumers: Set<string>): boolean {
 	return consumers.has(`${candidate.file}\u0000${candidate.name.text}`);
 }
 
-/** Keeps explicitly configured module contracts out of single-consumer cleanup. */
+/**
+ * Keeps explicitly configured module contracts out of single-consumer cleanup.
+ *
+ * @param cfg
+ * @param candidate
+ * @param checker
+ *
+ * @return
+ */
 function isCfgdPublicContract(cfg: QualityCfg, candidate: Candidate, checker: ts.TypeChecker): boolean {
 	const file = relative(cfg.root, candidate.file).split(sep).join('/');
 	if (!cfg.frameworkEntryExports?.[file]?.includes(candidate.name.text)) return false;
@@ -357,12 +410,19 @@ function isCfgdPublicContract(cfg: QualityCfg, candidate: Candidate, checker: ts
 	return Boolean(exported && canonical(checker, exported) === candidate.symbol);
 }
 
-/** Keeps declarations exported by a package entrypoint out of local single-use advice. */
+/**
+ * Keeps declarations exported by a package entrypoint out of local single-use advice.
+ *
+ * @param cfg
+ * @param candidate
+ * @param checker
+ *
+ * @return
+ */
 function isPackageEntryExport(cfg: QualityCfg, candidate: Candidate, checker: ts.TypeChecker): boolean {
 	const moduleSymbol = checker.getSymbolAtLocation(candidate.source);
 	const exported = moduleSymbol && checker.getExportsOfModule(moduleSymbol).find((symbol) => symbol.name === candidate.name.text);
 	if (!exported || canonical(checker, exported) !== candidate.symbol) return false;
-
 	for (let dir = dirname(candidate.file); dir.startsWith(cfg.root); dir = dirname(dir)) {
 		const manifestPath = join(dir, 'package.json');
 		if (!statSync(manifestPath, { throwIfNoEntry: false })?.isFile()) continue;
@@ -399,7 +459,14 @@ function isPackageEntryExport(cfg: QualityCfg, candidate: Candidate, checker: ts
 	return false;
 }
 
-/** Preserves a React identity hook or interval handle whose one use is required by lifecycle semantics. */
+/**
+ * Preserves a React identity hook or interval handle whose one use is required by lifecycle semantics.
+ *
+ * @param candidate
+ * @param use
+ *
+ * @return
+ */
 function isRequiredLifecycleVal(candidate: Candidate, use: Reference): boolean {
 	if (candidate.kind !== 'variable' || !ts.isVariableStatement(candidate.statement)) return false;
 	const init = candidate.statement.declarationList.declarations[0]?.initializer;
@@ -417,7 +484,14 @@ function isRequiredLifecycleVal(candidate: Candidate, use: Reference): boolean {
 	);
 }
 
-/** Keeps imported type names in scope when an inline would discard their annotation. */
+/**
+ * Keeps imported type names in scope when an inline would discard their annotation.
+ *
+ * @param candidate
+ * @param checker
+ *
+ * @return
+ */
 function hasImportedTypeAnnotation(candidate: Candidate, checker: ts.TypeChecker): boolean {
 	if (candidate.kind !== 'variable' || !ts.isVariableStatement(candidate.statement)) return false;
 	return candidate.statement.declarationList.declarations.some((d) => {
@@ -479,7 +553,13 @@ function containsExplicitAny(candidate: Candidate): boolean {
 	return found;
 }
 
-/** Rejects initializers whose await would be moved into an unrelated callback. */
+/**
+ * Rejects initializers whose await would be moved into an unrelated callback.
+ *
+ * @param candidate
+ *
+ * @return
+ */
 function containsAwait(candidate: Candidate): boolean {
 	if (!ts.isVariableStatement(candidate.statement)) return false;
 	let found = false;
@@ -492,7 +572,13 @@ function containsAwait(candidate: Candidate): boolean {
 	return found;
 }
 
-/** Rejects expressions whose timing, hook order, or observable identity can change when moved. */
+/**
+ * Rejects expressions whose timing, hook order, or observable identity can change when moved.
+ *
+ * @param candidate
+ *
+ * @return
+ */
 function initSafeToInline(candidate: Candidate): boolean {
 	if (candidate.kind !== 'variable' || !ts.isVariableStatement(candidate.statement)) return true;
 	const declaration = candidate.statement.declarationList.declarations[0];
@@ -545,7 +631,13 @@ function isWriteReference(reference: Reference): boolean {
 	);
 }
 
-/** Preserves saved values used to restore mutable object or property state. */
+/**
+ * Preserves saved values used to restore mutable object or property state.
+ *
+ * @param reference
+ *
+ * @return
+ */
 function isStateRestorationReference(reference: Reference): boolean {
 	return (
 		ts.isBinaryExpression(reference.node.parent) &&
@@ -665,6 +757,7 @@ function fnType(statement: ts.FunctionDeclaration): string {
  * @param ref Single JSX component reference.
  * @param replacement Inline function or component expression.
  * @param reactName Local import alias for React's createElement function.
+ * @param componentType
  *
  * @return JSX replacement edit, or `null` when the reference is not a JSX tag.
  */
@@ -689,6 +782,7 @@ function jsxInlineEdit(ref: Reference, replacement: string, reactName: string, c
 /**
  * Expands a property or namespace access when the declaration is its right-hand identifier.
  *
+ * @param node
  * @param n Identifier reference to expand.
  *
  * @return Largest qualified/property access expression containing the identifier.
@@ -750,6 +844,7 @@ function fnExpr(statement: ts.FunctionDeclaration): string | null {
  *
  * @param c Candidate selected for inlining.
  * @param ref Single consumer location.
+ * @param checker
  *
  * @return Inline source text, or `null` when the declaration has no replacement.
  */
@@ -805,7 +900,11 @@ function reactImportPos(src: ts.SourceFile): number {
 	if (imports.length) return imports[imports.length - 1]!.end;
 	return src.statements[0]?.getStart(src) ?? 0;
 }
-
+/**
+ *
+ * @param c
+ * @returns
+ */
 function attachedComments(c: Candidate): { start: number; end: number; text: string }[] {
 	const start = c.statement.getFullStart();
 	const end = c.statement.getStart(c.source);
@@ -818,7 +917,11 @@ function attachedComments(c: Candidate): { start: number; end: number; text: str
 		})
 		.map((r) => ({ start: r.pos, end: r.end, text: c.source.text.slice(r.pos, r.end) }));
 }
-
+/**
+ *
+ * @param c
+ * @returns
+ */
 function discardedDeclarationComments(c: Candidate): string[] {
 	if (!ts.isVariableStatement(c.statement)) return [];
 	const declaration = c.statement.declarationList.declarations[0];
@@ -833,7 +936,14 @@ function discardedDeclarationComments(c: Candidate): string[] {
 	return comments;
 }
 
-/** Rejects a batch when its edited files gain TypeScript errors. */
+/**
+ * Rejects a batch when its edited files gain TypeScript errors.
+ *
+ * @param program
+ * @param updates
+ *
+ * @return
+ */
 function filesWithNewTypeErrs(program: ts.Program, updates: Map<string, string>): Set<string> {
 	const files = [...updates.keys()];
 	const total = files.length * 2;
@@ -894,7 +1004,14 @@ function filesWithNewTypeErrs(program: ts.Program, updates: Map<string, string>)
 	return introducedErrs ? new Set(updates.keys()) : new Set();
 }
 
-/** Returns whether a proposed batch adds any TypeScript error in an edited file. */
+/**
+ * Returns whether a proposed batch adds any TypeScript error in an edited file.
+ *
+ * @param program
+ * @param updates
+ *
+ * @return
+ */
 export function deadCodeEditsIntroduceTypeErrors(program: ts.Program, updates: Map<string, string>): boolean {
 	return filesWithNewTypeErrs(program, updates).size > 0;
 }
@@ -903,6 +1020,7 @@ export function deadCodeEditsIntroduceTypeErrors(program: ts.Program, updates: M
  * Inlines every single-use declaration and validates each rewritten source file.
  *
  * @param cfg Quality configuration defining the source scope and files to rewrite.
+ * @param changedFiles
  *
  * @return Number of files containing edits, including declaration and consumer files.
  */
@@ -1041,6 +1159,8 @@ function fixSingleUsePass(cfg: QualityCfg, changedFiles: Set<string>): number {
  * Repeats single-use inlining until nested edits have been applied in separate valid passes.
  *
  * @param cfg Quality configuration defining the source scope and files to rewrite.
+ * @param changedFileNames
+ * @param onPass
  *
  * @return Number of files changed across all passes.
  */

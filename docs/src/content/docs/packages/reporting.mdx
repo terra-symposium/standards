@@ -32,4 +32,54 @@ export default withResponsivePlaywright(defineConfig({
 });
 ```
 
+Use `withResponsivePlaywright()` around the repository's primary Playwright config to apply the shared six viewport sizes (390, 640, 768, 1024, 1280, and 1536 pixels), enable full-page screenshots, and attach the shared reporter. Every regular project is expanded automatically. Setup projects run once; list manual capture project names in `singleRunProjects` when needed. The default run uses all six sizes. Set `PW_VIEWPORTS=mobile,lg` for a focused run.
+
+The reporter writes native screenshots to one timestamped `images` folder, one workbook row for each Playwright execution, and a PowerPoint slide for each logical test. Each test slide lays out its viewport previews together and labels missing captures. An optional `supplementalResultsFile` adds structured non-Playwright results to the workbook once; those rows do not create slides.
+
+```ts
+import { defineConfig } from '@playwright/test';
+import { withResponsivePlaywright } from '@terra-symposium/reporting/viewports';
+
+export default withResponsivePlaywright(defineConfig({
+	projects: [{ name: 'app', testMatch: '**/*.spec.ts' }],
+	// Keep the repository's server, authentication, and other Playwright options here.
+}), {
+	singleRunProjects: ['manual-auth-capture'],
+	supplementalResultsFile: 'test-results/node-test-results.json',
+});
+```
+
 `@playwright/test` version 1.52+ within the current major is a peer dependency. Spreadsheet and slideshow generation use included Excel and PowerPoint dependencies. Your repository owns scenarios, evidence naming, output paths, and CI artifact upload; consult the installed declarations for exact call signatures.
+
+## Load timing
+
+`withResponsivePlaywright()` reads the `loadTesting` block from the repo's `quality.json`. Timing defaults to warning above 2 seconds and failure above 5 seconds. Tests can set their own budget and measure named operations with the `loadTest` fixture. Page navigation timing is captured automatically when using that fixture.
+
+```ts
+import { loadTest as test } from '@terra-symposium/reporting/playwright';
+
+test('dashboard loads', async ({ load, page }) => {
+	load.setTestBudget({ warnMs: 4000, failMs: 8000 });
+	await load.measure('load account summary', () => page.getByRole('button', { name: 'Refresh' }).click(), { warnMs: 3000, failMs: 6000 });
+});
+```
+
+Operation-level overrides can also be configured by measurement name in `quality.json`. Test-level keys use `<repo-relative test file>::<full title path>`. For example, a costly operation named `bulk import` can have a larger budget without changing other measurements.
+
+Non-Playwright runners can contribute timings through `supplementalResultsFile` by including `loadMeasurements` on each result:
+
+```json
+{
+	"complete": true,
+	"results": [{
+		"file": "tests/import.test.mjs",
+		"groups": "imports",
+		"title": "imports a large archive",
+		"status": "passed",
+		"duration": 850,
+		"loadMeasurements": [{ "name": "bulk import", "kind": "operation", "durationMs": 620 }]
+	}]
+}
+```
+
+The workbook includes per-test load grades and a `Load timings` sheet. The slideshow includes a run summary, test-slide grades, and paginated measurement details. Existing repos can preserve their current test outcomes and artifacts by setting `"loadTesting": { "enabled": false }` in `quality.json`; no test source edits are required.

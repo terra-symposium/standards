@@ -14,8 +14,17 @@ import React, { Component } from 'react';
 CONFIG
 //////////////////////////////////////////////////*/
 
+/**
+ *
+ */
 export type ErrorReporter = (err: Error, report: { name: string; componentStack: string | null }) => void;
+/**
+ *
+ */
 export type ErrorBoundaryProps = { children?: React.ReactNode; fallback?: (err: Error) => React.ReactNode; name?: string; resetKey?: string; onError?: ErrorReporter };
+/**
+ *
+ */
 export type ErrorBoundaryState = { error: Error | null };
 
 /*//////////////////////////////////////////////////
@@ -32,6 +41,12 @@ HELPERS
  * @return A component with the same props that renders through an error boundary.
  */
 export function withErrorBoundary<P extends object>(ComponentToWrap: React.ComponentType<P>, name: string, onErr?: ErrorReporter): React.ComponentType<P> {
+	/**
+	 *
+	 * @param props
+	 *
+	 * @return
+	 */
 	function BoundedComponent(props: P): React.JSX.Element {
 		return (
 			<ErrorBoundary name={name} onError={onErr}>

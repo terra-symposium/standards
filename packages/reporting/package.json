@@ -21,6 +21,7 @@
 		"./core": "./dist/core.js",
 		"./playwright": "./dist/playwright.js",
 		"./viewports": "./dist/viewports.js",
+		"./load-testing": "./dist/load-testing.js",
 		"./spreadsheet": "./dist/spreadsheet.js",
 		"./slideshow": "./dist/slideshow.js"
 	},

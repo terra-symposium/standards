@@ -20,7 +20,13 @@ import type { QualityAnalysis, QualityCfg } from './runner.js';
 TYPES
 //////////////////////////////////////////////////*/
 
+/**
+ *
+ */
 export type ObjectForwardingFinding = { file: string; line: number; column: number; callee: string; source: string; properties: string[]; recommendation: string };
+
+/** Counts exact duplicate properties removed and conservative cases left untouched. */
+export type ObjectForwardingFixResult = { fixed: number; skipped: number };
 
 /*//////////////////////////////////////////////////
 HELPERS
@@ -129,7 +135,7 @@ export function objectForwardingFindings(cfg: QualityCfg, analysis?: QualityAnal
  *
  * @return Counts of exact duplicate properties removed and conservative cases left untouched.
  */
-export function fixObjectForwarding(cfg: QualityCfg, analysis?: QualityAnalysis): { fixed: number; skipped: number } {
+export function fixObjectForwarding(cfg: QualityCfg, analysis?: QualityAnalysis): ObjectForwardingFixResult {
 	let fixed = 0;
 	let skipped = 0;
 	for (const file of analysis?.files ?? srcFiles(cfg)) {
