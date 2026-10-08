@@ -54,9 +54,11 @@ test('naming maps are immutable and identifier tokenisation preserves separators
 	assert.deepEqual(identifierTokens('article_error-2_value'), ['article', 'error', '2', 'value']);
 	assert.deepEqual(identifierTokens(''), []);
 });
-test('callback aliases select semantic initials, deterministic fallbacks, and the documented exhausted-reservation behavior', () => {
+test('callback aliases shorten only configured idioms and choose deterministic fallbacks on collision', () => {
 	assert.equal(callbackAlias('customer'), 'c');
-	assert.equal(callbackAlias('unknownValue'), 'u');
+	assert.equal(callbackAlias('unknownValue'), 'unknownValue');
+	assert.equal(callbackAlias('field'), 'field');
+	assert.equal(callbackAlias('label'), 'label');
 	assert.equal(callbackAlias('customer', ['c']), 'v');
 	assert.equal(callbackAlias('customer', ['c', 'v', 'r', 'x', 'd', 'e', 'n', 's']), 'c');
 	assert.equal(renameId('index', { numericIndex: true }), 'i');
@@ -144,7 +146,7 @@ void [mapped, rendered, ordinary, handle, view];
 	assert.equal(supported.length, 5);
 	assert.equal(renameDeclaration(supported[0]), 'c');
 	assert.equal(renameDeclaration(supported[1]), 'i');
-	assert.equal(renameDeclaration(supported[2]), 'b');
+	assert.equal(renameDeclaration(supported[2]), 'block');
 	assert.equal(renameDeclaration(supported[3]), 'c');
 	assert.equal(renameDeclaration(supported[4]), 'e');
 });

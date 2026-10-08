@@ -43,6 +43,8 @@ type ImportGroup = 'API' | 'COMPONENTS' | 'DATA' | 'TYPES';
 type SrcGroup = 'CONFIG' | 'HELPERS';
 export type DocumentationRequirements = { types?: boolean; functions?: boolean; exportedFunctions?: boolean; noInlineFunctions?: boolean };
 
+export type DuplicateImportFinding = { file: string; line: number; module: string };
+
 /*//////////////////////////////////////////////////
 DOCUMENTATION
 //////////////////////////////////////////////////*/
@@ -52,7 +54,7 @@ export type DocumentationFinding = {
 	line: number;
 	column: number;
 	name: string;
-	kind: 'file' | 'summary' | 'param' | 'return' | 'tag' | 'type' | 'function' | 'inline';
+	kind: 'file' | 'summary' | 'param' | 'return' | 'tag' | 'type' | 'function' | 'inline' | 'orphan';
 	reason: string;
 	severity: 'warning' | 'error';
 };
@@ -219,6 +221,49 @@ function importGroup(name: string): ImportGroup {
 	if (/^[A-Z][A-Z0-9_]*$/.test(name)) return 'DATA';
 	if (/^[A-Z]/.test(name)) return 'COMPONENTS';
 	return 'API';
+}
+
+/**
+ * Finds repeated named bindings that the source maintainer can merge without
+ * changing import evaluation order or side-effect-only imports.
+ *
+ * @param files Configured source files to inspect.
+ *
+ * @return One finding for each later import declaration that repeats a binding.
+ */
+export function duplicateImportFindings(files: string[]): DuplicateImportFinding[] {
+	const findings: DuplicateImportFinding[] = [];
+	for (const file of files) {
+		if (!SUPPORTED.has(extname(file))) continue;
+		const text = readFileSync(file, 'utf8');
+		const parsed = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, srcKind(file));
+		const seen = new Set<string>();
+		for (const declaration of parsed.statements.filter(ts.isImportDeclaration)) {
+			if (!declaration.importClause || !ts.isStringLiteral(declaration.moduleSpecifier)) continue;
+			const module = declaration.moduleSpecifier.text;
+			const clause = declaration.importClause;
+			const keys: string[] = [];
+			if (clause.name) keys.push(`${module}|${importGroup(clause.name.text)}|${clause.isTypeOnly ? 'type' : 'value'}|default:${clause.name.text}`);
+			if (clause.namedBindings && ts.isNamespaceImport(clause.namedBindings)) {
+				const binding = clause.namedBindings.name.text;
+				keys.push(`${module}|${importGroup(binding)}|${clause.isTypeOnly ? 'type' : 'value'}|namespace:${binding}`);
+			}
+			if (clause.namedBindings && ts.isNamedImports(clause.namedBindings)) {
+				for (const element of clause.namedBindings.elements) {
+					const typeOnly = clause.isTypeOnly || element.isTypeOnly;
+					const group = typeOnly ? 'TYPES' : importGroup(element.name.text);
+					const binding = element.getText(parsed).replace(/^type\s+/, '');
+					keys.push(`${module}|${group}|${typeOnly ? 'type' : 'value'}|${binding}`);
+				}
+			}
+			if (keys.some((key) => seen.has(key))) {
+				const { line } = parsed.getLineAndCharacterOfPosition(declaration.getStart(parsed));
+				findings.push({ file, line: line + 1, module });
+			}
+			for (const key of keys) seen.add(key);
+		}
+	}
+	return findings;
 }
 
 /**
@@ -689,15 +734,10 @@ export function removeNonCodeComments(fileName: string): boolean {
 		if (token === ts.SyntaxKind.SingleLineCommentTrivia || token === ts.SyntaxKind.MultiLineCommentTrivia)
 			comments.push({ start: scanner.getTokenPos(), end: scanner.getTextPos(), text: scanner.getTokenText() });
 	for (const block of tsdocBlocks(original, parsed)) {
-		if (
-			block.text
-				.replace(/^\/\*\*|\*\/$/g, '')
-				.replace(/^\s*\* ?/gm, '')
-				.trim()
-		)
-			continue;
 		const followingDeclaration = nodeStarts.filter((s) => s >= block.end).sort((a, b) => a - b)[0];
-		if ((followingDeclaration === undefined || !/^\s*$/.test(original.slice(block.end, followingDeclaration))) && !fileHeaderBlock(original, [block]))
+		const detached = followingDeclaration === undefined || !/^\s*$/.test(original.slice(block.end, followingDeclaration));
+		const empty = !block.text.replace(/^\/\*\*|\*\/$/g, '').replace(/^\s*\* ?/gm, '').trim();
+		if ((detached || empty) && !fileHeaderBlock(original, [block]))
 			removals.push({ start: block.start, end: block.end });
 	}
 	const headings = comments.filter(({ text: t }) => /^\/\*\/{10,}/.test(t) || /^\/\/\s*[A-Z][A-Z _-]*\s*$/.test(t));
@@ -973,8 +1013,33 @@ function descriptionFindingsForFile(cfg: QualityCfg, file: string, src: string, 
 	const blocks = tsdocBlocks(src, parsed);
 	const findings: DocumentationFinding[] = [];
 	const header = fileHeaderBlock(src, blocks);
+	const attached = new Set<number>();
+	const markAttached = (node: ts.Node): void => {
+		if (
+			ts.isDeclarationStatement(node) ||
+			ts.isFunctionLike(node) ||
+			ts.isClassLike(node) ||
+			ts.isEnumMember(node) ||
+			ts.isPropertySignature(node) ||
+			ts.isMethodSignature(node) ||
+			ts.isCallSignatureDeclaration(node) ||
+			ts.isConstructSignatureDeclaration(node) ||
+			ts.isIndexSignatureDeclaration(node) ||
+			ts.isTypeParameterDeclaration(node) ||
+			ts.isVariableStatement(node)
+		)
+			for (const range of ts.getLeadingCommentRanges(src, node.getFullStart()) ?? [])
+				if (src.slice(range.pos, range.end).startsWith('/**') && /^\s*$/.test(src.slice(range.end, node.getStart(parsed)))) attached.add(range.pos);
+		ts.forEachChild(node, markAttached);
+	};
+	markAttached(parsed);
 	for (const block of blocks) {
 		if (block === header) continue;
+		if (!attached.has(block.start)) {
+			const finding = documentationCommentReport(file, parsed, block.start, '<detached TSDoc>', 'orphan', 'remove or attach this TSDoc to a declaration', cfg);
+			findings.push({ ...finding, severity: 'warning' });
+			continue;
+		}
 		const lines = tsdocLines(block);
 		const firstTag = lines.findIndex((l) => l.text.startsWith('@'));
 		const summary = lines

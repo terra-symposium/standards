@@ -21,7 +21,7 @@ import { join } from 'node:path';
 TESTS
 //////////////////////////////////////////////////*/
 
-test('source discovery handles nested roots, include roots, exclusions, direct files, and its cache contract', () => {
+test('source discovery handles nested roots, include roots, exclusions, direct files, and files created during a run', () => {
 	const root = fixtureRoot('terra-quality-files-');
 	const main = fixtureFile(root, 'src/main.ts', 'export const main = true;\n');
 	fixtureFile(root, 'src/nested/keep.ts', 'export const keep = true;\n');
@@ -32,9 +32,8 @@ test('source discovery handles nested roots, include roots, exclusions, direct f
 	fixtureFile(root, 'include/notes.md', '# not source\n');
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], includeRoots: ['include'], extensions: ['.ts', '.js'], skippedDirectories: ['ignored'], skippedFiles: ['src/nested/skip.ts'] });
 	assert.deepEqual(srcFiles(cfg), [main, join(root, 'include/index.js'), join(root, 'src/nested/keep.ts')].sort());
-	const beforeNewFile = srcFiles(cfg);
 	fixtureFile(root, 'src/new.ts', 'export const newFile = true;\n');
-	assert.deepEqual(srcFiles(cfg), beforeNewFile, 'the process-local discovery cache intentionally caches the file set');
+	assert.deepEqual(srcFiles(cfg), [main, join(root, 'include/index.js'), join(root, 'src/nested/keep.ts'), join(root, 'src/new.ts')].sort());
 	assert.deepEqual(srcFiles(createQualityCfg({ root, sourceRoots: [main], extensions: ['.ts'] })), [main]);
 	assert.deepEqual(srcFiles(createQualityCfg({ root, sourceRoots: ['does-not-exist'], extensions: ['.ts'] })), []);
 });

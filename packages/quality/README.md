@@ -49,6 +49,8 @@ The executable loads `quality.json` from the current repository. A wrapper can c
 
 The default `quality` command scans changed and untracked files, enables every built-in check, and enables every available autofix. `quality:all` scans every configured source file. `--warn` disables autofixes for one run. `--strict` makes naming errors fail. Use `--skip-commands` for a fast static-only pass and `--skip-recommendations` to omit advisory subprocesses; configured domains remain available through `domain`.
 
+Every multi-item quality scan displays a visible progress bar from its first update, including when stderr is not a TTY. Updates rewrite one shared line in place instead of printing fractions or one line per update; each stage ends with a newline. `quality:all` runs quality checks, not the Node test suite; configured test commands and repository test scripts run separately and should report their own suite or test progress.
+
 ### Switches
 
 Use `enabledChecks` to disable a built-in check. Unspecified checks are enabled:
@@ -98,14 +100,15 @@ Each rule is independent. `functions` covers all named functions. `exportedFunct
 
 ### Import
 
-- **Does:** Resolves local imports using source roots, extensions, aliases, and external prefixes, then reports unresolved local modules.
+- **Does:** Resolves local imports using source roots, extensions, aliases, and external prefixes; reports unresolved local modules and repeated named bindings from the same module. The full autofix workflow consolidates repeated bindings through source maintenance, while `--warn` reports them without editing.
 - **Terms:** “External prefix” marks an intentionally external namespace. “Alias” maps an import prefix to a repository path.
-- **Configure:** Set `aliases`, `externalPrefixes`, `skippedDirectories`, and `skippedFiles`. Import has no autofix because selecting the intended replacement is semantic.
+- **Configure:** Set `aliases`, `externalPrefixes`, `skippedDirectories`, and `skippedFiles`. An unresolved module has no autofix because selecting the intended replacement is semantic; duplicate named bindings are merged only when the existing import grouping makes the rewrite unambiguous.
 - **Ideology:** Import correctness is a dependency-boundary check, not merely a style preference. Do not use external exemptions to hide broken local imports.
 
 ### Name
 
 - **Does:** Finds naming drift and applies safe whole-word or prefix-based identifier renames. It avoids exported or conflicting symbols and preserves syntax-aware JSX cases.
+- **Callback aliases:** Shortens only explicitly configured idioms such as `node` → `n` and `index` → `i`; unknown callback names remain full words. Astro files are never text-rewritten by the naming fixer.
 - **Terms:** “Suggestion” is non-strict. “Error” fails when `--strict` is used. `--warn` reports without renaming.
 - **Configure:** Use `protectedIdentifiers` for stable names. Set `autofix.name` to `false` for review-only output.
 - **Ideology:** Names should be consistent where the transformation is unambiguous. Protect public API names, domain vocabulary, and intentional abbreviations.
@@ -124,23 +127,15 @@ Each rule is independent. `functions` covers all named functions. `exportedFunct
 - **Configure:** Set `tools.eslint` and optional `lintRoots`. Use `enabledChecks.lint` and `autofix.lint` to control execution and edits.
 - **Ideology:** Lint should catch repeatable defects. Rules requiring product or security judgment should not receive broad automatic edits.
 
-### Knip
+### Dead code (Knip, unused declarations, and single-use)
 
-- **Does:** Runs Knip for unused files, exports, dependencies, and reachability checks, propagating its status when enabled.
-- **Terms:** “Unused” means unreachable according to Knip's entry points and project model; it does not automatically mean semantically unnecessary.
-- **Configure:** Set `tools.knip` and `autofix.knip` for supported Knip fixes. A separate Knip JSON file is not required for invocation. Disable Knip when entry-point metadata is incomplete.
-- **Ideology:** Dead-code cleanup should be evidence-led. Review generated files, dynamic imports, plugins, and framework conventions before deletion.
-
-### Single-use
-
-- **Does:** The fixing `quality` run automatically inlines declarations with exactly one in-scope consumer, including types, interfaces, functions, and variables. Rewrites are syntax-checked before source files are written. The final source pass removes generated section/group comments and detached TSDoc while preserving declaration documentation and meaningful inline comments.
-- **Configure:** Use `singleUse.skippedDirectories` for repository-owned component or shared-code directories that should remain out of this rule without disabling other quality checks. `quality --warn` checks without changing files.
-
-```json
-{ "singleUse": { "skippedDirectories": ["src/components"] } }
-```
-
-- **Ideology:** Keep single-use implementation details at their consumer; reserve reusable modules for code with multiple consumers.
+- **Does:** The canonical `dead-code` workflow coordinates Knip (unused files, exports, dependencies, reachability), ESLint's unused private declarations, TypeScript single-use analysis, and detached-TSDoc detection. `quality`, `quality:all`, `dead-code`, `knip`, and `single-use` all dispatch through this same coordinator; focused command names are compatibility entry points, not separate detector implementations.
+- **Autofix:** This is the default. The runner privatizes only unambiguously identified unused named exports, removes unused private declarations with side-effect-free initialization, and inlines only type declarations or constant values whose AST rewrite is supported. It never deletes a source file or dependency automatically. Fixes are syntax-checked and validated against TypeScript diagnostics; a rejected file is restored independently, preserving safe changes in other files. TSDoc attached to a removed declaration is removed with that declaration. Existing detached TSDoc is not discarded automatically.
+- **Findings:** Every remaining issue prints its rule, path and line, severity, reason, whether an automatic fix is available, and a concrete agent action. Review-only findings explain what to inline or remove and which behavior, effects, hooks, identity, or type information must be preserved. A passing autofix run means no known safe automatic edit remains; explicit manual warnings may remain.
+- **Read-only:** `terra-quality dead-code --all --warn` never writes to configured source files. It replays the canonical fixer in a temporary source copy to distinguish edits that pass the TypeScript safety gate from candidates that must remain manual. It fails for a fix the default run could land or for an analysis/tool/inventory failure; manual-only warnings are reported but do not fail the command. `quality:all --warn` applies the same dead-code policy within the full read-only suite. A default autofix run fails if a safe automatic finding remains unresolved.
+- **Entry points:** Set Knip `includeEntryExports: true`, then list required exports in `quality.json` `frameworkEntryExports`. Exact paths cover action registries and middleware; `astro/src/pages/**/*.ts` covers real routes, excluding underscore-prefixed private modules. Only explicitly named exports count as framework consumers, so extra exports in the same file remain findings. Private UI components are never blanket entry points. Do not use directory-wide single-use or documented-callable exemptions.
+- **TSDoc:** The audit scans all configured source files. TSDoc must attach to live code or be a recognized file header. For a detached block, attach it to the declaration it describes when that relationship is clear; otherwise remove only that block, preserving meaningful constraints and prose.
+- **Ideology:** Keep one-use implementation details at their consumer and retain reusable/public contracts through explicit entry-point metadata, not undocumented tool exceptions.
 
 ### Type
 

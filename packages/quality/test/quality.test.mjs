@@ -671,16 +671,14 @@ test('naming applies whole-word image aliases and prefix-only state aliases', ()
 	assert.equal(renameId('isClean'), 'isClean');
 	assert.equal(renameId('isSafe'), 'isSafe');
 });
-test('naming safely fixes Astro frontmatter while preserving markup boundaries', () => {
+test('naming leaves Astro frontmatter, framework properties, and markup unchanged', () => {
 	const root = mkdtempSync(join(tmpdir(), 'quality-naming-astro-'));
 	mkdirSync(join(root, 'src'));
-	writeFileSync(join(root, 'src', 'Page.astro'), '---\nconst error = new Error("x");\nconsole.log(error);\n---\n<Component error={error} />\n<p>{error.message}</p>\n');
+	const source = '---\nconst error = new Error("x");\nconsole.log(error);\nconst message = "Salesphere user";\nconst user = Astro.locals.user;\n---\n<Component error={error} />\n<p>{message}</p>\n';
+	writeFileSync(join(root, 'src', 'Page.astro'), source);
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.astro'] });
 	runQualityCli(cfg, ['naming', '--all']);
-	assert.match(readFileSync(join(root, 'src', 'Page.astro'), 'utf8'), /const err = new Error/);
-	assert.match(readFileSync(join(root, 'src', 'Page.astro'), 'utf8'), /console\.log\(err\)/);
-	assert.match(readFileSync(join(root, 'src', 'Page.astro'), 'utf8'), /<Component error=\{error\} \/>/);
-	assert.match(readFileSync(join(root, 'src', 'Page.astro'), 'utf8'), /<p>\{error\.message\}<\/p>/);
+	assert.equal(readFileSync(join(root, 'src', 'Page.astro'), 'utf8'), source);
 });
 test('naming preserves shorthand property keys while renaming their values', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-'));
@@ -710,14 +708,14 @@ test('naming shortens map callback parameters and all symbol references', () => 
 	assert.equal(readFileSync(file, 'utf8'), 'const output = input.map((n, i) => ({ node: n, index: i }));\nvoid output;\n');
 	assert.deepEqual(namingFindings(cfg), []);
 });
-test('naming reduces arbitrary map callback parameters to free initials', () => {
+test('naming keeps full words when no callback alias is an established idiom', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-callback-initials-'));
 	mkdirSync(join(root, 'src'));
 	const file = join(root, 'src', 'main.ts');
 	writeFileSync(file, 'const output = content.map((line) => (line ? ` * ${line}` : " *"));\nvoid output;\n');
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
 	runQualityCli(cfg, ['naming', '--all']);
-	assert.equal(readFileSync(file, 'utf8'), 'const output = content.map((l) => (l ? ` * ${l}` : " *"));\nvoid output;\n');
+	assert.equal(readFileSync(file, 'utf8'), 'const output = content.map((line) => (line ? ` * ${line}` : " *"));\nvoid output;\n');
 });
 test('naming shortens TypeScript traversal callbacks with conflict checks', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-callbacks-'));
@@ -746,6 +744,16 @@ test('naming reuses concise aliases safely across independent map scopes', () =>
 	runQualityCli(cfg, ['naming', '--all']);
 	assert.equal(readFileSync(file, 'utf8'), 'const first = input.map((n) => n.id);\nconst second = input.flatMap((n) => n.children);\nvoid [first, second];\n');
 });
+test('naming allows a callback alias used only in a sibling function scope', () => {
+	const root = mkdtempSync(join(tmpdir(), 'terra-quality-callback-sibling-scope-'));
+	mkdirSync(join(root, 'src'));
+	const file = join(root, 'src', 'main.ts');
+	writeFileSync(file, 'function unrelated() { const v = 1; return v; }\nconst output = input.map((value) => value);\nvoid [unrelated, output];\n');
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
+	runQualityCli(cfg, ['naming', '--all']);
+	assert.equal(readFileSync(file, 'utf8'), 'function unrelated() { const v = 1; return v; }\nconst output = input.map((v) => v);\nvoid [unrelated, output];\n');
+	assert.deepEqual(namingFindings(cfg), []);
+});
 test('naming preserves object keys but not positional syntax in destructured map parameters', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-callbacks-'));
 	mkdirSync(join(root, 'src'));
@@ -771,7 +779,7 @@ test('callback renames do not alter unrelated JSDoc parameters with the same nam
 	writeFileSync(file, '/** @param name */\nfunction retain(name: string) { return name; }\nconst output = input.map((name) => name.id);\nvoid [retain, output];\n');
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
 	runQualityCli(cfg, ['naming', '--all']);
-	assert.equal(readFileSync(file, 'utf8'), '/** @param name */\nfunction retain(name: string) { return name; }\nconst output = input.map((n) => n.id);\nvoid [retain, output];\n');
+	assert.equal(readFileSync(file, 'utf8'), '/** @param name */\nfunction retain(name: string) { return name; }\nconst output = input.map((name) => name.id);\nvoid [retain, output];\n');
 });
 test('naming leaves node unchanged outside configured map callbacks', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-callbacks-'));
@@ -859,6 +867,17 @@ test('naming refuses file-level destination collisions', () => {
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
 	runQualityCli(cfg, ['naming', '--all']);
 	assert.equal(readFileSync(file, 'utf8'), src);
+});
+test('naming autofix does not create a same-file collision across function scopes', () => {
+	const root = mkdtempSync(join(tmpdir(), 'terra-quality-naming-sibling-collision-'));
+	mkdirSync(join(root, 'src'), { recursive: true });
+	const file = join(root, 'src', 'main.ts');
+	const src = 'function AdminOrgSection() { return 1; }\nfunction AdminOrganisationSection() { return AdminOrgSection(); }\nvoid AdminOrganisationSection();\n';
+	writeFileSync(file, src);
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], tools: { prettier: 'prettier' } });
+	runQualityCli(cfg, ['naming', '--all']);
+	assert.equal(readFileSync(file, 'utf8'), src);
+	assert.deepEqual(namingFindings(cfg), []);
 });
 test('naming avoids repository helper shadowing in initializers', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-shadow-'));

@@ -88,6 +88,7 @@ export const CALLBACK_ALIASES = replacementMap(
 		[['record', 'result', 'row'], 'r'],
 		[['stage', 'section'], 's'],
 		['item', 'i'],
+		['index', 'i'],
 		[['entry', 'event', 'edge'], 'e'],
 		[['value', 'intent'], 'v'],
 		['group', 'g'],
@@ -95,7 +96,6 @@ export const CALLBACK_ALIASES = replacementMap(
 		['problem', 'p'],
 		['node', 'n'],
 		['link', 'l'],
-		['line', 'l'],
 		['data', 'd'],
 	],
 	false,
@@ -234,7 +234,9 @@ function tokenCase(original: string, replacement: string): string {
  * @return A concise available callback alias.
  */
 export function callbackAlias(name: string, reserved: string[] = []): string {
-	const preferred = CALLBACK_ALIASES[name.toLowerCase() as keyof typeof CALLBACK_ALIASES] ?? identifierTokens(name)[0]?.charAt(0).toLowerCase() ?? 'v';
+	const configured = CALLBACK_ALIASES[name.toLowerCase() as keyof typeof CALLBACK_ALIASES];
+	if (!configured) return name;
+	const preferred = configured;
 	if (!reserved.includes(preferred)) return preferred;
 	for (const fallback of ['v', 'r', 'x', 'd', 'n', 'e', 'c', 's']) if (!reserved.includes(fallback)) return fallback;
 	return preferred;
@@ -463,7 +465,10 @@ export function isRenamableDeclaration(n: ts.Identifier): boolean {
  * @return The nearest function-like scope, or the source file when no function owns it.
  */
 export function declarationScope(n: ts.Identifier): ts.Node {
-	let scope: ts.Node = n.parent;
+	const declaration = n.parent;
+	const isOuterDeclarationName =
+		(ts.isFunctionDeclaration(declaration) || ts.isClassDeclaration(declaration) || ts.isInterfaceDeclaration(declaration) || ts.isTypeAliasDeclaration(declaration)) && declaration.name === n;
+	let scope: ts.Node = isOuterDeclarationName ? declaration.parent : declaration;
 	while (!ts.isSourceFile(scope)) {
 		if (
 			ts.isArrowFunction(scope) ||
