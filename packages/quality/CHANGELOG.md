@@ -1,5 +1,11 @@
 # @terra-symposium/quality
 
+## 0.4.50
+
+### Patch Changes
+
+- Exclude explicitly skipped generated files from dead-code inventory comparisons.
+
 ## 0.4.49
 
 ### Patch Changes

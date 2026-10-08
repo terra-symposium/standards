@@ -1191,7 +1191,10 @@ function runDeadCode(cfg: QualityCfg, fix: boolean, all: boolean, verify = true,
 			if (emit) console.error(`  Single-use rewrite pass ${pass} starting (${filesChanged} source files changed so far).`);
 		});
 		const currentInventory = new Set(filesFor(cfg, true));
-		if (currentInventory.size !== initialInventory.size || [...initialInventory].some((file) => !currentInventory.has(file)))
+		const skippedInventory = new Set(cfg.skippedFiles ?? []);
+		const trackedInitialInventory = [...initialInventory].filter((file) => !skippedInventory.has(file));
+		const trackedCurrentInventory = [...currentInventory].filter((file) => !skippedInventory.has(file));
+		if (trackedCurrentInventory.length !== trackedInitialInventory.length || trackedInitialInventory.some((file) => !currentInventory.has(file)))
 			throw new Error('Dead-code autofix changed the configured source inventory; file creation or deletion is not an automatic dead-code fix.');
 		const proposed = new Map<string, string>();
 		for (const file of changedFiles) {
