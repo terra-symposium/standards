@@ -88,6 +88,7 @@ export const CALLBACK_ALIASES = replacementMap(
 		[['record', 'result', 'row'], 'r'],
 		[['stage', 'section'], 's'],
 		['item', 'i'],
+		['index', 'i'],
 		[['entry', 'event', 'edge'], 'e'],
 		[['value', 'intent'], 'v'],
 		['group', 'g'],
@@ -95,7 +96,6 @@ export const CALLBACK_ALIASES = replacementMap(
 		['problem', 'p'],
 		['node', 'n'],
 		['link', 'l'],
-		['line', 'l'],
 		['data', 'd'],
 	],
 	false,
@@ -234,10 +234,11 @@ function tokenCase(original: string, replacement: string): string {
  * @return A concise available callback alias.
  */
 export function callbackAlias(name: string, reserved: string[] = []): string {
-	const preferred = CALLBACK_ALIASES[name.toLowerCase() as keyof typeof CALLBACK_ALIASES] ?? identifierTokens(name)[0]?.charAt(0).toLowerCase() ?? 'v';
-	if (!reserved.includes(preferred)) return preferred;
+	const cfgd = CALLBACK_ALIASES[name.toLowerCase() as keyof typeof CALLBACK_ALIASES];
+	if (!cfgd) return name;
+	if (!reserved.includes(cfgd)) return cfgd;
 	for (const fallback of ['v', 'r', 'x', 'd', 'n', 'e', 'c', 's']) if (!reserved.includes(fallback)) return fallback;
-	return preferred;
+	return cfgd;
 }
 
 /**
@@ -463,7 +464,9 @@ export function isRenamableDeclaration(n: ts.Identifier): boolean {
  * @return The nearest function-like scope, or the source file when no function owns it.
  */
 export function declarationScope(n: ts.Identifier): ts.Node {
-	let scope: ts.Node = n.parent;
+	const isOuterDeclarationName =
+		(ts.isFunctionDeclaration(n.parent) || ts.isClassDeclaration(n.parent) || ts.isInterfaceDeclaration(n.parent) || ts.isTypeAliasDeclaration(n.parent)) && n.parent.name === n;
+	let scope: ts.Node = isOuterDeclarationName ? n.parent.parent : n.parent;
 	while (!ts.isSourceFile(scope)) {
 		if (
 			ts.isArrowFunction(scope) ||

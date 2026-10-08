@@ -1,5 +1,61 @@
 # @terra-symposium/quality
 
+## 0.4.50
+
+### Patch Changes
+
+- Exclude explicitly skipped generated files from dead-code inventory comparisons.
+
+## 0.4.49
+
+### Patch Changes
+
+- Include the repository's shared support modules in read-only dead-code preview copies so ESLint rules can resolve imported source dependencies.
+
+## 0.4.48
+
+### Patch Changes
+
+- Copy TypeScript ESLint configs and their Tailwind preset into read-only dead-code previews so ESLint can load the repository configuration.
+
+## 0.4.47
+
+### Patch Changes
+
+- Run dead-code ESLint in ten-file batches with live progress and explicitly enable the discovered flat config.
+
+## 0.4.46
+
+### Patch Changes
+
+- Pass the repository's discovered flat ESLint config explicitly to dead-code analysis so TypeScript configs are loaded consistently.
+
+## 0.4.45
+
+### Patch Changes
+
+- Set the npm package homepage to https://terra-symposium-quality.netlify.app/.
+
+## 0.4.44
+
+### Patch Changes
+
+- Run ESLint in ten-file batches so long full-source checks update progress more frequently.
+
+## 0.4.43
+
+### Patch Changes
+
+- Cache TypeScript module resolution and identifier scans while classifying Knip consumers, and report progress during full-source consumer analysis.
+- Report each dead-code analysis, single-use rewrite pass, and transactional TypeScript safety-check batch so long-running work has visible progress.
+- Report remaining dead-code findings with safe-fix classification and explicit agent remediation guidance; manual-only warnings no longer fail dead-code checks.
+- Never delete unreachable files automatically, avoid broad detached-comment cleanup, and preserve safe fixes in unaffected files when TypeScript validation rejects one file's edits.
+- Consolidate Knip, unused declarations, one-use inlining, and detached TSDoc into one autofixing and read-only dead-code workflow.
+- Validate automatic rewrites against TypeScript diagnostics and roll back only the rejected source file.
+- Make `--warn` preflight the same fixes in an isolated temporary source copy so type-rejected rewrites are manual warnings without mutating the configured repository.
+- Keep Astro frontmatter out of name autofixes; textual replacement could corrupt framework properties and string literals.
+- Keep callback parameters as full words unless the repository's explicit semantic alias map defines a conventional short form.
+
 ## 0.4.40
 
 ### Patch Changes

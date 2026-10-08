@@ -18,6 +18,11 @@ import type { QualityAnalysis, QualityCfg } from './runner.js';
 /*//////////////////////////////////////////////////
 REGEX
 //////////////////////////////////////////////////*/
+const TYPE_S_REGEX = /^type\s+/;
+
+/*//////////////////////////////////////////////////
+REGEX
+//////////////////////////////////////////////////*/
 const R_N_REGEX = /\r?\n/;
 const S_S_G_REGEX = () => /\/\*\*[\s\S]*?\*\//g;
 
@@ -43,6 +48,8 @@ type ImportGroup = 'API' | 'COMPONENTS' | 'DATA' | 'TYPES';
 type SrcGroup = 'CONFIG' | 'HELPERS';
 export type DocumentationRequirements = { types?: boolean; functions?: boolean; exportedFunctions?: boolean; noInlineFunctions?: boolean };
 
+export type DuplicateImportFinding = { file: string; line: number; module: string };
+
 /*//////////////////////////////////////////////////
 DOCUMENTATION
 //////////////////////////////////////////////////*/
@@ -52,7 +59,7 @@ export type DocumentationFinding = {
 	line: number;
 	column: number;
 	name: string;
-	kind: 'file' | 'summary' | 'param' | 'return' | 'tag' | 'type' | 'function' | 'inline';
+	kind: 'file' | 'summary' | 'param' | 'return' | 'tag' | 'type' | 'function' | 'inline' | 'orphan';
 	reason: string;
 	severity: 'warning' | 'error';
 };
@@ -222,6 +229,51 @@ function importGroup(name: string): ImportGroup {
 }
 
 /**
+ * Finds repeated named bindings that the source maintainer can merge without
+ * changing import evaluation order or side-effect-only imports.
+ *
+ * @param files Configured source files to inspect.
+ *
+ * @return One finding for each later import declaration that repeats a binding.
+ */
+export function duplicateImportFindings(files: string[]): DuplicateImportFinding[] {
+	const findings: DuplicateImportFinding[] = [];
+	for (const file of files) {
+		if (!SUPPORTED.has(extname(file))) continue;
+		const text = readFileSync(file, 'utf8');
+		const parsed = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, srcKind(file));
+		const seen = new Set<string>();
+		for (const declaration of parsed.statements.filter(ts.isImportDeclaration)) {
+			if (!declaration.importClause || !ts.isStringLiteral(declaration.moduleSpecifier)) continue;
+			const keys: string[] = [];
+			if (declaration.importClause.name)
+				keys.push(
+					`${declaration.moduleSpecifier.text}|${importGroup(declaration.importClause.name.text)}|${declaration.importClause.isTypeOnly ? 'type' : 'value'}|default:${declaration.importClause.name.text}`,
+				);
+			if (declaration.importClause.namedBindings && ts.isNamespaceImport(declaration.importClause.namedBindings)) {
+				keys.push(
+					`${declaration.moduleSpecifier.text}|${importGroup(declaration.importClause.namedBindings.name.text)}|${declaration.importClause.isTypeOnly ? 'type' : 'value'}|namespace:${declaration.importClause.namedBindings.name.text}`,
+				);
+			}
+			if (declaration.importClause.namedBindings && ts.isNamedImports(declaration.importClause.namedBindings)) {
+				for (const element of declaration.importClause.namedBindings.elements) {
+					const typeOnly = declaration.importClause.isTypeOnly || element.isTypeOnly;
+					const group = typeOnly ? 'TYPES' : importGroup(element.name.text);
+					const binding = element.getText(parsed).replace(TYPE_S_REGEX, '');
+					keys.push(`${declaration.moduleSpecifier.text}|${group}|${typeOnly ? 'type' : 'value'}|${binding}`);
+				}
+			}
+			if (keys.some((key) => seen.has(key))) {
+				const { line } = parsed.getLineAndCharacterOfPosition(declaration.getStart(parsed));
+				findings.push({ file, line: line + 1, module: declaration.moduleSpecifier.text });
+			}
+			for (const key of keys) seen.add(key);
+		}
+	}
+	return findings;
+}
+
+/**
  * Merges and renders imports into deterministic groups while preserving type-only imports.
  *
  * @param parsed Parsed source file used to recover exact module-specifier text.
@@ -255,7 +307,7 @@ function groupedImports(parsed: ts.SourceFile, imports: ts.ImportDeclaration[]):
 			for (const el of n.importClause.namedBindings.elements) {
 				const elTypeOnly = n.importClause.isTypeOnly || el.isTypeOnly;
 				const group = elTypeOnly ? 'TYPES' : importGroup(el.name.text);
-				get(group, n, elTypeOnly).named.add(el.getText(parsed).replace(/^type\s+/, ''));
+				get(group, n, elTypeOnly).named.add(el.getText(parsed).replace(TYPE_S_REGEX, ''));
 			}
 		}
 	}
@@ -689,16 +741,13 @@ export function removeNonCodeComments(fileName: string): boolean {
 		if (token === ts.SyntaxKind.SingleLineCommentTrivia || token === ts.SyntaxKind.MultiLineCommentTrivia)
 			comments.push({ start: scanner.getTokenPos(), end: scanner.getTextPos(), text: scanner.getTokenText() });
 	for (const block of tsdocBlocks(original, parsed)) {
-		if (
-			block.text
-				.replace(/^\/\*\*|\*\/$/g, '')
-				.replace(/^\s*\* ?/gm, '')
-				.trim()
-		)
-			continue;
 		const followingDeclaration = nodeStarts.filter((s) => s >= block.end).sort((a, b) => a - b)[0];
-		if ((followingDeclaration === undefined || !/^\s*$/.test(original.slice(block.end, followingDeclaration))) && !fileHeaderBlock(original, [block]))
-			removals.push({ start: block.start, end: block.end });
+		const detached = followingDeclaration === undefined || !S_REGEX.test(original.slice(block.end, followingDeclaration));
+		const empty = !block.text
+			.replace(/^\/\*\*|\*\/$/g, '')
+			.replace(/^\s*\* ?/gm, '')
+			.trim();
+		if ((detached || empty) && !fileHeaderBlock(original, [block])) removals.push({ start: block.start, end: block.end });
 	}
 	const headings = comments.filter(({ text: t }) => /^\/\*\/{10,}/.test(t) || /^\/\/\s*[A-Z][A-Z _-]*\s*$/.test(t));
 	for (const [idx, heading] of headings.entries()) {
@@ -973,8 +1022,33 @@ function descriptionFindingsForFile(cfg: QualityCfg, file: string, src: string, 
 	const blocks = tsdocBlocks(src, parsed);
 	const findings: DocumentationFinding[] = [];
 	const header = fileHeaderBlock(src, blocks);
+	const attached = new Set<number>();
+	const markAttached = (node: ts.Node): void => {
+		if (
+			ts.isDeclarationStatement(node) ||
+			ts.isFunctionLike(node) ||
+			ts.isClassLike(node) ||
+			ts.isEnumMember(node) ||
+			ts.isPropertySignature(node) ||
+			ts.isMethodSignature(node) ||
+			ts.isCallSignatureDeclaration(node) ||
+			ts.isConstructSignatureDeclaration(node) ||
+			ts.isIndexSignatureDeclaration(node) ||
+			ts.isTypeParameterDeclaration(node) ||
+			ts.isVariableStatement(node)
+		)
+			for (const range of ts.getLeadingCommentRanges(src, node.getFullStart()) ?? [])
+				if (src.slice(range.pos, range.end).startsWith('/**') && S_REGEX.test(src.slice(range.end, node.getStart(parsed)))) attached.add(range.pos);
+		ts.forEachChild(node, markAttached);
+	};
+	markAttached(parsed);
 	for (const block of blocks) {
 		if (block === header) continue;
+		if (!attached.has(block.start)) {
+			const finding = documentationCommentReport(file, parsed, block.start, '<detached TSDoc>', 'orphan', 'remove or attach this TSDoc to a declaration', cfg);
+			findings.push({ ...finding, severity: 'warning' });
+			continue;
+		}
 		const lines = tsdocLines(block);
 		const firstTag = lines.findIndex((l) => l.text.startsWith('@'));
 		const summary = lines

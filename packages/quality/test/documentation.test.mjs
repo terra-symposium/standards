@@ -13,7 +13,7 @@ IMPORTS
 // API
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { createQualityCfg, documentSrcFile, documentationFindings, maintainSrcFile, protectLongImports, removeNonCodeComments } from '../dist/index.js';
+import { createQualityCfg, documentSrcFile, documentationFindings, duplicateImportFindings, maintainSrcFile, protectLongImports, removeNonCodeComments } from '../dist/index.js';
 import { fixtureFile, fixtureRoot, fixtureText } from './support.mjs';
 
 /*//////////////////////////////////////////////////
@@ -78,6 +78,38 @@ export function useDashboardConfigurationDialog(initialConfigure: string | undef
 			['return', '@return', 'error'],
 		],
 	);
+});
+
+test('documentation findings warn for detached TSDoc and accept declaration and file-header comments', () => {
+	const root = fixtureRoot('terra-quality-detached-tsdoc-');
+	fixtureFile(
+		root,
+		'src/main.ts',
+		`/** src/main.ts */
+/** Describes a declaration that was removed. */
+`,
+	);
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
+	assert.deepEqual(
+		documentationFindings(cfg).map(({ kind, name, severity }) => [kind, name, severity]),
+		[['orphan', '<detached TSDoc>', 'warning']],
+	);
+	assert.equal(removeNonCodeComments(`${root}/src/main.ts`), true);
+	assert.doesNotMatch(fixtureText(root, 'src/main.ts'), /Describes a declaration that was removed/);
+});
+test('documentation description audit accepts TSDoc attached to a type member', () => {
+	const root = fixtureRoot('terra-quality-property-tsdoc-');
+	fixtureFile(
+		root,
+		'src/main.ts',
+		`type CompatibilityInput = {
+	/** Keeps legacy action policy out of the canonical builder during migration. */
+	proposedActions?: never[];
+};
+`,
+	);
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
+	assert.deepEqual(documentationFindings(cfg), []);
 });
 test('documentation findings recognize the props scaffold for destructured parameters', () => {
 	const root = fixtureRoot('terra-quality-destructured-function-doc-');
@@ -306,6 +338,18 @@ void admin;
 	assert.equal((first.match(/import type \{ createAdminClient \}/g) ?? []).length, 1);
 	assert.equal(maintainSrcFile(root, file), false);
 	assert.equal(fixtureText(root, 'src/main.ts'), first);
+});
+test('duplicate import audit reports repeated type bindings with their later source location', () => {
+	const root = fixtureRoot('terra-quality-import-audit-');
+	const file = fixtureFile(
+		root,
+		'src/main.ts',
+		`import type { RecordData } from './types';
+import type { RecordData } from './types';
+export type Result = RecordData;
+`,
+	);
+	assert.deepEqual(duplicateImportFindings([file]), [{ file, line: 2, module: './types' }]);
 });
 test('maintainSrcFile heals orphaned duplicate header fragments and merges adjacent descriptions', () => {
 	const root = fixtureRoot('terra-quality-document-header-healing-');

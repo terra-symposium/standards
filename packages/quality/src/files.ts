@@ -19,12 +19,6 @@ import type { QualityCfg } from './runner.js';
 CONFIG
 //////////////////////////////////////////////////*/
 
-// File discovery is shared by nearly every check. Cache by the effective
-// discovery inputs so a full run walks the repository once per scope instead
-// of once per check. The cache is process-local and naturally disappears
-// between CLI invocations; source edits do not change the file set.
-const fileCache = new Map<string, string[]>();
-
 /*//////////////////////////////////////////////////
 HELPERS
 //////////////////////////////////////////////////*/
@@ -37,13 +31,6 @@ HELPERS
  * @return Sorted absolute paths for files that belong to the configured source scope.
  */
 export function srcFiles(cfg: QualityCfg): string[] {
-	const cacheKey = JSON.stringify([cfg.root, cfg.sourceRoots, cfg.includeRoots ?? [], cfg.extensions, cfg.skippedDirectories ?? [], cfg.skippedFiles ?? []]);
-	const cached = fileCache.get(cacheKey);
-	// Quality stages can rename or generate source files. Do not reuse a stale
-	// inventory after a discovered path disappears (for example, naming moves a
-	// legacy page into its canonical route directory).
-	if (cached && cached.every((f) => existsSync(f))) return cached;
-	if (cached) fileCache.delete(cacheKey);
 	const roots = [...cfg.sourceRoots, ...(cfg.includeRoots ?? [])];
 	const exts = new Set(cfg.extensions);
 	const skipped = new Set(cfg.skippedDirectories ?? []);
@@ -63,9 +50,7 @@ export function srcFiles(cfg: QualityCfg): string[] {
 		}
 	};
 	for (const root of roots) walk(root);
-	const result = files.sort((a, b) => a.localeCompare(b));
-	fileCache.set(cacheKey, result);
-	return result;
+	return files.sort((a, b) => a.localeCompare(b));
 }
 
 /**

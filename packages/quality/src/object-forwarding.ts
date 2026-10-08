@@ -21,7 +21,6 @@ TYPES
 //////////////////////////////////////////////////*/
 
 export type ObjectForwardingFinding = { file: string; line: number; column: number; callee: string; source: string; properties: string[]; recommendation: string };
-export type ObjectForwardingFixResult = { fixed: number; skipped: number };
 
 /*//////////////////////////////////////////////////
 HELPERS
@@ -130,7 +129,7 @@ export function objectForwardingFindings(cfg: QualityCfg, analysis?: QualityAnal
  *
  * @return Counts of exact duplicate properties removed and conservative cases left untouched.
  */
-export function fixObjectForwarding(cfg: QualityCfg, analysis?: QualityAnalysis): ObjectForwardingFixResult {
+export function fixObjectForwarding(cfg: QualityCfg, analysis?: QualityAnalysis): { fixed: number; skipped: number } {
 	let fixed = 0;
 	let skipped = 0;
 	for (const file of analysis?.files ?? srcFiles(cfg)) {

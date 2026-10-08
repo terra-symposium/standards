@@ -15,16 +15,18 @@ import { aliasFindings, declarationScope, isCallbackDeclaration, isProtectedPath
 import { checkImports } from './imports.js';
 import { collapseInlineIfs } from './inline-if.js';
 import { collapseTypesAndObjects } from './collapse.js';
-import { dirname, relative, resolve, sep } from 'node:path';
-import { documentSrcFile, documentationFindings, maintainSrcFile, protectLongImports, removeNonCodeComments } from './documentation.js';
-import { existsSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
+import { documentSrcFile, documentationFindings, duplicateImportFindings, maintainSrcFile, protectLongImports } from './documentation.js';
+import { cpSync, copyFileSync, existsSync, mkdtempSync, mkdirSync, readFileSync, realpathSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { fixObjectForwarding, objectForwardingFindings } from './object-forwarding.js';
 import { fixRegexDedup, fixRepeatedClasses, regexFindings, repeatedClassFindings, uiPatternFindings } from './patterns.js';
-import { fixSingleUseDeclarations, singleUseFindings } from './single-use.js';
+import { deadCodeEditsIntroduceTypeErrors, deadCodeTypeProgram, fixSingleUseDeclarations, singleUseFindings } from './single-use.js';
 import { securityFindings } from './security.js';
 import { spawnSync } from 'node:child_process';
+import { tmpdir } from 'node:os';
 import { srcFiles, workingSrcFiles } from './files.js';
+import { qualityProgress } from './progress.js';
 
 // DATA
 import { DOCUMENTATION_DESCRIPTION_NOTICE } from './documentation.js';
@@ -35,10 +37,41 @@ import type { DocumentationRequirements } from './documentation.js';
 /*//////////////////////////////////////////////////
 REGEX
 //////////////////////////////////////////////////*/
+const R_N_REGEX = /\r?\n/;
+const SHARED_REGEX = /\/\*|\/\//;
+
+/*//////////////////////////////////////////////////
+REGEX
+//////////////////////////////////////////////////*/
 const CJS_JS_JSX_MJS_TS_TSX_REGEX = /\.(?:cjs|js|jsx|mjs|ts|tsx)$/;
 const G_REGEX = () => /-/g;
-const G_CLASS_2 = () => /[.*+?^${}()|[\]\\]/g;
 const C_M_JS_TS_REGEX = /\.(?:c|m)?(?:js|ts)$/;
+const CLI_CMDS = new Set([
+	'quality',
+	'quality:all',
+	'quality:baseline',
+	'document',
+	'maintain',
+	'format',
+	'naming',
+	'domain',
+	'single-use',
+	'dead-code',
+	'security',
+	'repeated-classes',
+	'regex-dedup',
+	'ui-patterns',
+	'imports',
+	'aliases',
+	'forwarding',
+	'documentation',
+	'lint',
+	'knip',
+	'types',
+]);
+const CLI_FLAGS = new Set(['--all', '--warn', '--strict', '--skip-commands', '--skip-recommendations', '--help', '-h', '--version', '-v']);
+const TOOL_OUTPUT_MAX_BUFFER = 64 * 1024 * 1024;
+const ESLINT_BATCH_SIZE = 10;
 
 /*//////////////////////////////////////////////////
 REGEX
@@ -64,7 +97,7 @@ export type QualityCheckName =
 	| 'repeated-classes'
 	| 'regex-dedup'
 	| 'ui-patterns';
-export type QualityAutofixName = 'document' | 'format' | 'name' | 'lint' | 'knip' | 'alias' | 'forward' | 'repeatedClasses' | 'regexDedup';
+export type QualityAutofixName = 'document' | 'format' | 'name' | 'lint' | 'knip' | 'dead-code' | 'alias' | 'forward' | 'repeatedClasses' | 'regexDedup';
 export type QualityCfg = {
 	root: string;
 	sourceRoots: string[];
@@ -74,8 +107,8 @@ export type QualityCfg = {
 	externalPrefixes?: string[];
 	skippedDirectories?: string[];
 	skippedFiles?: string[];
-	singleUse?: { skippedDirectories?: string[] };
 	protectedIdentifiers?: string[];
+	frameworkEntryExports?: Record<string, string[]>;
 	renameExports?: boolean;
 	qualityCommands?: { name: string; command: string; args?: string[] }[];
 	enabledChecks?: Partial<Record<QualityCheckName, boolean>>;
@@ -229,7 +262,6 @@ export function createQualityCfg(cfg: QualityCfg): QualityCfg {
 		includeRoots: (cfg.includeRoots ?? []).map((p) => resolve(cfg.root, p)),
 		skippedDirectories: [...new Set([...defaultSkipped, ...(cfg.skippedDirectories ?? [])])],
 		skippedFiles: (cfg.skippedFiles ?? []).map((p) => resolve(cfg.root, p)),
-		singleUse: { ...cfg.singleUse, skippedDirectories: (cfg.singleUse?.skippedDirectories ?? []).map((p) => resolve(cfg.root, p)) },
 		aliases: cfg.aliases ?? {},
 		protectedIdentifiers: cfg.protectedIdentifiers ?? [],
 		lintRoots: (cfg.lintRoots ?? []).map((p) => resolve(cfg.root, p)),
@@ -268,28 +300,6 @@ function qualityHeader(name: string, detail: string): void {
 }
 
 /**
- * Renders compact progress for a file-processing quality section.
- *
- * @param label Section operation being performed.
- * @param curr Number of files completed.
- * @param total Number of files in the section.
- *
- * @return Nothing; progress is written to standard error.
- */
-function qualityProgress(label: string, curr: number, total: number): void {
-	const completed = Math.min(Math.max(curr, 0), total);
-	const width = 24;
-	const filled = total ? Math.round((completed / total) * width) : width;
-	const line = `  ${label} [${'='.repeat(filled)}${' '.repeat(width - filled)}] ${completed}/${total}`;
-	if (process.stderr.isTTY) {
-		process.stderr.write(`\r${line}`);
-		if (completed >= total) process.stderr.write('\n');
-		return;
-	}
-	console.error(line);
-}
-
-/**
  * Converts tool output into compact single-line messages without terminal control codes.
  *
  * @param val Raw child-process output.
@@ -299,7 +309,7 @@ function qualityProgress(label: string, curr: number, total: number): void {
 function compactOutput(val: string): string[] {
 	return val
 		.replace(ANSI_ESCAPE, '')
-		.split(/\r?\n/)
+		.split(R_N_REGEX)
 		.map((l) => l.replace(/\s+/g, ' ').trim())
 		.filter(Boolean);
 }
@@ -326,7 +336,7 @@ function printChildOutput(val: string | Buffer | null | undefined): void {
  * @return Child-process exit status, or `1` when spawning fails without a status.
  */
 function run(cfg: QualityCfg, cmd: string, args: string[], opts: { quietSuccess?: boolean } = {}): number {
-	const result = spawnSync(cmd, args, { cwd: cfg.root, stdio: ['inherit', 'pipe', 'pipe'], env: process.env });
+	const result = spawnSync(cmd, args, { cwd: cfg.root, stdio: ['inherit', 'pipe', 'pipe'], env: process.env, maxBuffer: TOOL_OUTPUT_MAX_BUFFER });
 	if (!opts.quietSuccess || result.status) {
 		printChildOutput(result.stdout);
 		printChildOutput(result.stderr);
@@ -404,7 +414,7 @@ function scopedCfg(cfg: QualityCfg, all: boolean): QualityCfg {
  *
  * @return Nothing; failures are reflected in the process exit code.
  */
-function runLint(cfg: QualityCfg, opts: QualityOptions, exhaustive = false): void {
+function runLint(cfg: QualityCfg, opts: QualityOptions, exhaustive = false, deadCodeCoordinated = false): void {
 	const files = filesFor(cfg, opts.all).filter((f) => /\.(?:astro|cjs|js|jsx|mjs|ts|tsx)$/.test(f));
 	if (!files.length) return;
 	qualityHeader('lint', `${opts.fix ? 'Fixing' : 'Checking'} ${files.length} source files with ESLint`);
@@ -415,6 +425,7 @@ function runLint(cfg: QualityCfg, opts: QualityOptions, exhaustive = false): voi
 		'--cache-location',
 		'node_modules/.cache/eslint',
 		'--no-warn-ignored',
+		...(deadCodeCoordinated ? ['--rule', 'unused-imports/no-unused-vars: off'] : []),
 		...(exhaustive ? ['--max-warnings=0'] : []),
 		...(opts.fix ? ['--fix'] : []),
 	];
@@ -422,7 +433,7 @@ function runLint(cfg: QualityCfg, opts: QualityOptions, exhaustive = false): voi
 	const before = opts.fix ? snapshotFiles(cfg, files) : undefined;
 	let completed = 0;
 	qualityProgress('ESLint', completed, files.length);
-	for (const filesBatch of batches(files)) {
+	for (const filesBatch of batches(files, ESLINT_BATCH_SIZE)) {
 		const status = run(cfg, toolPath(cfg, cfg.tools?.eslint, 'eslint'), [...flags, ...filesBatch], { quietSuccess: opts.fix });
 		completed += filesBatch.length;
 		qualityProgress('ESLint', completed, files.length);
@@ -447,93 +458,237 @@ function runLint(cfg: QualityCfg, opts: QualityOptions, exhaustive = false): voi
  *
  * @return Number of unused function declarations removed.
  */
-function fixUnusedFns(cfg: QualityCfg, all: boolean): number {
-	const files = filesFor(cfg, all).filter((f) => CJS_JS_JSX_MJS_TS_TSX_REGEX.test(f));
+function fixUnusedDeclarations(cfg: QualityCfg, reports: EslintReport[], changedFiles: Set<string>): number {
 	let fixed = 0;
-	for (const filesBatch of batches(files)) {
-		const result = spawnSync(
-			toolPath(cfg, cfg.tools?.eslint, 'eslint'),
-			['--cache', '--cache-strategy', 'content', '--cache-location', 'node_modules/.cache/eslint', '--format', 'json', '--no-warn-ignored', ...filesBatch],
-			{ cwd: cfg.root, encoding: 'utf8', env: process.env },
+	const importedConsumers = importedExportConsumers(cfg);
+	for (const report of reports) {
+		const src = readFileSync(report.filePath, 'utf8');
+		const ast = ts.createSourceFile(
+			report.filePath,
+			src,
+			ts.ScriptTarget.Latest,
+			true,
+			C_M_JS_TS_X_CLASS_2.test(report.filePath) && report.filePath.endsWith('x') ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
 		);
-		let reports: Array<{ filePath: string; messages: Array<{ ruleId?: string; line: number; column: number }> }> = [];
-		try {
-			reports = JSON.parse(result.stdout || '[]') as typeof reports;
-		} catch {
-			continue;
-		}
-		for (const report of reports) {
-			const src = readFileSync(report.filePath, 'utf8');
-			const ast = ts.createSourceFile(
-				report.filePath,
-				src,
-				ts.ScriptTarget.Latest,
-				true,
-				C_M_JS_TS_X_CLASS_2.test(report.filePath) && report.filePath.endsWith('x') ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
-			);
-			const starts = new Set(report.messages.filter((m) => m.ruleId === 'unused-imports/no-unused-vars').map((m) => ast.getPositionOfLineAndCharacter(m.line - 1, m.column - 1)));
-			const edits: Array<{ start: number; end: number }> = [];
-			const visit = (node: ts.Node): void => {
-				if (ts.isFunctionDeclaration(node) && node.name && starts.has(node.name.getStart(ast)) && !node.modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword)) {
-					let start = node.getStart(ast);
-					const comments = ts.getLeadingCommentRanges(src, node.getFullStart()) ?? [];
-					const attached = comments.at(-1);
-					if (attached?.kind === ts.SyntaxKind.MultiLineCommentTrivia && src.slice(attached.end, start).trim() === '' && src.slice(attached.pos, attached.pos + 3) === '/**') start = attached.pos;
-					let end = node.end;
-					while (src[end] === ' ' || src[end] === '\t') end++;
-					if (src.slice(end, end + 2) === '\r\n') end += 2;
-					else if (src[end] === '\n') end++;
-					edits.push({ start, end });
-				}
-				ts.forEachChild(node, visit);
-			};
-			visit(ast);
-			if (!edits.length) continue;
-			let updated = src;
-			for (const edit of edits.sort((a, b) => b.start - a.start)) updated = `${updated.slice(0, edit.start)}${updated.slice(edit.end)}`;
-			const diagnostics =
-				ts.transpileModule(updated, { fileName: report.filePath, reportDiagnostics: true, compilerOptions: { allowJs: true, jsx: ts.JsxEmit.Preserve, target: ts.ScriptTarget.ESNext } }).diagnostics ??
-				[];
-			if (diagnostics.some((d) => d.category === ts.DiagnosticCategory.Error)) continue;
-			writeFileSync(report.filePath, updated);
-			fixed += edits.length;
-		}
+		if ((ast as ts.SourceFile & { parseDiagnostics: readonly ts.Diagnostic[] }).parseDiagnostics.length)
+			throw new Error(`ESLint reported unused declarations in unparsable source: ${report.filePath}`);
+		const starts = new Set(report.messages.filter((m) => m.ruleId === 'unused-imports/no-unused-vars').map((m) => ast.getPositionOfLineAndCharacter(m.line - 1, m.column - 1)));
+		const edits: Array<{ start: number; end: number; text?: string }> = [];
+		const visit = (node: ts.Node): void => {
+			let declaration: ts.Node | undefined;
+			const name =
+				ts.isFunctionDeclaration(node) || ts.isTypeAliasDeclaration(node) || ts.isInterfaceDeclaration(node)
+					? node.name?.text
+					: ts.isVariableDeclaration(node) && ts.isIdentifier(node.name)
+						? node.name.text
+						: undefined;
+			const externallyConsumed = name ? importedConsumers.get(resolve(report.filePath))?.has(name) : false;
+			const isTopLevel = (candidate: ts.Node): boolean =>
+				candidate.parent === ast ||
+				(ts.isVariableDeclaration(candidate) && ts.isVariableDeclarationList(candidate.parent) && ts.isVariableStatement(candidate.parent.parent) && candidate.parent.parent.parent === ast);
+			const isExported = (candidate: ts.Node): boolean => ts.canHaveModifiers(candidate) && Boolean(ts.getModifiers(candidate)?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword));
+			if (ts.isFunctionDeclaration(node) && node.name && starts.has(node.name.getStart(ast)) && isTopLevel(node) && !isExported(node) && !externallyConsumed) declaration = node;
+			if ((ts.isTypeAliasDeclaration(node) || ts.isInterfaceDeclaration(node)) && starts.has(node.name.getStart(ast)) && isTopLevel(node) && !isExported(node) && !externallyConsumed)
+				declaration = node;
+			if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && starts.has(node.name.getStart(ast)) && isTopLevel(node) && !externallyConsumed) {
+				if (
+					ts.isVariableDeclarationList(node.parent) &&
+					(node.parent.flags & ts.NodeFlags.Const) !== 0 &&
+					node.parent.declarations.length === 1 &&
+					ts.isVariableStatement(node.parent.parent) &&
+					!node.parent.parent.modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword) &&
+					node.initializer &&
+					isPureUnusedInit(node.initializer)
+				)
+					declaration = node.parent.parent;
+			}
+			if (declaration) {
+				let start = declaration.getStart(ast);
+				const comments = ts.getLeadingCommentRanges(src, declaration.getFullStart()) ?? [];
+				const attached = comments.at(-1);
+				if (attached?.kind === ts.SyntaxKind.MultiLineCommentTrivia && src.slice(attached.end, start).trim() === '' && src.slice(attached.pos, attached.pos + 3) === '/**') start = attached.pos;
+				let end = declaration.end;
+				while (src[end] === ' ' || src[end] === '\t') end++;
+				if (src.slice(end, end + 2) === '\r\n') end += 2;
+				else if (src[end] === '\n') end++;
+				edits.push({ start, end });
+			}
+			ts.forEachChild(node, visit);
+		};
+		visit(ast);
+		if (!edits.length) continue;
+		let updated = src;
+		for (const edit of edits.sort((a, b) => b.start - a.start)) updated = `${updated.slice(0, edit.start)}${updated.slice(edit.end)}`;
+		const diagnostics =
+			ts.transpileModule(updated, { fileName: report.filePath, reportDiagnostics: true, compilerOptions: { allowJs: true, jsx: ts.JsxEmit.Preserve, target: ts.ScriptTarget.ESNext } }).diagnostics ??
+			[];
+		if (diagnostics.some((d) => d.category === ts.DiagnosticCategory.Error)) continue;
+		writeFileSync(report.filePath, updated);
+		changedFiles.add(report.filePath);
+		fixed += edits.length;
 	}
 	return fixed;
 }
 
-type UnusedFnFinding = { file: string; line: number; name: string };
+/** Accepts only initializers whose evaluation has no observable effects. */
+function isPureUnusedInit(node: ts.Expression): boolean {
+	if (
+		ts.isStringLiteralLike(node) ||
+		ts.isNumericLiteral(node) ||
+		ts.isBigIntLiteral(node) ||
+		ts.isRegularExpressionLiteral(node) ||
+		node.kind === ts.SyntaxKind.TrueKeyword ||
+		node.kind === ts.SyntaxKind.FalseKeyword ||
+		node.kind === ts.SyntaxKind.NullKeyword ||
+		ts.isArrowFunction(node) ||
+		ts.isFunctionExpression(node)
+	)
+		return true;
+	if (ts.isParenthesizedExpression(node) || ts.isAsExpression(node) || ts.isTypeAssertionExpression(node) || ts.isNonNullExpression(node) || ts.isSatisfiesExpression(node))
+		return isPureUnusedInit(node.expression);
+	if (ts.isArrayLiteralExpression(node)) return node.elements.every((element) => !ts.isSpreadElement(element) && isPureUnusedInit(element));
+	if (ts.isObjectLiteralExpression(node))
+		return node.properties.every((property) => ts.isPropertyAssignment(property) && !ts.isComputedPropertyName(property.name) && isPureUnusedInit(property.initializer));
+	return false;
+}
 
-/** Reports private function declarations that ESLint proves have no references. */
-function unusedFnFindings(cfg: QualityCfg, all: boolean): UnusedFnFinding[] {
+type EslintReport = { filePath: string; messages: Array<{ ruleId?: string; line: number; column: number; message?: string }> };
+type DeadCodeFinding = { rule: string; file: string; line: number; name: string; severity: 'error' | 'warning'; autofixable: boolean; reason: string; agentAction: string };
+type KnipItem = { name: string; line?: number };
+type KnipIssue = { file: string; [kind: string]: string | KnipItem[] };
+
+/** Runs ESLint's machine-readable pass once for the selected source files. */
+function collectEslintReports(cfg: QualityCfg, all: boolean): EslintReport[] {
 	const files = filesFor(cfg, all).filter((f) => CJS_JS_JSX_MJS_TS_TSX_REGEX.test(f));
-	const findings: UnusedFnFinding[] = [];
-	for (const filesBatch of batches(files)) {
-		const result = spawnSync(toolPath(cfg, cfg.tools?.eslint, 'eslint'), ['--format', 'json', '--no-warn-ignored', ...filesBatch], { cwd: cfg.root, encoding: 'utf8', env: process.env });
-		let reports: Array<{ filePath: string; messages: Array<{ ruleId?: string; line: number; column: number }> }> = [];
-		try {
-			reports = JSON.parse(result.stdout || '[]') as typeof reports;
-		} catch {
-			continue;
-		}
-		for (const report of reports) {
-			const src = readFileSync(report.filePath, 'utf8');
-			const ast = ts.createSourceFile(
-				report.filePath,
-				src,
-				ts.ScriptTarget.Latest,
-				true,
-				C_M_JS_TS_X_CLASS_2.test(report.filePath) && report.filePath.endsWith('x') ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
-			);
-			const starts = new Set(report.messages.filter((m) => m.ruleId === 'unused-imports/no-unused-vars').map((m) => ast.getPositionOfLineAndCharacter(m.line - 1, m.column - 1)));
-			const visit = (node: ts.Node): void => {
-				if (ts.isFunctionDeclaration(node) && node.name && starts.has(node.name.getStart(ast)) && !node.modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword)) {
-					const line = ast.getLineAndCharacterOfPosition(node.name.getStart(ast)).line + 1;
-					findings.push({ file: relative(cfg.root, report.filePath), line, name: node.name.text });
-				}
-				ts.forEachChild(node, visit);
+	const reports: EslintReport[] = [];
+	const flatCfg = ['eslint.config.js', 'eslint.config.mjs', 'eslint.config.cjs', 'eslint.config.ts', 'eslint.config.mts', 'eslint.config.cts']
+		.map((f) => resolve(cfg.root, f))
+		.find((f) => existsSync(f));
+	let completed = 0;
+	qualityProgress('ESLint dead-code', completed, files.length);
+	for (const filesBatch of batches(files, ESLINT_BATCH_SIZE)) {
+		const result = spawnSync(toolPath(cfg, cfg.tools?.eslint, 'eslint'), ['--format', 'json', '--no-ignore', ...(flatCfg ? ['--config', flatCfg] : []), ...filesBatch], {
+			cwd: cfg.root,
+			encoding: 'utf8',
+			env: flatCfg ? { ...process.env, ESLINT_USE_FLAT_CONFIG: 'true' } : process.env,
+			maxBuffer: TOOL_OUTPUT_MAX_BUFFER,
+		});
+		reports.push(...parseEslintReports(result, filesBatch));
+		completed += filesBatch.length;
+		qualityProgress('ESLint dead-code', completed, files.length);
+	}
+	return reports;
+}
+
+/** Parses ESLint JSON and fails closed when the detector cannot provide a trustworthy result. */
+function parseEslintReports(result: ReturnType<typeof spawnSync>, files: string[]): EslintReport[] {
+	if (result.error) throw new Error(`ESLint dead-code detector failed: ${result.error.message}`);
+	if (result.status !== 0 && result.status !== 1)
+		throw new Error(
+			`ESLint dead-code detector exited ${result.status ?? 'without a status'} for ${files.length} source files (${files
+				.slice(0, 3)
+				.map((f) => relative(process.cwd(), f))
+				.join(', ')}${files.length > 3 ? ', …' : ''}): ${compactOutput(result.stderr?.toString() ?? '').join(' ')}`,
+		);
+	try {
+		const reports = JSON.parse(result.stdout?.toString() || '') as unknown;
+		if (!Array.isArray(reports)) throw new Error('expected a JSON array');
+		if (
+			reports.some(
+				(report) =>
+					!report ||
+					typeof report.filePath !== 'string' ||
+					!Array.isArray(report.messages) ||
+					(report.fatalErrorCount ?? 0) > 0 ||
+					report.messages.some(
+						(message: unknown) => !message || typeof message !== 'object' || !Number.isInteger((message as { line?: unknown }).line) || !Number.isInteger((message as { column?: unknown }).column),
+					),
+			)
+		)
+			throw new Error(`report entries must include filePath and well-formed messages: ${JSON.stringify(reports).slice(0, 4000)}`);
+		const actual = new Set(reports.map((report: { filePath: string }) => resolve(report.filePath)));
+		const missing = files.map((f) => resolve(f)).filter((f) => !actual.has(f));
+		if (missing.length) throw new Error(`missing reports for ${missing.join(', ')}`);
+		return reports as EslintReport[];
+	} catch (err) {
+		throw new Error(`ESLint dead-code detector returned invalid JSON for ${files.length} source files: ${err instanceof Error ? err.message : String(err)}`, { cause: err });
+	}
+}
+
+/** Reports unused private declarations, classifying only proven-safe removals as autofixable. */
+function unusedDeclarationFindings(cfg: QualityCfg, reports: EslintReport[]): DeadCodeFinding[] {
+	const findings: DeadCodeFinding[] = [];
+	for (const report of reports) {
+		const src = readFileSync(report.filePath, 'utf8');
+		const lines = src.split(R_N_REGEX);
+		const ast = ts.createSourceFile(
+			report.filePath,
+			src,
+			ts.ScriptTarget.Latest,
+			true,
+			C_M_JS_TS_X_CLASS_2.test(report.filePath) && report.filePath.endsWith('x') ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
+		);
+		if ((ast as ts.SourceFile & { parseDiagnostics: readonly ts.Diagnostic[] }).parseDiagnostics.length)
+			throw new Error(`ESLint reported unused declarations in unparsable source: ${report.filePath}`);
+		for (const msg of report.messages.filter((e) => e.ruleId === 'unused-imports/no-unused-vars')) {
+			const text = lines[msg.line - 1]?.slice(Math.max(0, msg.column - 1)) ?? '';
+			const name = text.match(/^[A-Za-z_$][\w$]*/)?.[0] ?? msg.message?.match(/^'([^']+)'/)?.[1] ?? '<unknown>';
+			const pos = ast.getPositionOfLineAndCharacter(msg.line - 1, msg.column - 1);
+			let declaration: ts.Node | undefined;
+			const find = (node: ts.Node): void => {
+				if (
+					(node as ts.Node & { name?: ts.Node }).name &&
+					ts.isIdentifier((node as ts.Node & { name?: ts.Node }).name as ts.Node) &&
+					((node as ts.Node & { name?: ts.Node }).name as ts.Node).getStart(ast) === pos
+				)
+					declaration = node;
+				ts.forEachChild(node, find);
 			};
-			visit(ast);
+			find(ast);
+			let autofixable = false;
+			let reason = 'The ESLint location did not resolve to a supported private declaration.';
+			const declarationExported =
+				declaration &&
+				((ts.canHaveModifiers(declaration) && Boolean(ts.getModifiers(declaration as ts.HasModifiers)?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword))) ||
+					(ts.isVariableDeclaration(declaration) &&
+						ts.isVariableDeclarationList(declaration.parent) &&
+						ts.isVariableStatement(declaration.parent.parent) &&
+						Boolean(declaration.parent.parent.modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword))));
+			const topLevelPrivate = Boolean(
+				declaration &&
+				(declaration.parent === ast ||
+					(ts.isVariableDeclaration(declaration) && ts.isVariableDeclarationList(declaration.parent) && ts.isVariableStatement(declaration.parent.parent) && declaration.parent.parent.parent === ast)),
+			);
+			if (declaration && !declarationExported && topLevelPrivate) {
+				if (ts.isFunctionDeclaration(declaration) || ts.isTypeAliasDeclaration(declaration) || ts.isInterfaceDeclaration(declaration)) {
+					autofixable = true;
+					reason = 'ESLint confirms this private declaration is unused and removing it has no initializer effects.';
+				} else if (ts.isVariableDeclaration(declaration)) {
+					autofixable =
+						ts.isVariableDeclarationList(declaration.parent) &&
+						(declaration.parent.flags & ts.NodeFlags.Const) !== 0 &&
+						declaration.parent.declarations.length === 1 &&
+						ts.isVariableStatement(declaration.parent.parent) &&
+						Boolean(declaration.initializer && isPureUnusedInit(declaration.initializer));
+					reason = autofixable ? 'The unused const has a side-effect-free initializer.' : 'Removing this binding may change initializer evaluation or declaration semantics.';
+				}
+			} else if (declaration && !declarationExported) {
+				reason = 'This unused binding is nested inside another declaration; removing its enclosing function or component would change behavior.';
+			}
+			findings.push({
+				rule: 'eslint/unused-private-declaration',
+				file: relative(cfg.root, report.filePath),
+				line: msg.line,
+				name,
+				severity: autofixable ? 'error' : 'warning',
+				autofixable,
+				reason,
+				agentAction: autofixable
+					? 'Run the canonical dead-code autofix; it should remove this declaration and its attached TSDoc without changing other source behavior.'
+					: reason.startsWith('This unused binding is nested')
+						? 'Remove only this local parameter or binding when appropriate; preserve its enclosing function, component, hook order, closure behavior, and control flow, then run the focused test and typecheck.'
+						: 'Inspect the declaration and its initializer. Remove the unused binding only if initializer evaluation and control flow remain equivalent; preserve observable effects, then run the affected focused test and typecheck.',
+			});
 		}
 	}
 	return findings;
@@ -599,7 +754,7 @@ function runProjectTypecheck(cfg: QualityCfg): void {
 		console.error(`  ${status ? '✗ failed' : '✓ passed'}`);
 		return;
 	}
-	const result = spawnSync(cfg.typecheckCommand.command, cfg.typecheckCommand.args ?? [], { cwd: cfg.root, stdio: ['inherit', 'pipe', 'pipe'], env: process.env });
+	const result = spawnSync(cfg.typecheckCommand.command, cfg.typecheckCommand.args ?? [], { cwd: cfg.root, stdio: ['inherit', 'pipe', 'pipe'], env: process.env, maxBuffer: TOOL_OUTPUT_MAX_BUFFER });
 	const output = `${result.stdout ?? ''}\n${result.stderr ?? ''}`;
 	printChildOutput(result.stdout);
 	printChildOutput(result.stderr);
@@ -645,6 +800,14 @@ function repairMissingImports(cfg: QualityCfg, program: ts.Program, checker: ts.
 	for (const src of program.getSourceFiles()) {
 		if (!src.fileName.startsWith(`${cfg.root}${sep}`) || !C_M_JS_TS_X_REGEX.test(src.fileName)) continue;
 		const missing = new Map<string, { source: ts.SourceFile; typeOnly: boolean }>();
+		const importedNames = new Set<string>();
+		for (const statement of src.statements.filter(ts.isImportDeclaration)) {
+			if (!statement.importClause) continue;
+			if (statement.importClause.name) importedNames.add(statement.importClause.name.text);
+			if (statement.importClause.namedBindings && ts.isNamespaceImport(statement.importClause.namedBindings)) importedNames.add(statement.importClause.namedBindings.name.text);
+			if (statement.importClause.namedBindings && ts.isNamedImports(statement.importClause.namedBindings))
+				for (const element of statement.importClause.namedBindings.elements) importedNames.add(element.name.text);
+		}
 		const visit = (n: ts.Node): void => {
 			const intrinsicJsxTag = ts.isIdentifier(n) && (ts.isJsxOpeningLikeElement(n.parent) || ts.isJsxClosingElement(n.parent)) && n.parent.tagName === n && /^[a-z]/.test(n.text);
 			const propertyName =
@@ -657,6 +820,7 @@ function repairMissingImports(cfg: QualityCfg, program: ts.Program, checker: ts.
 				!ts.isPropertyAccessExpression(n.parent) &&
 				!ts.isPropertyAccessChain(n.parent) &&
 				!ts.isQualifiedName(n.parent) &&
+				!importedNames.has(n.text) &&
 				!ts.isImportDeclaration(n.parent) &&
 				!ts.isImportSpecifier(n.parent) &&
 				!ts.isExportSpecifier(n.parent)
@@ -690,22 +854,511 @@ function repairMissingImports(cfg: QualityCfg, program: ts.Program, checker: ts.
 	}
 }
 
-/**
- * Runs Knip with either autofix, focused warning checks, or its exhaustive default mode.
- *
- * @param cfg Quality configuration containing the Knip executable.
- * @param fix Whether Knip may apply its supported fixes.
- * @param exhaustive Whether the complete Knip check should determine failure status.
- *
- * @return Nothing; Knip failures are reflected in the process exit code.
- */
-function runKnip(cfg: QualityCfg, fix: boolean, exhaustive = false): void {
-	qualityHeader('knip', `${fix ? 'Fixing and checking' : 'Checking'} unused files, exports, dependencies, and reachability`);
+/** Runs Knip once and validates its complete machine-readable issue inventory. */
+function readKnipIssues(cfg: QualityCfg): KnipIssue[] {
 	const knip = toolPath(cfg, cfg.tools?.knip, 'knip');
-	if (fix) run(cfg, knip, ['--fix', '--allow-remove-files', '--no-exit-code', '--no-config-hints'], { quietSuccess: true });
-	const status = run(cfg, knip, exhaustive ? ['--no-config-hints'] : ['--include', 'unresolved,nsExports,nsTypes,cycles', '--no-exit-code', '--no-config-hints']);
-	if (status) process.exitCode = status;
-	console.error(`  ${status ? '✗ failed' : '✓ passed'}`);
+	const result = spawnSync(knip, ['--reporter', 'json', '--no-config-hints'], { cwd: cfg.root, encoding: 'utf8', env: process.env, maxBuffer: TOOL_OUTPUT_MAX_BUFFER });
+	if (result.error || (result.status !== 0 && result.status !== 1)) throw new Error(`Knip failed: ${result.error?.message ?? result.stderr ?? result.status}`);
+	let issues: KnipIssue[];
+	try {
+		const parsed = JSON.parse(result.stdout) as { issues?: KnipIssue[] };
+		if (!Array.isArray(parsed.issues)) throw new Error('missing issues array');
+		issues = parsed.issues;
+		for (const issue of issues) {
+			if (!issue || typeof issue.file !== 'string' || !issue.file) throw new Error('finding without a source file');
+			assertKnipPath(cfg, issue.file, 'finding source');
+			for (const [kind, val] of Object.entries(issue)) {
+				if (kind === 'file') continue;
+				if (!Array.isArray(val)) throw new Error(`invalid ${kind} findings for ${issue.file}`);
+				for (const item of val) {
+					if (!item || typeof item.name !== 'string' || !item.name || (item.line !== undefined && (!Number.isInteger(item.line) || item.line < 1)))
+						throw new Error(`malformed ${kind} finding for ${issue.file}`);
+					if (kind === 'files') assertKnipPath(cfg, item.name, 'unreachable file');
+				}
+			}
+		}
+	} catch (err) {
+		throw new Error(`Knip returned invalid JSON: ${err instanceof Error ? err.message : String(err)}`, { cause: err });
+	}
+	if (result.status === 1 && issues.length === 0) throw new Error('Knip reported failure without findings');
+	return issues;
+}
+
+/** Rejects malformed, missing, or out-of-repository paths in Knip's inventory. */
+function assertKnipPath(cfg: QualityCfg, path: string, label: string): string {
+	const absolute = resolve(cfg.root, path);
+	const rel = relative(cfg.root, absolute);
+	if (isAbsolute(path) || rel === '..' || rel.startsWith(`..${sep}`)) throw new Error(`Knip returned a ${label} path outside the repository: ${path}`);
+	if (!existsSync(absolute)) throw new Error(`Knip returned a ${label} path that does not exist: ${path}`);
+	const realRoot = realpathSync(cfg.root);
+	const realPath = realpathSync(absolute);
+	const realRelative = relative(realRoot, realPath);
+	if (realRelative === '..' || realRelative.startsWith(`..${sep}`) || isAbsolute(realRelative)) throw new Error(`Knip returned a ${label} symlink outside the repository: ${path}`);
+	return absolute;
+}
+
+function collectKnipFindings(cfg: QualityCfg): DeadCodeFinding[] {
+	const issues = readKnipIssues(cfg);
+	const importedConsumers = importedExportConsumers(cfg);
+	const findings: DeadCodeFinding[] = [];
+	for (const issue of issues) {
+		const filePath = assertKnipPath(cfg, issue.file, 'finding source');
+		for (const [kind, val] of Object.entries(issue)) {
+			if (kind === 'file') continue;
+			for (const item of val as KnipItem[]) {
+				if (kind === 'exports' && isFrameworkEntryExport(cfg, issue.file, item.name)) continue;
+				const location = kind === 'files' ? item.name : issue.file;
+				const autoFixable = (kind === 'exports' || kind === 'types') && !importedConsumers.get(filePath)?.has(item.name) && knipExportCanBeMadePrivate(filePath, item.name);
+				const reason = autoFixable
+					? 'Knip identifies an unconsumed named export with a direct, unambiguous declaration.'
+					: kind === 'files'
+						? 'Knip considers this file unreachable; file deletion can affect dynamic, generated, or framework references.'
+						: importedConsumers.get(filePath)?.has(item.name)
+							? 'Knip reports this export as unused, but a configured source consumer was found.'
+							: `Knip reports an unused ${kind} that the safe export rewrite cannot identify unambiguously.`;
+				const agentAction = autoFixable
+					? 'Run the canonical dead-code autofix; it should remove only this export modifier, then verify the declaration and its local uses remain intact.'
+					: kind === 'files'
+						? 'Inspect imports, dynamic loading, framework discovery, generated inventories, and tests. Delete this file only if those checks prove it unreachable; otherwise correct the explicit entry-point or source-discovery model.'
+						: importedConsumers.get(filePath)?.has(item.name)
+							? 'Reconcile the reported consumer with Knip configuration and module resolution. Preserve the export while it has a real consumer; do not add a broad ignore.'
+							: `Inspect the exact ${kind} and its consumers. Remove it only if it is truly unused; otherwise add the concrete framework/public contract to the explicit entry model.`;
+				findings.push({ rule: `knip/${kind}`, file: location, line: item.line ?? 1, name: item.name, severity: autoFixable ? 'error' : 'warning', autofixable: autoFixable, reason, agentAction });
+			}
+		}
+	}
+	return findings;
+}
+
+function isFrameworkEntryExport(cfg: QualityCfg, file: string, name: string): boolean {
+	const publicRoute = !basename(file).startsWith('_');
+	return Object.entries(cfg.frameworkEntryExports ?? {}).some(([pattern, names]) => {
+		const pathMatches =
+			pattern === file ||
+			(publicRoute && pattern.endsWith('/**/*.ts') && file.startsWith(pattern.slice(0, -8)) && file.endsWith('.ts')) ||
+			(publicRoute && pattern.endsWith('/**/*.tsx') && file.startsWith(pattern.slice(0, -9)) && file.endsWith('.tsx'));
+		return pathMatches && names.includes(name);
+	});
+}
+
+function deadCodeScriptKind(file: string): ts.ScriptKind {
+	if (/\.tsx$/i.test(file)) return ts.ScriptKind.TSX;
+	if (/\.jsx$/i.test(file)) return ts.ScriptKind.JSX;
+	if (/\.(?:c|m)?js$/i.test(file)) return ts.ScriptKind.JS;
+	return ts.ScriptKind.TS;
+}
+
+function knipExportCanBeMadePrivate(file: string, name: string): boolean {
+	if (!existsSync(file) || file.endsWith('.astro')) return false;
+	const srcText = readFileSync(file, 'utf8');
+	const src = ts.createSourceFile(file, srcText, ts.ScriptTarget.Latest, true, deadCodeScriptKind(file));
+	if ((src as ts.SourceFile & { parseDiagnostics: readonly ts.Diagnostic[] }).parseDiagnostics.length) throw new Error(`Cannot safely classify Knip export in unparsable source: ${file}`);
+	for (const statement of src.statements) {
+		if (!ts.canHaveModifiers(statement) || !ts.getModifiers(statement as ts.HasModifiers)?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword)) continue;
+		if (ts.getModifiers(statement as ts.HasModifiers)?.some((modifier) => modifier.kind === ts.SyntaxKind.DefaultKeyword)) continue;
+		if (ts.isExportDeclaration(statement) && statement.exportClause && ts.isNamedExports(statement.exportClause)) {
+			if (statement.exportClause.elements.some((element) => element.name.text === name) && !SHARED_REGEX.test(srcText.slice(statement.exportClause.getStart(src), statement.exportClause.end)))
+				return true;
+		} else if (ts.isVariableStatement(statement)) {
+			const declaration = statement.declarationList.declarations[0];
+			if (statement.declarationList.declarations.length === 1 && declaration && ts.isIdentifier(declaration.name) && declaration.name.text === name) return true;
+		} else if ('name' in statement && statement.name && ts.isIdentifier(statement.name) && statement.name.text === name) return true;
+	}
+	return false;
+}
+
+/** Removes only an unused export modifier that Knip identifies precisely. */
+function fixKnipExports(cfg: QualityCfg, changedFiles: Set<string>): void {
+	const issues = readKnipIssues(cfg);
+	const importedConsumers = importedExportConsumers(cfg);
+	for (const issue of issues) {
+		const exports = [...(Array.isArray(issue.exports) ? issue.exports : []), ...(Array.isArray(issue.types) ? issue.types : [])];
+		if (!exports.length || issue.file.endsWith('.astro')) continue;
+		const file = assertKnipPath(cfg, issue.file, 'finding source');
+		const src = readFileSync(file, 'utf8');
+		const ast = ts.createSourceFile(file, src, ts.ScriptTarget.Latest, true, deadCodeScriptKind(file));
+		if ((ast as ts.SourceFile & { parseDiagnostics: readonly ts.Diagnostic[] }).parseDiagnostics.length) throw new Error(`Cannot safely fix Knip exports in unparsable source: ${issue.file}`);
+		const edits: Array<{ start: number; end: number; text?: string }> = [];
+		const externalConsumers = importedConsumers.get(resolve(file));
+		const removableNames = new Set(
+			exports
+				.filter((finding) => finding && typeof finding.name === 'string' && !isFrameworkEntryExport(cfg, issue.file, finding.name) && !externalConsumers?.has(finding.name))
+				.map((finding) => finding.name),
+		);
+		const handledNames = new Set<string>();
+		for (const statement of ast.statements) {
+			if (!ts.isExportDeclaration(statement) || !statement.exportClause || !ts.isNamedExports(statement.exportClause)) continue;
+			const removed = statement.exportClause.elements.filter((specifier) => removableNames.has(specifier.name.text));
+			if (!removed.length || SHARED_REGEX.test(src.slice(statement.exportClause.getStart(ast), statement.exportClause.end))) continue;
+			for (const specifier of removed) handledNames.add(specifier.name.text);
+			const retained = statement.exportClause.elements.filter((specifier) => !removableNames.has(specifier.name.text));
+			let end = statement.end;
+			if (!retained.length) {
+				if (src[end] === '\r' && src[end + 1] === '\n') end += 2;
+				else if (src[end] === '\n') end++;
+				const replacement = statement.moduleSpecifier && !statement.isTypeOnly ? `import ${statement.moduleSpecifier.getText(ast)}${src.slice(statement.moduleSpecifier.end, statement.end)}` : '';
+				edits.push({ start: statement.getStart(ast), end, text: replacement });
+			} else {
+				const keptClause = `{ ${retained.map((specifier) => specifier.getText(ast)).join(', ')} }`;
+				edits.push({
+					start: statement.getStart(ast),
+					end: statement.end,
+					text: `${src.slice(statement.getStart(ast), statement.exportClause.getStart(ast))}${keptClause}${src.slice(statement.exportClause.end, statement.end)}`,
+				});
+			}
+		}
+		for (const finding of exports) {
+			if (!finding || typeof finding.name !== 'string' || !finding.name) throw new Error(`Knip returned malformed export findings for ${issue.file}`);
+			if (!removableNames.has(finding.name) || isFrameworkEntryExport(cfg, issue.file, finding.name) || handledNames.has(finding.name)) continue;
+			const declaration = ast.statements.find((statement) => {
+				if (!ts.canHaveModifiers(statement) || !ts.getModifiers(statement as ts.HasModifiers)?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword)) return false;
+				if (ts.getModifiers(statement as ts.HasModifiers)?.some((modifier) => modifier.kind === ts.SyntaxKind.DefaultKeyword)) return false;
+				if (ts.isVariableStatement(statement)) {
+					return (
+						statement.declarationList.declarations.length === 1 &&
+						ts.isIdentifier(statement.declarationList.declarations[0]!.name) &&
+						statement.declarationList.declarations[0]!.name.text === finding.name
+					);
+				}
+				return 'name' in statement && statement.name && ts.isIdentifier(statement.name) && statement.name.text === finding.name;
+			});
+			if (!declaration || (finding.line && declaration.getStart(ast) > ast.getPositionOfLineAndCharacter(finding.line - 1, 0))) continue;
+			const modifier = ts.getModifiers(declaration as ts.HasModifiers)?.find((i) => i.kind === ts.SyntaxKind.ExportKeyword);
+			if (modifier) {
+				const end = src[modifier.end] === ' ' || src[modifier.end] === '\t' ? modifier.end + 1 : modifier.end;
+				edits.push({ start: modifier.getStart(ast), end });
+			}
+		}
+		const uniqueEdits = [...new Map(edits.map((edit) => [edit.start, edit])).values()].sort((left, right) => right.start - left.start);
+		if (uniqueEdits.length) {
+			const output = uniqueEdits.reduce((text, edit) => `${text.slice(0, edit.start)}${edit.text ?? ''}${text.slice(edit.end)}`, src);
+			writeFileSync(file, output);
+			changedFiles.add(file);
+		}
+	}
+}
+
+/** Finds export names that configured source files import and actually reference. */
+const importedExportConsumerCache = new WeakMap<QualityCfg, { signature: string; consumers: Map<string, Set<string>> }>();
+
+function importedExportConsumers(cfg: QualityCfg): Map<string, Set<string>> {
+	const srcFiles = filesFor(cfg, true).filter((path) => C_M_JS_TS_X_CLASS_2.test(path) || path.endsWith('.astro'));
+	const signature = srcFiles
+		.map((f) => {
+			const stats = statSync(f);
+			return `${f}:${stats.mtimeMs}:${stats.size}`;
+		})
+		.join('\n');
+	const cached = importedExportConsumerCache.get(cfg);
+	if (cached?.signature === signature) return cached.consumers;
+	const consumers = new Map<string, Set<string>>();
+	const paths = Object.fromEntries(Object.entries(cfg.aliases ?? {}).map(([pattern, target]) => [pattern.endsWith('*') ? pattern : `${pattern}*`, [target.endsWith('*') ? target : `${target}*`]]));
+	const compilerOpts: ts.CompilerOptions = { baseUrl: cfg.root, moduleResolution: ts.ModuleResolutionKind.Bundler, paths };
+	const moduleResolutionCache = ts.createModuleResolutionCache(cfg.root, (f) => f, compilerOpts);
+	const progressStep = Math.max(1, Math.ceil(srcFiles.length / 20));
+	qualityProgress('Knip import consumers', 0, srcFiles.length);
+	for (const [srcIdx, file] of srcFiles.entries()) {
+		if (srcIdx % progressStep === 0 || srcIdx + 1 === srcFiles.length) qualityProgress('Knip import consumers', srcIdx + 1, srcFiles.length);
+		const raw = readFileSync(file, 'utf8');
+		const astro = file.endsWith('.astro') ? /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/.exec(raw) : null;
+		if (file.endsWith('.astro') && !astro) continue;
+		const frontmatter = astro?.[1] ?? raw;
+		const markup = astro ? raw.slice(astro[0].length) : '';
+		const src = ts.createSourceFile(file, frontmatter, ts.ScriptTarget.Latest, true, file.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
+		const markupUses = (name: string): boolean => Boolean(markup) && markup.includes(name);
+		const referencedIdentifiers = new Set<string>();
+		const namespaceProperties = new Map<string, Set<string>>();
+		const collectReferences = (node: ts.Node): void => {
+			if (ts.isImportDeclaration(node)) return;
+			if (ts.isIdentifier(node)) referencedIdentifiers.add(node.text);
+			if (ts.isPropertyAccessExpression(node) && ts.isIdentifier(node.expression)) {
+				const properties = namespaceProperties.get(node.expression.text) ?? new Set<string>();
+				properties.add(node.name.text);
+				namespaceProperties.set(node.expression.text, properties);
+			}
+			ts.forEachChild(node, collectReferences);
+		};
+		collectReferences(src);
+		for (const statement of src.statements) {
+			if ((!ts.isImportDeclaration(statement) && !ts.isExportDeclaration(statement)) || !statement.moduleSpecifier || !ts.isStringLiteral(statement.moduleSpecifier)) continue;
+			const resolved = ts.resolveModuleName(statement.moduleSpecifier.text, file, compilerOpts, ts.sys, moduleResolutionCache).resolvedModule?.resolvedFileName;
+			if (!resolved) continue;
+			const owner = resolve(resolved);
+			const names = consumers.get(owner) ?? new Set<string>();
+			if (ts.isExportDeclaration(statement) && statement.exportClause && ts.isNamedExports(statement.exportClause)) {
+				for (const specifier of statement.exportClause.elements) names.add(specifier.propertyName?.text ?? specifier.name.text);
+				consumers.set(owner, names);
+				continue;
+			}
+			if (!ts.isImportDeclaration(statement)) continue;
+			const bindings = statement.importClause?.namedBindings;
+			if (!bindings) continue;
+			if (ts.isNamedImports(bindings)) {
+				for (const specifier of bindings.elements) {
+					if (referencedIdentifiers.has(specifier.name.text) || markupUses(specifier.name.text)) names.add(specifier.propertyName?.text ?? specifier.name.text);
+				}
+			} else if (ts.isNamespaceImport(bindings)) {
+				for (const property of namespaceProperties.get(bindings.name.text) ?? []) names.add(property);
+				if (markupUses(bindings.name.text)) {
+					for (const match of markup.matchAll(new RegExp(`<\\s*${bindings.name.text}\\.([A-Za-z_$][\\w$]*)(?:[\\s/>])`, 'g'))) names.add(match[1]!);
+				}
+			}
+			if (names.size) consumers.set(owner, names);
+		}
+	}
+	importedExportConsumerCache.set(cfg, { signature, consumers });
+	return consumers;
+}
+
+function acceptTypeSafeEdits(
+	program: ts.Program,
+	proposed: Map<string, string>,
+	original: Map<string, string>,
+	onBatch?: (checked: number, fileCount: number) => void,
+): { accepted: Map<string, string>; rejected: Set<string> } {
+	const rejected = new Set<string>();
+	let checks = 0;
+	const accept = (entries: [string, string][], base: Map<string, string>): Map<string, string> => {
+		if (!entries.length) return base;
+		onBatch?.(++checks, entries.length);
+		const candidate = new Map(base);
+		for (const [file, text] of entries) candidate.set(file, text);
+		if (!deadCodeEditsIntroduceTypeErrors(program, candidate)) return candidate;
+		if (entries.length === 1) {
+			rejected.add(entries[0]![0]);
+			return base;
+		}
+		const midpoint = Math.floor(entries.length / 2);
+		const afterLeft = accept(entries.slice(0, midpoint), base);
+		return accept(entries.slice(midpoint), afterLeft);
+	};
+	const baseline = new Map([...proposed.keys()].map((f) => [f, original.get(f)!]));
+	return {
+		accepted: accept(
+			[...proposed].sort(([left], [right]) => left.localeCompare(right)),
+			baseline,
+		),
+		rejected,
+	};
+}
+
+function printDeadCodeFindings(findings: DeadCodeFinding[]): void {
+	if (!findings.length) {
+		console.error('  ✓ dead-code checks passed; no autofixable findings or manual warnings remain');
+		return;
+	}
+	const errs = findings.filter((finding) => finding.severity === 'error');
+	const warnings = findings.filter((finding) => finding.severity === 'warning');
+	for (const finding of findings) {
+		console.error(`  - [${finding.severity.toUpperCase()}] ${finding.rule}: ${finding.file}:${finding.line} ${finding.name}`);
+		console.error(`      Reason: ${finding.reason}`);
+		console.error(`      Autofix: ${finding.autofixable ? 'available' : 'not safe or not supported'}`);
+		console.error(`      Agent action: ${finding.agentAction}`);
+	}
+	console.error(`  ${errs.length} error${errs.length === 1 ? '' : 's'}; ${warnings.length} manual warning${warnings.length === 1 ? '' : 's'}.`);
+	if (errs.length) process.exitCode = 1;
+}
+
+/** Runs every dead-code detector through one fix-and-verify boundary. */
+function runDeadCode(cfg: QualityCfg, fix: boolean, all: boolean, verify = true, emit = true): DeadCodeFinding[] {
+	if (emit) qualityHeader('dead-code', `${fix ? 'Fixing safe cases and checking' : 'Read-only check of'} unused files, exports, declarations, and single-use code`);
+	const changedFiles = new Set<string>();
+	const srcSnapshot = fix ? new Map(filesFor(cfg, true).map((f) => [f, readFileSync(f, 'utf8')])) : new Map<string, string>();
+	const initialInventory = fix ? new Set(srcSnapshot.keys()) : new Set<string>();
+	if (fix && emit) console.error(`  Preparing TypeScript baseline for ${srcSnapshot.size} configured source files...`);
+	const typeProgram = fix ? deadCodeTypeProgram(cfg) : null;
+	if (fix && emit) console.error('  TypeScript baseline ready.');
+	const typeRejectedFiles = new Set<string>();
+	let eslintReports: EslintReport[] = [];
+	if (fix) {
+		if (qualityCheckEnabled(cfg, 'knip')) {
+			if (emit) qualityHeader('dead-code/knip-fix', 'Removing only unambiguous unused export modifiers');
+			fixKnipExports(cfg, changedFiles);
+		}
+		if (qualityCheckEnabled(cfg, 'lint')) {
+			for (let round = 0; round < 5; round++) {
+				if (emit) console.error(`  ESLint unused-declaration pass ${round + 1}/5...`);
+				eslintReports = collectEslintReports(cfg, all);
+				if (!fixUnusedDeclarations(cfg, eslintReports, changedFiles)) break;
+			}
+		}
+		if (emit) console.error('  Checking and inlining safe single-use declarations...');
+		fixSingleUseDeclarations(cfg, changedFiles, (pass, filesChanged) => {
+			if (emit) console.error(`  Single-use rewrite pass ${pass} starting (${filesChanged} source files changed so far).`);
+		});
+		const currInventory = new Set(filesFor(cfg, true));
+		const skippedInventory = new Set(cfg.skippedFiles ?? []);
+		const trackedInitialInventory = [...initialInventory].filter((f) => !skippedInventory.has(f));
+		const trackedCurrInventory = [...currInventory].filter((f) => !skippedInventory.has(f));
+		if (trackedCurrInventory.length !== trackedInitialInventory.length || trackedInitialInventory.some((f) => !currInventory.has(f)))
+			throw new Error('Dead-code autofix changed the configured source inventory; file creation or deletion is not an automatic dead-code fix.');
+		const proposed = new Map<string, string>();
+		for (const file of changedFiles) {
+			const original = srcSnapshot.get(file);
+			if (original === undefined || !existsSync(file)) throw new Error(`Dead-code autofix changed source inventory unexpectedly: ${relative(cfg.root, file)}`);
+			const curr = readFileSync(file, 'utf8');
+			if (curr !== original) proposed.set(file, curr);
+		}
+		if (proposed.size) {
+			if (!typeProgram) throw new Error('Dead-code edit validation requires its baseline TypeScript program.');
+			if (emit) console.error(`  Validating ${proposed.size} changed files against TypeScript diagnostics...`);
+			const { accepted, rejected } = acceptTypeSafeEdits(typeProgram, proposed, srcSnapshot, (checked, count) => {
+				if (emit) console.error(`  TypeScript safety check ${checked} (${count} candidate files).`);
+			});
+			for (const file of rejected) {
+				const original = srcSnapshot.get(file);
+				if (original !== undefined) writeFileSync(file, original);
+				typeRejectedFiles.add(relative(cfg.root, file));
+				changedFiles.delete(file);
+			}
+			for (const [file, text] of accepted) if (readFileSync(file, 'utf8') !== text) writeFileSync(file, text);
+		}
+	}
+	if (!verify) return [];
+	const findings: DeadCodeFinding[] = [];
+	if (qualityCheckEnabled(cfg, 'knip')) {
+		if (emit) qualityHeader('dead-code/knip', 'Checking unused files, exports, dependencies, and reachability');
+		findings.push(...collectKnipFindings(cfg));
+	}
+	if (qualityCheckEnabled(cfg, 'lint')) eslintReports = collectEslintReports(cfg, all);
+	if (qualityCheckEnabled(cfg, 'lint')) findings.push(...unusedDeclarationFindings(cfg, eslintReports));
+	for (const single of singleUseFindings(cfg))
+		findings.push({
+			rule: 'typescript/single-use',
+			file: single.file,
+			line: single.line,
+			name: single.name,
+			severity: single.autofixable ? 'error' : 'warning',
+			autofixable: single.autofixable,
+			reason: single.reason,
+			agentAction: single.agentAction,
+		});
+	for (const finding of documentationFindings(scopedCfg(cfg, true)).filter((i) => i.kind === 'orphan'))
+		findings.push({
+			rule: 'tsdoc/detached',
+			file: finding.file,
+			line: finding.line,
+			name: finding.name,
+			severity: 'warning',
+			autofixable: false,
+			reason: finding.reason,
+			agentAction:
+				'Attach this TSDoc to the declaration it describes when that relationship is clear; otherwise remove only this detached block. Preserve meaningful constraints and do not move it across unrelated code.',
+		});
+	const finalFindings = findings.map((finding) =>
+		typeRejectedFiles.has(finding.file) && finding.autofixable
+			? {
+					...finding,
+					severity: 'warning' as const,
+					autofixable: false,
+					reason: `The proposed rewrite in this file introduced TypeScript diagnostics and was rolled back: ${finding.reason}`,
+					agentAction: 'Inspect the exact declaration and proposed rewrite, preserve semantics and types, then apply a source-level fix or leave this case manual.',
+				}
+			: finding,
+	);
+	if (emit) printDeadCodeFindings(finalFindings);
+	return finalFindings;
+}
+
+/**
+ * Runs the canonical fixer in a temporary source copy so --warn can distinguish
+ * fixes it can land from candidates rejected by the TypeScript safety gate.
+ *
+ * @param cfg Quality configuration for the user's untouched source tree.
+ * @param all Whether every configured source file should be inspected.
+ *
+ * @return Nothing; remaining automatic fixes set a failing process status.
+ */
+function runDeadCodeReadOnly(cfg: QualityCfg, all: boolean): void {
+	const customToolPath = [cfg.tools?.knip, cfg.tools?.eslint].some((tool) => tool && (isAbsolute(tool) || tool.includes('/') || tool.includes('\\')));
+	if (customToolPath) {
+		runDeadCode(cfg, false, all);
+		return;
+	}
+	const tempRoot = realpathSync(mkdtempSync(join(tmpdir(), 'terra-quality-dead-code-preview-')));
+	try {
+		const sharedRoot = resolve(cfg.root, 'shared');
+		const roots = [...new Set([...cfg.sourceRoots, ...(cfg.includeRoots ?? []), ...(existsSync(sharedRoot) ? [sharedRoot] : [])])].sort((left, right) => left.length - right.length);
+		const copiedRoots: string[] = [];
+		for (const sourceRoot of roots) {
+			const relativeRoot = relative(cfg.root, sourceRoot);
+			if (relativeRoot === '..' || relativeRoot.startsWith(`..${sep}`) || isAbsolute(relativeRoot))
+				throw new Error(`Cannot create a read-only dead-code preview for an external source root: ${sourceRoot}`);
+			if (copiedRoots.some((parent) => relativeRoot === parent || relativeRoot.startsWith(`${parent}${sep}`))) continue;
+			const destination = resolve(tempRoot, relativeRoot);
+			mkdirSync(dirname(destination), { recursive: true });
+			if (existsSync(sourceRoot)) cpSync(sourceRoot, destination, { recursive: true, verbatimSymlinks: true });
+			else mkdirSync(destination, { recursive: true });
+			copiedRoots.push(relativeRoot);
+		}
+		for (const file of [
+			'.prettierrc.mjs',
+			'package.json',
+			'pnpm-lock.yaml',
+			'pnpm-workspace.yaml',
+			'quality.json',
+			'knip.json',
+			'eslint.config.js',
+			'eslint.config.mjs',
+			'eslint.config.cjs',
+			'eslint.config.ts',
+			'eslint.config.mts',
+			'eslint.config.cts',
+			'tailwind.config.mjs',
+			'tailwind.preset.ts',
+			'postcss.config.mjs',
+			'tsconfig.json',
+			'tsconfig.eslint.json',
+			'astro/package.json',
+			'astro/astro.config.mjs',
+			'astro/tsconfig.json',
+			'astro/env.d.ts',
+			'playwright.config.ts',
+		]) {
+			const src = resolve(cfg.root, file);
+			if (!existsSync(src)) continue;
+			const destination = resolve(tempRoot, file);
+			mkdirSync(dirname(destination), { recursive: true });
+			copyFileSync(src, destination);
+		}
+		const srcRoots = [...new Set([...cfg.sourceRoots, ...(cfg.includeRoots ?? [])])];
+		for (const sourceRoot of srcRoots) {
+			for (let dir = sourceRoot; dir === cfg.root || dir.startsWith(`${cfg.root}${sep}`); dir = dirname(dir)) {
+				const srcModules = resolve(dir, 'node_modules');
+				if (existsSync(srcModules)) {
+					const relativeDir = relative(cfg.root, dir);
+					const shadowDir = resolve(tempRoot, relativeDir);
+					mkdirSync(shadowDir, { recursive: true });
+					const link = resolve(shadowDir, 'node_modules');
+					if (!existsSync(link)) symlinkSync(srcModules, link, process.platform === 'win32' ? 'junction' : 'dir');
+				}
+				if (dir === cfg.root) break;
+			}
+		}
+		const shadowCfg = createQualityCfg({
+			...cfg,
+			root: tempRoot,
+			sourceRoots: cfg.sourceRoots.map((path) => relative(cfg.root, path)),
+			includeRoots: (cfg.includeRoots ?? []).map((path) => relative(cfg.root, path)),
+			skippedFiles: (cfg.skippedFiles ?? []).map((path) => relative(cfg.root, path)),
+			lintRoots: (cfg.lintRoots ?? []).map((path) => relative(cfg.root, path)),
+			typecheckRoots: (cfg.typecheckRoots ?? []).map((path) => relative(cfg.root, path)),
+		});
+		process.exitCode = 0;
+		const before = runDeadCode(shadowCfg, false, all, true, false);
+		const after = runDeadCode(shadowCfg, true, all, true, false);
+		const remaining = new Set(after.map((finding) => `${finding.rule}\0${finding.file}\0${finding.name}`));
+		const unapplied = before.filter((finding) => finding.severity === 'error' && !remaining.has(`${finding.rule}\0${finding.file}\0${finding.name}`));
+		qualityHeader('dead-code', 'Read-only check of unused files, exports, declarations, and single-use code (safe-fix preview runs in a temporary copy)');
+		printDeadCodeFindings([...unapplied, ...after]);
+	} finally {
+		rmSync(tempRoot, { recursive: true, force: true });
+	}
+}
+
+function runDeadCodeCmd(cfg: QualityCfg, fix: boolean, all: boolean): void {
+	if (fix) runDeadCode(cfg, true, all);
+	else runDeadCodeReadOnly(cfg, all);
 }
 
 /**
@@ -777,29 +1430,6 @@ function fixNames(cfg: QualityCfg, all: boolean): void {
 	// TypeScript's parser does not understand Astro frontmatter. Keep Astro in
 	// reporting/import scope, but never apply symbol renames to it.
 	const allowed = new Set(filesFor(cfg, all).filter((f) => !isProtectedPath(f) && !f.endsWith('.astro')));
-	for (const file of filesFor(cfg, all).filter((f) => f.endsWith('.astro') && !isProtectedPath(f))) {
-		const source = readFileSync(file, 'utf8');
-		const frontmatter = /^---\r?\n([\s\S]*?)\r?\n---/.exec(source);
-		if (!frontmatter) continue;
-		const body = frontmatter[1]!;
-		const offset = frontmatter[0].indexOf(body);
-		const astroCfg = { ...cfg, sourceRoots: [file] };
-		const findings = namingFindings(astroCfg);
-		let updated = body;
-		const replacements = new Map(findings.map((f) => [f.name, f.suggestion]));
-		for (const [name, suggestion] of replacements) {
-			const escaped = name.replace(G_CLASS_2(), '\\$&');
-			updated = updated.replace(new RegExp(`\\b${escaped}\\b`, 'g'), suggestion);
-		}
-		let nSrc = updated === body ? source : `${source.slice(0, offset)}${updated}${source.slice(offset + body.length)}`;
-		for (const [name, suggestion] of replacements) {
-			if (name === suggestion) continue;
-			const escaped = name.replace(G_CLASS_2(), '\\$&');
-			const callback = new RegExp(`\\.map\\(\\s*(\\(\\s*)?(\\{\\s*${escaped}\\s*\\}|${escaped})\\s*\\)?\\s*=>\\s*\\(([\\s\\S]*?)\\)\\s*\\)`, 'g');
-			nSrc = nSrc.replace(callback, (m) => m.replace(new RegExp(`\\b${escaped}\\b`, 'g'), suggestion));
-		}
-		if (nSrc !== source) writeFileSync(file, nSrc);
-	}
 	let program = ts.createProgram({
 		rootNames: srcFiles(cfg).filter((f) => C_M_JS_TS_X_CLASS_2.test(f)),
 		options: {
@@ -946,6 +1576,8 @@ function fixNames(cfg: QualityCfg, all: boolean): void {
 		const inspect = (n: ts.Node): void => {
 			if (ts.isIdentifier(n) && isRenamableDeclaration(n) && !n.text.startsWith('_') && !protectedNames.has(n.text) && !hasInitShadow(n) && !hasInitReferenceToOtherSymbol(n)) {
 				const suggestion = renameDeclaration(n);
+				// Reject collisions in this declaration scope below, while allowing
+				// the same concise name in an unrelated sibling function scope.
 				if (hasInitRenameCollision(n, suggestion) || hasInitConsumerCollision(n, suggestion)) return;
 				const safety = renameSafetyByScope.get(declarationScope(n));
 				if (!isCallbackDeclaration(n) && (safety?.declared.has(suggestion) || (safety?.proposals.get(suggestion) ?? 0) > 1)) return;
@@ -1071,9 +1703,11 @@ export function runQuality(
 		forwarding: qualityCheckEnabled(cfg, 'forward') ? objectForwardingFindings(scoped, ctx) : [],
 		documentation: qualityCheckEnabled(cfg, 'document') ? documentationFindings(scoped, ctx) : [],
 	};
+	const duplicateImports = qualityCheckEnabled(cfg, 'import') ? duplicateImportFindings(ctx.files) : [];
 	if (qualityCheckEnabled(cfg, 'import')) {
 		qualityHeader('imports', 'Checking local import resolution');
 		printFindings(result.imports, (f) => `Unresolved import: ${f.importer} -> ${f.specifier}`);
+		printFindings(duplicateImports, (f) => `Duplicate named import: ${f.file}:${f.line} repeats an import from ${f.module}`);
 	}
 	if (qualityCheckEnabled(cfg, 'name')) {
 		qualityHeader('naming', 'Checking concise, consistent symbol names');
@@ -1092,7 +1726,14 @@ export function runQuality(
 		if (result.documentation.length) console.warn(`  note: ${DOCUMENTATION_DESCRIPTION_NOTICE}`);
 		printFindings(result.documentation, (f) => `${f.severity === 'warning' ? 'Documentation warning' : 'Documentation requirement'}: ${f.file}:${f.line}:${f.column} ${f.name}; ${f.reason}.`);
 	}
-	if (result.imports.length || result.aliases.length || result.documentation.some((f) => f.severity === 'error') || (strict && result.naming.some((f) => f.severity === 'error'))) process.exitCode = 1;
+	if (
+		result.imports.length ||
+		duplicateImports.length ||
+		result.aliases.length ||
+		result.documentation.some((f) => f.severity === 'error') ||
+		(strict && result.naming.some((f) => f.severity === 'error'))
+	)
+		process.exitCode = 1;
 	return result;
 }
 
@@ -1132,6 +1773,12 @@ function runDocumentation(cfg: QualityCfg, opts: QualityOptions, args: string[],
  * @return Nothing; command failures are reflected in the process exit code.
  */
 export function runQualityCli(cfg: QualityCfg, args = process.argv.slice(2)): void {
+	validCliArgs(args);
+	if (args.includes('--version') || args.includes('-v')) {
+		const pkg = JSON.parse(readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), '../package.json'), 'utf8')) as { version: string };
+		console.info(pkg.version);
+		return;
+	}
 	if (args.includes('--help') || args.includes('-h')) {
 		console.info('Usage: terra-quality <command> [options]');
 		console.info('Commands include quality, document, format, lint, knip, types, single-use, dead-code, security, and domain.');
@@ -1178,26 +1825,11 @@ export function runQualityCli(cfg: QualityCfg, args = process.argv.slice(2)): vo
 		return;
 	}
 	if (cmd === 'single-use') {
-		qualityHeader('single-use', `${opts.fix ? 'Fixing and checking' : 'Checking'} single-use declarations`);
-		if (opts.fix) fixSingleUseDeclarations(cfg);
-		const findings = singleUseFindings(cfg);
-		printFindings(findings, (f) => `Single-use ${f.decision}: ${f.file}:${f.line} ${f.name} — ${f.reason}`);
+		runDeadCodeCmd(cfg, qualityAutofixEnabled(cfg, 'dead-code', opts.fix), opts.all);
 		return;
 	}
 	if (cmd === 'dead-code') {
-		qualityHeader('dead-code', `${opts.fix ? 'Fixing and checking' : 'Checking'} private unused function declarations`);
-		if (opts.fix) {
-			let removed = 0;
-			for (let round = 0; round < 5; round++) {
-				const count = fixUnusedFns(cfg, opts.all);
-				removed += count;
-				if (!count) break;
-			}
-			if (removed) console.error(`  removed ${removed} private function${removed === 1 ? '' : 's'}`);
-		}
-		const findings = unusedFnFindings(cfg, opts.all);
-		for (const finding of findings) console.error(`  - Unused function: ${finding.file}:${finding.line} ${finding.name}`);
-		if (findings.length) process.exitCode = 1;
+		runDeadCodeCmd(cfg, qualityAutofixEnabled(cfg, 'dead-code', opts.fix), opts.all);
 		return;
 	}
 	if (cmd === 'security' || cmd === 'repeated-classes' || cmd === 'regex-dedup' || cmd === 'ui-patterns') {
@@ -1235,7 +1867,10 @@ export function runQualityCli(cfg: QualityCfg, args = process.argv.slice(2)): vo
 		return;
 	}
 	if (cmd === 'lint') return qualityCheckEnabled(cfg, 'lint') ? runLint(cfg, { ...opts, fix: fix('lint') }) : undefined;
-	if (cmd === 'knip') return qualityCheckEnabled(cfg, 'knip') ? runKnip(cfg, fix('knip')) : undefined;
+	if (cmd === 'knip') {
+		runDeadCodeCmd(cfg, qualityAutofixEnabled(cfg, 'dead-code', opts.fix), opts.all);
+		return;
+	}
 	if (cmd === 'types') {
 		if (!qualityCheckEnabled(cfg, 'type')) return;
 		runTypecheck(cfg, opts.all ? [] : filesFor(cfg, false));
@@ -1247,15 +1882,6 @@ export function runQualityCli(cfg: QualityCfg, args = process.argv.slice(2)): vo
 		return;
 	}
 	if (cmd === 'quality' || cmd === 'quality:all' || cmd === 'quality:baseline') {
-		const inlinedFiles = new Set<string>();
-		if (opts.fix) {
-			const inlined = fixSingleUseDeclarations(cfg, inlinedFiles);
-			if (inlined) console.info(`Single-use fixer: ${inlined} declaration${inlined === 1 ? '' : 's'} inlined.`);
-			for (const file of inlinedFiles) {
-				maintainSrcFile(cfg.root, file);
-				removeNonCodeComments(file);
-			}
-		}
 		if (opts.fix && qualityCheckEnabled(cfg, 'alias')) aliasFindings(cfg, true);
 		if (fix('name') && qualityCheckEnabled(cfg, 'name')) {
 			const namingScope = scopedCfg(cfg, opts.all);
@@ -1274,23 +1900,15 @@ export function runQualityCli(cfg: QualityCfg, args = process.argv.slice(2)): vo
 			const result = fixRegexDedup(scoped);
 			if (result.fixed || result.skipped) console.info(`Regex fixer: ${result.fixed} literals replaced${result.skipped ? `; ${result.skipped} advisory cases retained` : ''}.`);
 		}
-		if (qualityCheckEnabled(cfg, 'knip') && cfg.tools?.knip) runKnip(cfg, fix('knip'), true);
-		if (fix('lint') && qualityCheckEnabled(cfg, 'lint')) {
-			let removed = 0;
-			for (let round = 0; round < 5; round++) {
-				const count = fixUnusedFns(cfg, opts.all);
-				removed += count;
-				if (!count) break;
-			}
-			if (removed) console.info(`Unused declaration fixer: ${removed} function${removed === 1 ? '' : 's'} removed.`);
-		}
-		if (qualityCheckEnabled(cfg, 'lint')) runLint(cfg, { ...opts, fix: fix('lint') }, true);
+		if (fix('lint') && qualityCheckEnabled(cfg, 'lint')) runLint(cfg, { ...opts, fix: true }, true, true);
 		if (qualityCheckEnabled(cfg, 'document')) {
 			const documentationIssues = documentationFindings(scopedCfg(cfg, opts.all)).filter((f) => f.severity === 'error');
 			if (documentationIssues.length) runDocumentation(cfg, opts, ['document', ...new Set(documentationIssues.map((f) => resolve(cfg.root, f.file))), '--quiet'], true);
 		}
 		if (fix('format') && qualityCheckEnabled(cfg, 'format')) runFormatter(cfg, { ...opts, fix: true }, opts.all ? [] : filesFor(cfg, false));
 		if (opts.fix && qualityCheckEnabled(cfg, 'alias')) aliasFindings(scoped, true);
+		if (qualityCheckEnabled(cfg, 'dead-code')) runDeadCodeCmd(cfg, qualityAutofixEnabled(cfg, 'dead-code', opts.fix), opts.all);
+		if (qualityCheckEnabled(cfg, 'lint')) runLint(cfg, { ...opts, fix: false }, true, true);
 		const analysis = createQualityAnalysis(scoped);
 		runGenericChecks(scoped, analysis);
 		if (qualityCheckEnabled(cfg, 'type') && cfg.tools?.tsc) {
@@ -1299,6 +1917,10 @@ export function runQualityCli(cfg: QualityCfg, args = process.argv.slice(2)): vo
 		}
 		if (!opts.skipCommands) runCfgdCmds(cfg);
 		if (!opts.skipRecommendations) runRecommendationCmds(cfg);
+		if (opts.fix && qualityCheckEnabled(cfg, 'import') && qualityAutofixEnabled(cfg, 'document', opts.fix)) {
+			const repeated = duplicateImportFindings(filesFor(cfg, opts.all));
+			for (const file of new Set(repeated.map((finding) => finding.file))) maintainSrcFile(cfg.root, file);
+		}
 		runQuality(cfg, true, opts.all, analysis);
 		if (qualityCheckEnabled(cfg, 'diff')) runDiffCheck(cfg);
 		if (opts.fix && qualityCheckEnabled(cfg, 'diff')) runDiffCheck(cfg);
@@ -1314,7 +1936,19 @@ export function runQualityCli(cfg: QualityCfg, args = process.argv.slice(2)): vo
  * @return Nothing; command failures are reflected in the process exit code.
  */
 export function runQualityFromCfg(file?: string, args = process.argv.slice(2)): void {
+	validCliArgs(args);
+	if (args.some((arg) => ['--version', '-v', '--help', '-h'].includes(arg))) {
+		runQualityCli({} as QualityCfg, args);
+		return;
+	}
 	runQualityCli(loadQualityCfg(file), args);
+}
+
+/** Reject unknown commands and flags before loading configuration or invoking a fixer. */
+function validCliArgs(args: string[]): void {
+	const cmd = args.find((arg) => !arg.startsWith('-')) ?? 'quality';
+	const unknownFlags = args.filter((arg) => arg.startsWith('-') && !CLI_FLAGS.has(arg));
+	if (!CLI_CMDS.has(cmd) || unknownFlags.length) throw new Error(`Unknown quality CLI arguments: ${[...(!CLI_CMDS.has(cmd) ? [cmd] : []), ...unknownFlags].join(', ')}`);
 }
 
 /**
@@ -1404,7 +2038,7 @@ export function runTypecheck(cfg: QualityCfg, args: string[] = []): void {
 			]
 		: ['--noEmit', '-p', cfg.tsconfig ?? 'tsconfig.json', ...suppliedFiles];
 	qualityHeader('typecheck', `Checking ${args.length ? 'the selected source files' : 'the configured TypeScript project'}`);
-	const result = spawnSync(toolPath(cfg, tsc, 'tsc'), compilerArgs, { cwd: cfg.root, stdio: ['inherit', 'pipe', 'pipe'] });
+	const result = spawnSync(toolPath(cfg, tsc, 'tsc'), compilerArgs, { cwd: cfg.root, stdio: ['inherit', 'pipe', 'pipe'], maxBuffer: TOOL_OUTPUT_MAX_BUFFER });
 	printChildOutput(result.stdout);
 	printChildOutput(result.stderr);
 	if (result.status) process.exitCode = result.status ?? 1;

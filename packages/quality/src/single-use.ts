@@ -10,24 +10,32 @@ IMPORTS
 // API
 import ts from 'typescript';
 import { relative, sep } from 'node:path';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, statSync, writeFileSync } from 'node:fs';
 import { srcFiles } from './files.js';
+import { qualityProgress } from './progress.js';
 
 // TYPES
 import type { QualityCfg } from './runner.js';
+
 /*//////////////////////////////////////////////////
 REGEX
 //////////////////////////////////////////////////*/
+
 const S_REGEX = /^\s*$/;
+const C_M_JS_JSX_TS_TSX_REGEX = /\.(?:c|m)?(?:js|jsx|ts|tsx)$/;
 
 /*//////////////////////////////////////////////////
-REGEX
+HELPERS
 //////////////////////////////////////////////////*/
 
-const C_M_JS_JSX_TS_TSX_REGEX = /\.(?:c|m)?(?:js|jsx|ts|tsx)$/;
-export type SingleUseFinding = { file: string; line: number; name: string; decision: 'INLINE' | 'KEEP' | 'REVIEW'; reason: string };
+const reportProgress = (label: string, idx: number, total: number): void => {
+	if (idx === 0 || idx === total || idx % Math.max(1, Math.ceil(total / 20)) === 0) qualityProgress(label, idx, total);
+};
+export type SingleUseFinding = { file: string; line: number; name: string; decision: 'INLINE' | 'REVIEW'; autofixable: boolean; reason: string; agentAction: string };
 type Candidate = { file: string; source: ts.SourceFile; statement: ts.Statement; name: ts.Identifier; symbol: ts.Symbol; kind: 'type' | 'interface' | 'variable' | 'function' };
 type Reference = { file: string; source: ts.SourceFile; node: ts.Identifier };
+const rejectedInlineCandidates = new Map<string, string>();
+const astroConsumerCache = new WeakMap<QualityCfg, { signature: string; consumers: Set<string> }>();
 const canonical = (c: ts.TypeChecker, s: ts.Symbol | undefined): ts.Symbol | undefined => (s && s.flags & ts.SymbolFlags.Alias ? c.getAliasedSymbol(s) : s);
 const isCandidateStatement = (s: ts.Statement): boolean => {
 	if (ts.canHaveModifiers(s) && ts.getModifiers(s)?.some((m) => m.kind === ts.SyntaxKind.DeclareKeyword)) return false;
@@ -44,10 +52,6 @@ const isImportNode = (n: ts.Node): boolean => {
 	for (let parent: ts.Node | undefined = n.parent; parent && !ts.isSourceFile(parent); parent = parent.parent) if (ts.isImportDeclaration(parent)) return true;
 	return false;
 };
-
-/*//////////////////////////////////////////////////
-HELPERS
-//////////////////////////////////////////////////*/
 
 /**
  * Creates the TypeScript program used to identify declarations and their consumers.
@@ -74,6 +78,11 @@ function programFor(cfg: QualityCfg): ts.Program {
 	});
 }
 
+/** Creates the shared TypeScript program used to validate a complete dead-code edit batch. */
+export function deadCodeTypeProgram(cfg: QualityCfg): ts.Program {
+	return programFor(cfg);
+}
+
 /**
  * Checks the single-use-specific scope without changing other quality checks.
  *
@@ -84,8 +93,7 @@ function programFor(cfg: QualityCfg): ts.Program {
  */
 function inSingleUseScope(cfg: QualityCfg, file: string): boolean {
 	const roots = [...cfg.sourceRoots, ...(cfg.includeRoots ?? [])];
-	const skipped = cfg.singleUse?.skippedDirectories ?? [];
-	return roots.some((r) => file === r || file.startsWith(`${r}${sep}`)) && !skipped.some((d) => file === d || file.startsWith(`${d}${sep}`));
+	return roots.some((r) => file === r || file.startsWith(`${r}${sep}`));
 }
 
 /**
@@ -114,8 +122,10 @@ function collect(cfg: QualityCfg, program: ts.Program, checker: ts.TypeChecker):
 	const declarationByLocation = new Map<string, Candidate>();
 	const candidateBySymbol = new Map<ts.Symbol, Candidate>();
 	const references = new Map<ts.Symbol, Reference[]>();
-	for (const source of program.getSourceFiles()) {
-		if (source.isDeclarationFile || !inSingleUseScope(cfg, source.fileName) || !C_M_JS_JSX_TS_TSX_REGEX.test(source.fileName)) continue;
+	const scopedSrcs = program.getSourceFiles().filter((source) => !source.isDeclarationFile && inSingleUseScope(cfg, source.fileName) && C_M_JS_JSX_TS_TSX_REGEX.test(source.fileName));
+	reportProgress('Single-use declaration scan:', 0, scopedSrcs.length);
+	for (const [sourceIndex, source] of scopedSrcs.entries()) {
+		reportProgress('Single-use declaration scan:', sourceIndex + 1, scopedSrcs.length);
 		const visitCandidates = (node: ts.Node): void => {
 			if (!isCandidateStatement(node as ts.Statement)) {
 				ts.forEachChild(node, visitCandidates);
@@ -147,8 +157,44 @@ function collect(cfg: QualityCfg, program: ts.Program, checker: ts.TypeChecker):
 		visitCandidates(source);
 	}
 	const candidateSymbols = new Set(candidates.map((c) => c.symbol));
-	for (const src of program.getSourceFiles()) {
-		if (src.isDeclarationFile || !inSingleUseRoots(cfg, src.fileName) || !C_M_JS_JSX_TS_TSX_REGEX.test(src.fileName)) continue;
+	const referenceSrcs = program.getSourceFiles().filter((source) => !source.isDeclarationFile && inSingleUseRoots(cfg, source.fileName) && C_M_JS_JSX_TS_TSX_REGEX.test(source.fileName));
+	const requiredExports = new Map<ts.Symbol, ts.Symbol>();
+	for (const src of referenceSrcs) {
+		const visitRequires = (node: ts.Node): void => {
+			if (
+				ts.isVariableDeclaration(node) &&
+				ts.isObjectBindingPattern(node.name) &&
+				node.initializer &&
+				ts.isCallExpression(node.initializer) &&
+				ts.isIdentifier(node.initializer.expression) &&
+				node.initializer.expression.text === 'require' &&
+				node.initializer.arguments.length === 1 &&
+				ts.isStringLiteral(node.initializer.arguments[0]!)
+			) {
+				const moduleSpecifier = node.initializer.arguments[0]!;
+				const moduleSrc = program.getSourceFile(ts.resolveModuleName(moduleSpecifier.text, src.fileName, program.getCompilerOptions(), ts.sys).resolvedModule?.resolvedFileName ?? '');
+				const moduleSymbol = moduleSrc && checker.getSymbolAtLocation(moduleSrc);
+				if (moduleSymbol) {
+					const exports = checker.getExportsOfModule(moduleSymbol);
+					for (const element of node.name.elements) {
+						if (!ts.isIdentifier(element.name) || element.dotDotDotToken) continue;
+						const exportName = element.propertyName && ts.isIdentifier(element.propertyName) ? element.propertyName.text : element.name.text;
+						const localSymbol = canonical(checker, checker.getSymbolAtLocation(element.name));
+						const exportSymbol = canonical(
+							checker,
+							exports.find((i) => i.name === exportName),
+						);
+						if (localSymbol && exportSymbol && candidateSymbols.has(exportSymbol)) requiredExports.set(localSymbol, exportSymbol);
+					}
+				}
+			}
+			ts.forEachChild(node, visitRequires);
+		};
+		visitRequires(src);
+	}
+	reportProgress('Single-use reference scan:', 0, referenceSrcs.length);
+	for (const [sourceIndex, src] of referenceSrcs.entries()) {
+		reportProgress('Single-use reference scan:', sourceIndex + 1, referenceSrcs.length);
 		const visit = (node: ts.Node): void => {
 			if (ts.isIdentifier(node)) {
 				if (ts.isBindingElement(node.parent)) {
@@ -164,11 +210,12 @@ function collect(cfg: QualityCfg, program: ts.Program, checker: ts.TypeChecker):
 				}
 				const shorthandSymbol = ts.isShorthandPropertyAssignment(node.parent) ? checker.getShorthandAssignmentValueSymbol(node.parent) : undefined;
 				const symbol = canonical(checker, shorthandSymbol ?? checker.getSymbolAtLocation(node) ?? (ts.isTypeQueryNode(node.parent) ? checker.getSymbolAtLocation(node.parent) : undefined));
-				if (!importUse && symbol && candidateSymbols.has(symbol)) {
+				const candidateSymbol = symbol && (candidateSymbols.has(symbol) ? symbol : requiredExports.get(symbol));
+				if (!importUse && candidateSymbol) {
 					const declaration = declarationByLocation.get(`${src.fileName}:${node.getStart(src)}`);
-					const candidate = candidateBySymbol.get(symbol);
+					const candidate = candidateBySymbol.get(candidateSymbol);
 					const selfReference = candidate?.file === src.fileName && node.getStart(src) >= candidate.statement.getStart(src) && node.getEnd() <= candidate.statement.getEnd();
-					if (!declaration && !selfReference) references.set(symbol, [...(references.get(symbol) ?? []), { file: src.fileName, source: src, node }]);
+					if (!declaration && !selfReference) references.set(candidateSymbol, [...(references.get(candidateSymbol) ?? []), { file: src.fileName, source: src, node }]);
 				}
 			}
 			ts.forEachChild(node, visit);
@@ -186,7 +233,40 @@ function collect(cfg: QualityCfg, program: ts.Program, checker: ts.TypeChecker):
  * @return Decision and explanation for the candidate.
  */
 function classify(candidate: Candidate): [SingleUseFinding['decision'], string] {
+	if (candidate.kind === 'function') return ['REVIEW', 'inlining a function can change its identity, closure, stack, or component behavior'];
+	if (candidate.kind === 'variable') {
+		if (!initSafeToInline(candidate)) return ['REVIEW', 'initializer is not a side-effect-free primitive constant'];
+		return ['INLINE', 'side-effect-free primitive constant has one in-scope consumer'];
+	}
 	return ['INLINE', `${candidate.kind} declaration has one in-scope consumer`];
+}
+
+function singleUseAgentAction(candidate: Candidate, use: Reference, canInline: boolean, reason: string): string {
+	if (canInline) return 'Run the canonical dead-code autofix, then verify the inlined type/value remains equivalent and rerun the affected test or typecheck.';
+	if (candidate.kind === 'function') {
+		if (candidate.file !== use.file)
+			return 'Keep the helper in its declaring module unless its module-local dependencies move with it; if you restructure that boundary, preserve closure capture, recursion, async behavior, and the caller contract.';
+		const isJsxUse = ts.isJsxOpeningElement(use.node.parent) || ts.isJsxSelfClosingElement(use.node.parent);
+		return isJsxUse
+			? 'Inline this component at its only JSX use only if React component identity, local state, hooks, effects, and render behavior remain unchanged. Otherwise retain it only for a concrete semantic boundary and verify with a focused render test.'
+			: 'Inline this helper at its sole call only if closure capture, recursion, `this`, async boundaries, stack-sensitive behavior, and evaluation order remain unchanged. Otherwise retain it only for a concrete semantic boundary and run its focused test.';
+	}
+	if (candidate.kind === 'type' || candidate.kind === 'interface')
+		return 'Inline this declaration at its sole type use only if generic arguments, imported names, and inferred specificity remain equivalent. Otherwise retain the separate type only when its name is materially useful, and verify with typecheck.';
+	if (reason.includes('cross-file initializer'))
+		return 'Keep the value in its declaring module unless its module-local dependencies move with it; if you restructure that boundary, verify initialization order and the consumer behavior.';
+	if (reason.includes('move await'))
+		return 'Keep the await at its current async boundary. Only inline after a deliberate async refactor that preserves sequencing, rejection handling, and the caller contract.';
+	if (reason.includes('write target'))
+		return 'Keep the binding because its only use is a write target. Do not substitute its initializer unless the same writable location and mutation semantics are preserved.';
+	if (reason.includes('imported type annotation'))
+		return 'Keep the binding and its imported type annotation together; only inline after preserving the annotation and confirming the affected typecheck.';
+	if (reason.includes('explicit any')) return 'Keep the named type boundary unless it can be inlined without introducing explicit any; verify the consumer with typecheck.';
+	const reactSrc = /\.(?:tsx|jsx)$/.test(candidate.source.fileName);
+	const invariants = reactSrc
+		? 'evaluation order and timing, closure capture, identity, writes, React hook order, and observable effects'
+		: 'evaluation order and timing, closure capture, identity, writes, and observable effects';
+	return `Inline the initializer at its sole use only if ${invariants} remain unchanged. Otherwise retain the binding for the concrete semantic reason reported above and verify the focused behavior.`;
 }
 
 /**
@@ -198,25 +278,11 @@ function classify(candidate: Candidate): [SingleUseFinding['decision'], string] 
  *
  * @return Type references excluding the declaration and import syntax itself.
  */
-function typeUses(cfg: QualityCfg, c: Candidate, program: ts.Program): Reference[] {
-	const uses: Reference[] = [];
-	for (const src of program.getSourceFiles()) {
-		if (src.isDeclarationFile || !inSingleUseRoots(cfg, src.fileName) || !C_M_JS_JSX_TS_TSX_REGEX.test(src.fileName)) continue;
-		const visit = (n: ts.Node): void => {
-			const tgt = ts.isIdentifier(n) ? referenceTgt(n) : n;
-			if (
-				ts.isIdentifier(n) &&
-				n.text === c.name.text &&
-				!(src.fileName === c.file && n.getStart(src) === c.name.getStart(c.source)) &&
-				!ts.isExportSpecifier(n.parent) &&
-				(ts.isTypeReferenceNode(tgt) || ts.isExpressionWithTypeArguments(tgt))
-			)
-				uses.push({ file: src.fileName, source: src, node: n });
-			ts.forEachChild(n, visit);
-		};
-		visit(src);
-	}
-	return uses;
+function typeReferences(candidate: Candidate, references: Map<ts.Symbol, Reference[]>): Reference[] {
+	return (references.get(candidate.symbol) ?? []).filter((reference) => {
+		const tgt = referenceTgt(reference.node);
+		return !isExportSpecifierReference(reference) && (ts.isTypeReferenceNode(tgt) || ts.isExpressionWithTypeArguments(tgt));
+	});
 }
 
 /**
@@ -227,34 +293,81 @@ function typeUses(cfg: QualityCfg, c: Candidate, program: ts.Program): Reference
  *
  * @return `true` when inlining would replace a module export with an expression.
  */
-function hasExportSpecifier(candidate: Candidate, checker: ts.TypeChecker): boolean {
-	if (ts.canHaveModifiers(candidate.statement) && ts.getModifiers(candidate.statement)?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword)) return true;
-	return candidate.source.statements.some(
-		(s) =>
-			ts.isExportDeclaration(s) &&
-			s.exportClause &&
-			ts.isNamedExports(s.exportClause) &&
-			s.exportClause.elements.some((s) => canonical(checker, checker.getSymbolAtLocation(s.propertyName ?? s.name)) === candidate.symbol),
-	);
+/** Collects Astro frontmatter and markup consumers once for an analysis run. */
+function astroConsumersFor(cfg: QualityCfg, program: ts.Program): Set<string> {
+	const astroFiles = srcFiles(cfg).filter((path) => path.endsWith('.astro'));
+	const signature = astroFiles
+		.map((f) => {
+			const stats = statSync(f);
+			return `${f}:${stats.mtimeMs}:${stats.size}`;
+		})
+		.join('\n');
+	let cached = astroConsumerCache.get(cfg);
+	if (!cached || cached.signature !== signature) {
+		const consumers = new Set<string>();
+		for (const f of astroFiles) {
+			const raw = readFileSync(f, 'utf8');
+			const match = /^---\s*\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/.exec(raw);
+			if (!match) continue;
+			const src = ts.createSourceFile(f, match[1]!, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+			const markup = raw.slice(match[0].length);
+			for (const statement of src.statements) {
+				if (!ts.isImportDeclaration(statement) || !ts.isStringLiteral(statement.moduleSpecifier)) continue;
+				const bindings = statement.importClause?.namedBindings;
+				if (!bindings || !ts.isNamedImports(bindings)) continue;
+				const resolved = ts.resolveModuleName(statement.moduleSpecifier.text, f, program.getCompilerOptions(), ts.sys).resolvedModule?.resolvedFileName;
+				if (!resolved) continue;
+				for (const imported of bindings.elements) {
+					if (!markup.includes(imported.name.text)) {
+						let used = false;
+						const inspect = (node: ts.Node): void => {
+							if (node === statement || used) return;
+							if (ts.isIdentifier(node) && node.text === imported.name.text && !isImportNode(node)) used = true;
+							ts.forEachChild(node, inspect);
+						};
+						for (const bodyStatement of src.statements) inspect(bodyStatement);
+						if (!used) continue;
+					}
+					consumers.add(`${resolved}\u0000${(imported.propertyName ?? imported.name).text}`);
+				}
+			}
+		}
+		cached = { signature, consumers };
+		astroConsumerCache.set(cfg, cached);
+	}
+	return cached.consumers;
 }
 
 /** Keeps exported bindings that are imported from Astro frontmatter outside the TypeScript program. */
-function hasAstroConsumer(candidate: Candidate, cfg: QualityCfg, program: ts.Program): boolean {
-	if (!ts.canHaveModifiers(candidate.statement) || !ts.getModifiers(candidate.statement)?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword)) return false;
-	return srcFiles(cfg)
-		.filter((f) => f.endsWith('.astro'))
-		.some((f) => {
-			const match = readFileSync(f, 'utf8').match(/^---\s*\r?\n([\s\S]*?)\r?\n---/);
-			if (!match) return false;
-			const src = ts.createSourceFile(f, match[1]!, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
-			return src.statements.some((s) => {
-				if (!ts.isImportDeclaration(s) || !ts.isStringLiteral(s.moduleSpecifier)) return false;
-				const bindings = s.importClause?.namedBindings;
-				if (!bindings || !ts.isNamedImports(bindings) || !bindings.elements.some((e) => (e.propertyName ?? e.name).text === candidate.name.text)) return false;
-				const resolved = ts.resolveModuleName(s.moduleSpecifier.text, f, program.getCompilerOptions(), ts.sys).resolvedModule?.resolvedFileName;
-				return resolved === candidate.file;
-			});
-		});
+function hasAstroConsumer(candidate: Candidate, consumers: Set<string>): boolean {
+	return consumers.has(`${candidate.file}\u0000${candidate.name.text}`);
+}
+
+/** Keeps explicitly configured module contracts out of single-consumer cleanup. */
+function isCfgdPublicContract(cfg: QualityCfg, candidate: Candidate, checker: ts.TypeChecker): boolean {
+	const file = relative(cfg.root, candidate.file).split(sep).join('/');
+	if (!cfg.frameworkEntryExports?.[file]?.includes(candidate.name.text)) return false;
+	const moduleSymbol = checker.getSymbolAtLocation(candidate.source);
+	const exported = moduleSymbol && checker.getExportsOfModule(moduleSymbol).find((symbol) => symbol.name === candidate.name.text);
+	return Boolean(exported && canonical(checker, exported) === candidate.symbol);
+}
+
+/** Preserves a React identity hook or interval handle whose one use is required by lifecycle semantics. */
+function isRequiredLifecycleVal(candidate: Candidate, use: Reference): boolean {
+	if (candidate.kind !== 'variable' || !ts.isVariableStatement(candidate.statement)) return false;
+	const init = candidate.statement.declarationList.declarations[0]?.initializer;
+	if (!init || !ts.isCallExpression(init)) return false;
+	const hookCall = ts.isIdentifier(init.expression) && init.expression.text === 'useId';
+	const intervalCall =
+		ts.isPropertyAccessExpression(init.expression) && ts.isIdentifier(init.expression.expression) && init.expression.expression.text === 'window' && init.expression.name.text === 'setInterval';
+	if (hookCall) return true;
+	if (!intervalCall || !ts.isCallExpression(use.node.parent)) return false;
+	return (
+		ts.isPropertyAccessExpression(use.node.parent.expression) &&
+		ts.isIdentifier(use.node.parent.expression.expression) &&
+		use.node.parent.expression.expression.text === 'window' &&
+		use.node.parent.expression.name.text === 'clearInterval'
+	);
 }
 
 /** Keeps imported type names in scope when an inline would discard their annotation. */
@@ -332,6 +445,22 @@ function containsAwait(candidate: Candidate): boolean {
 	return found;
 }
 
+/** Rejects expressions whose timing, hook order, or observable identity can change when moved. */
+function initSafeToInline(candidate: Candidate): boolean {
+	if (candidate.kind !== 'variable' || !ts.isVariableStatement(candidate.statement)) return true;
+	const declaration = candidate.statement.declarationList.declarations[0];
+	const init = declaration?.initializer;
+	if (!init || !(candidate.statement.declarationList.flags & ts.NodeFlags.Const) || init.getText(candidate.source).length > 120) return false;
+	return (
+		ts.isStringLiteral(init) ||
+		ts.isNumericLiteral(init) ||
+		ts.isNoSubstitutionTemplateLiteral(init) ||
+		init.kind === ts.SyntaxKind.TrueKeyword ||
+		init.kind === ts.SyntaxKind.FalseKeyword ||
+		init.kind === ts.SyntaxKind.NullKeyword
+	);
+}
+
 /**
  * Checks whether a cross-file variable initializer is a self-contained literal value.
  *
@@ -369,6 +498,17 @@ function isWriteReference(reference: Reference): boolean {
 	);
 }
 
+/** Preserves saved values used to restore mutable object or property state. */
+function isStateRestorationReference(reference: Reference): boolean {
+	return (
+		ts.isBinaryExpression(reference.node.parent) &&
+		reference.node.parent.right === reference.node &&
+		reference.node.parent.operatorToken.kind >= ts.SyntaxKind.FirstAssignment &&
+		reference.node.parent.operatorToken.kind <= ts.SyntaxKind.LastAssignment &&
+		(ts.isPropertyAccessExpression(reference.node.parent.left) || ts.isElementAccessExpression(reference.node.parent.left))
+	);
+}
+
 /**
  * Identifies a reference that only re-exports an imported binding.
  *
@@ -378,12 +518,6 @@ function isWriteReference(reference: Reference): boolean {
  */
 function isExportSpecifierReference(reference: Reference): boolean {
 	return ts.isExportSpecifier(reference.node.parent);
-}
-
-function isDocumentedCallable(candidate: Candidate): boolean {
-	if (!ts.isVariableStatement(candidate.statement)) return ts.isFunctionDeclaration(candidate.statement) && ts.getJSDocCommentsAndTags(candidate.statement).length > 0;
-	const init = candidate.statement.declarationList.declarations[0]?.initializer;
-	return Boolean(init && (ts.isArrowFunction(init) || ts.isFunctionExpression(init)) && ts.getJSDocCommentsAndTags(candidate.statement).length);
 }
 
 /**
@@ -397,23 +531,45 @@ export function singleUseFindings(cfg: QualityCfg): SingleUseFinding[] {
 	const program = programFor(cfg);
 	const checker = program.getTypeChecker();
 	const { candidates, references } = collect(cfg, program, checker);
-	return candidates.flatMap((c) => {
-		if (hasExportSpecifier(c, checker) || hasAstroConsumer(c, cfg, program)) return [];
-		if (isDocumentedCallable(c)) return [];
-		const uses = c.kind === 'type' || c.kind === 'interface' ? typeUses(cfg, c, program) : (references.get(c.symbol) ?? []).filter((r) => !isImportNode(r.node) && !isExportSpecifierReference(r));
-		if (uses.length !== 1) return [];
+	const astroConsumers = astroConsumersFor(cfg, program);
+	const findings: SingleUseFinding[] = [];
+	reportProgress('Single-use classification:', 0, candidates.length);
+	for (const [candidateIdx, c] of candidates.entries()) {
+		reportProgress('Single-use classification:', candidateIdx + 1, candidates.length);
+		if (isCfgdPublicContract(cfg, c, checker)) continue;
+		const uses = c.kind === 'type' || c.kind === 'interface' ? typeReferences(c, references) : (references.get(c.symbol) ?? []).filter((r) => !isImportNode(r.node) && !isExportSpecifierReference(r));
+		if (uses.length !== 1) continue;
 		const use = uses[0]!;
-		if (!inSingleUseScope(cfg, use.file)) return [];
-		if (c.kind === 'function' && c.file !== use.file) return [];
-		if (c.kind === 'variable' && c.file !== use.file && !crossFileVariableSafe(c)) return [];
-		if ((c.kind === 'type' || c.kind === 'interface') && !crossFileTypeSafe(c, use, checker)) return [];
-		if ((c.kind === 'type' || c.kind === 'interface') && containsExplicitAny(c)) return [];
-		if (c.kind === 'variable' && containsAwait(c)) return [];
-		if (c.kind === 'variable' && isWriteReference(use)) return [];
-		if (hasImportedTypeAnnotation(c, checker)) return [];
-		const [decision, reason] = classify(c);
-		return [{ file: relative(cfg.root, c.file), line: c.source.getLineAndCharacterOfPosition(c.name.getStart(c.source)).line + 1, name: c.name.text, decision, reason }];
-	});
+		if (!inSingleUseScope(cfg, use.file)) continue;
+		if (isRequiredLifecycleVal(c, use)) continue;
+		const [initialDecision, initialReason] = classify(c);
+		let reason = initialReason;
+		let canInline = initialDecision === 'INLINE';
+		if (hasAstroConsumer(c, astroConsumers)) continue;
+		if (c.kind === 'function') [canInline, reason] = [false, 'inlining a function can change its identity, closure, stack, or component behavior'];
+		else if (c.kind === 'variable' && c.file !== use.file && !crossFileVariableSafe(c)) [canInline, reason] = [false, 'cross-file initializer depends on module-local values'];
+		else if ((c.kind === 'type' || c.kind === 'interface') && !crossFileTypeSafe(c, use, checker)) [canInline, reason] = [false, 'type depends on declarations that are not available at the consumer'];
+		else if ((c.kind === 'type' || c.kind === 'interface') && containsExplicitAny(c)) [canInline, reason] = [false, 'inlining would introduce explicit any'];
+		else if (c.kind === 'variable' && containsAwait(c)) [canInline, reason] = [false, 'inlining would move await into another evaluation context'];
+		else if (c.kind === 'variable' && !initSafeToInline(c)) [canInline, reason] = [false, 'inlining could change evaluation timing, hook order, or side effects'];
+		else if (c.kind === 'variable' && isStateRestorationReference(use)) [canInline, reason] = [false, 'inlining would discard a saved value needed to restore mutable state'];
+		else if (c.kind === 'variable' && isWriteReference(use)) [canInline, reason] = [false, 'the sole reference is a write target'];
+		else if (c.kind === 'variable' && (ts.isJsxOpeningElement(use.node.parent) || ts.isJsxSelfClosingElement(use.node.parent)))
+			[canInline, reason] = [false, 'this is a standalone JSX component; keep its component identity and declaration boundary, or export it from its definition if it is a module-level component'];
+		else if (hasImportedTypeAnnotation(c, checker)) [canInline, reason] = [false, 'inlining would remove a required imported type annotation'];
+		const decision: SingleUseFinding['decision'] = canInline ? 'INLINE' : 'REVIEW';
+		const rejectedReason = rejectedInlineCandidates.get(`${c.file}:${c.name.text}`);
+		findings.push({
+			file: relative(cfg.root, c.file),
+			line: c.source.getLineAndCharacterOfPosition(c.name.getStart(c.source)).line + 1,
+			name: c.name.text,
+			decision: rejectedReason ? 'REVIEW' : decision,
+			autofixable: !rejectedReason && decision === 'INLINE',
+			reason: rejectedReason ?? reason,
+			agentAction: singleUseAgentAction(c, use, !rejectedReason && canInline, rejectedReason ?? reason),
+		});
+	}
+	return findings;
 }
 
 /**
@@ -630,6 +786,72 @@ function discardedDeclarationComments(c: Candidate): string[] {
 	return comments;
 }
 
+/** Rejects a batch when its edited files gain TypeScript errors. */
+function filesWithNewTypeErrs(program: ts.Program, updates: Map<string, string>): Set<string> {
+	const files = [...updates.keys()];
+	const total = files.length * 2;
+	qualityProgress('TypeScript validation', 0, total);
+	const opts = program.getCompilerOptions();
+	const host = ts.createCompilerHost(opts);
+	const originalGetSrcFile = host.getSourceFile.bind(host);
+	const originalDiagnostics: ts.Diagnostic[] = [];
+	for (const [fileIndex, file] of files.entries()) {
+		const sourceFile = program.getSourceFile(file);
+		if (sourceFile) originalDiagnostics.push(...ts.getPreEmitDiagnostics(program, sourceFile));
+		qualityProgress('TypeScript validation', fileIndex + 1, total);
+	}
+	const virtualFiles = new Map([...updates].map(([f, text]) => [f, text]));
+	host.getSourceFile = (fileName, langVersion, onErr, shouldCreateNewSrcFile) => {
+		const text = virtualFiles.get(fileName);
+		const scriptKind = fileName.endsWith('.tsx')
+			? ts.ScriptKind.TSX
+			: fileName.endsWith('.jsx')
+				? ts.ScriptKind.JSX
+				: fileName.endsWith('.js') || fileName.endsWith('.mjs') || fileName.endsWith('.cjs')
+					? ts.ScriptKind.JS
+					: ts.ScriptKind.TS;
+		return text === undefined ? originalGetSrcFile(fileName, langVersion, onErr, shouldCreateNewSrcFile) : ts.createSourceFile(fileName, text, langVersion, true, scriptKind);
+	};
+	host.readFile = (fileName) => virtualFiles.get(fileName) ?? ts.sys.readFile(fileName);
+	const originalFileExists = host.fileExists.bind(host);
+	host.fileExists = (fileName) => virtualFiles.has(fileName) || originalFileExists(fileName);
+	const updatedProgram = ts.createProgram({ rootNames: program.getRootFileNames(), options: opts, host });
+	const diagnosticKey = (diagnostic: ts.Diagnostic): string => `${diagnostic.code}:${ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n')}`;
+	const prevCounts = new Map<string, Map<string, number>>();
+	for (const diagnostic of originalDiagnostics) {
+		if (diagnostic.category !== ts.DiagnosticCategory.Error || !diagnostic.file) continue;
+		const file = diagnostic.file.fileName;
+		const counts = prevCounts.get(file) ?? new Map<string, number>();
+		const key = diagnosticKey(diagnostic);
+		counts.set(key, (counts.get(key) ?? 0) + 1);
+		prevCounts.set(file, counts);
+	}
+	const currCounts = new Map<string, Map<string, number>>();
+	for (const [fileIndex, file] of files.entries()) {
+		const sourceFile = updatedProgram.getSourceFile(file);
+		if (sourceFile) {
+			for (const diagnostic of ts.getPreEmitDiagnostics(updatedProgram, sourceFile)) {
+				if (diagnostic.category !== ts.DiagnosticCategory.Error || !diagnostic.file) continue;
+				const counts = currCounts.get(diagnostic.file.fileName) ?? new Map<string, number>();
+				const key = diagnosticKey(diagnostic);
+				counts.set(key, (counts.get(key) ?? 0) + 1);
+				currCounts.set(diagnostic.file.fileName, counts);
+			}
+		}
+		qualityProgress('TypeScript validation', files.length + fileIndex + 1, total);
+	}
+	const introducedErrs = [...currCounts].some(([f, after]) => {
+		const before = prevCounts.get(f) ?? new Map<string, number>();
+		return [...after].some(([key, count]) => count > (before.get(key) ?? 0));
+	});
+	return introducedErrs ? new Set(updates.keys()) : new Set();
+}
+
+/** Returns whether a proposed batch adds any TypeScript error in an edited file. */
+export function deadCodeEditsIntroduceTypeErrors(program: ts.Program, updates: Map<string, string>): boolean {
+	return filesWithNewTypeErrs(program, updates).size > 0;
+}
+
 /**
  * Inlines every single-use declaration and validates each rewritten source file.
  *
@@ -641,20 +863,24 @@ function fixSingleUsePass(cfg: QualityCfg, changedFiles: Set<string>): number {
 	const program = programFor(cfg);
 	const checker = program.getTypeChecker();
 	const { candidates, references: refs } = collect(cfg, program, checker);
+	const astroConsumers = astroConsumersFor(cfg, program);
 	const edits = new Map<string, { start: number; end: number; text: string }[]>();
-	const pending: { fileEdits: { file: string; start: number; end: number; text: string }[]; referenceLength: number; nestedReference: boolean; jsxFile?: string }[] = [];
+	const pending: { fileEdits: { file: string; start: number; end: number; text: string }[]; referenceLength: number; nestedReference: boolean; candidateKey: string; jsxFile?: string }[] = [];
 	for (const c of candidates) {
-		if (hasExportSpecifier(c, checker) || hasAstroConsumer(c, cfg, program)) continue;
-		if (isDocumentedCallable(c)) continue;
-		const uses = c.kind === 'type' || c.kind === 'interface' ? typeUses(cfg, c, program) : (refs.get(c.symbol) ?? []).filter((r) => !isImportNode(r.node) && !isExportSpecifierReference(r));
+		if (hasAstroConsumer(c, astroConsumers) || isCfgdPublicContract(cfg, c, checker)) continue;
+		const uses = c.kind === 'type' || c.kind === 'interface' ? typeReferences(c, refs) : (refs.get(c.symbol) ?? []).filter((r) => !isImportNode(r.node) && !isExportSpecifierReference(r));
 		if (uses.length !== 1) continue;
 		const ref = uses[0]!;
 		if (!inSingleUseScope(cfg, ref.file)) continue;
-		if (c.kind === 'function' && c.file !== ref.file) continue;
+		if (isRequiredLifecycleVal(c, ref)) continue;
+		if (c.kind === 'variable' && (ts.isJsxOpeningElement(ref.node.parent) || ts.isJsxSelfClosingElement(ref.node.parent))) continue;
+		if (c.kind === 'function') continue;
 		if (c.kind === 'variable' && c.file !== ref.file && !crossFileVariableSafe(c)) continue;
 		if ((c.kind === 'type' || c.kind === 'interface') && !crossFileTypeSafe(c, ref, checker)) continue;
 		if ((c.kind === 'type' || c.kind === 'interface') && containsExplicitAny(c)) continue;
 		if (c.kind === 'variable' && containsAwait(c)) continue;
+		if (c.kind === 'variable' && !initSafeToInline(c)) continue;
+		if (c.kind === 'variable' && isStateRestorationReference(ref)) continue;
 		if (c.kind === 'variable' && isWriteReference(ref)) continue;
 		if (hasImportedTypeAnnotation(c, checker)) continue;
 		if (
@@ -670,7 +896,7 @@ function fixSingleUsePass(cfg: QualityCfg, changedFiles: Set<string>): number {
 		const replacement = replacementFor(c, ref, checker);
 		if (!replacement) continue;
 		const comments = attachedComments(c);
-		const commentTexts = [...comments.map(({ text: val }) => val), ...discardedDeclarationComments(c)];
+		const commentTexts = [...comments.map(({ text: val }) => val).filter((val) => !val.startsWith('/**')), ...discardedDeclarationComments(c)];
 		const inlineReplacement = commentTexts.length ? `${commentTexts.map((v) => (v.startsWith('//') ? `/* ${v.slice(2).trim()} */` : v)).join(' ')} ${replacement}` : replacement;
 		const candidateEdits: { file: string; start: number; end: number; text: string }[] = [];
 		for (const comment of comments) candidateEdits.push({ file: c.file, start: comment.start, end: comment.end, text: '' });
@@ -693,19 +919,51 @@ function fixSingleUsePass(cfg: QualityCfg, changedFiles: Set<string>): number {
 		const nestedReference = candidates.some(
 			(o) => o !== c && o.source === ref.source && ref.node.getStart(ref.source) >= o.statement.getStart(ref.source) && ref.node.getEnd() <= o.statement.getEnd(),
 		);
-		pending.push({ fileEdits: candidateEdits, referenceLength: referenceEdit.end - referenceEdit.start, nestedReference, jsxFile });
+		pending.push({ fileEdits: candidateEdits, referenceLength: referenceEdit.end - referenceEdit.start, nestedReference, candidateKey: `${c.file}:${c.name.text}`, jsxFile });
 	}
 	const selected: typeof pending = [];
 	for (const candidate of pending.sort((l, r) => Number(r.nestedReference) - Number(l.nestedReference) || l.referenceLength - r.referenceLength)) {
-		const overlaps = selected.some((s) => candidate.fileEdits.some((c) => s.fileEdits.some((s) => s.file === c.file && c.start < s.end && s.start < c.end)));
-		if (overlaps) continue;
+		if (selected.some((other) => candidate.fileEdits.some((edit) => other.fileEdits.some((existing) => edit.file === existing.file && edit.start < existing.end && existing.start < edit.end))))
+			continue;
 		selected.push(candidate);
 	}
-	for (const candidate of selected) for (const edit of candidate.fileEdits) edits.set(edit.file, [...(edits.get(edit.file) ?? []), { start: edit.start, end: edit.end, text: edit.text }]);
-	for (const file of new Set(selected.flatMap((c) => (c.jsxFile ? [c.jsxFile] : [])))) {
-		const source = program.getSourceFile(file)!;
-		const pos = reactImportPos(source);
-		edits.set(file, [...(edits.get(file) ?? []), { start: pos, end: pos, text: `${pos ? '\n' : ''}import { createElement as ${reactCreateElementName(source)} } from 'react';\n` }]);
+	let remaining = selected;
+	while (remaining.length) {
+		edits.clear();
+		const jsxFiles = new Set(remaining.flatMap((c) => (c.jsxFile ? [c.jsxFile] : [])));
+		for (const candidate of remaining) for (const edit of candidate.fileEdits) edits.set(edit.file, [...(edits.get(edit.file) ?? []), edit]);
+		for (const file of jsxFiles) {
+			const source = program.getSourceFile(file)!;
+			const pos = reactImportPos(source);
+			edits.set(file, [...(edits.get(file) ?? []), { start: pos, end: pos, text: `${pos ? '\n' : ''}import { createElement as ${reactCreateElementName(source)} } from 'react';\n` }]);
+		}
+		const invalidFiles = new Set<string>();
+		for (const [file, fileEdits] of edits) {
+			const source = program.getSourceFile(file);
+			const ascending = [...fileEdits].sort((a, b) => a.start - b.start || a.end - b.end);
+			if (!source || ascending.some((edit, i) => i > 0 && edit.end > edit.start && ascending[i - 1]!.end > ascending[i - 1]!.start && edit.start < ascending[i - 1]!.end)) {
+				invalidFiles.add(file);
+				continue;
+			}
+			const original = readFileSync(file, 'utf8');
+			const updated = ascending.reverse().reduce((text, edit) => text.slice(0, edit.start) + edit.text + text.slice(edit.end), original);
+			const parsed = ts.createSourceFile(
+				file,
+				updated,
+				ts.ScriptTarget.Latest,
+				true,
+				file.endsWith('.tsx') || file.endsWith('.jsx') ? ts.ScriptKind.TSX : file.endsWith('.ts') ? ts.ScriptKind.TS : ts.ScriptKind.JS,
+			);
+			if ((parsed as ts.SourceFile & { parseDiagnostics: readonly ts.Diagnostic[] }).parseDiagnostics.length) invalidFiles.add(file);
+		}
+		if (!invalidFiles.size) break;
+		const rejected = remaining.filter((c) => c.fileEdits.some((edit) => invalidFiles.has(edit.file)) || (c.jsxFile && invalidFiles.has(c.jsxFile)));
+		for (const candidate of rejected)
+			rejectedInlineCandidates.set(
+				candidate.candidateKey,
+				`the combined inline in ${[...invalidFiles].map((f) => relative(cfg.root, f)).join(', ')} would produce invalid syntax; resolve this candidate manually`,
+			);
+		remaining = remaining.filter((c) => !rejected.includes(c));
 	}
 	const updates: { file: string; text: string }[] = [];
 	for (const [file, fileEdits] of edits) {
@@ -722,13 +980,7 @@ function fixSingleUsePass(cfg: QualityCfg, changedFiles: Set<string>): number {
 			file.endsWith('.tsx') || file.endsWith('.jsx') ? ts.ScriptKind.TSX : file.endsWith('.ts') ? ts.ScriptKind.TS : ts.ScriptKind.JS,
 		);
 		const parseDiagnostics = (parsed as ts.SourceFile & { parseDiagnostics: readonly ts.Diagnostic[] }).parseDiagnostics;
-		if (parseDiagnostics.length) {
-			const diagnostic = parseDiagnostics[0]!;
-			const offset = diagnostic.start ?? 0;
-			throw new Error(
-				`Single-use inline produced invalid syntax in ${relative(cfg.root, file)} near ${JSON.stringify(updated.slice(Math.max(0, offset - 100), Math.min(updated.length, offset + 140)))}: ${parseDiagnostics.map((i) => ts.flattenDiagnosticMessageText(i.messageText, '\n')).join('; ')}`,
-			);
-		}
+		if (parseDiagnostics.length) continue;
 		updates.push({ file, text: updated });
 	}
 	for (const { file, text } of updates) {
@@ -745,9 +997,11 @@ function fixSingleUsePass(cfg: QualityCfg, changedFiles: Set<string>): number {
  *
  * @return Number of files changed across all passes.
  */
-export function fixSingleUseDeclarations(cfg: QualityCfg, changedFileNames?: Set<string>): number {
+export function fixSingleUseDeclarations(cfg: QualityCfg, changedFileNames?: Set<string>, onPass?: (pass: number, changedFiles: number) => void): number {
+	rejectedInlineCandidates.clear();
 	const changedFiles = new Set<string>();
 	for (let pass = 0; pass < 1000; pass++) {
+		onPass?.(pass + 1, changedFiles.size);
 		const changed = fixSingleUsePass(cfg, changedFiles);
 		if (changed === 0) {
 			for (const file of changedFiles) changedFileNames?.add(file);

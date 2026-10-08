@@ -11,6 +11,7 @@
     "includeRoots": { "type": "array", "items": { "type": "string" } },
     "extensions": { "type": "array", "items": { "type": "string", "pattern": "^\\." } },
     "aliases": { "type": "object", "additionalProperties": { "type": "string" } },
+    "frameworkEntryExports": { "type": "object", "additionalProperties": { "type": "array", "items": { "type": "string" } } },
     "externalPrefixes": { "type": "array", "items": { "type": "string" } },
     "skippedDirectories": { "type": "array", "items": { "type": "string" } },
     "skippedFiles": { "type": "array", "items": { "type": "string" } },

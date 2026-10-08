@@ -49,6 +49,8 @@ The executable loads `quality.json` from the current repository. A wrapper can c
 
 The default `quality` command scans changed and untracked files, enables every built-in check, and enables every available autofix. `quality:all` scans every configured source file. `--warn` disables autofixes for one run. `--strict` makes naming errors fail. Use `--skip-commands` for a fast static-only pass and `--skip-recommendations` to omit advisory subprocesses; configured domains remain available through `domain`.
 
+Every multi-item quality scan displays a visible progress bar from its first update, including when stderr is not a TTY. Updates rewrite one shared line in place instead of printing fractions or one line per update; each stage ends with a newline. `quality:all` runs quality checks, not the Node test suite; configured test commands and repository test scripts run separately and should report their own suite or test progress.
+
 ### Switches
 
 Use `enabledChecks` to disable a built-in check. Unspecified checks are enabled:
@@ -75,118 +77,19 @@ Use `autofix` for checks that can edit files. Unspecified autofixes are enabled;
 
 Every check below uses the same description format: what it does, its terminology, configuration advice, and its guiding ideology.
 
-### Document
-
-- **Does:** Applies file headers, import grouping, section layout, whitespace, TSDoc shape, and the documentation policy. It can add minimal TSDoc placeholders where the policy makes that safe.
-- **Terms:** “Type” means a class, enum, interface, or type alias. “Function” means a named function declaration. “Exported function” means a named function declaration with `export`. “Inline function” means an arrow function or function expression, including callbacks.
-- **Configure:**
-
-```json
-{ "documentation": { "required": { "types": true, "functions": true, "exportedFunctions": true, "noInlineFunctions": false } } }
-```
-
-Each rule is independent. `functions` covers all named functions. `exportedFunctions` can cover only exported functions when `functions` is false. `noInlineFunctions` reports inline functions and asks for named declarations; it has no safe autofix. `autofix.document` controls document edits. `maintain` remains a compatibility alias for `document`.
-
-- **Ideology:** Documentation should describe stable public intent and current signatures, not invent prose. Generated tags are a useful baseline; humans should replace placeholders at public boundaries.
-
-### Format
-
-- **Does:** Runs Prettier over selected files and applies canonical layout protections, including long one-line imports where configured.
-- **Terms:** “Format” means syntax-preserving presentation changes, separate from semantic refactoring and lint rules.
-- **Configure:** Set `tools.prettier`, `prettierPrintWidth`, and `oneLineImports`. Prettier's native configuration is discovered by Prettier.
-- **Ideology:** Formatting should be deterministic, low-risk, and safe to repeat.
-
-### Import
-
-- **Does:** Resolves local imports using source roots, extensions, aliases, and external prefixes, then reports unresolved local modules.
-- **Terms:** “External prefix” marks an intentionally external namespace. “Alias” maps an import prefix to a repository path.
-- **Configure:** Set `aliases`, `externalPrefixes`, `skippedDirectories`, and `skippedFiles`. Import has no autofix because selecting the intended replacement is semantic.
-- **Ideology:** Import correctness is a dependency-boundary check, not merely a style preference. Do not use external exemptions to hide broken local imports.
-
-### Name
-
-- **Does:** Finds naming drift and applies safe whole-word or prefix-based identifier renames. It avoids exported or conflicting symbols and preserves syntax-aware JSX cases.
-- **Terms:** “Suggestion” is non-strict. “Error” fails when `--strict` is used. `--warn` reports without renaming.
-- **Configure:** Use `protectedIdentifiers` for stable names. Set `autofix.name` to `false` for review-only output.
-- **Ideology:** Names should be consistent where the transformation is unambiguous. Protect public API names, domain vocabulary, and intentional abbreviations.
-
-### Forward
-
-- **Does:** Finds call-site objects that repeat at least three properties from one source object, such as `userId: input.userId`. It recommends passing the source directly when everything is forwarded, or spreading it while retaining explicit overrides.
-- **Terms:** “Forwarding” is syntactic repetition, not proof that two object types are identical. “Projection” is an intentionally narrower object made from a larger one.
-- **Configure:** Toggle it with `enabledChecks.forward`. It has no autofix. It supports JavaScript and TypeScript object literals and ignores common persistence/mutation names such as `insert`, `upsert`, `update`, `set`, and `assign`.
-- **Ideology:** Prefer direct forwarding when a function intentionally accepts the same object. Keep explicit projections at API, persistence, authorization, redaction, schema, and versioning boundaries. The check is advisory because syntax cannot determine those contracts safely.
-
-### Lint
-
-- **Does:** Runs ESLint over selected files and propagates its exit status. Default fix mode passes ESLint's fix option.
-- **Terms:** “Lint” means repository-configured static rules supplied by ESLint. The quality package coordinates ESLint; it does not define its rule set.
-- **Configure:** Set `tools.eslint` and optional `lintRoots`. Use `enabledChecks.lint` and `autofix.lint` to control execution and edits.
-- **Ideology:** Lint should catch repeatable defects. Rules requiring product or security judgment should not receive broad automatic edits.
-
-### Knip
-
-- **Does:** Runs Knip for unused files, exports, dependencies, and reachability checks, propagating its status when enabled.
-- **Terms:** “Unused” means unreachable according to Knip's entry points and project model; it does not automatically mean semantically unnecessary.
-- **Configure:** Set `tools.knip` and `autofix.knip` for supported Knip fixes. A separate Knip JSON file is not required for invocation. Disable Knip when entry-point metadata is incomplete.
-- **Ideology:** Dead-code cleanup should be evidence-led. Review generated files, dynamic imports, plugins, and framework conventions before deletion.
-
-### Single-use
-
-- **Does:** The fixing `quality` run automatically inlines declarations with exactly one in-scope consumer, including types, interfaces, functions, and variables. Rewrites are syntax-checked before source files are written. The final source pass removes generated section/group comments and detached TSDoc while preserving declaration documentation and meaningful inline comments.
-- **Configure:** Use `singleUse.skippedDirectories` for repository-owned component or shared-code directories that should remain out of this rule without disabling other quality checks. `quality --warn` checks without changing files.
-
-```json
-{ "singleUse": { "skippedDirectories": ["src/components"] } }
-```
-
-- **Ideology:** Keep single-use implementation details at their consumer; reserve reusable modules for code with multiple consumers.
-
-### Type
-
-- **Does:** Runs configured source and project TypeScript checks.
-- **Terms:** “Source type check” uses files selected by the runner. “Project type check” runs the configured TypeScript project and may inspect files beyond working changes.
-- **Configure:** Set `tools.tsc`, `tsconfig`, `typecheckRoots`, and `typecheckExtensions`. Type has no autofix.
-- **Ideology:** Types should make invalid states difficult to represent without replacing runtime validation at untrusted boundaries.
-
-### Recommend
-
-- **Does:** Runs repository-specific advisory commands after primary checks. Output is visible, but their statuses do not fail the run.
-- **Terms:** “Recommendation” is intentionally non-blocking and suits migration hints, cleanup reports, and architectural suggestions.
-- **Configure:** Declare `recommendationCommands` and toggle them with `enabledRecommendations`. Any edits performed by such a command are its own documented contract.
-- **Ideology:** Advice should be visible without making exploratory cleanup block delivery.
-
-### Command
-
-- **Does:** Runs arbitrary repository commands, commonly `build` and `test`, and propagates their statuses. It does not guess how to limit them to changed files.
-- **Terms:** “Configured command” is a repository-owned process, not a built-in algorithm.
-- **Configure:** Declare `qualityCommands` with a unique `name`, executable `command`, and optional string `args`. Use `enabledCommands` for individual switches and `enabledChecks.command` for the category.
-- **Ideology:** The runner coordinates repository truth without assuming every repository builds or tests the same way. Keep commands deterministic and explicit about required services or credentials.
-
-### Diff
-
-- **Does:** Runs `git diff --check` to catch whitespace errors in the current Git worktree.
-- **Terms:** “Diff” is worktree hygiene, not semantic review.
-- **Configure:** Toggle it with `enabledChecks.diff`. It has no autofix and requires Git. Disable it for source archives or environments without a Git worktree.
-- **Ideology:** Small textual defects should be caught cheaply, but this is not a complete review or generated-artifact validation.
-
-### Security
-
-- **Does:** Reports committed or root-level environment files, environment-file loaders, secret-shaped environment access in configured client roots, disallowed imports, forbidden terms, and process-environment access outside configured runtime roots.
-- **Terms:** “Client root” and “runtime root” are repository paths supplied by configuration; the package does not assume a framework or deployment provider.
-- **Configure:** Use `security.forbiddenTerms`, `security.forbiddenImports`, `security.clientRoots`, and `security.allowProcessEnvRoots`. Run `terra-quality security`.
-- **Ideology:** Security checks should provide conservative, portable guardrails without pretending to understand every application’s trust model.
-
-### Repeated classes, regexes, and UI patterns
-
-- **Does:** `repeated-classes` reports repeated static class strings, `regex-dedup` reports exact duplicate regular-expression sources, and `ui-patterns` reports configurable UI patterns that should use shared primitives.
-- **Configure:** Set `repeatedClasses`, `regexDedup`, and `uiPatterns` in `quality.json`; all three checks accept repository-relative extensions, exclusions, and thresholds. Normal quality mode safely extracts repeated file-local class literals into `CONFIG`/`CLASSES` constants and non-stateful duplicate regex literals into `CONFIG`/`REGEX` constants. Set `regexDedup.sharedModule` to a repository-relative `.mjs` path to consolidate supported duplicates across ESM files into generated factories, with a matching `.d.mts` declaration. Without it, regex fixes remain file-local. Set `autofix.repeatedClasses` or `autofix.regexDedup` to `false` for review-only output; dynamic classes and incompatible CommonJS consumers remain advisory.
-
-### Object forwarding
-
-- **Does:** Reports object literals that manually forward several properties from one source object.
-- **Configure:** `autofix.forward` defaults to enabled and removes only exact properties redundantly repeated after an existing spread of the same source. Whole-object replacements, projections, mutation payloads, and ambiguous cases remain warnings.
-- **Ideology:** Generic checks report evidence and let each repository decide which repetition or pattern is intentional.
+- **Documentation:** Applies file headers, import grouping, section layout, whitespace, TSDoc shape, and the documentation policy. It can add minimal TSDoc placeholders where the policy makes that safe.
+- **Formatting:** Runs Prettier over selected files and applies canonical layout protections, including long one-line imports where configured.
+- **Imports:** Resolves local imports using source roots, extensions, aliases, and external prefixes; reports unresolved local modules and repeated named bindings from the same module. The full autofix workflow consolidates repeated bindings through source maintenance, while `--warn` reports them without editing.
+- **Naming Conventions:** Finds naming drift and applies safe whole-word or prefix-based identifier renames. It avoids exported or conflicting symbols and preserves syntax-aware JSX cases.
+- **Object Forwarding:** Finds call-site objects that repeat at least three properties from one source object, such as `userId: input.userId`. It recommends passing the source directly when everything is forwarded, or spreading it while retaining explicit overrides.
+- **Linting:** Runs ESLint over selected files and propagates its exit status. Default fix mode passes ESLint's fix option.
+- **Dead code:** The canonical `dead-code` workflow coordinates Knip (unused files, exports, dependencies, reachability), ESLint's unused private declarations, TypeScript single-use analysis, and detached-TSDoc detection. `quality`, `quality:all`, `dead-code`, `knip`, and `single-use` all dispatch through this same coordinator; focused command names are compatibility entry points, not separate detector implementations.
+- **Typing:** Runs configured source and project TypeScript checks.
+- **Recommendations:** Runs repository-specific advisory commands after primary checks. Output is visible, but their statuses do not fail the run.
+- **Commands:** Runs arbitrary repository commands, commonly `build` and `test`, and propagates their statuses. It does not guess how to limit them to changed files.
+- **Diff:** Runs `git diff --check` to catch whitespace errors in the current Git worktree.
+- **Security:** Reports committed or root-level environment files, environment-file loaders, secret-shaped environment access in configured client roots, disallowed imports, forbidden terms, and process-environment access outside configured runtime roots.
+- **Repetition:** `repeated-classes` reports repeated static class strings, `regex-dedup` reports exact duplicate regular-expression sources, and `ui-patterns` reports configurable UI patterns that should use shared primitives.
 
 ## Context limits
 
