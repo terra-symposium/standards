@@ -1,5 +1,11 @@
 # @terra-symposium/quality
 
+## 0.4.52
+
+### Patch Changes
+
+- Fail before quality mutations with an actionable error when a lint-enabled repository is missing an ESLint flat config.
+
 ## 0.4.50
 
 ### Patch Changes

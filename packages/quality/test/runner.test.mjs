@@ -211,6 +211,17 @@ test('the executable handles help without a config and rejects unknown commands 
 	assert.match(unknown.stderr, /Unknown quality CLI arguments: unknown-command/);
 	assert.doesNotMatch(unknown.stderr, /invalid config|Unexpected token/);
 });
+
+test('the executable rejects linting without an ESLint flat config before running quality', () => {
+	const root = fixtureRoot('terra-quality-eslint-config-required-');
+	fixtureFile(root, 'quality.json', JSON.stringify({ sourceRoots: ['src'], extensions: ['.ts'] }));
+	fixtureFile(root, 'src/main.ts', 'const value = true;\n');
+	const runner = fileURLToPath(new URL('../dist/runner.js', import.meta.url));
+	const result = spawnSync(process.execPath, [runner, 'quality', '--all'], { cwd: root, encoding: 'utf8' });
+	assert.notEqual(result.status, 0);
+	assert.match(result.stderr, /ESLint flat config is required for quality/);
+	assert.doesNotMatch(result.stderr, /couldn't find an eslint\.config/);
+});
 test('loadQualityCfg resolves a quality file root relative to the configuration file', () => {
 	const root = fixtureRoot('terra-quality-load-config-');
 	const cfgDir = join(root, 'config');

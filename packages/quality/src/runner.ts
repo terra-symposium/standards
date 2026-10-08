@@ -2081,7 +2081,19 @@ export function runQualityFromCfg(file?: string, args = process.argv.slice(2)): 
 		runQualityCli({} as QualityCfg, args);
 		return;
 	}
-	runQualityCli(loadQualityCfg(file), args);
+	const cfg = loadQualityCfg(file);
+	const command = args.find((arg) => !arg.startsWith('-')) ?? 'quality';
+	const lintCommands = new Set(['quality', 'quality:all', 'quality:baseline', 'document', 'maintain', 'dead-code', 'knip', 'lint', 'naming', 'single-use']);
+	if (lintCommands.has(command) && qualityCheckEnabled(cfg, 'lint')) {
+		const flatConfig = ['eslint.config.js', 'eslint.config.mjs', 'eslint.config.cjs', 'eslint.config.ts', 'eslint.config.mts', 'eslint.config.cts']
+			.map((config) => resolve(cfg.root, config))
+			.find((config) => existsSync(config));
+		if (!flatConfig)
+			throw new Error(
+				`ESLint flat config is required for ${command}. Add eslint.config.js, eslint.config.mjs, or eslint.config.ts at ${cfg.root} before running Terra Quality.`,
+			);
+	}
+	runQualityCli(cfg, args);
 }
 
 /**
