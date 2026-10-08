@@ -899,6 +899,31 @@ test('dead-code reports Astro-consumed exports when Knip disagrees without modif
 	assert.equal(readFileSync(astroPage, 'utf8'), `---\nimport { Widget as PageWidget } from './widget';\n---\n<PageWidget />\n`);
 	resetExitCode();
 });
+test('read-only dead-code preview copies shared support modules outside configured source roots', () => {
+	const root = fixtureRoot('terra-quality-preview-shared-support-');
+	fixtureFile(root, 'src/main.ts', `import '../shared/regex.mjs';\nexport const value = 1;\n`);
+	fixtureFile(root, 'shared/regex.mjs', 'export const pattern = /value/;\n');
+	fixtureFile(
+		root,
+		'node_modules/.bin/eslint',
+		`#!/usr/bin/env node
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
+if (!existsSync(join(process.cwd(), 'shared/regex.mjs'))) {
+  process.stderr.write('preview omitted shared/regex.mjs');
+  process.exit(2);
+}
+const files = process.argv.slice(2).filter((arg) => arg.endsWith('.ts'));
+process.stdout.write(JSON.stringify(files.map((filePath) => ({ filePath, messages: [] }))));
+`,
+		0o755,
+	);
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts', '.mjs'], tools: { eslint: 'eslint' }, enabledChecks: { knip: false } });
+	resetExitCode();
+	runQualityCli(cfg, ['dead-code', '--all', '--warn']);
+	assert.equal(process.exitCode, 0);
+	resetExitCode();
+});
 test('dead-code reports an exported ESLint location as manual after Knip rewrites its sibling export', () => {
 	const root = fixtureRoot('terra-quality-knip-eslint-file-boundary-');
 	const source = fixtureFile(root, 'src/auth.ts', `export function createClient() { return 'ready'; }\nexport const extra = 1;\n`);

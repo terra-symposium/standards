@@ -1277,7 +1277,8 @@ function runDeadCodeReadOnly(cfg: QualityCfg, all: boolean): void {
 	}
 	const tempRoot = realpathSync(mkdtempSync(join(tmpdir(), 'terra-quality-dead-code-preview-')));
 	try {
-		const roots = [...new Set([...cfg.sourceRoots, ...(cfg.includeRoots ?? [])])].sort((left, right) => left.length - right.length);
+		const sharedRoot = resolve(cfg.root, 'shared');
+		const roots = [...new Set([...cfg.sourceRoots, ...(cfg.includeRoots ?? []), ...(existsSync(sharedRoot) ? [sharedRoot] : [])])].sort((left, right) => left.length - right.length);
 		const copiedRoots: string[] = [];
 		for (const sourceRoot of roots) {
 			const relativeRoot = relative(cfg.root, sourceRoot);

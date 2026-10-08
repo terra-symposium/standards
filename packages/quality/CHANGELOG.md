@@ -1,5 +1,11 @@
 # @terra-symposium/quality
 
+## 0.4.49
+
+### Patch Changes
+
+- Include the repository's shared support modules in read-only dead-code preview copies so ESLint rules can resolve imported source dependencies.
+
 ## 0.4.48
 
 ### Patch Changes
