@@ -931,6 +931,31 @@ process.stdout.write(JSON.stringify([{ filePath: ${JSON.stringify(source)}, mess
 	assert.doesNotMatch(fixtureText(root, 'src/auth.ts'), /export const extra/);
 	resetExitCode();
 });
+test('dead-code passes a discovered TypeScript flat ESLint config explicitly', () => {
+	const root = fixtureRoot('terra-quality-eslint-flat-config-');
+	const source = fixtureFile(root, 'src/main.ts', 'export const value = 1;\n');
+	const config = fixtureFile(root, 'eslint.config.ts', 'export default [];\n');
+	const eslint = fixtureFile(
+		root,
+		'bin/eslint-config-recorder.mjs',
+		`#!/usr/bin/env node
+import { appendFileSync } from 'node:fs';
+appendFileSync(${JSON.stringify(join(root, 'eslint-args.jsonl'))}, JSON.stringify(process.argv.slice(2)) + '\\n');
+const files = process.argv.slice(2).filter((arg) => arg.endsWith('.ts') && !arg.includes('eslint.config.ts'));
+process.stdout.write(JSON.stringify(files.map((filePath) => ({ filePath, messages: [] }))));
+`,
+		0o755,
+	);
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], tools: { eslint }, enabledChecks: { knip: false } });
+	resetExitCode();
+	runQualityCli(cfg, ['dead-code', '--all', '--warn']);
+	assert.equal(process.exitCode, 0);
+	const args = JSON.parse(fixtureText(root, 'eslint-args.jsonl').trim());
+	assert.deepEqual(args.slice(0, 4), ['--format', 'json', '--no-ignore', '--config']);
+	assert.equal(args[4], config);
+	assert.ok(args.includes(source));
+	resetExitCode();
+});
 test('dead-code preserves Astro frontmatter consumers resolved through configured TypeScript aliases', () => {
 	const root = fixtureRoot('terra-quality-knip-astro-alias-consumer-');
 	const owner = fixtureFile(root, 'astro/src/lib/auth.server.ts', `export function createClient() { return 'ready'; }\n`);

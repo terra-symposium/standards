@@ -568,8 +568,17 @@ type KnipIssue = { file: string; [kind: string]: string | KnipItem[] };
 function collectEslintReports(cfg: QualityCfg, all: boolean): EslintReport[] {
 	const files = filesFor(cfg, all).filter((f) => CJS_JS_JSX_MJS_TS_TSX_REGEX.test(f));
 	const reports: EslintReport[] = [];
+	const flatConfig = ['eslint.config.js', 'eslint.config.mjs', 'eslint.config.cjs', 'eslint.config.ts', 'eslint.config.mts', 'eslint.config.cts']
+		.map((file) => resolve(cfg.root, file))
+		.find((file) => existsSync(file));
 	for (const filesBatch of batches(files)) {
-		const result = spawnSync(toolPath(cfg, cfg.tools?.eslint, 'eslint'), ['--format', 'json', '--no-ignore', ...filesBatch], {
+		const result = spawnSync(toolPath(cfg, cfg.tools?.eslint, 'eslint'), [
+			'--format',
+			'json',
+			'--no-ignore',
+			...(flatConfig ? ['--config', flatConfig] : []),
+			...filesBatch,
+		], {
 			cwd: cfg.root,
 			encoding: 'utf8',
 			env: process.env,

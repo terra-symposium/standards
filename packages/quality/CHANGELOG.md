@@ -1,5 +1,11 @@
 # @terra-symposium/quality
 
+## 0.4.46
+
+### Patch Changes
+
+- Pass the repository's discovered flat ESLint config explicitly to dead-code analysis so TypeScript configs are loaded consistently.
+
 ## 0.4.45
 
 ### Patch Changes
