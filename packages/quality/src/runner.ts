@@ -571,7 +571,9 @@ function collectEslintReports(cfg: QualityCfg, all: boolean): EslintReport[] {
 	const flatConfig = ['eslint.config.js', 'eslint.config.mjs', 'eslint.config.cjs', 'eslint.config.ts', 'eslint.config.mts', 'eslint.config.cts']
 		.map((file) => resolve(cfg.root, file))
 		.find((file) => existsSync(file));
-	for (const filesBatch of batches(files)) {
+	let completed = 0;
+	qualityProgress('ESLint dead-code', completed, files.length);
+	for (const filesBatch of batches(files, ESLINT_BATCH_SIZE)) {
 		const result = spawnSync(toolPath(cfg, cfg.tools?.eslint, 'eslint'), [
 			'--format',
 			'json',
@@ -581,10 +583,12 @@ function collectEslintReports(cfg: QualityCfg, all: boolean): EslintReport[] {
 		], {
 			cwd: cfg.root,
 			encoding: 'utf8',
-			env: process.env,
+			env: flatConfig ? { ...process.env, ESLINT_USE_FLAT_CONFIG: 'true' } : process.env,
 			maxBuffer: TOOL_OUTPUT_MAX_BUFFER,
 		});
 		reports.push(...parseEslintReports(result, filesBatch));
+		completed += filesBatch.length;
+		qualityProgress('ESLint dead-code', completed, files.length);
 	}
 	return reports;
 }

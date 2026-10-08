@@ -1,5 +1,11 @@
 # @terra-symposium/quality
 
+## 0.4.47
+
+### Patch Changes
+
+- Run dead-code ESLint in ten-file batches with live progress and explicitly enable the discovered flat config.
+
 ## 0.4.46
 
 ### Patch Changes
