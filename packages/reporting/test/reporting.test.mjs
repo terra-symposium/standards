@@ -81,6 +81,28 @@ test('normalizes result summaries and viewport project names', () => {
 	]);
 });
 
+// Confirms page timing starts without destructuring the controller fixture.
+test('captures page navigation for tests that do not destructure the load fixture', async () => {
+	const root = await fs.mkdtemp(path.join(os.tmpdir(), 'reporting-load-fixture-'));
+	const specFile = path.join(root, 'navigation.spec.mjs');
+	const configFile = path.join(root, 'playwright.config.mjs');
+	const reportFile = path.join(root, 'playwright-report.json');
+	const testModule = new URL('../dist/playwright.js', import.meta.url).href;
+	await fs.writeFile(specFile, `import { loadTest as test } from ${JSON.stringify(testModule)};\ntest('navigates without using load', async ({ page }) => { await page.goto('data:text/html,<title>loaded</title>'); });\n`);
+	await fs.writeFile(configFile, `export default { testDir: ${JSON.stringify(root)}, reporter: [['json', { outputFile: ${JSON.stringify(reportFile)} }]], projects: [{ name: 'chromium', use: { browserName: 'chromium' } }] };\n`);
+	try {
+		await execFileAsync('pnpm', ['exec', 'playwright', 'test', '--config', configFile], { cwd: path.resolve(path.dirname(new URL(import.meta.url).pathname), '../../..'), timeout: 60000 });
+		const report = JSON.parse(await fs.readFile(reportFile, 'utf8'));
+		const results = report.suites.flatMap((suite) => suite.specs.flatMap((spec) => spec.tests.flatMap((entry) => entry.results)));
+		const attachment = results.flatMap((result) => result.attachments).find((entry) => entry.name === 'load-testing');
+		assert.ok(attachment, 'the automatic fixture should attach load measurements');
+		const payload = JSON.parse(Buffer.from(attachment.body, 'base64').toString('utf8'));
+		assert.ok(payload.measurements.some((measurement) => measurement.kind === 'page' && measurement.durationMs > 0), JSON.stringify(payload));
+	} finally {
+		await fs.rm(root, { recursive: true, force: true });
+	}
+});
+
 /** Covers default viewport expansion, focused selection, and projects that must run once. */
 test('expands regular Playwright projects and preserves single-run setup/capture projects', () => {
 	const original = process.env.PW_VIEWPORTS;
