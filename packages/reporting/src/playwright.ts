@@ -77,7 +77,7 @@ export type LoadTestController = {
  * Import as `test` in suites that need page and operation-level measurements.
  */
 export const loadTest = diagnosticsTest.extend<{ load: LoadTestController }>({
-	load: async ({ page, context }, use, info): Promise<void> => {
+	load: [async ({ page, context }, use, info): Promise<void> => {
 		const configuredEnabled = (info.config as unknown as { metadata?: Record<string, unknown> }).metadata?.terraLoadTestingEnabled;
 		const enabled = typeof configuredEnabled === 'boolean' ? configuredEnabled : readLoadTestingConfig().enabled;
 		const measurements: LoadMeasurementInput[] = [];
@@ -133,7 +133,7 @@ export const loadTest = diagnosticsTest.extend<{ load: LoadTestController }>({
 				}
 			}
 		}
-	},
+	}, { auto: true }],
 });
 
 /** Application-specific paths and catalog settings for the shared reporter. */
