@@ -1,5 +1,11 @@
 # @terra-symposium/reporting
 
+## 0.2.2
+
+### Patch Changes
+
+- Add configurable Playwright load timing budgets and reporting.
+
 ## 0.2.1
 
 ### Patch Changes

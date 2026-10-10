@@ -1,6 +1,6 @@
 {
 	"name": "@terra-symposium/reporting",
-	"version": "0.2.1",
+	"version": "0.2.2",
 	"description": "Reusable Playwright evidence reporting for Terra repositories",
 	"type": "module",
 	"main": "./dist/core.js",
