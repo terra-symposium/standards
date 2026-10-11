@@ -1,10 +1,66 @@
 # Terra Shared
 
-Shared foundations for Terra Symposium repositories.
+Terra Shared is a pnpm workspace of reusable packages maintained for Terra Symposium applications. It provides repository quality tooling, React error-boundary helpers, and test-evidence reporting.
+
+## Packages
+
+| Package                                                                                                | Purpose                                                                                               | Runtime requirements                                                         |
+| ------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| [`@terra-symposium/quality`](https://www.npmjs.com/package/@terra-symposium/quality)                   | Configurable JavaScript and TypeScript quality checks, safe maintenance, and the `terra-quality` CLI. | Node.js `>=18.18`                                                            |
+| [`@terra-symposium/error-boundaries`](https://www.npmjs.com/package/@terra-symposium/error-boundaries) | React error boundaries plus status-copy and route-error helpers.                                      | React and React DOM `>=18`                                                   |
+| [`@terra-symposium/reporting`](https://www.npmjs.com/package/@terra-symposium/reporting)               | Responsive Playwright evidence, diagnostics, spreadsheets, slideshows, and load timings.              | Node.js `>=18.18`; `@playwright/test >=1.52.0 <2` for Playwright integration |
+
+All three packages are configured for public npm publication. Consumers install them from npm without a Terra registry token. The CI release workflow uses the repository's `NPM_TOKEN` secret to publish versions.
 
 ## Documentation
 
-The Starlight documentation site lives in [`docs/`](docs/). It includes an external-consumer setup guide, a full `quality.json` reference, explanations of each quality check, CLI workflows, and package guides.
+Read the [Terra Shared documentation](https://terra-symposium-quality.netlify.app/) for setup guides, configuration references, package APIs, and contribution instructions. The site source lives in [`docs/`](docs/).
+
+## Install a package
+
+Install only the package your application uses:
+
+```sh
+# Terra Quality
+pnpm add -D @terra-symposium/quality
+
+# React boundary helpers
+pnpm add @terra-symposium/error-boundaries
+
+# Playwright reporting
+pnpm add -D @terra-symposium/reporting @playwright/test
+```
+
+For Terra Quality, add a `quality.json` in the repository root and start with:
+
+```json
+{
+	"$schema": "./node_modules/@terra-symposium/quality/quality.schema.json",
+	"sourceRoots": ["src"],
+	"extensions": [".js", ".jsx", ".ts", ".tsx"],
+	"enabledChecks": {
+		"format": false,
+		"lint": false,
+		"knip": false,
+		"dead-code": false
+	}
+}
+```
+
+Then run `pnpm exec terra-quality`. See the [quality setup guide](https://terra-symposium-quality.netlify.app/packages/quality/setup/) for the full workflow.
+
+## Develop this repository
+
+Use Node.js `22.19.0` and pnpm `10.30.3` to match CI. From the repository root:
+
+```sh
+pnpm install --frozen-lockfile
+pnpm build
+pnpm test
+pnpm quality:all
+```
+
+Work on or preview the documentation site with:
 
 ```sh
 pnpm docs:dev
@@ -12,22 +68,8 @@ pnpm docs:build
 pnpm docs:preview
 ```
 
-## Packages
+Package changes use [Changesets](https://github.com/changesets/changesets). Add a changeset for a publishable package change with `pnpm changeset`; documentation-only changes do not require a package version bump. Pull requests and pushes to `main` run the repository quality workflow. The release workflow versions and publishes packages after changesets are merged.
 
-- `@terra-symposium/quality` — configurable AST checks, naming rules, maintenance orchestration, and repository quality CLI.
-- `@terra-symposium/error-boundaries` — framework-neutral React error-boundary lifecycle and adapters.
-- `@terra-symposium/reporting` — reusable Playwright evidence fixtures, spreadsheets, and slideshows.
+## Project boundaries
 
-Both packages are published publicly to the npm registry. Consumers can install them without a registry token; publishing from CI uses the repository `NPM_TOKEN` secret.
-
-Repository-specific paths, framework entrypoints, visual fallback components, security manifests, and deployment checks stay in the consuming repository.
-
-## Development
-
-```bash
-pnpm install --frozen-lockfile
-pnpm build
-pnpm test
-```
-
-Releases use Changesets. Add a changeset for package API changes, then let the release workflow version and publish the affected packages.
+These packages provide reusable primitives. Each consuming repository remains responsible for its application-specific source paths, framework integration, fallback UI, credentials, services, deployment policy, and domain tests.

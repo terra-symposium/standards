@@ -5,21 +5,23 @@ template: splash
 hero:
   tagline: Reusable foundations for Terra Symposium repositories.
   actions:
-    - text: Configure quality.json
-      link: /quality/configuration/
+    - text: Choose a package
+      link: /packages/quality/
       icon: right-arrow
-    - text: Get started
-      link: /getting-started/
+    - text: Contribute
+      link: /contributing/
       icon: external
       variant: minimal
 ---
 
-Terra Shared publishes packages for repository quality checks, React error boundaries, and Playwright evidence reporting.
+Terra Shared maintains packages used across Terra Symposium applications. Each package has its own setup guide, public entry points, configuration reference, and known boundaries.
 
-## Choose a guide
+## Packages
 
-- [Get started](/getting-started/) — install a package and orient yourself.
-- [Quality overview](/quality/overview/) — understand how the runner scopes and checks work.
-- [Configure `quality.json`](/quality/configuration/) — configure source scope, checks, autofixes, tools, and commands.
-- [Explore each check](/quality/checks/document/) — see what each check detects and its limits.
-- [Packages](/packages/error-boundaries/) — learn about error boundaries and reporting helpers.
+| Package                                                          | Use it for                                                                     | Start here                                                        |
+| ---------------------------------------------------------------- | ------------------------------------------------------------------------------ | ----------------------------------------------------------------- |
+| [@terra-symposium/quality](/packages/quality/)                   | Configurable source checks, safe maintenance, and repository commands.         | [Install and set up](/packages/quality/setup/)                    |
+| [@terra-symposium/error-boundaries](/packages/error-boundaries/) | React render-error recovery and small framework-specific error helpers.        | [Use error boundaries](/packages/error-boundaries/)               |
+| [@terra-symposium/reporting](/packages/reporting/)               | Responsive Playwright runs, diagnostics, evidence artifacts, and load timings. | [Configure Playwright reporting](/packages/reporting/playwright/) |
+
+All packages are published to the public npm registry. See [Contributing](/contributing/) to set up this workspace, change a package, or update these docs.

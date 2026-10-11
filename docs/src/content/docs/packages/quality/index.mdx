@@ -1,0 +1,41 @@
+---
+title: Terra Quality
+description: Install, configure, and run the Terra Quality source checker and repository CLI.
+---
+
+`@terra-symposium/quality` coordinates built-in JavaScript and TypeScript checks with tools and commands configured by your repository. It uses `quality.json` for scope and policy and provides the `terra-quality` executable.
+
+Terra Quality does not install project tools or create their native configuration. Install and configure any enabled formatter, linter, reachability checker, type checker, build, or test command in the consuming repository.
+
+## Start here
+
+1. [Install the package and choose a first run](/packages/quality/setup/).
+2. [Configure source scope, checks, tools, and commands](/packages/quality/configuration/).
+3. [Choose local and CI run modes](/packages/quality/workflows/).
+4. [Review each check's behavior and limits](/packages/quality/checks/).
+5. [Resolve common setup and run issues](/packages/quality/troubleshooting/).
+
+## How a run works
+
+The CLI reads `quality.json` from the current working directory unless a library caller supplies another path. It resolves configured paths from the config file's directory or its explicit `root`, selects changed and untracked files by default, and runs enabled checks in order. Pass `--all` to scan the full configured source scope.
+
+Fix mode is the default for the normal quality workflow. It applies enabled, syntax-aware transformations and tool fixes. Pass `--warn` for a read-only run. Configured quality commands run unless skipped; advisory recommendations do not fail the run.
+
+## Compatibility
+
+The package requires Node.js `>=18.18`. Checks target configured JavaScript and TypeScript source files. Tool behavior and framework-specific source discovery remain the responsibility of the repository's own configuration.
+
+## Package entry points
+
+The package root re-exports its library API. Explicit subpaths are available for focused imports:
+
+| Import                                       | Use                                                              |
+| -------------------------------------------- | ---------------------------------------------------------------- |
+| `@terra-symposium/quality`                   | Shared check, configuration, analysis, and maintenance APIs.     |
+| `@terra-symposium/quality/cli`               | CLI configuration loading, dispatch, and runner functions.       |
+| `@terra-symposium/quality/naming`            | Naming rules, findings, and syntax-aware rename helpers.         |
+| `@terra-symposium/quality/object-forwarding` | Forwarding findings and conservative autofixes.                  |
+| `@terra-symposium/quality/single-use`        | Single-consumer analysis and safe declaration maintenance.       |
+| `@terra-symposium/quality/port`              | Helpers for inspecting local TCP listeners and acquiring a port. |
+
+`portOwners(port)` uses `lsof` to find listeners. `acquirePort(port)` sends `SIGTERM` and, if needed, `SIGKILL` to processes using that port before waiting for it to become available. Use it only when the caller owns those processes.

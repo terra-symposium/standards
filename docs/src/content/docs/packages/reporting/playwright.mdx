@@ -1,0 +1,94 @@
+---
+title: Responsive Playwright
+description: Expand Playwright projects across viewports and collect browser diagnostics.
+---
+
+## Add the shared configuration
+
+Wrap the consuming repository's existing Playwright config with `withResponsivePlaywright`:
+
+```ts
+import { defineConfig } from '@playwright/test';
+import { withResponsivePlaywright } from '@terra-symposium/reporting/viewports';
+
+export default withResponsivePlaywright(
+	defineConfig({
+		projects: [
+			{ name: 'chromium', testMatch: '**/*.spec.ts' },
+			{ name: 'setup', testMatch: '**/*.setup.ts' },
+			{ name: 'manual-capture', testMatch: '**/*.capture.spec.ts' },
+		],
+	}),
+	{
+		singleRunProjects: ['manual-capture'],
+		outputRoot: 'test-results/visual',
+		supplementalResultsFile: 'test-results/unit-results.json',
+	},
+);
+```
+
+The helper preserves other Playwright settings and reporters. It expands regular projects across six default viewports and configures full-page automatic screenshots. Projects used as dependencies, setup-named projects, and projects matching a `.setup.*` file run once. Add other single-run project names to `singleRunProjects`.
+
+## Select viewports
+
+By default, all six viewports run:
+
+| Name     | Size       |
+| -------- | ---------- |
+| `mobile` | 390 × 844  |
+| `sm`     | 640 × 800  |
+| `md`     | 768 × 900  |
+| `lg`     | 1024 × 768 |
+| `xl`     | 1280 × 720 |
+| `2xl`    | 1536 × 864 |
+
+Set `PW_VIEWPORTS` to a comma- or space-separated list to run a subset:
+
+```sh
+PW_VIEWPORTS=mobile,lg pnpm exec playwright test
+```
+
+Aliases include `phone` for `mobile`, `tablet` for `md`, `desktop`/`computer`/`default` for `xl`, and `wide` for `2xl`. A single `xl` selection keeps the base project name; other selections add the viewport name to the project.
+
+## Capture browser diagnostics
+
+Import `diagnosticsTest` where a test suite should attach browser messages:
+
+```ts
+import { diagnosticsTest as test, expect } from '@terra-symposium/reporting/playwright';
+
+test('account page is healthy', async ({ page }) => {
+	await page.goto('/account');
+	await expect(page.getByRole('heading', { name: 'Account' })).toBeVisible();
+});
+```
+
+The fixture records browser console errors and warnings, uncaught page errors, and failed requests, then attaches them as JSON to the Playwright test result. The shared reporter combines these attachments with terminal diagnostics and test outcomes.
+
+## Outputs and options
+
+The reporter writes to a timestamped directory under `test-results/visual` by default. It copies native screenshots into the run directory and creates `report.xlsx` and `report.pptx`. The helper uses `test-results/playwright-output` for Playwright's intermediate output directory.
+
+`withResponsivePlaywright(config, options)` accepts `singleRunProjects`, `outputDir`, `outputRoot`, `supplementalResultsFile`, `qualityConfigFile`, and explicit `loadTesting` settings. Supplemental results are added to the workbook. With load timing enabled they also appear in slideshow output without screenshot previews; otherwise the slideshow contains browser results only. See [load testing](/packages/reporting/load-testing/) for timing settings and [artifact writers](/packages/reporting/artifacts/) for direct report generation.
+
+## Configure the reporter directly
+
+Use `ProgressReporter` when the repository wants the artifact reporter without the responsive config wrapper. It implements the Playwright reporter interface and infers project and test-file metadata from the discovered suite unless you provide it explicitly:
+
+```ts
+export default {
+	reporter: [
+		[
+			'@terra-symposium/reporting/playwright',
+			{
+				outputRoot: 'test-results/visual',
+				reportFile: 'report.xlsx',
+				slideshowFile: 'report.pptx',
+				qualityConfigFile: 'quality.json',
+			},
+		],
+	],
+};
+```
+
+`ReportingOptions` also accepts `featureFiles`, `projects`, `viewportCatalog`, `supplementalResultsFile`, and explicit `loadTesting` settings. Set `viewportCatalog` when results use a custom viewport naming scheme; provide `featureFiles` and `projects` only when the suite-derived metadata is not the desired report grouping. The responsive wrapper configures the reporter automatically.

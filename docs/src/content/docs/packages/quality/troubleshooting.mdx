@@ -1,0 +1,20 @@
+---
+title: Troubleshooting
+description: Diagnose common Terra Quality installation, scope, and tool failures.
+---
+
+| Problem                                         | Resolution                                                                                                                                                                                    |
+| ----------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `quality.json` was not found                    | Run the CLI from the directory containing the file. By default, the CLI loads `quality.json` from the current working directory.                                                              |
+| A check reports no selected files               | Confirm `sourceRoots` and `extensions`. Changed-file mode only includes tracked changes and untracked files that are not ignored; use `--all` to select the complete configured source scope. |
+| Lint says an ESLint flat config is required     | Add a supported flat config file at the configured `root` (for example, `eslint.config.mjs`) or set `enabledChecks.lint` to `false` until the repository has one.                             |
+| A configured executable cannot be found         | Install that tool in the consuming repository. A configured executable name first checks `<root>/node_modules/.bin`; a configured path containing a slash is used as provided.                |
+| The formatter changes a file unexpectedly       | Re-run with `--warn` to review without source autofixes, then inspect the repository's Prettier configuration and the specific fixer that ran.                                                |
+| A command runs from the wrong directory         | Set `root` to the repository root. Quality and recommendation commands run with `root` as their working directory and inherit the calling process environment.                                |
+| A tool or command should not run in one mode    | Use `--skip-commands` or `--skip-recommendations` for one run, or use `enabledChecks`, `enabledCommands`, or `enabledRecommendations` in configuration.                                       |
+| A local import is treated as unresolved         | Add the internal path mapping to `aliases`, or add a narrow `externalPrefixes` entry for a genuinely external namespace.                                                                      |
+| Knip reports a framework entry point as unused  | Review Knip's entry model first. Where supported, list stable framework-discovered exports under `frameworkEntryExports`; do not suppress unrelated findings.                                 |
+| TypeScript reports that JSX is disabled         | Set `compilerOptions.jsx` in the effective `tsconfig.json` (React projects generally use `react-jsx`) and run `tsc --noEmit -p tsconfig.json` so the project configuration is applied. Restart the editor's TypeScript language server if diagnostics remain stale. |
+| A changed-file run fails outside a Git worktree | Run with `--all` or create a Git worktree so the CLI can determine the changed-file set.                                                                                                      |
+
+See the [configuration reference](/packages/quality/configuration/) for every scope, tool, and policy field. Use [CLI workflows](/packages/quality/workflows/) to choose a run mode.

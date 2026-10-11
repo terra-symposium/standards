@@ -1,16 +1,49 @@
 ---
 title: Contributing
-description: Build, test, and update Terra Shared packages and documentation.
+description: Set up the Terra Shared workspace, validate changes, and prepare package releases.
 ---
 
-This is a pnpm workspace. From the repository root:
+## Prerequisites
+
+Use Node.js 22.19.0 and pnpm 10.30.3 to match the repository workflows. The root `package.json` also declares the pnpm version used by Corepack.
+
+## Set up the workspace
+
+Run these commands from the repository root:
 
 ```sh
 pnpm install --frozen-lockfile
 pnpm build
 pnpm test
+pnpm quality:all
 ```
 
-Work on the docs site with `pnpm docs:dev`; build it with `pnpm docs:build` and preview with `pnpm docs:preview`.
+`pnpm build` builds each workspace package. `pnpm test` runs the package test suites. `pnpm quality:all` performs the configured full-source quality pass and skips configured repository commands and advisory recommendations; run the build and tests separately as shown above.
 
-Package API changes use Changesets. Add a changeset for publishable package changes; documentation-only updates do not need a package version bump. When changing quality behavior, keep the schema, examples, CLI behavior, and check guides aligned. The quality package's `test/README.md` documents its test coverage contract.
+## Work on the documentation
+
+The documentation site uses Astro and Starlight. Start the development server, build the static site, or preview that build with:
+
+```sh
+pnpm docs:dev
+pnpm docs:build
+pnpm docs:preview
+```
+
+Documentation source is under `docs/src/content/docs/`. Use Markdown or MDX, include a concise `title` and `description` in each page's frontmatter, and link to other guides with their site paths. Run `pnpm docs:build` after editing pages so Starlight can validate content and internal links.
+
+## Change and release a package
+
+Keep public package behavior, entry-point declarations, examples, and package documentation aligned. Each published package has a `README.md` alongside its source; the site under `docs/` provides the longer guides.
+
+For a publishable package change, create a changeset:
+
+```sh
+pnpm changeset
+```
+
+Choose each affected package and the appropriate semver release type, then commit the generated file under `.changeset/` with the package change. Documentation-only changes do not need a changeset. The quality workflow runs on pull requests and pushes to `main`; the release workflow uses Changesets to prepare versions and publish packages after changesets are merged.
+
+## Repository ownership
+
+The packages expose reusable primitives and do not own application-specific integration. Keep consumer paths, framework configuration, secrets, service setup, deployment rules, and domain test scenarios in the consuming repository.

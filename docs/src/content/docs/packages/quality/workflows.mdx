@@ -1,0 +1,80 @@
+---
+title: CLI workflows
+description: Choose safe local and CI run modes and invoke focused Terra Quality checks.
+---
+
+Run the executable installed by `@terra-symposium/quality`:
+
+```sh
+pnpm exec terra-quality [command] [options]
+```
+
+The CLI reads `quality.json` from the current working directory. Use `pnpm exec terra-quality --help` to see the current usage summary.
+
+## Choose a run mode
+
+File scope and write behavior are independent. The default scope is changed and untracked source files in the current Git worktree. `--all` expands the scope to every configured source file. Fixes are enabled by default; `--warn` disables them for that run.
+
+| Invocation                                                                            | Scope                       | Applies autofixes? | Runs configured commands? |
+| ------------------------------------------------------------------------------------- | --------------------------- | ------------------ | ------------------------- |
+| `pnpm exec terra-quality`                                                             | Changed and untracked files | Yes, when enabled  | Yes                       |
+| `pnpm exec terra-quality quality --warn`                                              | Changed and untracked files | No                 | Yes                       |
+| `pnpm exec terra-quality quality --all`                                               | All configured source files | Yes, when enabled  | Yes                       |
+| `pnpm exec terra-quality quality --all --warn`                                        | All configured source files | No                 | Yes                       |
+| `pnpm exec terra-quality quality --all --warn --skip-commands --skip-recommendations` | All configured source files | No                 | No                        |
+
+`--strict` makes naming errors fail the run. To disable one fixer for every run, set its entry under `autofix` to `false`. Commands and recommendations can also be selected by name in `quality.json`.
+
+Changed-file mode requires a Git worktree. Use `--all` when running from a source archive or when you need a complete scan. `--warn` is review-only for Terra Quality's source and tool autofixes; configured commands still run and follow their own behavior.
+
+## CI
+
+Use one of these patterns:
+
+```sh
+# Terra Quality owns the complete command set.
+pnpm exec terra-quality quality --all --warn
+
+# Build and tests run in separate workflow steps.
+pnpm exec terra-quality quality --all --warn --skip-commands --skip-recommendations
+```
+
+Keep the package's source scope and native tool configuration consistent with the CI checkout. Do not rely on changed-file mode for a complete CI check.
+
+## Focused commands
+
+| Command               | Purpose                                                                        |
+| --------------------- | ------------------------------------------------------------------------------ |
+| `document`            | Check declaration documentation and maintain supported source layout.          |
+| `maintain`            | Alias for `document`.                                                          |
+| `format`              | Apply or check structural formatting and configured Prettier formatting.       |
+| `lint`                | Run the configured ESLint executable.                                          |
+| `knip` or `dead-code` | Run the coordinated unused-file, export, declaration, and single-use analysis. |
+| `types`               | Run the configured TypeScript project or source type check.                    |
+| `imports`             | Run the import, naming, alias, forwarding, and documentation checks.           |
+| `naming`              | Apply eligible naming fixes, then run the quality checks.                      |
+| `security`            | Run configured security checks.                                                |
+| `repeated-classes`    | Find or extract supported repeated static class strings.                       |
+| `regex-dedup`         | Find or consolidate supported duplicate regular expressions.                   |
+| `ui-patterns`         | Report configured UI patterns.                                                 |
+| `domain <name>`       | Run one configured command by its name.                                        |
+| `quality:all`         | Alias for a full-scope `quality` run.                                          |
+| `quality:baseline`    | Run a normal quality pass with the default changed-file scope.                 |
+
+Focused commands respect the relevant check and autofix settings. For config-driven checks, provide the matching policy block in `quality.json`. The `maintain` command remains an alias for `document`.
+
+## Add workspace scripts
+
+A repository can expose common modes through package scripts:
+
+```json
+{
+	"scripts": {
+		"quality": "terra-quality",
+		"quality:all": "terra-quality quality --all",
+		"quality:check": "terra-quality quality --all --warn"
+	}
+}
+```
+
+Use the fix-enabled command for local maintenance and the read-only command for review or CI. Keep build and test commands explicit in `qualityCommands` or in separate workflow steps.

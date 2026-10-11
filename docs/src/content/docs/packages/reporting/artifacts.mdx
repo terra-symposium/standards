@@ -1,0 +1,44 @@
+---
+title: Report artifacts
+description: Write and understand the spreadsheet and slideshow outputs.
+---
+
+## Outputs from the Playwright reporter
+
+The default reporter creates a timestamped run directory under `test-results/visual`. Each run contains:
+
+- `report.xlsx`: a summary, result sheets grouped by test file, project information, diagnostics, and—when enabled—a load-timings sheet.
+- `report.pptx`: screenshot-backed slides grouped by logical test, with responsive previews and diagnostic context. When timing is enabled, it includes a timing summary and paginated timing details.
+- An `images` directory containing the screenshots copied from Playwright attachments.
+
+Pass `outputRoot` to `withResponsivePlaywright` or `ProgressReporter` to change the parent directory. `reportFile` and `slideshowFile` change the artifact filenames when constructing the reporter directly.
+
+## Write artifacts directly
+
+Use the normalized `ReportRun` and `VisualResult` types from `/core` when another runner already owns result collection:
+
+```ts
+import type { ReportRun } from '@terra-symposium/reporting/core';
+import { writeSpreadsheet } from '@terra-symposium/reporting/spreadsheet';
+import { writeSlideshow } from '@terra-symposium/reporting/slideshow';
+
+const run: ReportRun = {
+	results: [],
+	runDiagnostics: [],
+	featureFiles: [],
+	projects: [],
+};
+
+await writeSpreadsheet('test-results/report.xlsx', run);
+await writeSlideshow('test-results/report.pptx', run.results);
+```
+
+A slideshow needs accessible screenshot paths on results to create visual previews; missing captures are labeled in the slide. The workbook can also record results without screenshots.
+
+The `writeSpreadsheet(file, run)` function accepts normalized run metadata. `writeSlideshow(file, results, options?)` accepts optional title and document-metadata overrides. When load testing is enabled, set `run.loadTestingEnabled` or `options.loadTestingEnabled` so empty timing sections are still represented.
+
+## Supplemental results
+
+Set `supplementalResultsFile` on the responsive configuration or reporter to merge structured results from another runner into the workbook. The JSON object can contain `complete`, `results`, and `runDiagnostics`. Each result follows the `VisualResult` shape; optional `loadMeasurements` adds timing data.
+
+Supplemental rows are added to the workbook and project summary. When load timing is enabled, they are also passed to the slideshow writer, which labels their missing screenshots; with timing disabled, the Playwright reporter creates slides from browser results only.
