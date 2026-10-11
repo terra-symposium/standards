@@ -42,7 +42,7 @@ For a full, read-only source check:
 pnpm exec terra-quality quality --all --warn
 ```
 
-The normal scope is changed and untracked files in a Git worktree. `--all` selects every file under `sourceRoots`; `--warn` disables autofixes. Configured quality commands still run unless you pass `--skip-commands`.
+The normal scope is changed and untracked files in a Git worktree. `--all` selects every file under `sourceRoots`; `--warn` disables autofixes and runs dead-code analysis once without a temporary fix preview. It reports rule-level fix candidates; fix mode then type-checks proposed dead-code edits before writing and may reject a candidate. Configured quality commands still run unless you pass `--skip-commands`.
 
 ## What it does
 
