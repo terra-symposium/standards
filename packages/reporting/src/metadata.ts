@@ -3,8 +3,19 @@
  * Neutral metadata helpers for Open XML spreadsheet and slideshow artifacts.
  */
 
+/*//////////////////////////////////////////////////
+IMPORTS
+//////////////////////////////////////////////////*/
+
+// API
 import fs from 'node:fs/promises';
+
+// COMPONENTS
 import JSZip from 'jszip';
+
+/*//////////////////////////////////////////////////
+CONFIG
+//////////////////////////////////////////////////*/
 
 /** Replaces library-generated application labels with neutral evidence metadata. */
 export const neutralizeApplicationMetadata = async (file: string): Promise<void> => {

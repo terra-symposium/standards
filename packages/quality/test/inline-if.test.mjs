@@ -10,9 +10,9 @@ IMPORTS
 // API
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { runInNewContext } from 'node:vm';
 import { collapseInlineIfs } from '../dist/index.js';
 import { fixtureFile, fixtureRoot, fixtureText } from './support.mjs';
+import { runInNewContext } from 'node:vm';
 
 /*//////////////////////////////////////////////////
 TESTS
@@ -54,7 +54,6 @@ if (multiple) { first(); second(); }
 	);
 	assert.equal(collapseInlineIfs(file), false);
 });
-
 test('collapseInlineIfs preserves the historical nested-if else owner and runtime behavior', () => {
 	const root = fixtureRoot('terra-quality-inline-if-else-owner-');
 	const file = fixtureFile(root, 'src/main.ts', 'if (outer) { if (inner) run(); } else stop();\n');

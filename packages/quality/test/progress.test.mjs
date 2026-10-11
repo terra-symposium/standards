@@ -23,7 +23,6 @@ test('progress updates always include a bar and rewrite one line even without a 
 	qualityProgress('Sample scan', 2, 4, capture);
 	qualityProgress('Sample scan', 4, 4, capture);
 	qualityProgress('Empty scan', 0, 0, capture);
-
 	const updates = writes.filter((write) => write.startsWith('\r'));
 	assert.equal(updates.length, 4);
 	assert.ok(

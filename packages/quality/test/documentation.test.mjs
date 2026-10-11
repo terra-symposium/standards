@@ -79,7 +79,6 @@ export function useDashboardConfigurationDialog(initialConfigure: string | undef
 		],
 	);
 });
-
 test('documentation findings warn for detached TSDoc and accept declaration and file-header comments', () => {
 	const root = fixtureRoot('terra-quality-detached-tsdoc-');
 	fixtureFile(
@@ -328,7 +327,6 @@ test('maintainSrcFile deduplicates repeated type imports across maintenance runs
 import type { createAdminClient } from '../../lib/auth.server';
 import type { createAdminClient } from '../../lib/auth.server';
 import type { createAdminClient } from '../../lib/auth.server';
-
 const admin = createAdminClient();
 void admin;
 `,

@@ -3,12 +3,18 @@
  * Responsive viewport selection and Playwright project naming helpers.
  */
 
-import type { PlaywrightTestConfig } from '@playwright/test';
+/*//////////////////////////////////////////////////
+IMPORTS
+//////////////////////////////////////////////////*/
+
+// API
 import fs from 'node:fs';
 import path from 'node:path';
 import { readLoadTestingConfig } from './load-testing.js';
 
+// TYPES
 import type { LoadTestingConfig } from './core.js';
+import type { PlaywrightTestConfig } from '@playwright/test';
 
 /*//////////////////////////////////////////////////
 CONFIG
@@ -153,12 +159,7 @@ export const withResponsivePlaywright = <T extends PlaywrightTestConfig>(cfg: T,
 	const sharedDist = sharedDistCandidates.find((c) => fs.existsSync(c)) || sharedDistCandidates[0];
 	const resolvedSharedDist = fs.existsSync(sharedDist) ? fs.realpathSync(sharedDist) : sharedDist;
 	const external = [...(cfg.build?.external || []), path.join(resolvedSharedDist, '**')];
-	const projects = (cfg.projects || []) as Array<{
-		dependencies?: readonly string[];
-		name?: string;
-		testMatch?: unknown;
-		use?: Record<string, unknown>;
-	}>;
+	const projects = (cfg.projects || []) as Array<{ dependencies?: readonly string[]; name?: string; testMatch?: unknown; use?: Record<string, unknown> }>;
 	const dependencyProjects = new Set(projects.flatMap((p) => p.dependencies || []));
 	const singleRun = new Set(opts.singleRunProjects || []);
 	const isSetup = (project: (typeof projects)[number], idx: number): boolean => {

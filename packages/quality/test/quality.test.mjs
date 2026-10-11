@@ -544,7 +544,6 @@ test('maintenance preserves existing TSDoc prose and tag descriptions while addi
 test('maintenance preserves managed-looking sections in files without imports', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-sections-'));
 	const file = join(root, 'main.ts');
-
 	writeFileSync(
 		file,
 		`/** main.ts */

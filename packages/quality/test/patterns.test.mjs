@@ -10,12 +10,12 @@ IMPORTS
 
 // API
 import assert from 'node:assert/strict';
-import { resolve } from 'node:path';
 import test from 'node:test';
-import { pathToFileURL } from 'node:url';
 import ts from 'typescript';
 import { createQualityCfg, fixRegexDedup, fixRepeatedClasses, regexFindings, repeatedClassFindings, runTailwindCanonical, uiPatternFindings } from '../dist/index.js';
 import { fixtureFile, fixtureRoot, fixtureText } from './support.mjs';
+import { pathToFileURL } from 'node:url';
+import { resolve } from 'node:path';
 
 /*//////////////////////////////////////////////////
 TESTS
@@ -117,7 +117,6 @@ test('shared regex registry rewrites TypeScript and MJS literals and constructor
 	assert.equal(regexFindings(cfg).length, 2);
 	assert.deepEqual(fixRegexDedup(cfg), { fixed: 4, skipped: 0 });
 	assert.deepEqual(regexFindings(cfg), []);
-
 	const tsSrc = fixtureText(root, 'src/nested/use.ts');
 	const mjsSrc = fixtureText(root, 'scripts/use.mjs');
 	assert.match(tsSrc, /import \* as TerraQualityRegex2 from '\.\.\/\.\.\/shared\/regex\.mjs';/);
@@ -127,7 +126,6 @@ test('shared regex registry rewrites TypeScript and MJS literals and constructor
 	assert.match(tsSrc, /TerraQualityRegex2\.REGEX_ALPHA_G_REGEX\(\)/);
 	assert.match(mjsSrc, /TerraQualityRegex\.REGEX_ALPHA_G_REGEX\(\)/);
 	assert.match(mjsSrc, /TerraQualityRegex\.REGEX_CONSTRUCTOR_GY_REGEX\(\)/);
-
 	const registrySrc = fixtureText(root, 'shared/regex.mjs');
 	const registryTypes = fixtureText(root, 'shared/regex.d.mts');
 	assert.match(registrySrc, /export const REGEX_ALPHA_G_REGEX = \(\) => \(/);
@@ -142,7 +140,6 @@ test('shared regex registry rewrites TypeScript and MJS literals and constructor
 		target: ts.ScriptTarget.ESNext,
 	});
 	assert.deepEqual(ts.getPreEmitDiagnostics(program), []);
-
 	const registry = await import(`${pathToFileURL(resolve(root, 'shared/regex.mjs')).href}?fresh=1`);
 	const alphaFactoryName = registrySrc.match(/\/\/ @terra-quality-regex-key "alpha\/g"\nexport const (\w+)/)?.[1];
 	assert.ok(alphaFactoryName);

@@ -15,9 +15,9 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 // prettier-ignore
 import { createQualityAnalysis, createQualityCfg, loadQualityCfg, qualityAutofixEnabled, qualityCheckEnabled, qualityCmdEnabled, qualityRecommendationEnabled, runFormatter, runQuality, runQualityCli, runQualityFromCfg, runTypecheck } from '../dist/index.js';
-import { existsSync, lstatSync, readFileSync, readlinkSync, readdirSync, symlinkSync } from 'node:fs';
-import { fixtureFile, fixtureRoot, fixtureText, resetExitCode } from './support.mjs';
+import { existsSync, lstatSync, readFileSync, readdirSync, readlinkSync, symlinkSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { fixtureFile, fixtureRoot, fixtureText, resetExitCode } from './support.mjs';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 
@@ -115,7 +115,6 @@ test('CLI help exits before default quality dispatch or any configured autofix c
 	const src = 'const value = true;\nvoid value;\n';
 	fixtureFile(root, 'src/main.ts', src);
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
-
 	resetExitCode();
 	runQualityCli(cfg, ['--help']);
 	assert.equal(fixtureText(root, 'src/main.ts'), src);
@@ -211,7 +210,6 @@ test('the executable handles help without a config and rejects unknown commands 
 	assert.match(unknown.stderr, /Unknown quality CLI arguments: unknown-command/);
 	assert.doesNotMatch(unknown.stderr, /invalid config|Unexpected token/);
 });
-
 test('the executable rejects linting without an ESLint flat config before running quality', () => {
 	const root = fixtureRoot('terra-quality-eslint-config-required-');
 	fixtureFile(root, 'quality.json', JSON.stringify({ sourceRoots: ['src'], extensions: ['.ts'] }));
@@ -493,7 +491,6 @@ export type Result = RecordData;
 	assert.equal(process.exitCode, 0);
 	resetExitCode();
 });
-
 test('full quality routes unused-variable findings through dead-code once and keeps manual-only lint cases non-blocking', () => {
 	const root = fixtureRoot('terra-quality-full-dead-code-coordination-');
 	const src = fixtureFile(root, 'src/main.ts', 'const value = create();\n');

@@ -17,7 +17,6 @@ import test from 'node:test';
 import ts from 'typescript';
 import { createQualityCfg, fixSingleUseDeclarations, fixSingleUseTypes, singleUseFindings } from '../dist/index.js';
 import { fixtureFile, fixtureRoot, fixtureText } from './support.mjs';
-
 test('single-use functions with attached prose require review and remain unchanged', () => {
 	const root = fixtureRoot('terra-quality-single-use-comments-');
 	fixtureFile(
@@ -47,7 +46,6 @@ describe('fixture', () => {
 	assert.equal((result.match(/Walks configured source roots/g) ?? []).length, 1);
 	assert.equal(ts.createSourceFile('main.ts', result, ts.ScriptTarget.Latest, true).parseDiagnostics.length, 0);
 });
-
 test('inlining keeps attached comments for constants and types', () => {
 	const root = fixtureRoot('terra-quality-single-use-comment-kinds-');
 	fixtureFile(
@@ -68,7 +66,6 @@ void result;
 	assert.doesNotMatch(result, /Defines the wire payload/);
 	assert.equal(ts.createSourceFile('main.ts', result, ts.ScriptTarget.Latest, true).parseDiagnostics.length, 0);
 });
-
 test('single-use analysis blocks function inlining and preserves attached TSDoc', () => {
 	const root = fixtureRoot('terra-quality-single-use-callable-tsdoc-');
 	fixtureFile(
@@ -102,7 +99,6 @@ void transformed;
 	assert.match(result, /const transformValue/);
 	assert.equal(ts.createSourceFile('main.ts', result, ts.ScriptTarget.Latest, true).parseDiagnostics.length, 0);
 });
-
 test('single-use analysis blocks hook calls and other effectful initializers', () => {
 	const root = fixtureRoot('terra-quality-single-use-effects-');
 	fixtureFile(
@@ -123,7 +119,6 @@ export function View({ enabled }: { enabled: boolean }) {
 	assert.equal(fixSingleUseDeclarations(cfg), 0);
 	assert.match(fixtureText(root, 'src/view.tsx'), /const memo = useMemo/);
 });
-
 test('single-use agent actions name the actual unsafe boundary without irrelevant React guidance', () => {
 	const root = fixtureRoot('terra-quality-single-use-agent-actions-');
 	fixtureFile(root, 'src/script.mjs', `const setting = process.env.SETTING;\nconsole.log(setting);\n`);
@@ -233,7 +228,6 @@ void [payload, result];
 	assert.equal(ts.createSourceFile('consumer.ts', consumer, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS).parseDiagnostics.length, 0);
 	assert.equal(fixSingleUseTypes(cfg), 0);
 });
-
 test('single-use type fixing preserves grouped imports when several bindings are inlined', () => {
 	const root = fixtureRoot('terra-quality-single-use-grouped-types-');
 	fixtureFile(root, 'src/types.ts', `export type First = { first: string };\nexport type Second = { second: number };\nexport interface Third { third: boolean; }\nexport type Retained = string;\n`);
@@ -256,7 +250,6 @@ test('single-use type fixing preserves grouped imports when several bindings are
 		[],
 	);
 });
-
 test('single-use type analysis distinguishes same-named declarations by resolved symbol', () => {
 	const root = fixtureRoot('terra-quality-single-use-same-name-');
 	fixtureFile(root, 'src/first.ts', `export type Payload = { first: string };\n`);

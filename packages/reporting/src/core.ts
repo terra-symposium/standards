@@ -35,12 +35,7 @@ export type LoadMeasurementInput = { name: string; kind: LoadMeasurementKind; du
 export type LoadMeasurement = LoadMeasurementInput & { budget: LoadBudget; grade: LoadGrade };
 
 /** Optional repo-level load testing settings read from quality.json. */
-export type LoadTestingConfig = {
-	enabled?: boolean;
-	defaultBudget?: LoadBudgetOverride;
-	testBudgets?: Record<string, LoadBudgetOverride>;
-	operationBudgets?: Record<string, LoadBudgetOverride>;
-};
+export type LoadTestingConfig = { enabled?: boolean; defaultBudget?: LoadBudgetOverride; testBudgets?: Record<string, LoadBudgetOverride>; operationBudgets?: Record<string, LoadBudgetOverride> };
 
 /*//////////////////////////////////////////////////
 TYPES
