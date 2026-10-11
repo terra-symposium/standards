@@ -765,7 +765,6 @@ function jsxInlineEdit(ref: Reference, replacement: string, reactName: string, c
  * Expands a property or namespace access when the declaration is its right-hand identifier.
  *
  * @param node Identifier reference whose surrounding access expression is expanded.
- * @param n Identifier reference to expand.
  *
  * @return Largest qualified/property access expression containing the identifier.
  */
