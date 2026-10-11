@@ -132,7 +132,7 @@ const slideCopy = (r: VisualResult, review: ImgReview): string => {
  * Adds a single-result slide with its screenshot and review prompts.
  *
  * @param presentation Presentation receiving the slide.
- * @param grouproup Screenshot-backed result to render.
+ * @param r Screenshot-backed result to render.
  * @param slideNumber One-based slide number shown in the title.
  * @returns A promise that resolves after the slide and notes are added.
  */
@@ -201,9 +201,7 @@ const addResponsiveSlide = async (presentation: Presentation, group: readonly Vi
 };
 /** Optional visible and metadata overrides for a slideshow artifact. */
 export type SlideshowOptions = { title?: string; author?: string; company?: string; subject?: string; loadTestingEnabled?: boolean };
-/**
- * Describes the load row data used by the quality tooling.
- */
+/** One test result paired with a graded timing measurement for the report. */
 type LoadRow = { result: VisualResult; measurement: NonNullable<VisualResult['loadMeasurements']>[number] };
 /** Adds a run-level load summary slide and names the slowest measurements. */
 const addLoadSummarySlide = (presentation: Presentation, results: readonly VisualResult[]): void => {
