@@ -7,15 +7,9 @@
 CONFIG
 //////////////////////////////////////////////////*/
 
-/**
- * Handles error status for the quality tooling.
- * Describes the error status data used by the quality tooling.
- */
+/** Supported HTTP statuses with shared user-facing error-page copy. */
 export type ErrorStatus = 400 | 401 | 403 | 404 | 500 | 502 | 503;
-/**
- * Handles error status copy for the quality tooling.
- * Describes the error status copy data used by the quality tooling.
- */
+/** Heading and description shown for one supported error status. */
 export type ErrorStatusCopy = { title: string; description: string };
 export const ERROR_STATUS_COPY: Readonly<Record<ErrorStatus, ErrorStatusCopy>> = Object.freeze({
 	400: { title: 'Bad Request', description: 'The server could not understand the request due to invalid syntax.' },
@@ -34,9 +28,9 @@ FUNCTIONS
 /**
  * Resolves unknown status values to the safe internal-server-error response.
  *
- * @param status HTTP status code used to select the response copy.
+ * @param status HTTP status code to resolve.
  *
- * @return The errorstatuscopy result used by the caller.
+ * @return Shared copy for a supported status, or generic copy for an unknown value.
  */
 export function errorStatusCopy(status: number): ErrorStatusCopy {
 	return ERROR_STATUS_COPY[status as ErrorStatus] ?? { title: 'Unknown Error', description: 'Something went wrong.' };

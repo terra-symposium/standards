@@ -7,15 +7,9 @@
 CONFIG
 //////////////////////////////////////////////////*/
 
-/**
- * Handles next route error for the quality tooling.
- * Describes the next route error data used by the quality tooling.
- */
+/** Next.js route error with the optional framework-provided diagnostic digest. */
 export type NextRouteError = Error & { digest?: string };
-/**
- * Handles next route error props for the quality tooling.
- * Describes the next route error props data used by the quality tooling.
- */
+/** Props used by a Next.js route error component that can retry rendering. */
 export type NextRouteErrorProps = { error: NextRouteError; reset: () => void };
 
 /*//////////////////////////////////////////////////
@@ -25,9 +19,9 @@ FUNCTIONS
 /**
  * Returns the framework-provided digest without exposing an error message as a public identifier.
  *
- * @param err Error value caught by the boundary handler.
+ * @param err Route error whose framework digest should be read.
  *
- * @return The errordigest result used by the caller.
+ * @return The framework digest, when present, without exposing the error message.
  */
 export function errorDigest(err: NextRouteError): string | undefined {
 	return err.digest;
