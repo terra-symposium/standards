@@ -1,5 +1,11 @@
 # @terra-symposium/quality
 
+## 0.4.53
+
+### Patch Changes
+
+- 5b9bdd8: Run read-only dead-code analysis once instead of repeating the full scan in a temporary autofix preview.
+
 ## 0.4.52
 
 ### Patch Changes
