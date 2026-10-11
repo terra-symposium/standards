@@ -21,10 +21,7 @@ REGEX
 //////////////////////////////////////////////////*/
 
 const ENV_REGEX = /(^|\/)\.env(?:\.|$)/;
-/**
- * Handles security finding for the quality tooling.
- * Describes the security finding data used by the quality tooling.
- */
+/** A source or repository-boundary issue found by a configured security policy. */
 export type SecurityFinding = { file?: string; message: string };
 
 /*//////////////////////////////////////////////////
