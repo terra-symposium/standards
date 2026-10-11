@@ -1,5 +1,11 @@
 # @terra-symposium/reporting
 
+## 0.3.0
+
+### Minor Changes
+
+- Add reusable Playwright evidence fixtures and neutral spreadsheet and slideshow reporters for Terra repositories.
+
 ## 0.2.2
 
 ### Patch Changes
