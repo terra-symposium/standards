@@ -21,7 +21,8 @@ TYPES
 //////////////////////////////////////////////////*/
 
 /**
- *
+ * Handles object forwarding finding for the quality tooling.
+ * Describes the object forwarding finding data used by the quality tooling.
  */
 export type ObjectForwardingFinding = { file: string; line: number; column: number; callee: string; source: string; properties: string[]; recommendation: string };
 

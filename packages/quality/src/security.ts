@@ -22,7 +22,8 @@ REGEX
 
 const ENV_REGEX = /(^|\/)\.env(?:\.|$)/;
 /**
- *
+ * Handles security finding for the quality tooling.
+ * Describes the security finding data used by the quality tooling.
  */
 export type SecurityFinding = { file?: string; message: string };
 

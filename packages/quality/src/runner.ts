@@ -83,7 +83,8 @@ REGEX
 const C_M_JS_TS_X_REGEX = /\.(?:c|m)?(?:js|ts)x?$/;
 const C_M_JS_TS_X_CLASS_2 = /\.(?:(?:c|m)?(?:js|ts)x?)$/;
 /**
- *
+ * Handles quality check name for the quality tooling.
+ * Describes the quality check name data used by the quality tooling.
  */
 export type QualityCheckName =
 	| 'document'
@@ -104,11 +105,13 @@ export type QualityCheckName =
 	| 'regex-dedup'
 	| 'ui-patterns';
 /**
- *
+ * Handles quality autofix name for the quality tooling.
+ * Describes the quality autofix name data used by the quality tooling.
  */
 export type QualityAutofixName = 'document' | 'format' | 'name' | 'lint' | 'knip' | 'dead-code' | 'alias' | 'forward' | 'repeatedClasses' | 'regexDedup';
 /**
- *
+ * Handles quality cfg for the quality tooling.
+ * Describes the quality cfg data used by the quality tooling.
  */
 export type QualityCfg = {
 	root: string;
@@ -151,15 +154,17 @@ export type QualityCfg = {
 	};
 };
 /**
- *
+ * Handles quality analysis for the quality tooling.
+ * Describes the quality analysis data used by the quality tooling.
  */
 export type QualityAnalysis = { files: string[]; texts: Map<string, string>; sources: Map<string, ts.SourceFile>; program: ts.Program; checker: ts.TypeChecker };
 /**
- *
+ * Handles quality options for the quality tooling.
+ * Describes the quality options data used by the quality tooling.
  */
 export type QualityOptions = { fix: boolean; all: boolean; strict: boolean; skipCommands?: boolean; skipRecommendations?: boolean };
 /**
- *
+ * Describes the generic finding data used by the quality tooling.
  */
 type GenericFinding =
 	{ file?: string; message: string } | { value: string; count: number; locations: string[] } | { source: string; count: number; locations: string[] } | { file: string; pattern: string };
@@ -361,7 +366,7 @@ function printChildOutput(val: string | Buffer | null | undefined): void {
  * @param cfg Quality configuration defining the subprocess working directory.
  * @param cmd Executable path or command name.
  * @param args Arguments passed to the executable.
- * @param opts
+ * @param opts Parsed command-line options controlling scope and writes.
  *
  * @return Child-process exit status, or `1` when spawning fails without a status.
  */
@@ -379,7 +384,7 @@ function run(cfg: QualityCfg, cmd: string, args: string[], opts: { quietSuccess?
  * Captures source text so automatic tools can report changed-file counts without
  * replaying their successful per-file output.
  *
- * @param cfg
+ * @param cfg Normalized quality configuration that defines the repository scope and enabled checks.
  * @param files Files modified by the automatic tool.
  *
  * @return Text snapshots keyed by absolute filename.
@@ -391,7 +396,7 @@ function snapshotFiles(cfg: QualityCfg, files: string[]): Map<string, string> {
 /**
  * Counts files whose contents differ from a prior snapshot.
  *
- * @param cfg
+ * @param cfg Normalized quality configuration that defines the repository scope and enabled checks.
  * @param files Files to compare.
  * @param before Initial file contents.
  *
@@ -443,7 +448,7 @@ function scopedCfg(cfg: QualityCfg, all: boolean): QualityCfg {
  * @param cfg Quality configuration defining the repository and ESLint executable.
  * @param opts CLI options controlling scope and autofix.
  * @param exhaustive Whether warnings should fail the run.
- * @param deadCodeCoordinated
+ * @param deadCodeCoordinated Whether the dead-code pass already ran as part of this quality operation.
  *
  * @return Nothing; failures are reflected in the process exit code.
  */
@@ -487,9 +492,8 @@ function runLint(cfg: QualityCfg, opts: QualityOptions, exhaustive = false, dead
  * variables whose initializers may have side effects.
  *
  * @param cfg Quality configuration defining the repository and ESLint executable.
- * @param reports
- * @param changedFiles
- * @param all Whether every configured source file should be inspected.
+ * @param reports ESLint reports collected for the selected source files.
+ * @param changedFiles Source files changed during the current quality pass.
  *
  * @return Number of unused function declarations removed.
  */
@@ -568,9 +572,9 @@ function fixUnusedDeclarations(cfg: QualityCfg, reports: EslintReport[], changed
 /**
  * Accepts only initializers whose evaluation has no observable effects.
  *
- * @param node
+ * @param node TypeScript syntax node being inspected or updated.
  *
- * @return
+ * @return Whether the requested condition holds.
  */
 function isPureUnusedInit(node: ts.Expression): boolean {
 	if (
@@ -593,29 +597,29 @@ function isPureUnusedInit(node: ts.Expression): boolean {
 	return false;
 }
 /**
- *
+ * Represents one ESLint result and its reported messages.
  */
 type EslintReport = { filePath: string; messages: Array<{ ruleId?: string; line: number; column: number; message?: string }> };
 /**
- *
+ * Describes an unused-code finding and the action available for it.
  */
 type DeadCodeFinding = { rule: string; file: string; line: number; name: string; severity: 'error' | 'warning'; autofixable: boolean; reason: string; agentAction: string };
 /**
- *
+ * Represents one item reported by Knip.
  */
 type KnipItem = { name: string; line?: number };
 /**
- *
+ * Represents a Knip issue grouped by source file and issue kind.
  */
 type KnipIssue = { file: string; [kind: string]: string | KnipItem[] };
 
 /**
  * Runs ESLint's machine-readable pass once for the selected source files.
  *
- * @param cfg
- * @param all
+ * @param cfg Normalized quality configuration defining the repository scope and enabled checks.
+ * @param all Whether the full configured repository scope should be checked.
  *
- * @return
+ * @return Structured findings collected from the selected source files.
  */
 function collectEslintReports(cfg: QualityCfg, all: boolean): EslintReport[] {
 	const files = filesFor(cfg, all).filter((f) => CJS_JS_JSX_MJS_TS_TSX_REGEX.test(f));
@@ -642,10 +646,10 @@ function collectEslintReports(cfg: QualityCfg, all: boolean): EslintReport[] {
 /**
  * Parses ESLint JSON and fails closed when the detector cannot provide a trustworthy result.
  *
- * @param result
- * @param files
+ * @param result Result from the preceding analysis or check.
+ * @param files Source files selected for the current quality operation.
  *
- * @return
+ * @return Structured findings collected from the selected source files.
  */
 function parseEslintReports(result: ReturnType<typeof spawnSync>, files: string[]): EslintReport[] {
 	if (result.error) throw new Error(`ESLint dead-code detector failed: ${result.error.message}`);
@@ -684,10 +688,10 @@ function parseEslintReports(result: ReturnType<typeof spawnSync>, files: string[
 /**
  * Reports unused private declarations, classifying only proven-safe removals as autofixable.
  *
- * @param cfg
- * @param reports
+ * @param cfg Normalized quality configuration defining the repository scope and enabled checks.
+ * @param reports ESLint reports collected for the selected source files.
  *
- * @return
+ * @return The matching value or findings for the requested input.
  */
 function unusedDeclarationFindings(cfg: QualityCfg, reports: EslintReport[]): DeadCodeFinding[] {
 	const findings: DeadCodeFinding[] = [];
@@ -930,9 +934,9 @@ function repairMissingImports(cfg: QualityCfg, program: ts.Program, checker: ts.
 /**
  * Runs Knip once and validates its complete machine-readable issue inventory.
  *
- * @param cfg
+ * @param cfg Normalized quality configuration defining the repository scope and enabled checks.
  *
- * @return
+ * @return The parsed data needed by the caller.
  */
 function readKnipIssues(cfg: QualityCfg): KnipIssue[] {
 	const knip = toolPath(cfg, cfg.tools?.knip, 'knip');
@@ -966,11 +970,11 @@ function readKnipIssues(cfg: QualityCfg): KnipIssue[] {
 /**
  * Rejects malformed, missing, or out-of-repository paths in Knip's inventory.
  *
- * @param cfg
- * @param path
- * @param label
+ * @param cfg Normalized quality configuration defining the repository scope and enabled checks.
+ * @param path Path being tested against the configured source scope.
+ * @param label Human-readable label used in a validation message.
  *
- * @return
+ * @return The assertknippath result used by the caller.
  */
 function assertKnipPath(cfg: QualityCfg, path: string, label: string): string {
 	const absolute = resolve(cfg.root, path);
@@ -984,9 +988,11 @@ function assertKnipPath(cfg: QualityCfg, path: string, label: string): string {
 	return absolute;
 }
 /**
+ * Collects knip findings for the configured repository.
  *
- * @param cfg
- * @returns
+ * @param cfg Normalized quality configuration defining the repository scope and enabled checks.
+ *
+ * @return The matching value or findings for the requested input.
  */
 function collectKnipFindings(cfg: QualityCfg): DeadCodeFinding[] {
 	const issues = readKnipIssues(cfg);
@@ -1021,11 +1027,13 @@ function collectKnipFindings(cfg: QualityCfg): DeadCodeFinding[] {
 	return findings;
 }
 /**
+ * Reports whether framework entry export.
  *
- * @param cfg
- * @param file
- * @param name
- * @returns
+ * @param cfg Normalized quality configuration defining the repository scope and enabled checks.
+ * @param file Source file path being examined.
+ * @param name Identifier or display name being analyzed.
+ *
+ * @return Whether the requested condition holds.
  */
 function isFrameworkEntryExport(cfg: QualityCfg, file: string, name: string): boolean {
 	const publicRoute = !basename(file).startsWith('_');
@@ -1038,9 +1046,11 @@ function isFrameworkEntryExport(cfg: QualityCfg, file: string, name: string): bo
 	});
 }
 /**
+ * Handles dead code script kind for the quality tooling.
  *
- * @param file
- * @returns
+ * @param file Source file path being examined.
+ *
+ * @return The deadcodescriptkind result used by the caller.
  */
 function deadCodeScriptKind(file: string): ts.ScriptKind {
 	if (/\.tsx$/i.test(file)) return ts.ScriptKind.TSX;
@@ -1049,10 +1059,12 @@ function deadCodeScriptKind(file: string): ts.ScriptKind {
 	return ts.ScriptKind.TS;
 }
 /**
+ * Handles knip export can be made private for the quality tooling.
  *
- * @param file
- * @param name
- * @returns
+ * @param file Source file path being examined.
+ * @param name Identifier or display name being analyzed.
+ *
+ * @return The knipexportcanbemadeprivate result used by the caller.
  */
 function knipExportCanBeMadePrivate(file: string, name: string): boolean {
 	if (!existsSync(file) || file.endsWith('.astro')) return false;
@@ -1076,8 +1088,8 @@ function knipExportCanBeMadePrivate(file: string, name: string): boolean {
 /**
  * Removes only an unused export modifier that Knip identifies precisely.
  *
- * @param cfg
- * @param changedFiles
+ * @param cfg Normalized quality configuration defining the repository scope and enabled checks.
+ * @param changedFiles Source files changed during the current quality pass.
  */
 function fixKnipExports(cfg: QualityCfg, changedFiles: Set<string>): void {
 	const issues = readKnipIssues(cfg);
@@ -1151,9 +1163,11 @@ function fixKnipExports(cfg: QualityCfg, changedFiles: Set<string>): void {
 /** Finds export names that configured source files import and actually reference. */
 const importedExportConsumerCache = new WeakMap<QualityCfg, { signature: string; consumers: Map<string, Set<string>> }>();
 /**
+ * Handles imported export consumers for the quality tooling.
  *
- * @param cfg
- * @returns
+ * @param cfg Normalized quality configuration defining the repository scope and enabled checks.
+ *
+ * @return The importedexportconsumers result used by the caller.
  */
 function importedExportConsumers(cfg: QualityCfg): Map<string, Set<string>> {
 	const srcFiles = filesFor(cfg, true).filter((path) => C_M_JS_TS_X_CLASS_2.test(path) || path.endsWith('.astro'));
@@ -1224,12 +1238,14 @@ function importedExportConsumers(cfg: QualityCfg): Map<string, Set<string>> {
 	return consumers;
 }
 /**
+ * Handles accept type safe edits for the quality tooling.
  *
- * @param onBatch
- * @param original
- * @param program
- * @param proposed
- * @returns
+ * @param program Callback that validates each proposed source-edit batch.
+ * @param proposed Original source text before the proposed edit.
+ * @param original TypeScript program supplying source files, symbols, and type-checker context.
+ * @param onBatch Proposed source text after the candidate edits.
+ *
+ * @return Whether the requested source update was applied successfully.
  */
 function acceptTypeSafeEdits(
 	program: ts.Program,
@@ -1263,8 +1279,9 @@ function acceptTypeSafeEdits(
 	};
 }
 /**
+ * Prints dead code findings for the configured repository.
  *
- * @param findings
+ * @param findings Quality findings to report or act on.
  */
 function printDeadCodeFindings(findings: DeadCodeFinding[]): void {
 	if (!findings.length) {
@@ -1286,13 +1303,13 @@ function printDeadCodeFindings(findings: DeadCodeFinding[]): void {
 /**
  * Runs every dead-code detector through one fix-and-verify boundary.
  *
- * @param cfg
- * @param fix
- * @param all
- * @param verify
- * @param emit
+ * @param cfg Normalized quality configuration defining the repository scope and enabled checks.
+ * @param fix Whether safe automatic fixes should be applied.
+ * @param all Whether the full configured repository scope should be checked.
+ * @param verify Whether proposed source changes should be checked before writing.
+ * @param emit Whether progress and findings should be printed.
  *
- * @return
+ * @return The rundeadcode result used by the caller.
  */
 function runDeadCode(cfg: QualityCfg, fix: boolean, all: boolean, verify = true, emit = true): DeadCodeFinding[] {
 	if (emit) qualityHeader('dead-code', `${fix ? 'Fixing safe cases and checking' : 'Read-only check of'} unused files, exports, declarations, and single-use code`);
@@ -1491,10 +1508,11 @@ function runDeadCodeReadOnly(cfg: QualityCfg, all: boolean): void {
 	}
 }
 /**
+ * Runs dead code cmd for the configured repository.
  *
- * @param all
- * @param cfg
- * @param fix
+ * @param cfg Whether the full configured repository scope should be checked.
+ * @param fix Normalized quality configuration defining the repository scope and enabled checks.
+ * @param all Whether safe automatic fixes should be applied.
  */
 function runDeadCodeCmd(cfg: QualityCfg, fix: boolean, all: boolean): void {
 	if (fix) runDeadCode(cfg, true, all);
@@ -2082,16 +2100,13 @@ export function runQualityFromCfg(file?: string, args = process.argv.slice(2)): 
 		return;
 	}
 	const cfg = loadQualityCfg(file);
-	const command = args.find((arg) => !arg.startsWith('-')) ?? 'quality';
-	const lintCommands = new Set(['quality', 'quality:all', 'quality:baseline', 'document', 'maintain', 'dead-code', 'knip', 'lint', 'naming', 'single-use']);
-	if (lintCommands.has(command) && qualityCheckEnabled(cfg, 'lint')) {
-		const flatConfig = ['eslint.config.js', 'eslint.config.mjs', 'eslint.config.cjs', 'eslint.config.ts', 'eslint.config.mts', 'eslint.config.cts']
+	const cmd = args.find((arg) => !arg.startsWith('-')) ?? 'quality';
+	const lintCmds = new Set(['quality', 'quality:all', 'quality:baseline', 'document', 'maintain', 'dead-code', 'knip', 'lint', 'naming', 'single-use']);
+	if (lintCmds.has(cmd) && qualityCheckEnabled(cfg, 'lint')) {
+		const flatCfg = ['eslint.config.js', 'eslint.config.mjs', 'eslint.config.cjs', 'eslint.config.ts', 'eslint.config.mts', 'eslint.config.cts']
 			.map((config) => resolve(cfg.root, config))
 			.find((config) => existsSync(config));
-		if (!flatConfig)
-			throw new Error(
-				`ESLint flat config is required for ${command}. Add eslint.config.js, eslint.config.mjs, or eslint.config.ts at ${cfg.root} before running Terra Quality.`,
-			);
+		if (!flatCfg) throw new Error(`ESLint flat config is required for ${cmd}. Add eslint.config.js, eslint.config.mjs, or eslint.config.ts at ${cfg.root} before running Terra Quality.`);
 	}
 	runQualityCli(cfg, args);
 }
@@ -2099,7 +2114,7 @@ export function runQualityFromCfg(file?: string, args = process.argv.slice(2)): 
 /**
  * Reject unknown commands and flags before loading configuration or invoking a fixer.
  *
- * @param args
+ * @param args Command-line arguments to dispatch.
  */
 function validCliArgs(args: string[]): void {
 	const cmd = args.find((arg) => !arg.startsWith('-')) ?? 'quality';

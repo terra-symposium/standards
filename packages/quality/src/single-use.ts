@@ -32,15 +32,16 @@ const reportProgress = (label: string, idx: number, total: number): void => {
 	if (idx === 0 || idx === total || idx % Math.max(1, Math.ceil(total / 20)) === 0) qualityProgress(label, idx, total);
 };
 /**
- *
+ * Handles single use finding for the quality tooling.
+ * Describes the single use finding data used by the quality tooling.
  */
 export type SingleUseFinding = { file: string; line: number; name: string; decision: 'INLINE' | 'REVIEW'; autofixable: boolean; reason: string; agentAction: string };
 /**
- *
+ * Describes the candidate data used by the quality tooling.
  */
 type Candidate = { file: string; source: ts.SourceFile; statement: ts.Statement; name: ts.Identifier; symbol: ts.Symbol; kind: 'type' | 'interface' | 'variable' | 'function' };
 /**
- *
+ * Describes the reference data used by the quality tooling.
  */
 type Reference = { file: string; source: ts.SourceFile; node: ts.Identifier };
 const rejectedInlineCandidates = new Map<string, string>();
@@ -90,9 +91,9 @@ function programFor(cfg: QualityCfg): ts.Program {
 /**
  * Creates the shared TypeScript program used to validate a complete dead-code edit batch.
  *
- * @param cfg
+ * @param cfg Normalized quality configuration defining the repository scope and enabled checks.
  *
- * @return
+ * @return TypeScript program used to validate proposed dead-code edits.
  */
 export function deadCodeTypeProgram(cfg: QualityCfg): ts.Program {
 	return programFor(cfg);
@@ -114,25 +115,13 @@ function inSingleUseScope(cfg: QualityCfg, file: string): boolean {
 /**
  * Excludes configured directories from single-use candidate analysis.
  *
- * @param cfg
- * @param file
+ * @param cfg Normalized quality configuration defining the repository scope and enabled checks.
+ * @param file Source file path being examined.
  *
- * @return
+ * @return `true` when the file is eligible for single-use analysis.
  */
 function isSingleUseCandidate(cfg: QualityCfg, file: string): boolean {
 	return inSingleUseScope(cfg, file) && !(cfg.singleUse?.skippedDirectories ?? []).some((directory) => file === directory || file.startsWith(`${directory}${sep}`));
-}
-
-/**
- * Checks whether a file can contribute references, including files skipped as declaration candidates.
- *
- * @param cfg Quality configuration defining the source roots.
- * @param file Absolute source path being considered.
- *
- * @return `true` when the file is in a configured source root.
- */
-function inSingleUseRoots(cfg: QualityCfg, file: string): boolean {
-	return [...cfg.sourceRoots, ...(cfg.includeRoots ?? [])].some((r) => file === r || file.startsWith(`${r}${sep}`));
 }
 
 /**
@@ -184,7 +173,7 @@ function collect(cfg: QualityCfg, program: ts.Program, checker: ts.TypeChecker):
 		visitCandidates(source);
 	}
 	const candidateSymbols = new Set(candidates.map((c) => c.symbol));
-	const referenceSrcs = program.getSourceFiles().filter((source) => !source.isDeclarationFile && inSingleUseRoots(cfg, source.fileName) && C_M_JS_JSX_TS_TSX_REGEX.test(source.fileName));
+	const referenceSrcs = program.getSourceFiles().filter((source) => !source.isDeclarationFile && inSingleUseScope(cfg, source.fileName) && C_M_JS_JSX_TS_TSX_REGEX.test(source.fileName));
 	const requiredExports = new Map<ts.Symbol, ts.Symbol>();
 	for (const src of referenceSrcs) {
 		const visitRequires = (node: ts.Node): void => {
@@ -268,12 +257,14 @@ function classify(candidate: Candidate): [SingleUseFinding['decision'], string] 
 	return ['INLINE', `${candidate.kind} declaration has one in-scope consumer`];
 }
 /**
+ * Builds a concrete remediation instruction for a single-use finding.
  *
- * @param canInline
- * @param candidate
- * @param reason
- * @param use
- * @returns
+ * @param candidate Declaration being evaluated for single-use inlining.
+ * @param use Reference that consumes the candidate declaration.
+ * @param canInline Whether the candidate can be safely inlined automatically.
+ * @param reason Reason the candidate is considered safe or requires review.
+ *
+ * @return An instruction describing how to resolve or retain the declaration.
  */
 function singleUseAgentAction(candidate: Candidate, use: Reference, canInline: boolean, reason: string): string {
 	if (canInline) return 'Run the canonical dead-code autofix, then verify the inlined type/value remains equivalent and rerun the affected test or typecheck.';
@@ -306,11 +297,8 @@ function singleUseAgentAction(candidate: Candidate, use: Reference, canInline: b
 /**
  * Finds type-position references to a candidate declaration across the configured source scope.
  *
- * @param candidate
- * @param references
- * @param cfg Quality configuration defining the source roots to scan.
- * @param c Type alias or interface whose consumers should be located.
- * @param program TypeScript program containing the source files to inspect.
+ * @param candidate Declaration whose symbol references should be filtered.
+ * @param references References grouped by their canonical TypeScript symbol.
  *
  * @return Type references excluding the declaration and import syntax itself.
  */
@@ -332,10 +320,10 @@ function typeReferences(candidate: Candidate, references: Map<ts.Symbol, Referen
 /**
  * Collects Astro frontmatter and markup consumers once for an analysis run.
  *
- * @param cfg
- * @param program
+ * @param cfg Normalized quality configuration defining the repository scope and enabled checks.
+ * @param program TypeScript program supplying source files, symbols, and type-checker context.
  *
- * @return
+ * @return Source positions for matching Astro frontmatter and markup consumers.
  */
 function astroConsumersFor(cfg: QualityCfg, program: ts.Program): Set<string> {
 	const astroFiles = srcFiles(cfg).filter((path) => path.endsWith('.astro'));
@@ -384,10 +372,10 @@ function astroConsumersFor(cfg: QualityCfg, program: ts.Program): Set<string> {
 /**
  * Keeps exported bindings that are imported from Astro frontmatter outside the TypeScript program.
  *
- * @param candidate
- * @param consumers
+ * @param candidate Declaration being evaluated for single-use inlining.
+ * @param consumers Source references that consume the candidate declaration.
  *
- * @return
+ * @return `true` when an Astro file consumes the declaration.
  */
 function hasAstroConsumer(candidate: Candidate, consumers: Set<string>): boolean {
 	return consumers.has(`${candidate.file}\u0000${candidate.name.text}`);
@@ -396,11 +384,11 @@ function hasAstroConsumer(candidate: Candidate, consumers: Set<string>): boolean
 /**
  * Keeps explicitly configured module contracts out of single-consumer cleanup.
  *
- * @param cfg
- * @param candidate
- * @param checker
+ * @param cfg Normalized quality configuration defining the repository scope and enabled checks.
+ * @param candidate Declaration being evaluated for single-use inlining.
+ * @param checker TypeScript type checker used to resolve declaration symbols.
  *
- * @return
+ * @return `true` when configuration marks the declaration's module as a public contract.
  */
 function isCfgdPublicContract(cfg: QualityCfg, candidate: Candidate, checker: ts.TypeChecker): boolean {
 	const file = relative(cfg.root, candidate.file).split(sep).join('/');
@@ -413,11 +401,11 @@ function isCfgdPublicContract(cfg: QualityCfg, candidate: Candidate, checker: ts
 /**
  * Keeps declarations exported by a package entrypoint out of local single-use advice.
  *
- * @param cfg
- * @param candidate
- * @param checker
+ * @param cfg Normalized quality configuration defining the repository scope and enabled checks.
+ * @param candidate Declaration being evaluated for single-use inlining.
+ * @param checker TypeScript type checker used to resolve declaration symbols.
  *
- * @return
+ * @return `true` when the declaration is re-exported by a package entrypoint.
  */
 function isPackageEntryExport(cfg: QualityCfg, candidate: Candidate, checker: ts.TypeChecker): boolean {
 	const moduleSymbol = checker.getSymbolAtLocation(candidate.source);
@@ -462,10 +450,10 @@ function isPackageEntryExport(cfg: QualityCfg, candidate: Candidate, checker: ts
 /**
  * Preserves a React identity hook or interval handle whose one use is required by lifecycle semantics.
  *
- * @param candidate
- * @param use
+ * @param candidate Declaration being evaluated for single-use inlining.
+ * @param use Reference that consumes the candidate declaration.
  *
- * @return
+ * @return `true` when the candidate preserves a required lifecycle value.
  */
 function isRequiredLifecycleVal(candidate: Candidate, use: Reference): boolean {
 	if (candidate.kind !== 'variable' || !ts.isVariableStatement(candidate.statement)) return false;
@@ -487,10 +475,10 @@ function isRequiredLifecycleVal(candidate: Candidate, use: Reference): boolean {
 /**
  * Keeps imported type names in scope when an inline would discard their annotation.
  *
- * @param candidate
- * @param checker
+ * @param candidate Declaration being evaluated for single-use inlining.
+ * @param checker TypeScript type checker used to resolve declaration symbols.
  *
- * @return
+ * @return `true` when the candidate's annotation uses an imported type name.
  */
 function hasImportedTypeAnnotation(candidate: Candidate, checker: ts.TypeChecker): boolean {
 	if (candidate.kind !== 'variable' || !ts.isVariableStatement(candidate.statement)) return false;
@@ -556,9 +544,9 @@ function containsExplicitAny(candidate: Candidate): boolean {
 /**
  * Rejects initializers whose await would be moved into an unrelated callback.
  *
- * @param candidate
+ * @param candidate Declaration being evaluated for single-use inlining.
  *
- * @return
+ * @return `true` when the initializer contains an `await` expression.
  */
 function containsAwait(candidate: Candidate): boolean {
 	if (!ts.isVariableStatement(candidate.statement)) return false;
@@ -575,9 +563,9 @@ function containsAwait(candidate: Candidate): boolean {
 /**
  * Rejects expressions whose timing, hook order, or observable identity can change when moved.
  *
- * @param candidate
+ * @param candidate Declaration being evaluated for single-use inlining.
  *
- * @return
+ * @return `true` when the initializer can be moved without changing semantics.
  */
 function initSafeToInline(candidate: Candidate): boolean {
 	if (candidate.kind !== 'variable' || !ts.isVariableStatement(candidate.statement)) return true;
@@ -634,9 +622,9 @@ function isWriteReference(reference: Reference): boolean {
 /**
  * Preserves saved values used to restore mutable object or property state.
  *
- * @param reference
+ * @param reference Reference whose syntax may restore previously saved state.
  *
- * @return
+ * @return `true` when the reference restores mutable object or property state.
  */
 function isStateRestorationReference(reference: Reference): boolean {
 	return (
@@ -757,7 +745,7 @@ function fnType(statement: ts.FunctionDeclaration): string {
  * @param ref Single JSX component reference.
  * @param replacement Inline function or component expression.
  * @param reactName Local import alias for React's createElement function.
- * @param componentType
+ * @param componentType Component declaration kind used to check render semantics.
  *
  * @return JSX replacement edit, or `null` when the reference is not a JSX tag.
  */
@@ -782,8 +770,7 @@ function jsxInlineEdit(ref: Reference, replacement: string, reactName: string, c
 /**
  * Expands a property or namespace access when the declaration is its right-hand identifier.
  *
- * @param node
- * @param n Identifier reference to expand.
+ * @param node Identifier whose qualified or property access should be expanded.
  *
  * @return Largest qualified/property access expression containing the identifier.
  */
@@ -844,7 +831,7 @@ function fnExpr(statement: ts.FunctionDeclaration): string | null {
  *
  * @param c Candidate selected for inlining.
  * @param ref Single consumer location.
- * @param checker
+ * @param checker TypeScript type checker used to resolve declaration symbols.
  *
  * @return Inline source text, or `null` when the declaration has no replacement.
  */
@@ -901,9 +888,11 @@ function reactImportPos(src: ts.SourceFile): number {
 	return src.statements[0]?.getStart(src) ?? 0;
 }
 /**
+ * Handles attached comments for the quality tooling.
  *
- * @param c
- * @returns
+ * @param c Value of c used by the documented operation.
+ *
+ * @return The attachedcomments result used by the caller.
  */
 function attachedComments(c: Candidate): { start: number; end: number; text: string }[] {
 	const start = c.statement.getFullStart();
@@ -918,9 +907,11 @@ function attachedComments(c: Candidate): { start: number; end: number; text: str
 		.map((r) => ({ start: r.pos, end: r.end, text: c.source.text.slice(r.pos, r.end) }));
 }
 /**
+ * Handles discarded declaration comments for the quality tooling.
  *
- * @param c
- * @returns
+ * @param c Value of c used by the documented operation.
+ *
+ * @return The discardeddeclarationcomments result used by the caller.
  */
 function discardedDeclarationComments(c: Candidate): string[] {
 	if (!ts.isVariableStatement(c.statement)) return [];
@@ -939,10 +930,10 @@ function discardedDeclarationComments(c: Candidate): string[] {
 /**
  * Rejects a batch when its edited files gain TypeScript errors.
  *
- * @param program
- * @param updates
+ * @param program TypeScript program supplying source files, symbols, and type-checker context.
+ * @param updates Source-file updates proposed by the inlining pass.
  *
- * @return
+ * @return The parsed data needed by the caller.
  */
 function filesWithNewTypeErrs(program: ts.Program, updates: Map<string, string>): Set<string> {
 	const files = [...updates.keys()];
@@ -977,11 +968,10 @@ function filesWithNewTypeErrs(program: ts.Program, updates: Map<string, string>)
 	const prevCounts = new Map<string, Map<string, number>>();
 	for (const diagnostic of originalDiagnostics) {
 		if (diagnostic.category !== ts.DiagnosticCategory.Error || !diagnostic.file) continue;
-		const file = diagnostic.file.fileName;
-		const counts = prevCounts.get(file) ?? new Map<string, number>();
+		const counts = prevCounts.get(diagnostic.file.fileName) ?? new Map<string, number>();
 		const key = diagnosticKey(diagnostic);
 		counts.set(key, (counts.get(key) ?? 0) + 1);
-		prevCounts.set(file, counts);
+		prevCounts.set(diagnostic.file.fileName, counts);
 	}
 	const currCounts = new Map<string, Map<string, number>>();
 	for (const [fileIndex, file] of files.entries()) {
@@ -1007,10 +997,10 @@ function filesWithNewTypeErrs(program: ts.Program, updates: Map<string, string>)
 /**
  * Returns whether a proposed batch adds any TypeScript error in an edited file.
  *
- * @param program
- * @param updates
+ * @param program TypeScript program supplying source files, symbols, and type-checker context.
+ * @param updates Source-file updates proposed by the inlining pass.
  *
- * @return
+ * @return Whether the requested source update was applied successfully.
  */
 export function deadCodeEditsIntroduceTypeErrors(program: ts.Program, updates: Map<string, string>): boolean {
 	return filesWithNewTypeErrs(program, updates).size > 0;
@@ -1020,7 +1010,7 @@ export function deadCodeEditsIntroduceTypeErrors(program: ts.Program, updates: M
  * Inlines every single-use declaration and validates each rewritten source file.
  *
  * @param cfg Quality configuration defining the source scope and files to rewrite.
- * @param changedFiles
+ * @param changedFiles Source files changed during the current quality pass.
  *
  * @return Number of files containing edits, including declaration and consumer files.
  */
@@ -1159,8 +1149,8 @@ function fixSingleUsePass(cfg: QualityCfg, changedFiles: Set<string>): number {
  * Repeats single-use inlining until nested edits have been applied in separate valid passes.
  *
  * @param cfg Quality configuration defining the source scope and files to rewrite.
- * @param changedFileNames
- * @param onPass
+ * @param changedFileNames Source file names modified by the current pass.
+ * @param onPass Callback invoked after a validated rewrite pass.
  *
  * @return Number of files changed across all passes.
  */

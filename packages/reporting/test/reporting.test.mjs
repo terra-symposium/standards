@@ -1,27 +1,38 @@
+/**
+ * packages/reporting/test/reporting.test.mjs
+ */
+
 // packages/reporting/test/reporting.test.mjs
 
 /*//////////////////////////////////////////////////
 IMPORTS
 //////////////////////////////////////////////////*/
 
+// API
 import assert from 'node:assert/strict';
-import { execFile } from 'node:child_process';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { promisify } from 'node:util';
 import test from 'node:test';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 
 /*//////////////////////////////////////////////////
 CONFIG
 //////////////////////////////////////////////////*/
 
 const execFileAsync = promisify(execFile);
-
 const { diagnosticCount, normalizeVisualStatus: normVisualStatus, orderedFiles, statusCounts } = await import('@terra-symposium/reporting/core');
 const { parseDiagnostics, stripAnsi, default: ProgressReporter } = await import('@terra-symposium/reporting/playwright');
 const { baseVisualProjectName, projectViewportName, resolveVisualViewports, visualProjectName, withResponsivePlaywright } = await import('@terra-symposium/reporting/viewports');
-const { DEFAULT_LOAD_BUDGET, gradeLoad, gradeLoadMeasurement, normalizeLoadTestingConfig, readLoadTestingConfig, timeLoadOperation } = await import('@terra-symposium/reporting/load-testing');
+const {
+	DEFAULT_LOAD_BUDGET,
+	gradeLoad,
+	gradeLoadMeasurement,
+	normalizeLoadTestingConfig: normLoadTestingCfg,
+	readLoadTestingConfig: readLoadTestingCfg,
+	timeLoadOperation: timeLoadOp,
+} = await import('@terra-symposium/reporting/load-testing');
 const { writeSpreadsheet } = await import('@terra-symposium/reporting/spreadsheet');
 const { writeSlideshow } = await import('@terra-symposium/reporting/slideshow');
 
@@ -29,7 +40,7 @@ const { writeSlideshow } = await import('@terra-symposium/reporting/slideshow');
 HELPERS
 //////////////////////////////////////////////////*/
 
-/** Creates the smallest complete normalized result fixture for reporting tests. */
+/* Creates the smallest complete normalized result fixture for reporting tests. */
 const result = (overrides = {}) => ({
 	browserErrors: '',
 	duration: 10,
@@ -52,7 +63,7 @@ const result = (overrides = {}) => ({
 TESTS
 //////////////////////////////////////////////////*/
 
-/** Covers status normalization, diagnostics, file ordering, and viewport aliases. */
+/* Covers status normalization, diagnostics, file ordering, and viewport aliases. */
 test('normalizes result summaries and viewport project names', () => {
 	const vals = [result(), result({ status: 'failed' }), result({ status: 'interrupted', file: 'other.spec.ts' })];
 	assert.deepEqual(statusCounts(vals), { passed: 1, failed: 1, timedOut: 0, skipped: 0, interrupted: 1 });
@@ -85,25 +96,33 @@ test('normalizes result summaries and viewport project names', () => {
 test('captures page navigation for tests that do not destructure the load fixture', async () => {
 	const root = await fs.mkdtemp(path.join(os.tmpdir(), 'reporting-load-fixture-'));
 	const specFile = path.join(root, 'navigation.spec.mjs');
-	const configFile = path.join(root, 'playwright.config.mjs');
+	const cfgFile = path.join(root, 'playwright.config.mjs');
 	const reportFile = path.join(root, 'playwright-report.json');
-	const testModule = new URL('../dist/playwright.js', import.meta.url).href;
-	await fs.writeFile(specFile, `import { loadTest as test } from ${JSON.stringify(testModule)};\ntest('navigates without using load', async ({ page }) => { await page.goto('data:text/html,<title>loaded</title>'); });\n`);
-	await fs.writeFile(configFile, `export default { testDir: ${JSON.stringify(root)}, reporter: [['json', { outputFile: ${JSON.stringify(reportFile)} }]], projects: [{ name: 'chromium', use: { browserName: 'chromium' } }] };\n`);
+	await fs.writeFile(
+		specFile,
+		`import { loadTest as test } from ${JSON.stringify(new URL('../dist/playwright.js', import.meta.url).href)};\ntest('navigates without using load', async ({ page }) => { await page.goto('data:text/html,<title>loaded</title>'); });\n`,
+	);
+	await fs.writeFile(
+		cfgFile,
+		`export default { testDir: ${JSON.stringify(root)}, reporter: [['json', { outputFile: ${JSON.stringify(reportFile)} }]], projects: [{ name: 'chromium', use: { browserName: 'chromium' } }] };\n`,
+	);
 	try {
-		await execFileAsync('pnpm', ['exec', 'playwright', 'test', '--config', configFile], { cwd: path.resolve(path.dirname(new URL(import.meta.url).pathname), '../../..'), timeout: 60000 });
+		await execFileAsync('pnpm', ['exec', 'playwright', 'test', '--config', cfgFile], { cwd: path.resolve(path.dirname(new URL(import.meta.url).pathname), '../../..'), timeout: 60000 });
 		const report = JSON.parse(await fs.readFile(reportFile, 'utf8'));
-		const results = report.suites.flatMap((suite) => suite.specs.flatMap((spec) => spec.tests.flatMap((entry) => entry.results)));
-		const attachment = results.flatMap((result) => result.attachments).find((entry) => entry.name === 'load-testing');
+		const results = report.suites.flatMap((suite) => suite.specs.flatMap((spec) => spec.tests.flatMap((e) => e.results)));
+		const attachment = results.flatMap((r) => r.attachments).find((e) => e.name === 'load-testing');
 		assert.ok(attachment, 'the automatic fixture should attach load measurements');
 		const payload = JSON.parse(Buffer.from(attachment.body, 'base64').toString('utf8'));
-		assert.ok(payload.measurements.some((measurement) => measurement.kind === 'page' && measurement.durationMs > 0), JSON.stringify(payload));
+		assert.ok(
+			payload.measurements.some((measurement) => measurement.kind === 'page' && measurement.durationMs > 0),
+			JSON.stringify(payload),
+		);
 	} finally {
 		await fs.rm(root, { recursive: true, force: true });
 	}
 });
 
-/** Covers default viewport expansion, focused selection, and projects that must run once. */
+/* Covers default viewport expansion, focused selection, and projects that must run once. */
 test('expands regular Playwright projects and preserves single-run setup/capture projects', () => {
 	const original = process.env.PW_VIEWPORTS;
 	delete process.env.PW_VIEWPORTS;
@@ -114,7 +133,6 @@ test('expands regular Playwright projects and preserves single-run setup/capture
 	);
 	if (original === undefined) delete process.env.PW_VIEWPORTS;
 	else process.env.PW_VIEWPORTS = original;
-
 	const cfg = withResponsivePlaywright(
 		{
 			reporter: ['list'],
@@ -136,7 +154,6 @@ test('expands regular Playwright projects and preserves single-run setup/capture
 	assert.deepEqual(cfg.projects.find(({ name: n }) => n === 'app-mobile').dependencies, ['auth-setup']);
 	assert.equal(cfg.projects.find(({ name: n }) => n === 'browser-mobile').use.viewport.width, 390);
 	assert.ok(cfg.reporter.some((r) => Array.isArray(r) && r[0] === '@terra-symposium/reporting/playwright'));
-
 	process.env.PW_VIEWPORTS = 'md,xl';
 	assert.deepEqual(
 		resolveVisualViewports().map(({ name: n }) => n),
@@ -152,34 +169,33 @@ test('expands regular Playwright projects and preserves single-run setup/capture
 	else process.env.PW_VIEWPORTS = original;
 });
 
-/** Covers default timing thresholds, grading boundaries, config overrides, and failure-safe measurement. */
+/* Covers default timing thresholds, grading boundaries, config overrides, and failure-safe measurement. */
 test('loads and grades per-test and operation timing budgets', async () => {
 	assert.deepEqual(DEFAULT_LOAD_BUDGET, { warnMs: 2000, failMs: 5000 });
 	assert.equal(gradeLoad(2000, DEFAULT_LOAD_BUDGET), 'pass');
 	assert.equal(gradeLoad(2001, DEFAULT_LOAD_BUDGET), 'warning');
 	assert.equal(gradeLoad(5000, DEFAULT_LOAD_BUDGET), 'warning');
 	assert.equal(gradeLoad(5001, DEFAULT_LOAD_BUDGET), 'fail');
-	const config = normalizeLoadTestingConfig({
+	const cfg = normLoadTestingCfg({
 		defaultBudget: { warnMs: 2000, failMs: 5000 },
 		testBudgets: { 'tests/example.spec.ts::Dashboard loads': { failMs: 10000 } },
 		operationBudgets: { 'bulk import': { warnMs: 5000, failMs: 9000 } },
 	});
-	assert.equal(gradeLoadMeasurement({ name: 'test duration', kind: 'test', durationMs: 6000 }, config, 'tests/example.spec.ts::Dashboard loads').grade, 'warning');
-	assert.deepEqual(gradeLoadMeasurement({ name: 'bulk import', kind: 'operation', durationMs: 6000 }, config, 'tests/example.spec.ts::Dashboard loads').budget, { warnMs: 5000, failMs: 9000 });
-	assert.deepEqual(gradeLoadMeasurement({ name: 'bulk import', kind: 'operation', durationMs: 2500, budget: { warnMs: 1000 } }, config, 'tests/example.spec.ts::Dashboard loads').budget, {
+	assert.equal(gradeLoadMeasurement({ name: 'test duration', kind: 'test', durationMs: 6000 }, cfg, 'tests/example.spec.ts::Dashboard loads').grade, 'warning');
+	assert.deepEqual(gradeLoadMeasurement({ name: 'bulk import', kind: 'operation', durationMs: 6000 }, cfg, 'tests/example.spec.ts::Dashboard loads').budget, { warnMs: 5000, failMs: 9000 });
+	assert.deepEqual(gradeLoadMeasurement({ name: 'bulk import', kind: 'operation', durationMs: 2500, budget: { warnMs: 1000 } }, cfg, 'tests/example.spec.ts::Dashboard loads').budget, {
 		warnMs: 1000,
 		failMs: 9000,
 	});
 	const root = await fs.mkdtemp(path.join(os.tmpdir(), 'terra-load-config-'));
-	const configFile = path.join(root, 'quality.json');
-	await fs.writeFile(configFile, JSON.stringify({ loadTesting: { enabled: false, defaultBudget: { warnMs: 3000, failMs: 7000 } } }));
-	assert.equal(readLoadTestingConfig(configFile).enabled, false);
-	assert.deepEqual(readLoadTestingConfig(configFile, { enabled: true }).defaultBudget, { warnMs: 3000, failMs: 7000 });
-	assert.equal(withResponsivePlaywright({ projects: [{ name: 'browser' }] }, { qualityConfigFile: configFile }).metadata.terraLoadTestingEnabled, false);
-
+	const cfgFile = path.join(root, 'quality.json');
+	await fs.writeFile(cfgFile, JSON.stringify({ loadTesting: { enabled: false, defaultBudget: { warnMs: 3000, failMs: 7000 } } }));
+	assert.equal(readLoadTestingCfg(cfgFile).enabled, false);
+	assert.deepEqual(readLoadTestingCfg(cfgFile, { enabled: true }).defaultBudget, { warnMs: 3000, failMs: 7000 });
+	assert.equal(withResponsivePlaywright({ projects: [{ name: 'browser' }] }, { qualityConfigFile: cfgFile }).metadata.terraLoadTestingEnabled, false);
 	const recorded = [];
 	assert.equal(
-		await timeLoadOperation(
+		await timeLoadOp(
 			'read cache',
 			() => 42,
 			(sample) => recorded.push(sample),
@@ -191,7 +207,7 @@ test('loads and grades per-test and operation timing budgets', async () => {
 	assert.ok(recorded[0].durationMs >= 0);
 	await assert.rejects(
 		() =>
-			timeLoadOperation(
+			timeLoadOp(
 				'failed operation',
 				() => Promise.reject(new Error('operation failed')),
 				(sample) => recorded.push(sample),
@@ -201,7 +217,7 @@ test('loads and grades per-test and operation timing budgets', async () => {
 	assert.equal(recorded[1].name, 'failed operation');
 });
 
-/** Covers neutral spreadsheet/slideshow metadata, embedded evidence, and empty runs. */
+/* Covers neutral spreadsheet/slideshow metadata, embedded evidence, and empty runs. */
 test('writes neutral spreadsheet and slideshow artifacts', async () => {
 	const root = await fs.mkdtemp(path.join(os.tmpdir(), 'terra-reporting-'));
 	const { default: sharp } = await import('sharp');
@@ -258,7 +274,6 @@ test('writes neutral spreadsheet and slideshow artifacts', async () => {
 	await nestedWorkbook.xlsx.readFile(nestedReport);
 	assert.equal(nestedWorkbook.worksheets[1].name, 'tests_actions_registry.test.mjs');
 	assert.equal(nestedWorkbook.worksheets[2].name, 'tests_actions_registry.test (2)');
-
 	const responsive = path.join(root, 'responsive.pptx');
 	const responsiveResults = [
 		result({ viewport: 'mobile', viewportSize: '390×844', screenshot }),
@@ -287,7 +302,7 @@ test('writes neutral spreadsheet and slideshow artifacts', async () => {
 	assert.match(emptyNotes, /No browser test results were collected/);
 });
 
-/** Covers timing artifacts, supplemental runner rows, reporter enforcement, and the legacy opt-out. */
+// Covers timing artifacts, supplemental runner rows, reporter enforcement, and the legacy opt-out. */
 test('reports load timing details and fails only when enabled budgets are exceeded', async () => {
 	const root = await fs.mkdtemp(path.join(os.tmpdir(), 'terra-load-report-'));
 	const budget = { warnMs: 2000, failMs: 5000 };
@@ -340,11 +355,7 @@ test('reports load timing details and fails only when enabled budgets are exceed
 	assert.match(slide2, /Load fail/);
 	assert.match(slide4, /bulk import/);
 	assert.match(slide4, /disk staging/);
-
-	const reporter = new ProgressReporter({
-		outputRoot: path.join(root, 'enforced'),
-		loadTesting: { defaultBudget: { warnMs: 1000, failMs: 2000 } },
-	});
+	const reporter = new ProgressReporter({ outputRoot: path.join(root, 'enforced'), loadTesting: { defaultBudget: { warnMs: 1000, failMs: 2000 } } });
 	const testCase = {
 		id: 'slow-test',
 		location: { file: path.join(root, 'tests', 'slow.spec.ts') },
@@ -366,7 +377,6 @@ test('reports load timing details and fails only when enabled budgets are exceed
 		status: 'passed',
 	});
 	assert.equal(await testOverride.onEnd(), undefined);
-
 	const optedOut = new ProgressReporter({ outputRoot: path.join(root, 'opted-out'), loadTesting: { enabled: false } });
 	optedOut.onTestEnd(testCase, { attachments: [], duration: 2501, error: undefined, retry: 0, status: 'passed' });
 	assert.equal(await optedOut.onEnd(), undefined);

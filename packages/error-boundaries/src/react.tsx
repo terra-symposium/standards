@@ -15,15 +15,18 @@ CONFIG
 //////////////////////////////////////////////////*/
 
 /**
- *
+ * Handles error reporter for the quality tooling.
+ * Describes the error reporter data used by the quality tooling.
  */
 export type ErrorReporter = (err: Error, report: { name: string; componentStack: string | null }) => void;
 /**
- *
+ * Handles error boundary props for the quality tooling.
+ * Describes the error boundary props data used by the quality tooling.
  */
 export type ErrorBoundaryProps = { children?: React.ReactNode; fallback?: (err: Error) => React.ReactNode; name?: string; resetKey?: string; onError?: ErrorReporter };
 /**
- *
+ * Handles error boundary state for the quality tooling.
+ * Describes the error boundary state data used by the quality tooling.
  */
 export type ErrorBoundaryState = { error: Error | null };
 
@@ -42,10 +45,11 @@ HELPERS
  */
 export function withErrorBoundary<P extends object>(ComponentToWrap: React.ComponentType<P>, name: string, onErr?: ErrorReporter): React.ComponentType<P> {
 	/**
+	 * Handles bounded component for the quality tooling.
 	 *
-	 * @param props
+	 * @param props Properties passed to the React error boundary.
 	 *
-	 * @return
+	 * @return The boundedcomponent result used by the caller.
 	 */
 	function BoundedComponent(props: P): React.JSX.Element {
 		return (

@@ -119,7 +119,7 @@ const slideCopy = (r: VisualResult, review: ImgReview): string => {
 		`${r.project} · ${r.viewport} · ${r.viewportSize}`,
 		r.groups || r.file,
 		`Status: ${r.status}${r.duration ? ` · ${r.duration} ms` : ''}${grade ? ` · Load: ${grade}` : ''}`,
-		...measurements.map((item) => `Load ${item.kind}: ${item.name} — ${item.durationMs.toFixed(1)} ms (${item.grade}; warn ${item.budget.warnMs} / fail ${item.budget.failMs} ms)`),
+		...measurements.map((i) => `Load ${i.kind}: ${i.name} — ${i.durationMs.toFixed(1)} ms (${i.grade}; warn ${i.budget.warnMs} / fail ${i.budget.failMs} ms)`),
 		'',
 		...review.cues.map((c) => `• ${c}`),
 	];
@@ -132,7 +132,7 @@ const slideCopy = (r: VisualResult, review: ImgReview): string => {
  * Adds a single-result slide with its screenshot and review prompts.
  *
  * @param presentation Presentation receiving the slide.
- * @param r Screenshot-backed result to render.
+ * @param grouproup Screenshot-backed result to render.
  * @param slideNumber One-based slide number shown in the title.
  * @returns A promise that resolves after the slide and notes are added.
  */
@@ -202,12 +202,12 @@ const addResponsiveSlide = async (presentation: Presentation, group: readonly Vi
 /** Optional visible and metadata overrides for a slideshow artifact. */
 export type SlideshowOptions = { title?: string; author?: string; company?: string; subject?: string; loadTestingEnabled?: boolean };
 /**
- *
+ * Describes the load row data used by the quality tooling.
  */
 type LoadRow = { result: VisualResult; measurement: NonNullable<VisualResult['loadMeasurements']>[number] };
 /** Adds a run-level load summary slide and names the slowest measurements. */
 const addLoadSummarySlide = (presentation: Presentation, results: readonly VisualResult[]): void => {
-	const measurements: LoadRow[] = results.flatMap((result) => (result.loadMeasurements || []).map((measurement) => ({ result, measurement })));
+	const measurements: LoadRow[] = results.flatMap((r) => (r.loadMeasurements || []).map((measurement) => ({ result: r, measurement })));
 	const counts = loadGradeCounts(measurements.map(({ measurement }) => measurement));
 	const slowest = [...measurements].sort((a, b) => b.measurement.durationMs - a.measurement.durationMs).slice(0, 6);
 	const slide = presentation.addSlide();
@@ -226,22 +226,22 @@ const addLoadSummarySlide = (presentation: Presentation, results: readonly Visua
 	});
 	slide.addText(
 		slowest.length
-			? `Slowest measurements\n${slowest.map(({ result, measurement }) => `${measurement.grade.toUpperCase()}  ${measurement.durationMs.toFixed(1)} ms  ${result.file} · ${result.title} · ${measurement.name}`).join('\n')}`
+			? `Slowest measurements\n${slowest.map(({ result: r, measurement }) => `${measurement.grade.toUpperCase()}  ${measurement.durationMs.toFixed(1)} ms  ${r.file} · ${r.title} · ${measurement.name}`).join('\n')}`
 			: 'No load measurements were collected.',
 		{ color: COLOURS.ink, fontFace: 'Aptos', fontSize: 13, fit: 'shrink', margin: 0.08, valign: 'mid', x: 0.58, y: 2.05, w: 12.1, h: 4.3 },
 	);
 };
 /** Adds paginated slides containing every individual test, page, and operation measurement. */
 const addLoadDetailSlides = (presentation: Presentation, results: readonly VisualResult[]): number => {
-	const measurements: LoadRow[] = results.flatMap((result) => (result.loadMeasurements || []).map((measurement) => ({ result, measurement })));
+	const measurements: LoadRow[] = results.flatMap((r) => (r.loadMeasurements || []).map((measurement) => ({ result: r, measurement })));
 	const pageSize = 12;
 	const pages = Math.max(1, Math.ceil(measurements.length / pageSize));
 	for (let page = 0; page < pages; page += 1) {
 		const lines = measurements
 			.slice(page * pageSize, (page + 1) * pageSize)
 			.map(
-				({ result, measurement }) =>
-					`${measurement.grade.toUpperCase().padEnd(7)} ${measurement.durationMs.toFixed(1).padStart(9)} ms  ${measurement.kind.padEnd(9)} ${result.file} · ${result.title} · ${measurement.name}  [warn ${measurement.budget.warnMs} / fail ${measurement.budget.failMs} ms]`,
+				({ result: r, measurement }) =>
+					`${measurement.grade.toUpperCase().padEnd(7)} ${measurement.durationMs.toFixed(1).padStart(9)} ms  ${measurement.kind.padEnd(9)} ${r.file} · ${r.title} · ${measurement.name}  [warn ${measurement.budget.warnMs} / fail ${measurement.budget.failMs} ms]`,
 			);
 		const slide = presentation.addSlide();
 		slide.background = { color: COLOURS.surface };
@@ -270,7 +270,7 @@ const addLoadDetailSlides = (presentation: Presentation, results: readonly Visua
  * @returns A promise that resolves after the slideshow has been written.
  */
 export const writeSlideshow = async (file: string, results: readonly VisualResult[], opts: SlideshowOptions = {}): Promise<void> => {
-	const loadEnabled = opts.loadTestingEnabled ?? results.some((result) => !!result.loadMeasurements?.length);
+	const loadEnabled = opts.loadTestingEnabled ?? results.some((r) => !!r.loadMeasurements?.length);
 	const presentation = new /* The runtime package is CommonJS while NodeNext exposes its constructor through a namespace type. */ (
 		createRequire(import.meta.url)('pptxgenjs') as new () => Presentation
 	)();

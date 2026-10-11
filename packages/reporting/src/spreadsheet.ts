@@ -160,10 +160,10 @@ const addResultSheet = (book: ExcelJS.Workbook, name: string, vals: readonly Vis
 			val.visual === 'Embedded' ? '' : val.visual,
 		]);
 		row.alignment = { vertical: 'top' };
-		const durationColumn = loadEnabled ? 8 : 7;
-		const retryColumn = loadEnabled ? 9 : 8;
-		row.getCell(durationColumn).numFmt = '0';
-		row.getCell(retryColumn).numFmt = '0';
+		const durationCol = loadEnabled ? 8 : 7;
+		const retryCol = loadEnabled ? 9 : 8;
+		row.getCell(durationCol).numFmt = '0';
+		row.getCell(retryCol).numFmt = '0';
 		styleStatus(row.getCell(6), val.status);
 		if (loadEnabled && resultLoadGrade(val)) styleLoadGrade(row.getCell(7), resultLoadGrade(val));
 		if (val.browserErrors) row.getCell(loadEnabled ? 11 : 10).note = val.browserErrors;
@@ -191,13 +191,12 @@ const addSummary = (book: ExcelJS.Workbook, run: ReportRun, loadEnabled: boolean
 	for (const file of orderedFiles(run)) {
 		const vals = resultsForFile(run, file);
 		const counts = statusCounts(vals);
-		const loadCounts = loadGradeCounts(vals.flatMap((result) => result.loadMeasurements || []));
+		const loadCounts = loadGradeCounts(vals.flatMap((r) => r.loadMeasurements || []));
 		sheet.addRow([file, ...VISUAL_STATUSES.map((s) => counts[s]), VISUAL_STATUSES.reduce((t, s) => t + counts[s], 0), ...(loadEnabled ? [loadCounts.pass, loadCounts.warning, loadCounts.fail] : [])]);
 	}
 	styleHeader(sheet);
 	sheet.columns = [{ width: 32 }, ...Array.from({ length: loadEnabled ? 9 : 6 }, () => ({ width: 14 }))];
 };
-
 /** Adds a row for every timed test, page navigation, and named operation. */
 const addLoadTimings = (book: ExcelJS.Workbook, results: readonly VisualResult[]): void => {
 	const sheet = book.addWorksheet('Load timings');
@@ -268,7 +267,7 @@ const addDiagnostics = (book: ExcelJS.Workbook, run: ReportRun): void => {
  * @returns A promise that resolves after the workbook has been written.
  */
 export const writeSpreadsheet = async (file: string, run: ReportRun): Promise<void> => {
-	const loadEnabled = run.loadTestingEnabled ?? run.results.some((result) => !!result.loadMeasurements?.length);
+	const loadEnabled = run.loadTestingEnabled ?? run.results.some((r) => !!r.loadMeasurements?.length);
 	const book = new ExcelJS.Workbook();
 	book.creator = 'Test evidence reporter';
 	book.lastModifiedBy = 'Test evidence reporter';

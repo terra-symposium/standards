@@ -22,7 +22,8 @@ CONFIG
 
 const MODULE_EXTS = ['', '.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs', '.mts', '.cts', '.astro', '.mdx', '.json', '.css', '.scss', '.svg', '.png', '.jpg', '.jpeg', '.webp'];
 /**
- *
+ * Handles import failure for the quality tooling.
+ * Describes the import failure data used by the quality tooling.
  */
 export type ImportFailure = { importer: string; specifier: string };
 

@@ -8,11 +8,13 @@ CONFIG
 //////////////////////////////////////////////////*/
 
 /**
- *
+ * Handles error status for the quality tooling.
+ * Describes the error status data used by the quality tooling.
  */
 export type ErrorStatus = 400 | 401 | 403 | 404 | 500 | 502 | 503;
 /**
- *
+ * Handles error status copy for the quality tooling.
+ * Describes the error status copy data used by the quality tooling.
  */
 export type ErrorStatusCopy = { title: string; description: string };
 export const ERROR_STATUS_COPY: Readonly<Record<ErrorStatus, ErrorStatusCopy>> = Object.freeze({
@@ -32,9 +34,9 @@ FUNCTIONS
 /**
  * Resolves unknown status values to the safe internal-server-error response.
  *
- * @param status
+ * @param status HTTP status code used to select the response copy.
  *
- * @return
+ * @return The errorstatuscopy result used by the caller.
  */
 export function errorStatusCopy(status: number): ErrorStatusCopy {
 	return ERROR_STATUS_COPY[status as ErrorStatus] ?? { title: 'Unknown Error', description: 'Something went wrong.' };

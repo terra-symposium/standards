@@ -1,14 +1,19 @@
 {
 	"$schema": "https://unpkg.com/knip@6/schema.json",
 	"ignoreDependencies": ["pptxgenjs"],
+	"ignoreFiles": ["packages/*/dist/**"],
 	"workspaces": {
 		"packages/error-boundaries": {
-			"entry": ["test/*.test.mjs"],
+			"entry": ["src/index.ts", "src/react.tsx", "src/astro.ts", "src/next.ts", "test/*.test.mjs"],
 			"project": ["src/**/*.ts", "test/**/*.mjs"],
 			"ignoreDependencies": ["@types/react-dom", "react-dom"]
 		},
+		"packages/reporting": {
+			"entry": ["src/core.ts", "src/playwright.ts", "src/viewports.ts", "src/load-testing.ts", "src/spreadsheet.ts", "src/slideshow.ts", "src/metadata.ts", "test/*.test.mjs"],
+			"project": ["src/**/*.ts", "test/**/*.mjs"]
+		},
 		"packages/quality": {
-			"entry": ["test/*.test.mjs"],
+			"entry": ["src/index.ts", "src/runner.ts", "src/naming.ts", "src/object-forwarding.ts", "src/single-use.ts", "src/port.ts", "test/*.test.mjs"],
 			"project": ["src/**/*.ts", "test/**/*.mjs"]
 		}
 	}

@@ -69,7 +69,7 @@ export type LoadTestController = {
 	/** Sets a budget override for this test's total elapsed duration. */
 	setTestBudget: (budget: LoadBudgetOverride) => void;
 	/** Measures a named asynchronous or synchronous operation and preserves its return value. */
-	measure: <T>(name: string, operation: () => T | Promise<T>, budget?: LoadBudgetOverride) => Promise<T>;
+	measure: <T>(name: string, op: () => T | Promise<T>, budget?: LoadBudgetOverride) => Promise<T>;
 };
 
 /**
@@ -77,63 +77,66 @@ export type LoadTestController = {
  * Import as `test` in suites that need page and operation-level measurements.
  */
 export const loadTest = diagnosticsTest.extend<{ load: LoadTestController }>({
-	load: [async ({ page, context }, use, info): Promise<void> => {
-		const configuredEnabled = (info.config as unknown as { metadata?: Record<string, unknown> }).metadata?.terraLoadTestingEnabled;
-		const enabled = typeof configuredEnabled === 'boolean' ? configuredEnabled : readLoadTestingConfig().enabled;
-		const measurements: LoadMeasurementInput[] = [];
-		const pending: Promise<void>[] = [];
-		let testBudget: LoadBudgetOverride | undefined;
-		const observe = (target: typeof page): void => {
-			target.on('load', () => {
-				if (!enabled || target.url() === 'about:blank') return;
-				const pendingLoad = target
-					.evaluate(() => {
-						const entry = performance.getEntries().find((item) => String(item.entryType) === 'navigation') as PerformanceNavigationTiming | undefined;
-						return entry ? { durationMs: entry.duration, pathname: location.pathname } : undefined;
-					})
-					.then((navigation) => {
-						if (!navigation || navigation.durationMs <= 0) return;
-						measurements.push({ name: `page load: ${navigation.pathname || '/'}`, kind: 'page', durationMs: navigation.durationMs });
-					})
-					.catch(() => undefined);
-				pending.push(pendingLoad);
-			});
-		};
-		observe(page);
-		context.on('page', observe);
-		const controller: LoadTestController = {
-			setTestBudget: (budget) => {
-				testBudget = validateLoadBudgetOverride(budget);
-			},
-			measure: async <T>(name: string, operation: () => T | Promise<T>, budget?: LoadBudgetOverride): Promise<T> => {
-				if (!enabled) return operation();
-				return timeLoadOperation(
-					name,
-					operation,
-					(measurement) => {
-						measurements.push(measurement);
-					},
-					budget,
-				);
-			},
-		};
-		try {
-			await use(controller);
-		} finally {
-			context.off('page', observe);
-			await Promise.all(pending);
-			if (enabled && (measurements.length || testBudget)) {
-				try {
-					await info.attach('load-testing', {
-						body: Buffer.from(JSON.stringify({ measurements, testBudget })),
-						contentType: 'application/json',
-					});
-				} catch {
-					// Preserve the test result if Playwright has already closed its attachment store.
+	load: [
+		async ({ page, context: ctx }, use, info): Promise<void> => {
+			const cfgdEnabled = (info.config as unknown as { metadata?: Record<string, unknown> }).metadata?.terraLoadTestingEnabled;
+			const enabled = typeof cfgdEnabled === 'boolean' ? cfgdEnabled : readLoadTestingConfig().enabled;
+			const measurements: LoadMeasurementInput[] = [];
+			const pending: Promise<void>[] = [];
+			let testBudget: LoadBudgetOverride | undefined;
+			const observe = (tgt: typeof page): void => {
+				tgt.on('load', () => {
+					if (!enabled || tgt.url() === 'about:blank') return;
+					const pendingLoad = tgt
+						.evaluate(() => {
+							const entry = performance.getEntries().find((i) => String(i.entryType) === 'navigation') as PerformanceNavigationTiming | undefined;
+							return entry ? { durationMs: entry.duration, pathname: location.pathname } : undefined;
+						})
+						.then((navigation) => {
+							if (!navigation || navigation.durationMs <= 0) return;
+							measurements.push({ name: `page load: ${navigation.pathname || '/'}`, kind: 'page', durationMs: navigation.durationMs });
+						})
+						.catch(() => undefined);
+					pending.push(pendingLoad);
+				});
+			};
+			observe(page);
+			ctx.on('page', observe);
+			const controller: LoadTestController = {
+				setTestBudget: (budget) => {
+					testBudget = validateLoadBudgetOverride(budget);
+				},
+				measure: async <T>(name: string, op: () => T | Promise<T>, budget?: LoadBudgetOverride): Promise<T> => {
+					if (!enabled) return op();
+					return timeLoadOperation(
+						name,
+						op,
+						(measurement) => {
+							measurements.push(measurement);
+						},
+						budget,
+					);
+				},
+			};
+			try {
+				await use(controller);
+			} finally {
+				ctx.off('page', observe);
+				await Promise.all(pending);
+				if (enabled && (measurements.length || testBudget)) {
+					try {
+						await info.attach('load-testing', {
+							body: Buffer.from(JSON.stringify({ measurements, testBudget })),
+							contentType: 'application/json',
+						});
+					} catch {
+						// Preserve the test result if Playwright has already closed its attachment store.
+					}
 				}
 			}
-		}
-	}, { auto: true }],
+		},
+		{ auto: true },
+	],
 });
 
 /** Application-specific paths and catalog settings for the shared reporter. */
@@ -158,7 +161,7 @@ HELPERS
 
 /**
  * Removes terminal color escapes before diagnostics enter an artifact.
- * @param value Terminal output that may contain ANSI escape sequences.
+ * @param valerminal output that may contain ANSI escape sequences.
  * @returns Terminal output with ANSI formatting removed.
  */
 export const stripAnsi = (val: string): string => val.replace(new RegExp(`${String.fromCharCode(27)}\\[[0-?]*[ -/]*[@-~]`, 'g'), '');
@@ -192,7 +195,7 @@ const terminalText = (chunk: string | Buffer): string => stripAnsi(chunk.toStrin
 
 /**
  * Identifies terminal output that should be retained as diagnostic evidence.
- * @param value Normalized terminal output.
+ * @param valormalized terminal output.
  * @returns Whether the output contains a diagnostic keyword.
  */
 const isTerminalDiagnostic = (val: string): boolean => /\b(?:error|errors|failed|failure|exception|warning|warn|timeout|requestfailed|pageerror)\b/i.test(val);
@@ -231,14 +234,14 @@ const screenshotAttachment = (attachments: readonly ReporterAttachment[]): Repor
 
 /** Reads timing samples and a test override from the fixture attachment. */
 const loadAttachment = (attachments: readonly ReporterAttachment[]): { measurements: LoadMeasurementInput[]; testBudget?: LoadBudgetOverride } => {
-	const attachment = attachments.find((value) => value.name === 'load-testing' && value.contentType === 'application/json');
+	const attachment = attachments.find((v) => v.name === 'load-testing' && v.contentType === 'application/json');
 	if (!attachment) return { measurements: [] };
 	try {
 		const parsed = JSON.parse(readAttachment(attachment)) as Record<string, unknown>;
 		const measurements = Array.isArray(parsed.measurements)
-			? parsed.measurements.flatMap((value): LoadMeasurementInput[] => {
-					if (!value || typeof value !== 'object') return [];
-					const row = value as Record<string, unknown>;
+			? parsed.measurements.flatMap((v): LoadMeasurementInput[] => {
+					if (!v || typeof v !== 'object') return [];
+					const row = v as Record<string, unknown>;
 					if (typeof row.name !== 'string' || !row.name.trim() || !['page', 'operation'].includes(String(row.kind))) return [];
 					if (typeof row.durationMs !== 'number' || !Number.isFinite(row.durationMs) || row.durationMs < 0) return [];
 					let budget: LoadBudgetOverride | undefined;
@@ -259,12 +262,12 @@ const addLoadMeasurements = (
 	id: string,
 	inputs: readonly LoadMeasurementInput[],
 	testBudget: LoadBudgetOverride | undefined,
-	config: ReturnType<typeof readLoadTestingConfig>,
+	cfg: ReturnType<typeof readLoadTestingConfig>,
 ): VisualResult => {
-	if (!config.enabled) return result;
+	if (!cfg.enabled) return result;
 	const measurements: LoadMeasurement[] = [
-		gradeLoadMeasurement({ name: 'test duration', kind: 'test', durationMs: result.duration, ...(testBudget ? { budget: testBudget } : {}) }, config, id),
-		...inputs.map((input) => gradeLoadMeasurement(input, config, id)),
+		gradeLoadMeasurement({ name: 'test duration', kind: 'test', durationMs: result.duration, ...(testBudget ? { budget: testBudget } : {}) }, cfg, id),
+		...inputs.map((input) => gradeLoadMeasurement(input, cfg, id)),
 	];
 	return { ...result, loadMeasurements: measurements, loadTestId: id };
 };
@@ -272,7 +275,7 @@ const addLoadMeasurements = (
 /**
  * Creates the framework-neutral identity fields shared by all result records.
  * @param test Playwright test identity.
- * @param configuredProject Configured Playwright project name.
+ * @param cfgdProjectgured Playwright project name.
  * @param viewportCatalog Catalog used to resolve viewport labels and sizes.
  * @returns Framework-neutral identity fields for a visual result.
  */
@@ -307,7 +310,7 @@ const testTitleParts = (test: { location: { file: string }; title: string; title
 /**
  * Generates a stable filename for a copied screenshot.
  * @param result Result whose identity contributes to the filename.
- * @param index Result position used to keep duplicate names distinct.
+ * @param idxesult position used to keep duplicate names distinct.
  * @returns A filesystem-safe screenshot filename.
  */
 const screenshotName = (result: VisualResult, idx: number): string => {
@@ -322,7 +325,7 @@ const screenshotName = (result: VisualResult, idx: number): string => {
 /**
  * Copies captured screenshots into the timestamped run directory.
  * @param results Results whose screenshot paths should be relocated.
- * @param runDirectory Timestamped output directory for the current run.
+ * @param runDirtamped output directory for the current run.
  * @returns Results with copied screenshot paths.
  */
 const copyScreenshots = (results: readonly VisualResult[], runDir: string): VisualResult[] => {
@@ -353,11 +356,11 @@ const redactEvidence = (val: unknown): string => {
 };
 
 /** Converts untrusted supplemental timing values to supported measurement inputs. */
-const supplementalMeasurements = (value: unknown): LoadMeasurementInput[] => {
-	if (!Array.isArray(value)) return [];
-	return value.flatMap((entry): LoadMeasurementInput[] => {
-		if (!entry || typeof entry !== 'object') return [];
-		const row = entry as Record<string, unknown>;
+const supplementalMeasurements = (val: unknown): LoadMeasurementInput[] => {
+	if (!Array.isArray(val)) return [];
+	return val.flatMap((e): LoadMeasurementInput[] => {
+		if (!e || typeof e !== 'object') return [];
+		const row = e as Record<string, unknown>;
 		if (typeof row.name !== 'string' || !row.name.trim() || !['page', 'operation'].includes(String(row.kind))) return [];
 		if (typeof row.durationMs !== 'number' || !Number.isFinite(row.durationMs) || row.durationMs < 0) return [];
 		let budget: LoadBudgetOverride | undefined;
@@ -541,7 +544,7 @@ export default class ProgressReporter {
 		const titleParts = testTitleParts(test);
 		const testId = loadTestId(test.location.file, titleParts, this.options.loadTesting.root);
 		const attachedLoad = loadAttachment(result.attachments);
-		const normalized: VisualResult = {
+		const norm: VisualResult = {
 			...testIdentity(test, test.parent.project()?.name || test.titlePath().find((v) => v.startsWith('root-')) || 'unknown', this.options.viewportCatalog),
 			browserErrors: redactEvidence(diagnosticText(result.attachments, 'browser-diagnostics').join('\n')),
 			duration: result.duration,
@@ -552,7 +555,7 @@ export default class ProgressReporter {
 			terminalErrors: redactEvidence(this.terminalDiagnostics.get(result)?.join('\n') || ''),
 			visual: screenshot ? 'Embedded' : result.attachments.some((v) => v.name === 'visual-error') ? 'Capture failed' : 'No visual surface',
 		};
-		this.results.push(addLoadMeasurements(normalized, testId, attachedLoad.measurements, attachedLoad.testBudget, this.options.loadTesting));
+		this.results.push(addLoadMeasurements(norm, testId, attachedLoad.measurements, attachedLoad.testBudget, this.options.loadTesting));
 		this.terminalDiagnostics.delete(result);
 	}
 
@@ -601,11 +604,9 @@ export default class ProgressReporter {
 		await writeSpreadsheet(spreadsheet, run);
 		await writeSlideshow(slideshow, this.options.loadTesting.enabled ? results : browserResults, { loadTestingEnabled: this.options.loadTesting.enabled });
 		process.stdout.write(`Test spreadsheet: ${spreadsheet}\nTest slideshow: ${slideshow}\n`);
-		const measurements = results.flatMap((result) => result.loadMeasurements || []);
+		const measurements = results.flatMap((r) => r.loadMeasurements || []);
 		const loadCounts = loadGradeCounts(measurements);
-		if (this.options.loadTesting.enabled) {
-			process.stdout.write(`Load budgets: ${loadCounts.pass} pass, ${loadCounts.warning} warning, ${loadCounts.fail} fail.\n`);
-		}
+		if (this.options.loadTesting.enabled) process.stdout.write(`Load budgets: ${loadCounts.pass} pass, ${loadCounts.warning} warning, ${loadCounts.fail} fail.\n`);
 		return loadCounts.fail ? 'failed' : undefined;
 	}
 }

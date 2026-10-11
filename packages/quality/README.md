@@ -19,9 +19,25 @@ The package supports single-package repositories, monorepos, CI, pre-commit hook
 Install the package as a development dependency from the public npm registry; no registry configuration or read token is needed:
 
 ```sh
-pnpm add -D @terra-symposium/quality
+pnpm add -D @terra-symposium/quality prettier
 npx terra-quality
 ```
+
+The package coordinates tools but does not install them. Install each tool enabled in `quality.json` in the consuming repository. Repositories with Astro files also need `prettier-plugin-astro` and a Prettier config that registers the plugin and Astro parser:
+
+```sh
+pnpm add -D prettier-plugin-astro
+```
+
+```js
+// .prettierrc.mjs
+export default {
+	plugins: ['prettier-plugin-astro'],
+	overrides: [{ files: '*.astro', options: { parser: 'astro' } }],
+};
+```
+
+For React TSX projects, make sure the effective `tsconfig.json` enables JSX, usually with `"jsx": "react-jsx"`. Editors may need their TypeScript language server restarted after changing the config. The [getting-started guide](https://terra-symposium-quality.netlify.app/getting-started/) has a copy-ready setup and troubleshooting steps.
 
 The executable loads `quality.json` from the current repository. A wrapper can call `loadQualityCfg(path)` and `runQualityCli`; no wrapper is needed for the normal case.
 
