@@ -20,10 +20,7 @@ import type { QualityAnalysis, QualityCfg } from './runner.js';
 TYPES
 //////////////////////////////////////////////////*/
 
-/**
- * Handles object forwarding finding for the quality tooling.
- * Describes the object forwarding finding data used by the quality tooling.
- */
+/** A call-site object that repeats values from a source object. */
 export type ObjectForwardingFinding = { file: string; line: number; column: number; callee: string; source: string; properties: string[]; recommendation: string };
 
 /** Counts exact duplicate properties removed and conservative cases left untouched. */

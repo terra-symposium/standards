@@ -20,9 +20,7 @@ REGEX
 //////////////////////////////////////////////////*/
 
 const A_Z_REGEX = /^[A-Z]/;
-/**
- * Describes the rename kind data used by the quality tooling.
- */
+/** Context used when shortening an identifier without changing its meaning. */
 type RenameKind = { numericIndex?: boolean; callback?: boolean; reserved?: string[] };
 export const IDENTIFIER_REPLACEMENTS = replacementMap([
 	[['administrator', 'administration'], 'admin'],
@@ -143,9 +141,7 @@ export const PROTECTED_IDENTIFIERS = new Set([
 export const PROTECTED_PATH_PARTS = new Set(['node_modules', '.next', 'out', 'build', 'coverage', 'src/components/ui']);
 export const PROTECTED_FILENAMES = new Set(['page.tsx', 'page.ts', 'layout.tsx', 'layout.ts', 'route.ts', 'route.tsx', 'error.tsx', 'loading.tsx', 'not-found.tsx', 'index.ts', 'index.tsx']);
 export const CODE_EXTS = new Set(['.js', '.jsx', '.mjs', '.cjs', '.ts', '.tsx', '.mts', '.cts']);
-/**
- * Describes a name that should be shortened or normalized.
- */
+/** A naming issue or concise-name suggestion found in one source file. */
 export type NamingFinding = { file: string; name: string; suggestion: string; severity: 'error' | 'warning'; start: number };
 
 /*//////////////////////////////////////////////////
