@@ -5,7 +5,7 @@
 	"extensions": [".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx", ".mts", ".cts"],
 	"tools": { "eslint": "eslint", "knip": "knip", "prettier": "prettier" },
 	"oneLineImports": true,
-	"singleUse": { "skippedDirectories": ["packages/quality"] },
+	"singleUse": { "skippedDirectories": ["packages/quality", "packages/reporting"] },
 	"renameExports": true,
 	"prettierPrintWidth": 200,
 	"qualityCommands": [

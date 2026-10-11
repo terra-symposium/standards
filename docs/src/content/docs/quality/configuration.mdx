@@ -155,4 +155,4 @@ Regex shared-module extraction expects a repository-relative `.mjs` and matching
 
 ## Terra Shared's own config
 
-This repository scans `packages` and `scripts`, supports JS/TS module extensions, protects long one-line imports, and opts into `build` and `test` commands. It skips single-use in `packages/quality`, where declarations are part of reusable package APIs. Treat it as an example; choose scope to fit your own repository.
+This repository scans `packages` and `scripts`, supports JS/TS module extensions, protects long one-line imports, and opts into `build` and `test` commands. It skips single-use in `packages/quality` and `packages/reporting`, where local helper boundaries preserve readability and evaluation order in reusable packages. Treat it as an example; choose scope to fit your own repository.
