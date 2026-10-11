@@ -12,7 +12,7 @@ IMPORTS
 // API
 import ts from 'typescript';
 import { aliasFindings, declarationScope, isCallbackDeclaration, isProtectedPath, isRenamableDeclaration, namingFindings, renameDeclaration, renameId } from './naming.js';
-import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
+import { basename, dirname, isAbsolute, relative, resolve, sep } from 'node:path';
 import { checkImports } from './imports.js';
 import { collapseInlineIfs } from './inline-if.js';
 import { collapseTypesAndObjects } from './collapse.js';
@@ -1236,6 +1236,7 @@ function acceptTypeSafeEdits(
 }
 /** Prints dead-code findings and sets a failing process status for autofixable issues.
  * @param findings Findings collected by the dead-code coordinator.
+ * @param typeSafetyVerified Whether the candidate autofixes passed TypeScript safety checks.
  */
 function printDeadCodeFindings(findings: DeadCodeFinding[], typeSafetyVerified = true): void {
 	if (!findings.length) {
@@ -1370,7 +1371,10 @@ function runDeadCode(cfg: QualityCfg, fix: boolean, all: boolean, verify = true,
 	return finalFindings;
 }
 
-/** Runs dead-code detectors once without modifying the source tree. */
+/** Runs dead-code detectors once without modifying the source tree.
+ * @param cfg Quality configuration defining source scope and tools.
+ * @param all Whether to inspect all configured source files.
+ */
 function runDeadCodeReadOnly(cfg: QualityCfg, all: boolean): void {
 	runDeadCode(cfg, false, all);
 }
