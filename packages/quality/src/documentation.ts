@@ -47,30 +47,20 @@ const S_CLASS_5 = /^\{[^}]+\}\s*/;
 const OPEN = `/*${'/'.repeat(50)}`;
 const CLOSE = `${'/'.repeat(50)}*/`;
 const SUPPORTED = new Set(['.cjs', '.cts', '.js', '.jsx', '.mjs', '.mts', '.ts', '.tsx']);
-/**
- * Names the canonical sections used to sort imports.
- */
+/** Canonical groups used to order and label source imports. */
 type ImportGroup = 'API' | 'COMPONENTS' | 'DATA' | 'TYPES';
-/**
- * Names the source-file groups used by quality maintenance.
- */
+/** Source-code sections maintained by the documentation formatter. */
 type SrcGroup = 'CONFIG' | 'HELPERS';
-/**
- * Configures which source declarations require TSDoc descriptions.
- */
+/** Declaration categories that can require meaningful TSDoc descriptions. */
 export type DocumentationRequirements = { types?: boolean; functions?: boolean; exportedFunctions?: boolean; noInlineFunctions?: boolean };
-/**
- * Identifies a repeated import that should be grouped with its peer.
- */
+/** A repeated named import reported within one source file. */
 export type DuplicateImportFinding = { file: string; line: number; module: string };
 
 /*//////////////////////////////////////////////////
 DOCUMENTATION
 //////////////////////////////////////////////////*/
 
-/**
- * Describes a documentation-policy finding and its source location.
- */
+/** One missing, malformed, or detached source-documentation item. */
 export type DocumentationFinding = {
 	file: string;
 	line: number;
@@ -81,13 +71,9 @@ export type DocumentationFinding = {
 	severity: 'warning' | 'error';
 };
 export const DOCUMENTATION_DESCRIPTION_NOTICE = 'Ask an agent for meaningful documentation prose; this check only reports missing descriptions and never generates them in bulk.';
-/**
- * Stores the source range and text of one TSDoc block.
- */
+/** Source offsets and exact comment text for one TSDoc block. */
 type TSDocBlock = { start: number; end: number; text: string };
-/**
- * Stores the source offset and content of one TSDoc line.
- */
+/** Character offset and normalized text for one parsed TSDoc line. */
 type TSDocLine = { offset: number; text: string };
 const DESCRIPTION_OPTIONAL_TAGS = new Set(['abstract', 'const', 'default', 'event', 'hideconstructor', 'internal', 'package', 'private', 'protected', 'public', 'readonly', 'sealed', 'virtual']);
 
@@ -306,9 +292,7 @@ export function duplicateImportFindings(files: string[]): DuplicateImportFinding
  */
 function groupedImports(parsed: ts.SourceFile, imports: ts.ImportDeclaration[]): Record<ImportGroup, { source: string; text: string }[]> {
 	const groups: Record<ImportGroup, { source: string; text: string }[]> = { API: [], COMPONENTS: [], DATA: [], TYPES: [] };
-	/**
-	 * Describes the merged import data used by the quality tooling.
-	 */
+	/** Information preserved while import declarations are merged and re-emitted. */
 	type MergedImport = { group: ImportGroup; source: string; module: string; typeOnly: boolean; defaultName?: string; namespace?: string; named: Set<string> };
 	const merged = new Map<string, MergedImport>();
 	const get = (group: ImportGroup, n: ts.ImportDeclaration, typeOnly: boolean) => {
@@ -520,26 +504,21 @@ function removeManagedSects(src: string, fileName: string): string {
 	return matches.sort((a, b) => b.index! - a.index!).reduce((t, m) => `${t.slice(0, m.index!)}${t.slice(m.index! + m[0].length)}`, src);
 }
 
-/**
- * Returns the parameter identifier used for generated TSDoc tags.
- *
- * @param p Function parameter whose name should be rendered in a TSDoc tag.
- * @param i Zero-based parameter position used when the parameter is destructured.
- *
- * @return The identifier name or a stable fallback for the parameter position.
+/** Chooses the TSDoc parameter-tag name for a declared parameter.
+ * @param p Parameter declaration whose binding name should be documented.
+ * @param i Zero-based parameter position used when the binding has no simple identifier.
+ * @returns The identifier name, `props` for object bindings, or a positional fallback.
  */
 function fnParamName(p: ts.ParameterDeclaration, i: number): string {
 	return ts.isIdentifier(p.name) ? p.name.text : ts.isObjectBindingPattern(p.name) ? 'props' : `param${i + 1}`;
 }
 /**
- * Generates a TSDoc block for a function declaration while preserving existing prose.
- *
- * @param n Function declaration whose parameter list determines required tags.
- * @param parsed Parsed source file containing the declaration.
- * @param eol Line-ending sequence used in the generated block.
- * @param existing Existing TSDoc text to retain where possible.
- *
- * @return TSDoc text with parameter tags aligned to the declaration.
+ * Rebuilds a function's TSDoc layout while preserving existing summary and tag prose.
+ * @param n Function declaration whose signature controls required parameter and return tags.
+ * @param parsed Source file containing the declaration.
+ * @param eol Line-ending sequence to emit.
+ * @param existing Existing TSDoc block, when one is present.
+ * @returns Normalized TSDoc text; missing prose remains blank for later authoring.
  */
 function genFnDoc(n: ts.FunctionDeclaration, parsed: ts.SourceFile, eol: string, existing = ''): string {
 	const params = n.parameters.map(fnParamName);
@@ -589,11 +568,11 @@ function genFnDoc(n: ts.FunctionDeclaration, parsed: ts.SourceFile, eol: string,
 /**
  * Adds missing parameter and return tags to existing function TSDoc without inventing prose.
  *
- * @param src Source text being parsed or inspected.
- * @param fileName Source file path being read or updated.
- * @param eol Line-ending sequence retained in the generated source.
+ * @param src Source text whose function documentation should be normalized.
+ * @param fileName Filename used to select the source parser mode.
+ * @param eol Line-ending sequence to emit.
  *
- * @return Whether the requested source update was applied successfully.
+ * @return Updated source text with the required parameter and return tags.
  */
 function maintainFnDocs(src: string, fileName: string, eol: string): string {
 	const parsed = ts.createSourceFile(fileName, src, ts.ScriptTarget.Latest, true, srcKind(fileName));
@@ -740,9 +719,9 @@ export function maintainSrcFile(root: string, fileName: string): boolean {
 /**
  * Removes generated section scaffolding and empty or detached TSDoc after source edits.
  *
- * @param fileName Source file path being read or updated.
+ * @param fileName Source filename whose generated or detached comments should be removed.
  *
- * @return The removenoncodecomments result used by the caller.
+ * @return Whether the file was changed after a validated write.
  */
 export function removeNonCodeComments(fileName: string): boolean {
 	if (!SUPPORTED.has(extname(fileName))) return false;

@@ -1,5 +1,13 @@
 # @terra-symposium/quality
 
+## 0.4.54
+
+### Patch Changes
+
+- Run ESLint in ten-file batches so long full-source checks update progress more frequently.
+- Report missing parameter and return documentation for documented functions whose signatures expose those contracts.
+- Inline all single-use declarations with syntax-checked, context-aware rewrites and support a rule-specific skipped-directory list.
+
 ## 0.4.53
 
 ### Patch Changes
