@@ -16,7 +16,7 @@ import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'nod
 import { checkImports } from './imports.js';
 import { collapseInlineIfs } from './inline-if.js';
 import { collapseTypesAndObjects } from './collapse.js';
-import { copyFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, realpathSync, statSync, writeFileSync } from 'node:fs';
 import { deadCodeEditsIntroduceTypeErrors, deadCodeTypeProgram, fixSingleUseDeclarations, singleUseFindings } from './single-use.js';
 import { documentSrcFile, documentationFindings, duplicateImportFindings, maintainSrcFile, protectLongImports } from './documentation.js';
 import { fileURLToPath } from 'node:url';
@@ -26,7 +26,6 @@ import { qualityProgress } from './progress.js';
 import { securityFindings } from './security.js';
 import { spawnSync } from 'node:child_process';
 import { srcFiles, workingSrcFiles } from './files.js';
-import { tmpdir } from 'node:os';
 
 // DATA
 import { DOCUMENTATION_DESCRIPTION_NOTICE } from './documentation.js';
@@ -1283,7 +1282,7 @@ function acceptTypeSafeEdits(
  *
  * @param findings Quality findings to report or act on.
  */
-function printDeadCodeFindings(findings: DeadCodeFinding[]): void {
+function printDeadCodeFindings(findings: DeadCodeFinding[], typeSafetyVerified = true): void {
 	if (!findings.length) {
 		console.error('  ✓ dead-code checks passed; no autofixable findings or manual warnings remain');
 		return;
@@ -1293,7 +1292,12 @@ function printDeadCodeFindings(findings: DeadCodeFinding[]): void {
 	for (const finding of findings) {
 		console.error(`  - [${finding.severity.toUpperCase()}] ${finding.rule}: ${finding.file}:${finding.line} ${finding.name}`);
 		console.error(`      Reason: ${finding.reason}`);
-		console.error(`      Autofix: ${finding.autofixable ? 'available' : 'not safe or not supported'}`);
+		const autofix = !finding.autofixable
+			? 'not safe or not supported'
+			: typeSafetyVerified
+				? 'available'
+				: 'candidate; fix mode checks TypeScript before writing';
+		console.error(`      Autofix: ${autofix}`);
 		console.error(`      Agent action: ${finding.agentAction}`);
 	}
 	console.error(`  ${errs.length} error${errs.length === 1 ? '' : 's'}; ${warnings.length} manual warning${warnings.length === 1 ? '' : 's'}.`);
@@ -1407,105 +1411,13 @@ function runDeadCode(cfg: QualityCfg, fix: boolean, all: boolean, verify = true,
 				}
 			: finding,
 	);
-	if (emit) printDeadCodeFindings(finalFindings);
+	if (emit) printDeadCodeFindings(finalFindings, fix);
 	return finalFindings;
 }
 
-/**
- * Runs the canonical fixer in a temporary source copy so --warn can distinguish
- * fixes it can land from candidates rejected by the TypeScript safety gate.
- *
- * @param cfg Quality configuration for the user's untouched source tree.
- * @param all Whether every configured source file should be inspected.
- *
- * @return Nothing; remaining automatic fixes set a failing process status.
- */
+/** Runs dead-code detectors once without modifying the source tree. */
 function runDeadCodeReadOnly(cfg: QualityCfg, all: boolean): void {
-	const customToolPath = [cfg.tools?.knip, cfg.tools?.eslint].some((tool) => tool && (isAbsolute(tool) || tool.includes('/') || tool.includes('\\')));
-	if (customToolPath) {
-		runDeadCode(cfg, false, all);
-		return;
-	}
-	const tempRoot = realpathSync(mkdtempSync(join(tmpdir(), 'terra-quality-dead-code-preview-')));
-	try {
-		const sharedRoot = resolve(cfg.root, 'shared');
-		const roots = [...new Set([...cfg.sourceRoots, ...(cfg.includeRoots ?? []), ...(existsSync(sharedRoot) ? [sharedRoot] : [])])].sort((left, right) => left.length - right.length);
-		const copiedRoots: string[] = [];
-		for (const sourceRoot of roots) {
-			const relativeRoot = relative(cfg.root, sourceRoot);
-			if (relativeRoot === '..' || relativeRoot.startsWith(`..${sep}`) || isAbsolute(relativeRoot))
-				throw new Error(`Cannot create a read-only dead-code preview for an external source root: ${sourceRoot}`);
-			if (copiedRoots.some((parent) => relativeRoot === parent || relativeRoot.startsWith(`${parent}${sep}`))) continue;
-			const destination = resolve(tempRoot, relativeRoot);
-			mkdirSync(dirname(destination), { recursive: true });
-			if (existsSync(sourceRoot)) cpSync(sourceRoot, destination, { recursive: true, verbatimSymlinks: true });
-			else mkdirSync(destination, { recursive: true });
-			copiedRoots.push(relativeRoot);
-		}
-		for (const file of [
-			'.prettierrc.mjs',
-			'package.json',
-			'pnpm-lock.yaml',
-			'pnpm-workspace.yaml',
-			'quality.json',
-			'knip.json',
-			'eslint.config.js',
-			'eslint.config.mjs',
-			'eslint.config.cjs',
-			'eslint.config.ts',
-			'eslint.config.mts',
-			'eslint.config.cts',
-			'tailwind.config.mjs',
-			'tailwind.preset.ts',
-			'postcss.config.mjs',
-			'tsconfig.json',
-			'tsconfig.eslint.json',
-			'astro/package.json',
-			'astro/astro.config.mjs',
-			'astro/tsconfig.json',
-			'astro/env.d.ts',
-			'playwright.config.ts',
-		]) {
-			const src = resolve(cfg.root, file);
-			if (!existsSync(src)) continue;
-			const destination = resolve(tempRoot, file);
-			mkdirSync(dirname(destination), { recursive: true });
-			copyFileSync(src, destination);
-		}
-		const srcRoots = [...new Set([...cfg.sourceRoots, ...(cfg.includeRoots ?? [])])];
-		for (const sourceRoot of srcRoots) {
-			for (let dir = sourceRoot; dir === cfg.root || dir.startsWith(`${cfg.root}${sep}`); dir = dirname(dir)) {
-				const srcModules = resolve(dir, 'node_modules');
-				if (existsSync(srcModules)) {
-					const relativeDir = relative(cfg.root, dir);
-					const shadowDir = resolve(tempRoot, relativeDir);
-					mkdirSync(shadowDir, { recursive: true });
-					const link = resolve(shadowDir, 'node_modules');
-					if (!existsSync(link)) symlinkSync(srcModules, link, process.platform === 'win32' ? 'junction' : 'dir');
-				}
-				if (dir === cfg.root) break;
-			}
-		}
-		const shadowCfg = createQualityCfg({
-			...cfg,
-			root: tempRoot,
-			sourceRoots: cfg.sourceRoots.map((path) => relative(cfg.root, path)),
-			includeRoots: (cfg.includeRoots ?? []).map((path) => relative(cfg.root, path)),
-			singleUse: { skippedDirectories: (cfg.singleUse?.skippedDirectories ?? []).map((path) => relative(cfg.root, path)) },
-			skippedFiles: (cfg.skippedFiles ?? []).map((path) => relative(cfg.root, path)),
-			lintRoots: (cfg.lintRoots ?? []).map((path) => relative(cfg.root, path)),
-			typecheckRoots: (cfg.typecheckRoots ?? []).map((path) => relative(cfg.root, path)),
-		});
-		process.exitCode = 0;
-		const before = runDeadCode(shadowCfg, false, all, true, false);
-		const after = runDeadCode(shadowCfg, true, all, true, false);
-		const remaining = new Set(after.map((finding) => `${finding.rule}\0${finding.file}\0${finding.name}`));
-		const unapplied = before.filter((finding) => finding.severity === 'error' && !remaining.has(`${finding.rule}\0${finding.file}\0${finding.name}`));
-		qualityHeader('dead-code', 'Read-only check of unused files, exports, declarations, and single-use code (safe-fix preview runs in a temporary copy)');
-		printDeadCodeFindings([...unapplied, ...after]);
-	} finally {
-		rmSync(tempRoot, { recursive: true, force: true });
-	}
+	runDeadCode(cfg, false, all);
 }
 /**
  * Runs dead code cmd for the configured repository.

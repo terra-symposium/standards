@@ -25,7 +25,7 @@ File scope and write behavior are independent. The default scope is changed and 
 
 `--strict` makes naming errors fail the run. To disable one fixer for every run, set its entry under `autofix` to `false`. Commands and recommendations can also be selected by name in `quality.json`.
 
-Changed-file mode requires a Git worktree. Use `--all` when running from a source archive or when you need a complete scan. `--warn` is review-only for Terra Quality's source and tool autofixes; configured commands still run and follow their own behavior.
+Changed-file mode requires a Git worktree. Use `--all` when running from a source archive or when you need a complete scan. `--warn` is review-only for Terra Quality's source and tool autofixes. Dead-code analysis runs once and reports rule-level autofix candidates from that scan; fix mode type-checks proposed edits before writing and can reject a candidate. Configured commands still run and follow their own behavior.
 
 ## CI
 
