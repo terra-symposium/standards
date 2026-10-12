@@ -6,7 +6,9 @@
     "dev": "astro dev",
     "build": "astro build",
     "test": "tsx --test test/*.test.ts",
-    "db:migrate": "node --experimental-strip-types scripts/migrate.ts"
+    "db:migrate": "node --experimental-strip-types scripts/migrate.ts",
+    "history:import": "tsx scripts/import-local-history.ts",
+    "reports:import": "tsx scripts/import-local-build-report.ts"
   },
   "dependencies": {
     "@astrojs/react": "^7.0.1",

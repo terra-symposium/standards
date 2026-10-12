@@ -29,7 +29,7 @@ export default async function handler(request: Request): Promise<Response> {
   const branch = url.searchParams.get('branch') ?? 'main';
   const selectedBranch = branches.find((row) => row.name === branch && row.enabled) as { history_status: string; history_count: number } | undefined;
   if (!selectedBranch) return Response.json({ error: 'Branch not tracked' }, { status: 404 });
-  const runs = await sql`SELECT run_id, run_attempt, head_sha, completed_at, conclusion, tests_passed, tests_failed, tests_skipped, checks_enabled, checks_total, checks_clean, quality_findings FROM runs WHERE repository_id = ${id} AND branch = ${branch} ORDER BY completed_at DESC LIMIT 300`;
+  const runs = await sql`SELECT run_id, run_attempt, head_sha, completed_at, conclusion, run_source AS source, quality_policy_branch, tests_passed, tests_failed, tests_skipped, checks_enabled, checks_total, checks_clean, quality_findings FROM runs WHERE repository_id = ${id} AND branch = ${branch} ORDER BY completed_at DESC LIMIT 300`;
   const requestedPage = Number(url.searchParams.get('commitPage') ?? '1');
   if (!Number.isSafeInteger(requestedPage) || requestedPage < 1) return Response.json({ error: 'Invalid commit page' }, { status: 400 });
   const countRows = selectedBranch.history_status === 'complete' ? await sql`SELECT count(*) AS total FROM commits WHERE repository_id = ${id} AND branch = ${branch}` : [];
