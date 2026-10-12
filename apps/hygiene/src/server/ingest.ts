@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { db } from './db.js';
-import { parseBuildReport, reportTargetsTrackedBranch, type BuildReport, type HistoryReport } from './history.js';
+import { parseBuildReport, parseHistoryReport, reportTargetsTrackedBranch, type BuildReport, type HistoryReport } from './history.js';
 
 /** Normalize report inputs before they are written to Neon. */
 export function buildReportCounts(input: unknown): { report: BuildReport; tests: BuildReport['tests']; quality: BuildReport['quality'] } {
@@ -52,8 +52,26 @@ async function persistHistoryReport(repositoryId: number, runId: number, report:
 	WHERE b.repository_id = ${repositoryId} AND b.name = ${report.branch} AND EXISTS (SELECT 1 FROM recorded)`;
 }
 
+/** Persist a local history import without presenting it as a CI build. */
+export async function ingestHistoryReport(repositoryId: number, input: unknown): Promise<void> {
+	const report = parseHistoryReport(input);
+	const sql = db();
+	const rows = await sql`SELECT owner, name FROM repositories WHERE id = ${repositoryId} AND active`;
+	const repository = rows[0] as { owner: string; name: string } | undefined;
+	if (!repository || `${repository.owner}/${repository.name}`.toLowerCase() !== report.repository.toLowerCase()) throw new Error('report does not match an active repository');
+	const branchRows = await sql`SELECT name FROM branches WHERE repository_id = ${repositoryId} AND name = ${report.branch} AND enabled`;
+	if (!branchRows.length) throw new Error('branch is not enabled');
+	const runId = buildRunId({ repository: report.repository, branch: report.branch, headSha: report.headSha, completedAt: report.generatedAt });
+	await persistHistoryReport(repositoryId, runId, report, report.generatedAt);
+}
+
 /** Persist only normalized build metrics and history metadata from a validated report. */
-export async function ingestBuildReport(repositoryId: number, report: BuildReport): Promise<void> {
+export async function ingestBuildReport(
+	repositoryId: number,
+	report: BuildReport,
+	source: 'github-actions' | 'local' = 'github-actions',
+	qualityPolicyBranch: string | null = null,
+): Promise<void> {
 	const sql = db();
 	const rows = await sql`SELECT owner, name FROM repositories WHERE id = ${repositoryId} AND active`;
 	const repository = rows[0] as { owner: string; name: string } | undefined;
@@ -63,12 +81,12 @@ export async function ingestBuildReport(repositoryId: number, report: BuildRepor
 	if (!branchRows.length) throw new Error('branch is not enabled');
 
 	const runId = buildRunId(report);
-	await sql`INSERT INTO runs (repository_id, branch, run_id, run_attempt, head_sha, completed_at, conclusion, tests_passed, tests_failed, tests_skipped, checks_enabled, checks_total, checks_clean, quality_findings)
-		VALUES (${repositoryId}, ${report.branch}, ${runId}, 1, ${report.headSha}, ${report.completedAt}, ${report.conclusion}, ${report.tests?.passed ?? null}, ${report.tests?.failed ?? null}, ${report.tests?.skipped ?? null}, ${report.quality?.enabled ?? null}, ${report.quality?.total ?? null}, ${report.quality?.clean ?? null}, ${report.quality?.findings ?? null})
+	await sql`INSERT INTO runs (repository_id, branch, run_id, run_attempt, head_sha, completed_at, conclusion, tests_passed, tests_failed, tests_skipped, checks_enabled, checks_total, checks_clean, quality_findings, run_source, quality_policy_branch)
+		VALUES (${repositoryId}, ${report.branch}, ${runId}, 1, ${report.headSha}, ${report.completedAt}, ${report.conclusion}, ${report.tests?.passed ?? null}, ${report.tests?.failed ?? null}, ${report.tests?.skipped ?? null}, ${report.quality?.enabled ?? null}, ${report.quality?.total ?? null}, ${report.quality?.clean ?? null}, ${report.quality?.findings ?? null}, ${source}, ${qualityPolicyBranch})
 		ON CONFLICT (repository_id, run_id, run_attempt) DO UPDATE SET branch = excluded.branch, head_sha = excluded.head_sha, completed_at = excluded.completed_at,
 			conclusion = excluded.conclusion, tests_passed = excluded.tests_passed, tests_failed = excluded.tests_failed, tests_skipped = excluded.tests_skipped,
 			checks_enabled = excluded.checks_enabled, checks_total = excluded.checks_total, checks_clean = excluded.checks_clean,
-			quality_findings = excluded.quality_findings, processed_at = now()`;
+			quality_findings = excluded.quality_findings, run_source = excluded.run_source, quality_policy_branch = excluded.quality_policy_branch, processed_at = now()`;
 
 	if (report.history && reportTargetsTrackedBranch(report.history, `${repository.owner}/${repository.name}`, [report.branch])) {
 		await persistHistoryReport(repositoryId, runId, report.history, report.completedAt);

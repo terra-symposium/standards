@@ -11,3 +11,6 @@ coverage/
 
 # Local Netlify folder
 .netlify
+
+# Local environment credentials
+**/.env.local
