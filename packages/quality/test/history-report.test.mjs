@@ -29,9 +29,9 @@ function historyFixture() {
 	git(root, ['config', 'user.name', 'Terra Test']);
 	git(root, ['config', 'user.email', 'terra@example.test']);
 	const write = (path, contents) => {
-		const target = join(root, path);
-		mkdirSync(join(target, '..'), { recursive: true });
-		writeFileSync(target, contents);
+		const tgt = join(root, path);
+		mkdirSync(join(tgt, '..'), { recursive: true });
+		writeFileSync(tgt, contents);
 	};
 	write('src/main.ts', 'one\ntwo\n');
 	write('test/main.test.ts', 'test\n');
@@ -72,20 +72,23 @@ test('full snapshots include dates, source totals, and source-only changes acros
 		assert.equal(report.commits[2].additions, 3);
 		assert.equal(report.commits[2].deletions, 3);
 		assert.equal(report.commits[2].sourceLines, 4);
-	} finally { rmSync(root, { recursive: true, force: true }); }
+	} finally {
+		rmSync(root, { recursive: true, force: true });
+	}
 });
 
 test('history scope includes tests and excludes generated, vendor, documentation, dependency, build and configuration files', () => {
 	assert.equal(isHistorySourcePath('src/main.ts'), true);
 	assert.equal(isHistorySourcePath('test/main.test.ts'), true);
-	for (const path of ['node_modules/a.ts', 'vendor/a.py', 'dist/a.js', 'docs/example.ts', 'src/generated/a.ts', 'src/vite.config.ts', 'tsconfig.json']) assert.equal(isHistorySourcePath(path), false, path);
+	for (const path of ['node_modules/a.ts', 'vendor/a.py', 'dist/a.js', 'docs/example.ts', 'src/generated/a.ts', 'src/vite.config.ts', 'tsconfig.json'])
+		assert.equal(isHistorySourcePath(path), false, path);
 });
 
 test('push deltas contain commits after the supplied base and the CLI writes schema version 1', () => {
 	const { root, secondSha, headSha } = historyFixture();
-	const oldRepository = process.env.GITHUB_REPOSITORY;
+	const oldRepo = process.env.GITHUB_REPOSITORY;
 	const oldBranch = process.env.GITHUB_REF_NAME;
-	const previousCwd = process.cwd();
+	const prevCwd = process.cwd();
 	try {
 		const delta = createHistoryReport(root, { repository: 'owner/repo', branch: 'main', baseSha: secondSha });
 		assert.equal(delta.mode, 'delta');
@@ -96,12 +99,20 @@ test('push deltas contain commits after the supplied base and the CLI writes sch
 		process.env.GITHUB_REPOSITORY = 'owner/repo';
 		process.env.GITHUB_REF_NAME = 'main';
 		process.chdir(root);
-		runQualityFromCfg(undefined, ['history', '--report-json', 'history.json']);
-		assert.equal(JSON.parse(readFileSync(join(root, 'history.json'), 'utf8')).schemaVersion, 1);
+		runQualityFromCfg(undefined, ['history', '--branch', 'main', '--report-json', 'history.json']);
+		const snapshot = JSON.parse(readFileSync(join(root, 'history.json'), 'utf8'));
+		assert.equal(snapshot.schemaVersion, 1);
+		assert.equal(snapshot.mode, 'snapshot');
+		assert.equal(snapshot.branch, 'main');
+		runQualityFromCfg(undefined, ['history', '--branch', 'main', '--base-sha', secondSha, '--report-json', 'delta.json']);
+		const deltaReport = JSON.parse(readFileSync(join(root, 'delta.json'), 'utf8'));
+		assert.equal(deltaReport.mode, 'delta');
+		assert.equal(deltaReport.baseSha, secondSha);
+		assert.equal(deltaReport.commits.length, 1);
 	} finally {
-		process.chdir(previousCwd);
-		if (oldRepository === undefined) delete process.env.GITHUB_REPOSITORY;
-		else process.env.GITHUB_REPOSITORY = oldRepository;
+		process.chdir(prevCwd);
+		if (oldRepo === undefined) delete process.env.GITHUB_REPOSITORY;
+		else process.env.GITHUB_REPOSITORY = oldRepo;
 		if (oldBranch === undefined) delete process.env.GITHUB_REF_NAME;
 		else process.env.GITHUB_REF_NAME = oldBranch;
 		rmSync(root, { recursive: true, force: true });
@@ -115,9 +126,9 @@ test('merge commits count source changes against their first parent', () => {
 		git(root, ['config', 'user.name', 'Terra Test']);
 		git(root, ['config', 'user.email', 'terra@example.test']);
 		const write = (path, contents) => {
-			const target = join(root, path);
-			mkdirSync(join(target, '..'), { recursive: true });
-			writeFileSync(target, contents);
+			const tgt = join(root, path);
+			mkdirSync(join(tgt, '..'), { recursive: true });
+			writeFileSync(tgt, contents);
 		};
 		write('src/main.ts', 'main\n');
 		git(root, ['add', '.']);
@@ -138,5 +149,7 @@ test('merge commits count source changes against their first parent', () => {
 		assert.equal(merge.additions, 1);
 		assert.equal(merge.deletions, 0);
 		assert.equal(merge.sourceLines, 3);
-	} finally { rmSync(root, { recursive: true, force: true }); }
+	} finally {
+		rmSync(root, { recursive: true, force: true });
+	}
 });

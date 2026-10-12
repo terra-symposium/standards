@@ -1,49 +1,64 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { zipSync, strToU8 } from 'fflate';
 import { parseJUnit, parseQualityReport, score } from '../src/server/metrics.js';
-import { reportsFromZip, eligibleRun } from '../src/server/ingest.js';
-import { parseHistoryReport, reportTargetsTrackedBranch } from '../src/server/history.js';
-import { appJwt, repositoryAdmin } from '../src/server/github.js';
+import { buildReportCounts, buildRunId } from '../src/server/ingest.js';
+import { parseBuildReport, parseHistoryReport, reportTargetsTrackedBranch } from '../src/server/history.js';
+import { repositoryAdmin } from '../src/server/github.js';
 import { acceptDelivery, repositoryOwner, verifySignature } from '../netlify/functions/webhook.mts';
-import { createHmac, generateKeyPairSync, verify } from 'node:crypto';
-import { validInternalSecret } from '../src/server/auth.js';
+import { createHmac } from 'node:crypto';
+import { hashReportToken, matchesReportToken } from '../src/server/report-auth.js';
 
 test('JUnit counts failures, errors and skipped cases without suite double counting', () => {
   const xml = '<testsuites><testsuite tests="4"><testcase name="a"/><testcase name="b"><failure/></testcase><testcase name="c"><error/></testcase><testcase name="d"><skipped/></testcase></testsuite></testsuites>';
   assert.deepEqual(parseJUnit(xml), { passed: 1, failed: 2, skipped: 1 });
 });
-
 test('quality contract rejects unknown versions and counts clean checks', () => {
   assert.deepEqual(parseQualityReport({ schemaVersion: 1, checks: [{ name: 'lint', status: 'passed', findings: 0 }, { name: 'imports', status: 'findings', findings: 2 }, { name: 'format', status: 'skipped', findings: 0 }] }), { total: 3, enabled: 2, clean: 1, findings: 2 });
   assert.throws(() => parseQualityReport({ schemaVersion: 2, checks: [] }), /Unsupported/);
 });
 
-test('failed workflow artifact still produces both metric inputs', () => {
-  const bytes = zipSync({ 'terra-quality.json': strToU8(JSON.stringify({ schemaVersion: 1, checks: [{ name: 'lint', status: 'failed', findings: 1 }] })), 'junit.xml': strToU8('<testsuite><testcase name="a"><failure/></testcase></testsuite>') });
-  const reports = reportsFromZip(bytes);
-  assert.deepEqual(reports.tests, { passed: 0, failed: 1, skipped: 0 });
-  assert.deepEqual(reports.quality, { total: 1, enabled: 1, clean: 0, findings: 1 });
-  assert.equal(reports.hasJUnit, true);
-  assert.equal(reports.hasQuality, true);
-  assert.deepEqual(reports.history, []);
-  const run = { status: 'completed', conclusion: 'failure', event: 'push', head_branch: 'main' } as Parameters<typeof eligibleRun>[0];
-  assert.equal(eligibleRun(run, ['main']), true);
-  assert.equal(eligibleRun({ ...run, event: 'pull_request' }, ['main']), false);
+test('failed Netlify builds still produce both test and quality metric inputs', () => {
+  const report = buildReportCounts({ schemaVersion: 1, repository: 'owner/repo', branch: 'main', headSha: 'a'.repeat(40), completedAt: '2026-01-01T00:00:00.000Z', conclusion: 'failure', junitXml: '<testsuite><testcase name="a"><failure/></testcase></testsuite>', quality: { schemaVersion: 1, checks: [{ name: 'lint', status: 'failed', findings: 1 }] }, history: null });
+  assert.deepEqual(report.tests, { passed: 0, failed: 1, skipped: 0 });
+  assert.deepEqual(report.quality, { total: 1, enabled: 1, clean: 0, findings: 1 });
+  assert.equal(report.report.conclusion, 'failure');
 });
 
-test('history-only artifacts leave test and quality metrics missing', () => {
+test('history-only build reports leave test and quality metrics missing', () => {
   const sha = 'a'.repeat(40);
-  const reports = reportsFromZip(zipSync({ 'terra-history-main.json': strToU8(JSON.stringify({
+  const report = buildReportCounts({ schemaVersion: 1, repository: 'owner/repo', branch: 'main', headSha: sha, completedAt: '2026-01-01T00:00:00.000Z', conclusion: 'success', junitXml: null, quality: null, history: {
     schemaVersion: 1, mode: 'snapshot', repository: 'owner/repo', branch: 'main', headSha: sha, baseSha: null,
     generatedAt: '2026-01-01T00:00:00.000Z', commits: [{ sha, authorDate: '2026-01-01T00:00:00.000Z', additions: 0, deletions: 0, sourceLines: 1 }],
-  })) }));
-  assert.equal(reports.tests, null);
-  assert.equal(reports.quality, null);
-  assert.equal(reports.hasJUnit, false);
-  assert.equal(reports.hasQuality, false);
-  assert.equal(reports.history.length, 1);
-  assert.equal(score(reports.tests, reports.quality).score, null);
+  } });
+  assert.equal(report.tests, null);
+  assert.equal(report.quality, null);
+  assert.equal(report.report.history?.commits.length, 1);
+  assert.equal(score(report.tests, report.quality).score, null);
+});
+
+test('build reports reject unknown versions, mismatched history heads, and another branch', () => {
+  const sha = 'b'.repeat(40);
+  const report = { schemaVersion: 1, repository: 'owner/repo', branch: 'development', headSha: sha, completedAt: '2026-01-01T00:00:00.000Z', conclusion: 'success', junitXml: null, quality: null, history: null };
+  assert.equal(parseBuildReport(report).branch, 'development');
+  assert.throws(() => parseBuildReport({ ...report, schemaVersion: 2 }), /Unsupported/);
+  const otherHead = 'c'.repeat(40);
+  const otherHistory = { schemaVersion: 1, mode: 'snapshot', repository: 'owner/repo', branch: 'development', headSha: otherHead, baseSha: null, generatedAt: report.completedAt, commits: [{ sha: otherHead, authorDate: report.completedAt, additions: 0, deletions: 0, sourceLines: 1 }] };
+  assert.throws(() => parseBuildReport({ ...report, history: otherHistory }), /does not match/);
+  assert.throws(() => parseHistoryReport({ ...otherHistory, commits: [] }), /at least one commit/);
+  assert.equal(reportTargetsTrackedBranch({ schemaVersion: 1, mode: 'snapshot', repository: 'owner/repo', branch: 'development', headSha: sha, baseSha: null, generatedAt: report.completedAt, commits: [{ sha, authorDate: report.completedAt, additions: 0, deletions: 0, sourceLines: 0 }] }, 'owner/repo', ['main']), false);
+});
+
+test('empty history deltas are valid only when the base already equals the head', () => {
+  const sha = 'd'.repeat(40);
+  const delta = { schemaVersion: 1, mode: 'delta', repository: 'owner/repo', branch: 'main', headSha: sha, baseSha: sha, generatedAt: '2026-01-01T00:00:00.000Z', commits: [] };
+  assert.deepEqual(parseHistoryReport(delta).commits, []);
+  assert.throws(() => parseHistoryReport({ ...delta, baseSha: 'e'.repeat(40) }), /Empty delta/);
+});
+
+test('build run identifiers stay stable across retries and change between builds', () => {
+  const report = { repository: 'owner/repo', branch: 'main', headSha: 'f'.repeat(40), completedAt: '2026-01-01T00:00:00.000Z' };
+  assert.equal(buildRunId(report), buildRunId(report));
+  assert.notEqual(buildRunId(report), buildRunId({ ...report, completedAt: '2026-01-01T00:00:01.000Z' }));
 });
 
 test('score averages components and disappears with missing data', () => {
@@ -131,10 +146,13 @@ test('installation repository payloads can omit the owner object', () => {
   assert.throws(() => repositoryOwner({ id: 1, name: 'repo', private: true }), /missing an owner/);
 });
 
-test('internal jobs reject a missing server secret', () => {
-  assert.equal(validInternalSecret('', undefined), false);
-  assert.equal(validInternalSecret('wrong', 'expected'), false);
-  assert.equal(validInternalSecret('expected', 'expected'), true);
+test('repository build tokens are stored and compared as repository-scoped hashes', () => {
+  const token = 'netlify-build-token';
+  const hash = hashReportToken(token);
+  assert.notEqual(hash, token);
+  assert.equal(matchesReportToken(token, hash), true);
+  assert.equal(matchesReportToken('another-repository-token', hash), false);
+  assert.equal(matchesReportToken(token, null), false);
 });
 
 test('repository admin check denies another repository administrator', async () => {
@@ -144,21 +162,4 @@ test('repository admin check denies another repository administrator', async () 
     assert.equal(await repositoryAdmin('owner', 'own', 'alice', 'token'), true);
     assert.equal(await repositoryAdmin('other', 'private', 'alice', 'token'), false);
   } finally { globalThis.fetch = previous; }
-});
-
-test('App JWT accepts a base64-prefixed private key', () => {
-  const previousAppId = process.env.GITHUB_APP_ID;
-  const previousPrivateKey = process.env.GITHUB_APP_PRIVATE_KEY;
-  const { privateKey, publicKey } = generateKeyPairSync('rsa', { modulusLength: 1024 });
-  process.env.GITHUB_APP_ID = '1234';
-  process.env.GITHUB_APP_PRIVATE_KEY = `base64:${Buffer.from(privateKey.export({ type: 'pkcs8', format: 'pem' })).toString('base64')}`;
-  try {
-    const [header, payload, signature] = appJwt().split('.');
-    assert.equal(verify('RSA-SHA256', Buffer.from(`${header}.${payload}`), publicKey, Buffer.from(signature, 'base64url')), true);
-  } finally {
-    if (previousAppId === undefined) delete process.env.GITHUB_APP_ID;
-    else process.env.GITHUB_APP_ID = previousAppId;
-    if (previousPrivateKey === undefined) delete process.env.GITHUB_APP_PRIVATE_KEY;
-    else process.env.GITHUB_APP_PRIVATE_KEY = previousPrivateKey;
-  }
 });
