@@ -1,9 +1,8 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { db } from '../../src/server/db.js';
-import { enqueue } from '../../src/server/jobs.js';
-import type { GithubRepository, WorkflowRun } from '../../src/server/github.js';
+import type { GithubRepository } from '../../src/server/github.js';
 
-type Event = { action?: string; installation?: { id: number; account?: { login?: string } }; repositories?: GithubRepository[]; repositories_added?: GithubRepository[]; repositories_removed?: GithubRepository[]; repository?: GithubRepository; workflow_run?: WorkflowRun; ref?: string };
+type Event = { action?: string; installation?: { id: number; account?: { login?: string } }; repositories?: GithubRepository[]; repositories_added?: GithubRepository[]; repositories_removed?: GithubRepository[] };
 
 export function repositoryOwner(repo: GithubRepository, installationOwner?: string): string {
   const fullNameOwner = repo.full_name?.split('/');
@@ -54,9 +53,6 @@ export default async function handler(request: Request): Promise<Response> {
         }
         for (const repo of event.repositories_removed ?? []) await sql`UPDATE repositories SET active = false, updated_at = now() WHERE id = ${repo.id}`;
         if (event.action === 'deleted') await sql`UPDATE repositories SET active = false, updated_at = now() WHERE installation_id = ${installationId}`;
-      }
-      if (kind === 'workflow_run' && event.action === 'completed' && event.workflow_run) {
-        await enqueue({ repositoryId: event.workflow_run.repository.id, runId: event.workflow_run.id });
       }
     },
     async () => { await sql`DELETE FROM deliveries WHERE id = ${delivery}`; },

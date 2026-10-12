@@ -12,7 +12,6 @@
     "@astrojs/react": "^4.4.2",
     "@neondatabase/serverless": "^1.0.2",
     "astro": "^5.16.6",
-    "fflate": "^0.8.2",
     "fast-xml-parser": "^5.2.5",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"
