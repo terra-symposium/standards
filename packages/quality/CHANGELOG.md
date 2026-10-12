@@ -1,5 +1,11 @@
 # @terra-symposium/quality
 
+## 0.5.0
+
+### Minor Changes
+
+- d8ad7c5: Add versioned quality and local Git history reports for CI hygiene artifacts.
+
 ## 0.4.54
 
 ### Patch Changes
