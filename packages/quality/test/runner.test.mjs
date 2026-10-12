@@ -139,6 +139,20 @@ test('CLI version and invalid arguments never dispatch quality work', () => {
 	assert.equal(result.stdout.trim(), version);
 	assert.equal(result.stderr, '');
 });
+test('CLI writes a versioned report with check statuses and finding counts', () => {
+	const root = fixtureRoot('terra-quality-json-report-');
+	fixtureFile(root, 'src/main.ts', 'export const value = 1;\n');
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
+	resetExitCode();
+	runQualityCli(cfg, ['imports', '--all', '--warn', '--report-json', 'terra-quality.json']);
+	const report = JSON.parse(fixtureText(root, 'terra-quality.json'));
+	assert.equal(report.schemaVersion, 1);
+	assert.equal(report.command, 'imports');
+	assert.equal(report.scope, 'all');
+	assert.ok(Array.isArray(report.checks));
+	assert.ok(report.checks.some((check) => check.name === 'imports' && check.status === 'passed' && check.findings === 0));
+	resetExitCode();
+});
 test('repeated naming repair never appends a second import for an already-bound local name', () => {
 	const root = fixtureRoot('terra-quality-naming-import-idempotence-');
 	const src = fixtureFile(
