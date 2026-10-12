@@ -1,12 +1,5 @@
 # @terra-symposium/quality
 
-## 0.5.0
-
-### Minor Changes
-
-- Add a versioned JSON report option for repository hygiene dashboards, with per-check status and finding counts.
-- 2ec48fc: Add versioned quality and local Git history reports for CI hygiene artifacts.
-
 ## 0.4.54
 
 ### Patch Changes

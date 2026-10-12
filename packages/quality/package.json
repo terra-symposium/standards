@@ -1,6 +1,6 @@
 {
 	"name": "@terra-symposium/quality",
-	"version": "0.5.0",
+	"version": "0.4.54",
 	"description": "Configurable quality checks and maintenance tooling for Terra Symposium repositories",
 	"homepage": "https://terra-symposium-quality.netlify.app/",
 	"type": "module",
