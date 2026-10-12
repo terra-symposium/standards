@@ -26,6 +26,7 @@ import { qualityProgress } from './progress.js';
 import { securityFindings } from './security.js';
 import { spawnSync } from 'node:child_process';
 import { srcFiles, workingSrcFiles } from './files.js';
+import { writeHistoryReport } from './history-report.js';
 
 // DATA
 import { DOCUMENTATION_DESCRIPTION_NOTICE } from './documentation.js';
@@ -50,6 +51,7 @@ const G_REGEX = () => /-/g;
 const C_M_JS_TS_REGEX = /\.(?:c|m)?(?:js|ts)$/;
 const CLI_CMDS = new Set([
 	'quality',
+	'history',
 	'quality:all',
 	'quality:baseline',
 	'document',
@@ -71,9 +73,20 @@ const CLI_CMDS = new Set([
 	'knip',
 	'types',
 ]);
-const CLI_FLAGS = new Set(['--all', '--warn', '--strict', '--skip-commands', '--skip-recommendations', '--help', '-h', '--version', '-v']);
+const CLI_FLAGS = new Set(['--all', '--warn', '--strict', '--skip-commands', '--skip-recommendations', '--help', '-h', '--version', '-v', '--report-json']);
 const TOOL_OUTPUT_MAX_BUFFER = 64 * 1024 * 1024;
 const ESLINT_BATCH_SIZE = 10;
+
+/** Stable, artifact-safe summary of a single CLI invocation. */
+export type QualityJsonReport = {
+	schemaVersion: 1;
+	generatedAt: string;
+	command: string;
+	scope: 'all' | 'changed';
+	checks: { name: string; status: 'passed' | 'findings' | 'failed' | 'skipped'; findings: number }[];
+};
+let reportStages: Map<string, QualityJsonReport['checks'][number]> | undefined;
+let reportStageName: string | undefined;
 
 /*//////////////////////////////////////////////////
 REGEX
@@ -311,6 +324,10 @@ function toolPath(cfg: QualityCfg, cfgd: string | undefined, fallback: string): 
  * @return Nothing; the heading is written to standard error with the other quality messages.
  */
 function qualityHeader(name: string, detail: string): void {
+	if (reportStages) {
+		reportStageName = name;
+		reportStages.set(name, { name, status: 'passed', findings: 0 });
+	}
 	console.error(`\n=== ${name} ===`);
 	console.error(detail);
 }
@@ -354,6 +371,10 @@ function printChildOutput(val: string | Buffer | null | undefined): void {
  */
 function run(cfg: QualityCfg, cmd: string, args: string[], opts: { quietSuccess?: boolean } = {}): number {
 	const result = spawnSync(cmd, args, { cwd: cfg.root, stdio: ['inherit', 'pipe', 'pipe'], env: process.env, maxBuffer: TOOL_OUTPUT_MAX_BUFFER });
+	if (result.status && reportStages && reportStageName) {
+		const stage = reportStages.get(reportStageName);
+		if (stage) stage.status = 'failed';
+	}
 	if (!opts.quietSuccess || result.status) {
 		printChildOutput(result.stdout);
 		printChildOutput(result.stderr);
@@ -1239,6 +1260,13 @@ function acceptTypeSafeEdits(
  * @param typeSafetyVerified Whether the candidate autofixes passed TypeScript safety checks.
  */
 function printDeadCodeFindings(findings: DeadCodeFinding[], typeSafetyVerified = true): void {
+	if (reportStages) {
+		const stage = reportStages.get('dead-code');
+		if (stage) {
+			stage.findings = findings.length;
+			if (findings.length) stage.status = 'findings';
+		}
+	}
 	if (!findings.length) {
 		console.error('  ✓ dead-code checks passed; no autofixable findings or manual warnings remain');
 		return;
@@ -1411,6 +1439,13 @@ function runDiffCheck(cfg: QualityCfg): void {
  * @return Nothing; findings and a clean summary are written to the console.
  */
 function printFindings<T>(findings: readonly T[], fmt: (finding: T) => string): void {
+	if (reportStages && reportStageName && findings.length) {
+		const stage = reportStages.get(reportStageName);
+		if (stage) {
+			stage.findings += findings.length;
+			stage.status = 'findings';
+		}
+	}
 	if (!findings.length) {
 		console.error('  ✓ clean');
 		return;
@@ -1801,6 +1836,51 @@ function runDocumentation(cfg: QualityCfg, opts: QualityOptions, args: string[],
  */
 export function runQualityCli(cfg: QualityCfg, args = process.argv.slice(2)): void {
 	validCliArgs(args);
+	const reportIndex = args.indexOf('--report-json');
+	const reportPath = reportIndex < 0 ? undefined : args[reportIndex + 1];
+	const commandArgs = reportIndex < 0 ? args : args.filter((_, i) => i !== reportIndex && i !== reportIndex + 1);
+	if (!reportPath) {
+		dispatchQualityCli(cfg, commandArgs);
+		return;
+	}
+	reportStages = new Map();
+	reportStageName = undefined;
+	try {
+		dispatchQualityCli(cfg, commandArgs);
+	} finally {
+		const executed = [...reportStages.values()].filter((stage) => {
+			if (stage.name.includes('/') || stage.name.startsWith('recommendation:')) return false;
+			const names: Record<string, QualityCheckName> = { imports: 'import', naming: 'name', aliases: 'alias', forwarding: 'forward', documentation: 'document', typecheck: 'type' };
+			const check = names[stage.name] ?? (stage.name.startsWith('command:') ? 'command' : stage.name) as QualityCheckName;
+			if (!qualityCheckEnabled(cfg, check)) return false;
+			if (stage.name === 'security' && !cfg.security) return false;
+			if (stage.name === 'repeated-classes' && !cfg.repeatedClasses) return false;
+			if (stage.name === 'regex-dedup' && !cfg.regexDedup) return false;
+			if (stage.name === 'ui-patterns' && !cfg.uiPatterns) return false;
+			return true;
+		});
+		const standard = ['documentation', 'format', 'imports', 'naming', 'forwarding', 'lint', 'dead-code', 'typecheck', 'diff', 'aliases', 'security', 'repeated-classes', 'regex-dedup', 'ui-patterns'];
+		const report: QualityJsonReport = {
+			schemaVersion: 1,
+			generatedAt: new Date().toISOString(),
+			command: commandArgs.find((arg) => !arg.startsWith('-')) ?? 'quality',
+			scope: commandArgs.includes('--all') || commandArgs.includes('quality:all') ? 'all' : 'changed',
+			checks: [...executed, ...standard.filter((name) => !executed.some((stage) => stage.name === name)).map((name) => ({ name, status: 'skipped' as const, findings: 0 }))],
+		};
+		writeFileSync(resolve(cfg.root, reportPath), `${JSON.stringify(report, null, 2)}\n`);
+		reportStages = undefined;
+		reportStageName = undefined;
+	}
+}
+
+/**
+ * Route validated arguments to the requested quality command.
+ *
+ * @param cfg Normalized repository quality configuration.
+ * @param args Validated CLI arguments.
+ */
+function dispatchQualityCli(cfg: QualityCfg, args: string[]): void {
+	validCliArgs(args);
 	if (args.includes('--version') || args.includes('-v')) {
 		const pkg = JSON.parse(readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), '../package.json'), 'utf8')) as { version: string };
 		console.info(pkg.version);
@@ -1808,8 +1888,8 @@ export function runQualityCli(cfg: QualityCfg, args = process.argv.slice(2)): vo
 	}
 	if (args.includes('--help') || args.includes('-h')) {
 		console.info('Usage: terra-quality <command> [options]');
-		console.info('Commands include quality, document, format, lint, knip, types, single-use, dead-code, security, and domain.');
-		console.info('Options: --all, --warn, --strict, --skip-commands, --skip-recommendations.');
+		console.info('Commands include quality, history, document, format, lint, knip, types, single-use, dead-code, security, and domain.');
+		console.info('Options: --all, --warn, --strict, --skip-commands, --skip-recommendations, --report-json <path>.');
 		return;
 	}
 	const cmd = args.find((a) => !a.startsWith('-')) ?? 'quality';
@@ -1968,14 +2048,21 @@ export function runQualityFromCfg(file?: string, args = process.argv.slice(2)): 
 		runQualityCli({} as QualityCfg, args);
 		return;
 	}
+	const reportIndex = args.indexOf('--report-json');
+	const command = args.find((arg, index) => index !== reportIndex + 1 && !arg.startsWith('-')) ?? 'quality';
+	if (command === 'history') {
+		const reportPath = reportIndex < 0 ? undefined : args[reportIndex + 1];
+		if (!reportPath) throw new Error('terra-quality history requires --report-json <path>.');
+		writeHistoryReport(process.cwd(), reportPath);
+		return;
+	}
 	const cfg = loadQualityCfg(file);
-	const cmd = args.find((arg) => !arg.startsWith('-')) ?? 'quality';
 	const lintCmds = new Set(['quality', 'quality:all', 'quality:baseline', 'document', 'maintain', 'dead-code', 'knip', 'lint', 'naming', 'single-use']);
-	if (lintCmds.has(cmd) && qualityCheckEnabled(cfg, 'lint')) {
+	if (lintCmds.has(command) && qualityCheckEnabled(cfg, 'lint')) {
 		const flatCfg = ['eslint.config.js', 'eslint.config.mjs', 'eslint.config.cjs', 'eslint.config.ts', 'eslint.config.mts', 'eslint.config.cts']
 			.map((config) => resolve(cfg.root, config))
 			.find((config) => existsSync(config));
-		if (!flatCfg) throw new Error(`ESLint flat config is required for ${cmd}. Add eslint.config.js, eslint.config.mjs, or eslint.config.ts at ${cfg.root} before running Terra Quality.`);
+		if (!flatCfg) throw new Error(`ESLint flat config is required for ${command}. Add eslint.config.js, eslint.config.mjs, or eslint.config.ts at ${cfg.root} before running Terra Quality.`);
 	}
 	runQualityCli(cfg, args);
 }
@@ -1986,8 +2073,12 @@ export function runQualityFromCfg(file?: string, args = process.argv.slice(2)): 
  * @param args CLI arguments to validate before configuration or source changes.
  */
 function validCliArgs(args: string[]): void {
-	const cmd = args.find((arg) => !arg.startsWith('-')) ?? 'quality';
-	const unknownFlags = args.filter((arg) => arg.startsWith('-') && !CLI_FLAGS.has(arg));
+	const reportIndex = args.indexOf('--report-json');
+	if (reportIndex >= 0 && (!args[reportIndex + 1] || args[reportIndex + 1].startsWith('-') || args.lastIndexOf('--report-json') !== reportIndex))
+		throw new Error('--report-json requires one output path.');
+	const commandArgs = args.filter((_, i) => i !== reportIndex + 1 || reportIndex < 0);
+	const cmd = commandArgs.find((arg) => !arg.startsWith('-')) ?? 'quality';
+	const unknownFlags = commandArgs.filter((arg) => arg.startsWith('-') && !CLI_FLAGS.has(arg));
 	if (!CLI_CMDS.has(cmd) || unknownFlags.length) throw new Error(`Unknown quality CLI arguments: ${[...(!CLI_CMDS.has(cmd) ? [cmd] : []), ...unknownFlags].join(', ')}`);
 }
 

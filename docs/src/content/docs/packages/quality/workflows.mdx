@@ -41,6 +41,37 @@ pnpm exec terra-quality quality --all --warn --skip-commands --skip-recommendati
 
 Keep the package's source scope and native tool configuration consistent with the CI checkout. Do not rely on changed-file mode for a complete CI check.
 
+### Publish hygiene artifacts
+
+`--report-json <path>` writes a versioned report with each executed check's status and finding count. It preserves the command's normal exit status. Use the full, read-only scope in CI and upload both reports even when quality or tests fail. The dashboard expects a GitHub Actions artifact named `terra-hygiene` containing `terra-quality.json` and one or more JUnit files named `junit*.xml` or `test-results*.xml`.
+
+```yaml
+- name: Terra Quality
+  run: pnpm exec terra-quality quality --all --warn --skip-commands --skip-recommendations --report-json terra-quality.json
+
+- name: Tests
+  if: always()
+  run: pnpm test -- --reporter=junit --outputFile=junit.xml
+
+- name: Local Git history
+  if: always() && github.event_name != 'pull_request'
+  run: pnpm exec terra-quality history --report-json terra-history.json
+
+- name: Upload hygiene reports
+  if: always()
+  uses: actions/upload-artifact@v4
+  with:
+    name: terra-hygiene
+    path: |
+      terra-quality.json
+      terra-history*.json
+      junit*.xml
+      test-results*.xml
+    if-no-files-found: warn
+```
+
+Adapt the test command to the consumer's test runner; it must write JUnit XML even on test failure. Generate history reports from a full Git checkout (`actions/checkout` with `fetch-depth: 0`). The CLI emits a full snapshot for manual or scheduled runs. For a GitHub push event it emits the commits from `before` through the checked-out head when that base is reachable; force-pushes and new branches become snapshots. A weekly full snapshot can reconcile several branches by checking each one out and passing its report to the same artifact. Configure `workflow_dispatch` for first imports and extra branches, and upload only `terra-history*.json` files from non-PR runs. The dashboard accepts a report only when its repository and branch are connected and enabled. PR runs remain excluded. The report schema starts at version `1`; an absent test or quality report leaves the composite score unavailable while any present raw metrics remain visible.
+
 ## Focused commands
 
 | Command               | Purpose                                                                        |

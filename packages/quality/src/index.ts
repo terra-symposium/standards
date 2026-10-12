@@ -5,6 +5,7 @@
 
 export * from './collapse.js';
 export * from './files.js';
+export * from './history-report.js';
 export * from './imports.js';
 export * from './inline-if.js';
 export * from './documentation.js';

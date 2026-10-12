@@ -13,8 +13,12 @@
 			"project": ["src/**/*.ts", "test/**/*.mjs"]
 		},
 		"packages/quality": {
-			"entry": ["src/index.ts", "src/runner.ts", "src/naming.ts", "src/object-forwarding.ts", "src/single-use.ts", "src/port.ts", "test/*.test.mjs"],
+			"entry": ["src/index.ts", "src/runner.ts", "src/naming.ts", "src/object-forwarding.ts", "src/single-use.ts", "src/port.ts", "src/history-report.ts", "test/*.test.mjs"],
 			"project": ["src/**/*.ts", "test/**/*.mjs"]
+		},
+		"apps/hygiene": {
+			"entry": ["src/pages/index.astro", "netlify/functions/*.mts", "scripts/*.ts", "test/*.test.ts"],
+			"project": ["src/**/*.ts", "src/**/*.tsx", "netlify/functions/**/*.mts", "scripts/**/*.ts", "test/**/*.ts"]
 		}
 	}
 }
