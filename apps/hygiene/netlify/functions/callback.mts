@@ -12,11 +12,16 @@ export default async function handler(request: Request): Promise<Response> {
     headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
     body: JSON.stringify({ client_id: process.env.GITHUB_CLIENT_ID, client_secret: process.env.GITHUB_CLIENT_SECRET, code }),
   });
-  if (!tokenResponse.ok) return new Response('GitHub sign-in failed', { status: 502 });
-  const tokenData = await tokenResponse.json() as { access_token?: string; refresh_token?: string; expires_in?: number };
-  if (!tokenData.access_token) return new Response('GitHub sign-in failed', { status: 502 });
+  const tokenData = await tokenResponse.json().catch(() => null) as { access_token?: string; refresh_token?: string; expires_in?: number; error?: string } | null;
+  if (!tokenResponse.ok || !tokenData?.access_token) {
+    console.error('GitHub OAuth token exchange failed', { status: tokenResponse.status, error: tokenData?.error ?? 'missing_access_token' });
+    return new Response('GitHub sign-in failed', { status: 502 });
+  }
   const userResponse = await fetch('https://api.github.com/user', { headers: { Authorization: `Bearer ${tokenData.access_token}`, Accept: 'application/vnd.github+json' } });
-  if (!userResponse.ok) return new Response('GitHub user lookup failed', { status: 502 });
+  if (!userResponse.ok) {
+    console.error('GitHub OAuth user lookup failed', { status: userResponse.status });
+    return new Response('GitHub user lookup failed', { status: 502 });
+  }
   const user = await userResponse.json() as { id: number; login: string };
   const token = await createSession(user.id, user.login, tokenData.access_token, tokenData.refresh_token, tokenData.expires_in);
   return new Response(null, { status: 302, headers: { Location: '/', 'Set-Cookie': sessionCookie(token) } });
