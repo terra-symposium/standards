@@ -1,0 +1,12 @@
+[build]
+command = "pnpm --filter @terra-symposium/hygiene-dashboard db:migrate && pnpm --filter @terra-symposium/hygiene-dashboard build"
+publish = "apps/hygiene/dist"
+
+[functions]
+directory = "/apps/hygiene/netlify/functions"
+  node_bundler = "esbuild"
+
+[[redirects]]
+from = "/api/*"
+to = "/.netlify/functions/:splat"
+status = 200

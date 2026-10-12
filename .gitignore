@@ -1,9 +1,11 @@
 node_modules/
 dist/
 coverage/
+**/.astro/
 /.quality-test-tmp/
 .changeset/*.md
 !.changeset/README.md
+!.changeset/tidy-repos-report.md
 
 # Local Netlify folder
 .netlify
