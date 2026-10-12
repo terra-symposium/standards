@@ -7,6 +7,12 @@ const COOKIE = 'terra_hygiene_session';
 
 function digest(value: string): string { return createHash('sha256').update(value).digest('hex'); }
 
+export function cookieSecurityAttribute(origin = process.env.APP_ORIGIN): string {
+  if (!origin) return '; Secure';
+  const { hostname, protocol } = new URL(origin);
+  return protocol === 'http:' && (hostname === '127.0.0.1' || hostname === '[::1]') ? '' : '; Secure';
+}
+
 function key(): Buffer {
   const secret = process.env.SESSION_SECRET;
   if (!secret || secret.length < 32) throw new Error('SESSION_SECRET must be at least 32 characters');
@@ -35,8 +41,8 @@ export async function createSession(userId: number, login: string, accessToken: 
   return token;
 }
 
-export function sessionCookie(token: string, maxAge = 604800): string {
-  return `${COOKIE}=${token}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${maxAge}`;
+export function sessionCookie(token: string, maxAge = 604800, origin = process.env.APP_ORIGIN): string {
+  return `${COOKIE}=${token}; Path=/; HttpOnly${cookieSecurityAttribute(origin)}; SameSite=Lax; Max-Age=${maxAge}`;
 }
 
 export async function session(request: Request): Promise<Session | null> {

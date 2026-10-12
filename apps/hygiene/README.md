@@ -32,4 +32,8 @@ The dashboard checks the signed-in GitHub user's current admin permission for ev
 
 ## Local development
 
-Run `pnpm --filter @terra-symposium/hygiene-dashboard dev` for the UI. To exercise Functions locally, use `netlify dev` with the example environment values filled in. Run `pnpm --filter @terra-symposium/hygiene-dashboard test` for parser, authorization, score, and report policy tests.
+Use the Netlify CLI's local emulator to run the dashboard and its Functions together. In this linked project the CLI can load database and GitHub credentials from the production environment; no deployment is needed. Override `APP_ORIGIN` to `http://127.0.0.1:8888`, and add `http://127.0.0.1/api/callback` as an additional callback URL in the GitHub App settings. Loopback HTTP cookies are allowed only for `127.0.0.1`; hosted origins continue to require secure cookies. If you run without the linked site's environment, copy `.env.example` to `.env` and fill in those values locally.
+
+Run database migrations once with `pnpm --filter @terra-symposium/hygiene-dashboard db:migrate`, then from `apps/hygiene` start the local server with `APP_ORIGIN=http://127.0.0.1:8888 pnpm exec netlify dev --context production --command 'pnpm exec astro dev --host 127.0.0.1 --port 4321' --functions netlify/functions --port 8888 --target-port 4321`. Netlify Dev proxies the Astro dev server and exposes the Functions at the same `/api/*` paths used by the hosted app. Open `http://127.0.0.1:8888`. This does not deploy the site.
+
+For UI-only work, `pnpm --filter @terra-symposium/hygiene-dashboard dev` starts Astro without Netlify Functions. Run `pnpm --filter @terra-symposium/hygiene-dashboard test` for parser, authorization, score, and report policy tests.
