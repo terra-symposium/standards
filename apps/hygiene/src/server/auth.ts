@@ -78,6 +78,3 @@ export function equalSecret(a: string, b: string): boolean {
   return left.length === right.length && timingSafeEqual(left, right);
 }
 
-export function validInternalSecret(provided: string, expected: string | undefined): boolean {
-  return !!expected && equalSecret(provided, expected);
-}
