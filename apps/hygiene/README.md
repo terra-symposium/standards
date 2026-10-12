@@ -1,32 +1,35 @@
 # Terra Shared repository hygiene
 
-Separate Astro/React site for administrators of repositories that install the Terra Hygiene GitHub App. The site stores normalized test, quality, and commit counts in a dedicated Neon database. It does not retain artifact contents, source files, or logs.
+Separate Astro/React dashboard for admins of repositories that install the Terra Hygiene GitHub App. The site stores normalized test, quality, and commit counts in Neon. It discards uploaded report contents after parsing and never stores source files or build logs.
 
 ## Provision
 
-1. Connect a dedicated Neon database to this Netlify site or set its connection string as `DATABASE_URL`. The app also reads `NETLIFY_DATABASE_URL` from Netlify's Neon integration. The Netlify build runs the idempotent schema migration before compiling; for a local migration, run `pnpm --filter @terra-symposium/hygiene-dashboard db:migrate` with either variable in the environment.
-2. Create a GitHub App with a callback URL of `https://<site>/api/callback`, webhook URL `https://<site>/api/webhook`, and **read-only** repository permissions for Metadata, Actions, and Contents. Subscribe to Installation, Installation repositories, and Workflow run events. Enable user authorization and generate a private key and client secret.
-3. Create a separate Netlify site from this repository with the repository root as its base directory and `apps/hygiene` as its package directory. Its build command, publish directory, and functions directory are in `netlify.toml`. Set every variable in `.env.example` for the production context. `GITHUB_APP_PRIVATE_KEY` accepts a PEM value or `base64:<base64-encoded PEM>` for multiline secrets. If the plan supports environment scopes, make credentials available to Functions. `INTERNAL_JOB_SECRET` should be a unique random value.
-4. Install the GitHub App on selected repositories. Only their GitHub administrators will see them after sign-in.
+1. Connect a dedicated Neon database to this Netlify site or set `DATABASE_URL`. The app also reads `NETLIFY_DATABASE_URL` from Netlify's Neon integration. The build applies the idempotent SQL migrations before compiling.
+2. Create a GitHub App with callback URL `https://<site>/api/callback`, webhook URL `https://<site>/api/webhook`, and read-only repository permissions. Subscribe to Installation and Installation repositories events. Enable user authorization and set the webhook secret.
+3. Create a Netlify site for this repository with the repository root as its base directory and `apps/hygiene` as its package directory. Set the variables in `.env.example` for the production Functions context.
+4. Install the GitHub App on selected repositories. Signed-in users see a repository only when GitHub confirms their current admin permission.
 
-## Data flow
+## Collect reports without GitHub Actions
 
-The webhook records installations and queues completed workflow runs for ingestion. GitHub Actions uploads JUnit XML, a versioned Terra Quality JSON report, and a versioned local Git history report in the `terra-hygiene` artifact. Reports are read from the artifact ZIP in memory; only normalized test, quality, and per-commit counts are stored. Upload and report generation run after test failures. Pull request runs are ignored.
+Collection runs in the connected repository's Netlify build plugin. It uses ordinary branch builds for push deltas and one weekly Netlify Scheduled Function to trigger full-history reconciliation builds. There is no GitHub Actions run or frequent polling. The local plugin runs at the end of the deploy even when the build failed, excludes pull request deploys, runs the selected JUnit test command and Terra Quality report, and reads commit history from Netlify's local Git checkout.
 
-The consumer workflow generates push deltas from a full Git checkout, runs a weekly full snapshot for `main` and `development`, and accepts `workflow_dispatch` for initial imports and additional branches. GitHub only exposes scheduled and manual workflow runs when the file is on the repository's default branch. For Terra's development-first flow, promote the reviewed workflow from `development` to `main` before using those runs. Add an extra branch in the dashboard, then run the **Type Check** workflow for that branch to import its full history. Later pushes on tracked branches upload deltas. Snapshots replace prior rows for that branch, so weekly reconciliation also corrects force-pushes and earlier report gaps. The report counts tracked source and test files with the dashboard's generated, vendor, build, dependency, documentation, and configuration exclusions. The collector discards downloaded reports after ingestion.
+To connect another repository, install the GitHub App on it, then open **Netlify setup** in its dashboard card. Copy `plugins/netlify-plugin-terra-hygiene` and `netlify/functions/hygiene-reconcile.mjs` from the Terra Symposium website repository into the consumer repository and add the local plugin entry to its root `netlify.toml`. Issue a report token and store it as `TERRA_HYGIENE_REPORT_TOKEN` in the Build environment. Enable branch deploys and trigger an initial build for every tracked branch. Then create a Netlify Build Hook for each branch and set `TERRA_HYGIENE_WEEKLY_BUILD_HOOKS` to their JSON array in the Functions environment. The dashboard shows the token once; issuing a replacement rotates it. Set `TERRA_HYGIENE_URL` to this dashboard URL if using a non-production dashboard.
 
-The CLI requires `@terra-symposium/quality` with the history report command:
+Enable Netlify branch deploys for each tracked branch. `main` and `development` are tracked by default. The first build on a branch sends a full snapshot. Later builds send commits after the last imported head. A weekly scheduled function runs Mondays at 03:00 UTC and triggers each configured branch Build Hook; the resulting builds send a full snapshot to reconcile force-pushes and missed reports. Pull request deploys are ignored.
+
+The plugin invokes `@terra-symposium/quality` for the versioned `terra-quality.json` and local Git history report. Publish the package version declared by the plugin before enabling collection on a consumer repository. The history command supports explicit branch and base values:
 
 ```sh
-pnpm exec terra-quality history --report-json terra-history.json
+pnpm exec terra-quality history --branch main --report-json terra-history.json
+pnpm exec terra-quality history --branch main --base-sha <previous-head> --report-json terra-history.json
 ```
 
-Set `GITHUB_REPOSITORY` and `GITHUB_REF_NAME` when running outside GitHub Actions. Push event metadata selects delta mode only when the event's `before` commit is an ancestor of the checked-out head; other runs produce a full snapshot.
+Reports use schema version 1. The history report includes commit author dates, source and test line additions/deletions, and source-line totals using the dashboard exclusions. The test rate excludes skipped cases. The quality rate uses enabled checks with no findings. The 0–100 score equally weights those component rates and stays unavailable when either report is missing.
 
-Branches default to `main` and `development`; an administrator can add another branch in the dashboard.
+## Authorization and storage
 
-The API checks the signed-in GitHub user's current `admin` permission through their GitHub App user token for each repository query. GitHub requires a user token for this permission endpoint. Sessions are opaque tokens stored by hash; GitHub tokens are encrypted at rest and refreshed when needed. The browser never receives an App token or database credential.
+The dashboard checks the signed-in GitHub user's current admin permission for every repository query. Netlify build tokens are stored as hashes, scoped to one repository, and compared in constant time. Sessions are opaque tokens stored by hash; GitHub OAuth tokens are encrypted at rest. Report payloads are validated before normalized values are persisted.
 
 ## Local development
 
-Run `pnpm --filter @terra-symposium/hygiene-dashboard dev` for the static UI. To exercise Functions locally, use `netlify dev` with the example environment values filled in. Run `pnpm --filter @terra-symposium/hygiene-dashboard test` for parser and policy tests.
+Run `pnpm --filter @terra-symposium/hygiene-dashboard dev` for the UI. To exercise Functions locally, use `netlify dev` with the example environment values filled in. Run `pnpm --filter @terra-symposium/hygiene-dashboard test` for parser, authorization, score, and report policy tests.

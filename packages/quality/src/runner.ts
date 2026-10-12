@@ -73,7 +73,7 @@ const CLI_CMDS = new Set([
 	'knip',
 	'types',
 ]);
-const CLI_FLAGS = new Set(['--all', '--warn', '--strict', '--skip-commands', '--skip-recommendations', '--help', '-h', '--version', '-v', '--report-json']);
+const CLI_FLAGS = new Set(['--all', '--warn', '--strict', '--skip-commands', '--skip-recommendations', '--help', '-h', '--version', '-v', '--report-json', '--branch', '--base-sha']);
 const TOOL_OUTPUT_MAX_BUFFER = 64 * 1024 * 1024;
 const ESLINT_BATCH_SIZE = 10;
 
@@ -1276,11 +1276,7 @@ function printDeadCodeFindings(findings: DeadCodeFinding[], typeSafetyVerified =
 	for (const finding of findings) {
 		console.error(`  - [${finding.severity.toUpperCase()}] ${finding.rule}: ${finding.file}:${finding.line} ${finding.name}`);
 		console.error(`      Reason: ${finding.reason}`);
-		const autofix = !finding.autofixable
-			? 'not safe or not supported'
-			: typeSafetyVerified
-				? 'available'
-				: 'candidate; fix mode checks TypeScript before writing';
+		const autofix = !finding.autofixable ? 'not safe or not supported' : typeSafetyVerified ? 'available' : 'candidate; fix mode checks TypeScript before writing';
 		console.error(`      Autofix: ${autofix}`);
 		console.error(`      Agent action: ${finding.agentAction}`);
 	}
@@ -1836,36 +1832,36 @@ function runDocumentation(cfg: QualityCfg, opts: QualityOptions, args: string[],
  */
 export function runQualityCli(cfg: QualityCfg, args = process.argv.slice(2)): void {
 	validCliArgs(args);
-	const reportIndex = args.indexOf('--report-json');
-	const reportPath = reportIndex < 0 ? undefined : args[reportIndex + 1];
-	const commandArgs = reportIndex < 0 ? args : args.filter((_, i) => i !== reportIndex && i !== reportIndex + 1);
+	const reportIdx = args.indexOf('--report-json');
+	const reportPath = reportIdx < 0 ? undefined : args[reportIdx + 1];
+	const cmdArgs = reportIdx < 0 ? args : args.filter((_, i) => i !== reportIdx && i !== reportIdx + 1);
 	if (!reportPath) {
-		dispatchQualityCli(cfg, commandArgs);
+		dispatchQualityCli(cfg, cmdArgs);
 		return;
 	}
 	reportStages = new Map();
 	reportStageName = undefined;
 	try {
-		dispatchQualityCli(cfg, commandArgs);
+		dispatchQualityCli(cfg, cmdArgs);
 	} finally {
-		const executed = [...reportStages.values()].filter((stage) => {
-			if (stage.name.includes('/') || stage.name.startsWith('recommendation:')) return false;
+		const executed = [...reportStages.values()].filter((s) => {
+			if (s.name.includes('/') || s.name.startsWith('recommendation:')) return false;
 			const names: Record<string, QualityCheckName> = { imports: 'import', naming: 'name', aliases: 'alias', forwarding: 'forward', documentation: 'document', typecheck: 'type' };
-			const check = names[stage.name] ?? (stage.name.startsWith('command:') ? 'command' : stage.name) as QualityCheckName;
+			const check = names[s.name] ?? ((s.name.startsWith('command:') ? 'command' : s.name) as QualityCheckName);
 			if (!qualityCheckEnabled(cfg, check)) return false;
-			if (stage.name === 'security' && !cfg.security) return false;
-			if (stage.name === 'repeated-classes' && !cfg.repeatedClasses) return false;
-			if (stage.name === 'regex-dedup' && !cfg.regexDedup) return false;
-			if (stage.name === 'ui-patterns' && !cfg.uiPatterns) return false;
+			if (s.name === 'security' && !cfg.security) return false;
+			if (s.name === 'repeated-classes' && !cfg.repeatedClasses) return false;
+			if (s.name === 'regex-dedup' && !cfg.regexDedup) return false;
+			if (s.name === 'ui-patterns' && !cfg.uiPatterns) return false;
 			return true;
 		});
 		const standard = ['documentation', 'format', 'imports', 'naming', 'forwarding', 'lint', 'dead-code', 'typecheck', 'diff', 'aliases', 'security', 'repeated-classes', 'regex-dedup', 'ui-patterns'];
 		const report: QualityJsonReport = {
 			schemaVersion: 1,
 			generatedAt: new Date().toISOString(),
-			command: commandArgs.find((arg) => !arg.startsWith('-')) ?? 'quality',
-			scope: commandArgs.includes('--all') || commandArgs.includes('quality:all') ? 'all' : 'changed',
-			checks: [...executed, ...standard.filter((name) => !executed.some((stage) => stage.name === name)).map((name) => ({ name, status: 'skipped' as const, findings: 0 }))],
+			command: cmdArgs.find((arg) => !arg.startsWith('-')) ?? 'quality',
+			scope: cmdArgs.includes('--all') || cmdArgs.includes('quality:all') ? 'all' : 'changed',
+			checks: [...executed, ...standard.filter((name) => !executed.some((s) => s.name === name)).map((name) => ({ name, status: 'skipped' as const, findings: 0 }))],
 		};
 		writeFileSync(resolve(cfg.root, reportPath), `${JSON.stringify(report, null, 2)}\n`);
 		reportStages = undefined;
@@ -1889,7 +1885,7 @@ function dispatchQualityCli(cfg: QualityCfg, args: string[]): void {
 	if (args.includes('--help') || args.includes('-h')) {
 		console.info('Usage: terra-quality <command> [options]');
 		console.info('Commands include quality, history, document, format, lint, knip, types, single-use, dead-code, security, and domain.');
-		console.info('Options: --all, --warn, --strict, --skip-commands, --skip-recommendations, --report-json <path>.');
+		console.info('Options: --all, --warn, --strict, --skip-commands, --skip-recommendations, --report-json <path>; history also accepts --branch <name> and --base-sha <sha>.');
 		return;
 	}
 	const cmd = args.find((a) => !a.startsWith('-')) ?? 'quality';
@@ -2048,21 +2044,23 @@ export function runQualityFromCfg(file?: string, args = process.argv.slice(2)): 
 		runQualityCli({} as QualityCfg, args);
 		return;
 	}
-	const reportIndex = args.indexOf('--report-json');
-	const command = args.find((arg, index) => index !== reportIndex + 1 && !arg.startsWith('-')) ?? 'quality';
-	if (command === 'history') {
-		const reportPath = reportIndex < 0 ? undefined : args[reportIndex + 1];
+	const reportIdx = args.indexOf('--report-json');
+	const cmd = args.find((arg, i) => i !== reportIdx + 1 && !arg.startsWith('-')) ?? 'quality';
+	if (cmd === 'history') {
+		const reportPath = reportIdx < 0 ? undefined : args[reportIdx + 1];
 		if (!reportPath) throw new Error('terra-quality history requires --report-json <path>.');
-		writeHistoryReport(process.cwd(), reportPath);
+		const branch = optVal(args, '--branch');
+		const baseSha = optVal(args, '--base-sha');
+		writeHistoryReport(process.cwd(), reportPath, { ...(branch ? { branch } : {}), ...(baseSha ? { baseSha } : {}) });
 		return;
 	}
 	const cfg = loadQualityCfg(file);
 	const lintCmds = new Set(['quality', 'quality:all', 'quality:baseline', 'document', 'maintain', 'dead-code', 'knip', 'lint', 'naming', 'single-use']);
-	if (lintCmds.has(command) && qualityCheckEnabled(cfg, 'lint')) {
+	if (lintCmds.has(cmd) && qualityCheckEnabled(cfg, 'lint')) {
 		const flatCfg = ['eslint.config.js', 'eslint.config.mjs', 'eslint.config.cjs', 'eslint.config.ts', 'eslint.config.mts', 'eslint.config.cts']
 			.map((config) => resolve(cfg.root, config))
 			.find((config) => existsSync(config));
-		if (!flatCfg) throw new Error(`ESLint flat config is required for ${command}. Add eslint.config.js, eslint.config.mjs, or eslint.config.ts at ${cfg.root} before running Terra Quality.`);
+		if (!flatCfg) throw new Error(`ESLint flat config is required for ${cmd}. Add eslint.config.js, eslint.config.mjs, or eslint.config.ts at ${cfg.root} before running Terra Quality.`);
 	}
 	runQualityCli(cfg, args);
 }
@@ -2073,13 +2071,28 @@ export function runQualityFromCfg(file?: string, args = process.argv.slice(2)): 
  * @param args CLI arguments to validate before configuration or source changes.
  */
 function validCliArgs(args: string[]): void {
-	const reportIndex = args.indexOf('--report-json');
-	if (reportIndex >= 0 && (!args[reportIndex + 1] || args[reportIndex + 1].startsWith('-') || args.lastIndexOf('--report-json') !== reportIndex))
-		throw new Error('--report-json requires one output path.');
-	const commandArgs = args.filter((_, i) => i !== reportIndex + 1 || reportIndex < 0);
-	const cmd = commandArgs.find((arg) => !arg.startsWith('-')) ?? 'quality';
-	const unknownFlags = commandArgs.filter((arg) => arg.startsWith('-') && !CLI_FLAGS.has(arg));
+	const reportIdx = args.indexOf('--report-json');
+	if (reportIdx >= 0 && (!args[reportIdx + 1] || args[reportIdx + 1].startsWith('-') || args.lastIndexOf('--report-json') !== reportIdx)) throw new Error('--report-json requires one output path.');
+	for (const flag of ['--branch', '--base-sha']) {
+		const idx = args.indexOf(flag);
+		if (idx >= 0 && (!args[idx + 1] || args[idx + 1].startsWith('-') || args.lastIndexOf(flag) !== idx)) throw new Error(`${flag} requires one value.`);
+	}
+	const cmdArgs = args.filter((_, i) => i !== reportIdx + 1 || reportIdx < 0);
+	const cmd = cmdArgs.find((arg) => !arg.startsWith('-')) ?? 'quality';
+	const unknownFlags = cmdArgs.filter((arg) => arg.startsWith('-') && !CLI_FLAGS.has(arg));
 	if (!CLI_CMDS.has(cmd) || unknownFlags.length) throw new Error(`Unknown quality CLI arguments: ${[...(!CLI_CMDS.has(cmd) ? [cmd] : []), ...unknownFlags].join(', ')}`);
+}
+
+/**
+ * Read a single value following a validated CLI flag.
+ *
+ * @param args CLI arguments.
+ * @param flag Flag whose following value is returned.
+ * @return The flag value, or undefined when the flag was not supplied.
+ */
+function optVal(args: string[], flag: string): string | undefined {
+	const idx = args.indexOf(flag);
+	return idx < 0 ? undefined : args[idx + 1];
 }
 
 /**
