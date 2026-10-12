@@ -23,7 +23,7 @@ export type HistoryReport = {
 	commits: HistoryCommitReport[];
 };
 
-const SOURCE_EXT = /\.(?:astro|c|cc|cpp|cs|css|go|html|java|js|jsx|jsonl|kt|less|m|mdx|php|py|rb|rs|scss|sh|sql|svelte|swift|ts|tsx|vue)$/i;
+const SRC_EXT = /\.(?:astro|c|cc|cpp|cs|css|go|html|java|js|jsx|jsonl|kt|less|m|mdx|php|py|rb|rs|scss|sh|sql|svelte|swift|ts|tsx|vue)$/i;
 const EXCLUDED_DIR = /^(?:\.git|\.github|\.next|\.nuxt|\.output|\.turbo|\.vercel|\.netlify|\.astro|\.cache|build|coverage|dist|docs?|documentation|generated|vendor|node_modules|bower_components|target|out|public|static|storybook-static|test-results)$/i;
 const EXCLUDED_FILE = /^(?:package(?:-lock)?\.json|pnpm-lock\.yaml|yarn\.lock|tsconfig(?:\.[^.]+)?\.json|(?:astro|eslint|prettier|vite|vitest|webpack|rollup|tailwind|postcss|jest|playwright|babel|next|netlify)\.config\.[^.]+|Dockerfile|Makefile)$/i;
 const HISTORY_BATCH_SIZE = 50;
@@ -41,7 +41,7 @@ export function isHistorySourcePath(path: string): boolean {
 	if (!parts.length || parts.some((part) => part === '..' || part === '')) return false;
 	if (parts.slice(0, -1).some((part) => EXCLUDED_DIR.test(part))) return false;
 	const file = parts.at(-1) ?? '';
-	return SOURCE_EXT.test(file) && !EXCLUDED_FILE.test(file) && !/\.(?:config|generated|gen|min|map|snap|lock)\.[^.]+$/i.test(file) && !/^\./.test(file);
+	return SRC_EXT.test(file) && !EXCLUDED_FILE.test(file) && !/\.(?:config|generated|gen|min|map|snap|lock)\.[^.]+$/i.test(file) && !/^\./.test(file);
 }
 
 /**
@@ -74,7 +74,7 @@ function gitBuffer(root: string, args: string[], input: string): Buffer {
  * @param root Git checkout path.
  * @return The owner/repository name.
  */
-function repositoryName(root: string): string {
+function repoName(root: string): string {
 	const fromEnvironment = process.env.GITHUB_REPOSITORY;
 	if (fromEnvironment && /^[^/]+\/[^/]+$/.test(fromEnvironment)) return fromEnvironment.replace(/\.git$/i, '');
 	const remote = git(root, ['config', '--get', 'remote.origin.url']).trim();
@@ -89,11 +89,11 @@ function repositoryName(root: string): string {
  * @return The push base SHA, or null when no usable base is present.
  */
 function pushBase(): string | null {
-	const eventPath = process.env.GITHUB_EVENT_PATH;
-	if (!eventPath) return null;
+	const ePath = process.env.GITHUB_EVENT_PATH;
+	if (!ePath) return null;
 	try {
-		const event = JSON.parse(readFileSync(eventPath, 'utf8')) as { before?: unknown };
-		return typeof event.before === 'string' && /^[a-f\d]{40}$/i.test(event.before) && !/^0{40}$/.test(event.before) ? event.before : null;
+		const e = JSON.parse(readFileSync(ePath, 'utf8')) as { before?: unknown };
+		return typeof e.before === 'string' && /^[a-f\d]{40}$/i.test(e.before) && !/^0{40}$/.test(e.before) ? e.before : null;
 	} catch {
 		return null;
 	}
@@ -107,7 +107,7 @@ function pushBase(): string | null {
  * @param parents Commit parent SHAs.
  * @param stats Per-commit source line totals to update.
  */
-function sourceChanges(root: string, head: string, parents: string[], stats: Map<string, { additions: number; deletions: number }>): void {
+function srcChanges(root: string, head: string, parents: string[], stats: Map<string, { additions: number; deletions: number }>): void {
 	if (!parents.length) return;
 	const output = git(root, ['diff', '--numstat', '--no-renames', '--no-ext-diff', parents[0], head, '--']);
 	for (const line of output.split('\n')) {
@@ -119,10 +119,10 @@ function sourceChanges(root: string, head: string, parents: string[], stats: Map
 		if (!isHistorySourcePath(path)) continue;
 		const additions = line.slice(0, firstTab) === '-' ? 0 : Number(line.slice(0, firstTab));
 		const deletions = line.slice(firstTab + 1, secondTab) === '-' ? 0 : Number(line.slice(firstTab + 1, secondTab));
-		const current = stats.get(head) ?? { additions: 0, deletions: 0 };
-		current.additions += additions;
-		current.deletions += deletions;
-		stats.set(head, current);
+		const curr = stats.get(head) ?? { additions: 0, deletions: 0 };
+		curr.additions += additions;
+		curr.deletions += deletions;
+		stats.set(head, curr);
 	}
 }
 
@@ -148,7 +148,7 @@ function readNumstatLog(root: string, range: string, stats: Map<string, { additi
 			merges.add(sha);
 			continue;
 		}
-		const current = { additions: 0, deletions: 0 };
+		const curr = { additions: 0, deletions: 0 };
 		const body = headerEnd < 0 ? '' : block.slice(headerEnd + 1);
 		for (const entry of body.split('\x00')) {
 			const firstTab = entry.indexOf('\t');
@@ -156,10 +156,10 @@ function readNumstatLog(root: string, range: string, stats: Map<string, { additi
 			if (firstTab < 0 || secondTab < 0 || !isHistorySourcePath(entry.slice(secondTab + 1))) continue;
 			const added = entry.slice(0, firstTab);
 			const removed = entry.slice(firstTab + 1, secondTab);
-			current.additions += added === '-' ? 0 : Number(added);
-			current.deletions += removed === '-' ? 0 : Number(removed);
+			curr.additions += added === '-' ? 0 : Number(added);
+			curr.deletions += removed === '-' ? 0 : Number(removed);
 		}
-		stats.set(sha, current);
+		stats.set(sha, curr);
 	}
 	return merges;
 }
@@ -260,33 +260,33 @@ function isAncestor(root: string, base: string, head: string): boolean {
  * Build a complete snapshot or push delta from the local Git object database.
  *
  * @param root Path to the full Git checkout.
- * @param options Optional repository, branch, or push-base overrides.
+ * @param opts Optional repository, branch, or push-base overrides.
  * @return A versioned history report with normalized commit counts.
  */
-export function createHistoryReport(root: string, options: { repository?: string; branch?: string; baseSha?: string | null } = {}): HistoryReport {
+export function createHistoryReport(root: string, opts: { repository?: string; branch?: string; baseSha?: string | null } = {}): HistoryReport {
 	const headSha = git(root, ['rev-parse', 'HEAD']).trim();
-	const branch = options.branch ?? process.env.GITHUB_REF_NAME ?? git(root, ['branch', '--show-current']).trim();
+	const branch = opts.branch ?? process.env.GITHUB_REF_NAME ?? git(root, ['branch', '--show-current']).trim();
 	if (!branch) throw new Error('Set GITHUB_REF_NAME or pass a checked-out branch to generate a history report.');
-	const base = options.baseSha === undefined ? pushBase() : options.baseSha;
+	const base = opts.baseSha === undefined ? pushBase() : opts.baseSha;
 	const delta = !!base && isAncestor(root, base, headSha);
 	const range = delta ? `${base}..${headSha}` : headSha;
 	const commits = commitMetadata(root, range);
 	const changes = new Map<string, { additions: number; deletions: number }>();
 	const merges = readNumstatLog(root, range, changes);
-	for (const commit of commits) if (merges.has(commit.sha)) sourceChanges(root, commit.sha, commit.parents, changes);
+	for (const commit of commits) if (merges.has(commit.sha)) srcChanges(root, commit.sha, commit.parents, changes);
 
 	const lineCounts = new Map<string, number>();
 	const reportCommits: HistoryCommitReport[] = [];
 	for (let start = 0; start < commits.length; start += HISTORY_BATCH_SIZE) {
 		const batch = commits.slice(start, start + HISTORY_BATCH_SIZE).map((commit) => ({ commit, blobs: parseTree(root, commit.sha) }));
-		blobLineCounts(root, batch.flatMap((item) => item.blobs), lineCounts);
+		blobLineCounts(root, batch.flatMap((i) => i.blobs), lineCounts);
 		for (const { commit, blobs } of batch) {
 			const changed = changes.get(commit.sha) ?? { additions: 0, deletions: 0 };
 			reportCommits.push({ sha: commit.sha, authorDate: commit.authorDate, additions: changed.additions, deletions: changed.deletions, sourceLines: blobs.reduce((total, blob) => total + (lineCounts.get(blob) ?? 0), 0) });
 		}
 	}
 
-	return { schemaVersion: 1, mode: delta ? 'delta' : 'snapshot', repository: options.repository ?? repositoryName(root), branch, headSha, baseSha: delta ? base : null, generatedAt: new Date().toISOString(), commits: reportCommits };
+	return { schemaVersion: 1, mode: delta ? 'delta' : 'snapshot', repository: opts.repository ?? repoName(root), branch, headSha, baseSha: delta ? base : null, generatedAt: new Date().toISOString(), commits: reportCommits };
 }
 
 /**
@@ -294,11 +294,11 @@ export function createHistoryReport(root: string, options: { repository?: string
  *
  * @param root Path to the full Git checkout.
  * @param path Output path relative to the checkout.
- * @param options Optional repository, branch, or push-base overrides.
+ * @param opts Optional repository, branch, or push-base overrides.
  * @return The generated history report.
  */
-export function writeHistoryReport(root: string, path: string, options?: { repository?: string; branch?: string; baseSha?: string | null }): HistoryReport {
-	const report = createHistoryReport(root, options);
+export function writeHistoryReport(root: string, path: string, opts?: { repository?: string; branch?: string; baseSha?: string | null }): HistoryReport {
+	const report = createHistoryReport(root, opts);
 	writeFileSync(resolve(root, path), `${JSON.stringify(report, null, 2)}\n`);
 	return report;
 }
