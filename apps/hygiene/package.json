@@ -9,9 +9,9 @@
     "db:migrate": "node --experimental-strip-types scripts/migrate.ts"
   },
   "dependencies": {
-    "@astrojs/react": "^4.4.2",
+    "@astrojs/react": "^7.0.1",
     "@neondatabase/serverless": "^1.0.2",
-    "astro": "^5.16.6",
+    "astro": "^7.3.8",
     "fast-xml-parser": "^5.2.5",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"
