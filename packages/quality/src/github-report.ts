@@ -352,13 +352,18 @@ function dependabotCfgState(api: GitHubApi, repository: string, branch: string):
  */
 function settingsFinding(repository: string, feature: GitHubFeature): GitHubFinding {
 	const enabled = REQUIRED_FEATURE_LABELS[feature];
+	const agentInstructions = feature === 'versionUpdates'
+		? 'Inspect the repository manifests and package managers, then add a minimal .github/dependabot.yml entry for each appropriate ecosystem with its repository directory and update schedule. Add version-update groups when they will reduce pull request noise. Validate the configuration and run the focused quality checks; do not change repository settings through an API.'
+		: feature === 'groupedUpdates'
+			? 'Confirm the Grouped security updates toggle in the GitHub repository settings UI. If grouping version updates is also desired, add suitable groups to .github/dependabot.yml. Explicit security-update group rules can override the UI toggle; do not change settings through an API.'
+			: `Check the ${enabled} setting in GitHub repository settings. If disabled, enable it with a repository administrator; if the read-only API could not verify it, confirm the actual state in the UI. Do not use a write API or change unrelated security settings.`;
 	return {
 		repository,
 		category: 'setting',
 		severity: 'medium',
 		title: `${enabled} is disabled or could not be verified`,
 		url: `https://github.com/${repository}/settings/security_analysis`,
-		agentInstructions: `Check the ${enabled} setting in GitHub repository settings. If it is disabled, enable it with a repository administrator; if the read-only API could not verify it, confirm the actual state in the UI. Do not use a write API or change unrelated security settings.`,
+		agentInstructions,
 	};
 }
 
