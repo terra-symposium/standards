@@ -1,15 +1,15 @@
 import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+/*//////////////////////////////////////////////////
+REGEX
+//////////////////////////////////////////////////*/
+const S_REGEX = /\s+/;
+const GIT_I_REGEX = /\.git$/i;
+const A_F_D_40_I_REGEX = /^[a-f\d]{40}$/i;
 
 /** Per-commit history data that is safe to persist in the dashboard. */
-export type HistoryCommitReport = {
-	sha: string;
-	authorDate: string;
-	additions: number;
-	deletions: number;
-	sourceLines: number;
-};
+export type HistoryCommitReport = { sha: string; authorDate: string; additions: number; deletions: number; sourceLines: number };
 
 /** Versioned local Git history snapshot or push delta. */
 export type HistoryReport = {
@@ -24,8 +24,10 @@ export type HistoryReport = {
 };
 
 const SRC_EXT = /\.(?:astro|c|cc|cpp|cs|css|go|html|java|js|jsx|jsonl|kt|less|m|mdx|php|py|rb|rs|scss|sh|sql|svelte|swift|ts|tsx|vue)$/i;
-const EXCLUDED_DIR = /^(?:\.git|\.github|\.next|\.nuxt|\.output|\.turbo|\.vercel|\.netlify|\.astro|\.cache|build|coverage|dist|docs?|documentation|generated|vendor|node_modules|bower_components|target|out|public|static|storybook-static|test-results)$/i;
-const EXCLUDED_FILE = /^(?:package(?:-lock)?\.json|pnpm-lock\.yaml|yarn\.lock|tsconfig(?:\.[^.]+)?\.json|(?:astro|eslint|prettier|vite|vitest|webpack|rollup|tailwind|postcss|jest|playwright|babel|next|netlify)\.config\.[^.]+|Dockerfile|Makefile)$/i;
+const EXCLUDED_DIR =
+	/^(?:\.git|\.github|\.next|\.nuxt|\.output|\.turbo|\.vercel|\.netlify|\.astro|\.cache|build|coverage|dist|docs?|documentation|generated|vendor|node_modules|bower_components|target|out|public|static|storybook-static|test-results)$/i;
+const EXCLUDED_FILE =
+	/^(?:package(?:-lock)?\.json|pnpm-lock\.yaml|yarn\.lock|tsconfig(?:\.[^.]+)?\.json|(?:astro|eslint|prettier|vite|vitest|webpack|rollup|tailwind|postcss|jest|playwright|babel|next|netlify)\.config\.[^.]+|Dockerfile|Makefile)$/i;
 const HISTORY_BATCH_SIZE = 50;
 const BLOB_BATCH_SIZE = 250;
 const GIT_OUTPUT_LIMIT = 128 * 1024 * 1024;
@@ -76,11 +78,11 @@ function gitBuffer(root: string, args: string[], input: string): Buffer {
  */
 function repoName(root: string): string {
 	const fromEnvironment = process.env.GITHUB_REPOSITORY;
-	if (fromEnvironment && /^[^/]+\/[^/]+$/.test(fromEnvironment)) return fromEnvironment.replace(/\.git$/i, '');
+	if (fromEnvironment && /^[^/]+\/[^/]+$/.test(fromEnvironment)) return fromEnvironment.replace(GIT_I_REGEX, '');
 	const remote = git(root, ['config', '--get', 'remote.origin.url']).trim();
 	const match = remote.match(/(?:github\.com[:/])([^/]+\/[^/]+?)(?:\.git)?$/i);
 	if (!match) throw new Error('Set GITHUB_REPOSITORY or use a GitHub origin remote to generate a history report.');
-	return match[1].replace(/\.git$/i, '');
+	return match[1].replace(GIT_I_REGEX, '');
 }
 
 /**
@@ -93,7 +95,7 @@ function pushBase(): string | null {
 	if (!ePath) return null;
 	try {
 		const e = JSON.parse(readFileSync(ePath, 'utf8')) as { before?: unknown };
-		return typeof e.before === 'string' && /^[a-f\d]{40}$/i.test(e.before) && !/^0{40}$/.test(e.before) ? e.before : null;
+		return typeof e.before === 'string' && A_F_D_40_I_REGEX.test(e.before) && !/^0{40}$/.test(e.before) ? e.before : null;
 	} catch {
 		return null;
 	}
@@ -142,8 +144,8 @@ function readNumstatLog(root: string, range: string, stats: Map<string, { additi
 		const headerEnd = block.indexOf('\n');
 		const header = headerEnd < 0 ? block : block.slice(0, headerEnd);
 		const [sha, parents = ''] = header.replace(/^\n/, '').split('\x00');
-		if (!/^[a-f\d]{40}$/i.test(sha)) continue;
-		const parentList = parents.trim().split(/\s+/).filter(Boolean);
+		if (!A_F_D_40_I_REGEX.test(sha)) continue;
+		const parentList = parents.trim().split(S_REGEX).filter(Boolean);
 		if (parentList.length > 1) {
 			merges.add(sha);
 			continue;
@@ -232,11 +234,15 @@ function blobLineCounts(root: string, blobs: string[], cache: Map<string, number
  * @return Commit SHAs, author dates, and parent SHAs.
  */
 function commitMetadata(root: string, range: string): { sha: string; authorDate: string; parents: string[] }[] {
-	return git(root, ['log', '--format=%H%x00%aI%x00%P', '--reverse', '--topo-order', range]).trim().split('\n').filter(Boolean).map((line) => {
-		const [sha, authorDate, parents = ''] = line.split('\x00');
-		if (!/^[a-f\d]{40}$/i.test(sha) || !Number.isFinite(Date.parse(authorDate))) throw new Error('Git returned invalid commit metadata.');
-		return { sha, authorDate, parents: parents.trim().split(/\s+/).filter(Boolean) };
-	});
+	return git(root, ['log', '--format=%H%x00%aI%x00%P', '--reverse', '--topo-order', range])
+		.trim()
+		.split('\n')
+		.filter(Boolean)
+		.map((line) => {
+			const [sha, authorDate, parents = ''] = line.split('\x00');
+			if (!A_F_D_40_I_REGEX.test(sha) || !Number.isFinite(Date.parse(authorDate))) throw new Error('Git returned invalid commit metadata.');
+			return { sha, authorDate, parents: parents.trim().split(S_REGEX).filter(Boolean) };
+		});
 }
 
 /**
@@ -279,14 +285,33 @@ export function createHistoryReport(root: string, opts: { repository?: string; b
 	const reportCommits: HistoryCommitReport[] = [];
 	for (let start = 0; start < commits.length; start += HISTORY_BATCH_SIZE) {
 		const batch = commits.slice(start, start + HISTORY_BATCH_SIZE).map((commit) => ({ commit, blobs: parseTree(root, commit.sha) }));
-		blobLineCounts(root, batch.flatMap((i) => i.blobs), lineCounts);
+		blobLineCounts(
+			root,
+			batch.flatMap((i) => i.blobs),
+			lineCounts,
+		);
 		for (const { commit, blobs } of batch) {
 			const changed = changes.get(commit.sha) ?? { additions: 0, deletions: 0 };
-			reportCommits.push({ sha: commit.sha, authorDate: commit.authorDate, additions: changed.additions, deletions: changed.deletions, sourceLines: blobs.reduce((total, blob) => total + (lineCounts.get(blob) ?? 0), 0) });
+			reportCommits.push({
+				sha: commit.sha,
+				authorDate: commit.authorDate,
+				additions: changed.additions,
+				deletions: changed.deletions,
+				sourceLines: blobs.reduce((total, blob) => total + (lineCounts.get(blob) ?? 0), 0),
+			});
 		}
 	}
 
-	return { schemaVersion: 1, mode: delta ? 'delta' : 'snapshot', repository: opts.repository ?? repoName(root), branch, headSha, baseSha: delta ? base : null, generatedAt: new Date().toISOString(), commits: reportCommits };
+	return {
+		schemaVersion: 1,
+		mode: delta ? 'delta' : 'snapshot',
+		repository: opts.repository ?? repoName(root),
+		branch,
+		headSha,
+		baseSha: delta ? base : null,
+		generatedAt: new Date().toISOString(),
+		commits: reportCommits,
+	};
 }
 
 /**
