@@ -58,10 +58,13 @@ Add a `github` section to `quality.json` to include GitHub analytics in the same
 {
 	"github": {
 		"repositories": ["owner/repo"],
-		"requiredFeatures": ["dependabotAlerts", "malwareAlerts", "securityUpdates", "versionUpdates", "groupedUpdates"]
+		"requiredFeatures": ["dependabotAlerts", "malwareAlerts", "securityUpdates", "versionUpdates", "groupedUpdates"],
+		"featureExemptions": { "owner/repo": ["dependabotAlerts", "securityUpdates"] }
 	}
 }
 ```
+
+`featureExemptions` skips required-setting and access checks for only the listed features in that repository. It does not hide alerts returned by an accessible endpoint. Use it when a repository intentionally does not support a feature, and keep the exception visible in the JSON and console report.
 
 The report includes open issues and pull requests, Dependabot vulnerability and malware alerts, code scanning and secret scanning alerts, and the readable repository security settings. It inspects the default branch's `dependabot.yml` for version updates and explicit `groups` rules with `applies-to: security-updates`. When no explicit security-update grouping rule exists, it marks the grouped setting unverified because the GitHub UI toggle is not present in the repository configuration; confirm that toggle in repository settings. Counts are `null` when an endpoint cannot be read or a feature is disabled; the report does not turn missing permissions or disabled scanning into a false zero.
 
