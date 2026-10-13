@@ -148,7 +148,7 @@ export type QualityCfg = {
 	repeatedClasses?: { minimumCount?: number; extensions?: string[]; ignoredDirectories?: string[] };
 	regexDedup?: { extensions?: string[]; ignoredFiles?: string[]; minimumCount?: number; sharedModule?: string };
 	uiPatterns?: { forbidden?: string[]; ignoredFiles?: string[]; extensions?: string[] };
-	github?: { repositories?: string[]; requiredFeatures?: GitHubFeature[] };
+	github?: { repositories?: string[]; requiredFeatures?: GitHubFeature[]; featureExemptions?: Record<string, GitHubFeature[]> };
 	singleUse?: { skippedDirectories?: string[] };
 	tsconfig?: string;
 	oneLineImports?: boolean;
@@ -1680,7 +1680,7 @@ function runGitHubCheck(cfg: QualityCfg, repos: string[] = [], explicit = false,
 		return;
 	}
 	try {
-		reportGitHubData = buildGitHubReport(targets, cfg.github?.requiredFeatures);
+		reportGitHubData = buildGitHubReport(targets, cfg.github?.requiredFeatures, undefined, cfg.github?.featureExemptions);
 		const findings = reportGitHubData.repositories.flatMap((repo) => repo.findings);
 		const failed = reportGitHubData.state === 'partial';
 		updateGitHubStage(failed ? 'failed' : findings.length ? 'findings' : 'passed', findings.length);
@@ -1688,8 +1688,8 @@ function runGitHubCheck(cfg: QualityCfg, repos: string[] = [], explicit = false,
 		if (!warn && findings.some((finding) => finding.category !== 'issue' && finding.category !== 'setting')) process.exitCode = 1;
 		if (failed && !warn) process.exitCode = 1;
 		console.info('  Use --report-json <path> to save detailed findings and agent instructions.');
-	} catch (error) {
-		const detail = error instanceof Error ? error.message : 'Unknown GitHub report error.';
+	} catch (err) {
+		const detail = err instanceof Error ? err.message : 'Unknown GitHub report error.';
 		reportGitHubData = { schemaVersion: 1, generatedAt: new Date().toISOString(), state: 'partial', detail, repositories: [] };
 		updateGitHubStage('failed', 0);
 		console.error(`  GitHub report failed: ${detail}`);

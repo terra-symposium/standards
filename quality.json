@@ -15,7 +15,10 @@
 			"Terra-Symposium/terra-shared",
 			"kaimacann/personal-monorepo"
 		],
-		"requiredFeatures": ["dependencyGraph", "dependabotAlerts", "malwareAlerts", "securityUpdates", "versionUpdates", "groupedUpdates"]
+		"requiredFeatures": ["dependencyGraph", "dependabotAlerts", "malwareAlerts", "securityUpdates", "versionUpdates", "groupedUpdates"],
+		"featureExemptions": {
+			"salesphere-vh/salesphere": ["dependencyGraph", "dependabotAlerts", "malwareAlerts", "securityUpdates", "versionUpdates", "groupedUpdates"]
+		}
 	},
 	"qualityCommands": [
 		{ "name": "build", "command": "pnpm", "args": ["run", "build"] },
