@@ -10,17 +10,96 @@ const apiPath = (endpoint) => `repos/acme/project${endpoint ? `/${endpoint}` : '
 
 test('GitHub report classifies open issues and security alerts without exposing secret values', () => {
 	const calls = new Map([
-		[apiPath(''), { ok: true, value: { default_branch: 'development', security_and_analysis: { dependency_graph: { status: 'enabled' }, secret_scanning: { status: 'enabled' }, secret_scanning_push_protection: { status: 'enabled' }, code_security: { status: 'enabled' } } } }],
-		[`${apiPath('issues')}?state=open&per_page=100`, { ok: true, value: [[{ number: 8, title: 'Fix\u001b[31m input\r\nparsing', labels: [{ name: 'bug' }] }, { number: 9, title: 'PR', pull_request: { url: 'https://api.github.com/pulls/9' } }]] }],
-		[`${apiPath('dependabot/alerts')}?state=open&per_page=100&classification=general`, { ok: true, value: [[{ number: 2, dependency: { package: { ecosystem: 'npm', name: 'left-pad' }, manifest_path: 'package.json' }, security_vulnerability: { severity: 'high', vulnerable_version_range: '< 2.0.0', first_patched_version: { identifier: '2.0.0' } }, security_advisory: { summary: 'Unsafe package' } }]] }],
-		[`${apiPath('dependabot/alerts')}?state=open&per_page=100&classification=malware`, { ok: true, value: [[{ number: 3, dependency: { package: { ecosystem: 'npm', name: 'evil-package' }, manifest_path: 'package.json' }, security_vulnerability: { severity: 'critical' }, security_advisory: { summary: 'Malicious package' } }]] }],
-		[`${apiPath('code-scanning/alerts')}?state=open&per_page=100`, { ok: true, value: [[{ number: 4, rule: { id: 'js/injection', description: 'Unsafe query', severity: 'error' }, most_recent_instance: { location: { path: 'src/query.ts', start_line: 11 } } }]] }],
-		[`${apiPath('secret-scanning/alerts')}?state=open&per_page=100`, { ok: true, value: [[{ number: 5, secret_type_display_name: 'API token', secret: 'must-never-appear', first_location_detected: { path: 'src/config.ts', start_line: 6 }, validity: 'active' }]] }],
+		[
+			apiPath(''),
+			{
+				ok: true,
+				value: {
+					default_branch: 'development',
+					security_and_analysis: {
+						dependency_graph: { status: 'enabled' },
+						secret_scanning: { status: 'enabled' },
+						secret_scanning_push_protection: { status: 'enabled' },
+						code_security: { status: 'enabled' },
+					},
+				},
+			},
+		],
+		[
+			`${apiPath('issues')}?state=open&per_page=100`,
+			{
+				ok: true,
+				value: [
+					[
+						{ number: 8, title: 'Fix\u001b[31m input\r\nparsing', labels: [{ name: 'bug' }] },
+						{ number: 9, title: 'PR', pull_request: { url: 'https://api.github.com/pulls/9' } },
+					],
+				],
+			},
+		],
+		[
+			`${apiPath('dependabot/alerts')}?state=open&per_page=100&classification=general`,
+			{
+				ok: true,
+				value: [
+					[
+						{
+							number: 2,
+							dependency: { package: { ecosystem: 'npm', name: 'left-pad' }, manifest_path: 'package.json' },
+							security_vulnerability: { severity: 'high', vulnerable_version_range: '< 2.0.0', first_patched_version: { identifier: '2.0.0' } },
+							security_advisory: { summary: 'Unsafe package' },
+						},
+					],
+				],
+			},
+		],
+		[
+			`${apiPath('dependabot/alerts')}?state=open&per_page=100&classification=malware`,
+			{
+				ok: true,
+				value: [
+					[
+						{
+							number: 3,
+							dependency: { package: { ecosystem: 'npm', name: 'evil-package' }, manifest_path: 'package.json' },
+							security_vulnerability: { severity: 'critical' },
+							security_advisory: { summary: 'Malicious package' },
+						},
+					],
+				],
+			},
+		],
+		[
+			`${apiPath('code-scanning/alerts')}?state=open&per_page=100`,
+			{
+				ok: true,
+				value: [[{ number: 4, rule: { id: 'js/injection', description: 'Unsafe query', severity: 'error' }, most_recent_instance: { location: { path: 'src/query.ts', start_line: 11 } } }]],
+			},
+		],
+		[
+			`${apiPath('secret-scanning/alerts')}?state=open&per_page=100`,
+			{ ok: true, value: [[{ number: 5, secret_type_display_name: 'API token', secret: 'must-never-appear', first_location_detected: { path: 'src/config.ts', start_line: 6 }, validity: 'active' }]] },
+		],
 		[apiPath('vulnerability-alerts'), { ok: true, value: null }],
 		[apiPath('automated-security-fixes'), { ok: true, value: { enabled: true } }],
-		[`${apiPath('contents/.github/dependabot.yml')}?ref=development`, { ok: true, value: { encoding: 'base64', content: Buffer.from('version: 2\nupdates:\n  - package-ecosystem: npm\n    directory: /\n    schedule:\n      interval: weekly\n    groups:\n      all:\n        applies-to: security-updates\n        patterns:\n          - "*"\n').toString('base64') } }],
+		[
+			`${apiPath('contents/.github/dependabot.yml')}?ref=development`,
+			{
+				ok: true,
+				value: {
+					encoding: 'base64',
+					content: Buffer.from(
+						'version: 2\nupdates:\n  - package-ecosystem: npm\n    directory: /\n    schedule:\n      interval: weekly\n    groups:\n      all:\n        applies-to: security-updates\n        patterns:\n          - "*"\n',
+					).toString('base64'),
+				},
+			},
+		],
 	]);
-	const report = buildGitHubReport([repo], ['dependabotAlerts', 'malwareAlerts', 'securityUpdates', 'versionUpdates', 'groupedUpdates'], (path) => calls.get(path) ?? { ok: false, state: 'unavailable', detail: 'unmatched test endpoint' });
+	const report = buildGitHubReport(
+		[repo],
+		['dependabotAlerts', 'malwareAlerts', 'securityUpdates', 'versionUpdates', 'groupedUpdates'],
+		(path) => calls.get(path) ?? { ok: false, state: 'unavailable', detail: 'unmatched test endpoint' },
+	);
 	const result = report.repositories[0];
 	assert.equal(report.state, 'complete');
 	assert.deepEqual(result.metrics, { openIssues: 1, openPullRequests: 1, dependabotAlerts: 1, malwareAlerts: 1, codeScanningAlerts: 1, secretScanningAlerts: 1 });
@@ -57,7 +136,9 @@ test('github CLI writes the analytics stage and agent instructions to the qualit
 	const bin = join(root, 'bin');
 	mkdirSync(bin);
 	const gh = join(bin, 'gh');
-	writeFileSync(gh, `#!/usr/bin/env node
+	writeFileSync(
+		gh,
+		`#!/usr/bin/env node
 const args = process.argv.slice(2).join(' ');
 if (args === 'auth status') process.exit(0);
 if (args.includes('contents/.github/dependabot.yml') || args.includes('contents/.github/dependabot.yaml')) { process.stderr.write('gh: Not Found (HTTP 404)\\n'); process.exit(1); }
@@ -71,7 +152,8 @@ if (args.includes('--paginate')) {
 }
 if (args.endsWith('repos/acme/project')) { process.stdout.write('{\\"default_branch\\":\\"main\\",\\"security_and_analysis\\":{\\"dependency_graph\\":{\\"status\\":\\"enabled\\"}}}'); process.exit(0); }
 process.stdout.write('[]');
-`);
+`,
+	);
 	chmodSync(gh, 0o755);
 	const originalPath = process.env.PATH;
 	const originalToken = process.env.GH_TOKEN;

@@ -1662,7 +1662,7 @@ function printFindings<T>(findings: readonly T[], fmt: (finding: T) => string): 
  */
 function runGitHubCheck(cfg: QualityCfg, repos: string[] = [], explicit = false, warn = false): void {
 	qualityHeader('github', 'Reading open issues, Dependabot, code scanning, and secret scanning alerts');
-	const targets = repos.length ? repos : cfg.github?.repositories ?? [inferGitHubRepo(cfg.root)].filter((repo): repo is string => Boolean(repo));
+	const targets = repos.length ? repos : (cfg.github?.repositories ?? [inferGitHubRepo(cfg.root)].filter((repo): repo is string => Boolean(repo)));
 	if (!targets.length) {
 		const detail = 'Set github.repositories in quality.json or pass --repository owner/name.';
 		reportGitHubData = { schemaVersion: 1, generatedAt: new Date().toISOString(), state: 'partial', detail, repositories: [] };
@@ -2124,7 +2124,23 @@ export function runQualityCli(cfg: QualityCfg, args = process.argv.slice(2)): vo
 			if (s.name === 'ui-patterns' && !cfg.uiPatterns) return false;
 			return true;
 		});
-		const standard = ['documentation', 'format', 'imports', 'naming', 'forwarding', 'lint', 'dead-code', 'typecheck', 'diff', 'aliases', 'security', 'repeated-classes', 'regex-dedup', 'ui-patterns', 'github'];
+		const standard = [
+			'documentation',
+			'format',
+			'imports',
+			'naming',
+			'forwarding',
+			'lint',
+			'dead-code',
+			'typecheck',
+			'diff',
+			'aliases',
+			'security',
+			'repeated-classes',
+			'regex-dedup',
+			'ui-patterns',
+			'github',
+		];
 		const report: QualityJsonReport = {
 			schemaVersion: 1,
 			generatedAt: new Date().toISOString(),
@@ -2155,7 +2171,9 @@ function dispatchQualityCli(cfg: QualityCfg, args: string[]): void {
 	if (args.includes('--help') || args.includes('-h')) {
 		console.info('Usage: terra-quality <command> [options]');
 		console.info('Commands include quality, history, github, document, format, lint, knip, types, single-use, dead-code, security, and domain.');
-		console.info('Options: --all, --warn, --strict, --skip-commands, --skip-recommendations, --report-json <path>, --repository owner/name; history also accepts --branch <name> and --base-sha <sha>.');
+		console.info(
+			'Options: --all, --warn, --strict, --skip-commands, --skip-recommendations, --report-json <path>, --repository owner/name; history also accepts --branch <name> and --base-sha <sha>.',
+		);
 		return;
 	}
 	const cmd = args.find((a) => !a.startsWith('-')) ?? 'quality';
