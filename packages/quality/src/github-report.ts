@@ -43,6 +43,7 @@ export type GitHubRepositoryReport = {
 		secretScanningAlerts: number | null;
 	};
 	features: Record<GitHubFeature, GitHubFeatureState>;
+	exemptedFeatures?: GitHubFeature[];
 	resources: { issues: GitHubResourceReport; dependabot: GitHubResourceReport; malware: GitHubResourceReport; codeScanning: GitHubResourceReport; secretScanning: GitHubResourceReport };
 	findings: GitHubFinding[];
 };
@@ -207,21 +208,21 @@ function apiSetting(result: ApiResult, enabledWhenEmpty = false): GitHubFeatureS
 }
 
 /** Build a URL-safe GitHub REST path for an owner/repository slug.
- * @param repository Owner/name repository slug.
+ * @param repo Owner/name repository slug.
  * @param endpoint REST endpoint below the repository.
  * @return Encoded REST path.
  */
-function repoPath(repository: string, endpoint: string): string {
-	const [owner, name] = repository.split('/');
+function repoPath(repo: string, endpoint: string): string {
+	const [owner, name] = repo.split('/');
 	return `repos/${encodeURIComponent(owner!)}/${encodeURIComponent(name!)}${endpoint ? `/${endpoint}` : ''}`;
 }
 
 /** Count open issues and pull requests and create findings for issues.
- * @param repository Owner/name repository slug.
+ * @param repo Owner/name repository slug.
  * @param vals Open issue and pull request records.
  * @return Issue findings and separate issue/pull request counts.
  */
-function issueFindings(repository: string, vals: unknown[]): { findings: GitHubFinding[]; issues: number; pulls: number } {
+function issueFindings(repo: string, vals: unknown[]): { findings: GitHubFinding[]; issues: number; pulls: number } {
 	let issues = 0;
 	let pulls = 0;
 	const findings: GitHubFinding[] = [];
@@ -237,12 +238,12 @@ function issueFindings(repository: string, vals: unknown[]): { findings: GitHubF
 		const title = text(item.title) ?? `Open issue #${number}`;
 		const labels = Array.isArray(item.labels) ? item.labels.map((label) => text(rec(label)?.name)).filter((label): label is string => Boolean(label)) : [];
 		findings.push({
-			repository,
+			repository: repo,
 			category: 'issue',
 			number,
 			severity: 'info',
 			title,
-			url: `https://github.com/${repository}/issues/${number}`,
+			url: `https://github.com/${repo}/issues/${number}`,
 			...(labels.length ? { summary: `Labels: ${labels.join(', ')}` } : {}),
 			agentInstructions: ISSUE_INSTRUCTIONS,
 		});
@@ -251,12 +252,12 @@ function issueFindings(repository: string, vals: unknown[]): { findings: GitHubF
 }
 
 /** Convert dependency alert records into safe remediation findings.
- * @param repository Owner/name repository slug.
+ * @param repo Owner/name repository slug.
  * @param vals Dependabot alert records.
  * @param cat Alert category.
  * @return Findings with package context and remediation instructions.
  */
-function dependabotFindings(repository: string, vals: unknown[], cat: 'dependabot' | 'malware'): GitHubFinding[] {
+function dependabotFindings(repo: string, vals: unknown[], cat: 'dependabot' | 'malware'): GitHubFinding[] {
 	return vals.flatMap((val): GitHubFinding[] => {
 		const alert = rec(val);
 		const dependency = rec(alert?.dependency);
@@ -276,12 +277,12 @@ function dependabotFindings(repository: string, vals: unknown[], cat: 'dependabo
 				: `${ALERT_INSTRUCTIONS}${patched ? ` Prefer the first patched version ${patched} when compatible; otherwise upgrade the direct parent or apply the narrowest safe override.` : ' If no patched version is listed, trace the dependency to its parent and find a maintained safe release or replacement.'}`;
 		return [
 			{
-				repository,
+				repository: repo,
 				category: cat,
 				number,
 				severity: text(vulnerability?.severity) ?? text(advisory?.severity) ?? 'unknown',
 				title,
-				url: `https://github.com/${repository}/security/dependabot/${number}`,
+				url: `https://github.com/${repo}/security/dependabot/${number}`,
 				...(manifest ? { location: manifest } : {}),
 				summary: [text(pkg?.ecosystem), name, affected ? `affected ${affected}` : undefined, patched ? `first patched ${patched}` : undefined].filter(Boolean).join(' · '),
 				agentInstructions: instructions,
@@ -291,11 +292,11 @@ function dependabotFindings(repository: string, vals: unknown[], cat: 'dependabo
 }
 
 /** Build findings from open code-scanning alerts.
- * @param repository Owner/name repository slug.
+ * @param repo Owner/name repository slug.
  * @param vals Code-scanning alert records.
  * @return Findings with source locations and remediation instructions.
  */
-function codeScanningFindings(repository: string, vals: unknown[]): GitHubFinding[] {
+function codeScanningFindings(repo: string, vals: unknown[]): GitHubFinding[] {
 	return vals.flatMap((val): GitHubFinding[] => {
 		const alert = rec(val);
 		const rule = rec(alert?.rule);
@@ -307,12 +308,12 @@ function codeScanningFindings(repository: string, vals: unknown[]): GitHubFindin
 		const line = Number.isSafeInteger(location?.start_line) ? Number(location?.start_line) : undefined;
 		return [
 			{
-				repository,
+				repository: repo,
 				category: 'code-scanning',
 				number,
 				severity: text(rule?.security_severity_level) ?? text(rule?.severity) ?? 'unknown',
 				title: text(rule?.description) ?? `Code scanning alert #${number}`,
-				url: `https://github.com/${repository}/security/code-scanning/${number}`,
+				url: `https://github.com/${repo}/security/code-scanning/${number}`,
 				...(path ? { location: `${path}${line ? `:${line}` : ''}` } : {}),
 				...(text(rule?.id) ? { summary: `Rule ${text(rule?.id)}` } : {}),
 				agentInstructions:
@@ -323,11 +324,11 @@ function codeScanningFindings(repository: string, vals: unknown[]): GitHubFindin
 }
 
 /** Build secret-scanning findings without copying secret values into the report.
- * @param repository Owner/name repository slug.
+ * @param repo Owner/name repository slug.
  * @param vals Secret-scanning alert records.
  * @return Findings with locations and rotation instructions only.
  */
-function secretScanningFindings(repository: string, vals: unknown[]): GitHubFinding[] {
+function secretScanningFindings(repo: string, vals: unknown[]): GitHubFinding[] {
 	return vals.flatMap((val): GitHubFinding[] => {
 		const alert = rec(val);
 		const instance = rec(alert?.first_location_detected);
@@ -338,12 +339,12 @@ function secretScanningFindings(repository: string, vals: unknown[]): GitHubFind
 		const secretType = text(alert.secret_type_display_name) ?? text(alert.secret_type) ?? 'secret';
 		return [
 			{
-				repository,
+				repository: repo,
 				category: 'secret-scanning',
 				number,
 				severity: 'critical',
 				title: `Exposed ${secretType}`,
-				url: `https://github.com/${repository}/security/secret-scanning/${number}`,
+				url: `https://github.com/${repo}/security/secret-scanning/${number}`,
 				...(path ? { location: `${path}${line ? `:${line}` : ''}` } : {}),
 				...(text(alert.validity) ? { summary: `Validity: ${text(alert.validity)}` } : {}),
 				agentInstructions:
@@ -355,13 +356,13 @@ function secretScanningFindings(repository: string, vals: unknown[]): GitHubFind
 
 /** Inspect the default branch Dependabot file for version and grouped security updates.
  * @param api GitHub REST request implementation.
- * @param repository Owner/name repository slug.
+ * @param repo Owner/name repository slug.
  * @param branch Default branch name.
  * @return Detected version and grouped update states.
  */
-function dependabotCfgState(api: GitHubApi, repository: string, branch: string): { versionUpdates: GitHubFeatureState; groupedUpdates: GitHubFeatureState } {
+function dependabotCfgState(api: GitHubApi, repo: string, branch: string): { versionUpdates: GitHubFeatureState; groupedUpdates: GitHubFeatureState } {
 	for (const file of ['.github/dependabot.yml', '.github/dependabot.yaml']) {
-		const result = api(`${repoPath(repository, `contents/${file}`)}?ref=${encodeURIComponent(branch)}`);
+		const result = api(`${repoPath(repo, `contents/${file}`)}?ref=${encodeURIComponent(branch)}`);
 		if (!result.ok) {
 			if (result.state === 'not-configured') continue;
 			return { versionUpdates: 'unknown', groupedUpdates: 'unknown' };
@@ -377,11 +378,11 @@ function dependabotCfgState(api: GitHubApi, repository: string, branch: string):
 }
 
 /** Create remediation guidance for a disabled or unverifiable required setting.
- * @param repository Owner/name repository slug.
+ * @param repo Owner/name repository slug.
  * @param feature Required setting to inspect.
  * @return Setting finding with the relevant GitHub settings link.
  */
-function settingsFinding(repository: string, feature: GitHubFeature): GitHubFinding {
+function settingsFinding(repo: string, feature: GitHubFeature): GitHubFinding {
 	const enabled = REQUIRED_FEATURE_LABELS[feature];
 	const agentInstructions =
 		feature === 'versionUpdates'
@@ -390,11 +391,11 @@ function settingsFinding(repository: string, feature: GitHubFeature): GitHubFind
 				? 'Confirm the Grouped security updates toggle in the GitHub repository settings UI. If grouping version updates is also desired, add suitable groups to .github/dependabot.yml. Explicit security-update group rules can override the UI toggle; do not change settings through an API.'
 				: `Check the ${enabled} setting in GitHub repository settings. If disabled, enable it with a repository administrator; if the read-only API could not verify it, confirm the actual state in the UI. Do not use a write API or change unrelated security settings.`;
 	return {
-		repository,
+		repository: repo,
 		category: 'setting',
 		severity: 'medium',
 		title: `${enabled} is disabled or could not be verified`,
-		url: `https://github.com/${repository}/settings/security_analysis`,
+		url: `https://github.com/${repo}/settings/security_analysis`,
 		agentInstructions,
 	};
 }
@@ -404,25 +405,33 @@ function settingsFinding(repository: string, feature: GitHubFeature): GitHubFind
  * @param repos Owner/name repository slugs.
  * @param requiredFeatures Settings that must be enabled for these repositories.
  * @param api Injectable read-only GitHub API boundary.
+ * @param featureExemptions Per-repository features that are intentionally out of scope.
  * @return A normalized report with safe agent remediation instructions.
  */
-export function buildGitHubReport(repos: readonly string[], requiredFeatures: readonly GitHubFeature[] = [], api: GitHubApi = ghApi): GitHubReport {
+export function buildGitHubReport(
+	repos: readonly string[],
+	requiredFeatures: readonly GitHubFeature[] = [],
+	api: GitHubApi = ghApi,
+	featureExemptions: Readonly<Record<string, readonly GitHubFeature[]>> = {},
+): GitHubReport {
 	const reports: GitHubRepositoryReport[] = [];
 	let partial = false;
-	for (const repository of [...new Set(repos)]) {
-		if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repository)) throw new Error(`Invalid GitHub repository slug: ${repository}`);
-		const metadataResult = api(repoPath(repository, ''));
+	for (const repo of [...new Set(repos)]) {
+		if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repo)) throw new Error(`Invalid GitHub repository slug: ${repo}`);
+		const exemptedFeatures = [...new Set(featureExemptions[repo] ?? [])];
+		const requiredForRepo = requiredFeatures.filter((feature) => !exemptedFeatures.includes(feature));
+		const metadataResult = api(repoPath(repo, ''));
 		const metadata = metadataResult.ok ? rec(metadataResult.value) : undefined;
 		if (!metadataResult.ok) partial = true;
 		const defaultBranch = text(metadata?.default_branch) ?? 'main';
-		const issuesResult = resultItems(api(`${repoPath(repository, 'issues')}?state=open&per_page=100`, true));
-		const dependabotResult = resultItems(api(`${repoPath(repository, 'dependabot/alerts')}?state=open&per_page=100&classification=general`, true));
-		const malwareResult = resultItems(api(`${repoPath(repository, 'dependabot/alerts')}?state=open&per_page=100&classification=malware`, true));
-		const codeResult = resultItems(api(`${repoPath(repository, 'code-scanning/alerts')}?state=open&per_page=100`, true));
-		const secretResult = resultItems(api(`${repoPath(repository, 'secret-scanning/alerts')}?state=open&per_page=100`, true));
-		const vulnerabilitySetting = api(repoPath(repository, 'vulnerability-alerts'));
-		const securityUpdateSetting = api(repoPath(repository, 'automated-security-fixes'));
-		const dependabotCfg = dependabotCfgState(api, repository, defaultBranch);
+		const issuesResult = resultItems(api(`${repoPath(repo, 'issues')}?state=open&per_page=100`, true));
+		const dependabotResult = resultItems(api(`${repoPath(repo, 'dependabot/alerts')}?state=open&per_page=100&classification=general`, true));
+		const malwareResult = resultItems(api(`${repoPath(repo, 'dependabot/alerts')}?state=open&per_page=100&classification=malware`, true));
+		const codeResult = resultItems(api(`${repoPath(repo, 'code-scanning/alerts')}?state=open&per_page=100`, true));
+		const secretResult = resultItems(api(`${repoPath(repo, 'secret-scanning/alerts')}?state=open&per_page=100`, true));
+		const vulnerabilitySetting = api(repoPath(repo, 'vulnerability-alerts'));
+		const securityUpdateSetting = api(repoPath(repo, 'automated-security-fixes'));
+		const dependabotCfg = dependabotCfgState(api, repo, defaultBranch);
 		const security = rec(metadata?.security_and_analysis);
 		const dependabotAlerts = apiSetting(vulnerabilitySetting, true);
 		const dependencyGraph = featureState(security?.dependency_graph);
@@ -441,15 +450,15 @@ export function buildGitHubReport(repos: readonly string[], requiredFeatures: re
 		};
 		for (const [feature, featureStatus] of Object.entries(features) as [GitHubFeature, GitHubFeatureState][]) {
 			if (featureStatus === 'unknown' && feature === 'dependencyGraph') continue;
-			if (requiredFeatures.includes(feature) && featureStatus !== 'enabled') {
+			if (requiredForRepo.includes(feature) && featureStatus !== 'enabled') {
 				partial ||= featureStatus === 'unknown';
 			}
 		}
-		const issues = issueFindings(repository, issuesResult.items);
-		const dependencyFindings = dependabotFindings(repository, dependabotResult.items, 'dependabot');
-		const malwareFindings = dependabotFindings(repository, malwareResult.items, 'malware');
-		const codeFindings = codeScanningFindings(repository, codeResult.items);
-		const secretFindings = secretScanningFindings(repository, secretResult.items);
+		const issues = issueFindings(repo, issuesResult.items);
+		const dependencyFindings = dependabotFindings(repo, dependabotResult.items, 'dependabot');
+		const malwareFindings = dependabotFindings(repo, malwareResult.items, 'malware');
+		const codeFindings = codeScanningFindings(repo, codeResult.items);
+		const secretFindings = secretScanningFindings(repo, secretResult.items);
 		const resources = {
 			issues: issuesResult.resource,
 			dependabot: dependabotResult.resource,
@@ -457,25 +466,31 @@ export function buildGitHubReport(repos: readonly string[], requiredFeatures: re
 			codeScanning: codeResult.resource,
 			secretScanning: secretResult.resource,
 		};
-		if (Object.values(resources).some((resource) => !['available', 'disabled', 'not-configured'].includes(resource.state))) partial = true;
+		const exemptResources = new Set<keyof typeof resources>([
+			...(exemptedFeatures.includes('dependabotAlerts') ? ['dependabot' as const] : []),
+			...(exemptedFeatures.includes('malwareAlerts') ? ['malware' as const] : []),
+		]);
+		if (Object.entries(resources).some(([name, resource]) => !exemptResources.has(name as keyof typeof resources) && !['available', 'disabled', 'not-configured'].includes(resource.state)))
+			partial = true;
 		const findings = [...issues.findings, ...dependencyFindings, ...malwareFindings, ...codeFindings, ...secretFindings];
-		for (const feature of requiredFeatures) if (features[feature] !== 'enabled') findings.push(settingsFinding(repository, feature));
+		for (const feature of requiredForRepo) if (features[feature] !== 'enabled') findings.push(settingsFinding(repo, feature));
 		for (const [name, resource] of Object.entries(resources)) {
+			if (exemptResources.has(name as keyof typeof resources)) continue;
 			if (resource.state === 'permission-denied' || resource.state === 'unauthenticated' || resource.state === 'unavailable') {
 				findings.push({
-					repository,
+					repository: repo,
 					category: 'access',
 					severity: 'unknown',
 					title: `Could not read ${name} from GitHub`,
-					url: `https://github.com/${repository}/security`,
+					url: `https://github.com/${repo}/security`,
 					...(resource.detail ? { summary: resource.detail } : {}),
 					agentInstructions: 'Use a GitHub identity or token with read access for this resource and rerun the report. A missing result is not evidence that there are no alerts.',
 				});
 			}
 		}
 		reports.push({
-			repository,
-			url: `https://github.com/${repository}`,
+			repository: repo,
+			url: `https://github.com/${repo}`,
 			metrics: {
 				openIssues: issuesResult.resource.count === null ? null : issues.issues,
 				openPullRequests: issuesResult.resource.count === null ? null : issues.pulls,
@@ -485,6 +500,7 @@ export function buildGitHubReport(repos: readonly string[], requiredFeatures: re
 				secretScanningAlerts: secretResult.resource.count,
 			},
 			features,
+			...(exemptedFeatures.length ? { exemptedFeatures } : {}),
 			resources,
 			findings,
 		});
@@ -514,6 +530,10 @@ export function formatGitHubReport(report: GitHubReport): string[] {
 		for (const finding of repo.findings) counts.set(finding.category, (counts.get(finding.category) ?? 0) + 1);
 		const findingSummary = [...counts].map(([cat, count]) => `${count} ${cat}`).join(', ');
 		const settingFindings = repo.findings.filter((finding) => finding.category === 'setting' || finding.category === 'access').map((finding) => `  - ${finding.category}: ${finding.title}`);
-		return [summary, ...(findingSummary ? [`  Findings: ${findingSummary}`, ...settingFindings] : [])];
+		return [
+			summary,
+			...(repo.exemptedFeatures?.length ? [`  Exempt features: ${repo.exemptedFeatures.join(', ')}`] : []),
+			...(findingSummary ? [`  Findings: ${findingSummary}`, ...settingFindings] : []),
+		];
 	});
 }
