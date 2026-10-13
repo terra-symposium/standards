@@ -1,0 +1,3 @@
+interface:
+  display_name: "Efficiency"
+  short_description: "Measure and improve package workflow runtime"
