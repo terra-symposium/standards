@@ -20,6 +20,7 @@ import { existsSync, readFileSync, realpathSync, statSync, writeFileSync } from 
 import { deadCodeEditsIntroduceTypeErrors, deadCodeTypeProgram, fixSingleUseDeclarations, singleUseFindings } from './single-use.js';
 import { documentSrcFile, documentationFindings, duplicateImportFindings, maintainSrcFile, protectLongImports } from './documentation.js';
 import { fileURLToPath } from 'node:url';
+import { buildGitHubReport, formatGitHubReport, hasGitHubAuth, type GitHubFeature, type GitHubReport } from './github-report.js';
 import { fixObjectForwarding, objectForwardingFindings } from './object-forwarding.js';
 import { fixRegexDedup, fixRepeatedClasses, regexFindings, repeatedClassFindings, uiPatternFindings } from './patterns.js';
 import { qualityProgress } from './progress.js';
@@ -69,11 +70,12 @@ const CLI_CMDS = new Set([
 	'aliases',
 	'forwarding',
 	'documentation',
+	'github',
 	'lint',
 	'knip',
 	'types',
 ]);
-const CLI_FLAGS = new Set(['--all', '--warn', '--strict', '--skip-commands', '--skip-recommendations', '--help', '-h', '--version', '-v', '--report-json', '--branch', '--base-sha']);
+const CLI_FLAGS = new Set(['--all', '--warn', '--strict', '--skip-commands', '--skip-recommendations', '--help', '-h', '--version', '-v', '--report-json', '--branch', '--base-sha', '--repository']);
 const TOOL_OUTPUT_MAX_BUFFER = 64 * 1024 * 1024;
 const ESLINT_BATCH_SIZE = 10;
 const ESLINT_ARGUMENT_BUDGET = 64 * 1024;
@@ -87,9 +89,11 @@ export type QualityJsonReport = {
 	command: string;
 	scope: 'all' | 'changed';
 	checks: { name: string; status: 'passed' | 'findings' | 'failed' | 'skipped'; findings: number }[];
+	github?: GitHubReport;
 };
 let reportStages: Map<string, QualityJsonReport['checks'][number]> | undefined;
 let reportStageName: string | undefined;
+let reportGitHubData: GitHubReport | undefined;
 
 /*//////////////////////////////////////////////////
 REGEX
@@ -115,7 +119,8 @@ export type QualityCheckName =
 	| 'security'
 	| 'repeated-classes'
 	| 'regex-dedup'
-	| 'ui-patterns';
+	| 'ui-patterns'
+	| 'github';
 /** Names accepted in the `autofix` configuration map. */
 export type QualityAutofixName = 'document' | 'format' | 'name' | 'lint' | 'knip' | 'dead-code' | 'alias' | 'forward' | 'repeatedClasses' | 'regexDedup';
 /** Normalized repository paths, source scope, policies, and tool settings. */
@@ -143,6 +148,7 @@ export type QualityCfg = {
 	repeatedClasses?: { minimumCount?: number; extensions?: string[]; ignoredDirectories?: string[] };
 	regexDedup?: { extensions?: string[]; ignoredFiles?: string[]; minimumCount?: number; sharedModule?: string };
 	uiPatterns?: { forbidden?: string[]; ignoredFiles?: string[]; extensions?: string[] };
+	github?: { repositories?: string[]; requiredFeatures?: GitHubFeature[] };
 	singleUse?: { skippedDirectories?: string[] };
 	tsconfig?: string;
 	oneLineImports?: boolean;
@@ -1648,6 +1654,71 @@ function printFindings<T>(findings: readonly T[], fmt: (finding: T) => string): 
 }
 
 /**
+ * Run the optional, read-only GitHub analytics stage.
+ * @param cfg Quality configuration containing repositories and expected settings.
+ * @param repos Repository overrides supplied to `terra-quality github`.
+ * @param explicit Whether GitHub reporting was requested as the command itself.
+ * @param warn Whether findings should be reported without setting a failing exit code.
+ */
+function runGitHubCheck(cfg: QualityCfg, repos: string[] = [], explicit = false, warn = false): void {
+	qualityHeader('github', 'Reading open issues, Dependabot, code scanning, and secret scanning alerts');
+	const targets = repos.length ? repos : cfg.github?.repositories ?? [inferGitHubRepo(cfg.root)].filter((repo): repo is string => Boolean(repo));
+	if (!targets.length) {
+		const detail = 'Set github.repositories in quality.json or pass --repository owner/name.';
+		reportGitHubData = { schemaVersion: 1, generatedAt: new Date().toISOString(), state: 'partial', detail, repositories: [] };
+		updateGitHubStage('failed', 0);
+		console.error(`  GitHub report unavailable: ${detail}`);
+		process.exitCode = 1;
+		return;
+	}
+	if (!hasGitHubAuth()) {
+		const detail = 'GitHub CLI is unavailable or unauthenticated; run gh auth login or set GH_TOKEN.';
+		reportGitHubData = { schemaVersion: 1, generatedAt: new Date().toISOString(), state: 'skipped', detail, repositories: [] };
+		updateGitHubStage(explicit ? 'failed' : 'skipped', 0);
+		console.error(`  GitHub report ${explicit ? 'failed' : 'skipped'}: ${detail}`);
+		if (explicit) process.exitCode = 1;
+		return;
+	}
+	try {
+		reportGitHubData = buildGitHubReport(targets, cfg.github?.requiredFeatures);
+		const findings = reportGitHubData.repositories.flatMap((repo) => repo.findings);
+		const failed = reportGitHubData.state === 'partial';
+		updateGitHubStage(failed ? 'failed' : findings.length ? 'findings' : 'passed', findings.length);
+		for (const line of formatGitHubReport(reportGitHubData)) console.warn(`  ${line}`);
+		if (!warn && findings.some((finding) => finding.category !== 'issue' && finding.category !== 'setting')) process.exitCode = 1;
+		if (failed && !warn) process.exitCode = 1;
+		console.info('  Use --report-json <path> to save detailed findings and agent instructions.');
+	} catch (error) {
+		const detail = error instanceof Error ? error.message : 'Unknown GitHub report error.';
+		reportGitHubData = { schemaVersion: 1, generatedAt: new Date().toISOString(), state: 'partial', detail, repositories: [] };
+		updateGitHubStage('failed', 0);
+		console.error(`  GitHub report failed: ${detail}`);
+		process.exitCode = 1;
+	}
+}
+
+/** Update the JSON summary for the active GitHub report stage.
+ * @param status Result state to record.
+ * @param findings Number of GitHub findings in the report.
+ */
+function updateGitHubStage(status: QualityJsonReport['checks'][number]['status'], findings: number): void {
+	const stage = reportStages?.get('github');
+	if (stage) {
+		stage.status = status;
+		stage.findings = findings;
+	}
+}
+
+/** Infer the current repository slug from its GitHub origin remote.
+ * @param root Repository root to inspect.
+ * @return The owner/name slug, or undefined for a non-GitHub remote.
+ */
+function inferGitHubRepo(root: string): string | undefined {
+	const remote = spawnSync('git', ['config', '--get', 'remote.origin.url'], { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).stdout.trim();
+	return remote.match(/(?:github\.com[:/])([^/]+\/[^/]+?)(?:\.git)?$/i)?.[1];
+}
+
+/**
  * Runs configured generic repository checks as part of the full quality command.
  *
  * @param cfg Quality configuration selecting enabled generic checks and their policies.
@@ -2038,6 +2109,7 @@ export function runQualityCli(cfg: QualityCfg, args = process.argv.slice(2)): vo
 	}
 	reportStages = new Map();
 	reportStageName = undefined;
+	reportGitHubData = undefined;
 	try {
 		dispatchQualityCli(cfg, cmdArgs);
 	} finally {
@@ -2052,13 +2124,14 @@ export function runQualityCli(cfg: QualityCfg, args = process.argv.slice(2)): vo
 			if (s.name === 'ui-patterns' && !cfg.uiPatterns) return false;
 			return true;
 		});
-		const standard = ['documentation', 'format', 'imports', 'naming', 'forwarding', 'lint', 'dead-code', 'typecheck', 'diff', 'aliases', 'security', 'repeated-classes', 'regex-dedup', 'ui-patterns'];
+		const standard = ['documentation', 'format', 'imports', 'naming', 'forwarding', 'lint', 'dead-code', 'typecheck', 'diff', 'aliases', 'security', 'repeated-classes', 'regex-dedup', 'ui-patterns', 'github'];
 		const report: QualityJsonReport = {
 			schemaVersion: 1,
 			generatedAt: new Date().toISOString(),
 			command: cmdArgs.find((arg) => !arg.startsWith('-')) ?? 'quality',
 			scope: cmdArgs.includes('--all') || cmdArgs.includes('quality:all') ? 'all' : 'changed',
 			checks: [...executed, ...standard.filter((name) => !executed.some((s) => s.name === name)).map((name) => ({ name, status: 'skipped' as const, findings: 0 }))],
+			...(reportGitHubData ? { github: reportGitHubData } : {}),
 		};
 		writeFileSync(resolve(cfg.root, reportPath), `${JSON.stringify(report, null, 2)}\n`);
 		reportStages = undefined;
@@ -2081,8 +2154,8 @@ function dispatchQualityCli(cfg: QualityCfg, args: string[]): void {
 	}
 	if (args.includes('--help') || args.includes('-h')) {
 		console.info('Usage: terra-quality <command> [options]');
-		console.info('Commands include quality, history, document, format, lint, knip, types, single-use, dead-code, security, and domain.');
-		console.info('Options: --all, --warn, --strict, --skip-commands, --skip-recommendations, --report-json <path>; history also accepts --branch <name> and --base-sha <sha>.');
+		console.info('Commands include quality, history, github, document, format, lint, knip, types, single-use, dead-code, security, and domain.');
+		console.info('Options: --all, --warn, --strict, --skip-commands, --skip-recommendations, --report-json <path>, --repository owner/name; history also accepts --branch <name> and --base-sha <sha>.');
 		return;
 	}
 	const cmd = args.find((a) => !a.startsWith('-')) ?? 'quality';
@@ -2094,6 +2167,10 @@ function dispatchQualityCli(cfg: QualityCfg, args: string[]): void {
 		skipRecommendations: args.includes('--skip-recommendations'),
 	};
 	const fix = (check: QualityAutofixName): boolean => qualityAutofixEnabled(cfg, check, opts.fix);
+	if (cmd === 'github') {
+		runGitHubCheck(cfg, optVals(args, '--repository'), true, args.includes('--warn'));
+		return;
+	}
 	if (cmd === 'document' || cmd === 'maintain') {
 		runDocumentation(cfg, opts, args, args.includes('--quiet'));
 		if (qualityCheckEnabled(cfg, 'format')) runFormatter(cfg, { ...opts, fix: fix('format') }, args.slice(1));
@@ -2224,6 +2301,7 @@ function dispatchQualityCli(cfg: QualityCfg, args: string[]): void {
 		runQuality(cfg, opts.strict, opts.all, analysis);
 		if (qualityCheckEnabled(cfg, 'diff')) runDiffCheck(cfg);
 		if (opts.fix && qualityCheckEnabled(cfg, 'diff')) runDiffCheck(cfg);
+		if (qualityCheckEnabled(cfg, 'github') && cfg.github?.repositories?.length) runGitHubCheck(cfg, [], false, args.includes('--warn'));
 	}
 }
 
@@ -2270,9 +2348,13 @@ export function runQualityFromCfg(file?: string, args = process.argv.slice(2)): 
 function validCliArgs(args: string[]): void {
 	const reportIdx = args.indexOf('--report-json');
 	if (reportIdx >= 0 && (!args[reportIdx + 1] || args[reportIdx + 1].startsWith('-') || args.lastIndexOf('--report-json') !== reportIdx)) throw new Error('--report-json requires one output path.');
-	for (const flag of ['--branch', '--base-sha']) {
+	for (const flag of ['--branch', '--base-sha', '--repository']) {
 		const idx = args.indexOf(flag);
-		if (idx >= 0 && (!args[idx + 1] || args[idx + 1].startsWith('-') || args.lastIndexOf(flag) !== idx)) throw new Error(`${flag} requires one value.`);
+		if (flag === '--repository') {
+			for (const occurrence of args.flatMap((arg, i) => (arg === flag ? [i] : []))) {
+				if (!args[occurrence + 1] || args[occurrence + 1].startsWith('-')) throw new Error(`${flag} requires an owner/name value.`);
+			}
+		} else if (idx >= 0 && (!args[idx + 1] || args[idx + 1].startsWith('-') || args.lastIndexOf(flag) !== idx)) throw new Error(`${flag} requires one value.`);
 	}
 	const cmdArgs = args.filter((_, i) => i !== reportIdx + 1 || reportIdx < 0);
 	const cmd = cmdArgs.find((arg) => !arg.startsWith('-')) ?? 'quality';
@@ -2290,6 +2372,15 @@ function validCliArgs(args: string[]): void {
 function optVal(args: string[], flag: string): string | undefined {
 	const idx = args.indexOf(flag);
 	return idx < 0 ? undefined : args[idx + 1];
+}
+
+/** Read each occurrence of a repeated CLI option.
+ * @param args Validated command-line arguments.
+ * @param flag Repeated flag to read.
+ * @return Values supplied after each occurrence of the flag.
+ */
+function optVals(args: string[], flag: string): string[] {
+	return args.flatMap((arg, i) => (arg === flag && args[i + 1] ? [args[i + 1]!] : []));
 }
 
 /**

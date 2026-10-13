@@ -3,9 +3,11 @@ dist/
 coverage/
 **/.astro/
 /.quality-test-tmp/
+/.quality-github-report.json
 .changeset/*.md
 !.changeset/README.md
 !.changeset/tidy-repos-report.md
+!.changeset/github-analytics-report.md
 
 # Local Netlify folder
 .netlify

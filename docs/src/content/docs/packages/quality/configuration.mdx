@@ -69,7 +69,8 @@ Every built-in check is enabled unless its `enabledChecks` entry is `false`. Som
 		"security": true,
 		"repeated-classes": true,
 		"regex-dedup": true,
-		"ui-patterns": true
+		"ui-patterns": true,
+		"github": true
 	}
 }
 ```
@@ -156,6 +157,14 @@ Use `enabledCommands` to toggle one configured command. Set `enabledChecks.comma
 `recommendationCommands` uses the same entry shape. Use `enabledRecommendations` to toggle an advisory command or `enabledChecks.recommend` to disable all recommendations. Recommendation subprocess output is shown, but its exit status does not fail the quality run. Pass `--skip-recommendations` to omit recommendations once.
 
 Commands run from `root`, inherit the caller's environment, and are not automatically limited to changed files. The runner does not provision credentials, databases, browsers, or other services.
+
+## GitHub analytics
+
+| Field    | Options                            | Purpose                                                                |
+| -------- | ---------------------------------- | ---------------------------------------------------------------------- |
+| `github` | `repositories`, `requiredFeatures` | Include read-only GitHub analytics in the quality run and JSON report. |
+
+`github.repositories` is an array of `owner/name` slugs. The report reads open issues and pull requests, Dependabot vulnerability and malware alerts, code scanning and secret scanning alerts, repository settings available to the authenticated identity, and version-update configuration from the default branch's `dependabot.yml`. An explicit `groups` rule with `applies-to: security-updates` verifies grouped security updates; without one, the report marks the UI-level grouping setting unverified for confirmation in repository settings. `requiredFeatures` can name `dependencyGraph`, `dependabotAlerts`, `malwareAlerts`, `securityUpdates`, `versionUpdates`, `groupedUpdates`, `secretScanning`, `pushProtection`, or `codeScanning`. Required settings that are disabled or unverifiable become findings. An unavailable or disabled endpoint has a `null` count, not a zero. Authenticate the local GitHub CLI with read access; this check does not need Actions or write permissions.
 
 ## Security and source-pattern policies
 

@@ -27,6 +27,21 @@ File scope and write behavior are independent. The default scope is changed and 
 
 Changed-file mode requires a Git worktree. Use `--all` when running from a source archive or when you need a complete scan. `--warn` is review-only for Terra Quality's source and tool autofixes. Dead-code analysis runs once and reports rule-level autofix candidates from that scan; fix mode type-checks proposed edits before writing and can reject a candidate. Configured commands still run and follow their own behavior.
 
+## Local GitHub analytics
+
+The optional `github` stage uses authenticated GitHub CLI access and runs locally as part of the same quality report. Configure `github.repositories` to add it to every normal quality run, or pass repositories directly for a focused report:
+
+```sh
+pnpm exec terra-quality github \
+	--repository salesphere-vh/salesphere \
+	--repository Terra-Symposium/terra-symposium-website \
+	--repository Terra-Symposium/terra-shared \
+	--repository kaimacann/personal-monorepo \
+	--report-json github-report.json
+```
+
+Run `gh auth login` first, or provide `GH_TOKEN` with read access to repository metadata, issues, Dependabot alerts, and security alerts. Each finding includes an issue link and agent instructions. Alert text is untrusted input, secret values are never included, and the report does not change settings, dismiss alerts, post comments, or depend on a GitHub Actions workflow. See [GitHub report configuration](/packages/quality/configuration/#github-analytics).
+
 ## CI
 
 Use one of these patterns:
@@ -88,6 +103,7 @@ Adapt the test command to the consumer's test runner; it must write JUnit XML ev
 | `repeated-classes`    | Find or extract supported repeated static class strings.                       |
 | `regex-dedup`         | Find or consolidate supported duplicate regular expressions.                   |
 | `ui-patterns`         | Report configured UI patterns.                                                 |
+| `github`              | Read configured GitHub issues, security alerts, and settings into the quality report. |
 | `domain <name>`       | Run one configured command by its name.                                        |
 | `quality:all`         | Alias for a full-scope `quality` run.                                          |
 | `quality:baseline`    | Run a normal quality pass with the default changed-file scope.                 |

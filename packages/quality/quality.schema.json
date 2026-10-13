@@ -62,6 +62,14 @@
     "repeatedClasses": { "type": "object", "properties": { "minimumCount": { "type": "number" }, "extensions": { "type": "array", "items": { "type": "string" } }, "ignoredDirectories": { "type": "array", "items": { "type": "string" } } }, "additionalProperties": false },
     "regexDedup": { "type": "object", "properties": { "minimumCount": { "type": "number" }, "extensions": { "type": "array", "items": { "type": "string" } }, "ignoredFiles": { "type": "array", "items": { "type": "string" } }, "sharedModule": { "type": "string", "minLength": 1 } }, "additionalProperties": false },
     "uiPatterns": { "type": "object", "properties": { "forbidden": { "type": "array", "items": { "type": "string" } }, "ignoredFiles": { "type": "array", "items": { "type": "string" } }, "extensions": { "type": "array", "items": { "type": "string" } } }, "additionalProperties": false },
+    "github": {
+      "type": "object",
+      "properties": {
+        "repositories": { "type": "array", "uniqueItems": true, "items": { "type": "string", "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$" } },
+        "requiredFeatures": { "type": "array", "uniqueItems": true, "items": { "enum": ["dependencyGraph", "dependabotAlerts", "malwareAlerts", "securityUpdates", "versionUpdates", "groupedUpdates", "secretScanning", "pushProtection", "codeScanning"] } }
+      },
+      "additionalProperties": false
+    },
     "enabledCommands": { "type": "object", "additionalProperties": { "type": "boolean" } },
     "enabledRecommendations": { "type": "object", "additionalProperties": { "type": "boolean" } },
     "qualityCommands": { "$ref": "#/$defs/commands" },
