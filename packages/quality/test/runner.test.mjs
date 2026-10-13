@@ -18,7 +18,7 @@ import { createQualityAnalysis, createQualityCfg, loadQualityCfg, qualityAutofix
 import { existsSync, lstatSync, readFileSync, readdirSync, readlinkSync, symlinkSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { fixtureFile, fixtureRoot, fixtureText, resetExitCode } from './support.mjs';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 
 /*//////////////////////////////////////////////////
@@ -622,6 +622,106 @@ process.stdout.write(JSON.stringify([{ filePath: file, messages: text.includes('
 	assert.equal(process.exitCode, 0);
 	assert.doesNotMatch(readFileSync(src, 'utf8'), /function unused/);
 	assert.match(readFileSync(src, 'utf8'), /function used/);
+});
+test('dead-code scans the full scope once and applies same-file fixes before rescanning only changed files', () => {
+	const root = fixtureRoot('terra-quality-dead-code-sweep-');
+	const src = fixtureFile(
+		root,
+		'src/main.ts',
+		`function outer() {
+  return nested();
+}
+function nested() { return 1; }
+function spare() { return 2; }
+`,
+	);
+	for (let idx = 0; idx < 10; idx += 1) fixtureFile(root, `src/other-${idx}.ts`, 'export {};\n');
+	const marker = join(root, 'eslint-files.jsonl');
+	const eslint = fixtureFile(
+		root,
+		'bin/eslint-dead-code-sweep.mjs',
+		`#!/usr/bin/env node
+import { appendFileSync, readFileSync } from 'node:fs';
+const files = process.argv.slice(2).filter((arg) => arg.endsWith('.ts'));
+appendFileSync(${JSON.stringify(marker)}, JSON.stringify(files) + '\\n');
+process.stdout.write(JSON.stringify(files.map((filePath) => {
+  const text = readFileSync(filePath, 'utf8');
+  const lines = text.split('\\n');
+  const names = text.includes('function outer')
+    ? ['outer', 'spare']
+    : text.includes('function nested') ? ['nested'] : [];
+  return { filePath, messages: names.map((name) => ({
+    ruleId: 'unused-imports/no-unused-vars',
+    line: lines.findIndex((line) => line.includes('function ' + name)) + 1,
+    column: 10,
+  })) };
+})));
+`,
+		0o755,
+	);
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], tools: { eslint }, enabledChecks: { knip: false } });
+	resetExitCode();
+	runQualityCli(cfg, ['dead-code', '--all']);
+	assert.equal(process.exitCode, 0);
+	assert.doesNotMatch(fixtureText(root, 'src/main.ts'), /function (?:outer|nested|spare)/);
+	const scans = fixtureText(root, 'eslint-files.jsonl')
+		.trim()
+		.split('\n')
+		.map((line) => JSON.parse(line));
+	assert.equal(scans.length, 3, 'initial full scan plus two changed-file cascade scans');
+	assert.equal(scans[0].length, 11, 'all configured files share one initial ESLint process');
+	assert.deepEqual(scans[1], [src]);
+	assert.deepEqual(scans[2], [src]);
+	resetExitCode();
+});
+test('dead-code runs only the configured unused-variable rule through the local flat-config API', (t) => {
+	const workspaceRoot = fileURLToPath(new URL('../../../', import.meta.url));
+	const workspaceModules = resolve(workspaceRoot, 'node_modules');
+	if (!existsSync(resolve(workspaceModules, 'eslint', 'package.json'))) {
+		t.skip('workspace ESLint is unavailable');
+		return;
+	}
+	const root = fixtureRoot('terra-quality-dead-code-focused-eslint-');
+	fixtureFile(root, 'src/[main].js', 'const unused = 1;\n');
+	fixtureFile(root, 'package.json', '{}\n');
+	const marker = join(root, 'slow-rule-ran.txt');
+	fixtureFile(
+		root,
+		'eslint.config.mjs',
+		`import { appendFileSync } from 'node:fs';
+const unusedRule = {
+  meta: { type: 'problem', schema: [] },
+  create(context) {
+    return { VariableDeclarator(node) { context.report({ node: node.id, message: 'fixture unused variable' }); } };
+  },
+};
+const slowRule = {
+  meta: { type: 'problem', schema: [] },
+  create() {
+    appendFileSync(${JSON.stringify(marker)}, 'ran\\n');
+    return {};
+  },
+};
+export default [{
+  plugins: {
+    'unused-imports': { rules: { 'no-unused-vars': unusedRule } },
+    fixture: { rules: { slow: slowRule } },
+  },
+  rules: { 'unused-imports/no-unused-vars': 'error', 'fixture/slow': 'error' },
+}];
+`,
+	);
+	symlinkSync(workspaceModules, join(root, 'node_modules'), process.platform === 'win32' ? 'junction' : 'dir');
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.js'], enabledChecks: { knip: false } });
+	const msgs = [];
+	t.mock.method(console, 'error', (...parts) => msgs.push(parts.join(' ')));
+	resetExitCode();
+	runQualityCli(cfg, ['dead-code', '--all', '--warn']);
+	assert.equal(process.exitCode, 1);
+	assert.match(msgs.join('\n'), /eslint\/unused-private-declaration/);
+	assert.equal(existsSync(marker), false, 'the unrelated expensive ESLint rule must not run');
+	assert.equal(fixtureText(root, 'src/[main].js'), 'const unused = 1;\n');
+	resetExitCode();
 });
 test('dead-code CLI fails read-only for safe single-use fixes, then inlines the primitive value', () => {
 	const root = fixtureRoot('terra-quality-dead-code-single-use-cli-');

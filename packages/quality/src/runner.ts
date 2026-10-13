@@ -76,6 +76,9 @@ const CLI_CMDS = new Set([
 const CLI_FLAGS = new Set(['--all', '--warn', '--strict', '--skip-commands', '--skip-recommendations', '--help', '-h', '--version', '-v', '--report-json', '--branch', '--base-sha']);
 const TOOL_OUTPUT_MAX_BUFFER = 64 * 1024 * 1024;
 const ESLINT_BATCH_SIZE = 10;
+const ESLINT_ARGUMENT_BUDGET = 64 * 1024;
+const FOCUSED_ESLINT_FALLBACK = 'TERRA_QUALITY_FOCUSED_ESLINT_UNAVAILABLE';
+const ESLINT_GLOB_SPECIALS = new Set(['*', '?', '[', ']', '{', '}', '(', ')', '!', '\\']);
 
 /** Stable, artifact-safe summary of a single CLI invocation. */
 export type QualityJsonReport = {
@@ -422,6 +425,42 @@ function batches<T>(vals: T[], size = 100): T[][] {
 }
 
 /**
+ * Splits file arguments below a conservative process argument-size limit.
+ *
+ * @param files Absolute file paths passed to ESLint.
+ *
+ * @return Ordered file batches that fit within the argument budget.
+ */
+function argumentBatches(files: string[]): string[][] {
+	const result: string[][] = [];
+	let batch: string[] = [];
+	let bytes = 0;
+	for (const file of files) {
+		const size = Buffer.byteLength(file) + 1;
+		if (batch.length && bytes + size > ESLINT_ARGUMENT_BUDGET) {
+			result.push(batch);
+			batch = [];
+			bytes = 0;
+		}
+		batch.push(file);
+		bytes += size;
+	}
+	if (batch.length) result.push(batch);
+	return result;
+}
+
+/**
+ * Escapes glob syntax in one repository-relative ESLint file pattern.
+ *
+ * @param path Repository-relative file path.
+ *
+ * @return Literal ESLint pattern matching only that path.
+ */
+function eslintFilePattern(path: string): string {
+	return [...path].map((character) => (ESLINT_GLOB_SPECIALS.has(character) ? `\\${character}` : character)).join('');
+}
+
+/**
  * Selects either the complete configured scope or the changed working-tree scope.
  *
  * @param cfg Quality configuration defining source discovery.
@@ -497,13 +536,15 @@ function runLint(cfg: QualityCfg, opts: QualityOptions, exhaustive = false, dead
  * @param cfg Quality configuration defining the repository and ESLint executable.
  * @param reports ESLint reports containing unused private function declarations.
  * @param changedFiles Set updated with files modified by the fixer.
+ * @param importedConsumers Export names referenced by configured source files.
  *
  * @return Number of unused function declarations removed.
  */
-function fixUnusedDeclarations(cfg: QualityCfg, reports: EslintReport[], changedFiles: Set<string>): number {
+function fixUnusedDeclarations(cfg: QualityCfg, reports: EslintReport[], changedFiles: Set<string>, importedConsumers = importedExportConsumers(cfg)): number {
 	let fixed = 0;
-	const importedConsumers = importedExportConsumers(cfg);
 	for (const report of reports) {
+		const unusedMsgs = report.messages.filter((message) => message.ruleId === 'unused-imports/no-unused-vars');
+		if (!unusedMsgs.length) continue;
 		const src = readFileSync(report.filePath, 'utf8');
 		const ast = ts.createSourceFile(
 			report.filePath,
@@ -514,7 +555,7 @@ function fixUnusedDeclarations(cfg: QualityCfg, reports: EslintReport[], changed
 		);
 		if ((ast as ts.SourceFile & { parseDiagnostics: readonly ts.Diagnostic[] }).parseDiagnostics.length)
 			throw new Error(`ESLint reported unused declarations in unparsable source: ${report.filePath}`);
-		const starts = new Set(report.messages.filter((m) => m.ruleId === 'unused-imports/no-unused-vars').map((m) => ast.getPositionOfLineAndCharacter(m.line - 1, m.column - 1)));
+		const starts = new Set(unusedMsgs.map((message) => ast.getPositionOfLineAndCharacter(message.line - 1, message.column - 1)));
 		const edits: Array<{ start: number; end: number; text?: string }> = [];
 		const visit = (node: ts.Node): void => {
 			let declaration: ts.Node | undefined;
@@ -609,28 +650,158 @@ type KnipItem = { name: string; line?: number };
 type KnipIssue = { file: string; [kind: string]: string | KnipItem[] };
 
 /**
+ * Uses the repository's resolved unused-variable rule without evaluating its unrelated lint rules.
+ *
+ * @param cfg Quality configuration defining the repository and selected ESLint executable.
+ * @param flatCfg Resolved flat ESLint config path.
+ *
+ * @return Whether the local ESLint API matches the configured executable.
+ */
+function canUseFocusedEslint(cfg: QualityCfg, flatCfg: string | undefined): boolean {
+	if (!flatCfg) return false;
+	const cfgdTool = cfg.tools?.eslint;
+	const localExecutable = resolve(cfg.root, 'node_modules', '.bin', 'eslint');
+	if (cfgdTool && cfgdTool !== 'eslint' && resolve(cfg.root, cfgdTool) !== localExecutable) return false;
+	return existsSync(resolve(cfg.root, 'node_modules', 'eslint', 'package.json'));
+}
+
+/**
+ * Builds a temporary flat config containing only each selected file's unused-variable rule.
+ *
+ * @param cfg Quality configuration defining the repository.
+ * @param flatCfg Original flat ESLint config used to resolve parser, plugin, and rule settings.
+ * @param files Source files passed to the focused detector.
+ *
+ * @return JavaScript module source for ESLint's temporary config loader.
+ */
+function focusedEslintCfgSrc(cfg: QualityCfg, flatCfg: string, files: string[]): string {
+	const patterns = files.map((f) => eslintFilePattern(relative(cfg.root, f).split(sep).join('/')));
+	return `
+import { createRequire } from 'node:module';
+import { resolve } from 'node:path';
+
+const root = ${JSON.stringify(cfg.root)};
+const configPath = ${JSON.stringify(flatCfg)};
+const sourceFiles = ${JSON.stringify(files)};
+const filePatterns = ${JSON.stringify(patterns)};
+
+try {
+	const requireFromRepo = createRequire(resolve(root, 'package.json'));
+	const { ESLint } = requireFromRepo('eslint');
+	const eslint = new ESLint({ cwd: root, overrideConfigFile: configPath, ignore: false });
+	const groups = new Map();
+	const objectIds = new WeakMap();
+	let nextObjectId = 0;
+	const objectId = (value) => {
+		if (!value || (typeof value !== 'object' && typeof value !== 'function')) return String(value);
+		if (!objectIds.has(value)) objectIds.set(value, ++nextObjectId);
+		return objectIds.get(value);
+	};
+	for (const [index, file] of sourceFiles.entries()) {
+		const effective = await eslint.calculateConfigForFile(file);
+		const languageOptions = effective?.languageOptions;
+		if (!languageOptions?.parser) throw new Error('ESLint did not resolve a parser for ' + file);
+		const parserOptions = { ...(languageOptions.parserOptions ?? {}) };
+		for (const key of ['project', 'projectService', 'program', 'tsconfigRootDir']) delete parserOptions[key];
+		const focusedLanguageOptions = { ...languageOptions, parserOptions };
+		const rule = effective.rules?.['unused-imports/no-unused-vars'];
+		const severity = Array.isArray(rule) ? rule[0] : rule;
+		const active = rule !== undefined && severity !== 0 && severity !== 'off';
+		const plugin = effective.plugins?.['unused-imports'];
+		if (active && !plugin) throw new Error('ESLint resolved the unused-variable rule without its plugin for ' + file);
+		const signature = JSON.stringify({
+			parser: objectId(languageOptions.parser),
+			plugin: objectId(plugin),
+			rule: active ? rule : null,
+			languageOptions: { ...focusedLanguageOptions, parser: undefined },
+			settings: effective.settings,
+		});
+		const group = groups.get(signature) ?? {
+			patterns: [],
+			languageOptions: focusedLanguageOptions,
+			plugins: plugin ? { 'unused-imports': plugin } : {},
+			rules: active ? { 'unused-imports/no-unused-vars': rule } : {},
+			settings: effective.settings,
+		};
+		group.patterns.push(filePatterns[index]);
+		groups.set(signature, group);
+	}
+	const focused = new ESLint({
+		cwd: root,
+		ignore: false,
+		overrideConfigFile: true,
+		overrideConfig: [...groups.values()].map((group) => ({
+			files: group.patterns,
+			languageOptions: group.languageOptions,
+			plugins: group.plugins,
+			rules: group.rules,
+			...(group.settings ? { settings: group.settings } : {}),
+		})),
+	});
+	const results = await focused.lintFiles(sourceFiles);
+	const reports = results.map(({ filePath, messages, fatalErrorCount }) => ({
+		filePath: resolve(filePath),
+		messages: messages.map(({ ruleId, line, column, message }) => ({ ruleId, line, column, message })),
+		fatalErrorCount,
+	}));
+	process.stdout.write(JSON.stringify(reports));
+} catch (error) {
+	console.error(${JSON.stringify(FOCUSED_ESLINT_FALLBACK)}, error instanceof Error ? error.stack ?? error.message : String(error));
+	process.exitCode = 2;
+}
+`;
+}
+
+/**
+ * Runs the unused-variable detector under the extracted repository rule configuration.
+ *
+ * @param cfg Quality configuration defining the repository.
+ * @param flatCfg Original flat ESLint config used to resolve the detector rule.
+ * @param files Source files in this argument-safe batch.
+ *
+ * @return ESLint process result, or `undefined` when the extraction requires the full-config fallback.
+ */
+function runFocusedEslint(cfg: QualityCfg, flatCfg: string, files: string[]): ReturnType<typeof spawnSync> | undefined {
+	const result = spawnSync(process.execPath, ['--input-type=module'], {
+		cwd: cfg.root,
+		encoding: 'utf8',
+		env: { ...process.env, ESLINT_USE_FLAT_CONFIG: 'true' },
+		input: focusedEslintCfgSrc(cfg, flatCfg, files),
+		maxBuffer: TOOL_OUTPUT_MAX_BUFFER,
+	});
+	if (result.status === 2 && result.stderr?.toString().includes(FOCUSED_ESLINT_FALLBACK)) return undefined;
+	return result;
+}
+
+/**
  * Runs ESLint's machine-readable pass once for the selected source files.
  *
  * @param cfg Quality configuration defining source files and the ESLint executable.
  * @param all Whether to inspect every configured source file instead of changed files.
+ * @param selectedFiles Optional exact file set to scan incrementally.
  *
  * @return Validated ESLint reports for the selected source files.
  */
-function collectEslintReports(cfg: QualityCfg, all: boolean): EslintReport[] {
-	const files = filesFor(cfg, all).filter((f) => CJS_JS_JSX_MJS_TS_TSX_REGEX.test(f));
+function collectEslintReports(cfg: QualityCfg, all: boolean, selectedFiles?: string[]): EslintReport[] {
+	const files = (selectedFiles ?? filesFor(cfg, all)).filter((f) => CJS_JS_JSX_MJS_TS_TSX_REGEX.test(f));
 	const reports: EslintReport[] = [];
 	const flatCfg = ['eslint.config.js', 'eslint.config.mjs', 'eslint.config.cjs', 'eslint.config.ts', 'eslint.config.mts', 'eslint.config.cts']
 		.map((f) => resolve(cfg.root, f))
 		.find((f) => existsSync(f));
+	const eslintPath = toolPath(cfg, cfg.tools?.eslint, 'eslint');
+	const focusedEslint = canUseFocusedEslint(cfg, flatCfg);
 	let completed = 0;
 	qualityProgress('ESLint dead-code', completed, files.length);
-	for (const filesBatch of batches(files, ESLINT_BATCH_SIZE)) {
-		const result = spawnSync(toolPath(cfg, cfg.tools?.eslint, 'eslint'), ['--format', 'json', '--no-ignore', ...(flatCfg ? ['--config', flatCfg] : []), ...filesBatch], {
-			cwd: cfg.root,
-			encoding: 'utf8',
-			env: flatCfg ? { ...process.env, ESLINT_USE_FLAT_CONFIG: 'true' } : process.env,
-			maxBuffer: TOOL_OUTPUT_MAX_BUFFER,
-		});
+	for (const filesBatch of argumentBatches(files)) {
+		const focusedResult = focusedEslint && flatCfg ? runFocusedEslint(cfg, flatCfg, filesBatch) : undefined;
+		const result =
+			focusedResult ??
+			spawnSync(eslintPath, ['--format', 'json', '--no-ignore', ...(flatCfg ? ['--config', flatCfg] : []), ...filesBatch], {
+				cwd: cfg.root,
+				encoding: 'utf8',
+				env: flatCfg ? { ...process.env, ESLINT_USE_FLAT_CONFIG: 'true' } : process.env,
+				maxBuffer: TOOL_OUTPUT_MAX_BUFFER,
+			});
 		reports.push(...parseEslintReports(result, filesBatch));
 		completed += filesBatch.length;
 		qualityProgress('ESLint dead-code', completed, files.length);
@@ -984,11 +1155,11 @@ function assertKnipPath(cfg: QualityCfg, path: string, label: string): string {
 }
 /** Converts Knip's validated issue inventory into dead-code review findings.
  * @param cfg Quality configuration defining scope and explicit entry-point contracts.
+ * @param importedConsumers Export names referenced by configured source files.
  * @returns Knip findings with safe export-modifier changes marked autofixable.
  */
-function collectKnipFindings(cfg: QualityCfg): DeadCodeFinding[] {
+function collectKnipFindings(cfg: QualityCfg, importedConsumers = importedExportConsumers(cfg)): DeadCodeFinding[] {
 	const issues = readKnipIssues(cfg);
-	const importedConsumers = importedExportConsumers(cfg);
 	const findings: DeadCodeFinding[] = [];
 	for (const issue of issues) {
 		const filePath = assertKnipPath(cfg, issue.file, 'finding source');
@@ -1304,23 +1475,46 @@ function runDeadCode(cfg: QualityCfg, fix: boolean, all: boolean, verify = true,
 	const typeProgram = fix ? deadCodeTypeProgram(cfg) : null;
 	if (fix && emit) console.error('  TypeScript baseline ready.');
 	const typeRejectedFiles = new Set<string>();
-	let eslintReports: EslintReport[] = [];
+	const eslintReportsByPath = new Map<string, EslintReport>();
+	const eslintScannedContents = new Map<string, string>();
+	let importedConsumersForRun: Map<string, Set<string>> | undefined;
+	const scanEslint = (selectedFiles?: string[]): EslintReport[] => {
+		const reports = collectEslintReports(cfg, all, selectedFiles);
+		for (const report of reports) {
+			const f = resolve(report.filePath);
+			eslintReportsByPath.set(f, report);
+			eslintScannedContents.set(f, readFileSync(f, 'utf8'));
+		}
+		return reports;
+	};
+	const scanDirtyEslintFiles = (): EslintReport[] => {
+		const dirtyFiles = [...eslintScannedContents].filter(([f, content]) => existsSync(f) && readFileSync(f, 'utf8') !== content).map(([f]) => f);
+		return dirtyFiles.length ? scanEslint(dirtyFiles) : [];
+	};
 	if (fix) {
 		if (qualityCheckEnabled(cfg, 'knip')) {
 			if (emit) qualityHeader('dead-code/knip-fix', 'Removing only unambiguous unused export modifiers');
 			fixKnipExports(cfg, changedFiles);
 		}
+		importedConsumersForRun = qualityCheckEnabled(cfg, 'knip') || qualityCheckEnabled(cfg, 'lint') ? importedExportConsumers(cfg) : undefined;
 		if (qualityCheckEnabled(cfg, 'lint')) {
+			if (emit) console.error('  Scanning configured files for safe unused-declaration fixes...');
+			let reportsToFix = scanEslint();
 			for (let round = 0; round < 5; round++) {
+				if (!reportsToFix.some((report) => report.messages.some((message) => message.ruleId === 'unused-imports/no-unused-vars'))) break;
 				if (emit) console.error(`  ESLint unused-declaration pass ${round + 1}/5...`);
-				eslintReports = collectEslintReports(cfg, all);
-				if (!fixUnusedDeclarations(cfg, eslintReports, changedFiles)) break;
+				const passChangedFiles = new Set<string>();
+				if (!fixUnusedDeclarations(cfg, reportsToFix, passChangedFiles, importedConsumersForRun)) break;
+				for (const file of passChangedFiles) changedFiles.add(file);
+				reportsToFix = scanDirtyEslintFiles();
 			}
 		}
 		if (emit) console.error('  Checking and inlining safe single-use declarations...');
-		fixSingleUseDeclarations(cfg, changedFiles, (pass, filesChanged) => {
+		const singleUseChangedFiles = new Set<string>();
+		fixSingleUseDeclarations(cfg, singleUseChangedFiles, (pass, filesChanged) => {
 			if (emit) console.error(`  Single-use rewrite pass ${pass} starting (${filesChanged} source files changed so far).`);
 		});
+		for (const file of singleUseChangedFiles) changedFiles.add(file);
 		const currInventory = new Set(filesFor(cfg, true));
 		const skippedInventory = new Set(cfg.skippedFiles ?? []);
 		const trackedInitialInventory = [...initialInventory].filter((f) => !skippedInventory.has(f));
@@ -1348,15 +1542,18 @@ function runDeadCode(cfg: QualityCfg, fix: boolean, all: boolean, verify = true,
 			}
 			for (const [file, text] of accepted) if (readFileSync(file, 'utf8') !== text) writeFileSync(file, text);
 		}
+		if (qualityCheckEnabled(cfg, 'lint')) scanDirtyEslintFiles();
 	}
 	if (!verify) return [];
 	const findings: DeadCodeFinding[] = [];
 	if (qualityCheckEnabled(cfg, 'knip')) {
 		if (emit) qualityHeader('dead-code/knip', 'Checking unused files, exports, dependencies, and reachability');
-		findings.push(...collectKnipFindings(cfg));
+		findings.push(...collectKnipFindings(cfg, importedConsumersForRun));
 	}
-	if (qualityCheckEnabled(cfg, 'lint')) eslintReports = collectEslintReports(cfg, all);
-	if (qualityCheckEnabled(cfg, 'lint')) findings.push(...unusedDeclarationFindings(cfg, eslintReports));
+	if (qualityCheckEnabled(cfg, 'lint')) {
+		if (!fix) scanEslint();
+		findings.push(...unusedDeclarationFindings(cfg, [...eslintReportsByPath.values()]));
+	}
 	for (const single of singleUseFindings(cfg))
 		findings.push({
 			rule: 'typescript/single-use',
