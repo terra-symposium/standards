@@ -18,6 +18,7 @@ dispatch behavior can be verified without running those tools.
 | Formatting transforms | JavaScript-family parsing, JSX/comment/string/regex safety, CRLF handling, nested and multi-statement conditionals, object/type collapsing, unsupported files, Prettier modes, Astro filtering, and argument batching. |
 | Forwarding and patterns | Object-forwarding thresholds and ignored payload methods, repeated class normalization and exclusions, UI pattern scope, regex literal/constructor deduplication, and Tailwind v4/v3/configuration/fix paths. |
 | Security | Environment visibility, forbidden terms/import forms, client secret-shaped values, dotenv loading, runtime environment boundaries, and Git-tracked visibility. |
+| GitHub reporting | Read-only issue and pull request counts, Dependabot and malware alerts, code/secret scanning alerts, settings/config state, null counts for unavailable endpoints, secret-value exclusion, and agent remediation instructions. |
 | Single-use analysis | Pure-data/runtime/callable/large-value classification, exact consumer counts, type consumers, include roots, cross-file type inlining, selective import editing, no-op safety, and JSON/Markdown reports. |
 | Runner and ports | Configuration normalization/loading, toggles, shared analysis, CLI domains, explicit commands, lint/Knip flags, recommendation policy, typecheck ownership, status propagation, formatter batching, generic check dispatch, and port acquisition/termination. |
 

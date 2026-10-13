@@ -8,6 +8,15 @@
 	"singleUse": { "skippedDirectories": ["packages/quality", "packages/reporting"] },
 	"renameExports": true,
 	"prettierPrintWidth": 200,
+	"github": {
+		"repositories": [
+			"salesphere-vh/salesphere",
+			"Terra-Symposium/terra-symposium-website",
+			"Terra-Symposium/terra-shared",
+			"kaimacann/personal-monorepo"
+		],
+		"requiredFeatures": ["dependencyGraph", "dependabotAlerts", "malwareAlerts", "securityUpdates", "versionUpdates", "groupedUpdates"]
+	},
 	"qualityCommands": [
 		{ "name": "build", "command": "pnpm", "args": ["run", "build"] },
 		{ "name": "test", "command": "pnpm", "args": ["run", "test"] }

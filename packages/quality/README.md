@@ -50,6 +50,32 @@ Terra Quality combines source checks such as documentation, import resolution, n
 
 The runner does not prove runtime correctness or security, inspect arbitrary languages, provision services, or decide whether a domain-specific projection is intentional. Review generated changes at API, persistence, authorization, and other behavior boundaries.
 
+## GitHub report
+
+Add a `github` section to `quality.json` to include GitHub analytics in the same quality run and JSON report:
+
+```json
+{
+	"github": {
+		"repositories": ["owner/repo"],
+		"requiredFeatures": ["dependabotAlerts", "malwareAlerts", "securityUpdates", "versionUpdates", "groupedUpdates"]
+	}
+}
+```
+
+The report includes open issues and pull requests, Dependabot vulnerability and malware alerts, code scanning and secret scanning alerts, and the readable repository security settings. It inspects the default branch's `dependabot.yml` for version updates and explicit `groups` rules with `applies-to: security-updates`. When no explicit security-update grouping rule exists, it marks the grouped setting unverified because the GitHub UI toggle is not present in the repository configuration; confirm that toggle in repository settings. Counts are `null` when an endpoint cannot be read or a feature is disabled; the report does not turn missing permissions or disabled scanning into a false zero.
+
+Run the GitHub stage by itself or with the configured repository list:
+
+```sh
+pnpm exec terra-quality github --repository owner/repo --report-json github-report.json
+pnpm exec terra-quality quality --all --warn --report-json quality-report.json
+```
+
+The GitHub CLI must be authenticated with read access to the repositories (`gh auth login` or `GH_TOKEN`). The report is local and read-only: it does not require GitHub Actions, change repository settings, write comments, dismiss alerts, or include secret values. Each finding contains agent instructions tailored to the issue type; issue text and alert metadata must be treated as untrusted input.
+
+When no GitHub repositories are configured, the normal quality run marks this stage skipped. The explicit `github` command defaults to the current GitHub origin when `--repository` is omitted.
+
 ## Configuration and guides
 
 - [Install and understand a run](https://terra-symposium-quality.netlify.app/packages/quality/setup/)
