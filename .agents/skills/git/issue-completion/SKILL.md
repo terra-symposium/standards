@@ -45,16 +45,16 @@ Never report an unrun or blocked test as passing.
 ## Present Commit Evidence
 
 Create a baseline deck after reviewing the commits.
-Treat that export as a draft for review.
-Use the presentation skill and test evidence skill.
-Keep one slide or section for every issue commit.
-Tie every example to its commit and test run.
+Treat the export as a draft for review and polish.
+Use the presentation skill and Terra test skill.
+Give every issue commit its own evidence slide.
+Tie every screenshot, example, and test to its commit.
 
 ### Build Evidence
 
-Show before and after for every commit.
-Use matching screenshots for visible changes.
-Capture every distinct UI context changed by the commit.
+Show the before and after for every commit.
+Use matched screenshots for visible changes.
+Capture every distinct changed UI context.
 For generated output, show a varied sample large enough to judge its range.
 Use about twelve examples when taste or consistency matters.
 For non-visual changes, show concise code, data, or flow evidence.
@@ -68,20 +68,23 @@ Never use a screenshot as proof that behavior works.
 
 ### Evaluate and Polish
 
-Run an independent agentic review of the baseline deck.
-Check slide coverage, evidence, visual quality, and test gaps.
-If delegation is unavailable, do a fresh review pass.
-Read the deck and compare it with the issue and commit list.
-Render every slide and inspect each one at full size.
-Use a contact sheet to review flow and consistency.
-Check that every commit, screenshot, test, and required context appears.
-Look for missing slides or images, sparse evidence, small text,
-clipping, overlap, awkward wrapping, and UI regressions.
+Review the baseline as an agentic evaluator before polishing.
+Read the deck and compare it with every issue and commit.
+Render every slide and inspect each at full size.
+Use a contact sheet to check flow and consistency.
+Look for missing slides, screenshots, tests, contexts, and evidence.
+Flag sparse slides, small text, clipping, overlap, and awkward wrapping.
 Check sample variety and every affected implementation context.
 Use the test skill to find missing behavior and edge-case tests.
+Add needed tests, rerun them, and record exact results.
+Fix gaps, polish the deck, export again, and repeat the review.
+Deliver only after visual and test gaps are resolved or clearly blocked.
+Record blockers and incomplete acceptance checks separately.
+Link the polished deck in the report.
 
-Fix the gaps, export again, and repeat the visual review.
-Deliver only after the reviewable gaps are resolved.
-If a required check cannot run, record the exact blocker.
-Link the polished presentation in the report.
-List blocked tests and incomplete commits separately.
+## Merge and Closure Gate
+
+Do not call a branch merge-ready while required checks are blocked.
+Do not close an issue until its criteria are integrated and verified.
+Keep production, credential, and external-runtime checks explicit.
+Report which issues are complete, blocked, or out of scope.
