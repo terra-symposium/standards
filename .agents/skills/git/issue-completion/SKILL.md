@@ -3,11 +3,11 @@ name: issue-completion
 description: Complete clear GitHub issues in isolated, tested pull requests.
 ---
 
-# Issue Completion
+# Issue completion
 
 Use after an issue audit to implement issues that are ready for agentic work.
 
-## Select Issues
+## Select issues
 
 Run the `issues` audit first.
 Select issues with clear scope, observable criteria, and runnable tests.
@@ -17,7 +17,7 @@ Hold unresolved product choices, credentials, production changes, and unclear ow
 Summarize selected issues and acceptance criteria before dispatch.
 If none qualify, report why and stop.
 
-## Dispatch and Review
+## Dispatch and review
 
 Spawn one subagent per selected issue.
 Give each the issue URL, repository, target branch, criteria, and audit evidence.
@@ -32,7 +32,7 @@ Check scope, tests, diff, and PR links; request corrections as needed.
 Report the exact question or missing evidence for blocked work.
 Do not close issues or comment. Keep secrets out of task text and artifacts.
 
-## Test New Behavior
+## Test new behavior
 
 Use the repository's test skill to choose coverage.
 Test new behavior and failure-prone nuances with focused assertions.
@@ -42,7 +42,7 @@ Record each test command, result, and blocker.
 Separate test failures from setup failures.
 Never report an unrun or blocked test as passing.
 
-## Present Commit Evidence
+## Present commit evidence
 
 Create a baseline deck after reviewing the commits.
 Treat the export as a draft for review and polish.
@@ -50,7 +50,7 @@ Use the presentation skill and Terra test skill.
 Give every issue commit its own evidence slide.
 Tie every screenshot, example, and test to its commit.
 
-### Build Evidence
+### Build evidence
 
 Show the before and after for every commit.
 Use matched screenshots for visible changes.
@@ -66,12 +66,14 @@ Add tests for new behavior and failure-prone nuances.
 Skip tests for purely decorative changes with no new behavior.
 Never use a screenshot as proof that behavior works.
 
-### Evaluate and Polish
+### Evaluate and polish
 
 Review the baseline as an agentic evaluator before polishing.
-Read the deck and compare it with every issue and commit.
+Read the exported PowerPoint and compare it with every issue and commit.
 Render every slide and inspect each at full size.
 Use a contact sheet to check flow and consistency.
+Build it from the current deck's slides, excluding stale renders.
+Check that slide and render counts match.
 Look for missing slides, screenshots, tests, contexts, and evidence.
 Flag sparse slides, small text, clipping, overlap, and awkward wrapping.
 Check sample variety and every affected implementation context.
@@ -80,9 +82,10 @@ Add needed tests, rerun them, and record exact results.
 Fix gaps, polish the deck, export again, and repeat the review.
 Deliver only after visual and test gaps are resolved or clearly blocked.
 Record blockers and incomplete acceptance checks separately.
+Use final commit IDs and keep issue, PR, and deck status consistent.
 Link the polished deck in the report.
 
-## Merge and Closure Gate
+## Merge and closure gate
 
 Do not call a branch merge-ready while required checks are blocked.
 Do not close an issue until its criteria are integrated and verified.
