@@ -1,0 +1,29 @@
+---
+name: standup
+description: Compare contributor activity with stated goals and prepare an evidence-based review.
+---
+
+# Terra Standup
+
+Use for standups, weekly reviews, and contributor reports.
+
+## Workflow
+
+1. Establish the reporting window and timezone. Read stated goals from available, authorized sources.
+2. Record unavailable sources as evidence gaps. Do not infer goals or progress from filenames.
+3. Verify repository, remote, branch, and commit range. Exclude mirrors and duplicate history.
+4. Inspect diffs, merges, reverts, and commit identities. Subjects alone do not prove outcomes.
+5. Compare findings with each goal using neutral, evidence-based statuses.
+6. Keep activity evidence separate from plans, meetings, and self-reported updates.
+7. Create the requested report or presentation. Do not commit, deploy, or change repository state.
+
+## Safeguards
+
+- Preserve unrelated work and exclude dirty files from contribution counts.
+- Report ambiguous or bot identities accurately.
+- A missing commit is not proof that work was not done.
+- Screenshots do not prove deployment. Label the environment and route.
+
+## Report
+
+Cite source refs and dates. State the window, timezone, evidence gaps, and attribution limits.
