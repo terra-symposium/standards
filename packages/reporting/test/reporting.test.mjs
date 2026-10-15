@@ -22,9 +22,9 @@ CONFIG
 //////////////////////////////////////////////////*/
 
 const execFileAsync = promisify(execFile);
-const { diagnosticCount, normalizeVisualStatus: normVisualStatus, orderedFiles, statusCounts } = await import('@terra-symposium/reporting/core');
-const { parseDiagnostics, stripAnsi, default: ProgressReporter } = await import('@terra-symposium/reporting/playwright');
-const { baseVisualProjectName, projectViewportName, resolveVisualViewports, visualProjectName, withResponsivePlaywright } = await import('@terra-symposium/reporting/viewports');
+const { diagnosticCount, normalizeVisualStatus: normVisualStatus, orderedFiles, statusCounts } = await import('@terra-symposium/standards-reporting/core');
+const { parseDiagnostics, stripAnsi, default: ProgressReporter } = await import('@terra-symposium/standards-reporting/playwright');
+const { baseVisualProjectName, projectViewportName, resolveVisualViewports, visualProjectName, withResponsivePlaywright } = await import('@terra-symposium/standards-reporting/viewports');
 const {
 	DEFAULT_LOAD_BUDGET,
 	gradeLoad,
@@ -32,9 +32,9 @@ const {
 	normalizeLoadTestingConfig: normLoadTestingCfg,
 	readLoadTestingConfig: readLoadTestingCfg,
 	timeLoadOperation: timeLoadOp,
-} = await import('@terra-symposium/reporting/load-testing');
-const { writeSpreadsheet } = await import('@terra-symposium/reporting/spreadsheet');
-const { writeSlideshow } = await import('@terra-symposium/reporting/slideshow');
+} = await import('@terra-symposium/standards-reporting/load-testing');
+const { writeSpreadsheet } = await import('@terra-symposium/standards-reporting/spreadsheet');
+const { writeSlideshow } = await import('@terra-symposium/standards-reporting/slideshow');
 
 /*//////////////////////////////////////////////////
 HELPERS
@@ -153,7 +153,7 @@ test('expands regular Playwright projects and preserves single-run setup/capture
 	assert.deepEqual(cfg.use.screenshot, { mode: 'on', fullPage: true, caret: 'initial' });
 	assert.deepEqual(cfg.projects.find(({ name: n }) => n === 'app-mobile').dependencies, ['auth-setup']);
 	assert.equal(cfg.projects.find(({ name: n }) => n === 'browser-mobile').use.viewport.width, 390);
-	assert.ok(cfg.reporter.some((r) => Array.isArray(r) && r[0] === '@terra-symposium/reporting/playwright'));
+	assert.ok(cfg.reporter.some((r) => Array.isArray(r) && r[0] === '@terra-symposium/standards-reporting/playwright'));
 	process.env.PW_VIEWPORTS = 'md,xl';
 	assert.deepEqual(
 		resolveVisualViewports().map(({ name: n }) => n),

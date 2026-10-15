@@ -3,14 +3,14 @@ title: Reporting
 description: Choose a reporting entry point for responsive tests, diagnostics, artifacts, and timings.
 ---
 
-`@terra-symposium/reporting` converts Playwright results into reusable diagnostic and review artifacts. It can expand regular projects across responsive viewports, capture browser diagnostics, write workbooks and slideshows, and grade load timings.
+`@terra-symposium/standards-reporting` converts Playwright results into reusable diagnostic and review artifacts. It can expand regular projects across responsive viewports, capture browser diagnostics, write workbooks and slideshows, and grade load timings.
 
 ## Install
 
 `@playwright/test` is a peer dependency for Playwright integrations:
 
 ```sh
-pnpm add -D @terra-symposium/reporting @playwright/test
+pnpm add -D @terra-symposium/standards-reporting @playwright/test
 ```
 
 The package supports Node.js `>=18.18` and `@playwright/test >=1.52.0 <2`. Spreadsheet, slideshow, and image-processing libraries are runtime dependencies of the package.
@@ -19,7 +19,7 @@ The package supports Node.js `>=18.18` and `@playwright/test >=1.52.0 <2`. Sprea
 
 | Import path                             | Use                                                                                                        |
 | --------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| `@terra-symposium/reporting` or `/core` | Shared result types and helpers such as `VisualResult`, `ReportRun`, `statusCounts`, and `resultsForFile`. |
+| `@terra-symposium/standards-reporting` or `/core` | Shared result types and helpers such as `VisualResult`, `ReportRun`, `statusCounts`, and `resultsForFile`. |
 | `/playwright`                           | The `diagnosticsTest` and `loadTest` fixtures, `ReportingOptions`, and `ProgressReporter`.                 |
 | `/viewports`                            | Responsive configuration, the default viewport catalog, and project-name helpers.                          |
 | `/load-testing`                         | Load budget configuration, validation, and grading helpers.                                                |

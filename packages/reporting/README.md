@@ -1,11 +1,11 @@
-# @terra-symposium/reporting
+# @terra-symposium/standards-reporting
 
 Reusable responsive Playwright diagnostics and evidence reports for Terra Symposium repositories.
 
 ## Install
 
 ```sh
-pnpm add -D @terra-symposium/reporting @playwright/test
+pnpm add -D @terra-symposium/standards-reporting @playwright/test
 ```
 
 The package requires Node.js `>=18.18` and has an `@playwright/test >=1.52.0 <2` peer dependency. Spreadsheet, slideshow, and image-processing dependencies are installed with the package.
@@ -14,7 +14,7 @@ The package requires Node.js `>=18.18` and has an `@playwright/test >=1.52.0 <2`
 
 ```ts
 import { defineConfig } from '@playwright/test';
-import { withResponsivePlaywright } from '@terra-symposium/reporting/viewports';
+import { withResponsivePlaywright } from '@terra-symposium/standards-reporting/viewports';
 
 export default withResponsivePlaywright(
 	defineConfig({
@@ -37,4 +37,4 @@ A timestamped directory under `test-results/visual` contains the workbook, slide
 - Use `/spreadsheet` and `/slideshow` to write artifacts from normalized results without using the Playwright reporter.
 - Use `/core`, `/viewports`, and `/load-testing` for shared types and helpers.
 
-The repository remains responsible for test scenarios, authentication, browser setup, CI uploads, and retention. See the [reporting guide](https://terra-symposium-quality.netlify.app/packages/reporting/) for complete options and output details.
+The repository remains responsible for test scenarios, authentication, browser setup, CI uploads, and retention. See the [reporting guide](https://standards-docs.netlify.app/packages/reporting/) for complete options and output details.

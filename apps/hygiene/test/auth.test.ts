@@ -9,7 +9,7 @@ test('local loopback sign-in cookies work over the HTTP development server', () 
 });
 
 test('hosted and non-loopback origins always use secure cookies', () => {
-  assert.equal(cookieSecurityAttribute('https://terra-shared-hygiene.netlify.app'), '; Secure');
+  assert.equal(cookieSecurityAttribute('https://standards-hygiene.netlify.app'), '; Secure');
   assert.equal(cookieSecurityAttribute('http://192.168.1.5:8888'), '; Secure');
-  assert.equal(sessionCookie('token', 60, 'https://terra-shared-hygiene.netlify.app').includes('; Secure'), true);
+  assert.equal(sessionCookie('token', 60, 'https://standards-hygiene.netlify.app').includes('; Secure'), true);
 });

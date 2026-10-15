@@ -2,7 +2,7 @@
 
 The tests in this directory exercise the public package boundary from
 `dist/index.js` and use isolated temporary repositories. They do not depend on
-the Terra Shared checkout, installed application dependencies, or the current
+the Standards checkout, installed application dependencies, or the current
 Git worktree. Command-oriented checks use executable fixtures that record their
 arguments, so formatter, linter, Knip, typecheck, recommendation, and domain
 dispatch behavior can be verified without running those tools.

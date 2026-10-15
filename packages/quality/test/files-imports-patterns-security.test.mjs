@@ -4,7 +4,7 @@
  * Tailwind canonicalisation, and portable security guardrails.
  * These tests deliberately use temporary repositories and fake tool packages.
  * They cover the package's observable contracts without depending on the
- * structure, dependencies, or secrets of the Terra Shared checkout.
+ * structure, dependencies, or secrets of the Standards checkout.
  */
 
 /*//////////////////////////////////////////////////

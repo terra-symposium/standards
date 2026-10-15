@@ -1,4 +1,4 @@
-# @terra-symposium/quality
+# @terra-symposium/standards-quality
 
 ## 0.5.0
 
@@ -60,7 +60,7 @@
 
 ### Patch Changes
 
-- Set the npm package homepage to https://terra-symposium-quality.netlify.app/.
+- Set the npm package homepage to https://standards-docs.netlify.app/.
 
 ## 0.4.44
 

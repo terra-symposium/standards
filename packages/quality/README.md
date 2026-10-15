@@ -1,4 +1,4 @@
-# @terra-symposium/quality
+# @terra-symposium/standards-quality
 
 A configurable quality runner for JavaScript and TypeScript repositories. Define source scope, policy, tools, and repository commands in `quality.json`; run them locally with the `terra-quality` CLI or in CI.
 
@@ -9,14 +9,14 @@ A configurable quality runner for JavaScript and TypeScript repositories. Define
 ## Install
 
 ```sh
-pnpm add -D @terra-symposium/quality
+pnpm add -D @terra-symposium/standards-quality
 ```
 
 Create `quality.json` in the repository root:
 
 ```json
 {
-	"$schema": "./node_modules/@terra-symposium/quality/quality.schema.json",
+	"$schema": "./node_modules/@terra-symposium/standards-quality/quality.schema.json",
 	"sourceRoots": ["src"],
 	"extensions": [".js", ".jsx", ".ts", ".tsx"],
 	"enabledChecks": {
@@ -81,10 +81,10 @@ When no GitHub repositories are configured, the normal quality run marks this st
 
 ## Configuration and guides
 
-- [Install and understand a run](https://terra-symposium-quality.netlify.app/packages/quality/setup/)
-- [Complete `quality.json` reference](https://terra-symposium-quality.netlify.app/packages/quality/configuration/)
-- [CLI and CI workflows](https://terra-symposium-quality.netlify.app/packages/quality/workflows/)
-- [Check behavior and autofix limits](https://terra-symposium-quality.netlify.app/packages/quality/checks/)
-- [Troubleshooting](https://terra-symposium-quality.netlify.app/packages/quality/troubleshooting/)
+- [Install and understand a run](https://standards-docs.netlify.app/packages/quality/setup/)
+- [Complete `quality.json` reference](https://standards-docs.netlify.app/packages/quality/configuration/)
+- [CLI and CI workflows](https://standards-docs.netlify.app/packages/quality/workflows/)
+- [Check behavior and autofix limits](https://standards-docs.netlify.app/packages/quality/checks/)
+- [Troubleshooting](https://standards-docs.netlify.app/packages/quality/troubleshooting/)
 
 The installed `quality.schema.json` provides editor validation. The [test README](test/README.md) describes the package's isolated test coverage.

@@ -1,11 +1,11 @@
-# @terra-symposium/error-boundaries
+# @terra-symposium/standards-error-boundaries
 
 Reusable React error boundaries and small Astro and Next.js error helpers for Terra Symposium applications.
 
 ## Install
 
 ```sh
-pnpm add @terra-symposium/error-boundaries
+pnpm add @terra-symposium/standards-error-boundaries
 ```
 
 React and React DOM `>=18` are peer dependencies.
@@ -13,7 +13,7 @@ React and React DOM `>=18` are peer dependencies.
 ## Catch React render failures
 
 ```tsx
-import { ErrorBoundary } from '@terra-symposium/error-boundaries/react';
+import { ErrorBoundary } from '@terra-symposium/standards-error-boundaries/react';
 
 <ErrorBoundary name="Account panel" fallback={() => <section role="alert">Account details are unavailable.</section>} onError={(error, context) => reportError(error, context)} resetKey={accountId}>
 	<AccountPanel accountId={accountId} />
@@ -26,8 +26,8 @@ React boundaries catch errors in descendant constructors, lifecycle methods, and
 
 ## Other entry points
 
-- `@terra-symposium/error-boundaries/astro` exports status-copy helpers for 400, 401, 403, 404, 500, 502, and 503 responses.
-- `@terra-symposium/error-boundaries/next` exports types and `errorDigest(error)` for framework-provided route-error digests.
+- `@terra-symposium/standards-error-boundaries/astro` exports status-copy helpers for 400, 401, 403, 404, 500, 502, and 503 responses.
+- `@terra-symposium/standards-error-boundaries/next` exports types and `errorDigest(error)` for framework-provided route-error digests.
 - The package root re-exports all entry-point APIs.
 
-See the [package guide](https://terra-symposium-quality.netlify.app/packages/error-boundaries/) for prop behavior and usage details.
+See the [package guide](https://standards-docs.netlify.app/packages/error-boundaries/) for prop behavior and usage details.

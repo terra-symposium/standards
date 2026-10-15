@@ -3,7 +3,7 @@ title: CLI workflows
 description: Choose safe local and CI run modes and invoke focused Terra Quality checks.
 ---
 
-Run the executable installed by `@terra-symposium/quality`:
+Run the executable installed by `@terra-symposium/standards-quality`:
 
 ```sh
 pnpm exec terra-quality [command] [options]
@@ -35,8 +35,8 @@ The optional `github` stage uses authenticated GitHub CLI access and runs locall
 pnpm exec terra-quality github \
 	--repository salesphere-vh/salesphere \
 	--repository Terra-Symposium/terra-symposium-website \
-	--repository Terra-Symposium/terra-shared \
-	--repository kaimacann/personal-monorepo \
+	--repository Terra-Symposium/standards \
+	--repository kaimacann/portfolio \
 	--report-json github-report.json
 ```
 

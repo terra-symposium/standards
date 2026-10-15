@@ -12,8 +12,8 @@
 		"repositories": [
 			"salesphere-vh/salesphere",
 			"Terra-Symposium/terra-symposium-website",
-			"Terra-Symposium/terra-shared",
-			"kaimacann/personal-monorepo"
+			"Terra-Symposium/standards",
+			"kaimacann/portfolio"
 		],
 		"requiredFeatures": ["dependencyGraph", "dependabotAlerts", "malwareAlerts", "securityUpdates", "versionUpdates", "groupedUpdates"],
 		"featureExemptions": {

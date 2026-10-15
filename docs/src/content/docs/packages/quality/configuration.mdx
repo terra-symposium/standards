@@ -11,7 +11,7 @@ This example uses built-in checks without enabling external tools:
 
 ```json
 {
-	"$schema": "./node_modules/@terra-symposium/quality/quality.schema.json",
+	"$schema": "./node_modules/@terra-symposium/standards-quality/quality.schema.json",
 	"sourceRoots": ["src"],
 	"extensions": [".js", ".jsx", ".ts", ".tsx"],
 	"enabledChecks": {
@@ -168,7 +168,7 @@ Commands run from `root`, inherit the caller's environment, and are not automati
 
 ## Security and source-pattern policies
 
-These checks require the corresponding policy object. See [check behavior](/packages/quality/checks/#repository-policies-and-patterns) before enabling them.
+These checks require the corresponding policy object. See [check behavior](/packages/quality/#repository-policies-and-patterns) before enabling them.
 
 | Field               | Options                                                                     | Purpose                                                                                                                                                              |
 | ------------------- | --------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -178,7 +178,7 @@ These checks require the corresponding policy object. See [check behavior](/pack
 | `uiPatterns`        | `forbidden`, `extensions`, `ignoredFiles`                                   | Report configured UI source patterns for review.                                                                                                                     |
 | `tailwindCanonical` | required `stylesheet`, optional `sourceRoots`                               | Configure the programmatic Tailwind v4 canonicalization helper.                                                                                                      |
 
-The Tailwind helper is exported as `runTailwindCanonical(cfg, fix?)`; it is not a `terra-quality` CLI command or a stage of the standard quality run. It uses Tailwind CSS v4's unstable design-system API, so pin the consumer's Tailwind version and review the helper when upgrading it. See [Tailwind canonical classes](/packages/quality/checks/#tailwind-canonical-classes) for invocation details.
+The Tailwind helper is exported as `runTailwindCanonical(cfg, fix?)`; it is not a `terra-quality` CLI command or a stage of the standard quality run. It uses Tailwind CSS v4's unstable design-system API, so pin the consumer's Tailwind version and review the helper when upgrading it. See [Tailwind canonical classes](/packages/quality/#tailwind-canonical-classes) for invocation details.
 
 Example:
 
@@ -200,7 +200,7 @@ These portable checks are policy guardrails, not a complete secret scanner, fram
 
 ## Load timing
 
-`loadTesting` is read by `@terra-symposium/reporting`. Load timing is enabled by default with a warning threshold of 2,000 ms and a failure threshold of 5,000 ms.
+`loadTesting` is read by `@terra-symposium/standards-reporting`. Load timing is enabled by default with a warning threshold of 2,000 ms and a failure threshold of 5,000 ms.
 
 ```json
 {
@@ -221,4 +221,4 @@ Budget values are milliseconds; `failMs` must be greater than `warnMs`. Test bud
 
 ## This repository's configuration
 
-The root [`quality.json`](https://github.com/Terra-Symposium/terra-shared/blob/main/quality.json) scans `packages` and `scripts`, enables several project-specific checks, preserves long one-line imports, and declares build and test commands. It excludes single-use analysis from `packages/quality`, where reusable declarations and package APIs are intentionally concentrated. Use it as a reference, then choose scope and rules that fit your repository.
+The root [`quality.json`](https://github.com/Terra-Symposium/standards/blob/main/quality.json) scans `packages` and `scripts`, enables several project-specific checks, preserves long one-line imports, and declares build and test commands. It excludes single-use analysis from `packages/quality`, where reusable declarations and package APIs are intentionally concentrated. Use it as a reference, then choose scope and rules that fit your repository.
