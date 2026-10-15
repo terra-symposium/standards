@@ -1,0 +1,3 @@
+interface:
+  display_name: "Issue Audit"
+  short_description: "Classify open issues using repository evidence"

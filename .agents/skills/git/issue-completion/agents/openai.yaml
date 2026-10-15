@@ -1,0 +1,3 @@
+interface:
+  display_name: "Issue Completion"
+  short_description: "Dispatch ready issues as tested pull requests"
