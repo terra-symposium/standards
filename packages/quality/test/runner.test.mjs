@@ -414,9 +414,11 @@ export function useDashboardConfigurationDialog(initialConfigure: DashboardConfi
 			['param', '@param initialConfigure', 'warning'],
 			['param', '@param allowed', 'warning'],
 			['return', '@return', 'warning'],
+			['param', '@param initialConfigure', 'error'],
+			['param', '@param allowed', 'error'],
 		],
 	);
-	assert.equal(process.exitCode, 0);
+	assert.equal(process.exitCode, 1);
 	resetExitCode();
 });
 test('CLI lint applies its autofix policy while the Knip audit remains read-only', () => {
