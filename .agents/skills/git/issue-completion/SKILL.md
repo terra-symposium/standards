@@ -45,9 +45,10 @@ Never report an unrun or blocked test as passing.
 ## Present Commit Evidence
 
 Create a baseline deck after reviewing the commits.
-Use the presentation skill and the repository's test evidence skill.
-Keep one slide or clear section for every issue commit.
-Tie each example to its commit and actual test run.
+Treat that export as a draft for review.
+Use the presentation skill and test evidence skill.
+Keep one slide or section for every issue commit.
+Tie every example to its commit and test run.
 
 ### Build Evidence
 
@@ -67,19 +68,20 @@ Never use a screenshot as proof that behavior works.
 
 ### Evaluate and Polish
 
-Treat the first export as a draft, not the deliverable.
-Read the exported deck and compare it with the issue and commit list.
-Render every final slide and inspect each one at full size.
-Use a contact sheet to review the deck's flow and consistency.
+Run an independent agentic review of the baseline deck.
+Check slide coverage, evidence, visual quality, and test gaps.
+If delegation is unavailable, do a fresh review pass.
+Read the deck and compare it with the issue and commit list.
+Render every slide and inspect each one at full size.
+Use a contact sheet to review flow and consistency.
 Check that every commit, screenshot, test, and required context appears.
-Look for missing slides, missing or broken images, sparse evidence,
-small text, clipping, overlap, awkward wrapping, and UI regressions.
-Review generated samples for variety, quality, and visual consistency.
-Review screenshots from every affected implementation context.
-Check that tests cover meaningful new behavior and not just the happy path.
+Look for missing slides or images, sparse evidence, small text,
+clipping, overlap, awkward wrapping, and UI regressions.
+Check sample variety and every affected implementation context.
+Use the test skill to find missing behavior and edge-case tests.
 
-Fix evidence gaps and visual problems, then export and inspect again.
-Do not deliver a first-pass deck while reviewable gaps remain.
+Fix the gaps, export again, and repeat the visual review.
+Deliver only after the reviewable gaps are resolved.
 If a required check cannot run, record the exact blocker.
 Link the polished presentation in the report.
 List blocked tests and incomplete commits separately.

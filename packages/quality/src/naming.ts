@@ -148,10 +148,27 @@ export type NamingFinding = { file: string; name: string; suggestion: string; se
 ALIASES
 //////////////////////////////////////////////////*/
 
-/** A declaration that only gives an existing symbol a second local name. */
+/** A declaration that only gives a stable local binding a second local name. */
 export type AliasFinding = { file: string; line: number; kind: 'const' | 'type'; name: string; replacement: string };
 const aliasTgt = (n: ts.Expression): ts.Identifier | ts.PropertyAccessExpression | ts.ElementAccessExpression | undefined =>
 	ts.isIdentifier(n) || ts.isPropertyAccessExpression(n) || ts.isElementAccessExpression(n) ? n : undefined;
+
+/** Confirms that an identifier keeps the same local binding after its declaration.
+ * @param symbol Symbol resolved for the identifier.
+ * @return Whether the target remains a stable local binding.
+ */
+function isStableLocalBinding(symbol: ts.Symbol): boolean {
+	if (symbol.flags & ts.SymbolFlags.Alias) return false;
+	const declaration = symbol.valueDeclaration;
+	const variable =
+		declaration && ts.isVariableDeclaration(declaration)
+			? declaration
+			: declaration && ts.isBindingElement(declaration) && ts.isVariableDeclaration(declaration.parent.parent)
+				? declaration.parent.parent
+				: undefined;
+	const list = variable?.parent;
+	return Boolean(list && ts.isVariableDeclarationList(list) && (list.flags & ts.NodeFlags.Const) !== 0);
+}
 
 /*//////////////////////////////////////////////////
 HELPERS
@@ -551,7 +568,7 @@ function externallyReferenced(files: string[], srcTexts: Map<string, string>, sr
  * @param analysisOrFix Shared analysis context, or the legacy boolean autofix flag.
  * @param legacyFix Autofix flag used when an analysis context is supplied.
  *
- * @return Alias declarations that can be removed, whether or not autofix is enabled.
+ * @return Safe local-binding aliases that can be removed, whether or not autofix is enabled.
  */
 export function aliasFindings(cfg: QualityCfg, analysisOrFix: QualityAnalysis | boolean = false, legacyFix = false): AliasFinding[] {
 	const analysis = typeof analysisOrFix === 'object' ? analysisOrFix : undefined;
@@ -587,7 +604,15 @@ export function aliasFindings(cfg: QualityCfg, analysisOrFix: QualityAnalysis | 
 	const findings: AliasFinding[] = [];
 	for (const src of program.getSourceFiles()) {
 		if (!files.includes(src.fileName)) continue;
-		const aliases: Array<{ statement: ts.Statement; name: ts.Identifier; symbol: ts.Symbol; replacement: string; kind: 'const' | 'type' }> = [];
+		const aliases: Array<{
+			statement: ts.Statement;
+			name: ts.Identifier;
+			symbol: ts.Symbol;
+			replacement: string;
+			kind: 'const' | 'type';
+			targetSymbol?: ts.Symbol;
+			targetName?: string;
+		}> = [];
 		const inspect = (node: ts.Node): void => {
 			if (
 				ts.isVariableStatement(node) &&
@@ -607,17 +632,18 @@ export function aliasFindings(cfg: QualityCfg, analysisOrFix: QualityAnalysis | 
 					: undefined;
 				if (
 					tgt &&
+					ts.isIdentifier(tgt) &&
 					symbol &&
 					targetSymbol &&
 					symbol !== targetSymbol &&
-					!tgt.getText(src).includes('?.') &&
+					isStableLocalBinding(targetSymbol) &&
 					!exportedSymbols.has(symbol) &&
 					!exportedNames.has(name.text) &&
 					!node.modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword)
 				)
-					aliases.push({ statement: node, name, symbol, replacement: tgt.getText(src), kind: 'const' });
+					aliases.push({ statement: node, name, symbol, replacement: tgt.getText(src), kind: 'const', targetSymbol, targetName: tgt.text });
 			}
-			if (ts.isTypeAliasDeclaration(node) && node.typeParameters === undefined && ts.isTypeReferenceNode(node.type) && node.type.typeArguments === undefined) {
+			if (ts.isTypeAliasDeclaration(node) && node.typeParameters === undefined && ts.isTypeReferenceNode(node.type) && ts.isIdentifier(node.type.typeName) && node.type.typeArguments === undefined) {
 				const symbol = checker.getSymbolAtLocation(node.name);
 				const targetSymbol = checker.getSymbolAtLocation(node.type.typeName);
 				if (
@@ -628,14 +654,15 @@ export function aliasFindings(cfg: QualityCfg, analysisOrFix: QualityAnalysis | 
 					!exportedNames.has(node.name.text) &&
 					!externallyReferenced(files, srcTexts, src.fileName, node.name.text)
 				)
-					aliases.push({ statement: node, name: node.name, symbol, replacement: node.type.getText(src), kind: 'type' });
+					aliases.push({ statement: node, name: node.name, symbol, replacement: node.type.getText(src), kind: 'type', targetSymbol, targetName: node.type.typeName.getText(src) });
 			}
 			ts.forEachChild(node, inspect);
 		};
 		inspect(src);
 		if (!aliases.length) continue;
-		const edits: Array<{ start: number; end: number; text: string }> = [];
+		const edits: Array<{ start: number; end: number; text: string; alias: (typeof aliases)[number] }> = [];
 		const symbols = new Map(aliases.map((a) => [a.symbol, a]));
+		const shadowed = new Set<(typeof aliases)[number]>();
 		const visit = (node: ts.Node): void => {
 			if (aliases.some((a) => a.statement === node)) return;
 			if (ts.isIdentifier(node)) {
@@ -644,17 +671,29 @@ export function aliasFindings(cfg: QualityCfg, analysisOrFix: QualityAnalysis | 
 						? (checker.getShorthandAssignmentValueSymbol(node.parent) ?? checker.getSymbolAtLocation(node))
 						: checker.getSymbolAtLocation(node);
 				const alias = symbols.get(symbol as ts.Symbol);
-				if (alias && node !== alias.name)
+				if (alias && node !== alias.name) {
+					const visibleTgt = checker.getSymbolsInScope(node, ts.SymbolFlags.Type | ts.SymbolFlags.Value).find((c) => c.name === alias.targetName);
+					if (alias.targetSymbol && visibleTgt !== alias.targetSymbol) {
+						shadowed.add(alias);
+						return;
+					}
 					edits.push({
 						start: node.getStart(src),
 						end: node.end,
 						text: ts.isShorthandPropertyAssignment(node.parent) && node.parent.name === node ? `${node.text}: ${alias.replacement}` : alias.replacement,
+						alias,
 					});
+				}
 			}
 			ts.forEachChild(node, visit);
 		};
 		visit(src);
-		for (const alias of aliases) {
+		const sAliases = aliases.filter((alias) => !shadowed.has(alias));
+		if (!sAliases.length) continue;
+		const sAliasSet = new Set(sAliases);
+		const sEdits = edits.filter((edit) => sAliasSet.has(edit.alias));
+		edits.splice(0, edits.length, ...sEdits);
+		for (const alias of sAliases) {
 			findings.push({
 				file: displayPath(cfg, src.fileName),
 				line: src.getLineAndCharacterOfPosition(alias.name.getStart(src)).line + 1,
@@ -662,7 +701,7 @@ export function aliasFindings(cfg: QualityCfg, analysisOrFix: QualityAnalysis | 
 				name: alias.name.text,
 				replacement: alias.replacement,
 			});
-			edits.push({ start: alias.statement.getFullStart(), end: alias.statement.end, text: '' });
+			edits.push({ start: alias.statement.getFullStart(), end: alias.statement.end, text: '', alias });
 		}
 		if (fix) {
 			const original = readFileSync(src.fileName, 'utf8');
