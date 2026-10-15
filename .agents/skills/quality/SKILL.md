@@ -1,9 +1,9 @@
 ---
 name: quality
-description: Run Terra Quality, fix actionable findings, and report reliable evidence.
+description: Run Terra Quality, fix findings, and report evidence.
 ---
 
-# Terra Quality
+# Quality
 
 Use this skill to audit or repair a Terra repository with `@terra-symposium/quality`.
 
@@ -12,8 +12,9 @@ Use this skill to audit or repair a Terra repository with `@terra-symposium/qual
 1. Read the repository's `quality.json`, package scripts, and installed Quality README.
 2. Record branch, status, scope, and existing changes. Preserve unrelated work.
 3. Run the configured quality command. Keep its full result, warnings, and exit status.
-4. Group findings by cause and owner. Fix the smallest complete set at its canonical source.
-5. Review autofixes and the full diff. Never treat an autofix exit code as proof of correctness.
+4. Group findings by cause and owner.
+   Fix the smallest complete set at its canonical source.
+5. Review autofixes and the full diff. Exit codes do not prove correctness.
 6. Rerun the affected checks and the required repository command.
 
 ## Guidance

@@ -1,9 +1,9 @@
 ---
 name: standards
-description: Apply shared Terra coding, documentation, and review conventions.
+description: Apply shared Terra coding and review conventions.
 ---
 
-# Terra Standards
+# Standards
 
 Use this skill to implement or review changes across Terra repositories.
 
@@ -26,4 +26,5 @@ Use this skill to implement or review changes across Terra repositories.
 
 ## Report
 
-Summarize changes, evidence, checks, and unresolved risks. Distinguish observed results from assumptions.
+Summarize changes, checks, evidence, and unresolved risks.
+Separate observed results from assumptions.
