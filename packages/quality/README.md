@@ -28,6 +28,8 @@ Create `quality.json` in the repository root:
 }
 ```
 
+Dead-code findings that require manual review fail quality by default. Set `"manualWarnings": "warning"` to keep them visible without failing the run. The runner completes the remaining checks and configured commands before returning failure, and its logs direct agents to resolve each manual finding one at a time before committing.
+
 This starting configuration uses the built-in checks without requiring external tools. Enable integrations as you install and configure the corresponding repository tools. When lint is enabled, add an ESLint flat config such as `eslint.config.mjs`.
 
 Run the changed-file pass with safe configured fixes enabled:

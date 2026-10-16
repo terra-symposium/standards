@@ -604,15 +604,7 @@ export function aliasFindings(cfg: QualityCfg, analysisOrFix: QualityAnalysis | 
 	const findings: AliasFinding[] = [];
 	for (const src of program.getSourceFiles()) {
 		if (!files.includes(src.fileName)) continue;
-		const aliases: Array<{
-			statement: ts.Statement;
-			name: ts.Identifier;
-			symbol: ts.Symbol;
-			replacement: string;
-			kind: 'const' | 'type';
-			targetSymbol?: ts.Symbol;
-			targetName?: string;
-		}> = [];
+		const aliases: Array<{ statement: ts.Statement; name: ts.Identifier; symbol: ts.Symbol; replacement: string; kind: 'const' | 'type'; targetSymbol?: ts.Symbol; targetName?: string }> = [];
 		const inspect = (node: ts.Node): void => {
 			if (
 				ts.isVariableStatement(node) &&

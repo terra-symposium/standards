@@ -244,11 +244,13 @@ test('loadQualityCfg resolves a quality file root relative to the configuration 
 	);
 	const cfg = loadQualityCfg(cfgPath);
 	assert.equal(cfg.root, root);
+	assert.equal(cfg.manualWarnings, 'error');
 	assert.deepEqual(cfg.sourceRoots, [join(root, 'src')]);
 	assert.deepEqual(cfg.extensions, ['.ts']);
 	assert.deepEqual(cfg.loadTesting, { enabled: false, defaultBudget: { warnMs: 3000, failMs: 7000 } });
 	assert.equal(cfgDir, join(root, 'config'));
 	const schema = JSON.parse(readFileSync(join(process.cwd(), 'quality.schema.json'), 'utf8'));
+	assert.deepEqual(schema.properties.manualWarnings.enum, ['error', 'warning']);
 	assert.ok(schema.properties.loadTesting);
 	assert.ok(schema.$defs.loadBudget);
 });
@@ -414,11 +416,9 @@ export function useDashboardConfigurationDialog(initialConfigure: DashboardConfi
 			['param', '@param initialConfigure', 'warning'],
 			['param', '@param allowed', 'warning'],
 			['return', '@return', 'warning'],
-			['param', '@param initialConfigure', 'error'],
-			['param', '@param allowed', 'error'],
 		],
 	);
-	assert.equal(process.exitCode, 1);
+	assert.equal(process.exitCode, 0);
 	resetExitCode();
 });
 test('CLI lint applies its autofix policy while the Knip audit remains read-only', () => {
@@ -507,10 +507,11 @@ export type Result = RecordData;
 	assert.equal(process.exitCode, 0);
 	resetExitCode();
 });
-test('full quality routes unused-variable findings through dead-code once and keeps manual-only lint cases non-blocking', () => {
+test('full quality routes unused-variable findings through dead-code once and honors the manual warning policy', () => {
 	const root = fixtureRoot('terra-quality-full-dead-code-coordination-');
 	const src = fixtureFile(root, 'src/main.ts', 'const value = create();\n');
 	const marker = join(root, 'eslint-args.jsonl');
+	const cmdMarker = join(root, 'command-ran.txt');
 	const eslint = fixtureFile(
 		root,
 		'bin/eslint.mjs',
@@ -528,10 +529,12 @@ if (args.includes('--format') && args.includes('json'))
 		sourceRoots: ['src'],
 		extensions: ['.ts'],
 		tools: { eslint },
+		qualityCommands: [{ name: 'followup', command: process.execPath, args: ['-e', `require('node:fs').writeFileSync(${JSON.stringify(cmdMarker)}, 'ok')`] }],
 		enabledChecks: {
 			document: false,
 			format: false,
 			import: false,
+			command: true,
 			name: false,
 			forward: false,
 			lint: true,
@@ -539,7 +542,6 @@ if (args.includes('--format') && args.includes('json'))
 			'dead-code': true,
 			type: false,
 			recommend: false,
-			command: false,
 			diff: false,
 			alias: false,
 			security: false,
@@ -549,11 +551,16 @@ if (args.includes('--format') && args.includes('json'))
 		},
 	});
 	resetExitCode();
-	runQualityCli(cfg, ['quality', '--all', '--warn', '--skip-commands', '--skip-recommendations']);
+	runQualityCli(cfg, ['quality', '--all', '--warn', '--skip-recommendations']);
 	const invocations = recordedCmds(root, 'eslint-args.jsonl');
 	assert.equal(invocations.filter((args) => args.includes('--format') && args.includes('json')).length, 1);
 	assert.ok(invocations.some((args) => args.includes('--rule') && args.includes('unused-imports/no-unused-vars: off')));
+	assert.equal(readFileSync(cmdMarker, 'utf8'), 'ok', 'configured commands still run after blocking manual findings');
 	assert.equal(fixtureText(root, 'src/main.ts'), 'const value = create();\n');
+	assert.equal(process.exitCode, 1, 'manual findings fail quality by default');
+	cfg.manualWarnings = 'warning';
+	resetExitCode();
+	runQualityCli(cfg, ['quality', '--all', '--warn', '--skip-recommendations']);
 	assert.equal(process.exitCode, 0);
 	resetExitCode();
 });
@@ -811,10 +818,10 @@ if (issues.length) process.exitCode = 1;
 	}
 	assert.ok(existsSync(knip));
 });
-test('dead-code CLI reports detached TSDoc as a read-only, actionable warning', () => {
+test('dead-code CLI reports detached TSDoc as a read-only, actionable warning when configured', () => {
 	const root = fixtureRoot('terra-quality-dead-code-tsdoc-cli-');
 	const src = fixtureFile(root, 'src/main.ts', '/** Documentation for a removed helper. */\n');
-	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], enabledChecks: { lint: false, knip: false } });
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], manualWarnings: 'warning', enabledChecks: { lint: false, knip: false } });
 	const original = readFileSync(src, 'utf8');
 	const originalErr = [console.error][0];
 	const output = [];
@@ -861,7 +868,7 @@ process.stdout.write(JSON.stringify([{ filePath: file, messages }]));
 	assert.match(updated, /export type PublicShape/);
 	assert.match(updated, /void \[/);
 });
-test('dead-code removes inert unused values and reports effectful initializers as non-blocking agent warnings', () => {
+test('dead-code removes inert unused values and reports effectful initializers as configurable agent warnings', () => {
 	const root = fixtureRoot('terra-quality-dead-code-variables-');
 	const src = fixtureFile(root, 'src/main.ts', 'const unusedArrow = () => 1;\nconst unusedData = { count: 1 };\nconst keep = sideEffect();\n');
 	const eslint = fixtureFile(
@@ -882,7 +889,7 @@ process.stdout.write(JSON.stringify([{ filePath: file, messages }]));
 `,
 		0o755,
 	);
-	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], tools: { eslint }, enabledChecks: { knip: false } });
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], tools: { eslint }, manualWarnings: 'warning', enabledChecks: { knip: false } });
 	resetExitCode();
 	const output = [];
 	const originalErr = [console.error][0];
@@ -914,7 +921,7 @@ process.stdout.write(JSON.stringify([{ filePath: file, messages: offset < 0 ? []
 `,
 		0o755,
 	);
-	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], tools: { eslint }, enabledChecks: { knip: false } });
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], tools: { eslint }, manualWarnings: 'warning', enabledChecks: { knip: false } });
 	resetExitCode();
 	const output = [];
 	const originalErr = [console.error][0];
@@ -992,7 +999,7 @@ test('dead-code reports a contradictory Knip result as a non-blocking actionable
 		`#!/usr/bin/env node\nprocess.stdout.write(JSON.stringify({ issues: [{ file: 'src/auth.ts', exports: [{ name: 'createClient', line: 1 }] }] }));\nprocess.exitCode = 1;\n`,
 		0o755,
 	);
-	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], tools: { knip }, enabledChecks: { lint: false } });
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], tools: { knip }, manualWarnings: 'warning', enabledChecks: { lint: false } });
 	resetExitCode();
 	runQualityCli(cfg, ['dead-code', '--all']);
 	assert.equal(process.exitCode, 0, 'a manual-only detector disagreement is a warning');
@@ -1025,11 +1032,23 @@ test('dead-code warn reports manual findings with explicit autofix status and ma
 	} finally {
 		console.error = originalErr;
 	}
-	assert.equal(process.exitCode, 0, `manual-only warnings are visible without failing --warn:\n${output.join('\n')}`);
+	assert.equal(process.exitCode, 1, `manual findings fail by default even in read-only mode:\n${output.join('\n')}`);
 	assert.deepEqual([readFileSync(src, 'utf8'), readFileSync(consumer, 'utf8')], original);
-	assert.match(output.join('\n'), /\[WARNING\] knip\/exports: src\/main\.ts:1 Client/);
+	assert.match(output.join('\n'), /\[ERROR\] knip\/exports: src\/main\.ts:1 Client/);
 	assert.match(output.join('\n'), /Autofix: not safe or not supported/);
 	assert.match(output.join('\n'), /Agent action: Reconcile the reported consumer/);
+	assert.match(output.join('\n'), /Fix each finding one by one, rerun quality, and continue only when all are resolved before committing/);
+	output.length = 0;
+	cfg.manualWarnings = 'warning';
+	console.error = (...parts) => output.push(parts.join(' '));
+	try {
+		resetExitCode();
+		runQualityCli(cfg, ['dead-code', '--all', '--warn']);
+	} finally {
+		console.error = originalErr;
+	}
+	assert.equal(process.exitCode, 0, `manual findings can be configured as warnings:\n${output.join('\n')}`);
+	assert.match(output.join('\n'), /\[WARNING\] knip\/exports: src\/main\.ts:1 Client/);
 	resetExitCode();
 });
 test('dead-code reports Astro-consumed exports when Knip disagrees without modifying them', () => {
@@ -1042,7 +1061,7 @@ test('dead-code reports Astro-consumed exports when Knip disagrees without modif
 		`#!/usr/bin/env node\nprocess.stdout.write(JSON.stringify({ issues: [{ file: 'src/widget.tsx', exports: [{ name: 'Widget', line: 1 }] }] }));\nprocess.exitCode = 1;\n`,
 		0o755,
 	);
-	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.tsx', '.astro'], tools: { knip }, enabledChecks: { lint: false } });
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.tsx', '.astro'], tools: { knip }, manualWarnings: 'warning', enabledChecks: { lint: false } });
 	resetExitCode();
 	runQualityCli(cfg, ['dead-code', '--all']);
 	assert.equal(process.exitCode, 0, 'a manual-only detector disagreement is a warning');
@@ -1098,7 +1117,7 @@ process.stdout.write(JSON.stringify([{ filePath: ${JSON.stringify(src)}, message
 `,
 		0o755,
 	);
-	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], tools: { knip, eslint } });
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], tools: { knip, eslint }, manualWarnings: 'warning' });
 	resetExitCode();
 	runQualityCli(cfg, ['dead-code', '--all']);
 	assert.equal(process.exitCode, 0, 'the unsupported ESLint location is a manual warning');
@@ -1142,7 +1161,15 @@ test('dead-code preserves Astro frontmatter consumers resolved through configure
 		`#!/usr/bin/env node\nprocess.stdout.write(JSON.stringify({ issues: [{ file: 'astro/src/lib/auth.server.ts', exports: [{ name: 'createClient', line: 1 }] }] }));\nprocess.exitCode = 1;\n`,
 		0o755,
 	);
-	const cfg = createQualityCfg({ root, sourceRoots: ['astro/src'], extensions: ['.ts', '.astro'], aliases: { '@/': 'astro/src/' }, tools: { knip }, enabledChecks: { lint: false } });
+	const cfg = createQualityCfg({
+		root,
+		sourceRoots: ['astro/src'],
+		extensions: ['.ts', '.astro'],
+		aliases: { '@/': 'astro/src/' },
+		tools: { knip },
+		manualWarnings: 'warning',
+		enabledChecks: { lint: false },
+	});
 	resetExitCode();
 	runQualityCli(cfg, ['dead-code', '--all']);
 	assert.equal(process.exitCode, 0, 'a manual-only detector disagreement is a warning');
@@ -1200,7 +1227,7 @@ if (issues.length) process.exitCode = 1;
 `,
 		0o755,
 	);
-	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], tools: { knip }, enabledChecks: { lint: false } });
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], tools: { knip }, manualWarnings: 'warning', enabledChecks: { lint: false } });
 	resetExitCode();
 	runQualityCli(cfg, ['dead-code', '--all']);
 	assert.equal(process.exitCode, 0);
@@ -1227,7 +1254,7 @@ process.stdout.write(JSON.stringify(reports));
 `,
 		0o755,
 	);
-	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], tools: { eslint }, enabledChecks: { knip: false } });
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], tools: { eslint }, manualWarnings: 'warning', enabledChecks: { knip: false } });
 	resetExitCode();
 	runQualityCli(cfg, ['dead-code', '--all']);
 	assert.equal(process.exitCode, 0, 'the type-rejected file is an actionable warning');

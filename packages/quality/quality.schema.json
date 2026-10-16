@@ -76,6 +76,7 @@
     "enabledRecommendations": { "type": "object", "additionalProperties": { "type": "boolean" } },
     "qualityCommands": { "$ref": "#/$defs/commands" },
     "recommendationCommands": { "$ref": "#/$defs/commands" },
+    "manualWarnings": { "enum": ["error", "warning"], "default": "error", "description": "Whether dead-code findings that require manual review block quality. Defaults to error." },
     "tsconfig": { "type": "string" },
     "oneLineImports": { "type": "boolean" },
     "prettierPrintWidth": { "type": "number" },

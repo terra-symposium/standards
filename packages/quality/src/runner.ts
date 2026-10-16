@@ -13,14 +13,14 @@ IMPORTS
 import ts from 'typescript';
 import { aliasFindings, declarationScope, isCallbackDeclaration, isProtectedPath, isRenamableDeclaration, namingFindings, renameDeclaration, renameId } from './naming.js';
 import { basename, dirname, isAbsolute, relative, resolve, sep } from 'node:path';
+import { buildGitHubReport, formatGitHubReport, hasGitHubAuth } from './github-report.js';
 import { checkImports } from './imports.js';
 import { collapseInlineIfs } from './inline-if.js';
 import { collapseTypesAndObjects } from './collapse.js';
-import { existsSync, readFileSync, realpathSync, statSync, writeFileSync } from 'node:fs';
 import { deadCodeEditsIntroduceTypeErrors, deadCodeTypeProgram, fixSingleUseDeclarations, singleUseFindings } from './single-use.js';
 import { documentSrcFile, documentationFindings, duplicateImportFindings, maintainSrcFile, protectLongImports } from './documentation.js';
+import { existsSync, readFileSync, realpathSync, statSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { buildGitHubReport, formatGitHubReport, hasGitHubAuth, type GitHubFeature, type GitHubReport } from './github-report.js';
 import { fixObjectForwarding, objectForwardingFindings } from './object-forwarding.js';
 import { fixRegexDedup, fixRepeatedClasses, regexFindings, repeatedClassFindings, runTailwindCanonical, uiPatternFindings } from './patterns.js';
 import { qualityProgress } from './progress.js';
@@ -35,6 +35,7 @@ import { PROTECTED_IDENTIFIERS } from './naming.js';
 
 // TYPES
 import type { DocumentationRequirements } from './documentation.js';
+import type { GitHubFeature, GitHubReport } from './github-report.js';
 
 /*//////////////////////////////////////////////////
 REGEX
@@ -139,6 +140,8 @@ export type QualityCfg = {
 	frameworkEntryExports?: Record<string, string[]>;
 	renameExports?: boolean;
 	qualityCommands?: { name: string; command: string; args?: string[] }[];
+	excludeTests?: boolean;
+	manualWarnings?: 'error' | 'warning';
 	enabledChecks?: Partial<Record<QualityCheckName, boolean>>;
 	autofix?: Partial<Record<QualityAutofixName, boolean>>;
 	documentation?: { required?: DocumentationRequirements };
@@ -295,6 +298,7 @@ export function createQualityCfg(cfg: QualityCfg): QualityCfg {
 	const defaultSkipped = ['.git', 'node_modules', 'dist', 'build', 'coverage', 'test-results', '.next', '.astro', '.sanity', '.netlify', '.cache', '.output', '.vercel', '.nuxt', '.husky'];
 	return {
 		...cfg,
+		manualWarnings: cfg.manualWarnings ?? 'error',
 		renameExports: cfg.renameExports ?? false,
 		root: resolve(cfg.root),
 		sourceRoots: cfg.sourceRoots.map((p) => resolve(cfg.root, p)),
@@ -687,12 +691,10 @@ function focusedEslintCfgSrc(cfg: QualityCfg, flatCfg: string, files: string[]):
 	return `
 import { createRequire } from 'node:module';
 import { resolve } from 'node:path';
-
 const root = ${JSON.stringify(cfg.root)};
 const configPath = ${JSON.stringify(flatCfg)};
 const sourceFiles = ${JSON.stringify(files)};
 const filePatterns = ${JSON.stringify(patterns)};
-
 try {
 	const requireFromRepo = createRequire(resolve(root, 'package.json'));
 	const { ESLint } = requireFromRepo('eslint');
@@ -1161,10 +1163,13 @@ function assertKnipPath(cfg: QualityCfg, path: string, label: string): string {
 	if (realRelative === '..' || realRelative.startsWith(`..${sep}`) || isAbsolute(realRelative)) throw new Error(`Knip returned a ${label} symlink outside the repository: ${path}`);
 	return absolute;
 }
-/** Converts Knip's validated issue inventory into dead-code review findings.
+/**
+ * Converts Knip's validated issue inventory into dead-code review findings.
+ *
  * @param cfg Quality configuration defining scope and explicit entry-point contracts.
  * @param importedConsumers Export names referenced by configured source files.
- * @returns Knip findings with safe export-modifier changes marked autofixable.
+ *
+ * @return Knip findings with safe export-modifier changes marked autofixable.
  */
 function collectKnipFindings(cfg: QualityCfg, importedConsumers = importedExportConsumers(cfg)): DeadCodeFinding[] {
 	const issues = readKnipIssues(cfg);
@@ -1197,11 +1202,14 @@ function collectKnipFindings(cfg: QualityCfg, importedConsumers = importedExport
 	}
 	return findings;
 }
-/** Checks whether a name is a configured framework-discovered route export.
+/**
+ * Checks whether a name is a configured framework-discovered route export.
+ *
  * @param cfg Quality configuration containing framework entry exports.
  * @param file Repository-relative source filename reported by Knip.
  * @param name Exported identifier to check.
- * @returns Whether the configured file or supported TypeScript route pattern includes the export.
+ *
+ * @return Whether the configured file or supported TypeScript route pattern includes the export.
  */
 function isFrameworkEntryExport(cfg: QualityCfg, file: string, name: string): boolean {
 	const publicRoute = !basename(file).startsWith('_');
@@ -1213,9 +1221,12 @@ function isFrameworkEntryExport(cfg: QualityCfg, file: string, name: string): bo
 		return pathMatches && names.includes(name);
 	});
 }
-/** Selects the TypeScript parser mode from a source filename's extension.
+/**
+ * Selects the TypeScript parser mode from a source filename's extension.
+ *
  * @param file Source filename to classify.
- * @returns The JavaScript, JSX, TypeScript, or TSX compiler script kind.
+ *
+ * @return The JavaScript, JSX, TypeScript, or TSX compiler script kind.
  */
 function deadCodeScriptKind(file: string): ts.ScriptKind {
 	if (/\.tsx$/i.test(file)) return ts.ScriptKind.TSX;
@@ -1223,10 +1234,13 @@ function deadCodeScriptKind(file: string): ts.ScriptKind {
 	if (/\.(?:c|m)?js$/i.test(file)) return ts.ScriptKind.JS;
 	return ts.ScriptKind.TS;
 }
-/** Checks whether Knip identified a direct named export that can become private.
+/**
+ * Checks whether Knip identified a direct named export that can become private.
+ *
  * @param file Absolute source filename containing the export.
  * @param name Exported identifier reported by Knip.
- * @returns Whether the export modifier can be removed without an ambiguous rewrite.
+ *
+ * @return Whether the export modifier can be removed without an ambiguous rewrite.
  */
 function knipExportCanBeMadePrivate(file: string, name: string): boolean {
 	if (!existsSync(file) || file.endsWith('.astro')) return false;
@@ -1324,9 +1338,12 @@ function fixKnipExports(cfg: QualityCfg, changedFiles: Set<string>): void {
 
 /** Finds export names that configured source files import and actually reference. */
 const importedExportConsumerCache = new WeakMap<QualityCfg, { signature: string; consumers: Map<string, Set<string>> }>();
-/** Builds a cache of exported names referenced by configured source consumers.
+/**
+ * Builds a cache of exported names referenced by configured source consumers.
+ *
  * @param cfg Quality configuration defining roots, aliases, and skipped paths.
- * @returns Export names grouped by their resolved absolute source file.
+ *
+ * @return Export names grouped by their resolved absolute source file.
  */
 function importedExportConsumers(cfg: QualityCfg): Map<string, Set<string>> {
 	const srcFiles = filesFor(cfg, true).filter((path) => C_M_JS_TS_X_CLASS_2.test(path) || path.endsWith('.astro'));
@@ -1396,12 +1413,15 @@ function importedExportConsumers(cfg: QualityCfg): Map<string, Set<string>> {
 	importedExportConsumerCache.set(cfg, { signature, consumers });
 	return consumers;
 }
-/** Accepts proposed edits only when they add no TypeScript errors to changed files.
+/**
+ * Accepts proposed edits only when they add no TypeScript errors to changed files.
+ *
  * @param program TypeScript program representing the original source.
  * @param proposed Proposed source text keyed by absolute filename.
  * @param original Original source text for the same files.
  * @param onBatch Optional progress callback for each validation batch.
- * @returns Accepted source edits and filenames rejected by the type-safety check.
+ *
+ * @return Accepted source edits and filenames rejected by the type-safety check.
  */
 function acceptTypeSafeEdits(
 	program: ts.Program,
@@ -1434,11 +1454,14 @@ function acceptTypeSafeEdits(
 		rejected,
 	};
 }
-/** Prints dead-code findings and sets a failing process status for autofixable issues.
+/**
+ * Prints dead-code findings and fails when errors or blocking manual findings remain.
+ *
  * @param findings Findings collected by the dead-code coordinator.
+ * @param manualWarnings Policy for manual-only findings.
  * @param typeSafetyVerified Whether the candidate autofixes passed TypeScript safety checks.
  */
-function printDeadCodeFindings(findings: DeadCodeFinding[], typeSafetyVerified = true): void {
+function printDeadCodeFindings(findings: DeadCodeFinding[], manualWarnings: 'error' | 'warning', typeSafetyVerified = true): void {
 	if (reportStages) {
 		const stage = reportStages.get('dead-code');
 		if (stage) {
@@ -1450,16 +1473,22 @@ function printDeadCodeFindings(findings: DeadCodeFinding[], typeSafetyVerified =
 		console.error('  ✓ dead-code checks passed; no autofixable findings or manual warnings remain');
 		return;
 	}
-	const errs = findings.filter((finding) => finding.severity === 'error');
-	const warnings = findings.filter((finding) => finding.severity === 'warning');
+	const errs = findings.filter((finding) => finding.severity === 'error' || manualWarnings === 'error');
+	const warnings = findings.filter((finding) => finding.severity === 'warning' && manualWarnings !== 'error');
+	const manualCount = findings.filter((finding) => finding.severity === 'warning').length;
 	for (const finding of findings) {
-		console.error(`  - [${finding.severity.toUpperCase()}] ${finding.rule}: ${finding.file}:${finding.line} ${finding.name}`);
+		const severity = finding.severity === 'warning' && manualWarnings === 'error' ? 'ERROR' : finding.severity.toUpperCase();
+		console.error(`  - [${severity}] ${finding.rule}: ${finding.file}:${finding.line} ${finding.name}`);
 		console.error(`      Reason: ${finding.reason}`);
 		const autofix = !finding.autofixable ? 'not safe or not supported' : typeSafetyVerified ? 'available' : 'candidate; fix mode checks TypeScript before writing';
 		console.error(`      Autofix: ${autofix}`);
 		console.error(`      Agent action: ${finding.agentAction}`);
 	}
-	console.error(`  ${errs.length} error${errs.length === 1 ? '' : 's'}; ${warnings.length} manual warning${warnings.length === 1 ? '' : 's'}.`);
+	console.error(
+		`  ${errs.length} error${errs.length === 1 ? '' : 's'}; ${manualCount} manual finding${manualCount === 1 ? '' : 's'}${manualWarnings === 'warning' ? ` (${warnings.length} warning${warnings.length === 1 ? '' : 's'})` : ''}.`,
+	);
+	if (manualWarnings === 'error' && manualCount > 0)
+		console.error('  Manual findings block quality by default. Fix each finding one by one, rerun quality, and continue only when all are resolved before committing.');
 	if (errs.length) process.exitCode = 1;
 }
 
@@ -1596,18 +1625,22 @@ function runDeadCode(cfg: QualityCfg, fix: boolean, all: boolean, verify = true,
 				}
 			: finding,
 	);
-	if (emit) printDeadCodeFindings(finalFindings, fix);
+	if (emit) printDeadCodeFindings(finalFindings, cfg.manualWarnings ?? 'error', fix);
 	return finalFindings;
 }
 
-/** Runs dead-code detectors once without modifying the source tree.
+/**
+ * Runs dead-code detectors once without modifying the source tree.
+ *
  * @param cfg Quality configuration defining source scope and tools.
  * @param all Whether to inspect all configured source files.
  */
 function runDeadCodeReadOnly(cfg: QualityCfg, all: boolean): void {
 	runDeadCode(cfg, false, all);
 }
-/** Dispatches the dead-code coordinator in fix or read-only mode.
+/**
+ * Dispatches the dead-code coordinator in fix or read-only mode.
+ *
  * @param cfg Quality configuration defining source scope and tools.
  * @param fix Whether eligible changes may be applied to source files.
  * @param all Whether to inspect all configured source files.
@@ -1657,6 +1690,7 @@ function printFindings<T>(findings: readonly T[], fmt: (finding: T) => string): 
 
 /**
  * Run the optional, read-only GitHub analytics stage.
+ *
  * @param cfg Quality configuration containing repositories and expected settings.
  * @param repos Repository overrides supplied to `terra-quality github`.
  * @param explicit Whether GitHub reporting was requested as the command itself.
@@ -1664,8 +1698,8 @@ function printFindings<T>(findings: readonly T[], fmt: (finding: T) => string): 
  */
 function runGitHubCheck(cfg: QualityCfg, repos: string[] = [], explicit = false, warn = false): void {
 	qualityHeader('github', 'Reading open issues, Dependabot, code scanning, and secret scanning alerts');
-	const targets = repos.length ? repos : (cfg.github?.repositories ?? [inferGitHubRepo(cfg.root)].filter((repo): repo is string => Boolean(repo)));
-	if (!targets.length) {
+	const tgts = repos.length ? repos : (cfg.github?.repositories ?? [inferGitHubRepo(cfg.root)].filter((repo): repo is string => Boolean(repo)));
+	if (!tgts.length) {
 		const detail = 'Set github.repositories in quality.json or pass --repository owner/name.';
 		reportGitHubData = { schemaVersion: 1, generatedAt: new Date().toISOString(), state: 'partial', detail, repositories: [] };
 		updateGitHubStage('failed', 0);
@@ -1682,7 +1716,7 @@ function runGitHubCheck(cfg: QualityCfg, repos: string[] = [], explicit = false,
 		return;
 	}
 	try {
-		reportGitHubData = buildGitHubReport(targets, cfg.github?.requiredFeatures, undefined, cfg.github?.featureExemptions);
+		reportGitHubData = buildGitHubReport(tgts, cfg.github?.requiredFeatures, undefined, cfg.github?.featureExemptions);
 		const findings = reportGitHubData.repositories.flatMap((repo) => repo.findings);
 		const failed = reportGitHubData.state === 'partial';
 		updateGitHubStage(failed ? 'failed' : findings.length ? 'findings' : 'passed', findings.length);
@@ -1699,7 +1733,9 @@ function runGitHubCheck(cfg: QualityCfg, repos: string[] = [], explicit = false,
 	}
 }
 
-/** Update the JSON summary for the active GitHub report stage.
+/**
+ * Update the JSON summary for the active GitHub report stage.
+ *
  * @param status Result state to record.
  * @param findings Number of GitHub findings in the report.
  */
@@ -1711,8 +1747,11 @@ function updateGitHubStage(status: QualityJsonReport['checks'][number]['status']
 	}
 }
 
-/** Infer the current repository slug from its GitHub origin remote.
+/**
+ * Infer the current repository slug from its GitHub origin remote.
+ *
  * @param root Repository root to inspect.
+ *
  * @return The owner/name slug, or undefined for a non-GitHub remote.
  */
 function inferGitHubRepo(root: string): string | undefined {
@@ -2128,9 +2167,7 @@ export function runQualityCli(cfg: QualityCfg, args = process.argv.slice(2)): vo
 	const reportIdx = args.indexOf('--report-json');
 	const reportPath = reportIdx < 0 ? undefined : args[reportIdx + 1];
 	const cmdArgs = reportIdx < 0 ? args : args.filter((_, i) => i !== reportIdx && i !== reportIdx + 1);
-	if (!reportPath) {
-		return dispatchQualityCli(cfg, cmdArgs);
-	}
+	if (!reportPath) return dispatchQualityCli(cfg, cmdArgs);
 	reportStages = new Map();
 	reportStageName = undefined;
 	reportGitHubData = undefined;
@@ -2180,9 +2217,9 @@ export function runQualityCli(cfg: QualityCfg, args = process.argv.slice(2)): vo
 	try {
 		const result = dispatchQualityCli(cfg, cmdArgs);
 		if (result instanceof Promise) return result.finally(writeReport);
-	} catch (error) {
+	} catch (err) {
 		writeReport();
-		throw error;
+		throw err;
 	}
 	writeReport();
 }
@@ -2219,12 +2256,11 @@ function dispatchQualityCli(cfg: QualityCfg, args: string[]): void | Promise<voi
 		skipRecommendations: args.includes('--skip-recommendations'),
 	};
 	const fix = (check: QualityAutofixName): boolean => qualityAutofixEnabled(cfg, check, opts.fix);
-	if (cfg.tailwindCanonical && qualityCheckEnabled(cfg, 'tailwind-canonical') && ['quality', 'quality:all', 'quality:baseline', 'imports', 'quality:patterns', 'types:architecture'].includes(cmd)) {
+	if (cfg.tailwindCanonical && qualityCheckEnabled(cfg, 'tailwind-canonical') && ['quality', 'quality:all', 'quality:baseline', 'imports', 'quality:patterns', 'types:architecture'].includes(cmd))
 		return runTailwindCanonicalCheck(cfg, fix('tailwindCanonical')).then(() => {
 			const checks = { ...cfg.enabledChecks, 'tailwind-canonical': false };
 			return dispatchQualityCli({ ...cfg, enabledChecks: checks }, args);
 		});
-	}
 	if (cmd === 'github') {
 		runGitHubCheck(cfg, optVals(args, '--repository'), true, args.includes('--warn'));
 		return;
@@ -2429,6 +2465,7 @@ function validCliArgs(args: string[]): void {
  *
  * @param args CLI arguments.
  * @param flag Flag whose following value is returned.
+ *
  * @return The flag value, or undefined when the flag was not supplied.
  */
 function optVal(args: string[], flag: string): string | undefined {
@@ -2436,9 +2473,12 @@ function optVal(args: string[], flag: string): string | undefined {
 	return idx < 0 ? undefined : args[idx + 1];
 }
 
-/** Read each occurrence of a repeated CLI option.
+/**
+ * Read each occurrence of a repeated CLI option.
+ *
  * @param args Validated command-line arguments.
  * @param flag Repeated flag to read.
+ *
  * @return Values supplied after each occurrence of the flag.
  */
 function optVals(args: string[], flag: string): string[] {

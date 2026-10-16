@@ -1,5 +1,11 @@
 # @terra-symposium/standards-quality
 
+## 0.7.0
+
+### Minor Changes
+
+- Treat manual dead-code findings as errors by default, with a configuration option to report them as warnings. Complete all configured checks before failing and give agents actionable fix-before-commit guidance.
+
 ## 0.6.0
 
 ### Minor Changes

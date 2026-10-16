@@ -43,6 +43,7 @@ Runtime paths resolve from `root`. By default, `root` is the directory containin
 | `frameworkEntryExports`        | Explicit framework-discovered exports that Knip should retain, keyed by a source file path or supported `/**/*.ts` / `/**/*.tsx` pattern.           |
 | `protectedIdentifiers`         | Names that naming maintenance must preserve.                                                                                                        |
 | `renameExports`                | Whether eligible exported names can be renamed. Defaults to `false`.                                                                                |
+| `manualWarnings`               | Whether dead-code findings requiring manual review block quality. Defaults to `error`; set to `warning` to keep them visible without failing.       |
 
 Keep scope and exclusions narrow. A broad root or external prefix can hide unresolved imports, unreachable files, or other source findings.
 
