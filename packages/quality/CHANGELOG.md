@@ -1,5 +1,16 @@
 # @terra-symposium/standards-quality
 
+## 0.6.0
+
+### Minor Changes
+
+- Add a Tailwind canonical-class check and autofix for arbitrary CSS variable utilities.
+- 10a5480: Add read-only GitHub analytics and agent-ready remediation guidance to quality reports.
+
+### Patch Changes
+
+- ea70e9d: Run dead-code ESLint detection in one focused sweep and recheck only changed files when safe removals expose cascaded unused declarations.
+
 ## 0.5.0
 
 ### Minor Changes

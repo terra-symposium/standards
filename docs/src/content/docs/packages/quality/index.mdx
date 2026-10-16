@@ -29,8 +29,8 @@ The package requires Node.js `>=18.18`. Checks target configured JavaScript and 
 
 The package root re-exports its library API. Explicit subpaths are available for focused imports:
 
-| Import                                       | Use                                                              |
-| -------------------------------------------- | ---------------------------------------------------------------- |
+| Import                                                 | Use                                                              |
+| ------------------------------------------------------ | ---------------------------------------------------------------- |
 | `@terra-symposium/standards-quality`                   | Shared check, configuration, analysis, and maintenance APIs.     |
 | `@terra-symposium/standards-quality/cli`               | CLI configuration loading, dispatch, and runner functions.       |
 | `@terra-symposium/standards-quality/naming`            | Naming rules, findings, and syntax-aware rename helpers.         |
@@ -39,7 +39,6 @@ The package root re-exports its library API. Explicit subpaths are available for
 | `@terra-symposium/standards-quality/port`              | Helpers for inspecting local TCP listeners and acquiring a port. |
 
 `portOwners(port)` uses `lsof` to find listeners. `acquirePort(port)` sends `SIGTERM` and, if needed, `SIGKILL` to processes using that port before waiting for it to become available. Use it only when the caller owns those processes.
-
 
 ## Checks
 
@@ -454,7 +453,7 @@ For example, configure a repeated bespoke button class as a forbidden pattern:
 
 #### Tailwind canonical classes
 
-Use the exported `runTailwindCanonical(cfg, fix?)` helper to ask the consuming repository's Tailwind CSS v4 design system for canonical class names. Configure a stylesheet and, optionally, source roots:
+The `tailwind-canonical` check asks the consuming repository's Tailwind CSS v4 design system for canonical class names, matching the editor's canonical-class suggestions. Configure a stylesheet and, optionally, source roots:
 
 ```json
 {
@@ -465,7 +464,16 @@ Use the exported `runTailwindCanonical(cfg, fix?)` helper to ask the consuming r
 }
 ```
 
-Run it through the package API:
+The normal `terra-quality quality` command applies these replacements before the other checks. Use `--warn` for a read-only check, or run this check by itself:
+
+```sh
+terra-quality tailwind-canonical --warn
+terra-quality tailwind-canonical
+```
+
+For example, `border-[var(--sl-color-gray-5)]` becomes `border-(--sl-color-gray-5)`. Disable the check with `enabledChecks["tailwind-canonical"]: false`, or keep diagnostics while disabling writes with `autofix.tailwindCanonical: false`.
+
+The package API is also available:
 
 ```ts
 import { loadQualityCfg, runTailwindCanonical } from '@terra-symposium/standards-quality';
@@ -483,7 +491,7 @@ const cfg = loadQualityCfg();
 await runTailwindCanonical(cfg, true);
 ```
 
-This helper is separate from the `terra-quality` CLI workflow and has no `enabledChecks` toggle. The repository must provide Tailwind CSS v4 and a valid stylesheet. It uses Tailwind's unstable design-system API and reports a skip when the installed package does not expose that API; pin Tailwind and review changes when upgrading it.
+The repository must provide Tailwind CSS v4 and a valid stylesheet. The check uses Tailwind's unstable design-system API and reports a skip when the installed package does not expose that API. Review the check when upgrading Tailwind.
 
 #### Command
 

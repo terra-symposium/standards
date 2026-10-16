@@ -2,6 +2,7 @@ node_modules/
 dist/
 coverage/
 **/.astro/
+/docs/src/generated/skills.json
 /.quality-test-tmp/
 /.quality-github-report.json
 .changeset/*.md

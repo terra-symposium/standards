@@ -1298,3 +1298,61 @@ test('CLI UI-pattern dispatch reports findings through the process exit status',
 	assert.equal(process.exitCode, 1);
 	resetExitCode();
 });
+test('quality CLI checks and autofixes Tailwind canonical-class suggestions', async () => {
+	const root = fixtureRoot('terra-quality-tailwind-cli-');
+	fixtureFile(root, 'package.json', '{"type":"module"}\n');
+	fixtureFile(root, 'styles/tailwind.css', '@import "tailwindcss";\n');
+	fixtureFile(root, 'node_modules/tailwindcss/package.json', JSON.stringify({ name: 'tailwindcss', type: 'module', main: 'index.mjs' }));
+	fixtureFile(
+		root,
+		'node_modules/tailwindcss/index.mjs',
+		`export async function __unstable__loadDesignSystem() {
+	return { canonicalizeCandidates(candidates) { return candidates.map((candidate) => candidate === 'border-[var(--sl-color-gray-5)]' ? 'border-(--sl-color-gray-5)' : candidate); } };
+}\n`,
+	);
+	fixtureFile(root, 'src/view.tsx', '<div className="border-[var(--sl-color-gray-5)]" />\n');
+	const cfg = createQualityCfg({
+		root,
+		sourceRoots: ['src'],
+		extensions: ['.tsx'],
+		tailwindCanonical: { stylesheet: 'styles/tailwind.css' },
+		enabledChecks: {
+			document: false,
+			format: false,
+			import: false,
+			name: false,
+			forward: false,
+			lint: false,
+			knip: false,
+			'dead-code': false,
+			type: false,
+			recommend: false,
+			command: false,
+			diff: false,
+			alias: false,
+			security: false,
+			'repeated-classes': false,
+			'regex-dedup': false,
+			'ui-patterns': false,
+			github: false,
+		},
+	});
+	resetExitCode();
+	await runQualityCli({ ...cfg, enabledChecks: { ...cfg.enabledChecks, 'tailwind-canonical': false } }, ['tailwind-canonical']);
+	await assert.rejects(runQualityCli({ ...cfg, autofix: { tailwindCanonical: false } }, ['tailwind-canonical']), /failed with 1 suggestion/);
+	await assert.rejects(runQualityCli(cfg, ['quality', '--all', '--warn', '--skip-commands', '--skip-recommendations', '--report-json', 'quality.json']), /failed with 1 suggestion/);
+	assert.deepEqual(
+		JSON.parse(fixtureText(root, 'quality.json')).checks.find((check) => check.name === 'tailwind-canonical'),
+		{ name: 'tailwind-canonical', status: 'failed', findings: 1 },
+	);
+	assert.equal(fixtureText(root, 'src/view.tsx'), '<div className="border-[var(--sl-color-gray-5)]" />\n');
+	resetExitCode();
+	await runQualityCli(cfg, ['quality', '--all', '--skip-commands', '--skip-recommendations']);
+	assert.equal(fixtureText(root, 'src/view.tsx'), '<div className="border-(--sl-color-gray-5)" />\n');
+	await runQualityCli(cfg, ['tailwind-canonical', '--warn', '--report-json', 'quality.json']);
+	assert.deepEqual(
+		JSON.parse(fixtureText(root, 'quality.json')).checks.find((check) => check.name === 'tailwind-canonical'),
+		{ name: 'tailwind-canonical', status: 'passed', findings: 0 },
+	);
+	resetExitCode();
+});

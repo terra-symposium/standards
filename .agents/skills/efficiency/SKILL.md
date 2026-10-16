@@ -40,8 +40,8 @@ For every recommendation, state the measured bottleneck, proposed change, expect
 
 Report results in this shape:
 
-| Command and scope | Baseline (runs and spread) | After (runs and spread) | Result counts and warnings |
-| --- | --- | --- | --- |
-| Exact command | Duration and input count | Duration and input count, or not measured | Findings, failures, and warnings |
+| Command and scope | Baseline (runs and spread) | After (runs and spread)                   | Result counts and warnings       |
+| ----------------- | -------------------------- | ----------------------------------------- | -------------------------------- |
+| Exact command     | Duration and input count   | Duration and input count, or not measured | Findings, failures, and warnings |
 
 Follow with the measured bottleneck and ranked recommendations or implemented changes, each with expected benefit, confidence, effort, and risk. State material regressions and unmeasured assumptions.

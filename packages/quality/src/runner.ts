@@ -22,7 +22,7 @@ import { documentSrcFile, documentationFindings, duplicateImportFindings, mainta
 import { fileURLToPath } from 'node:url';
 import { buildGitHubReport, formatGitHubReport, hasGitHubAuth, type GitHubFeature, type GitHubReport } from './github-report.js';
 import { fixObjectForwarding, objectForwardingFindings } from './object-forwarding.js';
-import { fixRegexDedup, fixRepeatedClasses, regexFindings, repeatedClassFindings, uiPatternFindings } from './patterns.js';
+import { fixRegexDedup, fixRepeatedClasses, regexFindings, repeatedClassFindings, runTailwindCanonical, uiPatternFindings } from './patterns.js';
 import { qualityProgress } from './progress.js';
 import { securityFindings } from './security.js';
 import { spawnSync } from 'node:child_process';
@@ -64,6 +64,7 @@ const CLI_CMDS = new Set([
 	'dead-code',
 	'security',
 	'repeated-classes',
+	'tailwind-canonical',
 	'regex-dedup',
 	'ui-patterns',
 	'imports',
@@ -118,11 +119,12 @@ export type QualityCheckName =
 	| 'alias'
 	| 'security'
 	| 'repeated-classes'
+	| 'tailwind-canonical'
 	| 'regex-dedup'
 	| 'ui-patterns'
 	| 'github';
 /** Names accepted in the `autofix` configuration map. */
-export type QualityAutofixName = 'document' | 'format' | 'name' | 'lint' | 'knip' | 'dead-code' | 'alias' | 'forward' | 'repeatedClasses' | 'regexDedup';
+export type QualityAutofixName = 'document' | 'format' | 'name' | 'lint' | 'knip' | 'dead-code' | 'alias' | 'forward' | 'repeatedClasses' | 'tailwindCanonical' | 'regexDedup';
 /** Normalized repository paths, source scope, policies, and tool settings. */
 export type QualityCfg = {
 	root: string;
@@ -1745,6 +1747,29 @@ function runGenericChecks(cfg: QualityCfg, analysis?: QualityAnalysis): void {
 }
 
 /**
+ * Runs the configured Tailwind canonical-class check and records its CLI report stage.
+ *
+ * @param cfg Quality configuration containing the Tailwind stylesheet and source roots.
+ * @param fix Whether to write Tailwind's canonical class suggestions.
+ *
+ * @return Promise resolving when the diagnostic or autofix completes.
+ */
+function runTailwindCanonicalCheck(cfg: QualityCfg, fix: boolean): Promise<void> {
+	qualityHeader('tailwind-canonical', `${fix ? 'Fixing and checking' : 'Checking'} canonical Tailwind classes`);
+	return runTailwindCanonical(cfg, fix).then(
+		() => undefined,
+		(error: unknown) => {
+			const stage = reportStages?.get('tailwind-canonical');
+			if (stage) {
+				stage.status = 'failed';
+				stage.findings = Number(/failed with (\d+) suggestion/.exec(error instanceof Error ? error.message : '')?.[1] ?? 0);
+			}
+			throw error;
+		},
+	);
+}
+
+/**
  * Renames safe repository-local declarations and repairs matching references.
  *
  * @param cfg Quality configuration defining source scope and naming protections.
@@ -2096,30 +2121,28 @@ function runDocumentation(cfg: QualityCfg, opts: QualityOptions, args: string[],
  * @param cfg Normalized quality configuration for the current repository.
  * @param args CLI arguments to dispatch.
  *
- * @return Nothing; command failures are reflected in the process exit code.
+ * @return A completion promise for asynchronous checks, or nothing for synchronous commands.
  */
-export function runQualityCli(cfg: QualityCfg, args = process.argv.slice(2)): void {
+export function runQualityCli(cfg: QualityCfg, args = process.argv.slice(2)): void | Promise<void> {
 	validCliArgs(args);
 	const reportIdx = args.indexOf('--report-json');
 	const reportPath = reportIdx < 0 ? undefined : args[reportIdx + 1];
 	const cmdArgs = reportIdx < 0 ? args : args.filter((_, i) => i !== reportIdx && i !== reportIdx + 1);
 	if (!reportPath) {
-		dispatchQualityCli(cfg, cmdArgs);
-		return;
+		return dispatchQualityCli(cfg, cmdArgs);
 	}
 	reportStages = new Map();
 	reportStageName = undefined;
 	reportGitHubData = undefined;
-	try {
-		dispatchQualityCli(cfg, cmdArgs);
-	} finally {
-		const executed = [...reportStages.values()].filter((s) => {
+	const writeReport = (): void => {
+		const executed = [...(reportStages?.values() ?? [])].filter((s) => {
 			if (s.name.includes('/') || s.name.startsWith('recommendation:')) return false;
 			const names: Record<string, QualityCheckName> = { imports: 'import', naming: 'name', aliases: 'alias', forwarding: 'forward', documentation: 'document', typecheck: 'type' };
 			const check = names[s.name] ?? ((s.name.startsWith('command:') ? 'command' : s.name) as QualityCheckName);
 			if (!qualityCheckEnabled(cfg, check)) return false;
 			if (s.name === 'security' && !cfg.security) return false;
 			if (s.name === 'repeated-classes' && !cfg.repeatedClasses) return false;
+			if (s.name === 'tailwind-canonical' && !cfg.tailwindCanonical) return false;
 			if (s.name === 'regex-dedup' && !cfg.regexDedup) return false;
 			if (s.name === 'ui-patterns' && !cfg.uiPatterns) return false;
 			return true;
@@ -2137,6 +2160,7 @@ export function runQualityCli(cfg: QualityCfg, args = process.argv.slice(2)): vo
 			'aliases',
 			'security',
 			'repeated-classes',
+			'tailwind-canonical',
 			'regex-dedup',
 			'ui-patterns',
 			'github',
@@ -2152,7 +2176,15 @@ export function runQualityCli(cfg: QualityCfg, args = process.argv.slice(2)): vo
 		writeFileSync(resolve(cfg.root, reportPath), `${JSON.stringify(report, null, 2)}\n`);
 		reportStages = undefined;
 		reportStageName = undefined;
+	};
+	try {
+		const result = dispatchQualityCli(cfg, cmdArgs);
+		if (result instanceof Promise) return result.finally(writeReport);
+	} catch (error) {
+		writeReport();
+		throw error;
 	}
+	writeReport();
 }
 
 /**
@@ -2160,8 +2192,10 @@ export function runQualityCli(cfg: QualityCfg, args = process.argv.slice(2)): vo
  *
  * @param cfg Normalized repository quality configuration.
  * @param args Validated CLI arguments.
+ *
+ * @return A completion promise for asynchronous checks, or nothing for synchronous commands.
  */
-function dispatchQualityCli(cfg: QualityCfg, args: string[]): void {
+function dispatchQualityCli(cfg: QualityCfg, args: string[]): void | Promise<void> {
 	validCliArgs(args);
 	if (args.includes('--version') || args.includes('-v')) {
 		const pkg = JSON.parse(readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), '../package.json'), 'utf8')) as { version: string };
@@ -2170,7 +2204,7 @@ function dispatchQualityCli(cfg: QualityCfg, args: string[]): void {
 	}
 	if (args.includes('--help') || args.includes('-h')) {
 		console.info('Usage: terra-quality <command> [options]');
-		console.info('Commands include quality, history, github, document, format, lint, knip, types, single-use, dead-code, security, and domain.');
+		console.info('Commands include quality, history, github, document, format, lint, knip, types, single-use, dead-code, tailwind-canonical, security, and domain.');
 		console.info(
 			'Options: --all, --warn, --strict, --skip-commands, --skip-recommendations, --report-json <path>, --repository owner/name; history also accepts --branch <name> and --base-sha <sha>.',
 		);
@@ -2185,6 +2219,12 @@ function dispatchQualityCli(cfg: QualityCfg, args: string[]): void {
 		skipRecommendations: args.includes('--skip-recommendations'),
 	};
 	const fix = (check: QualityAutofixName): boolean => qualityAutofixEnabled(cfg, check, opts.fix);
+	if (cfg.tailwindCanonical && qualityCheckEnabled(cfg, 'tailwind-canonical') && ['quality', 'quality:all', 'quality:baseline', 'imports', 'quality:patterns', 'types:architecture'].includes(cmd)) {
+		return runTailwindCanonicalCheck(cfg, fix('tailwindCanonical')).then(() => {
+			const checks = { ...cfg.enabledChecks, 'tailwind-canonical': false };
+			return dispatchQualityCli({ ...cfg, enabledChecks: checks }, args);
+		});
+	}
 	if (cmd === 'github') {
 		runGitHubCheck(cfg, optVals(args, '--repository'), true, args.includes('--warn'));
 		return;
@@ -2226,6 +2266,10 @@ function dispatchQualityCli(cfg: QualityCfg, args: string[]): void {
 	if (cmd === 'dead-code') {
 		runDeadCodeCmd(cfg, qualityAutofixEnabled(cfg, 'dead-code', opts.fix), opts.all);
 		return;
+	}
+	if (cmd === 'tailwind-canonical') {
+		if (!qualityCheckEnabled(cfg, 'tailwind-canonical') || !cfg.tailwindCanonical) return;
+		return runTailwindCanonicalCheck(cfg, fix('tailwindCanonical'));
 	}
 	if (cmd === 'security' || cmd === 'repeated-classes' || cmd === 'regex-dedup' || cmd === 'ui-patterns') {
 		if (cmd === 'repeated-classes' && fix('repeatedClasses')) {
@@ -2329,9 +2373,9 @@ function dispatchQualityCli(cfg: QualityCfg, args: string[]): void {
  * @param file Optional path to the quality configuration file.
  * @param args CLI arguments passed to the dispatcher.
  *
- * @return Nothing; command failures are reflected in the process exit code.
+ * @return A completion promise for asynchronous checks, or nothing for synchronous commands.
  */
-export function runQualityFromCfg(file?: string, args = process.argv.slice(2)): void {
+export function runQualityFromCfg(file?: string, args = process.argv.slice(2)): void | Promise<void> {
 	validCliArgs(args);
 	if (args.some((arg) => ['--version', '-v', '--help', '-h'].includes(arg))) {
 		runQualityCli({} as QualityCfg, args);
@@ -2355,7 +2399,7 @@ export function runQualityFromCfg(file?: string, args = process.argv.slice(2)): 
 			.find((config) => existsSync(config));
 		if (!flatCfg) throw new Error(`ESLint flat config is required for ${cmd}. Add eslint.config.js, eslint.config.mjs, or eslint.config.ts at ${cfg.root} before running Terra Quality.`);
 	}
-	runQualityCli(cfg, args);
+	return runQualityCli(cfg, args);
 }
 
 /**
@@ -2494,4 +2538,8 @@ export function runTypecheck(cfg: QualityCfg, args: string[] = []): void {
 	if (result.status) process.exitCode = result.status ?? 1;
 	console.error(`  ${result.status ? '✗ failed' : '✓ passed'}`);
 }
-if (process.argv[1] && realpathSync(resolve(process.argv[1])) === realpathSync(fileURLToPath(import.meta.url))) runQualityFromCfg();
+if (process.argv[1] && realpathSync(resolve(process.argv[1])) === realpathSync(fileURLToPath(import.meta.url)))
+	Promise.resolve(runQualityFromCfg()).catch((error: unknown) => {
+		console.error(error instanceof Error ? error.message : error);
+		process.exitCode = 1;
+	});

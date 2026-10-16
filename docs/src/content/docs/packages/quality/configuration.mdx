@@ -176,9 +176,9 @@ These checks require the corresponding policy object. See [check behavior](/pack
 | `repeatedClasses`   | `minimumCount`, `extensions`, `ignoredDirectories`                          | Find repeated static class strings in selected source files.                                                                                                         |
 | `regexDedup`        | `minimumCount`, `extensions`, `ignoredFiles`, `sharedModule`                | Find duplicate regex sources; an optional repository-relative `.mjs` module with a matching `.d.mts` declaration supports shared extraction.                         |
 | `uiPatterns`        | `forbidden`, `extensions`, `ignoredFiles`                                   | Report configured UI source patterns for review.                                                                                                                     |
-| `tailwindCanonical` | required `stylesheet`, optional `sourceRoots`                               | Configure the programmatic Tailwind v4 canonicalization helper.                                                                                                      |
+| `tailwindCanonical` | required `stylesheet`, optional `sourceRoots`                               | Configure the Tailwind v4 canonical-class check and autofix.                                                                                                         |
 
-The Tailwind helper is exported as `runTailwindCanonical(cfg, fix?)`; it is not a `terra-quality` CLI command or a stage of the standard quality run. It uses Tailwind CSS v4's unstable design-system API, so pin the consumer's Tailwind version and review the helper when upgrading it. See [Tailwind canonical classes](/packages/quality/#tailwind-canonical-classes) for invocation details.
+Configured repositories run `tailwind-canonical` during the normal quality command. Set `enabledChecks["tailwind-canonical"]` to `false` to disable it, or `autofix.tailwindCanonical` to `false` to retain diagnostics without writes. The standalone command is `terra-quality tailwind-canonical`; add `--warn` for a read-only check. The API remains exported as `runTailwindCanonical(cfg, fix?)`. See [Tailwind canonical classes](/packages/quality/#tailwind-canonical-classes) for examples and Tailwind v4 compatibility details.
 
 Example:
 

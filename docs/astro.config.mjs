@@ -1,4 +1,6 @@
 import { defineConfig } from 'astro/config';
+import tailwindcss from '@tailwindcss/vite';
+import react from '@astrojs/react';
 import starlight from '@astrojs/starlight';
 
 export default defineConfig({
@@ -29,10 +31,15 @@ export default defineConfig({
 		'/quality/checks/type': '/packages/quality/#type',
 		'/quality/checks/ui-patterns': '/packages/quality/#ui-patterns',
 	},
+	vite: {
+		plugins: [tailwindcss()],
+	},
 	integrations: [
+		react(),
 		starlight({
 			title: 'Standards',
 			description: 'Documentation for shared Terra Symposium packages, repository quality tooling, and package development.',
+			customCss: ['./src/tailwind.css'],
 			sidebar: [
 				{
 					label: 'Packages',
@@ -60,6 +67,7 @@ export default defineConfig({
 					],
 				},
 				{ label: 'Getting Started', link: '/packages/quality/setup/' },
+				{ label: 'Skills', link: '/skills/' },
 				{ label: 'Contributing', link: '/contributing/' },
 			],
 			tableOfContents: { minHeadingLevel: 2, maxHeadingLevel: 3 },
