@@ -85,6 +85,25 @@ Record blockers and incomplete acceptance checks separately.
 Use final commit IDs and keep issue, PR, and deck status consistent.
 Link the polished deck in the report.
 
+## Open interactive review
+
+Make browser review part of the default handoff.
+Use the final source revision or its verified deployment.
+Open a visible in-app browser tab for each changed interface.
+Include distinct consumers and meaningful interaction states.
+For non-visual commits, open source or evidence instead.
+
+Use real components with safe, isolated data where needed.
+Label fixtures and external behavior they cannot verify.
+Keep fixture state usable after refresh.
+Never publish real posts or make payments while preparing review.
+
+Check that every tab loads and exposes working controls.
+Provide a short checklist and URL for each tab.
+Keep local review servers running for the user.
+Record the revision, runtime limits, and cleanup instructions.
+Deliver the polished deck alongside the interactive tabs.
+
 ## Merge and closure gate
 
 Do not call a branch merge-ready while required checks are blocked.
