@@ -1,5 +1,15 @@
 # @terra-symposium/standards-quality
 
+## 0.8.0
+
+### Minor Changes
+
+- Fail quality by default when dead-code findings require manual review, with an opt-in warning policy and clear one-by-one remediation guidance.
+
+### Patch Changes
+
+- Preserve transitive alias chains when identifying removable declarations.
+
 ## 0.7.0
 
 ### Minor Changes

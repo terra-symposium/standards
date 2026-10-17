@@ -250,6 +250,54 @@ void read;
 	assert.match(fixtureText(root, 'src/main.ts'), /const alias = base;/);
 	assert.match(fixtureText(root, 'src/main.ts'), /return alias\.source \+ base\.source;/);
 });
+test('alias analysis preserves transitive value chains and still removes independent aliases', () => {
+	const root = fixtureRoot('terra-quality-alias-chain-');
+	fixtureFile(
+		root,
+		'src/main.ts',
+		`const base = 7;
+const first = base;
+const second = first;
+const third = second;
+const independentBase = 11;
+const independent = independentBase;
+export const result = [third, independent];
+`,
+	);
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
+	assert.deepEqual(
+		aliasFindings(cfg).map((finding) => [finding.name, finding.replacement]),
+		[['independent', 'independentBase']],
+	);
+	aliasFindings(cfg, true);
+	assert.match(fixtureText(root, 'src/main.ts'), /const first = base;\nconst second = first;\nconst third = second;/);
+	assert.doesNotMatch(fixtureText(root, 'src/main.ts'), /const independent =/);
+	assert.deepEqual(aliasFindings(cfg), []);
+});
+test('alias analysis preserves chains whose target is shadowed, including type aliases', () => {
+	const root = fixtureRoot('terra-quality-alias-shadow-chain-');
+	fixtureFile(
+		root,
+		'src/main.ts',
+		`const base = 7;
+const first = base;
+const second = first;
+function read(base: number, first: number) { return { second }; }
+type Base = { value: number };
+type First = Base;
+type Second = First;
+type IsolatedBase = { value: number };
+type Isolated = IsolatedBase;
+function readIsolated<IsolatedBase>(value: Isolated): number { return value.value; }
+export const result = [read(2, 3).second, readIsolated<string>({ value: 7 })];
+`,
+	);
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
+	assert.deepEqual(aliasFindings(cfg), []);
+	assert.deepEqual(aliasFindings(cfg, true), []);
+	assert.match(fixtureText(root, 'src/main.ts'), /const first = base;\nconst second = first;/);
+	assert.match(fixtureText(root, 'src/main.ts'), /type First = Base;\ntype Second = First;/);
+});
 test('naming findings use shared analysis, report severity by replacement kind, and preserve protected declarations', () => {
 	const root = fixtureRoot('terra-quality-naming-');
 	fixtureFile(root, 'src/main.ts', 'const category = true;\nconst activeValue = false;\nconst request = true;\nvoid [category, activeValue, request];\n');
