@@ -1,5 +1,5 @@
 /**
- * packages/quality/test/inline-if.test.mjs
+ * packages/quality/test/transforms/inline-if.test.mjs
  * Verifies safe single-statement conditional inlining and idempotence.
  */
 
@@ -10,8 +10,8 @@ IMPORTS
 // API
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { collapseInlineIfs } from '../dist/index.js';
-import { fixtureFile, fixtureRoot, fixtureText } from './support.mjs';
+import { collapseInlineIfs } from '../../dist/index.js';
+import { fixtureFile, fixtureRoot, fixtureText } from '../../support/fixtures.mjs';
 import { runInNewContext } from 'node:vm';
 
 /*//////////////////////////////////////////////////

@@ -261,12 +261,15 @@ function classify(candidate: Candidate): [SingleUseFinding['decision'], string] 
 	}
 	return ['INLINE', `${candidate.kind} declaration has one in-scope consumer`];
 }
-/** Builds the review action for an eligible or advisory single-use candidate.
+/**
+ * Builds the review action for an eligible or advisory single-use candidate.
+ *
  * @param candidate Declaration whose only consumer is being considered.
  * @param use The source reference that consumes the declaration.
  * @param canInline Whether the canonical rewrite can safely apply automatically.
  * @param reason Finding reason used to select a boundary-specific action.
- * @returns A concise next step for reviewing or applying the finding.
+ *
+ * @return A concise next step for reviewing or applying the finding.
  */
 function singleUseAgentAction(candidate: Candidate, use: Reference, canInline: boolean, reason: string): string {
 	if (canInline) return 'Run the canonical dead-code autofix, then verify the inlined type/value remains equivalent and rerun the affected test or typecheck.';
@@ -642,17 +645,18 @@ function isExportSpecifierReference(reference: Reference): boolean {
 }
 
 /**
- * Reports declarations that have exactly one in-scope consumer.
+ * Classifies single-use declarations using an existing TypeScript analysis.
  *
  * @param cfg Quality configuration defining the source scope.
+ * @param checker TypeScript checker belonging to the program.
+ * @param candidates Declarations eligible for single-use classification.
+ * @param references Resolved references for each declaration symbol.
+ * @param astroConsumers Framework references discovered from Astro files.
+ * @param program TypeScript program used for declaration and reference analysis.
  *
  * @return Single-use recommendations with their locations and safety decisions.
  */
-export function singleUseFindings(cfg: QualityCfg): SingleUseFinding[] {
-	const program = programFor(cfg);
-	const checker = program.getTypeChecker();
-	const { candidates, references } = collect(cfg, program, checker);
-	const astroConsumers = astroConsumersFor(cfg, program);
+function findingsFromAnalysis(cfg: QualityCfg, checker: ts.TypeChecker, candidates: Candidate[], references: Map<ts.Symbol, Reference[]>, astroConsumers: Set<string>): SingleUseFinding[] {
 	const findings: SingleUseFinding[] = [];
 	reportProgress('Single-use classification:', 0, candidates.length);
 	for (const [candidateIdx, c] of candidates.entries()) {
@@ -691,6 +695,20 @@ export function singleUseFindings(cfg: QualityCfg): SingleUseFinding[] {
 		});
 	}
 	return findings;
+}
+
+/**
+ * Reports declarations that have exactly one in-scope consumer.
+ *
+ * @param cfg Quality configuration defining the source scope.
+ *
+ * @return Single-use recommendations with their locations and safety decisions.
+ */
+export function singleUseFindings(cfg: QualityCfg): SingleUseFinding[] {
+	const program = programFor(cfg);
+	const checker = program.getTypeChecker();
+	const { candidates, references } = collect(cfg, program, checker);
+	return findingsFromAnalysis(cfg, checker, candidates, references, astroConsumersFor(cfg, program));
 }
 
 /**
@@ -881,9 +899,12 @@ function reactImportPos(src: ts.SourceFile): number {
 	if (imports.length) return imports[imports.length - 1]!.end;
 	return src.statements[0]?.getStart(src) ?? 0;
 }
-/** Collects meaningful leading comments that belong to a candidate declaration.
+/**
+ * Collects meaningful leading comments that belong to a candidate declaration.
+ *
  * @param c Candidate whose leading source comments are being preserved.
- * @returns Comment ranges and text that can move safely with an inline rewrite.
+ *
+ * @return Comment ranges and text that can move safely with an inline rewrite.
  */
 function attachedComments(c: Candidate): { start: number; end: number; text: string }[] {
 	const start = c.statement.getFullStart();
@@ -897,9 +918,12 @@ function attachedComments(c: Candidate): { start: number; end: number; text: str
 		})
 		.map((r) => ({ start: r.pos, end: r.end, text: c.source.text.slice(r.pos, r.end) }));
 }
-/** Extracts comments between a variable declaration and its initializer.
+/**
+ * Extracts comments between a variable declaration and its initializer.
+ *
  * @param c Candidate variable declaration being rewritten.
- * @returns Comments that would otherwise be lost when the declaration is removed.
+ *
+ * @return Comments that would otherwise be lost when the declaration is removed.
  */
 function discardedDeclarationComments(c: Candidate): string[] {
 	if (!ts.isVariableStatement(c.statement)) return [];
@@ -999,10 +1023,11 @@ export function deadCodeEditsIntroduceTypeErrors(program: ts.Program, updates: M
  *
  * @param cfg Quality configuration defining the source scope and files to rewrite.
  * @param changedFiles Set updated with files that receive a validated rewrite.
+ * @param finalFindings Optional caller array populated from this final analysis when no rewrite remains.
  *
  * @return Number of files containing edits, including declaration and consumer files.
  */
-function fixSingleUsePass(cfg: QualityCfg, changedFiles: Set<string>): number {
+function fixSingleUsePass(cfg: QualityCfg, changedFiles: Set<string>, finalFindings?: SingleUseFinding[]): number {
 	const program = programFor(cfg);
 	const checker = program.getTypeChecker();
 	const { candidates, references: refs } = collect(cfg, program, checker);
@@ -1130,6 +1155,7 @@ function fixSingleUsePass(cfg: QualityCfg, changedFiles: Set<string>): number {
 		writeFileSync(file, text);
 		changedFiles.add(file);
 	}
+	if (!updates.length && finalFindings) finalFindings.splice(0, finalFindings.length, ...findingsFromAnalysis(cfg, checker, candidates, refs, astroConsumers));
 	return updates.length;
 }
 
@@ -1139,15 +1165,16 @@ function fixSingleUsePass(cfg: QualityCfg, changedFiles: Set<string>): number {
  * @param cfg Quality configuration defining the source scope and files to rewrite.
  * @param changedFileNames Optional caller-owned set updated with files changed by this run.
  * @param onPass Optional callback invoked after each pass with its index and changed-file count.
+ * @param finalFindings Optional array populated from the final pass's already-scanned declarations and references.
  *
  * @return Number of files changed across all passes.
  */
-export function fixSingleUseDeclarations(cfg: QualityCfg, changedFileNames?: Set<string>, onPass?: (pass: number, changedFiles: number) => void): number {
+export function fixSingleUseDeclarations(cfg: QualityCfg, changedFileNames?: Set<string>, onPass?: (pass: number, changedFiles: number) => void, finalFindings?: SingleUseFinding[]): number {
 	rejectedInlineCandidates.clear();
 	const changedFiles = new Set<string>();
 	for (let pass = 0; pass < 1000; pass++) {
 		onPass?.(pass + 1, changedFiles.size);
-		const changed = fixSingleUsePass(cfg, changedFiles);
+		const changed = fixSingleUsePass(cfg, changedFiles, finalFindings);
 		if (changed === 0) {
 			for (const file of changedFiles) changedFileNames?.add(file);
 			return changedFiles.size;

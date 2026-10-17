@@ -1,5 +1,5 @@
 /**
- * packages/quality/test/object-forwarding.test.mjs
+ * packages/quality/test/transforms/object-forwarding.test.mjs
  * Verifies forwarding thresholds, recommendations, ignored payload calls, and
  * reuse of the shared TypeScript analysis context.
  */
@@ -11,8 +11,8 @@ IMPORTS
 // API
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { createQualityAnalysis, createQualityCfg, fixObjectForwarding, objectForwardingFindings } from '../dist/index.js';
-import { fixtureFile, fixtureRoot, fixtureText } from './support.mjs';
+import { createQualityAnalysis, createQualityCfg, fixObjectForwarding, objectForwardingFindings } from '../../dist/index.js';
+import { fixtureFile, fixtureRoot, fixtureText } from '../../support/fixtures.mjs';
 
 /*//////////////////////////////////////////////////
 TESTS

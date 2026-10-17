@@ -1,5 +1,11 @@
 # @terra-symposium/standards-quality
 
+## 0.8.1
+
+### Patch Changes
+
+- Standardize full quality phases and test progress, group dead-code output, and remove duplicate test declarations.
+
 ## 0.8.0
 
 ### Minor Changes

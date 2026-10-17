@@ -46,6 +46,14 @@ pnpm exec terra-quality quality --all --warn
 
 The normal scope is changed and untracked files in a Git worktree. `--all` selects every file under `sourceRoots`; `--warn` disables autofixes and runs dead-code analysis once without a temporary fix preview. It reports rule-level fix candidates; fix mode then type-checks proposed dead-code edits before writing and may reject a candidate. Configured quality commands still run unless you pass `--skip-commands`.
 
+## Output order and tests
+
+The runner controls a fixed phase order: **Format → Static quality → Tests → Framework / type checks → Build → Repository health**. `quality.json` selects enabled checks and commands; it does not define phase order or test categories. Commands in ordinary phases keep their configured order; tests keep their configured order within each category.
+
+Selected test commands are grouped as **Unit / Contract**, **Integration**, **Browser / Cloud**, or **Other tests**. Each suite has a 24-cell progress bar. Node and Playwright suites also report individual case progress; other runners receive suite-level progress only. The runner suppresses native child test output when its custom case reporter owns the output, preventing duplicate case listings.
+
+Dead-code is reported as one group. Fix mode shows **Safe fixes** (Knip import consumers, ESLint unused declarations, single-use declaration/reference scans, classification, then only proven edits) followed by **Verification** (Knip reachability, final ESLint and single-use results, and TypeScript safety for candidate edits). Manual findings appear in stable path/line/rule/name order and fail by default; set `"manualWarnings": "warning"` to make them non-blocking. All configured checks finish before the run returns failure.
+
 ## What it does
 
 Terra Quality combines source checks such as documentation, import resolution, naming, forwarding, security, and configured UI-pattern checks with repository-owned tools and commands. Safe transformations can maintain layout, apply tool fixes, and rewrite supported syntax. Findings that require domain or runtime judgment remain for review.

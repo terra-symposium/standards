@@ -1,5 +1,5 @@
 /**
- * packages/quality/test/documentation.test.mjs
+ * packages/quality/test/checks/documentation.test.mjs
  * Exercises documentation policy reporting, human-authored description audits,
  * source maintenance, scaffold insertion, and Prettier import protection.
  * The fixtures distinguish structural automation from prose authorship: the
@@ -13,8 +13,8 @@ IMPORTS
 // API
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { createQualityCfg, documentSrcFile, documentationFindings, duplicateImportFindings, maintainSrcFile, protectLongImports, removeNonCodeComments } from '../dist/index.js';
-import { fixtureFile, fixtureRoot, fixtureText } from './support.mjs';
+import { createQualityCfg, documentSrcFile, documentationFindings, duplicateImportFindings, maintainSrcFile, protectLongImports, removeNonCodeComments } from '../../dist/index.js';
+import { fixtureFile, fixtureRoot, fixtureText } from '../../support/fixtures.mjs';
 
 /*//////////////////////////////////////////////////
 TESTS

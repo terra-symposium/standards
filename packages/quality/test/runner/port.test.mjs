@@ -1,5 +1,5 @@
 /**
- * packages/quality/test/port.test.mjs
+ * packages/quality/test/runner/port.test.mjs
  * Verifies that port acquisition releases existing listeners safely.
  */
 
@@ -10,7 +10,7 @@ IMPORTS
 // API
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { acquirePort, portOwners } from '../dist/port.js';
+import { acquirePort, portOwners } from '../../dist/port.js';
 import { spawn } from 'node:child_process';
 
 /*//////////////////////////////////////////////////

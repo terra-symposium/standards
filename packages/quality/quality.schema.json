@@ -1,132 +1,172 @@
 {
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "Terra quality configuration",
-  "type": "object",
-  "additionalProperties": false,
-  "required": ["sourceRoots", "extensions"],
-  "properties": {
-    "$schema": { "type": "string" },
-    "root": { "type": "string" },
-    "sourceRoots": { "type": "array", "items": { "type": "string" } },
-    "includeRoots": { "type": "array", "items": { "type": "string" } },
-    "extensions": { "type": "array", "items": { "type": "string", "pattern": "^\\." } },
-    "aliases": { "type": "object", "additionalProperties": { "type": "string" } },
-    "frameworkEntryExports": { "type": "object", "additionalProperties": { "type": "array", "items": { "type": "string" } } },
-    "externalPrefixes": { "type": "array", "items": { "type": "string" } },
-    "skippedDirectories": { "type": "array", "items": { "type": "string" } },
-    "skippedFiles": { "type": "array", "items": { "type": "string" } },
-    "excludeTests": { "type": "boolean", "description": "Exclude files ending in .test.* and .spec.* from configured quality source scans." },
-    "singleUse": {
-      "type": "object",
-      "properties": { "skippedDirectories": { "type": "array", "items": { "type": "string" } } },
-      "additionalProperties": false
-    },
-    "renameExports": { "type": "boolean" },
-    "protectedIdentifiers": { "type": "array", "items": { "type": "string" } },
-    "enabledChecks": { "$ref": "#/$defs/toggles" },
-    "autofix": { "$ref": "#/$defs/toggles" },
-    "documentation": {
-      "type": "object",
-      "properties": {
-        "required": {
-          "type": "object",
-          "properties": {
-            "types": { "type": "boolean" },
-            "functions": { "type": "boolean", "description": "Require TSDoc for named functions, including substantive descriptions for every parameter." },
-            "exportedFunctions": { "type": "boolean", "description": "Require TSDoc for exported named functions, including substantive descriptions for every parameter." },
-            "noInlineFunctions": { "type": "boolean" }
-          },
-          "additionalProperties": false
-        }
-      },
-      "additionalProperties": false
-    },
-    "tailwindCanonical": {
-      "type": "object",
-      "required": ["stylesheet"],
-      "properties": {
-        "stylesheet": { "type": "string" },
-        "sourceRoots": { "type": "array", "items": { "type": "string" } }
-      },
-      "additionalProperties": false
-    },
-    "security": {
-      "type": "object",
-      "properties": {
-        "forbiddenTerms": { "type": "array", "items": { "type": "string" } },
-        "forbiddenImports": { "type": "array", "items": { "type": "string" } },
-        "clientRoots": { "type": "array", "items": { "type": "string" } },
-        "allowProcessEnvRoots": { "type": "array", "items": { "type": "string" } }
-      },
-      "additionalProperties": false
-    },
-    "repeatedClasses": { "type": "object", "properties": { "minimumCount": { "type": "number" }, "extensions": { "type": "array", "items": { "type": "string" } }, "ignoredDirectories": { "type": "array", "items": { "type": "string" } } }, "additionalProperties": false },
-    "regexDedup": { "type": "object", "properties": { "minimumCount": { "type": "number" }, "extensions": { "type": "array", "items": { "type": "string" } }, "ignoredFiles": { "type": "array", "items": { "type": "string" } }, "sharedModule": { "type": "string", "minLength": 1 } }, "additionalProperties": false },
-    "uiPatterns": { "type": "object", "properties": { "forbidden": { "type": "array", "items": { "type": "string" } }, "ignoredFiles": { "type": "array", "items": { "type": "string" } }, "extensions": { "type": "array", "items": { "type": "string" } } }, "additionalProperties": false },
-    "github": {
-      "type": "object",
-      "properties": {
-        "repositories": { "type": "array", "uniqueItems": true, "items": { "type": "string", "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$" } },
-        "requiredFeatures": { "type": "array", "uniqueItems": true, "items": { "enum": ["dependencyGraph", "dependabotAlerts", "malwareAlerts", "securityUpdates", "versionUpdates", "groupedUpdates", "secretScanning", "pushProtection", "codeScanning"] } },
-        "featureExemptions": { "type": "object", "propertyNames": { "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$" }, "additionalProperties": { "type": "array", "uniqueItems": true, "items": { "enum": ["dependencyGraph", "dependabotAlerts", "malwareAlerts", "securityUpdates", "versionUpdates", "groupedUpdates", "secretScanning", "pushProtection", "codeScanning"] } } }
-      },
-      "additionalProperties": false
-    },
-    "enabledCommands": { "type": "object", "additionalProperties": { "type": "boolean" } },
-    "enabledRecommendations": { "type": "object", "additionalProperties": { "type": "boolean" } },
-    "qualityCommands": { "$ref": "#/$defs/commands" },
-    "recommendationCommands": { "$ref": "#/$defs/commands" },
-    "manualWarnings": { "enum": ["error", "warning"], "default": "error", "description": "Whether dead-code findings that require manual review block quality. Defaults to error." },
-    "tsconfig": { "type": "string" },
-    "oneLineImports": { "type": "boolean" },
-    "prettierPrintWidth": { "type": "number" },
-    "lintRoots": { "type": "array", "items": { "type": "string" } },
-    "typecheckRoots": { "type": "array", "items": { "type": "string" } },
-    "typecheckExtensions": { "type": "array", "items": { "type": "string" } },
-    "typecheckCommand": {
-      "type": "object",
-      "required": ["command"],
-      "properties": {
-        "command": { "type": "string" },
-        "args": { "type": "array", "items": { "type": "string" } }
-      },
-      "additionalProperties": false
-    },
-    "loadTesting": {
-      "type": "object",
-      "properties": {
-        "enabled": { "type": "boolean" },
-        "defaultBudget": { "$ref": "#/$defs/loadBudget" },
-        "testBudgets": { "type": "object", "additionalProperties": { "$ref": "#/$defs/loadBudget" } },
-        "operationBudgets": { "type": "object", "additionalProperties": { "$ref": "#/$defs/loadBudget" } }
-      },
-      "additionalProperties": false
-    },
-    "tools": { "type": "object", "additionalProperties": { "type": "string" } }
-  },
-  "$defs": {
-    "toggles": { "type": "object", "additionalProperties": { "type": "boolean" } },
-    "loadBudget": {
-      "type": "object",
-      "properties": {
-        "warnMs": { "type": "number", "minimum": 0 },
-        "failMs": { "type": "number", "minimum": 0 }
-      },
-      "additionalProperties": false,
-      "anyOf": [{ "required": ["warnMs"] }, { "required": ["failMs"] }]
-    },
-    "commands": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "required": ["name", "command"],
-        "properties": {
-          "name": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
-          "command": { "type": "string" },
-          "args": { "type": "array", "items": { "type": "string" } }
-        },
-        "additionalProperties": false
-      }
-    }
-  }
+	"$schema": "https://json-schema.org/draft/2020-12/schema",
+	"title": "Terra quality configuration",
+	"type": "object",
+	"additionalProperties": false,
+	"required": ["sourceRoots", "extensions"],
+	"properties": {
+		"$schema": { "type": "string" },
+		"root": { "type": "string" },
+		"sourceRoots": { "type": "array", "items": { "type": "string" } },
+		"includeRoots": { "type": "array", "items": { "type": "string" } },
+		"extensions": { "type": "array", "items": { "type": "string", "pattern": "^\\." } },
+		"aliases": { "type": "object", "additionalProperties": { "type": "string" } },
+		"frameworkEntryExports": { "type": "object", "additionalProperties": { "type": "array", "items": { "type": "string" } } },
+		"externalPrefixes": { "type": "array", "items": { "type": "string" } },
+		"skippedDirectories": { "type": "array", "items": { "type": "string" } },
+		"skippedFiles": { "type": "array", "items": { "type": "string" } },
+		"excludeTests": { "type": "boolean", "description": "Exclude files ending in .test.* and .spec.* from configured quality source scans." },
+		"singleUse": {
+			"type": "object",
+			"properties": { "skippedDirectories": { "type": "array", "items": { "type": "string" } } },
+			"additionalProperties": false
+		},
+		"renameExports": { "type": "boolean" },
+		"protectedIdentifiers": { "type": "array", "items": { "type": "string" } },
+		"enabledChecks": { "$ref": "#/$defs/toggles" },
+		"autofix": { "$ref": "#/$defs/toggles" },
+		"documentation": {
+			"type": "object",
+			"properties": {
+				"required": {
+					"type": "object",
+					"properties": {
+						"types": { "type": "boolean" },
+						"functions": { "type": "boolean", "description": "Require TSDoc for named functions, including substantive descriptions for every parameter." },
+						"exportedFunctions": { "type": "boolean", "description": "Require TSDoc for exported named functions, including substantive descriptions for every parameter." },
+						"noInlineFunctions": { "type": "boolean" }
+					},
+					"additionalProperties": false
+				}
+			},
+			"additionalProperties": false
+		},
+		"tailwindCanonical": {
+			"type": "object",
+			"required": ["stylesheet"],
+			"properties": {
+				"stylesheet": { "type": "string" },
+				"sourceRoots": { "type": "array", "items": { "type": "string" } }
+			},
+			"additionalProperties": false
+		},
+		"security": {
+			"type": "object",
+			"properties": {
+				"forbiddenTerms": { "type": "array", "items": { "type": "string" } },
+				"forbiddenImports": { "type": "array", "items": { "type": "string" } },
+				"clientRoots": { "type": "array", "items": { "type": "string" } },
+				"allowProcessEnvRoots": { "type": "array", "items": { "type": "string" } }
+			},
+			"additionalProperties": false
+		},
+		"repeatedClasses": {
+			"type": "object",
+			"properties": {
+				"minimumCount": { "type": "number" },
+				"extensions": { "type": "array", "items": { "type": "string" } },
+				"ignoredDirectories": { "type": "array", "items": { "type": "string" } }
+			},
+			"additionalProperties": false
+		},
+		"regexDedup": {
+			"type": "object",
+			"properties": {
+				"minimumCount": { "type": "number" },
+				"extensions": { "type": "array", "items": { "type": "string" } },
+				"ignoredFiles": { "type": "array", "items": { "type": "string" } },
+				"sharedModule": { "type": "string", "minLength": 1 }
+			},
+			"additionalProperties": false
+		},
+		"uiPatterns": {
+			"type": "object",
+			"properties": {
+				"forbidden": { "type": "array", "items": { "type": "string" } },
+				"ignoredFiles": { "type": "array", "items": { "type": "string" } },
+				"extensions": { "type": "array", "items": { "type": "string" } }
+			},
+			"additionalProperties": false
+		},
+		"github": {
+			"type": "object",
+			"properties": {
+				"repositories": { "type": "array", "uniqueItems": true, "items": { "type": "string", "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$" } },
+				"requiredFeatures": {
+					"type": "array",
+					"uniqueItems": true,
+					"items": { "enum": ["dependencyGraph", "dependabotAlerts", "malwareAlerts", "securityUpdates", "versionUpdates", "groupedUpdates", "secretScanning", "pushProtection", "codeScanning"] }
+				},
+				"featureExemptions": {
+					"type": "object",
+					"propertyNames": { "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$" },
+					"additionalProperties": {
+						"type": "array",
+						"uniqueItems": true,
+						"items": { "enum": ["dependencyGraph", "dependabotAlerts", "malwareAlerts", "securityUpdates", "versionUpdates", "groupedUpdates", "secretScanning", "pushProtection", "codeScanning"] }
+					}
+				}
+			},
+			"additionalProperties": false
+		},
+		"enabledCommands": { "type": "object", "additionalProperties": { "type": "boolean" } },
+		"enabledRecommendations": { "type": "object", "additionalProperties": { "type": "boolean" } },
+		"qualityCommands": {
+			"$ref": "#/$defs/commands",
+			"description": "Commands selected for the quality run. Terra Quality owns phase order and test grouping; array order is preserved within ordinary phases and within each test group."
+		},
+		"recommendationCommands": { "$ref": "#/$defs/commands" },
+		"manualWarnings": { "enum": ["error", "warning"], "default": "error", "description": "Whether dead-code findings that require manual review block quality. Defaults to error." },
+		"tsconfig": { "type": "string" },
+		"oneLineImports": { "type": "boolean" },
+		"prettierPrintWidth": { "type": "number" },
+		"lintRoots": { "type": "array", "items": { "type": "string" } },
+		"typecheckRoots": { "type": "array", "items": { "type": "string" } },
+		"typecheckExtensions": { "type": "array", "items": { "type": "string" } },
+		"typecheckCommand": {
+			"type": "object",
+			"required": ["command"],
+			"properties": {
+				"command": { "type": "string" },
+				"args": { "type": "array", "items": { "type": "string" } }
+			},
+			"additionalProperties": false
+		},
+		"loadTesting": {
+			"type": "object",
+			"properties": {
+				"enabled": { "type": "boolean" },
+				"defaultBudget": { "$ref": "#/$defs/loadBudget" },
+				"testBudgets": { "type": "object", "additionalProperties": { "$ref": "#/$defs/loadBudget" } },
+				"operationBudgets": { "type": "object", "additionalProperties": { "$ref": "#/$defs/loadBudget" } }
+			},
+			"additionalProperties": false
+		},
+		"tools": { "type": "object", "additionalProperties": { "type": "string" } }
+	},
+	"$defs": {
+		"toggles": { "type": "object", "additionalProperties": { "type": "boolean" } },
+		"loadBudget": {
+			"type": "object",
+			"properties": {
+				"warnMs": { "type": "number", "minimum": 0 },
+				"failMs": { "type": "number", "minimum": 0 }
+			},
+			"additionalProperties": false,
+			"anyOf": [{ "required": ["warnMs"] }, { "required": ["failMs"] }]
+		},
+		"commands": {
+			"type": "array",
+			"items": {
+				"type": "object",
+				"required": ["name", "command"],
+				"properties": {
+					"name": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+					"command": { "type": "string" },
+					"args": { "type": "array", "items": { "type": "string" } }
+				},
+				"additionalProperties": false
+			}
+		}
+	}
 }

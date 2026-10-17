@@ -1,6 +1,6 @@
 {
 	"$schema": "https://unpkg.com/knip@6/schema.json",
-	"ignoreDependencies": ["pptxgenjs"],
+	"ignoreDependencies": ["pptxgenjs", "prettier"],
 	"ignoreFiles": ["packages/*/dist/**"],
 	"workspaces": {
 		"packages/error-boundaries": {
@@ -13,7 +13,17 @@
 			"project": ["src/**/*.ts", "test/**/*.mjs"]
 		},
 		"packages/quality": {
-			"entry": ["src/index.ts", "src/runner.ts", "src/naming.ts", "src/object-forwarding.ts", "src/single-use.ts", "src/port.ts", "src/history-report.ts", "test/*.test.mjs"],
+			"entry": [
+				"src/index.ts",
+				"src/runner.ts",
+				"src/workspace-test-runner.ts",
+				"src/naming.ts",
+				"src/object-forwarding.ts",
+				"src/single-use.ts",
+				"src/port.ts",
+				"src/history-report.ts",
+				"test/**/*.test.mjs"
+			],
 			"project": ["src/**/*.ts", "test/**/*.mjs"]
 		},
 		"apps/hygiene": {

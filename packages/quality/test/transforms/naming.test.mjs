@@ -1,5 +1,5 @@
 /**
- * packages/quality/test/naming.test.mjs
+ * packages/quality/test/transforms/naming.test.mjs
  * Verifies the public naming and alias-analysis APIs independently from the
  * CLI dispatcher, including tokenisation, scope safety, callback initials,
  * protected framework names, and alias replacement semantics.
@@ -14,11 +14,11 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import ts from 'typescript';
 // prettier-ignore
-import { aliasFindings, callbackAlias, createQualityAnalysis, createQualityCfg, declarationScope, hasPrefixReplacement, identifierTokens, isApprovedId, isCallbackDeclaration, isProtectedFilename, isProtectedPath, isRenamableDeclaration, namingFindings, renameDeclaration, renameId } from '../dist/index.js';
-import { fixtureFile, fixtureRoot, fixtureText } from './support.mjs';
+import { aliasFindings, callbackAlias, createQualityAnalysis, createQualityCfg, declarationScope, hasPrefixReplacement, identifierTokens, isApprovedId, isCallbackDeclaration, isProtectedFilename, isProtectedPath, isRenamableDeclaration, namingFindings, renameDeclaration, renameId } from '../../dist/index.js';
+import { fixtureFile, fixtureRoot, fixtureText } from '../../support/fixtures.mjs';
 
 // DATA
-import { CALLBACK_ALIASES, IDENTIFIER_REPLACEMENTS, PREFIX_REPLACEMENTS, PROTECTED_IDENTIFIERS } from '../dist/index.js';
+import { CALLBACK_ALIASES, IDENTIFIER_REPLACEMENTS, PREFIX_REPLACEMENTS, PROTECTED_IDENTIFIERS } from '../../dist/index.js';
 
 /*//////////////////////////////////////////////////
 HELPERS

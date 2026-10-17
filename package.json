@@ -6,7 +6,8 @@
 	"type": "module",
 	"scripts": {
 		"build": "pnpm -r build",
-		"test": "pnpm -r test",
+		"pretest": "pnpm --filter './packages/**' -r build",
+		"test": "node packages/quality/dist/workspace-test-runner.js",
 		"prepare": "husky",
 		"prequality": "pnpm --filter @terra-symposium/standards-quality build",
 		"quality": "node packages/quality/dist/runner.js quality --skip-commands --skip-recommendations",

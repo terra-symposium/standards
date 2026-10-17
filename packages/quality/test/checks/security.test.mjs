@@ -1,5 +1,5 @@
 /**
- * packages/quality/test/security.test.mjs
+ * packages/quality/test/checks/security.test.mjs
  * Verifies environment visibility, forbidden source patterns, client secret
  * boundaries, dotenv loading, and runtime process-environment exceptions.
  */
@@ -11,9 +11,9 @@ IMPORTS
 // API
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { createQualityCfg, securityFindings } from '../dist/index.js';
+import { createQualityCfg, securityFindings } from '../../dist/index.js';
 import { execFileSync } from 'node:child_process';
-import { fixtureFile, fixtureRoot } from './support.mjs';
+import { fixtureFile, fixtureRoot } from '../../support/fixtures.mjs';
 
 /*//////////////////////////////////////////////////
 TESTS

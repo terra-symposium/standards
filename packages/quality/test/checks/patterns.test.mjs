@@ -1,5 +1,5 @@
 /**
- * packages/quality/test/patterns.test.mjs
+ * packages/quality/test/checks/patterns.test.mjs
  * Verifies repeated classes, UI-pattern diagnostics, regex deduplication, and
  * Tailwind canonicalisation, including configured skips and safe autofixes.
  */
@@ -12,8 +12,8 @@ IMPORTS
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import ts from 'typescript';
-import { createQualityCfg, fixRegexDedup, fixRepeatedClasses, regexFindings, repeatedClassFindings, runTailwindCanonical, uiPatternFindings } from '../dist/index.js';
-import { fixtureFile, fixtureRoot, fixtureText } from './support.mjs';
+import { createQualityCfg, fixRegexDedup, fixRepeatedClasses, regexFindings, repeatedClassFindings, runTailwindCanonical, uiPatternFindings } from '../../dist/index.js';
+import { fixtureFile, fixtureRoot, fixtureText } from '../../support/fixtures.mjs';
 import { pathToFileURL } from 'node:url';
 import { resolve } from 'node:path';
 

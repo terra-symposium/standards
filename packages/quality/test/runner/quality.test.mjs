@@ -1,5 +1,5 @@
 /**
- * packages/quality/test/quality.test.mjs
+ * packages/quality/test/runner/quality.test.mjs
  * Exercises consolidated quality checks, fixers, and CLI behavior.
  */
 
@@ -11,19 +11,20 @@ IMPORTS
 import assert from 'node:assert/strict';
 import test from 'node:test';
 // prettier-ignore
-import { aliasFindings, checkImports, collapseInlineIfs, collapseTypesAndObjects, createQualityAnalysis, createQualityCfg, documentationFindings, maintainSrcFile, namingFindings, objectForwardingFindings, protectLongImports, regexFindings, renameId, runQualityCli, runTailwindCanonical, srcFiles } from '../dist/index.js';
+import { QualityPlaywrightReporter, aliasFindings, checkImports, collapseInlineIfs, collapseTypesAndObjects, createQualityAnalysis, createQualityCfg, documentationFindings, maintainSrcFile, namingFindings, objectForwardingFindings, protectLongImports, qualityNodeReporter, regexFindings, renameId, runQualityCli, runTailwindCanonical, srcFiles } from '../../dist/index.js';
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
 // DATA
-import { DOCUMENTATION_DESCRIPTION_NOTICE } from '../dist/index.js';
+import { DOCUMENTATION_DESCRIPTION_NOTICE } from '../../dist/index.js';
 test('consolidated quality modules expose their behavior from the public package entrypoint', () => {
-	for (const check of [aliasFindings, createQualityAnalysis, documentationFindings, regexFindings, runTailwindCanonical]) assert.equal(typeof check, 'function');
+	for (const check of [aliasFindings, createQualityAnalysis, documentationFindings, QualityPlaywrightReporter, qualityNodeReporter, regexFindings, runTailwindCanonical])
+		assert.equal(typeof check, 'function');
 });
 test('the published runtime dependency stays within the supported TypeScript API major', () => {
-	const manifest = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
+	const manifest = JSON.parse(readFileSync(new URL('../../package.json', import.meta.url), 'utf8'));
 	assert.equal(manifest.dependencies.typescript, '^5.0.0');
 });
 test('documentation warnings identify missing summary and tag descriptions without generating prose', () => {
@@ -257,12 +258,12 @@ const long = {
 void [short, long];
 `,
 	);
-	const prettier = fileURLToPath(new URL('../../../node_modules/.bin/prettier', import.meta.url));
+	const prettier = fileURLToPath(new URL('../../../../node_modules/.bin/prettier', import.meta.url));
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], tools: { prettier } });
 	runQualityCli(cfg, ['format', '--all']);
 	const result = readFileSync(file, 'utf8');
-	assert.match(result, /const short = \{ alpha: true, beta: false \};/);
-	assert.match(result, /type Short = \{ alpha: boolean; beta: boolean \};/);
+	assert.match(result, /const short = \{ alpha: true, beta: false,? \};/);
+	assert.match(result, /type Short = \{ alpha: boolean; beta: boolean,? \};/);
 	assert.match(result, /const long = \{\n/);
 });
 test('maintenance adds headers and grouped sorted imports', () => {
@@ -605,7 +606,7 @@ test('format applies maintenance before Prettier and is idempotent', () => {
 	mkdirSync(join(root, 'src'));
 	const file = join(root, 'src', 'main.ts');
 	writeFileSync(file, "import { readFileSync } from 'node:fs';\n\nconst value={active:true};\n");
-	const prettier = fileURLToPath(new URL('../../../node_modules/.bin/prettier', import.meta.url));
+	const prettier = fileURLToPath(new URL('../../../../node_modules/.bin/prettier', import.meta.url));
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], tools: { prettier } });
 	runQualityCli(cfg, ['format', '--all']);
 	const first = readFileSync(file, 'utf8');

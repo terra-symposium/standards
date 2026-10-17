@@ -4,8 +4,8 @@ import { mkdtempSync, mkdirSync, rmSync, writeFileSync, readFileSync, renameSync
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
-import { createHistoryReport, isHistorySourcePath } from '../dist/history-report.js';
-import { runQualityFromCfg } from '../dist/runner.js';
+import { createHistoryReport, isHistorySourcePath } from '../../dist/history-report.js';
+import { runQualityFromCfg } from '../../dist/runner.js';
 
 /**
  * Run a Git fixture command with a stable author and committer date.

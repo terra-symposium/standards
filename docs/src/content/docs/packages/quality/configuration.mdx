@@ -141,7 +141,7 @@ Tool names are resolved from `<root>/node_modules/.bin` first, then from the env
 
 ## Repository commands
 
-`qualityCommands` contains required subprocesses, commonly build and test commands. Each entry requires a unique lowercase `name` and a `command`; `args` is an optional array of strings.
+`qualityCommands` contains required subprocesses, commonly build and test commands. Each entry requires a unique lowercase `name` and a `command`; `args` is an optional array of strings. Terra Quality assigns commands to its fixed full-run phases and test groups, then preserves configured order within each phase or group; configuration does not define ordering or category fields.
 
 ```json
 {
