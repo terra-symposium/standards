@@ -24,7 +24,7 @@ jobs:
         run: npm install --global npm@11.5.1
       - run: pnpm install --frozen-lockfile
       - run: pnpm quality:all
-      - uses: changesets/action@v1
+      - uses: changesets/action@v2
         with:
           publish: pnpm release
           branch: development
