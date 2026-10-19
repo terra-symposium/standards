@@ -1,5 +1,18 @@
 # @terra-symposium/standards-quality
 
+## 0.9.1
+
+### Patch Changes
+
+- Scan Astro templates and recommend canonical ButtonLink variants for styled text links.
+- Include inferred ButtonLink variants in recommendation output.
+
+## 0.9.0
+
+### Minor Changes
+
+- Add an advisory scan for native UI controls that have configured shared component equivalents.
+
 ## 0.8.1
 
 ### Patch Changes

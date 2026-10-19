@@ -451,6 +451,34 @@ For example, configure a repeated bespoke button class as a forbidden pattern:
 <PrimaryButton>Save</PrimaryButton>
 ```
 
+#### UI component recommendations
+
+Find native JSX controls that likely have a shared component equivalent. Run this report when reviewing a repository; it does not run in the normal test or quality workflow and never edits files:
+
+```sh
+pnpm exec terra-quality ui-recommendations --all
+```
+
+The default rules recommend `Button` for native buttons, `Input` for common text and file inputs, and `Button` for input-based submit/reset actions. They recommend `ButtonLink` for anchors with static button-like classes and styled text links, while leaving plain anchors alone. The scan parses `.astro`, `.jsx`, and `.tsx`, skips `components/ui` primitive implementations, and reports a source line, replacement name, import path, reason, and inferred link variant when available. Treat every result as a review suggestion because native controls can be intentional.
+
+The default names and imports follow the common shadcn layout. Configure `uiRecommendations.rules` to match a repository's designated components, input types, and exceptions:
+
+```json
+{
+	"uiRecommendations": {
+		"rules": [
+			{ "element": "button", "component": "Button", "import": "@/components/ui/button" },
+			{ "element": "input", "component": "Input", "import": "@/components/ui/input", "types": ["text", "search", "email"] },
+			{ "element": "a", "component": "ButtonLink", "import": "@/components/ui/button", "when": "button-like" },
+			{ "element": "a", "component": "ButtonLink", "import": "@/components/ui/button", "when": "text-link" }
+		],
+		"ignoredDirectories": ["src/components/ui"]
+	}
+}
+```
+
+Configured rules replace the defaults. Omit `types` to match every instance of an element, or set it to limit input rules to specific `type` values. `when: "button-like"` limits anchor recommendations to static classes with button-like padding, shape, and action styling. `when: "text-link"` matches static anchor classes with a recognized text color and underline treatment, then infers a corresponding color-and-link treatment variant such as `primary-link` or `primary-underline`. A rule's explicit `variant` takes precedence over inference.
+
 #### Tailwind canonical classes
 
 The `tailwind-canonical` check asks the consuming repository's Tailwind CSS v4 design system for canonical class names, matching the editor's canonical-class suggestions. Configure a stylesheet and, optionally, source roots:
