@@ -22,7 +22,7 @@
 		"release": "changeset publish"
 	},
 	"devDependencies": {
-		"@changesets/cli": "^2.29.7",
+		"@changesets/cli": "^3.0.3",
 		"@eslint/js": "^10.0.1",
 		"@types/node": "^22.14.1",
 		"eslint": "^10.9.1",
