@@ -26,13 +26,13 @@
 		"@changesets/cli": "^2.29.7",
 		"@eslint/js": "^10.0.1",
 		"@types/node": "^22.14.1",
-		"eslint": "^10.9.1",
-		"globals": "^17.12.0",
+		"eslint": "^10.13.0",
+		"globals": "^17.13.0",
 		"husky": "^9.1.7",
-		"knip": "^6.34.0",
-		"prettier": "^3.9.6",
+		"knip": "^6.41.0",
+		"prettier": "^3.9.10",
 		"typescript": "^5.9.3",
-		"typescript-eslint": "^8.69.0"
+		"typescript-eslint": "^8.71.2"
 	},
 	"pnpm": {
 		"overrides": {
