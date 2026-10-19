@@ -88,6 +88,32 @@
 			},
 			"additionalProperties": false
 		},
+		"uiRecommendations": {
+			"type": "object",
+			"properties": {
+				"rules": {
+					"type": "array",
+					"items": {
+						"type": "object",
+						"required": ["element", "component", "import"],
+						"properties": {
+							"element": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+							"component": { "type": "string", "minLength": 1 },
+							"import": { "type": "string", "minLength": 1 },
+							"variant": { "type": "string", "minLength": 1 },
+							"types": { "type": "array", "items": { "type": "string" } },
+							"when": { "enum": ["always", "button-like", "text-link"] },
+							"reason": { "type": "string" }
+						},
+						"additionalProperties": false
+					}
+				},
+				"extensions": { "type": "array", "items": { "enum": [".astro", ".jsx", ".tsx"] } },
+				"ignoredFiles": { "type": "array", "items": { "type": "string" } },
+				"ignoredDirectories": { "type": "array", "items": { "type": "string" } }
+			},
+			"additionalProperties": false
+		},
 		"github": {
 			"type": "object",
 			"properties": {

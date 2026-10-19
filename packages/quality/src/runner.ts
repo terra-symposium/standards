@@ -26,6 +26,7 @@ import { fixRegexDedup, fixRepeatedClasses, regexFindings, repeatedClassFindings
 import { qualityProgress } from './progress.js';
 import { qualityNodeReporterOptions } from './node-reporter.js';
 import { securityFindings } from './security.js';
+import { uiComponentRecommendations } from './ui-recommendations.js';
 import { spawnSync } from 'node:child_process';
 import { srcFiles, workingSrcFiles } from './files.js';
 import { writeHistoryReport } from './history-report.js';
@@ -37,6 +38,7 @@ import { PROTECTED_IDENTIFIERS } from './naming.js';
 // TYPES
 import type { DocumentationRequirements } from './documentation.js';
 import type { GitHubFeature, GitHubReport } from './github-report.js';
+import type { UiRecommendationSettings } from './ui-recommendations.js';
 import type { Dirent } from 'node:fs';
 
 /*//////////////////////////////////////////////////
@@ -78,6 +80,7 @@ const CLI_CMDS = new Set([
 	'tailwind-canonical',
 	'regex-dedup',
 	'ui-patterns',
+	'ui-recommendations',
 	'imports',
 	'aliases',
 	'forwarding',
@@ -134,6 +137,7 @@ export type QualityCheckName =
 	| 'tailwind-canonical'
 	| 'regex-dedup'
 	| 'ui-patterns'
+	| 'ui-recommendations'
 	| 'github';
 /** Names accepted in the `autofix` configuration map. */
 export type QualityAutofixName = 'document' | 'format' | 'name' | 'lint' | 'knip' | 'dead-code' | 'alias' | 'forward' | 'repeatedClasses' | 'tailwindCanonical' | 'regexDedup';
@@ -164,6 +168,7 @@ export type QualityCfg = {
 	repeatedClasses?: { minimumCount?: number; extensions?: string[]; ignoredDirectories?: string[] };
 	regexDedup?: { extensions?: string[]; ignoredFiles?: string[]; minimumCount?: number; sharedModule?: string };
 	uiPatterns?: { forbidden?: string[]; ignoredFiles?: string[]; extensions?: string[] };
+	uiRecommendations?: UiRecommendationSettings;
 	github?: { repositories?: string[]; requiredFeatures?: GitHubFeature[]; featureExemptions?: Record<string, GitHubFeature[]> };
 	singleUse?: { skippedDirectories?: string[] };
 	tsconfig?: string;
@@ -2760,7 +2765,7 @@ function dispatchQualityCli(cfg: QualityCfg, args: string[]): void | Promise<voi
 	}
 	if (args.includes('--help') || args.includes('-h')) {
 		console.info('Usage: terra-quality <command> [options]');
-		console.info('Commands include quality, history, github, document, format, lint, knip, types, single-use, dead-code, tailwind-canonical, security, and domain.');
+		console.info('Commands include quality, history, github, document, format, lint, knip, types, single-use, dead-code, tailwind-canonical, security, ui-recommendations, and domain.');
 		console.info(
 			'Options: --all, --warn, --strict, --skip-commands, --skip-recommendations, --report-json <path>, --repository owner/name; history also accepts --branch <name> and --base-sha <sha>.',
 		);
@@ -2859,6 +2864,15 @@ function dispatchQualityCli(cfg: QualityCfg, args: string[]): void | Promise<voi
 				`${'file' in f ? `${f.file}: ` : ''}${'message' in f ? f.message : 'value' in f ? `${f.count}x ${f.value} (${f.locations.join(', ')})` : 'source' in f ? `${f.count}x ${f.source} (${f.locations.join(', ')})` : f.pattern}`,
 		);
 		if (findings.length) process.exitCode = 1;
+		return;
+	}
+	if (cmd === 'ui-recommendations') {
+		const findings = uiComponentRecommendations(cfg);
+		console.info(`UI component recommendations (${findings.length})`);
+		for (const finding of findings) {
+			const component = finding.variant ? `<${finding.component} variant="${finding.variant}">` : `<${finding.component}>`;
+			console.info(`  ${finding.file}:${finding.line}:${finding.column} <${finding.element}> → ${component} (import from '${finding.import}') — ${finding.reason}`);
+		}
 		return;
 	}
 	if (cfg.qualityCommands?.some((c) => c.name === cmd)) {
