@@ -20,6 +20,19 @@ import { fileURLToPath } from 'node:url';
 import { fixtureFile, fixtureRoot, fixtureText, resetExitCode } from '../../support/fixtures.mjs';
 import { join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
+/*//////////////////////////////////////////////////
+REGEX
+//////////////////////////////////////////////////*/
+const UNKNOWN_QUALITY_CLI_ARGUMENT_REGEX = /Unknown quality CLI argument/;
+const IMPORT_TYPE_RECORDDATA_FROM_TYPES_G_REGEX = () => /import type \{ RecordData \} from '\.\/types';/g;
+const REPORTER_PLAYWRIGHT_REPORTER_JS_U_REGEX = /^--reporter=.*playwright-reporter\.js$/u;
+const NODE_TESTS_PLAYWRIGHT_TESTS_REGEX = /Node tests|Playwright tests/;
+const CONFIG_10_REGEX = /CONFIG|\/{10,}/;
+const FUNCTION_UNUSED_REGEX = /function unused/;
+const AUTOFIX_NOT_SAFE_OR_NOT_SUPPORTED_REGEX = /Autofix: not safe or not supported/;
+const EXPORT_CONST_EXTRA_REGEX = /export const extra/;
+const EXPORT_FUNCTION_CREATECLIENT_REGEX = /export function createClient/;
+const EXPORT_CONST_GET_REGEX = /export const GET/;
 
 /*//////////////////////////////////////////////////
 HELPERS
@@ -68,47 +81,19 @@ function recordedCmds(root, markerRelativePath = 'command-args.jsonl') {
 TESTS
 //////////////////////////////////////////////////*/
 
-test('createQualityCfg applies defaults and resolves every repository-relative path exactly once', () => {
+test('createQualityCfg applies defaults and resolves configured paths exactly once', () => {
 	const root = fixtureRoot('terra-quality-runner-config-');
-	const cfg = createQualityCfg({
-		root,
-		sourceRoots: ['src'],
-		includeRoots: ['generated'],
-		extensions: ['.ts'],
-		skippedDirectories: ['generated-cache', 'node_modules'],
-		skippedFiles: ['src/ignored.ts'],
-		protectedIdentifiers: ['domainName'],
-		lintRoots: ['src'],
-		typecheckRoots: ['types'],
-	});
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], includeRoots: ['generated'], extensions: ['.ts'], protectedIdentifiers: ['domainName'], lintRoots: ['src'], typecheckRoots: ['types'] });
 	assert.equal(cfg.root, root);
 	assert.deepEqual(cfg.sourceRoots, [join(root, 'src')]);
 	assert.deepEqual(cfg.includeRoots, [join(root, 'generated')]);
-	assert.deepEqual(cfg.skippedFiles, [join(root, 'src/ignored.ts')]);
 	assert.deepEqual(cfg.lintRoots, [join(root, 'src')]);
 	assert.deepEqual(cfg.typecheckRoots, [join(root, 'types')]);
 	assert.equal(cfg.renameExports, false);
 	assert.deepEqual(cfg.aliases, {});
 	assert.deepEqual(cfg.protectedIdentifiers, ['domainName']);
-	for (const dir of [
-		'.git',
-		'node_modules',
-		'dist',
-		'build',
-		'coverage',
-		'test-results',
-		'.next',
-		'.astro',
-		'.sanity',
-		'.netlify',
-		'.cache',
-		'.output',
-		'.vercel',
-		'.nuxt',
-		'.husky',
-		'generated-cache',
-	])
-		assert.ok(cfg.skippedDirectories.includes(dir), dir);
+	assert.equal('skippedFiles' in cfg, false);
+	assert.equal('skippedDirectories' in cfg, false);
 });
 test('CLI help exits before default quality dispatch or any configured autofix can run', () => {
 	const root = fixtureRoot('terra-quality-cli-help-');
@@ -130,8 +115,8 @@ test('CLI version and invalid arguments never dispatch quality work', () => {
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
 	runQualityCli(cfg, ['--version']);
 	assert.equal(fixtureText(root, 'src/main.ts'), src);
-	assert.throws(() => runQualityCli(cfg, ['unknown-command']), /Unknown quality CLI argument/);
-	assert.throws(() => runQualityCli(cfg, ['quality', '--unknown']), /Unknown quality CLI argument/);
+	assert.throws(() => runQualityCli(cfg, ['unknown-command']), UNKNOWN_QUALITY_CLI_ARGUMENT_REGEX);
+	assert.throws(() => runQualityCli(cfg, ['quality', '--unknown']), UNKNOWN_QUALITY_CLI_ARGUMENT_REGEX);
 	assert.equal(fixtureText(root, 'src/main.ts'), src);
 	const result = spawnSync(process.execPath, [fileURLToPath(new URL('../../dist/runner.js', import.meta.url)), '--version'], { cwd: root, encoding: 'utf8' });
 	assert.equal(result.status, 0);
@@ -174,7 +159,7 @@ export const record: RecordData = { id: organization ? 'one' : 'two' };
 	const first = readFileSync(src, 'utf8');
 	runQualityCli(cfg, ['naming', '--all']);
 	assert.equal(readFileSync(src, 'utf8'), first);
-	assert.equal((first.match(/import type \{ RecordData \} from '\.\/types';/g) ?? []).length, 1);
+	assert.equal((first.match(IMPORT_TYPE_RECORDDATA_FROM_TYPES_G_REGEX()) ?? []).length, 1);
 	assert.match(first, /const org = true/);
 });
 test('naming autofix never text-rewrites Astro properties or string literals', () => {
@@ -381,11 +366,11 @@ test('full quality orders phases, groups suites, de-duplicates invocations, and 
 	const playwrightArgs = fixtureText(root, 'playwright-args.json').trim().split('\n');
 	assert.deepEqual(playwrightArgs.slice(0, 4), ['--filter', '@fixture/ui', 'run', 'e2e']);
 	assert.equal(playwrightArgs.at(-2), '--');
-	assert.match(playwrightArgs.at(-1), /^--reporter=.*playwright-reporter\.js$/u);
+	assert.match(playwrightArgs.at(-1), REPORTER_PLAYWRIGHT_REPORTER_JS_U_REGEX);
 	assert.doesNotMatch(playwrightArgs.join(' '), /dot/u);
 	const playwrightCliArgs = fixtureText(root, 'playwright-cli-args.txt').trim().split('\n');
 	assert.deepEqual(playwrightCliArgs.slice(0, 3), ['exec', 'playwright', 'test']);
-	assert.match(playwrightCliArgs.at(-1), /^--reporter=.*playwright-reporter\.js$/u);
+	assert.match(playwrightCliArgs.at(-1), REPORTER_PLAYWRIGHT_REPORTER_JS_U_REGEX);
 	assert.equal(fixtureText(root, 'diff-runs.txt').trim().split('\n').length, 1);
 	assert.equal(process.exitCode, 1, 'the failing suite keeps the overall command failed');
 	const text = output.join('\n');
@@ -406,12 +391,12 @@ test('full quality orders phases, groups suites, de-duplicates invocations, and 
 		groupOrder,
 		[...groupOrder].sort((left, right) => left - right),
 	);
-	assert.doesNotMatch(text, /Node tests|Playwright tests/, 'the fixture runners do not fabricate child case output');
+	assert.doesNotMatch(text, NODE_TESTS_PLAYWRIGHT_TESTS_REGEX, 'the fixture runners do not fabricate child case output');
 	assert.ok(progress.some((chunk) => chunk.includes('Test suites [') && chunk.includes('0/6')));
 	assert.ok(progress.some((chunk) => chunk.includes('Test suites [') && chunk.includes('6/6')));
 	assert.match(progress.join(''), /Test suites \[[█░]{24}\] 0\/6/);
 	assert.match(progress.join(''), /Test suites \[[█░]{24}\] 6\/6/);
-	assert.doesNotMatch(progress.join(''), /Node tests|Playwright tests/);
+	assert.doesNotMatch(progress.join(''), NODE_TESTS_PLAYWRIGHT_TESTS_REGEX);
 	resetExitCode();
 });
 test('full quality nests dead-code safe fixes and verification under static quality', () => {
@@ -742,7 +727,7 @@ export type Result = RecordData;
 	const fixedRun = runQuality('quality:all', '--all', '--skip-commands', '--skip-recommendations');
 	assert.equal(fixedRun.status, 0, fixedRun.stderr);
 	const fixed = readFileSync(src, 'utf8');
-	assert.equal((fixed.match(/import type \{ RecordData \} from '\.\/types';/g) ?? []).length, 1);
+	assert.equal((fixed.match(IMPORT_TYPE_RECORDDATA_FROM_TYPES_G_REGEX()) ?? []).length, 1);
 	const repeatRun = runQuality('quality:all', '--all', '--skip-commands', '--skip-recommendations');
 	assert.equal(repeatRun.status, 0, repeatRun.stderr);
 	assert.equal(readFileSync(src, 'utf8'), fixed);
@@ -860,8 +845,8 @@ CONFIG
 	resetExitCode();
 	runQualityCli(cfg, ['quality', '--all', '--skip-commands', '--skip-recommendations']);
 	assert.match(fixtureText(root, 'src/view.ts'), /void \('ready'\)/);
-	assert.match(fixtureText(root, 'src/view.ts'), /CONFIG|\/{10,}/);
-	assert.match(fixtureText(root, 'src/untouched.ts'), /CONFIG|\/{10,}/);
+	assert.match(fixtureText(root, 'src/view.ts'), CONFIG_10_REGEX);
+	assert.match(fixtureText(root, 'src/untouched.ts'), CONFIG_10_REGEX);
 	assert.match(fixtureText(root, 'src/untouched.ts'), /\*\* src\/untouched\.ts \*\//);
 });
 test('dead-code reports private unused functions and removes only the proven declaration', () => {
@@ -882,11 +867,11 @@ process.stdout.write(JSON.stringify([{ filePath: file, messages: text.includes('
 	resetExitCode();
 	runQualityCli(cfg, ['dead-code', '--all', '--warn']);
 	assert.equal(process.exitCode, 1);
-	assert.match(readFileSync(src, 'utf8'), /function unused/);
+	assert.match(readFileSync(src, 'utf8'), FUNCTION_UNUSED_REGEX);
 	resetExitCode();
 	runQualityCli(cfg, ['dead-code', '--all']);
 	assert.equal(process.exitCode, 0);
-	assert.doesNotMatch(readFileSync(src, 'utf8'), /function unused/);
+	assert.doesNotMatch(readFileSync(src, 'utf8'), FUNCTION_UNUSED_REGEX);
 	assert.match(readFileSync(src, 'utf8'), /function used/);
 });
 test('dead-code scans the full scope once and applies same-file fixes before rescanning only changed files', () => {
@@ -1103,7 +1088,7 @@ test('dead-code CLI reports detached TSDoc as a read-only, actionable warning wh
 	assert.equal(process.exitCode, 0, 'manual-only detached documentation remains non-blocking');
 	assert.equal(readFileSync(src, 'utf8'), original, '--warn must not edit the source');
 	assert.match(output.join('\n'), /\[WARNING\] tsdoc\/detached: src\/main\.ts:1/);
-	assert.match(output.join('\n'), /Autofix: not safe or not supported/);
+	assert.match(output.join('\n'), AUTOFIX_NOT_SAFE_OR_NOT_SUPPORTED_REGEX);
 	assert.match(output.join('\n'), /Agent action: Attach this TSDoc to the declaration it describes/);
 	resetExitCode();
 });
@@ -1244,7 +1229,7 @@ test('dead-code retains private Knip exports beside named framework entry export
 	resetExitCode();
 	runQualityCli(cfg, ['dead-code', '--warn']);
 	assert.equal(process.exitCode, 1);
-	assert.match(fixtureText(root, 'src/pages/api/report.ts'), /export const extra/);
+	assert.match(fixtureText(root, 'src/pages/api/report.ts'), EXPORT_CONST_EXTRA_REGEX);
 	fixtureFile(root, 'src/pages/api/report.ts', 'export const GET = () => 1;\n');
 	fixtureFile(
 		root,
@@ -1271,7 +1256,7 @@ test('dead-code reports a contradictory Knip result as a non-blocking actionable
 	resetExitCode();
 	runQualityCli(cfg, ['dead-code', '--all']);
 	assert.equal(process.exitCode, 0, 'a manual-only detector disagreement is a warning');
-	assert.match(fixtureText(root, 'src/auth.ts'), /export function createClient/);
+	assert.match(fixtureText(root, 'src/auth.ts'), EXPORT_FUNCTION_CREATECLIENT_REGEX);
 	assert.match(fixtureText(root, 'src/consumer.ts'), /makeClient\(\)/);
 	assert.match(fixtureText(root, 'src/namespace-consumer.ts'), /Auth\.createClient\(\)/);
 	assert.equal(readFileSync(owner, 'utf8'), `export function createClient() { return 'ready'; }\n`);
@@ -1303,7 +1288,7 @@ test('dead-code warn reports manual findings with explicit autofix status and ma
 	assert.equal(process.exitCode, 1, `manual findings fail by default even in read-only mode:\n${output.join('\n')}`);
 	assert.deepEqual([readFileSync(src, 'utf8'), readFileSync(consumer, 'utf8')], original);
 	assert.match(output.join('\n'), /\[ERROR\] knip\/exports: src\/main\.ts:1 Client/);
-	assert.match(output.join('\n'), /Autofix: not safe or not supported/);
+	assert.match(output.join('\n'), AUTOFIX_NOT_SAFE_OR_NOT_SUPPORTED_REGEX);
 	assert.match(output.join('\n'), /Agent action: Reconcile the reported consumer/);
 	assert.match(output.join('\n'), /Resolve each manual finding one by one, in the order listed, before committing/);
 	output.length = 0;
@@ -1389,9 +1374,9 @@ process.stdout.write(JSON.stringify([{ filePath: ${JSON.stringify(src)}, message
 	resetExitCode();
 	runQualityCli(cfg, ['dead-code', '--all']);
 	assert.equal(process.exitCode, 0, 'the unsupported ESLint location is a manual warning');
-	assert.match(fixtureText(root, 'src/auth.ts'), /export function createClient/);
+	assert.match(fixtureText(root, 'src/auth.ts'), EXPORT_FUNCTION_CREATECLIENT_REGEX);
 	assert.match(fixtureText(root, 'src/auth.ts'), /const extra = 1/);
-	assert.doesNotMatch(fixtureText(root, 'src/auth.ts'), /export const extra/);
+	assert.doesNotMatch(fixtureText(root, 'src/auth.ts'), EXPORT_CONST_EXTRA_REGEX);
 	resetExitCode();
 });
 test('dead-code passes a discovered TypeScript flat ESLint config explicitly', () => {
@@ -1472,11 +1457,11 @@ if (issues.length) process.exitCode = 1;
 	resetExitCode();
 	runQualityCli(cfg, ['dead-code', '--all']);
 	assert.equal(process.exitCode, 0);
-	assert.match(fixtureText(root, 'src/pages/api/report.ts'), /export const GET/);
+	assert.match(fixtureText(root, 'src/pages/api/report.ts'), EXPORT_CONST_GET_REGEX);
 	assert.match(fixtureText(root, 'src/pages/api/report.ts'), /const extra/);
-	assert.doesNotMatch(fixtureText(root, 'src/pages/api/report.ts'), /export const extra/);
+	assert.doesNotMatch(fixtureText(root, 'src/pages/api/report.ts'), EXPORT_CONST_EXTRA_REGEX);
 	assert.match(fixtureText(root, 'src/pages/api/report.ts'), /\nexport const following/);
-	assert.doesNotMatch(fixtureText(root, 'src/pages/api/_private.ts'), /export const GET/);
+	assert.doesNotMatch(fixtureText(root, 'src/pages/api/_private.ts'), EXPORT_CONST_GET_REGEX);
 	assert.match(fixtureText(root, 'src/reexports.ts'), /export \{ used \} from '\.\/service'/);
 	assert.doesNotMatch(fixtureText(root, 'src/reexports.ts'), /obsolete|export \{ extra/);
 	assert.match(fixtureText(root, 'src/reexports.ts'), /import '\.\/other';/);

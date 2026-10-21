@@ -8,6 +8,16 @@ CONFIG
 //////////////////////////////////////////////////*/
 
 const PROGRESS_BAR_WIDTH = 24;
+let progressSuppressed = false;
+
+/**
+ * Suppresses progress bars while preserving completed findings and summaries.
+ *
+ * @param suppressed Whether updates should be omitted until suppression is disabled.
+ */
+export function setQualityProgressSuppressed(suppressed: boolean): void {
+	progressSuppressed = suppressed;
+}
 
 /*//////////////////////////////////////////////////
 HELPERS
@@ -25,6 +35,7 @@ HELPERS
  * @return Nothing; the progress bar is written to standard error and may end with a newline.
  */
 export function qualityProgress(label: string, curr: number, total: number, write: (text: string) => void = (text) => void process.stderr.write(text), opts: { finalize?: boolean } = {}): void {
+	if (progressSuppressed) return;
 	const sTotal = Number.isFinite(total) ? Math.max(0, Math.floor(total)) : 0;
 	const completed = sTotal ? Math.min(Math.max(Math.floor(curr), 0), sTotal) : 0;
 	const fraction = sTotal ? completed / sTotal : 1;

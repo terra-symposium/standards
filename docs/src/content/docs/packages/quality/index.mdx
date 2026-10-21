@@ -116,7 +116,7 @@ Resolve local imports using configured roots, extensions, and aliases.
 
 Resolves relative and aliased imports in the configured source scope, including supported extensionless paths, index modules, and module forms. It reports unresolved local targets; there is no autofix because choosing a replacement requires semantic judgment.
 
-Configure `sourceRoots`, `extensions`, `aliases`, `externalPrefixes`, `skippedDirectories`, and `skippedFiles`. External prefixes mark intentionally external namespaces; aliases map import prefixes to repository paths. Keep exemptions narrow so they do not hide broken local imports.
+Configure `sourceRoots`, `extensions`, `aliases`, and `externalPrefixes`. External prefixes mark intentionally external namespaces; aliases map import prefixes to repository paths. All matching files under configured roots are scanned.
 
 **Before** — the relative target does not exist:
 
@@ -320,7 +320,7 @@ Find declarations with one in-scope consumer and optionally inline them.
 
 Counts in-scope consumers of types, interfaces, functions, and variables. The fixing run can inline declarations with exactly one; rewrites are syntax-checked before writing, generated grouping comments/detached TSDoc are cleaned, and declaration docs/meaningful inline comments are preserved.
 
-Set `singleUse.skippedDirectories` to exempt component or shared-code folders without disabling other checks. `--warn` checks without edits. One in-scope consumer does not prove conceptual privacy; review API and framework conventions.
+Single-use analysis covers all matching files under configured roots. `--warn` checks without edits. One consumer does not prove conceptual privacy; review API and framework conventions.
 
 **Before** — a local value has exactly one consumer:
 
@@ -392,7 +392,7 @@ Detect and optionally extract repeated static class strings.
 
 Counts repeated static class strings in configured extensions. Safe fixes extract repeated file-local literals into `CONFIG` or `CLASSES` constants; dynamic class expressions and cross-file design decisions remain advisory.
 
-Configure `minimumCount`, `extensions`, and `ignoredDirectories`. Move repetition that indicates a shared UI primitive into the appropriate component or design-system abstraction.
+Configure `minimumCount` and `extensions`. Move repetition that indicates a shared UI primitive into the appropriate component or design-system abstraction.
 
 **Before** — the same static classes appear in several JSX nodes:
 
@@ -420,7 +420,7 @@ Detect duplicate regular-expression sources and consolidate supported literals.
 
 Detects duplicate regex literals and supported constructors. Safe fixes extract file-local, non-stateful duplicates into `CONFIG` or `REGEX` constants. Set `sharedModule` to a repository-relative `.mjs` path and provide a matching `.d.mts` declaration to enable cross-file ESM factories; otherwise fixes stay file-local.
 
-Configure `minimumCount`, `extensions`, and `ignoredFiles`. Stateful regex flags and incompatible CommonJS consumers remain advisory because sharing may change behavior.
+Configure `minimumCount` and `extensions`. Stateful regex flags and incompatible CommonJS consumers remain advisory because sharing may change behavior.
 
 **Before** — the same non-stateful expression is constructed twice:
 
@@ -447,7 +447,7 @@ Report configured UI patterns that should use shared primitives.
 
 Searches configured extensions for forbidden UI pattern strings and reports matches; it does not rewrite components because choosing the shared primitive requires design judgment.
 
-Configure `uiPatterns.forbidden`, `extensions`, and `ignoredFiles`. Keep patterns specific enough to catch duplication without flagging intentional exceptions.
+Configure `uiPatterns.forbidden` and `extensions`. Keep patterns specific enough to catch duplication.
 
 For example, configure a repeated bespoke button class as a forbidden pattern:
 

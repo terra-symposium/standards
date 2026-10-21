@@ -67,8 +67,8 @@ Each bullet is one top-level `node:test` case. Nested assertions remain within t
 
 #### `files.test.mjs` (4)
 
-- source discovery handles nested roots, include roots, exclusions, direct files, and files created during a run
-- excludeTests omits test and spec files from quality source discovery
+- source discovery handles nested roots, include roots, direct files, and files created during a run
+- Test and spec files are included in quality source discovery when their extensions are configured
 - working-tree discovery includes modified and untracked sources but excludes ignored files
 - path utilities distinguish files, directories, missing paths, and repository-relative display names
 
@@ -79,8 +79,8 @@ Each bullet is one top-level `node:test` case. Nested assertions remain within t
 
 #### `patterns.test.mjs` (11)
 
-- repeated-class detection normalizes whitespace and ignores dynamic, one-word, test, and configured paths
-- UI pattern detection applies configured extensions and ignored repository-relative files
+- repeated-class detection normalizes whitespace and ignores dynamic and one-word values
+- UI pattern detection applies configured extensions to all matching files
 - regex deduplication inventories literals and RegExp constructors across configured source files
 - repeated-class fixer creates deterministic file-local CLASSES constants and leaves dynamic/HTML sources alone
 - regex fixer deduplicates stateless literals and preserves fresh stateful instances through factories
@@ -155,7 +155,7 @@ Each bullet is one top-level `node:test` case. Nested assertions remain within t
 - package entry exports are preserved without exempting private declarations in the same module
 - single-use fixing never removes a multi-use explicit-any compatibility alias
 - single-use scope includes every configured directory and reports manual cases explicitly
-- single-use skipped directories exclude candidates but still count their references
+- single-use analysis includes candidates in every configured directory
 - single-use fixer does not treat an export specifier as a local consumer
 - single-use analysis ignores destructuring bindings as declaration consumers
 - single-use analysis keeps cross-file closures and write-target values intact

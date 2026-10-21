@@ -43,7 +43,6 @@ export type GitHubRepositoryReport = {
 		secretScanningAlerts: number | null;
 	};
 	features: Record<GitHubFeature, GitHubFeatureState>;
-	exemptedFeatures?: GitHubFeature[];
 	resources: { issues: GitHubResourceReport; dependabot: GitHubResourceReport; malware: GitHubResourceReport; codeScanning: GitHubResourceReport; secretScanning: GitHubResourceReport };
 	findings: GitHubFinding[];
 };
@@ -405,21 +404,13 @@ function settingsFinding(repo: string, feature: GitHubFeature): GitHubFinding {
  * @param repos Owner/name repository slugs.
  * @param requiredFeatures Settings that must be enabled for these repositories.
  * @param api Injectable read-only GitHub API boundary.
- * @param featureExemptions Per-repository features that are intentionally out of scope.
  * @return A normalized report with safe agent remediation instructions.
  */
-export function buildGitHubReport(
-	repos: readonly string[],
-	requiredFeatures: readonly GitHubFeature[] = [],
-	api: GitHubApi = ghApi,
-	featureExemptions: Readonly<Record<string, readonly GitHubFeature[]>> = {},
-): GitHubReport {
+export function buildGitHubReport(repos: readonly string[], requiredFeatures: readonly GitHubFeature[] = [], api: GitHubApi = ghApi): GitHubReport {
 	const reports: GitHubRepositoryReport[] = [];
 	let partial = false;
 	for (const repo of [...new Set(repos)]) {
 		if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repo)) throw new Error(`Invalid GitHub repository slug: ${repo}`);
-		const exemptedFeatures = [...new Set(featureExemptions[repo] ?? [])];
-		const requiredForRepo = requiredFeatures.filter((feature) => !exemptedFeatures.includes(feature));
 		const metadataResult = api(repoPath(repo, ''));
 		const metadata = metadataResult.ok ? rec(metadataResult.value) : undefined;
 		if (!metadataResult.ok) partial = true;
@@ -450,7 +441,7 @@ export function buildGitHubReport(
 		};
 		for (const [feature, featureStatus] of Object.entries(features) as [GitHubFeature, GitHubFeatureState][]) {
 			if (featureStatus === 'unknown' && feature === 'dependencyGraph') continue;
-			if (requiredForRepo.includes(feature) && featureStatus !== 'enabled') {
+			if (requiredFeatures.includes(feature) && featureStatus !== 'enabled') {
 				partial ||= featureStatus === 'unknown';
 			}
 		}
@@ -466,16 +457,10 @@ export function buildGitHubReport(
 			codeScanning: codeResult.resource,
 			secretScanning: secretResult.resource,
 		};
-		const exemptResources = new Set<keyof typeof resources>([
-			...(exemptedFeatures.includes('dependabotAlerts') ? ['dependabot' as const] : []),
-			...(exemptedFeatures.includes('malwareAlerts') ? ['malware' as const] : []),
-		]);
-		if (Object.entries(resources).some(([name, resource]) => !exemptResources.has(name as keyof typeof resources) && !['available', 'disabled', 'not-configured'].includes(resource.state)))
-			partial = true;
+		if (Object.values(resources).some((resource) => !['available', 'disabled', 'not-configured'].includes(resource.state))) partial = true;
 		const findings = [...issues.findings, ...dependencyFindings, ...malwareFindings, ...codeFindings, ...secretFindings];
-		for (const feature of requiredForRepo) if (features[feature] !== 'enabled') findings.push(settingsFinding(repo, feature));
+		for (const feature of requiredFeatures) if (features[feature] !== 'enabled') findings.push(settingsFinding(repo, feature));
 		for (const [name, resource] of Object.entries(resources)) {
-			if (exemptResources.has(name as keyof typeof resources)) continue;
 			if (resource.state === 'permission-denied' || resource.state === 'unauthenticated' || resource.state === 'unavailable') {
 				findings.push({
 					repository: repo,
@@ -500,7 +485,6 @@ export function buildGitHubReport(
 				secretScanningAlerts: secretResult.resource.count,
 			},
 			features,
-			...(exemptedFeatures.length ? { exemptedFeatures } : {}),
 			resources,
 			findings,
 		});
@@ -530,10 +514,6 @@ export function formatGitHubReport(report: GitHubReport): string[] {
 		for (const finding of repo.findings) counts.set(finding.category, (counts.get(finding.category) ?? 0) + 1);
 		const findingSummary = [...counts].map(([cat, count]) => `${count} ${cat}`).join(', ');
 		const settingFindings = repo.findings.filter((finding) => finding.category === 'setting' || finding.category === 'access').map((finding) => `  - ${finding.category}: ${finding.title}`);
-		return [
-			summary,
-			...(repo.exemptedFeatures?.length ? [`  Exempt features: ${repo.exemptedFeatures.join(', ')}`] : []),
-			...(findingSummary ? [`  Findings: ${findingSummary}`, ...settingFindings] : []),
-		];
+		return [summary, ...(findingSummary ? [`  Findings: ${findingSummary}`, ...settingFindings] : [])];
 	});
 }
