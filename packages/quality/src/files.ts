@@ -14,11 +14,8 @@ import { existsSync, readdirSync, statSync } from 'node:fs';
 
 // TYPES
 import type { QualityCfg } from './runner.js';
-/*//////////////////////////////////////////////////
-REGEX
-//////////////////////////////////////////////////*/
-const TEST_SPEC_REGEX = /\.(?:test|spec)\.[^.]+$/;
 
+const SCAN_PRUNED_DIRS = new Set(['.git', 'node_modules', 'dist', 'build', 'coverage', 'test-results', '.next', '.astro', '.sanity', '.netlify', '.cache', '.output', '.vercel', '.nuxt', '.husky']);
 /*//////////////////////////////////////////////////
 HELPERS
 //////////////////////////////////////////////////*/
@@ -33,21 +30,20 @@ HELPERS
 export function srcFiles(cfg: QualityCfg): string[] {
 	const roots = [...cfg.sourceRoots, ...(cfg.includeRoots ?? [])];
 	const exts = new Set(cfg.extensions);
-	const skipped = new Set(cfg.skippedDirectories ?? []);
 	const files: string[] = [];
 	const walk = (dir: string): void => {
 		if (!existsSync(dir)) return;
 		if (statSync(dir).isFile()) {
-			if (exts.has(dir.slice(dir.lastIndexOf('.'))) && !cfg.skippedFiles?.includes(dir) && !(cfg.excludeTests && TEST_SPEC_REGEX.test(dir))) files.push(dir);
+			if (exts.has(dir.slice(dir.lastIndexOf('.')))) files.push(dir);
 			return;
 		}
 		for (const e of readdirSync(dir, { withFileTypes: true })) {
 			if (e.isDirectory()) {
-				if (!skipped.has(e.name)) walk(join(dir, e.name));
+				if (!SCAN_PRUNED_DIRS.has(e.name)) walk(join(dir, e.name));
 				continue;
 			}
 			const path = join(dir, e.name);
-			if (exts.has(e.name.slice(e.name.lastIndexOf('.'))) && !cfg.skippedFiles?.includes(path) && !(cfg.excludeTests && TEST_SPEC_REGEX.test(e.name))) files.push(path);
+			if (exts.has(e.name.slice(e.name.lastIndexOf('.')))) files.push(path);
 		}
 	};
 	for (const root of roots) walk(root);

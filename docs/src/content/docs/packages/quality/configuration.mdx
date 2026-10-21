@@ -35,9 +35,6 @@ Runtime paths resolve from `root`. By default, `root` is the directory containin
 | `sourceRoots`                  | Required source roots scanned by regular checks.                                                                                                    |
 | `includeRoots`                 | Additional source roots appended to `sourceRoots` during discovery.                                                                                 |
 | `extensions`                   | Required file extensions for source discovery, including the leading dot.                                                                           |
-| `skippedDirectories`           | Additional directory names excluded at any depth. Common generated and dependency folder names are excluded by default.                             |
-| `skippedFiles`                 | Repository-relative files excluded from checks.                                                                                                     |
-| `singleUse.skippedDirectories` | Repository-relative directory paths excluded from single-use and dead-code analysis only.                                                           |
 | `aliases`                      | Internal import prefixes mapped to repository paths, such as `{ "@/": "src/" }`.                                                                    |
 | `externalPrefixes`             | Import prefixes that the import checker should treat as external.                                                                                   |
 | `frameworkEntryExports`        | Explicit framework-discovered exports that Knip should retain, keyed by a source file path or supported `/**/*.ts` / `/**/*.tsx` pattern.           |
@@ -45,7 +42,7 @@ Runtime paths resolve from `root`. By default, `root` is the directory containin
 | `renameExports`                | Whether eligible exported names can be renamed. Defaults to `false`.                                                                                |
 | `manualWarnings`               | Whether dead-code findings requiring manual review block quality. Defaults to `error`; set to `warning` to keep them visible without failing.       |
 
-Keep scope and exclusions narrow. A broad root or external prefix can hide unresolved imports, unreachable files, or other source findings.
+Quality checks scan every matching source file below the configured roots, except standard generated and dependency output directories.
 
 ## Optional performance-pattern scan
 
@@ -215,9 +212,9 @@ These checks require the corresponding policy object. See [check behavior](/pack
 | Field               | Options                                                                     | Purpose                                                                                                                                                              |
 | ------------------- | --------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `security`          | `forbiddenTerms`, `forbiddenImports`, `clientRoots`, `allowProcessEnvRoots` | Report configured terms/imports, root-level or committed environment files, secret-shaped access in client roots, and process-environment use outside allowed roots. |
-| `repeatedClasses`   | `minimumCount`, `extensions`, `ignoredDirectories`                          | Find repeated static class strings in selected source files.                                                                                                         |
-| `regexDedup`        | `minimumCount`, `extensions`, `ignoredFiles`, `sharedModule`                | Find duplicate regex sources; an optional repository-relative `.mjs` module with a matching `.d.mts` declaration supports shared extraction.                         |
-| `uiPatterns`        | `forbidden`, `extensions`, `ignoredFiles`                                   | Report configured UI source patterns for review.                                                                                                                     |
+| `repeatedClasses`   | `minimumCount`, `extensions`                                                 | Find repeated static class strings in selected source files.                                                                                                         |
+| `regexDedup`        | `minimumCount`, `extensions`, `sharedModule`                                 | Find duplicate regex sources; an optional repository-relative `.mjs` module with a matching `.d.mts` declaration supports shared extraction.                         |
+| `uiPatterns`        | `forbidden`, `extensions`                                                    | Report configured UI source patterns for review.                                                                                                                     |
 | `uiRecommendations` | `rules`, `extensions`, `ignoredFiles`, `ignoredDirectories`                 | Configure the on-demand Astro/JSX shared-component recommendation report.                                                                                            |
 | `tailwindCanonical` | required `stylesheet`, optional `sourceRoots`                               | Configure the Tailwind v4 canonical-class check and autofix.                                                                                                         |
 

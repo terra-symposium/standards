@@ -21,7 +21,7 @@ import { resolve } from 'node:path';
 TESTS
 //////////////////////////////////////////////////*/
 
-test('repeated-class detection normalizes whitespace and ignores dynamic, one-word, test, and configured paths', () => {
+test('repeated-class detection normalizes whitespace and ignores dynamic and one-word values', () => {
 	const root = fixtureRoot('terra-quality-classes-');
 	const repeated = 'className="rounded   border bg-card"';
 	fixtureFile(root, 'src/one.tsx', `<div ${repeated} />\n<div class="rounded border bg-card" />\n`);
@@ -29,12 +29,11 @@ test('repeated-class detection normalizes whitespace and ignores dynamic, one-wo
 	fixtureFile(root, 'src/dynamic.tsx', `<div className={classes} /><div className="rounded {conditional}" />\n`);
 	fixtureFile(root, 'src/test/fixture.tsx', `<div className="rounded border bg-card" />\n`);
 	fixtureFile(root, 'src/generated/fixture.tsx', `<div className="rounded border bg-card" />\n`);
-	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.tsx'], repeatedClasses: { minimumCount: 5, ignoredDirectories: ['generated'] } });
-	assert.deepEqual(repeatedClassFindings(cfg), []);
-	const defaultCfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.tsx'], repeatedClasses: {} });
-	assert.deepEqual(repeatedClassFindings(defaultCfg), [{ value: 'rounded border bg-card', count: 4, locations: ['src/one.tsx:1', 'src/one.tsx:2', 'src/two.tsx:1', 'src/two.tsx:2'] }]);
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.tsx'], repeatedClasses: { minimumCount: 4 } });
+	assert.deepEqual(repeatedClassFindings(cfg), [
+		{ value: 'rounded border bg-card', count: 6, locations: ['src/generated/fixture.tsx:1', 'src/one.tsx:1', 'src/one.tsx:2', 'src/test/fixture.tsx:1', 'src/two.tsx:1', 'src/two.tsx:2'] },
+	]);
 });
-
 test('performance patterns are opt-in and report linear lookups nested in collection callbacks', () => {
 	const root = fixtureRoot('terra-quality-performance-patterns-');
 	fixtureFile(
@@ -54,23 +53,18 @@ test('performance patterns are opt-in and report linear lookups nested in collec
 		],
 	);
 });
-test('UI pattern detection applies configured extensions and ignored repository-relative files', () => {
+test('UI pattern detection applies configured extensions to all matching files', () => {
 	const root = fixtureRoot('terra-quality-ui-patterns-');
 	fixtureFile(root, 'src/visible.tsx', '<div><button className="legacy">Save</button></div>\n');
 	fixtureFile(root, 'src/ignored.tsx', '<button className="legacy">Ignore</button>\n');
 	fixtureFile(root, 'src/notes.html', '<button class="legacy">HTML</button>\n');
 	fixtureFile(root, 'src/no-match.tsx', '<Button>Shared primitive</Button>\n');
-	const cfg = createQualityCfg({
-		root,
-		sourceRoots: ['src'],
-		extensions: ['.tsx', '.html'],
-		uiPatterns: { forbidden: ['<button\\b'], ignoredFiles: ['src/ignored.tsx'], extensions: ['.tsx', '.html'] },
-	});
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.tsx', '.html'], uiPatterns: { forbidden: ['<button\\b'], extensions: ['.tsx', '.html'] } });
 	const findings = uiPatternFindings(cfg);
-	assert.equal(findings.length, 2);
+	assert.equal(findings.length, 3);
 	assert.deepEqual(
 		findings.map((f) => f.file),
-		['src/notes.html', 'src/visible.tsx'],
+		['src/ignored.tsx', 'src/notes.html', 'src/visible.tsx'],
 	);
 	assert.ok(findings.every((f) => f.pattern === '<button\\b'));
 });
@@ -81,13 +75,15 @@ test('regex deduplication inventories literals and RegExp constructors across co
 	fixtureFile(root, 'src/three.ts', `const first = /alpha/;\nvoid first;\n`);
 	fixtureFile(root, 'src/ignored.ts', `const first = /alpha/;\nvoid first;\n`);
 	fixtureFile(root, 'src/tests/test.ts', `const first = /alpha/;\nvoid first;\n`);
-	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], regexDedup: { ignoredFiles: ['src/ignored.ts'], minimumCount: 2 } });
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], regexDedup: { minimumCount: 2 } });
 	assert.deepEqual(regexFindings(cfg), [
-		{ source: 'alpha', count: 3, locations: ['src/one.ts:1', 'src/three.ts:1', 'src/two.ts:1'] },
+		{ source: 'alpha', count: 5, locations: ['src/ignored.ts:1', 'src/one.ts:1', 'src/tests/test.ts:1', 'src/three.ts:1', 'src/two.ts:1'] },
 		{ source: "'constructor'", count: 2, locations: ['src/one.ts:2', 'src/two.ts:2'] },
 	]);
 	const stricter = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], regexDedup: { minimumCount: 5 } });
-	assert.deepEqual(regexFindings(stricter), []);
+	assert.deepEqual(regexFindings(stricter), [
+		{ source: 'alpha', count: 5, locations: ['src/ignored.ts:1', 'src/one.ts:1', 'src/tests/test.ts:1', 'src/three.ts:1', 'src/two.ts:1'] },
+	]);
 });
 test('repeated-class fixer creates deterministic file-local CLASSES constants and leaves dynamic/HTML sources alone', () => {
 	const root = fixtureRoot('terra-quality-classes-fix-');

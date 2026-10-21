@@ -23,7 +23,7 @@ import { existsSync, readdirSync, readFileSync, realpathSync, statSync, writeFil
 import { fileURLToPath } from 'node:url';
 import { fixObjectForwarding, objectForwardingFindings } from './object-forwarding.js';
 import { fixRegexDedup, fixRepeatedClasses, performancePatternFindings, regexFindings, repeatedClassFindings, runTailwindCanonical, uiPatternFindings } from './patterns.js';
-import { qualityProgress } from './progress.js';
+import { qualityProgress, setQualityProgressSuppressed } from './progress.js';
 import { qualityNodeReporterOptions } from './node-reporter.js';
 import { securityFindings } from './security.js';
 import { accessibilityFindings, fixAccessibleNames } from './accessibility.js';
@@ -94,7 +94,7 @@ const CLI_CMDS = new Set([
 ]);
 const CLI_FLAGS = new Set(['--all', '--warn', '--strict', '--skip-commands', '--skip-recommendations', '--help', '-h', '--version', '-v', '--report-json', '--branch', '--base-sha', '--repository']);
 const TOOL_OUTPUT_MAX_BUFFER = 64 * 1024 * 1024;
-const ESLINT_BATCH_SIZE = 10;
+
 const ESLINT_ARGUMENT_BUDGET = 64 * 1024;
 const FOCUSED_ESLINT_FALLBACK = 'TERRA_QUALITY_FOCUSED_ESLINT_UNAVAILABLE';
 const ESLINT_GLOB_SPECIALS = new Set(['*', '?', '[', ']', '{', '}', '(', ')', '!', '\\']);
@@ -112,6 +112,7 @@ let reportStages: Map<string, QualityJsonReport['checks'][number]> | undefined;
 let reportStageName: string | undefined;
 let reportGitHubData: GitHubReport | undefined;
 let outputPhase: string | undefined;
+let quietOutput = false;
 
 /*//////////////////////////////////////////////////
 REGEX
@@ -155,13 +156,10 @@ export type QualityCfg = {
 	extensions: string[];
 	aliases?: Record<string, string>;
 	externalPrefixes?: string[];
-	skippedDirectories?: string[];
-	skippedFiles?: string[];
 	protectedIdentifiers?: string[];
 	frameworkEntryExports?: Record<string, string[]>;
 	renameExports?: boolean;
 	qualityCommands?: { name: string; command: string; args?: string[] }[];
-	excludeTests?: boolean;
 	manualWarnings?: 'error' | 'warning';
 	enabledChecks?: Partial<Record<QualityCheckName, boolean>>;
 	autofix?: Partial<Record<QualityAutofixName, boolean>>;
@@ -171,13 +169,12 @@ export type QualityCfg = {
 	enabledRecommendations?: Record<string, boolean>;
 	tailwindCanonical?: { stylesheet: string; sourceRoots?: string[] };
 	security?: { forbiddenTerms?: string[]; forbiddenImports?: string[]; clientRoots?: string[]; allowProcessEnvRoots?: string[] };
-	repeatedClasses?: { minimumCount?: number; extensions?: string[]; ignoredDirectories?: string[] };
-	regexDedup?: { extensions?: string[]; ignoredFiles?: string[]; minimumCount?: number; sharedModule?: string };
-	uiPatterns?: { forbidden?: string[]; ignoredFiles?: string[]; extensions?: string[] };
+	repeatedClasses?: { minimumCount?: number; extensions?: string[] };
+	regexDedup?: { extensions?: string[]; minimumCount?: number; sharedModule?: string };
+	uiPatterns?: { forbidden?: string[]; extensions?: string[] };
 	performancePatterns?: { ignoredFiles?: string[]; extensions?: string[] };
 	uiRecommendations?: UiRecommendationSettings;
-	github?: { repositories?: string[]; requiredFeatures?: GitHubFeature[]; featureExemptions?: Record<string, GitHubFeature[]> };
-	singleUse?: { skippedDirectories?: string[] };
+	github?: { repositories?: string[]; requiredFeatures?: GitHubFeature[] };
 	tsconfig?: string;
 	oneLineImports?: boolean;
 	prettierPrintWidth?: number;
@@ -341,7 +338,6 @@ export function loadQualityCfg(file = resolve(process.cwd(), 'quality.json')): Q
  * @return Configuration ready for quality checks and subprocess execution.
  */
 export function createQualityCfg(cfg: QualityCfg): QualityCfg {
-	const defaultSkipped = ['.git', 'node_modules', 'dist', 'build', 'coverage', 'test-results', '.next', '.astro', '.sanity', '.netlify', '.cache', '.output', '.vercel', '.nuxt', '.husky'];
 	return {
 		...cfg,
 		manualWarnings: cfg.manualWarnings ?? 'error',
@@ -349,9 +345,6 @@ export function createQualityCfg(cfg: QualityCfg): QualityCfg {
 		root: resolve(cfg.root),
 		sourceRoots: cfg.sourceRoots.map((p) => resolve(cfg.root, p)),
 		includeRoots: (cfg.includeRoots ?? []).map((p) => resolve(cfg.root, p)),
-		skippedDirectories: [...new Set([...defaultSkipped, ...(cfg.skippedDirectories ?? [])])],
-		singleUse: { skippedDirectories: (cfg.singleUse?.skippedDirectories ?? []).map((p) => resolve(cfg.root, p)) },
-		skippedFiles: (cfg.skippedFiles ?? []).map((p) => resolve(cfg.root, p)),
 		aliases: cfg.aliases ?? {},
 		protectedIdentifiers: cfg.protectedIdentifiers ?? [],
 		lintRoots: (cfg.lintRoots ?? []).map((p) => resolve(cfg.root, p)),
@@ -390,6 +383,7 @@ function qualityHeader(name: string, detail: string): void {
 		reportStages.set(name, { name, status: 'passed', findings: 0 });
 	}
 	if (outputPhase) {
+		if (quietOutput) return;
 		const indent = name.startsWith('dead-code/') || (outputPhase === 'Tests' && name.startsWith('command:')) ? '    ' : '  ';
 		const labels: Record<string, string> = {
 			'dead-code/safe-fixes': 'Safe fixes',
@@ -406,6 +400,7 @@ function qualityHeader(name: string, detail: string): void {
 		if (detail) console.error(`${indent}  ${detail}`);
 		return;
 	}
+	if (quietOutput) return;
 	console.error(`\n=== ${name} ===`);
 	console.error(detail);
 }
@@ -419,7 +414,7 @@ function qualityHeader(name: string, detail: string): void {
  */
 function beginQualityPhase(phase: QualityPhase): void {
 	outputPhase = phase;
-	console.error(`\n${phase.toUpperCase()}`);
+	if (!quietOutput) console.error(`\n${phase.toUpperCase()}`);
 }
 
 /**
@@ -972,7 +967,7 @@ function runLint(cfg: QualityCfg, opts: QualityOptions, exhaustive = false, dead
 	const before = opts.fix ? snapshotFiles(cfg, files) : undefined;
 	let completed = 0;
 	qualityProgress('ESLint', completed, files.length);
-	for (const filesBatch of batches(files, ESLINT_BATCH_SIZE)) {
+	for (const filesBatch of batches(files, (10))) {
 		const status = run(cfg, toolPath(cfg, cfg.tools?.eslint, 'eslint'), [...flags, ...filesBatch], { quietSuccess: opts.fix });
 		completed += filesBatch.length;
 		qualityProgress('ESLint', completed, files.length);
@@ -1951,9 +1946,9 @@ function runDeadCode(cfg: QualityCfg, fix: boolean, all: boolean, verify = true,
 	const changedFiles = new Set<string>();
 	const srcSnapshot = fix ? new Map(filesFor(cfg, true).map((f) => [f, readFileSync(f, 'utf8')])) : new Map<string, string>();
 	const initialInventory = fix ? new Set(srcSnapshot.keys()) : new Set<string>();
-	if (fix && emit) console.error(`  Preparing TypeScript baseline for ${srcSnapshot.size} configured source files...`);
+	if (fix && emit && !quietOutput) console.error(`  Preparing TypeScript baseline for ${srcSnapshot.size} configured source files...`);
 	const typeProgram = fix ? deadCodeTypeProgram(cfg) : null;
-	if (fix && emit) console.error('  TypeScript baseline ready.');
+	if (fix && emit && !quietOutput) console.error('  TypeScript baseline ready.');
 	const typeRejectedFiles = new Set<string>();
 	const singleUseVerificationFindings: ReturnType<typeof singleUseFindings> = [];
 	const eslintReportsByPath = new Map<string, EslintReport>();
@@ -1984,7 +1979,7 @@ function runDeadCode(cfg: QualityCfg, fix: boolean, all: boolean, verify = true,
 			let reportsToFix = scanEslint();
 			for (let round = 0; round < 5; round++) {
 				if (!reportsToFix.some((report) => report.messages.some((message) => message.ruleId === 'unused-imports/no-unused-vars'))) break;
-				if (emit) console.error(`  ESLint unused-declaration pass ${round + 1}/5...`);
+				if (emit && !quietOutput) console.error(`  ESLint unused-declaration pass ${round + 1}/5...`);
 				const passChangedFiles = new Set<string>();
 				if (!fixUnusedDeclarations(cfg, reportsToFix, passChangedFiles, importedConsumersForRun)) break;
 				for (const file of passChangedFiles) changedFiles.add(file);
@@ -1997,15 +1992,14 @@ function runDeadCode(cfg: QualityCfg, fix: boolean, all: boolean, verify = true,
 			cfg,
 			singleUseChangedFiles,
 			(pass, filesChanged) => {
-				if (emit) console.error(`  Single-use rewrite pass ${pass} starting (${filesChanged} source files changed so far).`);
+				if (emit && !quietOutput) console.error(`  Single-use rewrite pass ${pass} starting (${filesChanged} source files changed so far).`);
 			},
 			singleUseVerificationFindings,
 		);
 		for (const file of singleUseChangedFiles) changedFiles.add(file);
 		const currInventory = new Set(filesFor(cfg, true));
-		const skippedInventory = new Set(cfg.skippedFiles ?? []);
-		const trackedInitialInventory = [...initialInventory].filter((f) => !skippedInventory.has(f));
-		const trackedCurrInventory = [...currInventory].filter((f) => !skippedInventory.has(f));
+		const trackedInitialInventory = [...initialInventory];
+		const trackedCurrInventory = [...currInventory];
 		if (trackedCurrInventory.length !== trackedInitialInventory.length || trackedInitialInventory.some((f) => !currInventory.has(f)))
 			throw new Error('Dead-code autofix changed the configured source inventory; file creation or deletion is not an automatic dead-code fix.');
 		const proposed = new Map<string, string>();
@@ -2018,9 +2012,9 @@ function runDeadCode(cfg: QualityCfg, fix: boolean, all: boolean, verify = true,
 		if (verify) beginVerification();
 		if (proposed.size) {
 			if (!typeProgram) throw new Error('Dead-code edit validation requires its baseline TypeScript program.');
-			if (emit) console.error(`  Validating ${proposed.size} changed files against TypeScript diagnostics...`);
+			if (emit && !quietOutput) console.error(`  Validating ${proposed.size} changed files against TypeScript diagnostics...`);
 			const { accepted, rejected } = acceptTypeSafeEdits(typeProgram, proposed, srcSnapshot, (checked, count) => {
-				if (emit) console.error(`  TypeScript safety check ${checked} (${count} candidate files).`);
+				if (emit && !quietOutput) console.error(`  TypeScript safety check ${checked} (${count} candidate files).`);
 			});
 			for (const file of rejected) {
 				const original = srcSnapshot.get(file);
@@ -2170,7 +2164,7 @@ function runGitHubCheck(cfg: QualityCfg, repos: string[] = [], explicit = false,
 		return;
 	}
 	try {
-		reportGitHubData = buildGitHubReport(tgts, cfg.github?.requiredFeatures, undefined, cfg.github?.featureExemptions);
+		reportGitHubData = buildGitHubReport(tgts, cfg.github?.requiredFeatures);
 		const findings = reportGitHubData.repositories.flatMap((repo) => repo.findings);
 		const failed = reportGitHubData.state === 'partial';
 		updateGitHubStage(failed ? 'failed' : findings.length ? 'findings' : 'passed', findings.length);
@@ -2699,7 +2693,7 @@ function runFullQuality(cfg: QualityCfg, args: string[], opts: QualityOptions): 
 	const scoped = scopedCfg(cfg, opts.all);
 	if (opts.fix) {
 		outputPhase = 'PREPARING SAFE FIXES';
-		console.error('\nPREPARING SAFE FIXES');
+		if (!quietOutput) console.error('\nPREPARING SAFE FIXES');
 	}
 	if (opts.fix && qualityCheckEnabled(cfg, 'name') && fix('name')) {
 		const namingScope = scopedCfg(cfg, opts.all);
@@ -3043,7 +3037,7 @@ export function runFormatter(cfg: QualityCfg, optsOrArgs: QualityOptions | strin
 	let completed = 0;
 	qualityProgress('Prettier', completed, tgts.length);
 	for (const tgtBatch of batches(tgts)) {
-		const status = run(cfg, toolPath(cfg, cfg.tools?.prettier, 'prettier'), [...flags, ...tgtBatch], { quietSuccess: opts.fix });
+		const status = run(cfg, toolPath(cfg, cfg.tools?.prettier, 'prettier'), [...flags, ...tgtBatch], { quietSuccess: true });
 		completed += tgtBatch.length;
 		qualityProgress('Prettier', completed, tgts.length);
 		if (status) {
@@ -3094,8 +3088,11 @@ export function runTypecheck(cfg: QualityCfg, args: string[] = []): void {
 	if (result.status) process.exitCode = result.status ?? 1;
 	console.error(`  ${result.status ? '✗ failed' : '✓ passed'}`);
 }
-if (process.argv[1] && realpathSync(resolve(process.argv[1])) === realpathSync(fileURLToPath(import.meta.url)))
+if (process.argv[1] && realpathSync(resolve(process.argv[1])) === realpathSync(fileURLToPath(import.meta.url))) {
+	quietOutput = true;
+	setQualityProgressSuppressed(true);
 	Promise.resolve(runQualityFromCfg()).catch((error: unknown) => {
 		console.error(error instanceof Error ? error.message : error);
 		process.exitCode = 1;
 	});
+}
