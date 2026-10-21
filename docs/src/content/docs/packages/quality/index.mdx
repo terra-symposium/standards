@@ -154,6 +154,22 @@ const cmdName = 'build';
 run(cmdName);
 ```
 
+#### Accessibility
+
+Opt in with `enabledChecks.accessibility: true`. The check inspects native JSX controls and elements with explicit interactive roles for a source-evident accessible name. It recognizes ARIA names, associated labels, static child text, and image alternatives. Fix mode copies a literal `title` to `aria-label` only when the element has no visible or uncertain content, and adds `aria-hidden="true"` to an unnamed inline SVG only when its parent control already has a clear name. It does not invent labels or alter keyboard behavior.
+
+#### React display names
+
+Opt in with `enabledChecks.display-name: true`. The check finds direct named `forwardRef` components without a conventional `displayName`. Fix mode adds the component's own name only when the declaration and insertion point are unambiguous; existing custom assignments and wrapped components are left unchanged.
+
+#### Documented package commands
+
+Opt in with `enabledChecks.documented-commands: true` and configure `documentation.commandRoots`. The check scans fenced `sh`, `bash`, `zsh`, or `shell` blocks for pnpm directory flags `-C` and `--prefix`. Fix mode changes those exact command forms to `--dir`; prose, other executables, and other code fences are preserved. This filesystem-only scan is cheap and can stay on the changed-file path when the configured roots are scoped to maintained documentation.
+
+#### Performance patterns
+
+The opt-in `performancePatterns` check reports stable linear lookups such as `find`, `filter`, `includes`, `indexOf`, and `some` nested inside collection callbacks. It is advisory and never rewrites loops: use representative before/after measurements to decide whether precomputing an index preserves ordering, duplicate handling, and update semantics. Keep browser, broad integration, and benchmark validation in explicit or scheduled commands, and share expensive setup across cases in an existing suite.
+
 #### Lint
 
 Invoke repository-configured ESLint on selected files.

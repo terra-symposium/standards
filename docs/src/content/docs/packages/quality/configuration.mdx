@@ -47,6 +47,19 @@ Runtime paths resolve from `root`. By default, `root` is the directory containin
 
 Keep scope and exclusions narrow. A broad root or external prefix can hide unresolved imports, unreachable files, or other source findings.
 
+## Optional performance-pattern scan
+
+Set `performancePatterns` to scan for linear collection lookups nested inside collection callbacks. This diagnostic is opt-in, advisory, and never rewrites loops or changes lookup order. Confirm the path is performance-sensitive and benchmark it before applying an indexing change.
+
+```json
+{
+	"performancePatterns": {
+		"extensions": [".js", ".jsx", ".ts", ".tsx"],
+		"ignoredFiles": ["src/generated/client.ts"]
+	}
+}
+```
+
 ## Check and autofix controls
 
 Every built-in check is enabled unless its `enabledChecks` entry is `false`. Some checks need a policy block, tool, or repository command before they have work to do. Supported check names are:
@@ -59,6 +72,10 @@ Every built-in check is enabled unless its `enabledChecks` entry is `false`. Som
 		"import": true,
 		"name": true,
 		"forward": true,
+		"accessibility": true,
+		"display-name": true,
+		"performance-patterns": true,
+		"documented-commands": true,
 		"lint": true,
 		"knip": true,
 		"dead-code": true,
@@ -76,7 +93,7 @@ Every built-in check is enabled unless its `enabledChecks` entry is `false`. Som
 }
 ```
 
-A missing or `true` entry enables the check; `false` disables it. `--warn` disables all Terra Quality autofixes for one CLI run. To disable a particular fixer by default, set its name to `false` under `autofix`:
+A missing or `true` entry enables existing checks; the new `accessibility`, `display-name`, and `documented-commands` checks require an explicit `true` during rollout. `false` disables any check. `--warn` disables all Terra Quality autofixes for one CLI run. To disable a particular fixer by default, set its name to `false` under `autofix`:
 
 ```json
 {
@@ -89,11 +106,35 @@ A missing or `true` entry enables the check; `false` disables it. `--warn` disab
 		"dead-code": true,
 		"alias": true,
 		"forward": true,
+		"accessibility": true,
+		"displayName": true,
+		"documentedCommands": true,
 		"repeatedClasses": true,
 		"regexDedup": true
 	}
 }
 ```
+
+The accessibility, display-name, and documented-command checks are opt-in so publishing the package does not make existing consumers fail before they have reviewed or fixed their findings. Set their `enabledChecks` entries to `true` when ready. `performance-patterns` is advisory and runs only when a `performancePatterns` settings block is present. Configure `documentation.commandRoots` to check Markdown command examples and permit the source-evident pnpm flag correction:
+
+```json
+{
+	"enabledChecks": {
+		"accessibility": true,
+		"display-name": true,
+		"documented-commands": true
+	},
+	"documentation": {
+		"commandRoots": ["docs", ".agents"]
+	},
+	"performancePatterns": {
+		"extensions": [".js", ".jsx", ".ts", ".tsx"],
+		"ignoredFiles": ["src/generated/client.ts"]
+	}
+}
+```
+
+The performance check suggests indexing but does not make a rewrite or fail quality. Measure the representative path before deciding whether the change is worthwhile. Browser, broad integration, and benchmark checks should stay behind explicit or scheduled commands, with expensive setup shared within each suite.
 
 The `autofix` keys use camel case for `repeatedClasses` and `regexDedup`, while `enabledChecks` uses kebab case. A missing or `true` fixer entry permits its supported fixes when the CLI is in fix mode. Individual transformations remain conservative and may leave ambiguous cases for review.
 

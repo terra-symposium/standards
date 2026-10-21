@@ -13,12 +13,68 @@ IMPORTS
 // API
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { createQualityCfg, documentSrcFile, documentationFindings, duplicateImportFindings, maintainSrcFile, protectLongImports, removeNonCodeComments } from '../../dist/index.js';
+import { createQualityCfg, documentSrcFile, documentationFindings, documentedCommandFindings, duplicateImportFindings, fixDocumentedCommands, maintainSrcFile, protectLongImports, removeNonCodeComments } from '../../dist/index.js';
 import { fixtureFile, fixtureRoot, fixtureText } from '../../support/fixtures.mjs';
 
 /*//////////////////////////////////////////////////
 TESTS
 //////////////////////////////////////////////////*/
+
+test('documented commands diagnose and fix only deprecated pnpm directory flags in configured shell fences', () => {
+	const root = fixtureRoot('terra-quality-documented-commands-');
+	const file = fixtureFile(
+		root,
+		'docs/commands.md',
+		[
+			'Historical note: `pnpm -C old-tool test` is preserved as prose.',
+			'```sh',
+			'pnpm -C packages/app test',
+			'  pnpm --prefix "packages/docs" build -- --watch',
+			'npm --prefix packages/legacy test',
+			'```',
+			'```text',
+			'pnpm -C examples test',
+			'```',
+		].join('\n'),
+	);
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], documentation: { commandRoots: ['docs'] } });
+	assert.deepEqual(documentedCommandFindings(cfg).map(({ line, command }) => [line, command]), [
+		[3, 'pnpm -C packages/app test'],
+		[4, 'pnpm --prefix "packages/docs" build -- --watch'],
+	]);
+	assert.equal(fixDocumentedCommands(cfg), 2);
+	assert.equal(fixtureText(root, 'docs/commands.md'), [
+		'Historical note: `pnpm -C old-tool test` is preserved as prose.',
+		'```sh',
+		'pnpm --dir packages/app test',
+		'  pnpm --dir "packages/docs" build -- --watch',
+		'npm --prefix packages/legacy test',
+		'```',
+		'```text',
+		'pnpm -C examples test',
+		'```',
+	].join('\n'));
+	assert.equal(fixDocumentedCommands(cfg), 0, 'the transformation is idempotent');
+	assert.deepEqual(documentedCommandFindings(cfg), []);
+});
+
+test('documented command check is disabled without explicit roots and preserves CRLF', () => {
+	const root = fixtureRoot('terra-quality-document-command-disabled-');
+	fixtureFile(root, 'docs/commands.md', '```bash\r\npnpm -C packages/app test\r\n```\r\n');
+	const disabled = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
+	assert.deepEqual(documentedCommandFindings(disabled), []);
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], documentation: { commandRoots: ['docs'] } });
+	assert.equal(fixDocumentedCommands(cfg), 1);
+	assert.equal(fixtureText(root, 'docs/commands.md'), '```bash\r\npnpm --dir packages/app test\r\n```\r\n');
+});
+
+test('documented command autofix preserves mixed line endings', () => {
+	const root = fixtureRoot('terra-quality-document-command-mixed-lines-');
+	fixtureFile(root, 'docs/commands.md', '```sh\r\npnpm -C packages/app test\r\npnpm --prefix packages/docs build\n```\n');
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], documentation: { commandRoots: ['docs'] } });
+	assert.equal(fixDocumentedCommands(cfg), 2);
+	assert.equal(fixtureText(root, 'docs/commands.md'), '```sh\r\npnpm --dir packages/app test\r\npnpm --dir packages/docs build\n```\n');
+});
 
 test('documentation policy independently reports types, exported functions, and inline functions', () => {
 	const root = fixtureRoot('terra-quality-documentation-policy-');

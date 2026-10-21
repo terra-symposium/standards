@@ -12,7 +12,7 @@ IMPORTS
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import ts from 'typescript';
-import { createQualityCfg, fixRegexDedup, fixRepeatedClasses, regexFindings, repeatedClassFindings, runTailwindCanonical, uiPatternFindings } from '../../dist/index.js';
+import { createQualityCfg, fixRegexDedup, fixRepeatedClasses, performancePatternFindings, regexFindings, repeatedClassFindings, runTailwindCanonical, uiPatternFindings } from '../../dist/index.js';
 import { fixtureFile, fixtureRoot, fixtureText } from '../../support/fixtures.mjs';
 import { pathToFileURL } from 'node:url';
 import { resolve } from 'node:path';
@@ -33,6 +33,26 @@ test('repeated-class detection normalizes whitespace and ignores dynamic, one-wo
 	assert.deepEqual(repeatedClassFindings(cfg), []);
 	const defaultCfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.tsx'], repeatedClasses: {} });
 	assert.deepEqual(repeatedClassFindings(defaultCfg), [{ value: 'rounded border bg-card', count: 4, locations: ['src/one.tsx:1', 'src/one.tsx:2', 'src/two.tsx:1', 'src/two.tsx:2'] }]);
+});
+
+test('performance patterns are opt-in and report linear lookups nested in collection callbacks', () => {
+	const root = fixtureRoot('terra-quality-performance-patterns-');
+	fixtureFile(
+		root,
+		'src/view.ts',
+		`const result = items.map((item) => records.find((record) => record.id === item.id));\nconst filtered = items.map((item) => records.filter((record) => record.group === item.group));\nconst direct = items.find((item) => item.active);\nconst computed = items.map((item) => createRecords().find((record) => record.id === item.id));\n`,
+	);
+	const base = { root, sourceRoots: ['src'], extensions: ['.ts'] };
+	const cfg = createQualityCfg(base);
+	assert.deepEqual(performancePatternFindings(cfg), []);
+	const enabled = createQualityCfg({ ...base, performancePatterns: {} });
+	assert.deepEqual(
+		performancePatternFindings(enabled).map(({ method, receiver, line }) => ({ method, receiver, line })),
+		[
+			{ method: 'find', receiver: 'records', line: 1 },
+			{ method: 'filter', receiver: 'records', line: 2 },
+		],
+	);
 });
 test('UI pattern detection applies configured extensions and ignored repository-relative files', () => {
 	const root = fixtureRoot('terra-quality-ui-patterns-');
