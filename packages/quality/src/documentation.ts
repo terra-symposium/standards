@@ -10,7 +10,7 @@ IMPORTS
 // API
 import ts from 'typescript';
 import { displayPath, srcFiles } from './files.js';
-import { extname, relative, sep } from 'node:path';
+import { extname, relative, resolve, sep } from 'node:path';
 import { readFileSync, renameSync, unlinkSync, writeFileSync } from 'node:fs';
 
 // TYPES
@@ -55,6 +55,68 @@ type SrcGroup = 'CONFIG' | 'HELPERS';
 export type DocumentationRequirements = { types?: boolean; functions?: boolean; exportedFunctions?: boolean; noInlineFunctions?: boolean };
 /** A repeated named import reported within one source file. */
 export type DuplicateImportFinding = { file: string; line: number; module: string };
+/** A deprecated pnpm directory flag inside a configured documentation command block. */
+export type DocumentedCommandFinding = { file: string; line: number; command: string; recommendation: string };
+
+const PNPM_FENCE = /^\s*```(?:sh|bash|zsh|shell)\s*$/i;
+const FENCE_CLOSE = /^\s*```\s*$/;
+const PNPM_DIRECTORY_FLAG = /^(\s*(?:\$\s*)?pnpm)\s+(?:-C|--prefix)(\s+)("[^"]+"|'[^']+'|\S+)(.*)$/;
+
+/** Finds obsolete pnpm directory flags in configured Markdown shell fences. */
+export function documentedCommandFindings(cfg: QualityCfg): DocumentedCommandFinding[] {
+	const roots = cfg.documentation?.commandRoots?.map((path) => resolve(cfg.root, path)) ?? [];
+	if (!roots.length) return [];
+	return srcFiles({ ...cfg, sourceRoots: roots, extensions: ['.md', '.mdx'] }).flatMap((file) => {
+		const source = readFileSync(file, 'utf8');
+		const lines = source.split(/(?<=\n)/);
+		let inShellFence = false;
+		return lines.flatMap((segment, index) => {
+			const line = segment.replace(/\r?\n$/, '');
+			if (!inShellFence) {
+				if (PNPM_FENCE.test(line)) inShellFence = true;
+				return [];
+			}
+			if (FENCE_CLOSE.test(line)) {
+				inShellFence = false;
+				return [];
+			}
+			const match = PNPM_DIRECTORY_FLAG.exec(line);
+			return match ? [{ file: displayPath(cfg, file), line: index + 1, command: line.trim(), recommendation: 'replace the pnpm directory flag with --dir' }] : [];
+		});
+	});
+}
+
+/** Replaces only known deprecated pnpm directory flags in configured Markdown shell fences. */
+export function fixDocumentedCommands(cfg: QualityCfg): number {
+	const roots = cfg.documentation?.commandRoots?.map((path) => resolve(cfg.root, path)) ?? [];
+	if (!roots.length) return 0;
+	let fixed = 0;
+	for (const file of srcFiles({ ...cfg, sourceRoots: roots, extensions: ['.md', '.mdx'] })) {
+		const source = readFileSync(file, 'utf8');
+		let inShellFence = false;
+		const updated = source
+			.split(/(?<=\n)/)
+			.map((segment) => {
+				const line = segment.replace(/\r?\n$/, '');
+				const lineEnding = segment.slice(line.length);
+				if (!inShellFence) {
+					if (PNPM_FENCE.test(line)) inShellFence = true;
+					return segment;
+				}
+				if (FENCE_CLOSE.test(line)) {
+					inShellFence = false;
+					return segment;
+				}
+				const match = PNPM_DIRECTORY_FLAG.exec(line);
+				if (!match) return segment;
+				fixed++;
+				return `${match[1]} --dir${match[2]}${match[3]}${match[4]}${lineEnding}`;
+			})
+			.join('');
+		if (source !== updated) writeFileSync(file, updated);
+	}
+	return fixed;
+}
 
 /*//////////////////////////////////////////////////
 DOCUMENTATION

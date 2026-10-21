@@ -51,6 +51,67 @@ export type PatternFixResult = { fixed: number; skipped: number };
 /** One repeated regular expression source and its source locations. */
 export type RegexFinding = { source: string; count: number; locations: string[] };
 
+/** A repeated collection lookup inside another collection callback. */
+export type PerformancePatternFinding = { file: string; line: number; column: number; method: string; receiver: string; recommendation: string };
+
+const COLLECTION_CALLBACKS = new Set(['filter', 'flatMap', 'forEach', 'map', 'reduce', 'some']);
+const REPEATED_LOOKUPS = new Set(['find', 'filter', 'includes', 'indexOf', 'some']);
+
+/** Returns a stable receiver expression suitable for a manual indexing recommendation. */
+function stableReceiver(node: ts.Expression): string | undefined {
+	if (ts.isIdentifier(node)) return node.text;
+	if (ts.isPropertyAccessExpression(node) && ts.isIdentifier(node.expression)) return node.getText();
+	return undefined;
+}
+
+/** Finds the nearest enclosing function passed directly to a collection method. */
+function collectionCallback(node: ts.Node): ts.CallExpression | undefined {
+	for (let current: ts.Node | undefined = node.parent; current; current = current.parent) {
+		if (!ts.isFunctionLike(current)) continue;
+		const call = current.parent;
+		if (!ts.isCallExpression(call) || !call.arguments.includes(current as ts.Expression)) continue;
+		const callee = call.expression;
+		if (ts.isPropertyAccessExpression(callee) && COLLECTION_CALLBACKS.has(callee.name.text)) return call;
+	}
+	return undefined;
+}
+
+/** Reports repeated linear lookups nested in collection callbacks without changing source. */
+export function performancePatternFindings(cfg: QualityCfg, analysis?: QualityAnalysis): PerformancePatternFinding[] {
+	const settings = cfg.performancePatterns;
+	if (!settings) return [];
+	const extensions = new Set(settings.extensions ?? ['.js', '.jsx', '.ts', '.tsx']);
+	const ignoredFiles = new Set(settings.ignoredFiles ?? []);
+	const files = (analysis?.files ?? srcFiles({ ...cfg, extensions: [...extensions] })).filter((file) => extensions.has(file.slice(file.lastIndexOf('.'))));
+	const findings: PerformancePatternFinding[] = [];
+	for (const file of files) {
+		const display = displayPath(cfg, file);
+		if (ignoredFiles.has(display)) continue;
+		const text = analysis?.texts.get(file) ?? readFileSync(file, 'utf8');
+		const source = analysis?.sources.get(file) ?? ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, regexScriptKind(file));
+		if ((source as ts.SourceFile & { parseDiagnostics?: readonly ts.Diagnostic[] }).parseDiagnostics?.length) continue;
+		const visit = (node: ts.Node): void => {
+			if (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression) && REPEATED_LOOKUPS.has(node.expression.name.text) && collectionCallback(node)) {
+				const receiver = stableReceiver(node.expression.expression);
+				if (receiver) {
+					const position = source.getLineAndCharacterOfPosition(node.getStart(source));
+					findings.push({
+						file: display,
+						line: position.line + 1,
+						column: position.character + 1,
+						method: node.expression.name.text,
+						receiver,
+						recommendation: `Consider precomputing a Map or Set for ${receiver} before this collection callback; measure the representative path before changing it.`,
+					});
+				}
+			}
+			ts.forEachChild(node, visit);
+		};
+		visit(source);
+	}
+	return findings;
+}
+
 /*//////////////////////////////////////////////////
 HELPERS
 //////////////////////////////////////////////////*/
