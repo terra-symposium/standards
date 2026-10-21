@@ -9,12 +9,7 @@
 	"renameExports": true,
 	"prettierPrintWidth": 200,
 	"github": {
-		"repositories": [
-			"salesphere-vh/salesphere",
-			"Terra-Symposium/terra-symposium-website",
-			"Terra-Symposium/terra-shared",
-			"kaimacann/personal-monorepo"
-		],
+		"repositories": ["salesphere-vh/salesphere", "Terra-Symposium/terra-symposium-website", "Terra-Symposium/standards", "kaimacann/portfolio"],
 		"requiredFeatures": ["dependencyGraph", "dependabotAlerts", "malwareAlerts", "securityUpdates", "versionUpdates", "groupedUpdates"],
 		"featureExemptions": {
 			"salesphere-vh/salesphere": ["dependencyGraph", "dependabotAlerts", "malwareAlerts", "securityUpdates", "versionUpdates", "groupedUpdates"]
@@ -24,6 +19,7 @@
 		{ "name": "build", "command": "pnpm", "args": ["run", "build"] },
 		{ "name": "test", "command": "pnpm", "args": ["run", "test"] }
 	],
-	"documentation": {"required":{"types":true,"functions":true,"exportedFunctions":true,"noInlineFunctions":false}},
-	"enabledChecks": {"format":true,"lint":true,"knip":true,"type":true,"recommend":true,"name":true,"alias":true}
+	"documentation": { "required": { "types": true, "functions": true, "exportedFunctions": true, "noInlineFunctions": false } },
+	"tailwindCanonical": { "stylesheet": "docs/src/tailwind.css", "sourceRoots": ["docs/src/components"] },
+	"enabledChecks": { "format": true, "lint": true, "knip": true, "type": true, "recommend": true, "name": true, "alias": true, "tailwind-canonical": true }
 }

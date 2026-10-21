@@ -19,7 +19,7 @@ Use this skill to implement or review changes across Terra repositories.
 ## Boundaries
 
 - Keep application logic in its owning package.
-- Fix shared tooling at its source in `terra-shared`.
+- Fix shared tooling at its source in `standards`.
 - Avoid one-off consumer checks when a reusable rule belongs in shared tooling.
 - Do not suppress findings without a documented reason.
 - Keep secrets in approved stores. Never place credentials in source or artifacts.

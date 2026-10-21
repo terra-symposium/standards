@@ -5,7 +5,7 @@ description: Run Terra Quality, fix findings, and report evidence.
 
 # Quality
 
-Use this skill to audit or repair a Terra repository with `@terra-symposium/quality`.
+Use this skill to audit or repair a Terra repository with `@terra-symposium/standards-quality`.
 
 ## Workflow
 

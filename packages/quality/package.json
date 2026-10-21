@@ -1,8 +1,8 @@
 {
-	"name": "@terra-symposium/quality",
-	"version": "0.5.0",
+	"name": "@terra-symposium/standards-quality",
+	"version": "0.9.1",
 	"description": "Configurable quality checks and maintenance tooling for Terra Symposium repositories",
-	"homepage": "https://terra-symposium-quality.netlify.app/",
+	"homepage": "https://standards-docs.netlify.app/",
 	"type": "module",
 	"engines": {
 		"node": ">=18.18"
@@ -18,7 +18,7 @@
 	},
 	"repository": {
 		"type": "git",
-		"url": "git+https://github.com/Terra-Symposium/terra-shared.git"
+		"url": "git+https://github.com/Terra-Symposium/standards.git"
 	},
 	"exports": {
 		".": "./dist/index.js",
@@ -35,7 +35,7 @@
 	"scripts": {
 		"build": "tsc -p tsconfig.json",
 		"prepare": "npm run build",
-		"test": "node --test test/*.test.mjs"
+		"test": "node --test"
 	},
 	"dependencies": {
 		"typescript": "^5.0.0"

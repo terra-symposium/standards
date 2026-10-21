@@ -1,5 +1,5 @@
 {
-	"name": "@terra-symposium/reporting",
+	"name": "@terra-symposium/standards-reporting",
 	"version": "0.3.0",
 	"description": "Reusable Playwright evidence reporting for Terra repositories",
 	"type": "module",
@@ -14,7 +14,7 @@
 	},
 	"repository": {
 		"type": "git",
-		"url": "git+https://github.com/Terra-Symposium/terra-shared.git"
+		"url": "git+https://github.com/Terra-Symposium/standards.git"
 	},
 	"exports": {
 		".": "./dist/core.js",

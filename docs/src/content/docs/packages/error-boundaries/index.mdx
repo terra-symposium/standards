@@ -3,14 +3,14 @@ title: Error boundaries
 description: Catch React render failures and reuse small route-error helpers.
 ---
 
-`@terra-symposium/error-boundaries` provides a React error boundary and wrapper, shared HTTP-status copy, and a helper for framework-provided Next.js error digests. It leaves fallback presentation, telemetry, and route behavior to the application.
+`@terra-symposium/standards-error-boundaries` provides a React error boundary and wrapper, shared HTTP-status copy, and a helper for framework-provided Next.js error digests. It leaves fallback presentation, telemetry, and route behavior to the application.
 
 ## Install
 
 The package expects React and React DOM `>=18` as peer dependencies:
 
 ```sh
-pnpm add @terra-symposium/error-boundaries
+pnpm add @terra-symposium/standards-error-boundaries
 ```
 
 ## React boundary
@@ -18,7 +18,7 @@ pnpm add @terra-symposium/error-boundaries
 Import from the package root or the explicit React entry point:
 
 ```tsx
-import { ErrorBoundary } from '@terra-symposium/error-boundaries/react';
+import { ErrorBoundary } from '@terra-symposium/standards-error-boundaries/react';
 
 <ErrorBoundary
 	name="Account panel"
@@ -51,7 +51,7 @@ The `/astro` entry point provides `ErrorStatus`, `ErrorStatusCopy`, `ERROR_STATU
 
 ```astro
 ---
-import { errorStatusCopy } from '@terra-symposium/error-boundaries/astro';
+import { errorStatusCopy } from '@terra-symposium/standards-error-boundaries/astro';
 
 const copy = errorStatusCopy(Astro.response.status);
 const { title, description } = copy;
@@ -69,8 +69,8 @@ Use the returned title and description in your Astro error page or response. The
 The `/next` entry point exports the `NextRouteError` and `NextRouteErrorProps` types and `errorDigest(error)`. The helper returns the framework's `digest` field without exposing the error message as an identifier.
 
 ```tsx
-import { errorDigest } from '@terra-symposium/error-boundaries/next';
-import type { NextRouteErrorProps } from '@terra-symposium/error-boundaries/next';
+import { errorDigest } from '@terra-symposium/standards-error-boundaries/next';
+import type { NextRouteErrorProps } from '@terra-symposium/standards-error-boundaries/next';
 
 export default function ErrorPage({ error }: NextRouteErrorProps) {
 	const digest = errorDigest(error);
@@ -82,9 +82,9 @@ export default function ErrorPage({ error }: NextRouteErrorProps) {
 
 | Import                                    | Exports                                                                                            |
 | ----------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| `@terra-symposium/error-boundaries`       | All React, status-copy, and Next.js helpers.                                                       |
-| `@terra-symposium/error-boundaries/react` | `ErrorBoundary`, `ErrorBoundaryProps`, `ErrorBoundaryState`, `ErrorReporter`, `withErrorBoundary`. |
-| `@terra-symposium/error-boundaries/astro` | `ErrorStatus`, `ErrorStatusCopy`, `ERROR_STATUS_COPY`, `errorStatusCopy`.                          |
-| `@terra-symposium/error-boundaries/next`  | `NextRouteError`, `NextRouteErrorProps`, `errorDigest`.                                            |
+| `@terra-symposium/standards-error-boundaries`       | All React, status-copy, and Next.js helpers.                                                       |
+| `@terra-symposium/standards-error-boundaries/react` | `ErrorBoundary`, `ErrorBoundaryProps`, `ErrorBoundaryState`, `ErrorReporter`, `withErrorBoundary`. |
+| `@terra-symposium/standards-error-boundaries/astro` | `ErrorStatus`, `ErrorStatusCopy`, `ERROR_STATUS_COPY`, `errorStatusCopy`.                          |
+| `@terra-symposium/standards-error-boundaries/next`  | `NextRouteError`, `NextRouteErrorProps`, `errorDigest`.                                            |
 
 The helpers do not replace application-specific fallback design, privacy-safe logging, route conventions, or deployment configuration.

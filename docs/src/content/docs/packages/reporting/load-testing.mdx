@@ -3,7 +3,7 @@ title: Load testing
 description: Capture page and operation timings and apply configurable budgets.
 ---
 
-`@terra-symposium/reporting` can attach timing measurements to Playwright results and grade each measurement against warning and failure budgets.
+`@terra-symposium/standards-reporting` can attach timing measurements to Playwright results and grade each measurement against warning and failure budgets.
 
 ## Configure budgets
 
@@ -34,7 +34,7 @@ A test key uses `<repo-relative test file>::<full title path>`. Operation keys m
 Import `loadTest` for suites that need page-load and operation timings:
 
 ```ts
-import { loadTest as test, expect } from '@terra-symposium/reporting/playwright';
+import { loadTest as test, expect } from '@terra-symposium/standards-reporting/playwright';
 
 test('account summary loads', async ({ load, page }) => {
 	load.setTestBudget({ warnMs: 4000, failMs: 8000 });

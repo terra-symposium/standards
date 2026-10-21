@@ -1,4 +1,4 @@
-# Terra Shared repository hygiene
+# Standards repository hygiene
 
 Separate Astro/React dashboard for admins of repositories that install the Terra Hygiene GitHub App. The site stores normalized test, quality, and commit counts in Neon. It discards uploaded report contents after parsing and never stores source files or build logs.
 
@@ -15,7 +15,7 @@ The connected repository workflow generates JUnit XML and a Terra Quality JSON r
 
 The `main` and `development` branches are tracked by default. Full history can be imported locally at any time, and reports can be refreshed by rerunning the local importer. No scheduled function, Netlify deployment, or GitHub Actions usage is needed for local imports.
 
-The consumer workflow invokes `@terra-symposium/quality` for the versioned `terra-quality.json` and local Git history report. The history command supports explicit branch and base values:
+The consumer workflow invokes `@terra-symposium/standards-quality` for the versioned `terra-quality.json` and local Git history report. The history command supports explicit branch and base values:
 
 ```sh
 pnpm exec terra-quality history --branch main --report-json terra-history.json
@@ -49,6 +49,6 @@ For the Terra Symposium website, import test and quality metrics from a clean ch
 pnpm --filter @terra-symposium/hygiene-dashboard reports:import -- --repository Terra-Symposium/terra-symposium-website --checkout /path/to/terra-symposium-website --branch development
 ```
 
-Use `--branch main` for the main branch. The importer runs the repository's JUnit suite and `@terra-symposium/quality@0.5.0`, then discards the raw files. Its current test command is specific to the Terra Symposium website; another repository needs its JUnit test command configured before local test metrics can be imported. If a branch has no `quality.json`, the importer uses `origin/development:quality.json` and records that policy branch beside the local report.
+Use `--branch main` for the main branch. The importer runs the repository's JUnit suite and `@terra-symposium/standards-quality@0.5.0`, then discards the raw files. Its current test command is specific to the Terra Symposium website; another repository needs its JUnit test command configured before local test metrics can be imported. If a branch has no `quality.json`, the importer uses `origin/development:quality.json` and records that policy branch beside the local report.
 
 For UI-only work, `pnpm --filter @terra-symposium/hygiene-dashboard dev` starts Astro without Netlify Functions. Run `pnpm --filter @terra-symposium/hygiene-dashboard test` for parser, authorization, score, and report policy tests.

@@ -1,4 +1,4 @@
-# @terra-symposium/reporting
+# @terra-symposium/standards-reporting
 
 ## 0.3.0
 
