@@ -1,5 +1,11 @@
 # @terra-symposium/standards-quality
 
+## 1.0.0
+
+### Major Changes
+
+- Remove repository-specific source exclusion settings so configured source roots are scanned consistently. Update consumer `quality.json` files that use removed exclusion fields.
+
 ## 0.10.0
 
 ### Minor Changes
