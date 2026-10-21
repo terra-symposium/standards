@@ -13,14 +13,6 @@
 		"aliases": { "type": "object", "additionalProperties": { "type": "string" } },
 		"frameworkEntryExports": { "type": "object", "additionalProperties": { "type": "array", "items": { "type": "string" } } },
 		"externalPrefixes": { "type": "array", "items": { "type": "string" } },
-		"skippedDirectories": { "type": "array", "items": { "type": "string" } },
-		"skippedFiles": { "type": "array", "items": { "type": "string" } },
-		"excludeTests": { "type": "boolean", "description": "Exclude files ending in .test.* and .spec.* from configured quality source scans." },
-		"singleUse": {
-			"type": "object",
-			"properties": { "skippedDirectories": { "type": "array", "items": { "type": "string" } } },
-			"additionalProperties": false
-		},
 		"renameExports": { "type": "boolean" },
 		"protectedIdentifiers": { "type": "array", "items": { "type": "string" } },
 		"enabledChecks": { "$ref": "#/$defs/toggles" },
@@ -64,8 +56,7 @@
 			"type": "object",
 			"properties": {
 				"minimumCount": { "type": "number" },
-				"extensions": { "type": "array", "items": { "type": "string" } },
-				"ignoredDirectories": { "type": "array", "items": { "type": "string" } }
+				"extensions": { "type": "array", "items": { "type": "string" } }
 			},
 			"additionalProperties": false
 		},
@@ -74,7 +65,6 @@
 			"properties": {
 				"minimumCount": { "type": "number" },
 				"extensions": { "type": "array", "items": { "type": "string" } },
-				"ignoredFiles": { "type": "array", "items": { "type": "string" } },
 				"sharedModule": { "type": "string", "minLength": 1 }
 			},
 			"additionalProperties": false
@@ -83,7 +73,6 @@
 			"type": "object",
 			"properties": {
 				"forbidden": { "type": "array", "items": { "type": "string" } },
-				"ignoredFiles": { "type": "array", "items": { "type": "string" } },
 				"extensions": { "type": "array", "items": { "type": "string" } }
 			},
 			"additionalProperties": false
@@ -95,16 +84,7 @@
 				"requiredFeatures": {
 					"type": "array",
 					"uniqueItems": true,
-					"items": { "enum": ["dependencyGraph", "dependabotAlerts", "malwareAlerts", "securityUpdates", "versionUpdates", "groupedUpdates", "secretScanning", "pushProtection", "codeScanning"] }
-				},
-				"featureExemptions": {
-					"type": "object",
-					"propertyNames": { "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$" },
-					"additionalProperties": {
-						"type": "array",
-						"uniqueItems": true,
-						"items": { "enum": ["dependencyGraph", "dependabotAlerts", "malwareAlerts", "securityUpdates", "versionUpdates", "groupedUpdates", "secretScanning", "pushProtection", "codeScanning"] }
-					}
+				"items": { "enum": ["dependencyGraph", "dependabotAlerts", "malwareAlerts", "securityUpdates", "versionUpdates", "groupedUpdates", "secretScanning", "pushProtection", "codeScanning"] }
 				}
 			},
 			"additionalProperties": false

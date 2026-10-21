@@ -95,7 +95,7 @@ export function deadCodeTypeProgram(cfg: QualityCfg): ts.Program {
 /**
  * Checks the single-use-specific scope without changing other quality checks.
  *
- * @param cfg Quality configuration containing rule-specific directory exclusions.
+ * @param cfg Quality configuration containing source roots.
  * @param file Absolute source path being considered.
  *
  * @return `true` when the file is in scope for the single-use rule.
@@ -114,7 +114,7 @@ function inSingleUseScope(cfg: QualityCfg, file: string): boolean {
  * @return Whether the path is eligible for single-use analysis.
  */
 function isSingleUseCandidate(cfg: QualityCfg, file: string): boolean {
-	return inSingleUseScope(cfg, file) && !(cfg.singleUse?.skippedDirectories ?? []).some((directory) => file === directory || file.startsWith(`${directory}${sep}`));
+	return inSingleUseScope(cfg, file);
 }
 
 /**
