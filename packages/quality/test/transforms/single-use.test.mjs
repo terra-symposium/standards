@@ -1,5 +1,5 @@
 /**
- * packages/quality/test/single-use.test.mjs
+ * packages/quality/test/transforms/single-use.test.mjs
  * Verifies candidate discovery, semantic safety classification, cross-file
  * type inlining, import editing, report generation, and no-op boundaries.
  * The fixtures intentionally exercise every classification branch. A finding
@@ -15,8 +15,8 @@ IMPORTS
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import ts from 'typescript';
-import { createQualityCfg, fixSingleUseDeclarations, fixSingleUseTypes, singleUseFindings } from '../dist/index.js';
-import { fixtureFile, fixtureRoot, fixtureText } from './support.mjs';
+import { createQualityCfg, fixSingleUseDeclarations, fixSingleUseTypes, singleUseFindings } from '../../dist/index.js';
+import { fixtureFile, fixtureRoot, fixtureText } from '../../support/fixtures.mjs';
 test('single-use functions with attached prose require review and remain unchanged', () => {
 	const root = fixtureRoot('terra-quality-single-use-comments-');
 	fixtureFile(

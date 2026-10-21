@@ -9,7 +9,7 @@ Wrap the consuming repository's existing Playwright config with `withResponsiveP
 
 ```ts
 import { defineConfig } from '@playwright/test';
-import { withResponsivePlaywright } from '@terra-symposium/reporting/viewports';
+import { withResponsivePlaywright } from '@terra-symposium/standards-reporting/viewports';
 
 export default withResponsivePlaywright(
 	defineConfig({
@@ -55,7 +55,7 @@ Aliases include `phone` for `mobile`, `tablet` for `md`, `desktop`/`computer`/`d
 Import `diagnosticsTest` where a test suite should attach browser messages:
 
 ```ts
-import { diagnosticsTest as test, expect } from '@terra-symposium/reporting/playwright';
+import { diagnosticsTest as test, expect } from '@terra-symposium/standards-reporting/playwright';
 
 test('account page is healthy', async ({ page }) => {
 	await page.goto('/account');
@@ -79,7 +79,7 @@ Use `ProgressReporter` when the repository wants the artifact reporter without t
 export default {
 	reporter: [
 		[
-			'@terra-symposium/reporting/playwright',
+			'@terra-symposium/standards-reporting/playwright',
 			{
 				outputRoot: 'test-results/visual',
 				reportFile: 'report.xlsx',

@@ -13,7 +13,7 @@ import ts from 'typescript';
 import { createRequire } from 'node:module';
 import { dirname, relative, resolve } from 'node:path';
 import { displayPath, srcFiles } from './files.js';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 
 // TYPES
@@ -282,20 +282,21 @@ TAILWIND
  * @param root Repository root from which package resolution should begin.
  * @param id Stylesheet package identifier or path.
  * @param base Directory used for relative fallback resolution.
+ * @param stylesheetDir Directory of the configured stylesheet, used to find workspace dependencies.
  *
  * @return Absolute path to the stylesheet candidate.
  */
-function resolveStylesheet(root: string, id: string, base: string): string {
+function resolveStylesheet(root: string, id: string, base: string, stylesheetDir: string): string {
 	const require = createRequire(resolve(root, 'package.json'));
 	const known = { tailwindcss: 'tailwindcss/index.css', 'tw-animate-css': 'tw-animate-css/dist/tw-animate.css', 'shadcn/tailwind.css': 'shadcn/dist/tailwind.css' } as Record<string, string>;
 	const candidates = [known[id], id].filter((c): c is string => Boolean(c));
 	for (const candidate of candidates) {
-		for (const packageRoot of [resolve(root, 'node_modules'), resolve(root, 'astro/node_modules')]) {
+		for (const packageRoot of [resolve(root, 'node_modules'), resolve(root, 'astro/node_modules'), resolve(stylesheetDir, 'node_modules'), resolve(stylesheetDir, '../node_modules')]) {
 			const directPath = resolve(packageRoot, candidate);
-			if (existsSync(directPath)) return directPath;
+			if (existsSync(directPath) && statSync(directPath).isFile()) return directPath;
 		}
 		try {
-			return require.resolve(candidate, { paths: [base, root, resolve(root, 'astro')] });
+			return require.resolve(candidate, { paths: [base, stylesheetDir, resolve(stylesheetDir, '..'), root, resolve(root, 'astro')] });
 		} catch {
 			// Try the next package-resolution strategy.
 		}
@@ -309,11 +310,13 @@ function resolveStylesheet(root: string, id: string, base: string): string {
  * @param root Repository root used for package resolution.
  * @param id Stylesheet package identifier or path.
  * @param base Base directory for fallback resolution.
+ * @param stylesheetDir Directory of the configured stylesheet, used to find workspace dependencies.
  *
  * @return Loaded stylesheet path, resolution base, and source content.
  */
-async function loadStylesheet(root: string, id: string, base: string): Promise<{ path: string; base: string; content: string }> {
-	const path = resolveStylesheet(root, id, base);
+async function loadStylesheet(root: string, id: string, base: string, stylesheetDir: string): Promise<{ path: string; base: string; content: string }> {
+	const path = resolveStylesheet(root, id, base, stylesheetDir);
+	if (!existsSync(path) || !statSync(path).isFile()) throw new Error(`Tailwind stylesheet import does not resolve to a file: ${id}`);
 	return { path, base: dirname(path), content: readFileSync(path, 'utf8') };
 }
 
@@ -322,11 +325,13 @@ async function loadStylesheet(root: string, id: string, base: string): Promise<{
  *
  * @param consumerRequire CommonJS resolver rooted at the consumer package.
  * @param root Repository root whose dependency tree should be searched.
+ * @param stylesheetPath Configured stylesheet whose workspace dependencies should also be searched.
  *
  * @return Absolute path to the Tailwind import entry.
  */
-function resolveConsumerImport(consumerRequire: NodeRequire, root: string): string {
-	const paths = [root, resolve(root, 'astro')];
+function resolveConsumerImport(consumerRequire: NodeRequire, root: string, stylesheetPath: string): string {
+	const stylesheetDir = dirname(stylesheetPath);
+	const paths = [root, resolve(root, 'astro'), stylesheetDir, resolve(stylesheetDir, '..')];
 	const manifestPath = consumerRequire.resolve('tailwindcss/package.json', { paths });
 	const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as { exports?: { '.': { import?: string } }; module?: string; main?: string };
 	const entry = manifest.exports?.['.']?.import ?? manifest.module ?? manifest.main;
@@ -403,7 +408,7 @@ export async function runTailwindCanonical(cfg: QualityCfg, fix = false): Promis
 		) => Promise<{ canonicalizeCandidates: (candidates: string[]) => string[] }>;
 	};
 	try {
-		const packagePath = resolveConsumerImport(consumerRequire, cfg.root);
+		const packagePath = resolveConsumerImport(consumerRequire, cfg.root, stylesheetPath);
 		tailwind = (await import(pathToFileURL(packagePath).href)) as typeof tailwind;
 	} catch {
 		throw new Error('Tailwind canonical check could not load the consumer repository Tailwind package.');
@@ -413,7 +418,7 @@ export async function runTailwindCanonical(cfg: QualityCfg, fix = false): Promis
 		return 0;
 	}
 	const stylesheet = readFileSync(stylesheetPath, 'utf8');
-	const designSystem = await tailwind.__unstable__loadDesignSystem(stylesheet, { from: stylesheetPath, loadStylesheet: (id, base) => loadStylesheet(cfg.root, id, base) });
+	const designSystem = await tailwind.__unstable__loadDesignSystem(stylesheet, { from: stylesheetPath, loadStylesheet: (id, base) => loadStylesheet(cfg.root, id, base, dirname(stylesheetPath)) });
 	const scanCfg = cfg.tailwindCanonical.sourceRoots ? { ...cfg, sourceRoots: cfg.tailwindCanonical.sourceRoots.map((r) => resolve(cfg.root, r)) } : cfg;
 	const files = srcFiles(scanCfg).filter((f) => /\.(?:astro|cjs|js|jsx|mjs|ts|tsx)$/.test(f));
 	const findings: { file: string; start: number; end: number; original: string; replacement: string; line: number; column: number }[] = [];
@@ -445,8 +450,8 @@ export async function runTailwindCanonical(cfg: QualityCfg, fix = false): Promis
 	console.info(`Tailwind canonical class check passed: ${files.length} source files scanned.`);
 	return 0;
 }
-const REGEX_REGISTRY_MARKER = '// Generated by @terra-symposium/quality regex-dedup. Do not edit.';
-const REGEX_DECLARATION_MARKER = '// Generated by @terra-symposium/quality regex-dedup. Do not edit.';
+const REGEX_REGISTRY_MARKER = '// Generated by @terra-symposium/standards-quality regex-dedup. Do not edit.';
+const REGEX_DECLARATION_MARKER = '// Generated by @terra-symposium/standards-quality regex-dedup. Do not edit.';
 /** Parsed regular-expression candidate and the source context needed to rewrite it safely. */
 type RegexCandidate = { file: string; source: string; expression: string; node: ts.Node; ast: ts.SourceFile; rewritable: boolean };
 /** State read from or written to the optional shared regex module and declaration file. */

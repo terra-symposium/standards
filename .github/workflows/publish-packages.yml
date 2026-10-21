@@ -24,20 +24,20 @@ jobs:
         working-directory: packages/quality
         run: |
           version=$(node -p "require('./package.json').version")
-          npm view "@terra-symposium/quality@$version" version >/dev/null 2>&1 || npm publish --access public
+          npm view "@terra-symposium/standards-quality@$version" version >/dev/null 2>&1 || npm publish --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
       - name: Publish error boundaries when missing
         working-directory: packages/error-boundaries
         run: |
           version=$(node -p "require('./package.json').version")
-          npm view "@terra-symposium/error-boundaries@$version" version >/dev/null 2>&1 || npm publish --access public
+          npm view "@terra-symposium/standards-error-boundaries@$version" version >/dev/null 2>&1 || npm publish --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
       - name: Publish reporting when missing
         working-directory: packages/reporting
         run: |
           version=$(node -p "require('./package.json').version")
-          npm view "@terra-symposium/reporting@$version" version >/dev/null 2>&1 || npm publish --access public
+          npm view "@terra-symposium/standards-reporting@$version" version >/dev/null 2>&1 || npm publish --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

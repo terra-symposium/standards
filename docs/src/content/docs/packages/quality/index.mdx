@@ -3,7 +3,7 @@ title: Terra Quality
 description: Install, configure, and run the Terra Quality source checker and repository CLI.
 ---
 
-`@terra-symposium/quality` coordinates built-in JavaScript and TypeScript checks with tools and commands configured by your repository. It uses `quality.json` for scope and policy and provides the `terra-quality` executable.
+`@terra-symposium/standards-quality` coordinates built-in JavaScript and TypeScript checks with tools and commands configured by your repository. It uses `quality.json` for scope and policy and provides the `terra-quality` executable.
 
 Terra Quality does not install project tools or create their native configuration. Install and configure any enabled formatter, linter, reachability checker, type checker, build, or test command in the consuming repository.
 
@@ -12,7 +12,7 @@ Terra Quality does not install project tools or create their native configuratio
 1. [Install the package and choose a first run](/packages/quality/setup/).
 2. [Configure source scope, checks, tools, and commands](/packages/quality/configuration/).
 3. [Choose local and CI run modes](/packages/quality/workflows/).
-4. [Review each check's behavior and limits](/packages/quality/checks/).
+4. [Review checks and their limits](#checks).
 5. [Resolve common setup and run issues](/packages/quality/troubleshooting/).
 
 ## How a run works
@@ -29,13 +29,549 @@ The package requires Node.js `>=18.18`. Checks target configured JavaScript and 
 
 The package root re-exports its library API. Explicit subpaths are available for focused imports:
 
-| Import                                       | Use                                                              |
-| -------------------------------------------- | ---------------------------------------------------------------- |
-| `@terra-symposium/quality`                   | Shared check, configuration, analysis, and maintenance APIs.     |
-| `@terra-symposium/quality/cli`               | CLI configuration loading, dispatch, and runner functions.       |
-| `@terra-symposium/quality/naming`            | Naming rules, findings, and syntax-aware rename helpers.         |
-| `@terra-symposium/quality/object-forwarding` | Forwarding findings and conservative autofixes.                  |
-| `@terra-symposium/quality/single-use`        | Single-consumer analysis and safe declaration maintenance.       |
-| `@terra-symposium/quality/port`              | Helpers for inspecting local TCP listeners and acquiring a port. |
+| Import                                                 | Use                                                              |
+| ------------------------------------------------------ | ---------------------------------------------------------------- |
+| `@terra-symposium/standards-quality`                   | Shared check, configuration, analysis, and maintenance APIs.     |
+| `@terra-symposium/standards-quality/cli`               | CLI configuration loading, dispatch, and runner functions.       |
+| `@terra-symposium/standards-quality/naming`            | Naming rules, findings, and syntax-aware rename helpers.         |
+| `@terra-symposium/standards-quality/object-forwarding` | Forwarding findings and conservative autofixes.                  |
+| `@terra-symposium/standards-quality/single-use`        | Single-consumer analysis and safe declaration maintenance.       |
+| `@terra-symposium/standards-quality/port`              | Helpers for inspecting local TCP listeners and acquiring a port. |
 
 `portOwners(port)` uses `lsof` to find listeners. `acquirePort(port)` sends `SIGTERM` and, if needed, `SIGKILL` to processes using that port before waiting for it to become available. Use it only when the caller owns those processes.
+
+## Checks
+
+Use this page to see what each check reports, how it is configured, and where automated fixes stop. The [CLI workflow guide](/packages/quality/workflows/) explains focused and full runs; [configuration](/packages/quality/configuration/) lists every field.
+
+#### Source quality
+
+#### Document
+
+Source headers, declaration documentation, section layout, and whitespace checks.
+
+**Toggle:** `enabledChecks.document` · **Fix:** `autofix.document` · **Command:** `document`
+
+Maintains source headers, import groups, section layout, whitespace, and TSDoc shape. It scaffolds minimal tags required by documentation policy but does not invent prose.
+
+```json
+{
+	"documentation": {
+		"required": { "types": true, "functions": true, "exportedFunctions": true, "noInlineFunctions": false }
+	}
+}
+```
+
+“Types” means classes, enums, interfaces, and type aliases. “Functions” means named function declarations. `exportedFunctions` can require only exported named functions when `functions` is false. `noInlineFunctions` reports arrow functions and function expressions and has no safe autofix. `maintain` remains a compatibility alias for `document`.
+
+Replace generated scaffolding placeholders with descriptions of stable public intent and current signatures.
+
+**Before** — the public function has no meaningful summary:
+
+```ts
+export function formatPrice(amount: number): string {
+	return `$${amount.toFixed(2)}`;
+}
+```
+
+**After** — a maintainer explains its intent and parameter:
+
+```ts
+/** Formats a price in US dollars with two decimal places.
+ * @param amount Price in dollars.
+ * @returns The formatted price.
+ */
+export function formatPrice(amount: number): string {
+	return `$${amount.toFixed(2)}`;
+}
+```
+
+#### Format
+
+Deterministic formatting through Prettier and canonical import layout.
+
+**Toggle:** `enabledChecks.format` · **Fix:** `autofix.format` · **Command:** `format`
+
+Runs Prettier on selected files and applies canonical layout protections, including configured handling of long one-line imports. Formatting changes presentation, preserves program meaning, and is separate from lint and semantic refactoring.
+
+Configure `tools.prettier`, `prettierPrintWidth`, and `oneLineImports`. Prettier discovers its native configuration; this package does not install it. Install Prettier in the consuming repository with `pnpm add -D prettier`. For Astro files, also install `prettier-plugin-astro` and configure the plugin and `.astro` parser in `.prettierrc.mjs`; see [setup](/packages/quality/setup/) for an example.
+
+**Before**
+
+```ts
+const result = { name: 'Terra', active: true };
+```
+
+**After** — Prettier applies the repository's configured layout:
+
+```ts
+const result = { name: 'Terra', active: true };
+```
+
+#### Import validation
+
+Resolve local imports using configured roots, extensions, and aliases.
+
+**Toggle:** `enabledChecks.import` · **Fix:** none
+
+Resolves relative and aliased imports in the configured source scope, including supported extensionless paths, index modules, and module forms. It reports unresolved local targets; there is no autofix because choosing a replacement requires semantic judgment.
+
+Configure `sourceRoots`, `extensions`, `aliases`, `externalPrefixes`, `skippedDirectories`, and `skippedFiles`. External prefixes mark intentionally external namespaces; aliases map import prefixes to repository paths. Keep exemptions narrow so they do not hide broken local imports.
+
+**Before** — the relative target does not exist:
+
+```ts
+import { parseUser } from './users/parseUser.js';
+```
+
+**After** — point at the actual module (example repository layout: `src/user/parse-user.ts`):
+
+```ts
+import { parseUser } from '../user/parse-user.js';
+```
+
+#### Name
+
+Find naming drift and apply safe syntax-aware identifier renames.
+
+**Toggle:** `enabledChecks.name` · **Fix:** `autofix.name`
+
+Finds naming drift and safely renames whole words or prefixes after checking syntax, scope, collisions, protected paths, exports, shorthand properties, and JSX. Ambiguous or conflicting edits remain findings.
+
+Use `protectedIdentifiers` for stable domain names, public vocabulary, and abbreviations. Export renaming is off by default; enable it with `renameExports`. `--strict` fails on naming errors; `--warn` reports without renaming. Review API-facing edits before accepting them.
+
+**Before** — `command` is a configured long-word replacement:
+
+```ts
+const commandName = 'build';
+run(commandName);
+```
+
+**After** — the safe rename updates the declaration and its references:
+
+```ts
+const cmdName = 'build';
+run(cmdName);
+```
+
+#### Lint
+
+Invoke repository-configured ESLint on selected files.
+
+**Toggle:** `enabledChecks.lint` · **Fix:** `autofix.lint`
+
+Runs ESLint and propagates its exit status; fix mode passes ESLint's fix option. The package coordinates ESLint but does not define or install lint rules.
+
+Set `tools.eslint` and optional `lintRoots`; use native ESLint configuration for project plugins and rules. Avoid broad automatic fixes when product or security judgment is required.
+
+**Before** — if the repository enables ESLint's `no-console` rule:
+
+```ts
+function saveRecord(record: RecordData) {
+	console.log('saving');
+	return persist(record);
+}
+```
+
+**After** — remove or replace the disallowed logging according to repository policy:
+
+```ts
+function saveRecord(record: RecordData) {
+	return persist(record);
+}
+```
+
+The exact diagnostic and fix depend on the consuming repository's ESLint rules.
+
+#### Knip
+
+Find unused files, exports, dependencies, and unreachable code with Knip.
+
+**Toggle:** `enabledChecks.knip` · **Fix:** `autofix.knip` · **Command:** `knip`
+
+Runs Knip for unused files, exports, dependencies, and reachability. A finding means an item is unreachable from its configured entry points/project model, which may omit dynamic imports, plugins, or framework conventions.
+
+Set `tools.knip` and use its native config as needed. If entry-point metadata is incomplete, disable or scope the check; review deletion suggestions.
+
+**Before** — a dependency is declared but never imported:
+
+```json
+{ "dependencies": { "unused-helper": "^1.0.0", "zod": "^4.0.0" } }
+```
+
+**After** — after verifying it is not used through dynamic loading or a plugin, remove the unused entry:
+
+```json
+{ "dependencies": { "zod": "^4.0.0" } }
+```
+
+Knip reports reachability; review the finding before removing code or dependencies.
+
+#### Type
+
+Run selected-source or project-wide TypeScript checks.
+
+**Toggle:** `enabledChecks.type` · **Fix:** none · **Command:** `types`
+
+Type checking targets selected source files or the configured TypeScript project, which may inspect files beyond the changed-file set.
+
+Configure `tools.tsc`, `tsconfig`, `typecheckRoots`, and `typecheckExtensions`; `typecheckCommand` runs a repository-owned executable and args. Types help make invalid states harder to represent, but do not replace runtime validation at untrusted boundaries.
+
+**Before** — a string status is passed where the API requires a number:
+
+```ts
+function setStatus(code: number) {}
+const status = '404';
+setStatus(status);
+```
+
+**After** — use a number or parse validated external input at the boundary:
+
+```ts
+function setStatus(code: number) {}
+const status = 404;
+setStatus(status);
+```
+
+#### Diff
+
+Catch whitespace errors in the current Git worktree.
+
+**Toggle:** `enabledChecks.diff` · **Fix:** none
+
+Runs `git diff --check` for whitespace and patch errors. It requires Git and checks worktree hygiene, not semantics or generated artifacts; disable it for source archives or environments without a Git worktree.
+
+**Before** — `name: "Terra",␠` has a trailing space after the comma (`␠` marks the invisible space).
+
+**After** — remove the trailing whitespace:
+
+```js
+name: "Terra",
+```
+
+#### Refactoring and maintenance
+
+#### Object forwarding
+
+Identify repeated property forwarding and distinguish it from intentional projections.
+
+**Toggle:** `enabledChecks.forward` · **Fix:** `autofix.forward`
+
+Finds object literals forwarding at least three properties from one source (for example, `userId: input.userId`). Safe fixes remove exact redundant properties after an existing spread; whole-object replacement and projections remain advisory.
+
+“Forwarding” is syntactic repetition, not proof of equal object contracts; a “projection” intentionally selects a subset. Keep projections explicit at persistence, authorization, redaction, schema, versioning, and API boundaries. Common mutation names (`insert`, `update`, `upsert`, `set`, `assign`) are ignored.
+
+**Before** — the explicit value repeats the same source property after the spread:
+
+```ts
+sendUser({ ...input, userId: input.userId });
+```
+
+**After** — remove only the exact redundant property:
+
+```ts
+sendUser({ ...input });
+```
+
+#### Alias
+
+Find unnecessary compatibility aliases and repair supported references.
+
+**Toggle:** `enabledChecks.alias` · **Fix:** `autofix.alias`
+
+Reports aliases where the original identifier works directly. Fixes update references and imports when collision and public-contract checks allow; ambiguous cases remain findings.
+
+Use it to retire temporary internal indirection; review exported names and compatibility guarantees before enabling export-affecting cleanup.
+
+**Before** — a private constant only forwards another local value:
+
+```ts
+const displayName = user.name;
+return displayName;
+```
+
+**After** — use the value directly where the alias adds no useful meaning:
+
+```ts
+return user.name;
+```
+
+#### Single-use declarations
+
+Find declarations with one in-scope consumer and optionally inline them.
+
+**Focused command:** `single-use` · **Fix:** included in the fixing quality pass
+
+Counts in-scope consumers of types, interfaces, functions, and variables. The fixing run can inline declarations with exactly one; rewrites are syntax-checked before writing, generated grouping comments/detached TSDoc are cleaned, and declaration docs/meaningful inline comments are preserved.
+
+Set `singleUse.skippedDirectories` to exempt component or shared-code folders without disabling other checks. `--warn` checks without edits. One in-scope consumer does not prove conceptual privacy; review API and framework conventions.
+
+**Before** — a local value has exactly one consumer:
+
+```ts
+const title = `Hello, ${name}`;
+return <h1>{title}</h1>;
+```
+
+**After** — inline it at the only use:
+
+```tsx
+return <h1>{`Hello, ${name}`}</h1>;
+```
+
+#### Dead code
+
+Identify private unused function declarations.
+
+**Focused command:** `dead-code`
+
+Inspects private unused function declarations. It is narrower than general reachability analysis and never removes code automatically. Before acting, review dynamic invocation, framework conventions, and reflection.
+
+**Before** — no in-scope call sites use this private function:
+
+```ts
+function legacyLabel(value: string): string {
+	return value.trim();
+}
+```
+
+**After** — after confirming there are no dynamic or framework-driven callers, remove it:
+
+```ts
+// (no declaration)
+```
+
+#### Repository policies and patterns
+
+#### Security
+
+Portable checks for environment files, client secrets, imports, terms, and runtime boundaries.
+
+**Toggle:** `enabledChecks.security` plus a `security` config object · **Fix:** none · **Command:** `security`
+
+Reports committed or root-level environment files, environment-file loaders, secret-shaped environment access in client roots, forbidden imports and terms, and process-environment access outside allowed runtime roots. Security findings fail the run.
+
+Configure `security.forbiddenTerms`, `security.forbiddenImports`, `security.clientRoots`, and `security.allowProcessEnvRoots`; roots are repository paths. This portable guardrail does not prove an application is secure.
+
+**Before** — client code reads a secret-shaped variable:
+
+```ts
+const token = import.meta.env.API_SECRET;
+```
+
+**After** — keep the secret on the server and expose only the operation the client needs:
+
+```ts
+const response = await fetch('/api/account');
+const account = await response.json();
+```
+
+Server/API design depends on the application; the check reports the boundary violation without rewriting it.
+
+#### Repeated classes
+
+Detect and optionally extract repeated static class strings.
+
+**Toggle:** `enabledChecks.repeated-classes` plus `repeatedClasses` config · **Fix:** `autofix.repeatedClasses` · **Command:** `repeated-classes`
+
+Counts repeated static class strings in configured extensions. Safe fixes extract repeated file-local literals into `CONFIG` or `CLASSES` constants; dynamic class expressions and cross-file design decisions remain advisory.
+
+Configure `minimumCount`, `extensions`, and `ignoredDirectories`. Move repetition that indicates a shared UI primitive into the appropriate component or design-system abstraction.
+
+**Before** — the same static classes appear in several JSX nodes:
+
+```tsx
+<section className="rounded-xl border p-4">A</section>
+<section className="rounded-xl border p-4">B</section>
+<section className="rounded-xl border p-4">C</section>
+```
+
+**After** — a supported file-local autofix adds a constant in the existing `CONFIG` group and references it:
+
+```tsx
+const ROUNDED_XL_BORDER_P_4_CLASS = 'rounded-xl border p-4';
+
+<section className={ROUNDED_XL_BORDER_P_4_CLASS}>A</section>
+<section className={ROUNDED_XL_BORDER_P_4_CLASS}>B</section>
+<section className={ROUNDED_XL_BORDER_P_4_CLASS}>C</section>
+```
+
+#### Regex deduplication
+
+Detect duplicate regular-expression sources and consolidate supported literals.
+
+**Toggle:** `enabledChecks.regex-dedup` plus `regexDedup` config · **Fix:** `autofix.regexDedup` · **Command:** `regex-dedup`
+
+Detects duplicate regex literals and supported constructors. Safe fixes extract file-local, non-stateful duplicates into `CONFIG` or `REGEX` constants. Set `sharedModule` to a repository-relative `.mjs` path and provide a matching `.d.mts` declaration to enable cross-file ESM factories; otherwise fixes stay file-local.
+
+Configure `minimumCount`, `extensions`, and `ignoredFiles`. Stateful regex flags and incompatible CommonJS consumers remain advisory because sharing may change behavior.
+
+**Before** — the same non-stateful expression is constructed twice:
+
+```ts
+const first = /^terra-[a-z]+$/;
+const second = /^terra-[a-z]+$/;
+```
+
+**After** — a supported local autofix creates one constant and reuses it:
+
+```ts
+const TERRA_A_Z_REGEX = /^terra-[a-z]+$/;
+const first = TERRA_A_Z_REGEX;
+const second = TERRA_A_Z_REGEX;
+```
+
+Exact generated identifiers depend on the pattern and names already used in the file.
+
+#### UI patterns
+
+Report configured UI patterns that should use shared primitives.
+
+**Toggle:** `enabledChecks.ui-patterns` plus `uiPatterns` config · **Fix:** none · **Command:** `ui-patterns`
+
+Searches configured extensions for forbidden UI pattern strings and reports matches; it does not rewrite components because choosing the shared primitive requires design judgment.
+
+Configure `uiPatterns.forbidden`, `extensions`, and `ignoredFiles`. Keep patterns specific enough to catch duplication without flagging intentional exceptions.
+
+For example, configure a repeated bespoke button class as a forbidden pattern:
+
+```json
+{ "uiPatterns": { "forbidden": ["className=\\\"legacy-button\\\""] } }
+```
+
+**Before** — the flagged pattern appears in the source:
+
+```tsx
+<button className="legacy-button">Save</button>
+```
+
+**After** — replace it with the repository's approved shared primitive (illustrative API):
+
+```tsx
+<PrimaryButton>Save</PrimaryButton>
+```
+
+#### UI component recommendations
+
+Find native JSX controls that likely have a shared component equivalent. Run this report when reviewing a repository; it does not run in the normal test or quality workflow and never edits files:
+
+```sh
+pnpm exec terra-quality ui-recommendations --all
+```
+
+The default rules recommend `Button` for native buttons, `Input` for common text and file inputs, and `Button` for input-based submit/reset actions. They recommend `ButtonLink` for anchors with static button-like classes and styled text links, while leaving plain anchors alone. The scan parses `.astro`, `.jsx`, and `.tsx`, skips `components/ui` primitive implementations, and reports a source line, replacement name, import path, reason, and inferred link variant when available. Treat every result as a review suggestion because native controls can be intentional.
+
+The default names and imports follow the common shadcn layout. Configure `uiRecommendations.rules` to match a repository's designated components, input types, and exceptions:
+
+```json
+{
+	"uiRecommendations": {
+		"rules": [
+			{ "element": "button", "component": "Button", "import": "@/components/ui/button" },
+			{ "element": "input", "component": "Input", "import": "@/components/ui/input", "types": ["text", "search", "email"] },
+			{ "element": "a", "component": "ButtonLink", "import": "@/components/ui/button", "when": "button-like" },
+			{ "element": "a", "component": "ButtonLink", "import": "@/components/ui/button", "when": "text-link" }
+		],
+		"ignoredDirectories": ["src/components/ui"]
+	}
+}
+```
+
+Configured rules replace the defaults. Omit `types` to match every instance of an element, or set it to limit input rules to specific `type` values. `when: "button-like"` limits anchor recommendations to static classes with button-like padding, shape, and action styling. `when: "text-link"` matches static anchor classes with a recognized text color and underline treatment, then infers a corresponding color-and-link treatment variant such as `primary-link` or `primary-underline`. A rule's explicit `variant` takes precedence over inference.
+
+#### Tailwind canonical classes
+
+The `tailwind-canonical` check asks the consuming repository's Tailwind CSS v4 design system for canonical class names, matching the editor's canonical-class suggestions. Configure a stylesheet and, optionally, source roots:
+
+```json
+{
+	"tailwindCanonical": {
+		"stylesheet": "src/styles/global.css",
+		"sourceRoots": ["src"]
+	}
+}
+```
+
+The normal `terra-quality quality` command applies these replacements before the other checks. Use `--warn` for a read-only check, or run this check by itself:
+
+```sh
+terra-quality tailwind-canonical --warn
+terra-quality tailwind-canonical
+```
+
+For example, `border-[var(--sl-color-gray-5)]` becomes `border-(--sl-color-gray-5)`. Disable the check with `enabledChecks["tailwind-canonical"]: false`, or keep diagnostics while disabling writes with `autofix.tailwindCanonical: false`.
+
+The package API is also available:
+
+```ts
+import { loadQualityCfg, runTailwindCanonical } from '@terra-symposium/standards-quality';
+
+const cfg = loadQualityCfg();
+await runTailwindCanonical(cfg); // Read-only; rejects when suggestions are found.
+```
+
+On a separate run, pass `true` to apply the replacements:
+
+```ts
+import { loadQualityCfg, runTailwindCanonical } from '@terra-symposium/standards-quality';
+
+const cfg = loadQualityCfg();
+await runTailwindCanonical(cfg, true);
+```
+
+The repository must provide Tailwind CSS v4 and a valid stylesheet. The check uses Tailwind's unstable design-system API and reports a skip when the installed package does not expose that API. Review the check when upgrading Tailwind.
+
+#### Command
+
+Run explicit repository-owned quality commands such as build and test.
+
+**Toggle:** `enabledChecks.command` and `enabledCommands.<name>` · **Fix:** none
+
+Runs subprocesses in `qualityCommands` from `root` and propagates their status; it does not infer changed-file limits. Each item has a unique `name`, executable `command`, and optional string-array `args`.
+
+Use `enabledCommands` for per-command switches, `--skip-commands` to skip once, or `enabledChecks.command: false` to disable the category. Document required services and credentials in your workflow.
+
+**Before** — only static checks run because no repository commands are declared:
+
+```json
+{ "qualityCommands": [] }
+```
+
+**After** — add explicit build and test commands so a normal quality run includes them:
+
+```json
+{
+	"qualityCommands": [
+		{ "name": "build", "command": "pnpm", "args": ["run", "build"] },
+		{ "name": "test", "command": "pnpm", "args": ["run", "test"] }
+	]
+}
+```
+
+Run one configured command with `pnpm exec terra-quality domain test`.
+
+#### Recommend
+
+Run optional advisory repository commands without blocking delivery.
+
+**Toggle:** `enabledChecks.recommend` and `enabledRecommendations.<name>` · **Fix:** none
+
+Runs `recommendationCommands` after primary checks and shows output. Its subprocess status never fails the quality run, making it suitable for migration hints and cleanup reports.
+
+Items use `name`, `command`, and optional `args`; changes they make follow the command's own contract. Use `--skip-recommendations` to skip once.
+
+**Before** — a cleanup report is not part of the quality workflow:
+
+```json
+{ "recommendationCommands": [] }
+```
+
+**After** — add a non-blocking advisory command:
+
+```json
+{
+	"recommendationCommands": [{ "name": "dependency-report", "command": "pnpm", "args": ["run", "dependency-report"] }]
+}
+```
+
+The output is shown, but a nonzero recommendation status does not fail the quality run.

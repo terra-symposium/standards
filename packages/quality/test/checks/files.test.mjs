@@ -1,8 +1,8 @@
 /**
- * packages/quality/test/files.test.mjs
+ * packages/quality/test/checks/files.test.mjs
  * Verifies source discovery, working-tree scope selection, and path helpers.
  * Fixtures are isolated temporary repositories so cache and Git behavior are
- * tested without modifying the Terra Shared checkout.
+ * tested without modifying the Standards checkout.
  */
 
 /*//////////////////////////////////////////////////
@@ -12,9 +12,9 @@ IMPORTS
 // API
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { createQualityCfg, displayPath, isFile, srcFiles, workingSrcFiles } from '../dist/index.js';
+import { createQualityCfg, displayPath, isFile, srcFiles, workingSrcFiles } from '../../dist/index.js';
 import { execFileSync } from 'node:child_process';
-import { fixtureFile, fixtureRoot } from './support.mjs';
+import { fixtureFile, fixtureRoot } from '../../support/fixtures.mjs';
 import { join } from 'node:path';
 
 /*//////////////////////////////////////////////////

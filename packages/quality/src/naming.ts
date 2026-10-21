@@ -604,15 +604,7 @@ export function aliasFindings(cfg: QualityCfg, analysisOrFix: QualityAnalysis | 
 	const findings: AliasFinding[] = [];
 	for (const src of program.getSourceFiles()) {
 		if (!files.includes(src.fileName)) continue;
-		const aliases: Array<{
-			statement: ts.Statement;
-			name: ts.Identifier;
-			symbol: ts.Symbol;
-			replacement: string;
-			kind: 'const' | 'type';
-			targetSymbol?: ts.Symbol;
-			targetName?: string;
-		}> = [];
+		const aliases: Array<{ statement: ts.Statement; name: ts.Identifier; symbol: ts.Symbol; replacement: string; kind: 'const' | 'type'; targetSymbol?: ts.Symbol; targetName?: string }> = [];
 		const inspect = (node: ts.Node): void => {
 			if (
 				ts.isVariableStatement(node) &&
@@ -663,6 +655,14 @@ export function aliasFindings(cfg: QualityCfg, analysisOrFix: QualityAnalysis | 
 		const edits: Array<{ start: number; end: number; text: string; alias: (typeof aliases)[number] }> = [];
 		const symbols = new Map(aliases.map((a) => [a.symbol, a]));
 		const shadowed = new Set<(typeof aliases)[number]>();
+		const chained = new Set<(typeof aliases)[number]>();
+		for (const alias of aliases) {
+			const tgtAlias = alias.targetSymbol && symbols.get(alias.targetSymbol);
+			if (tgtAlias) {
+				chained.add(alias);
+				chained.add(tgtAlias);
+			}
+		}
 		const visit = (node: ts.Node): void => {
 			if (aliases.some((a) => a.statement === node)) return;
 			if (ts.isIdentifier(node)) {
@@ -688,7 +688,7 @@ export function aliasFindings(cfg: QualityCfg, analysisOrFix: QualityAnalysis | 
 			ts.forEachChild(node, visit);
 		};
 		visit(src);
-		const sAliases = aliases.filter((alias) => !shadowed.has(alias));
+		const sAliases = aliases.filter((alias) => !shadowed.has(alias) && !chained.has(alias));
 		if (!sAliases.length) continue;
 		const sAliasSet = new Set(sAliases);
 		const sEdits = edits.filter((edit) => sAliasSet.has(edit.alias));

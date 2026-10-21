@@ -98,7 +98,7 @@ async function main(): Promise<void> {
 				'--package',
 				'node@24',
 				'--package',
-				'@terra-symposium/quality@0.5.0',
+				'@terra-symposium/standards-quality@0.5.0',
 				'terra-quality',
 				'quality',
 				'--all',

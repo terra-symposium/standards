@@ -1,5 +1,5 @@
 /**
- * packages/quality/test/imports.test.mjs
+ * packages/quality/test/checks/imports.test.mjs
  * Verifies internal import resolution across source, asset, and module forms.
  */
 
@@ -10,8 +10,8 @@ IMPORTS
 // API
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { checkImports, createQualityCfg } from '../dist/index.js';
-import { fixtureFile, fixtureRoot } from './support.mjs';
+import { checkImports, createQualityCfg } from '../../dist/index.js';
+import { fixtureFile, fixtureRoot } from '../../support/fixtures.mjs';
 
 /*//////////////////////////////////////////////////
 TESTS

@@ -18,9 +18,9 @@ Pass `outputRoot` to `withResponsivePlaywright` or `ProgressReporter` to change 
 Use the normalized `ReportRun` and `VisualResult` types from `/core` when another runner already owns result collection:
 
 ```ts
-import type { ReportRun } from '@terra-symposium/reporting/core';
-import { writeSpreadsheet } from '@terra-symposium/reporting/spreadsheet';
-import { writeSlideshow } from '@terra-symposium/reporting/slideshow';
+import type { ReportRun } from '@terra-symposium/standards-reporting/core';
+import { writeSpreadsheet } from '@terra-symposium/standards-reporting/spreadsheet';
+import { writeSlideshow } from '@terra-symposium/standards-reporting/slideshow';
 
 const run: ReportRun = {
 	results: [],

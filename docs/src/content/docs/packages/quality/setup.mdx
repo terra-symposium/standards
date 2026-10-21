@@ -12,7 +12,7 @@ Terra Quality supports Node.js `>=18.18` and is available from the public npm re
 Add the package as a development dependency:
 
 ```sh
-pnpm add -D @terra-symposium/quality
+pnpm add -D @terra-symposium/standards-quality
 ```
 
 Terra Quality coordinates repository tools but does not install or configure them. Install each tool you enable in `quality.json`. For example, formatting requires Prettier:
@@ -41,7 +41,7 @@ Create `quality.json` at the repository root. This example enables built-in chec
 
 ```json
 {
-	"$schema": "./node_modules/@terra-symposium/quality/quality.schema.json",
+	"$schema": "./node_modules/@terra-symposium/standards-quality/quality.schema.json",
 	"sourceRoots": ["src"],
 	"extensions": [".js", ".jsx", ".ts", ".tsx"],
 	"enabledChecks": {

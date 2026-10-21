@@ -1,5 +1,5 @@
 /**
- * packages/quality/test/collapse.test.mjs
+ * packages/quality/test/transforms/collapse.test.mjs
  * Verifies syntax-aware object and type-body whitespace collapsing.
  */
 
@@ -10,8 +10,8 @@ IMPORTS
 // API
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { collapseTypesAndObjects } from '../dist/index.js';
-import { fixtureFile, fixtureRoot, fixtureText } from './support.mjs';
+import { collapseTypesAndObjects } from '../../dist/index.js';
+import { fixtureFile, fixtureRoot, fixtureText } from '../../support/fixtures.mjs';
 
 /*//////////////////////////////////////////////////
 TESTS

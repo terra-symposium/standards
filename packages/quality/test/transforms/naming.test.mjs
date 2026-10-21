@@ -1,5 +1,5 @@
 /**
- * packages/quality/test/naming.test.mjs
+ * packages/quality/test/transforms/naming.test.mjs
  * Verifies the public naming and alias-analysis APIs independently from the
  * CLI dispatcher, including tokenisation, scope safety, callback initials,
  * protected framework names, and alias replacement semantics.
@@ -14,11 +14,11 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import ts from 'typescript';
 // prettier-ignore
-import { aliasFindings, callbackAlias, createQualityAnalysis, createQualityCfg, declarationScope, hasPrefixReplacement, identifierTokens, isApprovedId, isCallbackDeclaration, isProtectedFilename, isProtectedPath, isRenamableDeclaration, namingFindings, renameDeclaration, renameId } from '../dist/index.js';
-import { fixtureFile, fixtureRoot, fixtureText } from './support.mjs';
+import { aliasFindings, callbackAlias, createQualityAnalysis, createQualityCfg, declarationScope, hasPrefixReplacement, identifierTokens, isApprovedId, isCallbackDeclaration, isProtectedFilename, isProtectedPath, isRenamableDeclaration, namingFindings, renameDeclaration, renameId } from '../../dist/index.js';
+import { fixtureFile, fixtureRoot, fixtureText } from '../../support/fixtures.mjs';
 
 // DATA
-import { CALLBACK_ALIASES, IDENTIFIER_REPLACEMENTS, PREFIX_REPLACEMENTS, PROTECTED_IDENTIFIERS } from '../dist/index.js';
+import { CALLBACK_ALIASES, IDENTIFIER_REPLACEMENTS, PREFIX_REPLACEMENTS, PROTECTED_IDENTIFIERS } from '../../dist/index.js';
 
 /*//////////////////////////////////////////////////
 HELPERS
@@ -249,6 +249,54 @@ void read;
 	assert.deepEqual(aliasFindings(cfg, true), []);
 	assert.match(fixtureText(root, 'src/main.ts'), /const alias = base;/);
 	assert.match(fixtureText(root, 'src/main.ts'), /return alias\.source \+ base\.source;/);
+});
+test('alias analysis preserves transitive value chains and still removes independent aliases', () => {
+	const root = fixtureRoot('terra-quality-alias-chain-');
+	fixtureFile(
+		root,
+		'src/main.ts',
+		`const base = 7;
+const first = base;
+const second = first;
+const third = second;
+const independentBase = 11;
+const independent = independentBase;
+export const result = [third, independent];
+`,
+	);
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
+	assert.deepEqual(
+		aliasFindings(cfg).map((finding) => [finding.name, finding.replacement]),
+		[['independent', 'independentBase']],
+	);
+	aliasFindings(cfg, true);
+	assert.match(fixtureText(root, 'src/main.ts'), /const first = base;\nconst second = first;\nconst third = second;/);
+	assert.doesNotMatch(fixtureText(root, 'src/main.ts'), /const independent =/);
+	assert.deepEqual(aliasFindings(cfg), []);
+});
+test('alias analysis preserves chains whose target is shadowed, including type aliases', () => {
+	const root = fixtureRoot('terra-quality-alias-shadow-chain-');
+	fixtureFile(
+		root,
+		'src/main.ts',
+		`const base = 7;
+const first = base;
+const second = first;
+function read(base: number, first: number) { return { second }; }
+type Base = { value: number };
+type First = Base;
+type Second = First;
+type IsolatedBase = { value: number };
+type Isolated = IsolatedBase;
+function readIsolated<IsolatedBase>(value: Isolated): number { return value.value; }
+export const result = [read(2, 3).second, readIsolated<string>({ value: 7 })];
+`,
+	);
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
+	assert.deepEqual(aliasFindings(cfg), []);
+	assert.deepEqual(aliasFindings(cfg, true), []);
+	assert.match(fixtureText(root, 'src/main.ts'), /const first = base;\nconst second = first;/);
+	assert.match(fixtureText(root, 'src/main.ts'), /type First = Base;\ntype Second = First;/);
 });
 test('naming findings use shared analysis, report severity by replacement kind, and preserve protected declarations', () => {
 	const root = fixtureRoot('terra-quality-naming-');

@@ -1,4 +1,4 @@
-# @terra-symposium/quality
+# @terra-symposium/standards-quality
 
 A configurable quality runner for JavaScript and TypeScript repositories. Define source scope, policy, tools, and repository commands in `quality.json`; run them locally with the `terra-quality` CLI or in CI.
 
@@ -9,14 +9,14 @@ A configurable quality runner for JavaScript and TypeScript repositories. Define
 ## Install
 
 ```sh
-pnpm add -D @terra-symposium/quality
+pnpm add -D @terra-symposium/standards-quality
 ```
 
 Create `quality.json` in the repository root:
 
 ```json
 {
-	"$schema": "./node_modules/@terra-symposium/quality/quality.schema.json",
+	"$schema": "./node_modules/@terra-symposium/standards-quality/quality.schema.json",
 	"sourceRoots": ["src"],
 	"extensions": [".js", ".jsx", ".ts", ".tsx"],
 	"enabledChecks": {
@@ -27,6 +27,8 @@ Create `quality.json` in the repository root:
 	}
 }
 ```
+
+Dead-code findings that require manual review fail quality by default. Set `"manualWarnings": "warning"` to keep them visible without failing the run. The runner completes the remaining checks and configured commands before returning failure, and its logs direct agents to resolve each manual finding one at a time before committing.
 
 This starting configuration uses the built-in checks without requiring external tools. Enable integrations as you install and configure the corresponding repository tools. When lint is enabled, add an ESLint flat config such as `eslint.config.mjs`.
 
@@ -43,6 +45,14 @@ pnpm exec terra-quality quality --all --warn
 ```
 
 The normal scope is changed and untracked files in a Git worktree. `--all` selects every file under `sourceRoots`; `--warn` disables autofixes and runs dead-code analysis once without a temporary fix preview. It reports rule-level fix candidates; fix mode then type-checks proposed dead-code edits before writing and may reject a candidate. Configured quality commands still run unless you pass `--skip-commands`.
+
+## Output order and tests
+
+The runner controls a fixed phase order: **Format → Static quality → Tests → Framework / type checks → Build → Repository health**. `quality.json` selects enabled checks and commands; it does not define phase order or test categories. Commands in ordinary phases keep their configured order; tests keep their configured order within each category.
+
+Selected test commands are grouped as **Unit / Contract**, **Integration**, **Browser / Cloud**, or **Other tests**. Each suite has a 24-cell progress bar. Node and Playwright suites also report individual case progress; other runners receive suite-level progress only. The runner suppresses native child test output when its custom case reporter owns the output, preventing duplicate case listings.
+
+Dead-code is reported as one group. Fix mode shows **Safe fixes** (Knip import consumers, ESLint unused declarations, single-use declaration/reference scans, classification, then only proven edits) followed by **Verification** (Knip reachability, final ESLint and single-use results, and TypeScript safety for candidate edits). Manual findings appear in stable path/line/rule/name order and fail by default; set `"manualWarnings": "warning"` to make them non-blocking. All configured checks finish before the run returns failure.
 
 ## What it does
 
@@ -81,10 +91,10 @@ When no GitHub repositories are configured, the normal quality run marks this st
 
 ## Configuration and guides
 
-- [Install and understand a run](https://terra-symposium-quality.netlify.app/packages/quality/setup/)
-- [Complete `quality.json` reference](https://terra-symposium-quality.netlify.app/packages/quality/configuration/)
-- [CLI and CI workflows](https://terra-symposium-quality.netlify.app/packages/quality/workflows/)
-- [Check behavior and autofix limits](https://terra-symposium-quality.netlify.app/packages/quality/checks/)
-- [Troubleshooting](https://terra-symposium-quality.netlify.app/packages/quality/troubleshooting/)
+- [Install and understand a run](https://standards-docs.netlify.app/packages/quality/setup/)
+- [Complete `quality.json` reference](https://standards-docs.netlify.app/packages/quality/configuration/)
+- [CLI and CI workflows](https://standards-docs.netlify.app/packages/quality/workflows/)
+- [Check behavior and autofix limits](https://standards-docs.netlify.app/packages/quality/checks/)
+- [Troubleshooting](https://standards-docs.netlify.app/packages/quality/troubleshooting/)
 
 The installed `quality.schema.json` provides editor validation. The [test README](test/README.md) describes the package's isolated test coverage.
