@@ -18,14 +18,16 @@ import { checkImports } from './imports.js';
 import { collapseInlineIfs } from './inline-if.js';
 import { collapseTypesAndObjects } from './collapse.js';
 import { deadCodeEditsIntroduceTypeErrors, deadCodeTypeProgram, fixSingleUseDeclarations, singleUseFindings } from './single-use.js';
-import { documentSrcFile, documentationFindings, duplicateImportFindings, maintainSrcFile, protectLongImports } from './documentation.js';
+import { documentSrcFile, documentationFindings, documentedCommandFindings, duplicateImportFindings, fixDocumentedCommands, maintainSrcFile, protectLongImports } from './documentation.js';
 import { existsSync, readdirSync, readFileSync, realpathSync, statSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { fixObjectForwarding, objectForwardingFindings } from './object-forwarding.js';
-import { fixRegexDedup, fixRepeatedClasses, regexFindings, repeatedClassFindings, runTailwindCanonical, uiPatternFindings } from './patterns.js';
+import { fixRegexDedup, fixRepeatedClasses, performancePatternFindings, regexFindings, repeatedClassFindings, runTailwindCanonical, uiPatternFindings } from './patterns.js';
 import { qualityProgress } from './progress.js';
 import { qualityNodeReporterOptions } from './node-reporter.js';
 import { securityFindings } from './security.js';
+import { accessibilityFindings, fixAccessibleNames } from './accessibility.js';
+import { displayNameFindings, fixDisplayNames } from './display-name.js';
 import { uiComponentRecommendations } from './ui-recommendations.js';
 import { spawnSync } from 'node:child_process';
 import { srcFiles, workingSrcFiles } from './files.js';
@@ -124,6 +126,10 @@ export type QualityCheckName =
 	| 'import'
 	| 'name'
 	| 'forward'
+	| 'accessibility'
+	| 'display-name'
+	| 'performance-patterns'
+	| 'documented-commands'
 	| 'lint'
 	| 'knip'
 	| 'dead-code'
@@ -140,7 +146,7 @@ export type QualityCheckName =
 	| 'ui-recommendations'
 	| 'github';
 /** Names accepted in the `autofix` configuration map. */
-export type QualityAutofixName = 'document' | 'format' | 'name' | 'lint' | 'knip' | 'dead-code' | 'alias' | 'forward' | 'repeatedClasses' | 'tailwindCanonical' | 'regexDedup';
+export type QualityAutofixName = 'document' | 'format' | 'name' | 'lint' | 'knip' | 'dead-code' | 'alias' | 'forward' | 'repeatedClasses' | 'tailwindCanonical' | 'regexDedup' | 'accessibility' | 'displayName' | 'documentedCommands';
 /** Normalized repository paths, source scope, policies, and tool settings. */
 export type QualityCfg = {
 	root: string;
@@ -159,7 +165,7 @@ export type QualityCfg = {
 	manualWarnings?: 'error' | 'warning';
 	enabledChecks?: Partial<Record<QualityCheckName, boolean>>;
 	autofix?: Partial<Record<QualityAutofixName, boolean>>;
-	documentation?: { required?: DocumentationRequirements };
+	documentation?: { required?: DocumentationRequirements; commandRoots?: string[] };
 	enabledCommands?: Record<string, boolean>;
 	recommendationCommands?: { name: string; command: string; args?: string[] }[];
 	enabledRecommendations?: Record<string, boolean>;
@@ -168,6 +174,7 @@ export type QualityCfg = {
 	repeatedClasses?: { minimumCount?: number; extensions?: string[]; ignoredDirectories?: string[] };
 	regexDedup?: { extensions?: string[]; ignoredFiles?: string[]; minimumCount?: number; sharedModule?: string };
 	uiPatterns?: { forbidden?: string[]; ignoredFiles?: string[]; extensions?: string[] };
+	performancePatterns?: { ignoredFiles?: string[]; extensions?: string[] };
 	uiRecommendations?: UiRecommendationSettings;
 	github?: { repositories?: string[]; requiredFeatures?: GitHubFeature[]; featureExemptions?: Record<string, GitHubFeature[]> };
 	singleUse?: { skippedDirectories?: string[] };
@@ -207,7 +214,14 @@ export type QualityAnalysis = { files: string[]; texts: Map<string, string>; sou
 export type QualityOptions = { fix: boolean; all: boolean; strict: boolean; skipCommands?: boolean; skipRecommendations?: boolean };
 /** Shared finding shapes rendered by the generic source-check reporter. */
 type GenericFinding =
-	{ file?: string; message: string } | { value: string; count: number; locations: string[] } | { source: string; count: number; locations: string[] } | { file: string; pattern: string };
+	| { file?: string; message: string }
+	| { file: string; line: number; column: number; element: string; message: string; fixable: boolean }
+	| { file: string; line: number; column: number; component: string; recommendation: string }
+	| { file: string; line: number; column: number; method: string; receiver: string; recommendation: string }
+	| { file: string; line: number; command: string; recommendation: string }
+	| { value: string; count: number; locations: string[] }
+	| { source: string; count: number; locations: string[] }
+	| { file: string; pattern: string };
 const ANSI_ESCAPE = new RegExp(`${String.fromCharCode(27)}\\[[0-?]*[ -/]*[@-~]`, 'g');
 
 /*//////////////////////////////////////////////////
@@ -265,6 +279,7 @@ export function createQualityAnalysis(cfg: QualityCfg): QualityAnalysis {
  * @return `true` unless the check is explicitly disabled.
  */
 export function qualityCheckEnabled(cfg: QualityCfg, check: QualityCheckName): boolean {
+	if (check === 'accessibility' || check === 'display-name' || check === 'documented-commands') return cfg.enabledChecks?.[check] === true;
 	return cfg.enabledChecks?.[check] !== false;
 }
 
@@ -2208,6 +2223,10 @@ function inferGitHubRepo(root: string): string | undefined {
  */
 function runGenericChecks(cfg: QualityCfg, analysis?: QualityAnalysis): void {
 	const checks = [
+		['accessibility', qualityCheckEnabled(cfg, 'accessibility') ? accessibilityFindings(cfg, analysis) : []],
+		['display-name', qualityCheckEnabled(cfg, 'display-name') ? displayNameFindings(cfg, analysis) : []],
+		['performance-patterns', cfg.performancePatterns && qualityCheckEnabled(cfg, 'performance-patterns') ? performancePatternFindings(cfg, analysis) : []],
+		['documented-commands', cfg.documentation?.commandRoots?.length && qualityCheckEnabled(cfg, 'documented-commands') ? documentedCommandFindings(cfg) : []],
 		['security', cfg.security ? securityFindings(cfg) : []],
 		['repeated-classes', cfg.repeatedClasses ? repeatedClassFindings(cfg, analysis) : []],
 		['regex-dedup', cfg.regexDedup ? regexFindings(cfg, analysis) : []],
@@ -2218,9 +2237,9 @@ function runGenericChecks(cfg: QualityCfg, analysis?: QualityAnalysis): void {
 		printFindings(
 			findings as readonly GenericFinding[],
 			(f) =>
-				`${'file' in f ? `${f.file}: ` : ''}${'message' in f ? f.message : 'value' in f ? `${f.count}x ${f.value} (${f.locations.join(', ')})` : 'source' in f ? `${f.count}x ${f.source} (${f.locations.join(', ')})` : f.pattern}`,
+				`${'file' in f ? `${f.file}: ` : ''}${'message' in f ? `${'line' in f ? `${f.line}:${f.column} ` : ''}${f.message}` : 'component' in f ? `${f.line}:${f.column} ${f.component}: ${f.recommendation}` : 'method' in f ? `${f.line}:${f.column} ${f.method}(${f.receiver}): ${f.recommendation}` : 'command' in f ? `${f.line}: ${f.recommendation} (${f.command})` : 'value' in f ? `${f.count}x ${f.value} (${f.locations.join(', ')})` : 'source' in f ? `${f.count}x ${f.source} (${f.locations.join(', ')})` : f.pattern}`,
 		);
-		if (findings.length && (name === 'security' || name === 'ui-patterns')) process.exitCode = 1;
+		if (findings.length && (name === 'accessibility' || name === 'display-name' || name === 'documented-commands' || name === 'security' || name === 'ui-patterns')) process.exitCode = 1;
 	}
 }
 
@@ -2686,6 +2705,9 @@ function runFullQuality(cfg: QualityCfg, args: string[], opts: QualityOptions): 
 		const namingScope = scopedCfg(cfg, opts.all);
 		if (namingFindings(namingScope).length) fixNames(cfg, opts.all);
 	}
+	if (fix('accessibility') && qualityCheckEnabled(cfg, 'accessibility')) fixAccessibleNames(scoped);
+	if (fix('displayName') && qualityCheckEnabled(cfg, 'display-name')) fixDisplayNames(scoped);
+	if (fix('documentedCommands') && qualityCheckEnabled(cfg, 'documented-commands')) fixDocumentedCommands(cfg);
 	if (fix('forward') && qualityCheckEnabled(cfg, 'forward')) {
 		const result = fixObjectForwarding(scoped);
 		if (result.fixed || result.skipped) console.info(`Forwarding fixer: ${result.fixed} exact duplicates removed${result.skipped ? `; ${result.skipped} advisory cases retained` : ''}.`);
@@ -2851,7 +2873,7 @@ function dispatchQualityCli(cfg: QualityCfg, args: string[]): void | Promise<voi
 			printFindings(
 				findings as readonly GenericFinding[],
 				(f) =>
-					`${'file' in f ? `${f.file}: ` : ''}${'message' in f ? f.message : 'value' in f ? `${f.count}x ${f.value} (${f.locations.join(', ')})` : 'source' in f ? `${f.count}x ${f.source} (${f.locations.join(', ')})` : f.pattern}`,
+					`${'file' in f ? `${f.file}: ` : ''}${'message' in f ? f.message : 'component' in f ? `${f.line}:${f.column} ${f.component}: ${f.recommendation}` : 'method' in f ? `${f.line}:${f.column} ${f.method}(${f.receiver}): ${f.recommendation}` : 'command' in f ? `${f.line}: ${f.recommendation} (${f.command})` : 'value' in f ? `${f.count}x ${f.value} (${f.locations.join(', ')})` : 'source' in f ? `${f.count}x ${f.source} (${f.locations.join(', ')})` : f.pattern}`,
 			);
 			if (findings.length) process.exitCode = 1;
 			return;
@@ -2861,7 +2883,7 @@ function dispatchQualityCli(cfg: QualityCfg, args: string[]): void | Promise<voi
 		printFindings(
 			findings as readonly GenericFinding[],
 			(f) =>
-				`${'file' in f ? `${f.file}: ` : ''}${'message' in f ? f.message : 'value' in f ? `${f.count}x ${f.value} (${f.locations.join(', ')})` : 'source' in f ? `${f.count}x ${f.source} (${f.locations.join(', ')})` : f.pattern}`,
+					`${'file' in f ? `${f.file}: ` : ''}${'message' in f ? f.message : 'component' in f ? `${f.line}:${f.column} ${f.component}: ${f.recommendation}` : 'method' in f ? `${f.line}:${f.column} ${f.method}(${f.receiver}): ${f.recommendation}` : 'command' in f ? `${f.line}: ${f.recommendation} (${f.command})` : 'value' in f ? `${f.count}x ${f.value} (${f.locations.join(', ')})` : 'source' in f ? `${f.count}x ${f.source} (${f.locations.join(', ')})` : f.pattern}`,
 		);
 		if (findings.length) process.exitCode = 1;
 		return;
