@@ -23,11 +23,12 @@
 		},
 		"renameExports": { "type": "boolean" },
 		"protectedIdentifiers": { "type": "array", "items": { "type": "string" } },
-		"enabledChecks": { "$ref": "#/$defs/toggles" },
-		"autofix": { "$ref": "#/$defs/toggles" },
+		"enabledChecks": { "$ref": "#/$defs/checkToggles" },
+		"autofix": { "$ref": "#/$defs/autofixToggles" },
 		"documentation": {
 			"type": "object",
 			"properties": {
+				"commandRoots": { "type": "array", "items": { "type": "string" }, "description": "Markdown roots where fenced pnpm commands are checked for deprecated directory flags." },
 				"required": {
 					"type": "object",
 					"properties": {
@@ -87,6 +88,15 @@
 				"extensions": { "type": "array", "items": { "type": "string" } }
 			},
 			"additionalProperties": false
+		},
+		"performancePatterns": {
+			"type": "object",
+			"properties": {
+				"extensions": { "type": "array", "items": { "type": "string", "pattern": "^\\." } },
+				"ignoredFiles": { "type": "array", "items": { "type": "string" } }
+			},
+			"additionalProperties": false,
+			"description": "Opt-in advisory scan for repeated linear collection lookups inside collection callbacks."
 		},
 		"uiRecommendations": {
 			"type": "object",
@@ -171,7 +181,25 @@
 		"tools": { "type": "object", "additionalProperties": { "type": "string" } }
 	},
 	"$defs": {
-		"toggles": { "type": "object", "additionalProperties": { "type": "boolean" } },
+		"checkToggles": {
+			"type": "object",
+			"properties": {
+				"accessibility": { "type": "boolean", "description": "Opt-in check for source-evident accessible names and decorative inline SVG exposure on native JSX controls and explicit interactive roles." },
+				"display-name": { "type": "boolean", "description": "Opt-in check for direct React forwardRef declarations without displayName." },
+				"performance-patterns": { "type": "boolean", "description": "Reports configured syntax patterns that may repeat work in collection callbacks; advisory only." },
+				"documented-commands": { "type": "boolean", "description": "Checks deprecated pnpm directory flags in configured Markdown shell fences." }
+			},
+			"additionalProperties": { "type": "boolean" }
+		},
+		"autofixToggles": {
+			"type": "object",
+			"properties": {
+				"accessibility": { "type": "boolean", "description": "Copies a literal title into aria-label or hides an unnamed inline SVG inside an already named control." },
+				"displayName": { "type": "boolean", "description": "Adds a conventional displayName to a direct named forwardRef declaration." },
+				"documentedCommands": { "type": "boolean", "description": "Rewrites pnpm -C and --prefix to the repository's canonical --dir flag in configured Markdown shell fences." }
+			},
+			"additionalProperties": { "type": "boolean" }
+		},
 		"loadBudget": {
 			"type": "object",
 			"properties": {

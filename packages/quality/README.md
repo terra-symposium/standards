@@ -58,6 +58,12 @@ Dead-code is reported as one group. Fix mode shows **Safe fixes** (Knip import c
 
 Terra Quality combines source checks such as documentation, import resolution, naming, forwarding, security, and configured UI-pattern checks with repository-owned tools and commands. Safe transformations can maintain layout, apply tool fixes, and rewrite supported syntax. Findings that require domain or runtime judgment remain for review.
 
+Enable `accessibility` and `display-name` under `enabledChecks` to run the JSX accessible-name and React `forwardRef` display-name checks. They are opt-in so an existing consumer can review the findings before making them part of its quality gate. The accessibility check recognizes ARIA, associated labels, static child text, and image alternatives; fix mode copies a literal `title` into `aria-label` only when no visible or uncertain content supplies a name, and marks an unnamed inline SVG hidden only when its containing control already has a clear name. The display-name fixer adds a conventional name only at an unambiguous statement boundary. Dynamic labels, custom component semantics, wrapped components, and conflicting assignments remain for review.
+
+Set `performancePatterns` in `quality.json` to enable advisory detection of linear `find`, `filter`, `includes`, `indexOf`, or `some` lookups inside collection callbacks. Findings suggest precomputing a `Map` or `Set`; the check does not rewrite code or fail the quality run because whether the path is hot and the correct index semantics require measurement and review.
+
+Enable `documented-commands` under `enabledChecks` and set `documentation.commandRoots` to check fenced shell examples for pnpm `-C` and `--prefix`; fix mode changes those exact invocations to `--dir` while leaving prose and unrelated fences untouched. Expensive browser, broad integration, and benchmark work should run through explicit or scheduled commands that reuse suite setup.
+
 The runner does not prove runtime correctness or security, inspect arbitrary languages, provision services, or decide whether a domain-specific projection is intentional. Review generated changes at API, persistence, authorization, and other behavior boundaries.
 
 ## GitHub report
