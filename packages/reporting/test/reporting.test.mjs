@@ -107,7 +107,10 @@ test('captures page navigation for tests that do not destructure the load fixtur
 		`export default { testDir: ${JSON.stringify(root)}, reporter: [['json', { outputFile: ${JSON.stringify(reportFile)} }]], projects: [{ name: 'chromium', use: { browserName: 'chromium' } }] };\n`,
 	);
 	try {
-		await execFileAsync('pnpm', ['exec', 'playwright', 'test', '--config', cfgFile], { cwd: path.resolve(path.dirname(new URL(import.meta.url).pathname), '../../..'), timeout: 60000 });
+		await execFileAsync('pnpm', ['--filter', '@terra-symposium/standards-reporting', 'exec', 'playwright', 'test', '--config', cfgFile], {
+			cwd: path.resolve(path.dirname(new URL(import.meta.url).pathname), '../../..'),
+			timeout: 60000,
+		});
 		const report = JSON.parse(await fs.readFile(reportFile, 'utf8'));
 		const results = report.suites.flatMap((suite) => suite.specs.flatMap((spec) => spec.tests.flatMap((e) => e.results)));
 		const attachment = results.flatMap((r) => r.attachments).find((e) => e.name === 'load-testing');

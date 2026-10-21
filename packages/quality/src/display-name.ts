@@ -243,7 +243,7 @@ export function fixDisplayNames(cfg: QualityCfg, analysis?: QualityAnalysis): Di
 				skipped++;
 				continue;
 			}
-			const edit = edits.get(insertAt) ?? { indent, names: [] };
+			const edit: { indent: string; names: string[] } = edits.get(insertAt) ?? { indent, names: [] };
 			if (!edit.names.includes(candidate.name)) edit.names.push(candidate.name);
 			edits.set(insertAt, edit);
 		}
