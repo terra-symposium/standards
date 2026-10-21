@@ -1,5 +1,11 @@
 # @terra-symposium/standards-quality
 
+## 0.10.0
+
+### Minor Changes
+
+- 7e75525: Add safe JSX accessible-name and React forwardRef display-name checks and autofixes.
+
 ## 0.9.1
 
 ### Patch Changes
