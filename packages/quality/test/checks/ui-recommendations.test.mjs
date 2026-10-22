@@ -96,7 +96,7 @@ test('UI recommendation rules override defaults and honor input types and ignore
 	);
 });
 
-test('ui-recommendations is an on-demand advisory CLI command that does not fail on findings', async () => {
+test('ui-recommendations is an on-demand command that fails on findings', async () => {
 	const root = fixtureRoot('terra-quality-ui-recommendation-cli-');
 	fixtureFile(root, 'src/view.tsx', '<><button>Save</button><a href="/" className="text-primary hover:underline">Home</a></>\n');
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.tsx'] });
@@ -112,6 +112,6 @@ test('ui-recommendations is an on-demand advisory CLI command that does not fail
 
 	assert.match(output.join('\n'), /src\/view\.tsx:1:\d+ <button> → <Button>/u);
 	assert.match(output.join('\n'), /src\/view\.tsx:1:\d+ <a> → <ButtonLink variant="primary-link">/u);
-	assert.equal(process.exitCode, 0);
+	assert.equal(process.exitCode, 1);
 	process.exitCode = 0;
 });
