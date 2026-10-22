@@ -41,7 +41,7 @@ test('UI recommendations report native controls and shared text links with sourc
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.tsx'] });
 
 	assert.deepEqual(
-		uiComponentRecommendations(cfg).map(({ file, line, element, component, import: importPath, variant }) => ({ file, line, element, component, importPath, variant })),
+		uiComponentRecommendations(cfg).map(({ file: f, line, element, component, import: importPath, variant }) => ({ file: f, line, element, component, importPath, variant })),
 		[
 			{ file: 'src/view.tsx', line: 3, element: 'button', component: 'Button', importPath: '@/components/ui/button', variant: undefined },
 			{ file: 'src/view.tsx', line: 4, element: 'input', component: 'Input', importPath: '@/components/ui/input', variant: undefined },
@@ -63,7 +63,7 @@ test('UI recommendations scan Astro markup and recognize the docs sidebar Button
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.astro'] });
 
 	assert.deepEqual(
-		uiComponentRecommendations(cfg).map(({ file, line, element, component, variant }) => ({ file, line, element, component, variant })),
+		uiComponentRecommendations(cfg).map(({ file: f, line, element, component, variant }) => ({ file: f, line, element, component, variant })),
 		[{ file: 'src/DocsLayout.astro', line: 2, element: 'a', component: 'ButtonLink', variant: 'primary-link' }],
 	);
 });
@@ -102,7 +102,7 @@ test('ui-recommendations is an on-demand advisory CLI command that does not fail
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.tsx'] });
 	const originalInfo = console.info;
 	const output = [];
-	console.info = (...values) => output.push(values.join(' '));
+	console.info = (...vals) => output.push(vals.join(' '));
 	process.exitCode = 0;
 	try {
 		await runQualityCli(cfg, ['ui-recommendations', '--all']);

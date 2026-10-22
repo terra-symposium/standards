@@ -14,7 +14,7 @@ Dead-code is one static-quality group with two explicit stages:
 
 - **Safe fixes:** Knip import consumers; ESLint unused declarations; single-use declaration/reference scans and candidate classification; apply only proven rewrites.
 - **Verification:** Knip unused-file/export/dependency reachability; final ESLint and single-use findings; TypeScript safety checks for proposed edits.
-- **Manual findings:** stable file/line/rule/name order; blocking errors by default; `manualWarnings: "warning"` is the explicit override. Continue every configured check before returning failure. Print: “Resolve each manual finding one by one, in the order listed, before committing.”
+- **Manual findings:** stable file/line/rule/name order; blocking warnings by default; `warningsAsErrors: false` is the explicit opt-out. Continue every configured check before returning failure. Print: “Resolve each manual finding one by one, in the order listed, before committing.”
 
 ```text
 Before                         After

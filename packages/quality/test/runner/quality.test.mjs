@@ -93,17 +93,17 @@ test('reports concise-name drift without changing source', () => {
 });
 test('renames requested words across casing, separators, compounds, plurals, and inflections', () => {
 	const cases = {
-		error: 'err',
-		Error: 'Err',
-		ERROR: 'ERR',
-		ErrorBoundary: 'ErrBoundary',
-		articleError: 'articleErr',
-		article_error: 'article_err',
-		Article_Error: 'Article_Err',
-		ARTICLE_ERROR: 'ARTICLE_ERR',
-		'ARTICLE-error': 'ARTICLE-err',
-		'article-error': 'article-err',
-		errors: 'errs',
+		error: 'error',
+		Error: 'Error',
+		ERROR: 'ERROR',
+		ErrorBoundary: 'ErrorBoundary',
+		articleError: 'articleError',
+		article_error: 'article_error',
+		Article_Error: 'Article_Error',
+		ARTICLE_ERROR: 'ARTICLE_ERROR',
+		'ARTICLE-error': 'ARTICLE-error',
+		'article-error': 'article-error',
+		errors: 'errors',
 		format: 'fmt',
 		FormatOptions: 'FmtOpts',
 		FORMAT_OPTIONS: 'FMT_OPTS',
@@ -112,11 +112,11 @@ test('renames requested words across casing, separators, compounds, plurals, and
 		initialise: 'init',
 		InitialiseRepository: 'InitRepo',
 		initialisedRepositories: 'initRepos',
-		INITIALIZATION_ERROR: 'INIT_ERR',
+		INITIALIZATION_ERROR: 'INIT_ERROR',
 		initialize_format: 'init_fmt',
 		repository: 'repo',
 		Repositories: 'Repos',
-		articleRepositoryError: 'articleRepoErr',
+		articleRepositoryError: 'articleRepoError',
 		attributes: 'attrs',
 		commands: 'cmds',
 		directories: 'dirs',
@@ -690,7 +690,7 @@ test('naming preserves shorthand property keys while renaming their values', () 
 	writeFileSync(file, 'function result(error: Error) { return { error }; }\nvoid result;\n');
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
 	runQualityCli(cfg, ['naming', '--all']);
-	assert.equal(readFileSync(file, 'utf8'), 'function result(err: Error) { return { error: err }; }\nvoid result;\n');
+	assert.equal(readFileSync(file, 'utf8'), 'function result(error: Error) { return { error }; }\nvoid result;\n');
 });
 test('naming preserves call punctuation when expanding a shorthand parameter', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-shorthand-param-'));
@@ -821,11 +821,11 @@ void [articleError, ErrorBoundary];
 	runQualityCli(cfg, ['naming', '--all']);
 	assert.equal(
 		readFileSync(file, 'utf8'),
-		`class ErrBoundary {}
-const articleErr = new ErrBoundary();
-const { error: err, repository: repo } = { error: articleErr, repository: 'shared' };
-try { throw err; } catch (fmt) { console.log(fmt, repo); }
-void [articleErr, ErrBoundary];
+		`class ErrorBoundary {}
+const articleError = new ErrorBoundary();
+const { error, repository: repo } = { error: articleError, repository: 'shared' };
+try { throw error; } catch (fmt) { console.log(fmt, repo); }
+void [articleError, ErrorBoundary];
 `,
 	);
 	assert.deepEqual(namingFindings(cfg), []);
@@ -909,7 +909,7 @@ test('naming keeps distinct aliases for adjacent parameters', () => {
 	writeFileSync(file, 'function run(config: object, command: string) { return [config, command]; }\nvoid run;\n');
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
 	runQualityCli(cfg, ['naming', '--all']);
-	assert.equal(readFileSync(file, 'utf8'), 'function run(cfg: object, cmd: string) { return [cfg, cmd]; }\nvoid run;\n');
+	assert.equal(readFileSync(file, 'utf8'), 'function run(config: object, cmd: string) { return [config, cmd]; }\nvoid run;\n');
 });
 test('naming reuses aliases in sibling function scopes and updates their TSDoc', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-function-scopes-'));
@@ -918,7 +918,10 @@ test('naming reuses aliases in sibling function scopes and updates their TSDoc',
 	writeFileSync(file, '/** @param config */\nexport function first(config: object) { return config; }\n/** @param config */\nexport function second(config: object) { return config; }\n');
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
 	runQualityCli(cfg, ['naming', '--all']);
-	assert.equal(readFileSync(file, 'utf8'), '/** @param cfg */\nexport function first(cfg: object) { return cfg; }\n/** @param cfg */\nexport function second(cfg: object) { return cfg; }\n');
+	assert.equal(
+		readFileSync(file, 'utf8'),
+		'/** @param config */\nexport function first(config: object) { return config; }\n/** @param config */\nexport function second(config: object) { return config; }\n',
+	);
 });
 test('naming ignores external types, JSX attributes, properties, and exported contracts', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-'));

@@ -25,20 +25,16 @@ type RenameKind = { numericIndex?: boolean; callback?: boolean; reserved?: strin
 export const IDENTIFIER_REPLACEMENTS = replacementMap([
 	[['administrator', 'administration'], 'admin'],
 	['attribute', 'attr'],
-	['category', 'cat'],
 	['intelligence', 'intel'],
-	['current', 'curr'],
 	['command', 'cmd'],
 	['column', 'col'],
 	['context', 'ctx'],
-	[['config', 'configuration'], 'cfg'],
 	['configured', 'cfgd'],
 	[['compare', 'comp'], 'comp'],
 	['definition', 'def'],
 	['difference', 'diff'],
 	['directory', 'dir'],
 	['destination', 'dest'],
-	['error', 'err'],
 	['event', 'e'],
 	['expression', 'expr'],
 	['extension', 'ext'],
@@ -64,7 +60,6 @@ export const IDENTIFIER_REPLACEMENTS = replacementMap([
 	[['request', 'requested'], 'req'],
 	['response', 'res'],
 	['source', 'src'],
-	['target', 'tgt'],
 	['value', 'val'],
 ]);
 export const PREFIX_REPLACEMENTS = replacementMap([
@@ -80,7 +75,7 @@ export const PREFIX_REPLACEMENTS = replacementMap([
 export const CALLBACK_ALIASES = replacementMap(
 	[
 		['workshop', 'w'],
-		[['customer', 'candidate', 'column'], 'c'],
+		[['candidate', 'column'], 'c'],
 		[['opportunity', 'organization', 'organisation', 'option'], 'o'],
 		['member', 'm'],
 		[['record', 'result', 'row'], 'r'],
