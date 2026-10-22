@@ -1,5 +1,11 @@
 # @terra-symposium/standards-quality
 
+## 2.0.3
+
+### Patch Changes
+
+- Run full ESLint and Prettier file sets in one invocation when they fit the argument limit, avoiding repeated project and file discovery.
+
 ## 2.0.2
 
 ### Patch Changes

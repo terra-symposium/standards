@@ -521,17 +521,15 @@ test('runFormatter supports legacy and typed invocation forms, ignores Astro tar
 	assert.deepEqual(invocations[2], ['--check', '--ignore-unknown', join(root, 'src/main.ts')]);
 	assert.equal(invocations.length, 3);
 });
-test('runFormatter divides large source arguments into bounded subprocess batches', () => {
+test('runFormatter passes the complete source set in one argument-safe invocation', () => {
 	const root = fixtureRoot('terra-quality-formatter-batches-');
 	const cmd = recordingCmd(root);
 	for (let idx = 0; idx < 201; idx += 1) fixtureFile(root, `src/file-${String(idx).padStart(3, '0')}.ts`, `const value${idx} = true;\n`);
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], tools: { prettier: cmd } });
 	runFormatter(cfg, { fix: false, all: true, strict: false });
 	const invocations = recordedCmds(root);
-	assert.equal(invocations.length, 3);
-	assert.equal(invocations[0].filter((a) => !a.startsWith('-')).length, 100);
-	assert.equal(invocations[1].filter((a) => !a.startsWith('-')).length, 100);
-	assert.equal(invocations[2].filter((a) => !a.startsWith('-')).length, 1);
+	assert.equal(invocations.length, 1);
+	assert.equal(invocations[0].filter((a) => !a.startsWith('-')).length, 201);
 });
 test('runTypecheck honors custom command ownership and does not invoke it for a scoped file-only request', () => {
 	const root = fixtureRoot('terra-quality-typecheck-');
@@ -661,7 +659,7 @@ test('CLI lint applies its autofix policy while the Knip audit remains read-only
 	runQualityCli(cfg, ['knip', '--all', '--warn']);
 	assert.deepEqual(recordedCmds(root, 'knip-args.jsonl').at(-1), ['--reporter', 'json', '--no-config-hints']);
 });
-test('CLI lint reuses an ESLint process across argument-safe file batches', () => {
+test('CLI lint passes the complete file set in one ESLint invocation', () => {
 	const root = fixtureRoot('terra-quality-lint-batches-');
 	const eslint = recordingCmd(root, 'eslint-args.jsonl', 'bin/record-eslint.mjs');
 	for (let idx = 0; idx < 11; idx += 1) fixtureFile(root, `src/file-${String(idx).padStart(2, '0')}.ts`, 'export {}\n');

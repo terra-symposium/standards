@@ -261,7 +261,7 @@ Each bullet is one top-level `node:test` case. Nested assertions remain within t
 - runQuality honors disabled findings categories without leaking a failure status
 - quality autofix fills missing TSDoc tags then reports blank prose for agent assistance
 - CLI lint applies its autofix policy while the Knip audit remains read-only
-- CLI lint updates progress after each ten-file ESLint batch
+- CLI lint passes the complete source set to ESLint in one invocation
 - quality:all reports duplicate imports read-only and consolidates them idempotently in autofix mode
 - full quality routes unused-variable findings through dead-code once and treats findings as errors
 - the fixing quality command inlines safe values without broad comment cleanup
