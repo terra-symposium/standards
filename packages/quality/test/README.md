@@ -14,7 +14,7 @@ Dead-code is one static-quality group with two explicit stages:
 
 - **Safe fixes:** Knip import consumers; ESLint unused declarations; single-use declaration/reference scans and candidate classification; apply only proven rewrites.
 - **Verification:** Knip unused-file/export/dependency reachability; final ESLint and single-use findings; TypeScript safety checks for proposed edits.
-- **Advisory findings:** stable file/line/rule/name order; warnings and recommendation failures always block, including when legacy warning settings are supplied. Continue every configured check before returning failure. Print: “Resolve each finding one by one, in the order listed, before committing.”
+- **Manual findings:** stable file/line/rule/name order; all findings are errors. Continue every configured check before returning failure.
 
 ```text
 Before                         After
@@ -86,7 +86,7 @@ Each bullet is one top-level `node:test` case. Nested assertions remain within t
 - regex fixer deduplicates stateless literals and preserves fresh stateful instances through factories
 - shared regex registry rewrites TypeScript and MJS literals and constructors with relative namespace imports
 - shared regex export allocation avoids names already owned by the registry
-- shared regex fixer leaves a duplicate group advisory when any consumer is CommonJS
+- shared regex fixer leaves a duplicate group unchanged when any consumer is CommonJS
 - shared regex fixer does not overwrite an unowned registry or partially rewrite consumers
 - Tailwind canonical diagnostics support missing configuration, missing stylesheets, skipped v4 packages, fixes, and nested stylesheet loading
 - Tailwind canonical diagnostics cleanly skip a package without the unstable v4 API
@@ -177,7 +177,7 @@ Each bullet is one top-level `node:test` case. Nested assertions remain within t
 
 - consolidated quality modules expose their behavior from the public package entrypoint
 - the published runtime dependency stays within the supported TypeScript API major
-- documentation warnings identify missing summary and tag descriptions without generating prose
+- documentation errors identify missing summary and tag descriptions without generating prose
 - resolves aliases and extensionless relative imports
 - does not recommend shape-changing forwarding or persistence payload rewrites
 - quality accepts individual changed files as scoped source roots
@@ -207,7 +207,7 @@ Each bullet is one top-level `node:test` case. Nested assertions remain within t
 - protects long one-line imports from Prettier wrapping
 - domain runs one configured quality command
 - alias fixer preserves generic aliases and generic references
-- naming supports warning-only and automatic-fix modes
+- naming supports read-only and automatic-fix modes
 - naming applies whole-word image aliases and prefix-only state aliases
 - naming leaves Astro frontmatter, framework properties, and markup unchanged
 - naming preserves shorthand property keys while renaming their values
@@ -263,21 +263,21 @@ Each bullet is one top-level `node:test` case. Nested assertions remain within t
 - CLI lint applies its autofix policy while the Knip audit remains read-only
 - CLI lint updates progress after each ten-file ESLint batch
 - quality:all reports duplicate imports read-only and consolidates them idempotently in autofix mode
-- full quality routes unused-variable findings through dead-code once and warnings always block
+- full quality routes unused-variable findings through dead-code once and treats findings as errors
 - the fixing quality command inlines safe values without broad comment cleanup
 - dead-code reports private unused functions and removes only the proven declaration
 - dead-code scans the full scope once and applies same-file fixes before rescanning only changed files
 - dead-code runs only the configured unused-variable rule through the local flat-config API
 - dead-code CLI fails read-only for safe single-use fixes, then inlines the primitive value
 - dead-code warn preview copies formatter and browser-test configs before comparing Knip findings
-- dead-code CLI reports detached TSDoc as a read-only, actionable warning when configured
+- dead-code CLI reports detached TSDoc as a read-only, actionable error
 - dead-code removes unused private type declarations with their attached TSDoc
-- dead-code removes inert unused values and reports effectful initializers as configurable agent warnings
+- dead-code removes inert unused values and reports effectful initializers as errors
 - dead-code never removes an exported function because one nested callback parameter is unused
 - dead-code fails closed when ESLint returns malformed detector output
 - dead-code accepts complete ESLint reports larger than the default subprocess buffer
 - dead-code retains private Knip exports beside named framework entry exports
-- dead-code reports a contradictory Knip result as a blocking actionable warning
+- dead-code reports a contradictory Knip result as a blocking error
 - dead-code warn reports manual findings with explicit autofix status and makes no source edits
 - dead-code reports Astro-consumed exports when Knip disagrees without modifying them
 - read-only dead-code preview copies shared support modules outside configured source roots
@@ -290,7 +290,7 @@ Each bullet is one top-level `node:test` case. Nested assertions remain within t
 - dead-code fails closed when Knip exits unsuccessfully with an empty inventory
 - dead-code validates the full Knip inventory before changing any export
 - dead-code fails closed when ESLint omits a configured source file
-- CLI recommendation execution is opt-in per invocation and recommendation failures block
+- CLI recommendation execution is opt-in per invocation and command failures block quality
 - CLI UI-pattern dispatch reports findings through the process exit status
 - quality CLI checks and autofixes Tailwind canonical-class suggestions
 

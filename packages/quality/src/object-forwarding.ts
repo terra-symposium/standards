@@ -112,13 +112,13 @@ function findingsForFile(cfg: QualityCfg, file: string, analysis?: QualityAnalys
 /**
  * Finds call-site object literals that repeat several properties directly from one source object.
  *
- * This is intentionally advisory: narrowing projections, persistence payloads, and security
- * boundaries can be valid even when they look like forwarding. Callers should review each finding.
+ * Narrowing projections, persistence payloads, and security boundaries are excluded because
+ * changing their shape can alter behavior.
  *
  * @param cfg Quality configuration controlling the source scope.
  * @param analysis Optional shared parse context for the current quality run.
  *
- * @return Object-forwarding recommendations.
+ * @return Object-forwarding errors.
  */
 export function objectForwardingFindings(cfg: QualityCfg, analysis?: QualityAnalysis): ObjectForwardingFinding[] {
 	return (analysis?.files ?? srcFiles(cfg)).flatMap((f) => findingsForFile(cfg, f, analysis));
@@ -126,7 +126,7 @@ export function objectForwardingFindings(cfg: QualityCfg, analysis?: QualityAnal
 
 /**
  * Removes only redundant explicit properties from object literals that already spread the same source.
- * Whole-object replacement and narrowing projections remain advisory because they can change object shape.
+ * Whole-object replacement and narrowing projections are excluded because they can change object shape.
  *
  * @param cfg Quality configuration defining the source scope.
  * @param analysis Optional shared analysis context used when available.

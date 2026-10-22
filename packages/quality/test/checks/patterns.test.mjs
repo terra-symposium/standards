@@ -81,9 +81,7 @@ test('regex deduplication inventories literals and RegExp constructors across co
 		{ source: "'constructor'", count: 2, locations: ['src/one.ts:2', 'src/two.ts:2'] },
 	]);
 	const stricter = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], regexDedup: { minimumCount: 5 } });
-	assert.deepEqual(regexFindings(stricter), [
-		{ source: 'alpha', count: 5, locations: ['src/ignored.ts:1', 'src/one.ts:1', 'src/tests/test.ts:1', 'src/three.ts:1', 'src/two.ts:1'] },
-	]);
+	assert.deepEqual(regexFindings(stricter), [{ source: 'alpha', count: 5, locations: ['src/ignored.ts:1', 'src/one.ts:1', 'src/tests/test.ts:1', 'src/three.ts:1', 'src/two.ts:1'] }]);
 });
 test('repeated-class fixer creates deterministic file-local CLASSES constants and leaves dynamic/HTML sources alone', () => {
 	const root = fixtureRoot('terra-quality-classes-fix-');
@@ -184,7 +182,7 @@ test('shared regex export allocation avoids names already owned by the registry'
 	assert.match(fixtureText(root, 'shared/regex.mjs'), /export const REGEX_ALPHA_REGEX_2 =/);
 	assert.match(fixtureText(root, 'src/one.ts'), /\.REGEX_ALPHA_REGEX_2\(\)/);
 });
-test('shared regex fixer leaves a duplicate group advisory when any consumer is CommonJS', () => {
+test('shared regex fixer leaves a duplicate group unchanged when any consumer is CommonJS', () => {
 	const root = fixtureRoot('terra-quality-regex-commonjs-');
 	fixtureFile(root, 'src/one.cjs', 'const first = /alpha/;\n');
 	fixtureFile(root, 'src/two.cjs', 'const second = /alpha/;\n');
