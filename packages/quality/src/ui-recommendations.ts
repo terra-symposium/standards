@@ -18,45 +18,22 @@ import type { QualityCfg } from './runner.js';
 /*//////////////////////////////////////////////////
 CONFIG
 //////////////////////////////////////////////////*/
+/*//////////////////////////////////////////////////
+REGEX
+//////////////////////////////////////////////////*/
+const S_U_REGEX = /\s+/u;
 
 /** One configured native JSX element and its suggested shared component. */
-export type UiRecommendationRule = {
-	element: string;
-	component: string;
-	import: string;
-	variant?: string;
-	types?: string[];
-	when?: 'always' | 'button-like' | 'text-link';
-	reason?: string;
-};
+export type UiRecommendationRule = { element: string; component: string; import: string; variant?: string; types?: string[]; when?: 'always' | 'button-like' | 'text-link'; reason?: string };
 
 /** Source scope and native-element mappings for the on-demand recommendation pass. */
-export type UiRecommendationSettings = {
-	rules?: UiRecommendationRule[];
-	extensions?: string[];
-	ignoredFiles?: string[];
-	ignoredDirectories?: string[];
-};
+export type UiRecommendationSettings = { rules?: UiRecommendationRule[]; extensions?: string[]; ignoredFiles?: string[]; ignoredDirectories?: string[] };
 
 /** A source location and the shared component that may replace its native JSX element. */
-export type UiComponentRecommendation = {
-	file: string;
-	line: number;
-	column: number;
-	element: string;
-	component: string;
-	import: string;
-	variant?: string;
-	reason: string;
-};
+export type UiComponentRecommendation = { file: string; line: number; column: number; element: string; component: string; import: string; variant?: string; reason: string };
 
 const DEFAULT_RULES: UiRecommendationRule[] = [
-	{
-		element: 'button',
-		component: 'Button',
-		import: '@/components/ui/button',
-		reason: 'Use the shared button primitive to keep action variants and interaction states consistent.',
-	},
+	{ element: 'button', component: 'Button', import: '@/components/ui/button', reason: 'Use the shared button primitive to keep action variants and interaction states consistent.' },
 	{
 		element: 'input',
 		component: 'Input',
@@ -71,20 +48,8 @@ const DEFAULT_RULES: UiRecommendationRule[] = [
 		types: ['button', 'reset', 'submit'],
 		reason: 'Use the shared button primitive for this input-based action while preserving its type.',
 	},
-	{
-		element: 'a',
-		component: 'ButtonLink',
-		import: '@/components/ui/button',
-		when: 'button-like',
-		reason: 'This action-styled link can use ButtonLink while retaining anchor navigation semantics.',
-	},
-	{
-		element: 'a',
-		component: 'ButtonLink',
-		import: '@/components/ui/button',
-		when: 'text-link',
-		reason: 'This styled text link can use ButtonLink while retaining anchor navigation semantics.',
-	},
+	{ element: 'a', component: 'ButtonLink', import: '@/components/ui/button', when: 'button-like', reason: 'This action-styled link can use ButtonLink while retaining anchor navigation semantics.' },
+	{ element: 'a', component: 'ButtonLink', import: '@/components/ui/button', when: 'text-link', reason: 'This styled text link can use ButtonLink while retaining anchor navigation semantics.' },
 ];
 
 const DEFAULT_EXTS = ['.astro', '.jsx', '.tsx'];
@@ -130,7 +95,7 @@ function jsxAttr(element: ts.JsxOpeningLikeElement, name: string): ts.JsxAttribu
  * @return `true` when the link has button-like spacing and shape.
  */
 function isButtonLike(val: string | undefined): boolean {
-	const classes = new Set((val ?? '').split(/\s+/u).filter(Boolean));
+	const classes = new Set((val ?? '').split(S_U_REGEX).filter(Boolean));
 	const hasHorizontalPadding = [...classes].some((className) => /^px-/u.test(className));
 	const hasVerticalPadding = [...classes].some((className) => /^py-/u.test(className));
 	const hasShape = [...classes].some((className) => className === 'border' || className === 'inline-flex' || className === 'flex' || className.startsWith('rounded'));
@@ -146,7 +111,7 @@ function isButtonLike(val: string | undefined): boolean {
  * @return A ButtonLink variant for recognized text-link styling.
  */
 function textLinkVariant(val: string | undefined): string | undefined {
-	const classes = new Set((val ?? '').split(/\s+/u).filter(Boolean));
+	const classes = new Set((val ?? '').split(S_U_REGEX).filter(Boolean));
 	const color = classes.has('text-primary')
 		? 'primary'
 		: classes.has('text-secondary-foreground')
