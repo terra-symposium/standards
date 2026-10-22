@@ -1,5 +1,11 @@
 # @terra-symposium/standards-quality
 
+## 2.0.2
+
+### Patch Changes
+
+- Disable ESLint's internal concurrency after its runtime reported a lower linting ratio. Keep the reused ESLint engine and file batches, which measured faster for the website's full check without changing findings.
+
 ## 2.0.1
 
 ### Patch Changes
