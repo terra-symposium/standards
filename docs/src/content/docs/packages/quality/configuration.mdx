@@ -40,7 +40,8 @@ Runtime paths resolve from `root`. By default, `root` is the directory containin
 | `frameworkEntryExports`        | Explicit framework-discovered exports that Knip should retain, keyed by a source file path or supported `/**/*.ts` / `/**/*.tsx` pattern.           |
 | `protectedIdentifiers`         | Names that naming maintenance must preserve.                                                                                                        |
 | `renameExports`                | Whether eligible exported names can be renamed. Defaults to `false`.                                                                                |
-| `manualWarnings`               | Whether dead-code findings requiring manual review block quality. Defaults to `error`; set to `warning` to keep them visible without failing.       |
+| `warningsAsErrors`             | Whether warnings and advisory findings block quality. Defaults to `true`; set to `false` only for a non-blocking policy.                            |
+| `manualWarnings`               | Deprecated compatibility alias. Prefer `warningsAsErrors`.                                                                                          |
 
 Quality checks scan every matching source file below the configured roots, except standard generated and dependency output directories.
 

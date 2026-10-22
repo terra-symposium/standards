@@ -503,6 +503,31 @@ test('single-use analysis ignores destructuring bindings as declaration consumer
 		false,
 	);
 });
+test('single-use analysis preserves currentTarget snapshots captured by inline and named callbacks', () => {
+	const root = fixtureRoot('terra-quality-current-target-snapshot-');
+	fixtureFile(
+		root,
+		'src/main.ts',
+		`type InputEvent = { currentTarget: { value: string } };
+type Setter = (callback: (current: string[]) => string[]) => void;
+function updateInline(event: InputEvent, set: Setter) {
+	const inlineSnapshot = event.currentTarget.value;
+	set(current => current.map((name, index) => index === 0 ? inlineSnapshot : name));
+}
+function updateNamed(event: InputEvent, set: Setter) {
+	const namedSnapshot = event.currentTarget.value;
+	function applyName(current: string[]) { return current.map((name, index) => index === 0 ? namedSnapshot : name); }
+	set(applyName);
+}
+void [updateInline, updateNamed];
+`,
+	);
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
+	assert.equal(
+		singleUseFindings(cfg).some((finding) => ['inlineSnapshot', 'namedSnapshot'].includes(finding.name)),
+		false,
+	);
+});
 test('single-use analysis keeps cross-file closures and write-target values intact', () => {
 	const root = fixtureRoot('terra-quality-single-use-context-safety-');
 	fixtureFile(root, 'src/helpers.ts', `const offset = 1;\nexport function addOffset(value: number) { return value + offset; }\nexport let position = 0;\n`);

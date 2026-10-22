@@ -87,7 +87,7 @@ const DEFAULT_RULES: UiRecommendationRule[] = [
 	},
 ];
 
-const DEFAULT_EXTENSIONS = ['.astro', '.jsx', '.tsx'];
+const DEFAULT_EXTS = ['.astro', '.jsx', '.tsx'];
 
 /*//////////////////////////////////////////////////
 HELPERS
@@ -96,18 +96,18 @@ HELPERS
 /**
  * Reads a literal JSX attribute value without evaluating runtime expressions.
  *
- * @param attribute JSX attribute to inspect.
+ * @param attr JSX attribute to inspect.
  *
  * @return Static string value, or undefined when the value is dynamic or absent.
  */
-function staticAttributeValue(attribute: ts.JsxAttribute | undefined): string | undefined {
-	const initializer = attribute?.initializer;
-	if (!initializer) return attribute ? '' : undefined;
-	if (ts.isStringLiteral(initializer) || ts.isNoSubstitutionTemplateLiteral(initializer)) return initializer.text;
-	if (!ts.isJsxExpression(initializer) || !initializer.expression) return undefined;
-	let expression = initializer.expression;
-	while (ts.isParenthesizedExpression(expression)) expression = expression.expression;
-	return ts.isStringLiteral(expression) || ts.isNoSubstitutionTemplateLiteral(expression) ? expression.text : undefined;
+function staticAttrVal(attr: ts.JsxAttribute | undefined): string | undefined {
+	const init = attr?.initializer;
+	if (!init) return attr ? '' : undefined;
+	if (ts.isStringLiteral(init) || ts.isNoSubstitutionTemplateLiteral(init)) return init.text;
+	if (!ts.isJsxExpression(init) || !init.expression) return undefined;
+	let expr = init.expression;
+	while (ts.isParenthesizedExpression(expr)) expr = expr.expression;
+	return ts.isStringLiteral(expr) || ts.isNoSubstitutionTemplateLiteral(expr) ? expr.text : undefined;
 }
 
 /**
@@ -118,19 +118,19 @@ function staticAttributeValue(attribute: ts.JsxAttribute | undefined): string | 
  *
  * @return Matching attribute when present.
  */
-function jsxAttribute(element: ts.JsxOpeningLikeElement, name: string): ts.JsxAttribute | undefined {
+function jsxAttr(element: ts.JsxOpeningLikeElement, name: string): ts.JsxAttribute | undefined {
 	return element.attributes.properties.find((property): property is ts.JsxAttribute => ts.isJsxAttribute(property) && ts.isIdentifier(property.name) && property.name.text === name);
 }
 
 /**
  * Checks whether static anchor classes resemble an action control.
  *
- * @param value Static class attribute value.
+ * @param val Static class attribute value.
  *
  * @return `true` when the link has button-like spacing and shape.
  */
-function isButtonLike(value: string | undefined): boolean {
-	const classes = new Set((value ?? '').split(/\s+/u).filter(Boolean));
+function isButtonLike(val: string | undefined): boolean {
+	const classes = new Set((val ?? '').split(/\s+/u).filter(Boolean));
 	const hasHorizontalPadding = [...classes].some((className) => /^px-/u.test(className));
 	const hasVerticalPadding = [...classes].some((className) => /^py-/u.test(className));
 	const hasShape = [...classes].some((className) => className === 'border' || className === 'inline-flex' || className === 'flex' || className.startsWith('rounded'));
@@ -141,12 +141,12 @@ function isButtonLike(value: string | undefined): boolean {
 /**
  * Resolves the shared text-link variant represented by static anchor classes.
  *
- * @param value Static class attribute value.
+ * @param val Static class attribute value.
  *
  * @return A ButtonLink variant for recognized text-link styling.
  */
-function textLinkVariant(value: string | undefined): string | undefined {
-	const classes = new Set((value ?? '').split(/\s+/u).filter(Boolean));
+function textLinkVariant(val: string | undefined): string | undefined {
+	const classes = new Set((val ?? '').split(/\s+/u).filter(Boolean));
 	const color = classes.has('text-primary')
 		? 'primary'
 		: classes.has('text-secondary-foreground')
@@ -169,7 +169,7 @@ function textLinkVariant(value: string | undefined): string | undefined {
  * @return Static class string when available.
  */
 function staticClasses(element: ts.JsxOpeningLikeElement): string | undefined {
-	return staticAttributeValue(jsxAttribute(element, 'className')) ?? staticAttributeValue(jsxAttribute(element, 'class'));
+	return staticAttrVal(jsxAttr(element, 'className')) ?? staticAttrVal(jsxAttr(element, 'class'));
 }
 
 /**
@@ -181,10 +181,10 @@ function staticClasses(element: ts.JsxOpeningLikeElement): string | undefined {
  * @return `true` when the rule's element, input type, and style conditions match.
  */
 function ruleMatches(rule: UiRecommendationRule, element: ts.JsxOpeningLikeElement): boolean {
-	const type = jsxAttribute(element, 'type');
+	const type = jsxAttr(element, 'type');
 	if (rule.types) {
-		const typeValue = type ? staticAttributeValue(type) : 'text';
-		if (typeValue === undefined || !rule.types.includes(typeValue.toLowerCase())) return false;
+		const typeVal = type ? staticAttrVal(type) : 'text';
+		if (typeVal === undefined || !rule.types.includes(typeVal.toLowerCase())) return false;
 	}
 	if (rule.when === 'button-like') {
 		return isButtonLike(staticClasses(element));
@@ -197,20 +197,21 @@ function ruleMatches(rule: UiRecommendationRule, element: ts.JsxOpeningLikeEleme
  * Checks whether a source file belongs to a UI primitive implementation directory.
  *
  * @param file Repository-relative source path.
- * @param ignoredDirectories Explicit repository-relative directories to skip.
+ * @param ignoredDirs Explicit repository-relative directories to skip.
+ * @param ignoredFiles Explicit repository-relative files to skip.
  *
  * @return `true` when the file is an implementation or an explicitly skipped path.
  */
-function isIgnoredFile(file: string, ignoredDirectories: string[], ignoredFiles: Set<string>): boolean {
-	const normalized = file.replaceAll('\\', '/');
-	const segments = normalized.split('/');
-	const primitiveDirectory = segments.some((segment, index) => segment === 'components' && segments[index + 1] === 'ui');
+function isIgnoredFile(file: string, ignoredDirs: string[], ignoredFiles: Set<string>): boolean {
+	const norm = file.replaceAll('\\', '/');
+	const segments = norm.split('/');
+	const primitiveDir = segments.some((segment, i) => segment === 'components' && segments[i + 1] === 'ui');
 	return (
-		primitiveDirectory ||
-		ignoredFiles.has(normalized) ||
-		ignoredDirectories.some((directory) => {
+		primitiveDir ||
+		ignoredFiles.has(norm) ||
+		ignoredDirs.some((directory) => {
 			const prefix = directory.replaceAll('\\', '/').replace(/^\/+|\/+$/gu, '');
-			return prefix && (normalized === prefix || normalized.startsWith(`${prefix}/`));
+			return prefix && (norm === prefix || norm.startsWith(`${prefix}/`));
 		})
 	);
 }
@@ -232,22 +233,22 @@ RECOMMENDATIONS
 export function uiComponentRecommendations(cfg: QualityCfg): UiComponentRecommendation[] {
 	const settings = cfg.uiRecommendations;
 	const rules = settings?.rules ?? DEFAULT_RULES;
-	const extensions = settings?.extensions ?? DEFAULT_EXTENSIONS;
-	const ignoredFiles = new Set((settings?.ignoredFiles ?? []).map((file) => file.replaceAll('\\', '/')));
+	const exts = settings?.extensions ?? DEFAULT_EXTS;
+	const ignoredFiles = new Set((settings?.ignoredFiles ?? []).map((f) => f.replaceAll('\\', '/')));
 	const findings: UiComponentRecommendation[] = [];
 
-	for (const file of srcFiles({ ...cfg, extensions })) {
+	for (const file of srcFiles({ ...cfg, extensions: exts })) {
 		const relativeFile = displayPath(cfg, file).replaceAll('\\', '/');
 		if (isIgnoredFile(relativeFile, settings?.ignoredDirectories ?? [], ignoredFiles)) continue;
-		const source = readFileSync(file, 'utf8');
+		const src = readFileSync(file, 'utf8');
 		const scriptKind = file.endsWith('.jsx') ? ts.ScriptKind.JSX : ts.ScriptKind.TSX;
-		const parsed = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, scriptKind);
+		const parsed = ts.createSourceFile(file, src, ts.ScriptTarget.Latest, true, scriptKind);
 
 		const visit = (node: ts.Node): void => {
 			if ((ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) && ts.isIdentifier(node.tagName)) {
 				const element = node.tagName.text;
 				if (element === element.toLowerCase()) {
-					const rule = rules.find((candidate) => candidate.element === element && ruleMatches(candidate, node));
+					const rule = rules.find((c) => c.element === element && ruleMatches(c, node));
 					if (rule) {
 						const { line, character } = parsed.getLineAndCharacterOfPosition(node.getStart(parsed));
 						const variant = rule.variant ?? (element === 'a' && rule.when === 'text-link' ? textLinkVariant(staticClasses(node)) : undefined);

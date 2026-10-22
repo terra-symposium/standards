@@ -94,7 +94,7 @@ const CLI_CMDS = new Set([
 ]);
 const CLI_FLAGS = new Set(['--all', '--warn', '--strict', '--skip-commands', '--skip-recommendations', '--help', '-h', '--version', '-v', '--report-json', '--branch', '--base-sha', '--repository']);
 const TOOL_OUTPUT_MAX_BUFFER = 64 * 1024 * 1024;
-
+const ESLINT_BATCH_SIZE = 250;
 const ESLINT_ARGUMENT_BUDGET = 64 * 1024;
 const FOCUSED_ESLINT_FALLBACK = 'TERRA_QUALITY_FOCUSED_ESLINT_UNAVAILABLE';
 const ESLINT_GLOB_SPECIALS = new Set(['*', '?', '[', ']', '{', '}', '(', ')', '!', '\\']);
@@ -160,6 +160,12 @@ export type QualityCfg = {
 	frameworkEntryExports?: Record<string, string[]>;
 	renameExports?: boolean;
 	qualityCommands?: { name: string; command: string; args?: string[] }[];
+<<<<<<< HEAD
+=======
+	excludeTests?: boolean;
+	warningsAsErrors?: boolean;
+	/** Deprecated compatibility alias for older quality.json files. @deprecated Use warningsAsErrors. */
+>>>>>>> e66c45d (fix(quality): block warnings by default)
 	manualWarnings?: 'error' | 'warning';
 	enabledChecks?: Partial<Record<QualityCheckName, boolean>>;
 	autofix?: Partial<Record<QualityAutofixName, boolean>>;
@@ -340,7 +346,7 @@ export function loadQualityCfg(file = resolve(process.cwd(), 'quality.json')): Q
 export function createQualityCfg(cfg: QualityCfg): QualityCfg {
 	return {
 		...cfg,
-		manualWarnings: cfg.manualWarnings ?? 'error',
+		warningsAsErrors: cfg.warningsAsErrors ?? cfg.manualWarnings !== 'warning',
 		renameExports: cfg.renameExports ?? false,
 		root: resolve(cfg.root),
 		sourceRoots: cfg.sourceRoots.map((p) => resolve(cfg.root, p)),
@@ -1889,10 +1895,10 @@ function acceptTypeSafeEdits(
  * Prints dead-code findings and fails when errors or blocking manual findings remain.
  *
  * @param findings Findings collected by the dead-code coordinator.
- * @param manualWarnings Policy for manual-only findings.
+ * @param warningsAsErrors Whether advisory findings block quality.
  * @param typeSafetyVerified Whether the candidate autofixes passed TypeScript safety checks.
  */
-function printDeadCodeFindings(findings: DeadCodeFinding[], manualWarnings: 'error' | 'warning', typeSafetyVerified = true): void {
+function printDeadCodeFindings(findings: DeadCodeFinding[], warningsAsErrors: boolean, typeSafetyVerified = true): void {
 	if (reportStages) {
 		const stage = reportStages.get('dead-code');
 		if (stage) {
@@ -1904,13 +1910,13 @@ function printDeadCodeFindings(findings: DeadCodeFinding[], manualWarnings: 'err
 		console.error('  ✓ dead-code checks passed; no autofixable findings or manual warnings remain');
 		return;
 	}
-	const errs = findings.filter((finding) => finding.severity === 'error' || manualWarnings === 'error');
-	const warnings = findings.filter((finding) => finding.severity === 'warning' && manualWarnings !== 'error');
+	const errs = findings.filter((finding) => finding.severity === 'error' || warningsAsErrors);
+	const warnings = findings.filter((finding) => finding.severity === 'warning' && !warningsAsErrors);
 	const manualCount = findings.filter((finding) => finding.severity === 'warning').length;
 	for (const finding of [...findings].sort(
 		(left, right) => left.file.localeCompare(right.file) || left.line - right.line || left.rule.localeCompare(right.rule) || left.name.localeCompare(right.name),
 	)) {
-		const severity = finding.severity === 'warning' && manualWarnings === 'error' ? 'ERROR' : finding.severity.toUpperCase();
+		const severity = finding.severity === 'warning' && warningsAsErrors ? 'ERROR' : finding.severity.toUpperCase();
 		console.error(`  - [${severity}] ${finding.rule}: ${finding.file}:${finding.line} ${finding.name}`);
 		console.error(`      Reason: ${finding.reason}`);
 		const autofix = !finding.autofixable ? 'not safe or not supported' : typeSafetyVerified ? 'available' : 'candidate; fix mode checks TypeScript before writing';
@@ -1918,9 +1924,9 @@ function printDeadCodeFindings(findings: DeadCodeFinding[], manualWarnings: 'err
 		console.error(`      Agent action: ${finding.agentAction}`);
 	}
 	console.error(
-		`  ${errs.length} error${errs.length === 1 ? '' : 's'}; ${manualCount} manual finding${manualCount === 1 ? '' : 's'}${manualWarnings === 'warning' ? ` (${warnings.length} warning${warnings.length === 1 ? '' : 's'})` : ''}.`,
+		`  ${errs.length} error${errs.length === 1 ? '' : 's'}; ${manualCount} manual finding${manualCount === 1 ? '' : 's'}${warningsAsErrors ? '' : ` (${warnings.length} warning${warnings.length === 1 ? '' : 's'})`}.`,
 	);
-	if (manualWarnings === 'error' && manualCount > 0) console.error('  Resolve each manual finding one by one, in the order listed, before committing.');
+	if (warningsAsErrors && manualCount > 0) console.error('  Resolve each manual finding one by one, in the order listed, before committing.');
 	if (errs.length) process.exitCode = 1;
 }
 
@@ -2073,7 +2079,7 @@ function runDeadCode(cfg: QualityCfg, fix: boolean, all: boolean, verify = true,
 				}
 			: finding,
 	);
-	if (emit) printDeadCodeFindings(finalFindings, cfg.manualWarnings ?? 'error', fix);
+	if (emit) printDeadCodeFindings(finalFindings, cfg.warningsAsErrors ?? true, fix);
 	return finalFindings;
 }
 
