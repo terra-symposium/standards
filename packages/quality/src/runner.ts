@@ -112,7 +112,6 @@ let reportStageName: string | undefined;
 let reportGitHubData: GitHubReport | undefined;
 let outputPhase: string | undefined;
 let qualityFindings: string[] = [];
-let qualityFindingCount = 0;
 let qualityDiagnostics: string[] = [];
 
 /*//////////////////////////////////////////////////
@@ -216,10 +215,6 @@ type QualityInvocation = NonNullable<QualityCfg['qualityCommands']>[number];
  * Fixed phase assigned to a selected quality command.
  */
 type QualityPhase = 'Format' | 'Static quality' | 'Tests' | 'Framework / type checks' | 'Build' | 'Repository health';
-/**
- * Stable display group assigned to a selected test command.
- */
-type QualityTestGroup = 'Unit / Contract' | 'Integration' | 'Browser / Cloud' | 'Other tests';
 /** Workspace package metadata used only to identify a selected package script. */
 type WorkspaceManifest = { directory: string; name?: string; scripts: Record<string, unknown> };
 const WORKSPACE_MANIFESTS = new Map<string, WorkspaceManifest[]>();
@@ -397,26 +392,38 @@ function toolPath(cfg: QualityCfg, cfgd: string | undefined, fallback: string): 
  *
  * @return Nothing; the heading is written to standard error with the other quality messages.
  */
+function qualityLabel(name: string): string {
+	const key = name.replace(/^(?:command|recommendation):/u, '').replace(/^dead-code\//u, '');
+	const labels: Record<string, string> = {
+		accessibility: 'Accessibility',
+		aliases: 'Aliases',
+		'dead-code': 'Dead Code',
+		documentation: 'Documentation',
+		'documented-commands': 'Documented Commands',
+		forwarding: 'Forwarding',
+		'performance-patterns': 'Performance Patterns',
+		'repeated-classes': 'Repeated Classes',
+		'regex-dedup': 'Regex Dedup',
+		'source-analysis': 'Source Analysis',
+		'tailwind-canonical': 'Tailwind Canonical',
+		typecheck: 'Typecheck',
+		'ui-patterns': 'UI Patterns',
+		'ui-recommendations': 'UI Recommendations',
+	};
+	if (labels[key]) return labels[key];
+	return key
+		.replace(/(^|[-/\s])([a-z])/gu, (_match, separator: string, letter: string) => `${separator === '-' || separator === '/' ? ' ' : separator}${letter.toUpperCase()}`)
+		.replace(/\bEslint\b/gu, 'ESLint');
+}
+
 function qualityHeader(name: string, detail: string): void {
 	if (reportStages) {
 		reportStageName = name;
 		reportStages.set(name, { name, status: 'passed', findings: 0 });
 	}
 	if (outputPhase) {
-		const indent = name.startsWith('dead-code/') || (outputPhase === 'Tests' && name.startsWith('command:')) ? '    ' : '  ';
-		const labels: Record<string, string> = {
-			'dead-code/safe-fixes': 'Safe fixes',
-			'dead-code/verification': 'Verification',
-			'dead-code/knip-fix': 'Knip import-consumer scan',
-			'dead-code/eslint-fix': 'ESLint unused-declaration scan',
-			'dead-code/single-use': 'Single-use declaration/reference scan and classification',
-			'dead-code/knip': 'Knip reachability verification',
-			'dead-code': 'Dead code',
-		};
-		const label =
-			labels[name] ?? name.replace(/^command:/u, '').replace(/(^|[-/])([a-z])/gu, (_match, separator: string, letter: string) => `${separator === '-' ? ' ' : separator}${letter.toUpperCase()}`);
-		console.error(`${indent}${label}`);
-		if (detail) console.error(`${indent}  ${detail}`);
+		if (outputPhase === 'PREPARING SAFE FIXES' || name.includes('/')) return;
+		console.error(`  ⠋ ${qualityLabel(name)}`);
 		return;
 	}
 	console.error(`\n=== ${name} ===`);
@@ -432,10 +439,35 @@ function qualityHeader(name: string, detail: string): void {
  * @return Nothing; a concise completion line is written to standard error.
  */
 function printCheckStatus(name: string, findings: number): void {
-	if (!outputPhase) return;
-	const label = name.replace(/(^|[-/])([a-z])/gu, (_match, separator: string, letter: string) => `${separator === '-' ? ' ' : separator}${letter.toUpperCase()}`);
-	const result = findings ? `${findings} finding${findings === 1 ? '' : 's'}` : 'clean';
-	console.error(`  ${findings ? '✗' : '✓'} ${label} · ${result}`);
+	if (!outputPhase || outputPhase === 'PREPARING SAFE FIXES') return;
+	console.error(`  ${findings ? '✗' : '✓'} ${qualityLabel(name)}`);
+}
+
+function printSkippedCheckStatus(name: string): void {
+	if (!outputPhase || outputPhase === 'PREPARING SAFE FIXES') return;
+	console.error(`  ↷ ${qualityLabel(name)}`);
+}
+
+/** Records one failed check and keeps its complete diagnostic for the final summary. */
+function recordQualityFailure(name: string, error: unknown): void {
+	const detail = error instanceof Error ? error.message : String(error);
+	const stage = reportStages?.get(name);
+	if (stage) stage.status = 'failed';
+	process.exitCode = 1;
+	if (outputPhase) qualityDiagnostics.push(`${qualityLabel(name)}: ${detail}`);
+	else console.error(`${qualityLabel(name)}: ${detail}`);
+}
+
+/** Runs an independent action and records its error without interrupting later checks. */
+function continueAfterFailure(name: string, action: () => void): boolean {
+	try {
+		action();
+		return true;
+	} catch (error) {
+		recordQualityFailure(name, error);
+		printCheckStatus(name, 1);
+		return false;
+	}
 }
 
 /**
@@ -629,14 +661,6 @@ function phaseForInvocation(cfg: QualityCfg, check: QualityInvocation): QualityP
  *
  * @return Stable display category for the test suite.
  */
-function testGroup(cfg: QualityCfg, check: QualityInvocation): QualityTestGroup {
-	const text = invocationText(cfg, check);
-	if (testRunner(cfg, check) === 'playwright' || /\b(?:playwright|browser|e2e|visual|cloud)\b/u.test(text)) return 'Browser / Cloud';
-	if (/\b(?:integration|database|postgres|neon|http|api)\b/u.test(text)) return 'Integration';
-	if (/\b(?:unit|contract)\b/u.test(text)) return 'Unit / Contract';
-	return 'Other tests';
-}
-
 /**
  * Identifies the runner family for configured test-command reporting.
  *
@@ -760,10 +784,9 @@ function run(cfg: QualityCfg, cmd: string, args: string[], opts: { quietSuccess?
  * @param completed One-based completed-suite count.
  * @param total Number of selected, deduplicated suites.
  *
- * @return Test group, exit status, and captured output to print after progress completes.
+ * @return Exit status and captured output for the final findings summary.
  */
-function runTestSuite(cfg: QualityCfg, check: QualityInvocation, completed: number, total: number): { group: QualityTestGroup; status: number; output: string[] } {
-	const group = testGroup(cfg, check);
+function runTestSuite(cfg: QualityCfg, check: QualityInvocation): { status: number; output: string[] } {
 	const runner = testRunner(cfg, check);
 	const args = [...(check.args ?? [])];
 	const env = { ...process.env };
@@ -795,18 +818,28 @@ function runTestSuite(cfg: QualityCfg, check: QualityInvocation, completed: numb
 			else args.splice(separator, 0, reporterArg);
 		}
 	}
-	qualityHeader(`command:${check.name}`, `Running ${check.command} ${(check.args ?? []).join(' ')}`.trim());
-	const result = spawnSync(check.command, args, { cwd: cfg.root, stdio: ['inherit', 'pipe', 'pipe'], env, maxBuffer: TOOL_OUTPUT_MAX_BUFFER });
-	const output = [...compactOutput(result.stdout?.toString() ?? ''), ...compactOutput(result.stderr?.toString() ?? '')];
-	if (result.error) output.push(`${check.command} failed: ${result.error.message}`);
-	const status = result.status ?? 1;
+	qualityHeader(`command:${check.name}`, '');
+	let status = 1;
+	let output: string[] = [];
+	try {
+		const result = spawnSync(check.command, args, { cwd: cfg.root, stdio: ['inherit', 'pipe', 'pipe'], env, maxBuffer: TOOL_OUTPUT_MAX_BUFFER });
+		output = [...compactOutput(result.stdout?.toString() ?? ''), ...compactOutput(result.stderr?.toString() ?? '')];
+		if (result.error) output.push(result.error.message);
+		status = result.status ?? 1;
+	} catch (error) {
+		output.push(error instanceof Error ? error.message : String(error));
+	}
 	if (reportStages && reportStageName) {
 		const stage = reportStages.get(reportStageName);
 		if (stage && status) stage.status = 'failed';
 	}
-	if (status) process.exitCode = status;
-	qualityProgress('Test suites', completed, total);
-	return { group, status, output };
+	if (status) {
+		process.exitCode = 1;
+		if (outputPhase) qualityDiagnostics.push(`${qualityLabel(check.name)} failed (exit ${status})${output.length ? `:\n${output.map((line) => `  ${line}`).join('\n')}` : ''}`);
+		else for (const line of output) console.error(`  ${line}`);
+	} else if (!outputPhase) for (const line of output) console.error(`  ${line}`);
+	printCheckStatus(check.name, status ? 1 : 0);
+	return { status, output };
 }
 
 /**
@@ -822,41 +855,30 @@ function runQualityPhase(cfg: QualityCfg, phase: QualityPhase): number {
 	let failures = 0;
 	if (phase === 'Tests') {
 		const suites = uniqueTestSuites(cmds);
-		if (!suites.length) {
-			console.error('  No configured test suites.');
-			return 0;
-		}
-		const groupOrder: QualityTestGroup[] = ['Unit / Contract', 'Integration', 'Browser / Cloud', 'Other tests'];
-		suites.sort((left, right) => groupOrder.indexOf(testGroup(cfg, left)) - groupOrder.indexOf(testGroup(cfg, right)));
-		qualityProgress('Test suites', 0, suites.length);
-		console.error('');
-		const results: Array<{ check: QualityInvocation; group: QualityTestGroup; status: number; output: string[] }> = [];
-		for (const [idx, check] of suites.entries()) {
-			const result = runTestSuite(cfg, check, idx + 1, suites.length);
-			if (result.status) failures += 1;
-			results.push({ check, group: result.group, status: result.status, output: result.output });
-		}
-		let lastGroup: QualityTestGroup | undefined;
-		for (const result of results) {
-			if (result.group !== lastGroup) console.error(`\n  ${result.group}`);
-			lastGroup = result.group;
-			if (result.status && outputPhase) {
-				qualityDiagnostics.push(`${result.check.name} failed (exit ${result.status})${result.output.length ? `:\n${result.output.map((line) => `  ${line}`).join('\n')}` : ''}`);
-			} else if (!outputPhase) {
-				for (const line of result.output) console.error(`    ${line}`);
+		for (const check of suites) {
+			try {
+				if (runTestSuite(cfg, check).status) failures += 1;
+			} catch (error) {
+				failures += 1;
+				recordQualityFailure(check.name, error);
+				printCheckStatus(check.name, 1);
 			}
-			console.error(`  ${result.check.name}: ${result.status ? '✗ failed' : '✓ passed'}`);
 		}
 		return failures;
 	}
 	for (const check of cmds) {
-		qualityHeader(`command:${check.name}`, `Running ${check.command} ${(check.args ?? []).join(' ')}`.trim());
-		const status = run(cfg, check.command, check.args ?? []);
+		qualityHeader(`command:${check.name}`, '');
+		let status = 1;
+		try {
+			status = run(cfg, check.command, check.args ?? []);
+		} catch (error) {
+			recordQualityFailure(`command:${check.name}`, error);
+		}
 		if (status) {
 			failures += 1;
-			process.exitCode = status;
+			process.exitCode = 1;
 		}
-		console.error(`  ${status ? '✗ failed' : '✓ passed'}`);
+		printCheckStatus(`command:${check.name}`, status ? 1 : 0);
 	}
 	return failures;
 }
@@ -1097,8 +1119,8 @@ function runLint(cfg: QualityCfg, opts: QualityOptions, exhaustive = false, dead
 			}
 		}
 	}
-	if (before) console.error(`  fixed ${changedFileCount(cfg, files, before)} files`);
-	console.error(`  ${failed ? '✗ failed' : '✓ passed'}`);
+	if (before && !outputPhase) console.error(`  fixed ${changedFileCount(cfg, files, before)} files`);
+	printCheckStatus('lint', failed ? 1 : 0);
 }
 
 /**
@@ -1408,19 +1430,22 @@ function parseEslintReports(result: ReturnType<typeof spawnSync>, files: string[
 					!report ||
 					typeof report.filePath !== 'string' ||
 					!Array.isArray(report.messages) ||
-					(report.fatalErrorCount ?? 0) > 0 ||
 					report.messages.some(
-						(message: unknown) => !message || typeof message !== 'object' || !Number.isInteger((message as { line?: unknown }).line) || !Number.isInteger((message as { column?: unknown }).column),
+						(message: unknown) =>
+							!message ||
+							typeof message !== 'object' ||
+							((message as { ruleId?: unknown }).ruleId === 'unused-imports/no-unused-vars' &&
+								(!Number.isInteger((message as { line?: unknown }).line) || !Number.isInteger((message as { column?: unknown }).column))),
 					),
 			)
 		)
-			throw new Error(`report entries must include filePath and well-formed messages: ${JSON.stringify(reports).slice(0, 4000)}`);
+			throw new Error('report entries must include filePath and well-formed messages');
 		const actual = new Set(reports.map((report: { filePath: string }) => resolve(report.filePath)));
 		const missing = files.map((f) => resolve(f)).filter((f) => !actual.has(f));
 		if (missing.length) throw new Error(`missing reports for ${missing.join(', ')}`);
 		return reports as EslintReport[];
 	} catch (err) {
-		throw new Error(`ESLint dead-code detector returned invalid JSON for ${files.length} source files: ${err instanceof Error ? err.message : String(err)}`, { cause: err });
+		throw new Error(`ESLint dead-code detector could not read reports for ${files.length} source files: ${err instanceof Error ? err.message : String(err)}`, { cause: err });
 	}
 }
 
@@ -1522,10 +1547,15 @@ function runCfgdCmd(cfg: QualityCfg, name: string): void {
 	if (!qualityCmdEnabled(cfg, name)) return;
 	const check = cfg.qualityCommands?.find((c) => c.name === name);
 	if (!check) throw new Error(`Unknown quality domain: ${name}`);
-	qualityHeader(`command:${name}`, `Running ${check.command} ${(check.args ?? []).join(' ')}`.trim());
-	const status = run(cfg, check.command, check.args ?? []);
-	if (status) process.exitCode = status;
-	console.error(`  ${status ? '✗ failed' : '✓ passed'}`);
+	qualityHeader(`command:${name}`, '');
+	let status = 1;
+	try {
+		status = run(cfg, check.command, check.args ?? []);
+	} catch (error) {
+		recordQualityFailure(`command:${name}`, error);
+	}
+	if (status) process.exitCode = 1;
+	printCheckStatus(`command:${name}`, status ? 1 : 0);
 }
 
 /**
@@ -1538,10 +1568,15 @@ function runCfgdCmd(cfg: QualityCfg, name: string): void {
 function runRecommendationCmds(cfg: QualityCfg): void {
 	for (const check of cfg.recommendationCommands ?? []) {
 		if (!qualityRecommendationEnabled(cfg, check.name)) continue;
-		qualityHeader(`recommendation:${check.name}`, `Running ${check.command} ${(check.args ?? []).join(' ')}`.trim());
-		const status = run(cfg, check.command, check.args ?? []);
-		if (status) process.exitCode = status;
-		console.error(`  ${status ? '✗ failed' : '✓ passed'}`);
+		qualityHeader(`recommendation:${check.name}`, '');
+		let status = 1;
+		try {
+			status = run(cfg, check.command, check.args ?? []);
+		} catch (error) {
+			recordQualityFailure(`recommendation:${check.name}`, error);
+		}
+		if (status) process.exitCode = 1;
+		printCheckStatus(`recommendation:${check.name}`, status ? 1 : 0);
 	}
 }
 
@@ -1557,7 +1592,7 @@ function runProjectTypecheck(cfg: QualityCfg): void {
 	if (!cfg.typecheckCommand) {
 		const status = run(cfg, toolPath(cfg, cfg.tools?.tsc, 'tsc'), ['--noEmit', '-p', cfg.tsconfig ?? 'tsconfig.json']);
 		if (status) process.exitCode = status;
-		console.error(`  ${status ? '✗ failed' : '✓ passed'}`);
+		printCheckStatus('typecheck', status ? 1 : 0);
 		return;
 	}
 	const result = spawnSync(cfg.typecheckCommand.command, cfg.typecheckCommand.args ?? [], { cwd: cfg.root, stdio: ['inherit', 'pipe', 'pipe'], env: process.env, maxBuffer: TOOL_OUTPUT_MAX_BUFFER });
@@ -1573,7 +1608,7 @@ function runProjectTypecheck(cfg: QualityCfg): void {
 		else printChildOutput(output);
 	}
 	if (status || diagnosticsReported) process.exitCode = status || 1;
-	console.error(`  ${status || diagnosticsReported ? '✗ failed' : '✓ passed'}`);
+	printCheckStatus('typecheck', status || diagnosticsReported ? 1 : 0);
 }
 
 /**
@@ -2044,7 +2079,6 @@ function printDeadCodeFindings(findings: DeadCodeFinding[], typeSafetyVerified =
 	}
 	lines.push(`  ${errs.length} error${errs.length === 1 ? '' : 's'}.`);
 	if (outputPhase) {
-		qualityFindingCount += errs.length;
 		qualityFindings.push(...lines.slice(0, -1));
 	} else for (const line of lines) console.error(line);
 	if (errs.length) process.exitCode = 1;
@@ -2072,9 +2106,9 @@ function runDeadCode(cfg: QualityCfg, fix: boolean, all: boolean, verify = true,
 	const changedFiles = new Set<string>();
 	const srcSnapshot = fix ? new Map(filesFor(cfg, true).map((f) => [f, readFileSync(f, 'utf8')])) : new Map<string, string>();
 	const initialInventory = fix ? new Set(srcSnapshot.keys()) : new Set<string>();
-	if (fix && emit) console.error(`  Preparing TypeScript baseline for ${srcSnapshot.size} configured source files...`);
+	if (fix && emit && !outputPhase) console.error(`  Preparing TypeScript baseline for ${srcSnapshot.size} configured source files...`);
 	const typeProgram = fix ? deadCodeTypeProgram(cfg) : null;
-	if (fix && emit) console.error('  TypeScript baseline ready.');
+	if (fix && emit && !outputPhase) console.error('  TypeScript baseline ready.');
 	const typeRejectedFiles = new Set<string>();
 	const singleUseVerificationFindings: ReturnType<typeof singleUseFindings> = [];
 	const eslintReportsByPath = new Map<string, EslintReport>();
@@ -2105,7 +2139,7 @@ function runDeadCode(cfg: QualityCfg, fix: boolean, all: boolean, verify = true,
 			let reportsToFix = scanEslint();
 			for (let round = 0; round < 5; round++) {
 				if (!reportsToFix.some((report) => report.messages.some((message) => message.ruleId === 'unused-imports/no-unused-vars'))) break;
-				if (emit) console.error(`  ESLint unused-declaration pass ${round + 1}/5...`);
+				if (emit && !outputPhase) console.error(`  ESLint unused-declaration pass ${round + 1}/5...`);
 				const passChangedFiles = new Set<string>();
 				if (!fixUnusedDeclarations(cfg, reportsToFix, passChangedFiles, importedConsumersForRun)) break;
 				for (const file of passChangedFiles) changedFiles.add(file);
@@ -2118,7 +2152,7 @@ function runDeadCode(cfg: QualityCfg, fix: boolean, all: boolean, verify = true,
 			cfg,
 			singleUseChangedFiles,
 			(pass, filesChanged) => {
-				if (emit) console.error(`  Single-use rewrite pass ${pass} starting (${filesChanged} source files changed so far).`);
+				if (emit && !outputPhase) console.error(`  Single-use rewrite pass ${pass} starting (${filesChanged} source files changed so far).`);
 			},
 			singleUseVerificationFindings,
 		);
@@ -2138,9 +2172,9 @@ function runDeadCode(cfg: QualityCfg, fix: boolean, all: boolean, verify = true,
 		if (verify) beginVerification();
 		if (proposed.size) {
 			if (!typeProgram) throw new Error('Dead-code edit validation requires its baseline TypeScript program.');
-			if (emit) console.error(`  Validating ${proposed.size} changed files against TypeScript diagnostics...`);
+			if (emit && !outputPhase) console.error(`  Validating ${proposed.size} changed files against TypeScript diagnostics...`);
 			const { accepted, rejected } = acceptTypeSafeEdits(typeProgram, proposed, srcSnapshot, (checked, count) => {
-				if (emit) console.error(`  TypeScript safety check ${checked} (${count} candidate files).`);
+				if (emit && !outputPhase) console.error(`  TypeScript safety check ${checked} (${count} candidate files).`);
 			});
 			for (const file of rejected) {
 				const original = srcSnapshot.get(file);
@@ -2209,8 +2243,8 @@ function runDeadCode(cfg: QualityCfg, fix: boolean, all: boolean, verify = true,
  * @param cfg Quality configuration defining source scope and tools.
  * @param all Whether to inspect all configured source files.
  */
-function runDeadCodeReadOnly(cfg: QualityCfg, all: boolean): void {
-	runDeadCode(cfg, false, all);
+function runDeadCodeReadOnly(cfg: QualityCfg, all: boolean): DeadCodeFinding[] {
+	return runDeadCode(cfg, false, all);
 }
 /**
  * Dispatches the dead-code coordinator in fix or read-only mode.
@@ -2220,8 +2254,8 @@ function runDeadCodeReadOnly(cfg: QualityCfg, all: boolean): void {
  * @param all Whether to inspect all configured source files.
  */
 function runDeadCodeCmd(cfg: QualityCfg, fix: boolean, all: boolean): void {
-	if (fix) runDeadCode(cfg, true, all);
-	else runDeadCodeReadOnly(cfg, all);
+	const findings = fix ? runDeadCode(cfg, true, all) : runDeadCodeReadOnly(cfg, all);
+	printCheckStatus('dead-code', findings.length);
 }
 
 /**
@@ -2235,7 +2269,7 @@ function runDiffCheck(cfg: QualityCfg): void {
 	qualityHeader('diff', 'Checking Git whitespace and patch errors');
 	const status = run(cfg, 'git', ['-c', 'core.pager=cat', 'diff', '--check']);
 	if (status) process.exitCode = status;
-	console.error(`  ${status ? '✗ failed' : '✓ passed'}`);
+	printCheckStatus('diff', status ? 1 : 0);
 }
 
 /**
@@ -2260,7 +2294,6 @@ function printFindings<T>(findings: readonly T[], fmt: (finding: T) => string): 
 	}
 	const lines = findings.map((finding) => `  - ${compactOutput(fmt(finding)).join(' ')}`);
 	if (outputPhase) {
-		qualityFindingCount += findings.length;
 		qualityFindings.push(...lines);
 	} else {
 		console.error(`  ${findings.length} error${findings.length === 1 ? '' : 's'}:`);
@@ -2268,14 +2301,29 @@ function printFindings<T>(findings: readonly T[], fmt: (finding: T) => string): 
 	}
 }
 
+/** Runs one independent finding check and keeps failures from blocking later checks. */
+function runFindingCheck<T>(name: string, detail: string, check: () => T[], format: (finding: T) => string): T[] {
+	qualityHeader(name, detail);
+	try {
+		const findings = check();
+		printFindings(findings, format);
+		if (findings.length) process.exitCode = 1;
+		printCheckStatus(name, findings.length);
+		return findings;
+	} catch (error) {
+		recordQualityFailure(name, error);
+		printCheckStatus(name, 1);
+		return [];
+	}
+}
+
 /** Prints findings collected during the full quality progress phases. */
 function printQualityFindings(): void {
 	if (!qualityFindings.length && !qualityDiagnostics.length) return;
-	console.error(`\nFINDINGS SUMMARY · ${qualityFindingCount} error${qualityFindingCount === 1 ? '' : 's'} · ${qualityDiagnostics.length} diagnostic${qualityDiagnostics.length === 1 ? '' : 's'}`);
+	console.error('\nFINDINGS SUMMARY');
 	for (const diagnostic of qualityDiagnostics) console.error(`  - ${diagnostic}`);
 	for (const finding of qualityFindings) console.error(finding);
 	qualityFindings = [];
-	qualityFindingCount = 0;
 	qualityDiagnostics = [];
 }
 
@@ -2294,16 +2342,22 @@ function runGitHubCheck(cfg: QualityCfg, repos: string[] = [], explicit = false,
 		const detail = 'Set github.repositories in quality.json or pass --repository owner/name.';
 		reportGitHubData = { schemaVersion: 1, generatedAt: new Date().toISOString(), state: 'partial', detail, repositories: [] };
 		updateGitHubStage('failed', 0);
-		console.error(`  GitHub report unavailable: ${detail}`);
+		if (outputPhase) qualityDiagnostics.push(`GitHub: ${detail}`);
+		else console.error(`  GitHub: ${detail}`);
 		process.exitCode = 1;
+		printCheckStatus('github', 1);
 		return;
 	}
 	if (!hasGitHubAuth()) {
 		const detail = 'GitHub CLI is unavailable or unauthenticated; run gh auth login or set GH_TOKEN.';
 		reportGitHubData = { schemaVersion: 1, generatedAt: new Date().toISOString(), state: 'skipped', detail, repositories: [] };
 		updateGitHubStage(explicit ? 'failed' : 'skipped', 0);
-		console.error(`  GitHub report ${explicit ? 'failed' : 'skipped'}: ${detail}`);
-		if (explicit) process.exitCode = 1;
+		if (explicit) {
+			if (outputPhase) qualityDiagnostics.push(`GitHub: ${detail}`);
+			else console.error(`  GitHub: ${detail}`);
+			process.exitCode = 1;
+			printCheckStatus('github', 1);
+		} else printSkippedCheckStatus('github');
 		return;
 	}
 	try {
@@ -2311,16 +2365,20 @@ function runGitHubCheck(cfg: QualityCfg, repos: string[] = [], explicit = false,
 		const findings = reportGitHubData.repositories.flatMap((repo) => repo.findings);
 		const failed = reportGitHubData.state === 'partial';
 		updateGitHubStage(failed ? 'failed' : findings.length ? 'findings' : 'passed', findings.length);
-		for (const line of formatGitHubReport(reportGitHubData)) console.warn(`  ${line}`);
-		if (!warn && findings.some((finding) => finding.category !== 'issue' && finding.category !== 'setting')) process.exitCode = 1;
+		const blockingFindings = findings.some((finding) => finding.category !== 'issue' && finding.category !== 'setting');
+		if (outputPhase) qualityFindings.push(...formatGitHubReport(reportGitHubData).map((line) => `  - ${line}`));
+		else for (const line of formatGitHubReport(reportGitHubData)) console.warn(`  ${line}`);
+		if (!warn && blockingFindings) process.exitCode = 1;
 		if (failed && !warn) process.exitCode = 1;
-		console.info('  Use --report-json <path> to save detailed findings and agent instructions.');
+		printCheckStatus('github', !warn && (blockingFindings || failed) ? 1 : 0);
 	} catch (err) {
 		const detail = err instanceof Error ? err.message : 'Unknown GitHub report error.';
 		reportGitHubData = { schemaVersion: 1, generatedAt: new Date().toISOString(), state: 'partial', detail, repositories: [] };
 		updateGitHubStage('failed', 0);
-		console.error(`  GitHub report failed: ${detail}`);
+		if (outputPhase) qualityDiagnostics.push(`GitHub: ${detail}`);
+		else console.error(`  GitHub: ${detail}`);
 		process.exitCode = 1;
+		printCheckStatus('github', 1);
 	}
 }
 
@@ -2370,14 +2428,19 @@ function runGenericChecks(cfg: QualityCfg, analysis?: QualityAnalysis): void {
 	if (cfg.uiPatterns && qualityCheckEnabled(cfg, 'ui-patterns')) checks.push(['ui-patterns', () => uiPatternFindings(cfg, analysis)]);
 	for (const [name, check] of checks) {
 		qualityHeader(name, `Checking ${name.replace(G_REGEX(), ' ')}`);
-		const findings = check();
-		printFindings(
-			findings,
-			(f) =>
-				`${'file' in f ? `${f.file}: ` : ''}${'message' in f ? `${'line' in f ? `${f.line}:${f.column} ` : ''}${f.message}` : 'component' in f ? `${f.line}:${f.column} ${f.component}: ${f.recommendation}` : 'method' in f ? `${f.line}:${f.column} ${f.method}(${f.receiver}): ${f.recommendation}` : 'command' in f ? `${f.line}: ${f.recommendation} (${f.command})` : 'value' in f ? `${f.count}x ${f.value} (${f.locations.join(', ')})` : 'source' in f ? `${f.count}x ${f.source} (${f.locations.join(', ')})` : f.pattern}`,
-		);
-		printCheckStatus(name, findings.length);
-		if (findings.length) process.exitCode = 1;
+		try {
+			const findings = check();
+			printFindings(
+				findings,
+				(f) =>
+					`${'file' in f ? `${f.file}: ` : ''}${'message' in f ? `${'line' in f ? `${f.line}:${f.column} ` : ''}${f.message}` : 'component' in f ? `${f.line}:${f.column} ${f.component}: ${f.recommendation}` : 'method' in f ? `${f.line}:${f.column} ${f.method}(${f.receiver}): ${f.recommendation}` : 'command' in f ? `${f.line}: ${f.recommendation} (${f.command})` : 'value' in f ? `${f.count}x ${f.value} (${f.locations.join(', ')})` : 'source' in f ? `${f.count}x ${f.source} (${f.locations.join(', ')})` : f.pattern}`,
+			);
+			printCheckStatus(name, findings.length);
+			if (findings.length) process.exitCode = 1;
+		} catch (error) {
+			recordQualityFailure(name, error);
+			printCheckStatus(name, 1);
+		}
 	}
 }
 
@@ -2391,8 +2454,15 @@ function runGenericChecks(cfg: QualityCfg, analysis?: QualityAnalysis): void {
  */
 function runTailwindCanonicalCheck(cfg: QualityCfg, fix: boolean): Promise<void> {
 	qualityHeader('tailwind-canonical', `${fix ? 'Fixing and checking' : 'Checking'} canonical Tailwind classes`);
-	return runTailwindCanonical(cfg, fix).then(
-		() => undefined,
+	let skipped = false;
+	return runTailwindCanonical(cfg, fix, {
+		quiet: Boolean(outputPhase),
+		onFinding: (finding) => qualityDiagnostics.push(finding),
+		onSkip: () => {
+			skipped = true;
+		},
+	}).then(
+		() => (skipped ? printSkippedCheckStatus('tailwind-canonical') : printCheckStatus('tailwind-canonical', 0)),
 		(error: unknown) => {
 			const stage = reportStages?.get('tailwind-canonical');
 			if (stage) {
@@ -2682,7 +2752,7 @@ export function runQuality(
 } {
 	void _strict;
 	const scoped = scopedCfg(cfg, all);
-	const ctx = analysis ?? createQualityAnalysis(scoped);
+	const ctx = analysis;
 	const result = {
 		imports: [] as ReturnType<typeof checkImports>,
 		naming: [] as ReturnType<typeof namingFindings>,
@@ -2693,36 +2763,53 @@ export function runQuality(
 	let duplicateImports: ReturnType<typeof duplicateImportFindings> = [];
 	if (qualityCheckEnabled(cfg, 'import')) {
 		qualityHeader('imports', 'Checking local import resolution');
-		result.imports = checkImports(scoped);
-		duplicateImports = duplicateImportFindings(ctx.files);
-		if (result.imports.length) printFindings(result.imports, (f) => `Unresolved import: ${f.importer} -> ${f.specifier}`);
-		if (duplicateImports.length) printFindings(duplicateImports, (f) => `Duplicate named import: ${f.file}:${f.line} repeats an import from ${f.module}`);
-		printCheckStatus('imports', result.imports.length + duplicateImports.length);
+		let findings = 0;
+		try {
+			result.imports = checkImports(scoped);
+			printFindings(result.imports, (f) => `Unresolved import: ${f.importer} -> ${f.specifier}`);
+			findings += result.imports.length;
+		} catch (error) {
+			recordQualityFailure('imports', error);
+			findings += 1;
+		}
+		try {
+			duplicateImports = duplicateImportFindings(ctx?.files ?? filesFor(scoped, true));
+			printFindings(duplicateImports, (f) => `Duplicate named import: ${f.file}:${f.line} repeats an import from ${f.module}`);
+			findings += duplicateImports.length;
+		} catch (error) {
+			recordQualityFailure('imports', error);
+			findings += 1;
+		}
+		printCheckStatus('imports', findings);
 	}
-	if (qualityCheckEnabled(cfg, 'name')) {
-		qualityHeader('naming', 'Checking concise, consistent symbol names');
-		result.naming = namingFindings(scoped, ctx);
-		printFindings(result.naming, (f) => `Naming error: ${f.file}: ${f.name} -> ${f.suggestion}`);
-		printCheckStatus('naming', result.naming.length);
-	}
-	if (qualityCheckEnabled(cfg, 'alias')) {
-		qualityHeader('aliases', 'Checking for unnecessary compatibility aliases');
-		result.aliases = aliasFindings(scoped, ctx);
-		printFindings(result.aliases, (f) => `Alias: ${f.file}:${f.line} ${f.kind} ${f.name} -> ${f.replacement}`);
-		printCheckStatus('aliases', result.aliases.length);
-	}
-	if (qualityCheckEnabled(cfg, 'forward')) {
-		qualityHeader('forwarding', 'Checking object-forwarding opportunities');
-		result.forwarding = objectForwardingFindings(scoped, ctx);
-		printFindings(result.forwarding, (f) => `Forwarding error: ${f.file}:${f.line}:${f.column} ${f.callee} repeats ${f.source}.${f.properties.join(', ')}; ${f.recommendation}.`);
-		printCheckStatus('forwarding', result.forwarding.length);
-	}
-	if (qualityCheckEnabled(cfg, 'document')) {
-		qualityHeader('documentation', 'Checking meaningful file, function, and parameter documentation');
-		result.documentation = documentationFindings(scoped, ctx);
-		printFindings(result.documentation, (f) => `Documentation error: ${f.file}:${f.line}:${f.column} ${f.name}; ${f.reason}.`);
-		printCheckStatus('documentation', result.documentation.length);
-	}
+	if (qualityCheckEnabled(cfg, 'name'))
+		result.naming = runFindingCheck(
+			'naming',
+			'Checking concise, consistent symbol names',
+			() => namingFindings(scoped, ctx),
+			(f) => `Naming error: ${f.file}: ${f.name} -> ${f.suggestion}`,
+		);
+	if (qualityCheckEnabled(cfg, 'alias'))
+		result.aliases = runFindingCheck(
+			'aliases',
+			'Checking for unnecessary compatibility aliases',
+			() => aliasFindings(scoped, ctx),
+			(f) => `Alias: ${f.file}:${f.line} ${f.kind} ${f.name} -> ${f.replacement}`,
+		);
+	if (qualityCheckEnabled(cfg, 'forward'))
+		result.forwarding = runFindingCheck(
+			'forwarding',
+			'Checking object-forwarding opportunities',
+			() => objectForwardingFindings(scoped, ctx),
+			(f) => `Forwarding error: ${f.file}:${f.line}:${f.column} ${f.callee} repeats ${f.source}.${f.properties.join(', ')}; ${f.recommendation}.`,
+		);
+	if (qualityCheckEnabled(cfg, 'document'))
+		result.documentation = runFindingCheck(
+			'documentation',
+			'Checking meaningful file, function, and parameter documentation',
+			() => documentationFindings(scoped, ctx),
+			(f) => `Documentation error: ${f.file}:${f.line}:${f.column} ${f.name}; ${f.reason}.`,
+		);
 	if (result.imports.length || duplicateImports.length || result.aliases.length || result.documentation.length > 0 || result.naming.length > 0 || result.forwarding.length > 0) process.exitCode = 1;
 	return result;
 }
@@ -2834,84 +2921,111 @@ export function runQualityCli(cfg: QualityCfg, args = process.argv.slice(2)): vo
  * @return A promise only when the asynchronous Tailwind check is selected.
  */
 function runFullQuality(cfg: QualityCfg, args: string[], opts: QualityOptions): void | Promise<void> {
+	process.exitCode = 0;
 	qualityFindings = [];
-	qualityFindingCount = 0;
 	qualityDiagnostics = [];
 	const fix = (check: QualityAutofixName): boolean => qualityAutofixEnabled(cfg, check, opts.fix);
 	const scoped = scopedCfg(cfg, opts.all);
 	if (opts.fix) {
 		outputPhase = 'PREPARING SAFE FIXES';
 		console.error('\nPREPARING SAFE FIXES');
+		console.error('  ⠋ Safe Fixes');
 	}
+	let safeFixFailed = false;
+	const safeFix = (name: string, action: () => void): void => {
+		if (!continueAfterFailure(name, action)) safeFixFailed = true;
+	};
 	if (opts.fix && qualityCheckEnabled(cfg, 'name') && fix('name')) {
-		const namingScope = scopedCfg(cfg, opts.all);
-		if (namingFindings(namingScope).length) fixNames(cfg, opts.all);
+		safeFix('naming', () => {
+			const namingScope = scopedCfg(cfg, opts.all);
+			if (namingFindings(namingScope).length) fixNames(cfg, opts.all);
+		});
 	}
-	if (fix('accessibility') && qualityCheckEnabled(cfg, 'accessibility')) fixAccessibleNames(scoped);
-	if (fix('displayName') && qualityCheckEnabled(cfg, 'display-name')) fixDisplayNames(scoped);
-	if (fix('documentedCommands') && qualityCheckEnabled(cfg, 'documented-commands')) fixDocumentedCommands(cfg);
+	if (fix('accessibility') && qualityCheckEnabled(cfg, 'accessibility')) safeFix('accessibility', () => fixAccessibleNames(scoped));
+	if (fix('displayName') && qualityCheckEnabled(cfg, 'display-name')) safeFix('display-name', () => fixDisplayNames(scoped));
+	if (fix('documentedCommands') && qualityCheckEnabled(cfg, 'documented-commands')) safeFix('documented-commands', () => fixDocumentedCommands(cfg));
 	if (fix('forward') && qualityCheckEnabled(cfg, 'forward')) {
-		const result = fixObjectForwarding(scoped);
-		if (result.fixed || result.skipped) console.info(`Forwarding fixer: ${result.fixed} exact duplicates removed${result.skipped ? `; ${result.skipped} unsafe cases left unchanged` : ''}.`);
+		safeFix('forwarding', () => {
+			const result = fixObjectForwarding(scoped);
+			if ((result.fixed || result.skipped) && !outputPhase)
+				console.info(`Forwarding fixer: ${result.fixed} exact duplicates removed${result.skipped ? `; ${result.skipped} unsafe cases left unchanged` : ''}.`);
+		});
 	}
 	if (fix('repeatedClasses') && qualityCheckEnabled(cfg, 'repeated-classes')) {
-		const result = fixRepeatedClasses(scoped);
-		if (result.fixed || result.skipped) console.info(`Class fixer: ${result.fixed} attributes replaced${result.skipped ? `; ${result.skipped} unsafe cases left unchanged` : ''}.`);
+		safeFix('repeated-classes', () => {
+			const result = fixRepeatedClasses(scoped);
+			if ((result.fixed || result.skipped) && !outputPhase) console.info(`Class fixer: ${result.fixed} attributes replaced${result.skipped ? `; ${result.skipped} unsafe cases left unchanged` : ''}.`);
+		});
 	}
 	if (fix('regexDedup') && qualityCheckEnabled(cfg, 'regex-dedup')) {
-		const result = fixRegexDedup(scoped);
-		if (result.fixed || result.skipped) console.info(`Regex fixer: ${result.fixed} literals replaced${result.skipped ? `; ${result.skipped} unsafe cases left unchanged` : ''}.`);
+		safeFix('regex-dedup', () => {
+			const result = fixRegexDedup(scoped);
+			if ((result.fixed || result.skipped) && !outputPhase) console.info(`Regex fixer: ${result.fixed} literals replaced${result.skipped ? `; ${result.skipped} unsafe cases left unchanged` : ''}.`);
+		});
 	}
-	if (fix('lint') && qualityCheckEnabled(cfg, 'lint')) runLint(cfg, { ...opts, fix: true }, true, true);
-	if (opts.fix && qualityCheckEnabled(cfg, 'alias')) aliasFindings(scoped, true);
+	if (fix('lint') && qualityCheckEnabled(cfg, 'lint')) safeFix('lint', () => runLint(cfg, { ...opts, fix: true }, true, true));
+	if (opts.fix && qualityCheckEnabled(cfg, 'alias')) safeFix('aliases', () => void aliasFindings(scoped, true));
 	if (qualityCheckEnabled(cfg, 'document')) {
-		const documentationIssues = documentationFindings(scopedCfg(cfg, opts.all)).filter((finding) => finding.severity === 'error');
-		if (documentationIssues.length) runDocumentation(cfg, opts, ['document', ...new Set(documentationIssues.map((finding) => resolve(cfg.root, finding.file))), '--quiet'], true);
+		safeFix('documentation', () => {
+			const documentationIssues = documentationFindings(scopedCfg(cfg, opts.all)).filter((finding) => finding.severity === 'error');
+			if (documentationIssues.length) runDocumentation(cfg, opts, ['document', ...new Set(documentationIssues.map((finding) => resolve(cfg.root, finding.file))), '--quiet'], true);
+		});
 	}
 	if (opts.fix && qualityCheckEnabled(cfg, 'import') && qualityAutofixEnabled(cfg, 'document', opts.fix)) {
-		const repeated = duplicateImportFindings(filesFor(cfg, opts.all));
-		for (const file of new Set(repeated.map((finding) => finding.file))) maintainSrcFile(cfg.root, file);
+		safeFix('imports', () => {
+			const repeated = duplicateImportFindings(filesFor(cfg, opts.all));
+			for (const file of new Set(repeated.map((finding) => finding.file))) maintainSrcFile(cfg.root, file);
+		});
 	}
+	if (opts.fix) console.error(`  ${safeFixFailed ? '✗' : '✓'} Safe Fixes`);
 	outputPhase = undefined;
 	beginQualityPhase('Format');
-	if (qualityCheckEnabled(cfg, 'format')) runFormatter(cfg, { ...opts, fix: fix('format') }, opts.all ? [] : filesFor(cfg, false));
-	if (!opts.skipCommands) runQualityPhase(cfg, 'Format');
+	if (qualityCheckEnabled(cfg, 'format')) continueAfterFailure('format', () => runFormatter(cfg, { ...opts, fix: fix('format') }, opts.all ? [] : filesFor(cfg, false)));
+	if (!opts.skipCommands) continueAfterFailure('format', () => void runQualityPhase(cfg, 'Format'));
 	beginQualityPhase('Static quality');
 	const continueStaticAndLater = (): void => {
-		if (qualityCheckEnabled(cfg, 'dead-code')) runDeadCodeCmd(cfg, qualityAutofixEnabled(cfg, 'dead-code', opts.fix), opts.all);
-		if (qualityCheckEnabled(cfg, 'lint')) runLint(cfg, { ...opts, fix: false }, true, true);
-		console.error('  Preparing shared source analysis...');
-		const analysis = createQualityAnalysis(scoped);
-		console.error('  ✓ Shared source analysis ready');
-		runGenericChecks(scoped, analysis);
-		runQuality(cfg, opts.strict, opts.all, analysis);
-		if (!opts.skipCommands) runQualityPhase(cfg, 'Static quality');
-		if (!opts.skipRecommendations) runRecommendationCmds(cfg);
+		if (qualityCheckEnabled(cfg, 'dead-code')) continueAfterFailure('dead-code', () => runDeadCodeCmd(cfg, qualityAutofixEnabled(cfg, 'dead-code', opts.fix), opts.all));
+		if (qualityCheckEnabled(cfg, 'lint')) continueAfterFailure('lint', () => runLint(cfg, { ...opts, fix: false }, true, true));
+		qualityHeader('source-analysis', '');
+		let analysis: QualityAnalysis | undefined;
+		try {
+			analysis = createQualityAnalysis(scoped);
+			printCheckStatus('source-analysis', 0);
+		} catch (error) {
+			recordQualityFailure('source-analysis', error);
+			printCheckStatus('source-analysis', 1);
+		}
+		continueAfterFailure('static checks', () => runGenericChecks(scoped, analysis));
+		continueAfterFailure('static checks', () => void runQuality(cfg, opts.strict, opts.all, analysis));
+		if (!opts.skipCommands) continueAfterFailure('static quality', () => void runQualityPhase(cfg, 'Static quality'));
+		if (!opts.skipRecommendations) continueAfterFailure('recommendations', () => runRecommendationCmds(cfg));
 		beginQualityPhase('Tests');
-		const testFailures = opts.skipCommands ? 0 : runQualityPhase(cfg, 'Tests');
-		const testSuites = opts.skipCommands ? 0 : uniqueTestSuites((cfg.qualityCommands ?? []).filter((check) => qualityCmdEnabled(cfg, check.name) && phaseForInvocation(cfg, check) === 'Tests')).length;
+		if (!opts.skipCommands) continueAfterFailure('tests', () => void runQualityPhase(cfg, 'Tests'));
 		beginQualityPhase('Framework / type checks');
 		if (qualityCheckEnabled(cfg, 'type') && (cfg.tools?.tsc || cfg.typecheckCommand)) {
-			runTypecheck(cfg);
-			if (cfg.typecheckExtensions?.length && !cfg.typecheckRoots?.length && !cfg.typecheckCommand) runProjectTypecheck(cfg);
+			continueAfterFailure('typecheck', () => {
+				runTypecheck(cfg);
+				if (cfg.typecheckExtensions?.length && !cfg.typecheckRoots?.length && !cfg.typecheckCommand) runProjectTypecheck(cfg);
+			});
 		}
-		if (!opts.skipCommands) runQualityPhase(cfg, 'Framework / type checks');
+		if (!opts.skipCommands) continueAfterFailure('framework checks', () => void runQualityPhase(cfg, 'Framework / type checks'));
 		beginQualityPhase('Build');
-		if (!opts.skipCommands) runQualityPhase(cfg, 'Build');
+		if (!opts.skipCommands) continueAfterFailure('build', () => void runQualityPhase(cfg, 'Build'));
 		beginQualityPhase('Repository health');
-		if (!opts.skipCommands) runQualityPhase(cfg, 'Repository health');
-		if (qualityCheckEnabled(cfg, 'diff') && !hasCfgdGitDiffCheck(cfg)) runDiffCheck(cfg);
-		if (qualityCheckEnabled(cfg, 'github') && cfg.github?.repositories?.length) runGitHubCheck(cfg, [], false, args.includes('--warn'));
-		console.error(`\nSUMMARY checks complete · ${testSuites} suites · ${testFailures} failed ${testFailures === 1 ? 'suite' : 'suites'} · ${process.exitCode ? 'checks failed' : 'all checks passed'}`);
+		if (!opts.skipCommands) continueAfterFailure('repository health', () => void runQualityPhase(cfg, 'Repository health'));
+		if (qualityCheckEnabled(cfg, 'diff') && !hasCfgdGitDiffCheck(cfg)) continueAfterFailure('diff', () => runDiffCheck(cfg));
+		if (qualityCheckEnabled(cfg, 'github') && cfg.github?.repositories?.length) continueAfterFailure('github', () => runGitHubCheck(cfg, [], false, args.includes('--warn')));
+		console.error(`\n${process.exitCode ? '✗' : '✓'} Quality complete`);
 		printQualityFindings();
 		outputPhase = undefined;
 	};
 	if (cfg.tailwindCanonical && qualityCheckEnabled(cfg, 'tailwind-canonical'))
-		return runTailwindCanonicalCheck(cfg, fix('tailwindCanonical')).then(continueStaticAndLater, (error: unknown) => {
-			process.exitCode = 1;
-			qualityDiagnostics.push(`Tailwind canonical check failed: ${error instanceof Error ? error.message : String(error)}`);
-			continueStaticAndLater();
-		});
+		return runTailwindCanonicalCheck(cfg, fix('tailwindCanonical'))
+			.catch((error: unknown) => {
+				recordQualityFailure('tailwind-canonical', error);
+				printCheckStatus('tailwind-canonical', 1);
+			})
+			.then(continueStaticAndLater);
 	continueStaticAndLater();
 }
 
@@ -3197,8 +3311,8 @@ export function runFormatter(cfg: QualityCfg, optsOrArgs: QualityOptions | strin
 			process.exitCode = status;
 		}
 	}
-	if (before) console.error(`  fixed ${changedFileCount(cfg, tgts, before)} files`);
-	console.error(`  ${failed ? '✗ failed' : '✓ passed'}`);
+	if (before && !outputPhase) console.error(`  fixed ${changedFileCount(cfg, tgts, before)} files`);
+	printCheckStatus('format', failed ? 1 : 0);
 }
 
 /**
@@ -3245,8 +3359,8 @@ export function runTypecheck(cfg: QualityCfg, args: string[] = []): void {
 			printChildOutput(result.stderr);
 		}
 	}
-	if (status) process.exitCode = status;
-	console.error(`  ${status ? '✗ failed' : '✓ passed'}`);
+	if (status) process.exitCode = 1;
+	printCheckStatus('typecheck', status ? 1 : 0);
 }
 if (process.argv[1] && realpathSync(resolve(process.argv[1])) === realpathSync(fileURLToPath(import.meta.url))) {
 	setQualityProgressSuppressed(true);
