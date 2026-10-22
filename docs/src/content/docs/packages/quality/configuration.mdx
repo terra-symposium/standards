@@ -29,19 +29,33 @@ Install and configure a tool before enabling the check that invokes it. For exam
 
 Runtime paths resolve from `root`. By default, `root` is the directory containing `quality.json`; an explicit relative `root` is resolved from the config file. The editor-only `$schema` value is a path to the installed JSON Schema and is not read by the runner.
 
-| Field                          | Purpose                                                                                                                                             |
-| ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `root`                         | Repository root used for source discovery and child-process working directories. Relative to the config file; defaults to its containing directory. |
-| `sourceRoots`                  | Required source roots scanned by regular checks.                                                                                                    |
-| `includeRoots`                 | Additional source roots appended to `sourceRoots` during discovery.                                                                                 |
-| `extensions`                   | Required file extensions for source discovery, including the leading dot.                                                                           |
-| `aliases`                      | Internal import prefixes mapped to repository paths, such as `{ "@/": "src/" }`.                                                                    |
-| `externalPrefixes`             | Import prefixes that the import checker should treat as external.                                                                                   |
-| `frameworkEntryExports`        | Explicit framework-discovered exports that Knip should retain, keyed by a source file path or supported `/**/*.ts` / `/**/*.tsx` pattern.           |
-| `protectedIdentifiers`         | Names that naming maintenance must preserve.                                                                                                        |
-| `renameExports`                | Whether eligible exported names can be renamed. Defaults to `false`.                                                                                |
+| Field                   | Purpose                                                                                                                                             |
+| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `root`                  | Repository root used for source discovery and child-process working directories. Relative to the config file; defaults to its containing directory. |
+| `sourceRoots`           | Required source roots scanned by regular checks.                                                                                                    |
+| `includeRoots`          | Additional source roots appended to `sourceRoots` during discovery.                                                                                 |
+| `skippedDirectories`    | Directory names or repository-relative directory paths omitted from source discovery. A directory name such as `.build` is skipped at every depth.  |
+| `skippedFiles`          | Repository-relative files omitted from source discovery and source-based checks.                                                                    |
+| `extensions`            | Required file extensions for source discovery, including the leading dot.                                                                           |
+| `aliases`               | Internal import prefixes mapped to repository paths, such as `{ "@/": "src/" }`.                                                                    |
+| `externalPrefixes`      | Import prefixes that the import checker should treat as external.                                                                                   |
+| `frameworkEntryExports` | Explicit framework-discovered exports that Knip should retain, keyed by a source file path or supported `/**/*.ts` / `/**/*.tsx` pattern.           |
+| `protectedIdentifiers`  | Names that naming maintenance must preserve.                                                                                                        |
+| `renameExports`         | Whether eligible exported names can be renamed. Defaults to `false`.                                                                                |
 
-Quality checks scan every matching source file below the configured roots, except standard generated and dependency output directories.
+Quality checks scan every matching source file below the configured roots, except standard generated and dependency output directories, including `.build` directories at any depth. Use `skippedDirectories` and `skippedFiles` for repository-specific generated or vendored sources. A skipped file is omitted as a discovered source root; TypeScript can still load it as an imported dependency when another retained file references it.
+
+The `singleUse.skippedDirectories` setting has a narrower effect: it leaves files in source discovery and the TypeScript program, so they can count as consumers, while declarations inside the configured paths are not suggested for inlining. This is useful for generated types that should protect shared declarations from a false single-use finding.
+
+```json
+{
+	"skippedDirectories": [".build", "src/vendor"],
+	"skippedFiles": ["src/lib/generated-types.ts"],
+	"singleUse": {
+		"skippedDirectories": ["src/lib/generated-types.ts"]
+	}
+}
+```
 
 ## Optional performance-pattern scan
 
@@ -211,9 +225,9 @@ These checks require the corresponding policy object. See [check behavior](/pack
 | Field               | Options                                                                     | Purpose                                                                                                                                                              |
 | ------------------- | --------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `security`          | `forbiddenTerms`, `forbiddenImports`, `clientRoots`, `allowProcessEnvRoots` | Report configured terms/imports, root-level or committed environment files, secret-shaped access in client roots, and process-environment use outside allowed roots. |
-| `repeatedClasses`   | `minimumCount`, `extensions`                                                 | Find repeated static class strings in selected source files.                                                                                                         |
-| `regexDedup`        | `minimumCount`, `extensions`, `sharedModule`                                 | Find duplicate regex sources; an optional repository-relative `.mjs` module with a matching `.d.mts` declaration supports shared extraction.                         |
-| `uiPatterns`        | `forbidden`, `extensions`                                                    | Report configured UI source patterns for review.                                                                                                                     |
+| `repeatedClasses`   | `minimumCount`, `extensions`                                                | Find repeated static class strings in selected source files.                                                                                                         |
+| `regexDedup`        | `minimumCount`, `extensions`, `sharedModule`                                | Find duplicate regex sources; an optional repository-relative `.mjs` module with a matching `.d.mts` declaration supports shared extraction.                         |
+| `uiPatterns`        | `forbidden`, `extensions`                                                   | Report configured UI source patterns for review.                                                                                                                     |
 | `uiRecommendations` | `rules`, `extensions`, `ignoredFiles`, `ignoredDirectories`                 | Configure the on-demand Astro/JSX shared-component recommendation report.                                                                                            |
 | `tailwindCanonical` | required `stylesheet`, optional `sourceRoots`                               | Configure the Tailwind v4 canonical-class check and autofix.                                                                                                         |
 

@@ -8,14 +8,31 @@ IMPORTS
 //////////////////////////////////////////////////*/
 
 // API
-import { basename, join, relative } from 'node:path';
+import { basename, dirname, join, normalize, relative, resolve, sep } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { existsSync, readdirSync, statSync } from 'node:fs';
 
 // TYPES
 import type { QualityCfg } from './runner.js';
 
-const SCAN_PRUNED_DIRS = new Set(['.git', 'node_modules', 'dist', 'build', 'coverage', 'test-results', '.next', '.astro', '.sanity', '.netlify', '.cache', '.output', '.vercel', '.nuxt', '.husky']);
+const SCAN_PRUNED_DIRS = new Set([
+	'.git',
+	'node_modules',
+	'dist',
+	'build',
+	'.build',
+	'coverage',
+	'test-results',
+	'.next',
+	'.astro',
+	'.sanity',
+	'.netlify',
+	'.cache',
+	'.output',
+	'.vercel',
+	'.nuxt',
+	'.husky',
+]);
 /*//////////////////////////////////////////////////
 HELPERS
 //////////////////////////////////////////////////*/
@@ -30,20 +47,40 @@ HELPERS
 export function srcFiles(cfg: QualityCfg): string[] {
 	const roots = [...cfg.sourceRoots, ...(cfg.includeRoots ?? [])];
 	const exts = new Set(cfg.extensions);
+	const skippedFiles = new Set((cfg.skippedFiles ?? []).map((file) => resolve(cfg.root, file)));
 	const files: string[] = [];
+	const isSkippedDirectory = (dir: string): boolean => {
+		const repoPath = relative(cfg.root, dir);
+		return (cfg.skippedDirectories ?? []).some((skipped) => {
+			const normalized = normalize(skipped.replaceAll('\\', '/'));
+			if (!normalized || normalized === '.') return false;
+			if (!normalized.includes(sep)) return basename(dir) === normalized;
+			const skippedPath = resolve(cfg.root, normalized);
+			return dir === skippedPath || dir.startsWith(`${skippedPath}${sep}`) || repoPath === normalized;
+		});
+	};
+	const isSkippedRootFile = (file: string): boolean => {
+		if (skippedFiles.has(resolve(file))) return true;
+		for (let dir = dirname(resolve(file)); ; dir = dirname(dir)) {
+			if (SCAN_PRUNED_DIRS.has(basename(dir)) || isSkippedDirectory(dir)) return true;
+			if (dir === cfg.root || dirname(dir) === dir) return false;
+		}
+	};
 	const walk = (dir: string): void => {
 		if (!existsSync(dir)) return;
-		if (statSync(dir).isFile()) {
-			if (exts.has(dir.slice(dir.lastIndexOf('.')))) files.push(dir);
+		const entry = statSync(dir);
+		if (entry.isFile()) {
+			if (!isSkippedRootFile(dir) && exts.has(dir.slice(dir.lastIndexOf('.')))) files.push(dir);
 			return;
 		}
+		if (!entry.isDirectory() || SCAN_PRUNED_DIRS.has(basename(dir)) || isSkippedDirectory(dir)) return;
 		for (const e of readdirSync(dir, { withFileTypes: true })) {
 			if (e.isDirectory()) {
 				if (!SCAN_PRUNED_DIRS.has(e.name)) walk(join(dir, e.name));
 				continue;
 			}
 			const path = join(dir, e.name);
-			if (exts.has(e.name.slice(e.name.lastIndexOf('.')))) files.push(path);
+			if (!skippedFiles.has(resolve(path)) && exts.has(e.name.slice(e.name.lastIndexOf('.')))) files.push(path);
 		}
 	};
 	for (const root of roots) walk(root);

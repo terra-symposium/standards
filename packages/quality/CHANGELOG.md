@@ -1,5 +1,11 @@
 # @terra-symposium/standards-quality
 
+## 2.0.1
+
+### Patch Changes
+
+- Honor configured source exclusions, group full-run diagnostics after completed progress, and reuse a bounded ESLint engine to reduce quality-run overhead.
+
 ## 2.0.0
 
 ### Major Changes

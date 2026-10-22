@@ -14,7 +14,7 @@ import test, { afterEach } from 'node:test';
 import { QualityPlaywrightReporter, aliasFindings, checkImports, collapseInlineIfs, collapseTypesAndObjects, createQualityAnalysis, createQualityCfg, documentationFindings, maintainSrcFile, namingFindings, objectForwardingFindings, protectLongImports, qualityNodeReporter, regexFindings, renameId, runQuality, runQualityCli, runTailwindCanonical, srcFiles } from '../../dist/index.js';
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
 
 // DATA
@@ -25,6 +25,27 @@ afterEach(() => {
 test('consolidated quality modules expose their behavior from the public package entrypoint', () => {
 	for (const check of [aliasFindings, createQualityAnalysis, documentationFindings, QualityPlaywrightReporter, qualityNodeReporter, regexFindings, runTailwindCanonical])
 		assert.equal(typeof check, 'function');
+});
+test('source skip settings normalize and appear in the published schema', () => {
+	const root = mkdtempSync(join(tmpdir(), 'terra-quality-source-skip-config-'));
+	const cfg = createQualityCfg({
+		root,
+		sourceRoots: ['src'],
+		extensions: ['.ts'],
+		skippedDirectories: ['.build'],
+		skippedFiles: ['src/generated.ts'],
+		singleUse: { skippedDirectories: ['src/generated'] },
+	});
+	assert.deepEqual(cfg.skippedDirectories, ['.build']);
+	assert.deepEqual(cfg.skippedFiles, [join(root, 'src/generated.ts')]);
+	assert.deepEqual(cfg.singleUse?.skippedDirectories, ['src/generated']);
+	const schema = JSON.parse(readFileSync(new URL('../../quality.schema.json', import.meta.url), 'utf8'));
+	assert.deepEqual(
+		Object.keys(schema.properties)
+			.filter((key) => ['skippedDirectories', 'skippedFiles', 'singleUse'].includes(key))
+			.sort(),
+		['singleUse', 'skippedDirectories', 'skippedFiles'],
+	);
 });
 test('the published runtime dependency stays within the supported TypeScript API major', () => {
 	const manifest = JSON.parse(readFileSync(new URL('../../package.json', import.meta.url), 'utf8'));
@@ -142,6 +163,25 @@ test('quality accepts individual changed files as scoped source roots', () => {
 	writeFileSync(file, 'const value = true;\n');
 	const cfg = createQualityCfg({ root, sourceRoots: [file], extensions: ['.ts'] });
 	assert.deepEqual(srcFiles(cfg), [file]);
+});
+test('source discovery honors configured skips and prunes generated build folders at every depth', () => {
+	const root = mkdtempSync(join(tmpdir(), 'terra-quality-source-skips-'));
+	const retained = join(root, 'src', 'retained.ts');
+	const skippedFile = join(root, 'src', 'generated-types.ts');
+	const skippedDirectory = join(root, 'src', 'vendor', 'generated.ts');
+	const nestedBuild = join(root, 'sanity', 'functions', 'arc', '.build', 'bundle.js');
+	for (const file of [retained, skippedFile, skippedDirectory, nestedBuild]) {
+		mkdirSync(dirname(file), { recursive: true });
+		writeFileSync(file, 'export {}\n');
+	}
+	const cfg = createQualityCfg({
+		root,
+		sourceRoots: ['src', 'sanity', skippedDirectory, nestedBuild],
+		extensions: ['.js', '.ts'],
+		skippedDirectories: ['.build', 'src/vendor'],
+		skippedFiles: ['src/generated-types.ts'],
+	});
+	assert.deepEqual(srcFiles(cfg), [retained]);
 });
 test('reports concise-name drift without changing source', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-'));
