@@ -1,5 +1,11 @@
 # @terra-symposium/standards-quality
 
+## 2.0.4
+
+### Patch Changes
+
+- Show each configured quality check before it runs and report its result afterward.
+
 ## 2.0.3
 
 ### Patch Changes
