@@ -14,7 +14,7 @@ Dead-code is one static-quality group with two explicit stages:
 
 - **Safe fixes:** Knip import consumers; ESLint unused declarations; single-use declaration/reference scans and candidate classification; apply only proven rewrites.
 - **Verification:** Knip unused-file/export/dependency reachability; final ESLint and single-use findings; TypeScript safety checks for proposed edits.
-- **Manual findings:** stable file/line/rule/name order; blocking warnings by default; `warningsAsErrors: false` is the explicit opt-out. Continue every configured check before returning failure. Print: “Resolve each manual finding one by one, in the order listed, before committing.”
+- **Advisory findings:** stable file/line/rule/name order; warnings and recommendation failures always block, including when legacy warning settings are supplied. Continue every configured check before returning failure. Print: “Resolve each finding one by one, in the order listed, before committing.”
 
 ```text
 Before                         After
@@ -263,7 +263,7 @@ Each bullet is one top-level `node:test` case. Nested assertions remain within t
 - CLI lint applies its autofix policy while the Knip audit remains read-only
 - CLI lint updates progress after each ten-file ESLint batch
 - quality:all reports duplicate imports read-only and consolidates them idempotently in autofix mode
-- full quality routes unused-variable findings through dead-code once and honors the manual warning policy
+- full quality routes unused-variable findings through dead-code once and warnings always block
 - the fixing quality command inlines safe values without broad comment cleanup
 - dead-code reports private unused functions and removes only the proven declaration
 - dead-code scans the full scope once and applies same-file fixes before rescanning only changed files
@@ -277,7 +277,7 @@ Each bullet is one top-level `node:test` case. Nested assertions remain within t
 - dead-code fails closed when ESLint returns malformed detector output
 - dead-code accepts complete ESLint reports larger than the default subprocess buffer
 - dead-code retains private Knip exports beside named framework entry exports
-- dead-code reports a contradictory Knip result as a non-blocking actionable warning
+- dead-code reports a contradictory Knip result as a blocking actionable warning
 - dead-code warn reports manual findings with explicit autofix status and makes no source edits
 - dead-code reports Astro-consumed exports when Knip disagrees without modifying them
 - read-only dead-code preview copies shared support modules outside configured source roots
@@ -290,7 +290,7 @@ Each bullet is one top-level `node:test` case. Nested assertions remain within t
 - dead-code fails closed when Knip exits unsuccessfully with an empty inventory
 - dead-code validates the full Knip inventory before changing any export
 - dead-code fails closed when ESLint omits a configured source file
-- CLI recommendation execution is opt-in per invocation and recommendation failures remain non-blocking
+- CLI recommendation execution is opt-in per invocation and recommendation failures block
 - CLI UI-pattern dispatch reports findings through the process exit status
 - quality CLI checks and autofixes Tailwind canonical-class suggestions
 
