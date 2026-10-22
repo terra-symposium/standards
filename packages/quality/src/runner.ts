@@ -93,7 +93,9 @@ const CLI_CMDS = new Set([
 ]);
 const CLI_FLAGS = new Set(['--all', '--warn', '--strict', '--skip-commands', '--skip-recommendations', '--help', '-h', '--version', '-v', '--report-json', '--branch', '--base-sha', '--repository']);
 const TOOL_OUTPUT_MAX_BUFFER = 64 * 1024 * 1024;
-const ESLINT_BATCH_SIZE = 250;
+const ESLINT_BATCH_SIZE = 50;
+const ESLINT_CONCURRENCY = 4;
+const ESLINT_API_FALLBACK = 78;
 const ESLINT_ARGUMENT_BUDGET = 64 * 1024;
 const FOCUSED_ESLINT_FALLBACK = 'TERRA_QUALITY_FOCUSED_ESLINT_UNAVAILABLE';
 const ESLINT_GLOB_SPECIALS = new Set(['*', '?', '[', ']', '{', '}', '(', ')', '!', '\\']);
@@ -114,6 +116,7 @@ let outputPhase: string | undefined;
 let quietOutput = false;
 let qualityFindings: string[] = [];
 let qualityFindingCount = 0;
+let qualityDiagnostics: string[] = [];
 
 /*//////////////////////////////////////////////////
 REGEX
@@ -168,6 +171,9 @@ export type QualityCfg = {
 	root: string;
 	sourceRoots: string[];
 	includeRoots?: string[];
+	skippedDirectories?: string[];
+	skippedFiles?: string[];
+	singleUse?: { skippedDirectories?: string[] };
 	extensions: string[];
 	aliases?: Record<string, string>;
 	externalPrefixes?: string[];
@@ -359,6 +365,9 @@ export function createQualityCfg(cfg: QualityCfg): QualityCfg {
 		root: resolve(cfg.root),
 		sourceRoots: cfg.sourceRoots.map((p) => resolve(cfg.root, p)),
 		includeRoots: (cfg.includeRoots ?? []).map((p) => resolve(cfg.root, p)),
+		skippedDirectories: cfg.skippedDirectories ?? [],
+		skippedFiles: (cfg.skippedFiles ?? []).map((p) => resolve(cfg.root, p)),
+		singleUse: cfg.singleUse ? { ...cfg.singleUse, skippedDirectories: cfg.singleUse.skippedDirectories ?? [] } : undefined,
 		aliases: cfg.aliases ?? {},
 		protectedIdentifiers: cfg.protectedIdentifiers ?? [],
 		lintRoots: (cfg.lintRoots ?? []).map((p) => resolve(cfg.root, p)),
@@ -713,16 +722,24 @@ function printChildOutput(val: string | Buffer | null | undefined): void {
  */
 function run(cfg: QualityCfg, cmd: string, args: string[], opts: { quietSuccess?: boolean } = {}): number {
 	const result = spawnSync(cmd, args, { cwd: cfg.root, stdio: ['inherit', 'pipe', 'pipe'], env: process.env, maxBuffer: TOOL_OUTPUT_MAX_BUFFER });
+	const status = result.status ?? 1;
 	if (result.status && reportStages && reportStageName) {
 		const stage = reportStages.get(reportStageName);
 		if (stage) stage.status = 'failed';
 	}
-	if (!opts.quietSuccess || result.status) {
+	if (outputPhase && status) {
+		const output = [...compactOutput(result.stdout?.toString() ?? ''), ...compactOutput(result.stderr?.toString() ?? '')];
+		qualityDiagnostics.push(`${cmd} ${args.join(' ')} failed${status ? ` (exit ${status})` : ''}${output.length ? `:\n${output.map((line) => `  ${line}`).join('\n')}` : ''}`);
+	} else if (!outputPhase && (!opts.quietSuccess || status)) {
 		printChildOutput(result.stdout);
 		printChildOutput(result.stderr);
 	}
-	if (result.error) console.error(`  ${cmd} failed: ${result.error.message}`);
-	return result.status ?? 1;
+	if (result.error) {
+		const message = `${cmd} failed: ${result.error.message}`;
+		if (outputPhase) qualityDiagnostics.push(message);
+		else console.error(`  ${message}`);
+	}
+	return status;
 }
 
 /**
@@ -732,13 +749,11 @@ function run(cfg: QualityCfg, cmd: string, args: string[], opts: { quietSuccess?
  * @param check Test command selected by quality.json.
  * @param completed One-based completed-suite count.
  * @param total Number of selected, deduplicated suites.
- * @param lastGroup Previously printed test category, if any.
  *
  * @return Test group, exit status, and captured output to print after progress completes.
  */
-function runTestSuite(cfg: QualityCfg, check: QualityInvocation, completed: number, total: number, lastGroup?: QualityTestGroup): { group: QualityTestGroup; status: number; output: string[] } {
+function runTestSuite(cfg: QualityCfg, check: QualityInvocation, completed: number, total: number): { group: QualityTestGroup; status: number; output: string[] } {
 	const group = testGroup(cfg, check);
-	if (group !== lastGroup) console.error(`\n  ${group}`);
 	const runner = testRunner(cfg, check);
 	const args = [...(check.args ?? [])];
 	const env = { ...process.env };
@@ -795,7 +810,6 @@ function runTestSuite(cfg: QualityCfg, check: QualityInvocation, completed: numb
 function runQualityPhase(cfg: QualityCfg, phase: QualityPhase): number {
 	const cmds = (cfg.qualityCommands ?? []).filter((check) => qualityCmdEnabled(cfg, check.name) && phaseForInvocation(cfg, check) === phase);
 	let failures = 0;
-	let lastGroup: QualityTestGroup | undefined;
 	if (phase === 'Tests') {
 		const suites = uniqueTestSuites(cmds);
 		if (!suites.length) {
@@ -806,15 +820,21 @@ function runQualityPhase(cfg: QualityCfg, phase: QualityPhase): number {
 		suites.sort((left, right) => groupOrder.indexOf(testGroup(cfg, left)) - groupOrder.indexOf(testGroup(cfg, right)));
 		qualityProgress('Test suites', 0, suites.length);
 		console.error('');
-		const results: Array<{ check: QualityInvocation; status: number; output: string[] }> = [];
+		const results: Array<{ check: QualityInvocation; group: QualityTestGroup; status: number; output: string[] }> = [];
 		for (const [idx, check] of suites.entries()) {
-			const result = runTestSuite(cfg, check, idx + 1, suites.length, lastGroup);
-			lastGroup = result.group;
+			const result = runTestSuite(cfg, check, idx + 1, suites.length);
 			if (result.status) failures += 1;
-			results.push({ check, status: result.status, output: result.output });
+			results.push({ check, group: result.group, status: result.status, output: result.output });
 		}
+		let lastGroup: QualityTestGroup | undefined;
 		for (const result of results) {
-			for (const line of result.output) console.error(`    ${line}`);
+			if (result.group !== lastGroup) console.error(`\n  ${result.group}`);
+			lastGroup = result.group;
+			if (result.status && outputPhase) {
+				qualityDiagnostics.push(`${result.check.name} failed (exit ${result.status})${result.output.length ? `:\n${result.output.map((line) => `  ${line}`).join('\n')}` : ''}`);
+			} else if (!outputPhase) {
+				for (const line of result.output) console.error(`    ${line}`);
+			}
 			console.error(`  ${result.check.name}: ${result.status ? '✗ failed' : '✓ passed'}`);
 		}
 		return failures;
@@ -952,6 +972,78 @@ function scopedCfg(cfg: QualityCfg, all: boolean): QualityCfg {
 }
 
 /**
+ * Creates the child program that reuses one ESLint engine across bounded file batches.
+ *
+ * @param cfg Quality configuration defining the repository root.
+ * @param files Ordered files to lint.
+ * @param opts CLI options controlling safe fixes.
+ * @param exhaustive Whether any warning must fail the lint pass.
+ * @param deadCodeCoordinated Whether unused-variable reporting belongs to the dead-code coordinator.
+ *
+ * @return ESM source for the ESLint API child process.
+ */
+function eslintApiSource(cfg: QualityCfg, files: string[], opts: QualityOptions, exhaustive: boolean, deadCodeCoordinated: boolean): string {
+	const payload = JSON.stringify({
+		root: cfg.root,
+		files,
+		batchSize: ESLINT_BATCH_SIZE,
+		concurrency: ESLINT_CONCURRENCY,
+		fix: opts.fix,
+		exhaustive,
+		deadCodeCoordinated,
+	});
+	const progressUrl = new URL('./progress.js', import.meta.url).href;
+	return `
+import { createRequire } from 'node:module';
+import { availableParallelism } from 'node:os';
+import { resolve } from 'node:path';
+
+const options = ${payload};
+const { qualityProgress } = await import(${JSON.stringify(progressUrl)});
+let ESLint;
+let engine;
+try {
+	({ ESLint } = createRequire(resolve(options.root, 'package.json'))('eslint'));
+	if (!ESLint) throw new Error('The installed ESLint package does not expose its API.');
+	engine = new ESLint({
+		cwd: options.root,
+		cache: true,
+		cacheLocation: 'node_modules/.cache/eslint',
+		cacheStrategy: 'content',
+		warnIgnored: false,
+		concurrency: Math.min(options.concurrency, Math.max(1, Math.floor(availableParallelism() / 2))),
+		fix: options.fix,
+		...(options.deadCodeCoordinated ? { overrideConfig: { rules: { 'unused-imports/no-unused-vars': 'off' } } } : {}),
+	});
+} catch {
+	process.exit(${ESLINT_API_FALLBACK});
+}
+
+try {
+	const results = [];
+	let completed = 0;
+	for (let start = 0; start < options.files.length; start += options.batchSize) {
+		const batch = options.files.slice(start, start + options.batchSize);
+		const batchResults = await engine.lintFiles(batch);
+		if (options.fix) await ESLint.outputFixes(batchResults);
+		results.push(...batchResults);
+		completed += batch.length;
+		qualityProgress('ESLint', completed, options.files.length);
+	}
+	const formatter = await engine.loadFormatter();
+	const output = await formatter.format(results);
+	if (output) process.stdout.write(output);
+	const errors = results.reduce((total, result) => total + result.errorCount, 0);
+	const warnings = results.reduce((total, result) => total + result.warningCount, 0);
+	process.exitCode = errors || (options.exhaustive && warnings) ? 1 : 0;
+} catch (error) {
+	process.stdout.write(error instanceof Error ? error.stack ?? error.message : String(error));
+	process.exitCode = 2;
+}
+`;
+}
+
+/**
  * Runs ESLint over the selected files in argument-safe batches.
  *
  * @param cfg Quality configuration defining the repository and ESLint executable.
@@ -980,13 +1072,44 @@ function runLint(cfg: QualityCfg, opts: QualityOptions, exhaustive = false, dead
 	const before = opts.fix ? snapshotFiles(cfg, files) : undefined;
 	let completed = 0;
 	qualityProgress('ESLint', completed, files.length);
-	for (const filesBatch of batches(files, 10)) {
-		const status = run(cfg, toolPath(cfg, cfg.tools?.eslint, 'eslint'), [...flags, ...filesBatch], { quietSuccess: opts.fix });
-		completed += filesBatch.length;
-		qualityProgress('ESLint', completed, files.length);
-		if (status) {
-			failed = true;
-			process.exitCode = status;
+	let apiUnavailable = cfg.tools?.eslint !== undefined && cfg.tools.eslint !== 'eslint';
+	if (!apiUnavailable) {
+		const result = spawnSync(process.execPath, ['--input-type=module'], {
+			cwd: cfg.root,
+			stdio: ['pipe', 'pipe', 'inherit'],
+			input: eslintApiSource(cfg, files, opts, exhaustive, deadCodeCoordinated),
+			env: process.env,
+			maxBuffer: TOOL_OUTPUT_MAX_BUFFER,
+		});
+		apiUnavailable = result.status === ESLINT_API_FALLBACK;
+		if (!apiUnavailable) {
+			const status = result.status ?? 1;
+			const childOutput = result.stdout?.toString() ?? '';
+			if (status && reportStages && reportStageName) {
+				const stage = reportStages.get(reportStageName);
+				if (stage) stage.status = 'failed';
+			}
+			if (status) {
+				failed = true;
+				process.exitCode = status;
+				const details = compactOutput(childOutput);
+				if (result.error) details.push(result.error.message);
+				if (outputPhase) qualityDiagnostics.push(`ESLint failed (exit ${status})${details.length ? `:\n${details.map((line) => `  ${line}`).join('\n')}` : ''}`);
+				else printChildOutput(childOutput);
+			} else if (!outputPhase && childOutput) printChildOutput(childOutput);
+		}
+	}
+	if (apiUnavailable) {
+		for (const batch of batches(files, ESLINT_BATCH_SIZE)) {
+			for (const filesBatch of argumentBatches(batch)) {
+				const status = run(cfg, toolPath(cfg, cfg.tools?.eslint, 'eslint'), [...flags, ...filesBatch], { quietSuccess: opts.fix });
+				completed += filesBatch.length;
+				qualityProgress('ESLint', completed, files.length);
+				if (status) {
+					failed = true;
+					process.exitCode = status;
+				}
+			}
 		}
 	}
 	if (before) console.error(`  fixed ${changedFileCount(cfg, files, before)} files`);
@@ -1454,10 +1577,16 @@ function runProjectTypecheck(cfg: QualityCfg): void {
 	}
 	const result = spawnSync(cfg.typecheckCommand.command, cfg.typecheckCommand.args ?? [], { cwd: cfg.root, stdio: ['inherit', 'pipe', 'pipe'], env: process.env, maxBuffer: TOOL_OUTPUT_MAX_BUFFER });
 	const output = `${result.stdout ?? ''}\n${result.stderr ?? ''}`;
-	printChildOutput(result.stdout);
-	printChildOutput(result.stderr);
 	const diagnosticsReported = /\berror\s+ts\(\d+\)/u.test(output) || /-\s+[1-9]\d*\s+errors?\b/u.test(output);
 	const status = result.status ?? 1;
+	if (status || diagnosticsReported) {
+		const lines = compactOutput(output);
+		if (outputPhase)
+			qualityDiagnostics.push(
+				`${cfg.typecheckCommand.command} ${cfg.typecheckCommand.args?.join(' ') ?? ''} ${status ? `failed (exit ${status})` : 'reported diagnostics'}${lines.length ? `:\n${lines.map((line) => `  ${line}`).join('\n')}` : ''}`,
+			);
+		else printChildOutput(output);
+	}
 	if (status || diagnosticsReported) process.exitCode = status || 1;
 	console.error(`  ${status || diagnosticsReported ? '✗ failed' : '✓ passed'}`);
 }
@@ -2156,11 +2285,13 @@ function printFindings<T>(findings: readonly T[], fmt: (finding: T) => string): 
 
 /** Prints findings collected during the full quality progress phases. */
 function printQualityFindings(): void {
-	if (!qualityFindings.length) return;
-	console.error(`\nFINDINGS SUMMARY · ${qualityFindingCount} error${qualityFindingCount === 1 ? '' : 's'}`);
+	if (!qualityFindings.length && !qualityDiagnostics.length) return;
+	console.error(`\nFINDINGS SUMMARY · ${qualityFindingCount} error${qualityFindingCount === 1 ? '' : 's'} · ${qualityDiagnostics.length} diagnostic${qualityDiagnostics.length === 1 ? '' : 's'}`);
+	for (const diagnostic of qualityDiagnostics) console.error(`  - ${diagnostic}`);
 	for (const finding of qualityFindings) console.error(finding);
 	qualityFindings = [];
 	qualityFindingCount = 0;
+	qualityDiagnostics = [];
 }
 
 /**
@@ -2711,6 +2842,7 @@ export function runQualityCli(cfg: QualityCfg, args = process.argv.slice(2)): vo
 function runFullQuality(cfg: QualityCfg, args: string[], opts: QualityOptions): void | Promise<void> {
 	qualityFindings = [];
 	qualityFindingCount = 0;
+	qualityDiagnostics = [];
 	const fix = (check: QualityAutofixName): boolean => qualityAutofixEnabled(cfg, check, opts.fix);
 	const scoped = scopedCfg(cfg, opts.all);
 	if (opts.fix) {
@@ -2774,14 +2906,14 @@ function runFullQuality(cfg: QualityCfg, args: string[], opts: QualityOptions): 
 		if (!opts.skipCommands) runQualityPhase(cfg, 'Repository health');
 		if (qualityCheckEnabled(cfg, 'diff') && !hasCfgdGitDiffCheck(cfg)) runDiffCheck(cfg);
 		if (qualityCheckEnabled(cfg, 'github') && cfg.github?.repositories?.length) runGitHubCheck(cfg, [], false, args.includes('--warn'));
-		printQualityFindings();
 		console.error(`\nSUMMARY checks complete · ${testSuites} suites · ${testFailures} failed ${testFailures === 1 ? 'suite' : 'suites'} · ${process.exitCode ? 'checks failed' : 'all checks passed'}`);
+		printQualityFindings();
 		outputPhase = undefined;
 	};
 	if (cfg.tailwindCanonical && qualityCheckEnabled(cfg, 'tailwind-canonical'))
 		return runTailwindCanonicalCheck(cfg, fix('tailwindCanonical')).then(continueStaticAndLater, (error: unknown) => {
 			process.exitCode = 1;
-			console.error(`  Tailwind canonical check failed: ${error instanceof Error ? error.message : String(error)}`);
+			qualityDiagnostics.push(`Tailwind canonical check failed: ${error instanceof Error ? error.message : String(error)}`);
 			continueStaticAndLater();
 		});
 	continueStaticAndLater();
@@ -3107,10 +3239,18 @@ export function runTypecheck(cfg: QualityCfg, args: string[] = []): void {
 		: ['--noEmit', '-p', cfg.tsconfig ?? 'tsconfig.json', ...suppliedFiles];
 	qualityHeader('typecheck', `Checking ${args.length ? 'the selected source files' : 'the configured TypeScript project'}`);
 	const result = spawnSync(toolPath(cfg, tsc, 'tsc'), compilerArgs, { cwd: cfg.root, stdio: ['inherit', 'pipe', 'pipe'], maxBuffer: TOOL_OUTPUT_MAX_BUFFER });
-	printChildOutput(result.stdout);
-	printChildOutput(result.stderr);
-	if (result.status) process.exitCode = result.status ?? 1;
-	console.error(`  ${result.status ? '✗ failed' : '✓ passed'}`);
+	const status = result.status ?? 1;
+	if (status) {
+		const output = [...compactOutput(result.stdout?.toString() ?? ''), ...compactOutput(result.stderr?.toString() ?? '')];
+		if (outputPhase)
+			qualityDiagnostics.push(`${toolPath(cfg, tsc, 'tsc')} ${compilerArgs.join(' ')} failed (exit ${status})${output.length ? `:\n${output.map((line) => `  ${line}`).join('\n')}` : ''}`);
+		else {
+			printChildOutput(result.stdout);
+			printChildOutput(result.stderr);
+		}
+	}
+	if (status) process.exitCode = status;
+	console.error(`  ${status ? '✗ failed' : '✓ passed'}`);
 }
 if (process.argv[1] && realpathSync(resolve(process.argv[1])) === realpathSync(fileURLToPath(import.meta.url))) {
 	quietOutput = true;

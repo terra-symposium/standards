@@ -32,7 +32,7 @@ TESTS
 
 test('documented commands diagnose and fix only deprecated pnpm directory flags in configured shell fences', () => {
 	const root = fixtureRoot('terra-quality-documented-commands-');
-	const file = fixtureFile(
+	fixtureFile(
 		root,
 		'docs/commands.md',
 		[

@@ -9,7 +9,7 @@ IMPORTS
 
 // API
 import ts from 'typescript';
-import { dirname, join, relative, sep } from 'node:path';
+import { basename, dirname, join, normalize, relative, resolve, sep } from 'node:path';
 import { qualityProgress } from './progress.js';
 import { readFileSync, statSync, writeFileSync } from 'node:fs';
 import { srcFiles } from './files.js';
@@ -114,7 +114,14 @@ function inSingleUseScope(cfg: QualityCfg, file: string): boolean {
  * @return Whether the path is eligible for single-use analysis.
  */
 function isSingleUseCandidate(cfg: QualityCfg, file: string): boolean {
-	return inSingleUseScope(cfg, file);
+	if (!inSingleUseScope(cfg, file)) return false;
+	return !(cfg.singleUse?.skippedDirectories ?? []).some((skipped) => {
+		const normalized = normalize(skipped.replaceAll('\\', '/'));
+		if (!normalized || normalized === '.') return false;
+		if (!normalized.includes(sep)) return basename(file) === normalized || file.split(sep).includes(normalized);
+		const skippedPath = resolve(cfg.root, normalized);
+		return file === skippedPath || file.startsWith(`${skippedPath}${sep}`);
+	});
 }
 
 /**

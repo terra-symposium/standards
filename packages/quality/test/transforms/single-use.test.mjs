@@ -473,6 +473,22 @@ test('single-use scope includes every configured directory and reports manual ca
 	assert.ok(findings.some((f) => f.name === 'SharedByComponents'));
 	assert.ok(findings.every((f) => ['INLINE', 'REVIEW'].includes(f.decision)));
 });
+test('single-use directory skips exclude candidates but retain their references', () => {
+	const root = fixtureRoot('terra-quality-single-use-skipped-reference-');
+	fixtureFile(root, 'src/shared.ts', 'export const sharedValue = 1;\n');
+	fixtureFile(root, 'src/app.ts', "import { sharedValue } from './shared.js';\nvoid sharedValue;\n");
+	fixtureFile(root, 'src/generated/reference.ts', "import { sharedValue } from '../shared.js';\nvoid sharedValue;\n");
+	const cfg = createQualityCfg({
+		root,
+		sourceRoots: ['src'],
+		extensions: ['.ts'],
+		singleUse: { skippedDirectories: ['src/generated'] },
+	});
+	assert.equal(
+		singleUseFindings(cfg).some((finding) => finding.name === 'sharedValue'),
+		false,
+	);
+});
 test('single-use analysis includes candidates in every configured directory', () => {
 	const root = fixtureRoot('terra-quality-single-use-all-directories-');
 	fixtureFile(root, 'src/quality/internal.ts', 'const internalOnly = 1;\nvoid internalOnly;\n');

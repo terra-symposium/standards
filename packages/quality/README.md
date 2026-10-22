@@ -48,7 +48,7 @@ The normal scope is changed and untracked files in a Git worktree. `--all` selec
 
 ## Output order and tests
 
-The runner controls a fixed phase order: **Format → Static quality → Tests → Framework / type checks → Build → Repository health**. `quality.json` selects enabled checks and commands; it does not define phase order or test categories. Commands in ordinary phases keep their configured order; tests keep their configured order within each category.
+The runner controls a fixed phase order: **Format → Static quality → Tests → Framework / type checks → Build → Repository health**. `quality.json` selects enabled checks and commands; it does not define phase order or test categories. Commands in ordinary phases keep their configured order; tests keep their configured order within each category. Progress completes before each check reports its status, and detailed errors from all phases appear together at the end under **FINDINGS SUMMARY**.
 
 Selected test commands are grouped as **Unit / Contract**, **Integration**, **Browser / Cloud**, or **Other tests**. Each suite has a 24-cell progress bar. Node and Playwright suites also report individual case progress; other runners receive suite-level progress only. The runner suppresses native child test output when its custom case reporter owns the output, preventing duplicate case listings.
 

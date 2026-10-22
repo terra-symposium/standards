@@ -92,8 +92,8 @@ test('createQualityCfg applies defaults and resolves configured paths exactly on
 	assert.equal(cfg.renameExports, false);
 	assert.deepEqual(cfg.aliases, {});
 	assert.deepEqual(cfg.protectedIdentifiers, ['domainName']);
-	assert.equal('skippedFiles' in cfg, false);
-	assert.equal('skippedDirectories' in cfg, false);
+	assert.deepEqual(cfg.skippedFiles, []);
+	assert.deepEqual(cfg.skippedDirectories, []);
 });
 test('CLI help exits before default quality dispatch or any configured autofix can run', () => {
 	const root = fixtureRoot('terra-quality-cli-help-');
@@ -372,7 +372,7 @@ test('full quality orders phases, groups suites, de-duplicates invocations, and 
 	assert.equal(fixtureText(root, 'diff-runs.txt').trim().split('\n').length, 1);
 	assert.equal(process.exitCode, 1, 'the failing suite keeps the overall command failed');
 	const text = output.join('\n');
-	const phaseOrder = ['FORMAT', 'STATIC QUALITY', 'TESTS', 'FRAMEWORK / TYPE CHECKS', 'BUILD', 'REPOSITORY HEALTH'].map((phase) => text.indexOf(phase));
+	const phaseOrder = ['FORMAT', 'STATIC QUALITY', 'TESTS', 'FRAMEWORK / TYPE CHECKS', 'BUILD', 'REPOSITORY HEALTH'].map((phase) => text.indexOf(`\n${phase}\n`));
 	assert.ok(phaseOrder.every((position) => position >= 0));
 	assert.deepEqual(
 		phaseOrder,
@@ -383,7 +383,7 @@ test('full quality orders phases, groups suites, de-duplicates invocations, and 
 	assert.match(text, /Browser \/ Cloud/);
 	assert.match(text, /Other tests/);
 	assert.match(text, /6 suites · 1 failed suite/);
-	const groupOrder = ['Unit / Contract', 'Integration', 'Browser / Cloud', 'Other tests'].map((g) => text.indexOf(g));
+	const groupOrder = ['Unit / Contract', 'Integration', 'Browser / Cloud', 'Other tests'].map((group) => text.indexOf(`\n  ${group}\n`));
 	assert.ok(groupOrder.every((position) => position >= 0));
 	assert.deepEqual(
 		groupOrder,
@@ -661,16 +661,15 @@ test('CLI lint applies its autofix policy while the Knip audit remains read-only
 	runQualityCli(cfg, ['knip', '--all', '--warn']);
 	assert.deepEqual(recordedCmds(root, 'knip-args.jsonl').at(-1), ['--reporter', 'json', '--no-config-hints']);
 });
-test('CLI lint updates progress after each ten-file ESLint batch', () => {
+test('CLI lint reuses an ESLint process across argument-safe file batches', () => {
 	const root = fixtureRoot('terra-quality-lint-batches-');
 	const eslint = recordingCmd(root, 'eslint-args.jsonl', 'bin/record-eslint.mjs');
 	for (let idx = 0; idx < 11; idx += 1) fixtureFile(root, `src/file-${String(idx).padStart(2, '0')}.ts`, 'export {}\n');
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], tools: { eslint } });
 	runQualityCli(cfg, ['lint', '--all', '--warn']);
 	const invocations = recordedCmds(root, 'eslint-args.jsonl');
-	assert.equal(invocations.length, 2);
-	assert.equal(invocations[0].filter((arg) => arg.endsWith('.ts')).length, 10);
-	assert.equal(invocations[1].filter((arg) => arg.endsWith('.ts')).length, 1);
+	assert.equal(invocations.length, 1);
+	assert.equal(invocations[0].filter((arg) => arg.endsWith('.ts')).length, 11);
 	resetExitCode();
 });
 test('quality:all reports duplicate imports read-only and consolidates them idempotently in autofix mode', () => {
@@ -815,7 +814,8 @@ if (args.includes('--format') && args.includes('json'))
 	assert.match(outputText, /\[ERROR\] eslint\/unused-private-declaration/);
 	assert.doesNotMatch(outputText, /\[WARNING\]/);
 	assert.ok(outputText.indexOf('[ERROR] eslint/unused-private-declaration') > outputText.indexOf('\nFINDINGS SUMMARY'));
-	assert.ok(outputEvents.findLastIndex((line) => line.includes('Test suites') && line.includes('1/1')) < outputEvents.lastIndexOf('    test feedback'));
+	assert.doesNotMatch(outputEvents.join(''), /(?:^|\n)\s*test feedback(?:\n|$)/u);
+	assert.ok(outputEvents.findLastIndex((line) => line.includes('Test suites') && line.includes('1/1')) < outputEvents.findLastIndex((line) => line.includes('contract: ✓ passed')));
 	resetExitCode();
 });
 test('the fixing quality command inlines safe values without broad comment cleanup', () => {

@@ -9,6 +9,19 @@
 		"root": { "type": "string" },
 		"sourceRoots": { "type": "array", "items": { "type": "string" } },
 		"includeRoots": { "type": "array", "items": { "type": "string" } },
+		"skippedDirectories": { "type": "array", "items": { "type": "string" }, "description": "Directory names or repository-relative directory paths excluded from source discovery." },
+		"skippedFiles": { "type": "array", "items": { "type": "string" }, "description": "Repository-relative files excluded from source discovery." },
+		"singleUse": {
+			"type": "object",
+			"properties": {
+				"skippedDirectories": {
+					"type": "array",
+					"items": { "type": "string" },
+					"description": "Directory names, repository-relative paths, or files excluded as single-use declaration candidates while remaining available as references."
+				}
+			},
+			"additionalProperties": false
+		},
 		"extensions": { "type": "array", "items": { "type": "string", "pattern": "^\\." } },
 		"aliases": { "type": "object", "additionalProperties": { "type": "string" } },
 		"frameworkEntryExports": { "type": "object", "additionalProperties": { "type": "array", "items": { "type": "string" } } },
@@ -120,7 +133,7 @@
 				"requiredFeatures": {
 					"type": "array",
 					"uniqueItems": true,
-				"items": { "enum": ["dependencyGraph", "dependabotAlerts", "malwareAlerts", "securityUpdates", "versionUpdates", "groupedUpdates", "secretScanning", "pushProtection", "codeScanning"] }
+					"items": { "enum": ["dependencyGraph", "dependabotAlerts", "malwareAlerts", "securityUpdates", "versionUpdates", "groupedUpdates", "secretScanning", "pushProtection", "codeScanning"] }
 				}
 			},
 			"additionalProperties": false
@@ -163,7 +176,10 @@
 		"checkToggles": {
 			"type": "object",
 			"properties": {
-				"accessibility": { "type": "boolean", "description": "Opt-in check for source-evident accessible names and decorative inline SVG exposure on native JSX controls and explicit interactive roles." },
+				"accessibility": {
+					"type": "boolean",
+					"description": "Opt-in check for source-evident accessible names and decorative inline SVG exposure on native JSX controls and explicit interactive roles."
+				},
 				"display-name": { "type": "boolean", "description": "Opt-in check for direct React forwardRef declarations without displayName." },
 				"performance-patterns": { "type": "boolean", "description": "Reports configured syntax patterns that may repeat work in collection callbacks; advisory only." },
 				"documented-commands": { "type": "boolean", "description": "Checks deprecated pnpm directory flags in configured Markdown shell fences." }
