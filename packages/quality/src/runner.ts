@@ -93,7 +93,6 @@ const CLI_CMDS = new Set([
 ]);
 const CLI_FLAGS = new Set(['--all', '--warn', '--strict', '--skip-commands', '--skip-recommendations', '--help', '-h', '--version', '-v', '--report-json', '--branch', '--base-sha', '--repository']);
 const TOOL_OUTPUT_MAX_BUFFER = 64 * 1024 * 1024;
-const ESLINT_BATCH_SIZE = 50;
 const ESLINT_API_FALLBACK = 78;
 const ESLINT_ARGUMENT_BUDGET = 64 * 1024;
 const FOCUSED_ESLINT_FALLBACK = 'TERRA_QUALITY_FOCUSED_ESLINT_UNAVAILABLE';
@@ -971,7 +970,7 @@ function scopedCfg(cfg: QualityCfg, all: boolean): QualityCfg {
 }
 
 /**
- * Creates the child program that reuses one ESLint engine across bounded file batches.
+ * Creates the child program that reuses one ESLint engine for the complete file set.
  *
  * @param cfg Quality configuration defining the repository root.
  * @param files Ordered files to lint.
@@ -985,7 +984,6 @@ function eslintApiSource(cfg: QualityCfg, files: string[], opts: QualityOptions,
 	const payload = JSON.stringify({
 		root: cfg.root,
 		files,
-		batchSize: ESLINT_BATCH_SIZE,
 		fix: opts.fix,
 		exhaustive,
 		deadCodeCoordinated,
@@ -1016,16 +1014,9 @@ try {
 }
 
 try {
-	const results = [];
-	let completed = 0;
-	for (let start = 0; start < options.files.length; start += options.batchSize) {
-		const batch = options.files.slice(start, start + options.batchSize);
-		const batchResults = await engine.lintFiles(batch);
-		if (options.fix) await ESLint.outputFixes(batchResults);
-		results.push(...batchResults);
-		completed += batch.length;
-		qualityProgress('ESLint', completed, options.files.length);
-	}
+	const results = await engine.lintFiles(options.files);
+	if (options.fix) await ESLint.outputFixes(results);
+	qualityProgress('ESLint', options.files.length, options.files.length);
 	const formatter = await engine.loadFormatter();
 	const output = await formatter.format(results);
 	if (output) process.stdout.write(output);
@@ -1040,7 +1031,7 @@ try {
 }
 
 /**
- * Runs ESLint over the selected files in argument-safe batches.
+ * Runs ESLint over the selected files in one API pass.
  *
  * @param cfg Quality configuration defining the repository and ESLint executable.
  * @param opts CLI options controlling scope and autofix.
@@ -1096,15 +1087,13 @@ function runLint(cfg: QualityCfg, opts: QualityOptions, exhaustive = false, dead
 		}
 	}
 	if (apiUnavailable) {
-		for (const batch of batches(files, ESLINT_BATCH_SIZE)) {
-			for (const filesBatch of argumentBatches(batch)) {
-				const status = run(cfg, toolPath(cfg, cfg.tools?.eslint, 'eslint'), [...flags, ...filesBatch], { quietSuccess: opts.fix });
-				completed += filesBatch.length;
-				qualityProgress('ESLint', completed, files.length);
-				if (status) {
-					failed = true;
-					process.exitCode = status;
-				}
+		for (const filesBatch of argumentBatches(files)) {
+			const status = run(cfg, toolPath(cfg, cfg.tools?.eslint, 'eslint'), [...flags, ...filesBatch], { quietSuccess: opts.fix });
+			completed += filesBatch.length;
+			qualityProgress('ESLint', completed, files.length);
+			if (status) {
+				failed = true;
+				process.exitCode = status;
 			}
 		}
 	}
@@ -3188,7 +3177,7 @@ export function runFormatter(cfg: QualityCfg, optsOrArgs: QualityOptions | strin
 	let failed = false;
 	let completed = 0;
 	qualityProgress('Prettier', completed, tgts.length);
-	for (const tgtBatch of batches(tgts)) {
+	for (const tgtBatch of argumentBatches(tgts)) {
 		const status = run(cfg, toolPath(cfg, cfg.tools?.prettier, 'prettier'), [...flags, ...tgtBatch], { quietSuccess: true });
 		completed += tgtBatch.length;
 		qualityProgress('Prettier', completed, tgts.length);
