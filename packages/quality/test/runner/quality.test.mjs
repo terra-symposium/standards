@@ -9,13 +9,17 @@ IMPORTS
 
 // API
 import assert from 'node:assert/strict';
-import test from 'node:test';
+import test, { afterEach } from 'node:test';
 // prettier-ignore
 import { QualityPlaywrightReporter, aliasFindings, checkImports, collapseInlineIfs, collapseTypesAndObjects, createQualityAnalysis, createQualityCfg, documentationFindings, maintainSrcFile, namingFindings, objectForwardingFindings, protectLongImports, qualityNodeReporter, regexFindings, renameId, runQualityCli, runTailwindCanonical, srcFiles } from '../../dist/index.js';
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
+
+afterEach(() => {
+	process.exitCode = 0;
+});
 
 // DATA
 import { DOCUMENTATION_DESCRIPTION_NOTICE } from '../../dist/index.js';
@@ -646,7 +650,7 @@ test('alias fixer preserves generic aliases and generic references', () => {
 	assert.deepEqual(aliasFindings(cfg, true), []);
 	assert.equal(readFileSync(file, 'utf8'), src);
 });
-test('naming supports warning-only and automatic-fix modes', () => {
+test('naming findings block read-only checks and automatic fixes apply the configured names', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-'));
 	mkdirSync(join(root, 'src'), { recursive: true });
 	const file = join(root, 'src', 'main.ts');
@@ -654,6 +658,7 @@ test('naming supports warning-only and automatic-fix modes', () => {
 	writeFileSync(file, src);
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
 	runQualityCli(cfg, ['naming', '--all', '--warn']);
+	assert.equal(process.exitCode, 1, 'naming recommendations always block quality');
 	assert.equal(readFileSync(file, 'utf8'), src);
 	runQualityCli(cfg, ['naming', '--all']);
 	assert.equal(readFileSync(file, 'utf8'), 'const org = true;\nconst genPattern = /ok/;\nexport const result = [org, genPattern];\n');

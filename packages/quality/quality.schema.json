@@ -132,12 +132,6 @@
 			"description": "Commands selected for the quality run. Terra Quality owns phase order and test grouping; array order is preserved within ordinary phases and within each test group."
 		},
 		"recommendationCommands": { "$ref": "#/$defs/commands" },
-		"warningsAsErrors": {
-			"type": "boolean",
-			"default": true,
-			"description": "Whether quality warnings and advisory findings block quality. Defaults to true; set false only when a non-blocking policy is intended."
-		},
-		"manualWarnings": { "enum": ["error", "warning"], "description": "Deprecated compatibility alias for warningsAsErrors; use warningsAsErrors instead." },
 		"tsconfig": { "type": "string" },
 		"oneLineImports": { "type": "boolean" },
 		"prettierPrintWidth": { "type": "number" },
