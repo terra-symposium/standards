@@ -28,7 +28,7 @@ Create `quality.json` in the repository root:
 }
 ```
 
-Warnings, advisory findings, and recommendation failures always fail the run. The runner completes the remaining checks and configured commands before returning failure, and its logs direct agents to resolve each finding one at a time before committing.
+Every quality finding is an error. The runner completes the remaining checks and configured commands before returning failure; there is no warning or non-blocking finding policy.
 
 This starting configuration uses the built-in checks without requiring external tools. Enable integrations as you install and configure the corresponding repository tools. When lint is enabled, add an ESLint flat config such as `eslint.config.mjs`.
 
@@ -52,7 +52,7 @@ The runner controls a fixed phase order: **Format → Static quality → Tests �
 
 Selected test commands are grouped as **Unit / Contract**, **Integration**, **Browser / Cloud**, or **Other tests**. Each suite has a 24-cell progress bar. Node and Playwright suites also report individual case progress; other runners receive suite-level progress only. The runner suppresses native child test output when its custom case reporter owns the output, preventing duplicate case listings.
 
-Dead-code is reported as one group. Fix mode shows **Safe fixes** (Knip import consumers, ESLint unused declarations, single-use declaration/reference scans, classification, then only proven edits) followed by **Verification** (Knip reachability, final ESLint and single-use results, and TypeScript safety for candidate edits). Findings appear in stable path/line/rule/name order and always block. All configured checks finish before the run returns failure.
+Dead-code is reported as one group. Fix mode shows **Safe fixes** (Knip import consumers, ESLint unused declarations, single-use declaration/reference scans, classification, then only proven edits) followed by **Verification** (Knip reachability, final ESLint and single-use results, and TypeScript safety for candidate edits). All findings appear in stable path/line/rule/name order and fail quality.
 
 ## What it does
 

@@ -23,7 +23,7 @@ File scope and write behavior are independent. The default scope is changed and 
 | `pnpm exec terra-quality quality --all --warn`                                        | All configured source files | No                 | Yes                       |
 | `pnpm exec terra-quality quality --all --warn --skip-commands --skip-recommendations` | All configured source files | No                 | No                        |
 
-`--strict` makes naming errors fail the run. To disable one fixer for every run, set its entry under `autofix` to `false`. Commands and recommendations can also be selected by name in `quality.json`.
+Every naming finding fails the run. To disable one fixer for every run, set its entry under `autofix` to `false`. Commands and recommendations can also be selected by name in `quality.json`.
 
 Changed-file mode requires a Git worktree. Use `--all` when running from a source archive or when you need a complete scan. `--warn` is review-only for Terra Quality's source and tool autofixes. Dead-code analysis runs once and reports rule-level autofix candidates from that scan; fix mode type-checks proposed edits before writing and can reject a candidate. Configured commands still run and follow their own behavior.
 
@@ -31,7 +31,7 @@ Changed-file mode requires a Git worktree. Use `--all` when running from a sourc
 
 Terra Quality owns the full-run order: **Format → Static quality → Tests → Framework / type checks → Build → Repository health**. `quality.json` continues to select checks and commands but does not set their order or test grouping. Test commands are grouped as **Unit / Contract**, **Integration**, **Browser / Cloud**, and **Other tests**. Every selected suite gets an overall progress bar; Node and Playwright also report per-case progress, while unknown runners show only suite progress. Commands keep their configured order within ordinary phases, and tests keep their configured order within each category.
 
-The dead-code section keeps safe edits and verification separate. Safe fixes scan Knip import consumers, ESLint unused declarations, and single-use declarations/references, classify candidates, and apply only proven changes. Verification checks unused-file/export/dependency reachability, final ESLint and single-use findings, and TypeScript safety. Manual findings are listed in stable order, fail by default, and do not prevent later configured checks from running. Set `warningsAsErrors` to `false` only when a non-blocking policy is intended.
+The dead-code section keeps safe edits and verification separate. Safe fixes scan Knip import consumers, ESLint unused declarations, and single-use declarations/references, classify candidates, and apply only proven changes. Verification checks unused-file/export/dependency reachability, final ESLint and single-use findings, and TypeScript safety. All findings are listed in stable order and fail quality; later configured checks still run before the command returns failure.
 
 ## Local GitHub analytics
 

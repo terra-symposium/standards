@@ -18,22 +18,45 @@ import type { QualityCfg } from './runner.js';
 /*//////////////////////////////////////////////////
 CONFIG
 //////////////////////////////////////////////////*/
-/*//////////////////////////////////////////////////
-REGEX
-//////////////////////////////////////////////////*/
-const S_U_REGEX = /\s+/u;
 
 /** One configured native JSX element and its suggested shared component. */
-export type UiRecommendationRule = { element: string; component: string; import: string; variant?: string; types?: string[]; when?: 'always' | 'button-like' | 'text-link'; reason?: string };
+export type UiRecommendationRule = {
+	element: string;
+	component: string;
+	import: string;
+	variant?: string;
+	types?: string[];
+	when?: 'always' | 'button-like' | 'text-link';
+	reason?: string;
+};
 
 /** Source scope and native-element mappings for the on-demand recommendation pass. */
-export type UiRecommendationSettings = { rules?: UiRecommendationRule[]; extensions?: string[]; ignoredFiles?: string[]; ignoredDirectories?: string[] };
+export type UiRecommendationSettings = {
+	rules?: UiRecommendationRule[];
+	extensions?: string[];
+	ignoredFiles?: string[];
+	ignoredDirectories?: string[];
+};
 
 /** A source location and the shared component that may replace its native JSX element. */
-export type UiComponentRecommendation = { file: string; line: number; column: number; element: string; component: string; import: string; variant?: string; reason: string };
+export type UiComponentRecommendation = {
+	file: string;
+	line: number;
+	column: number;
+	element: string;
+	component: string;
+	import: string;
+	variant?: string;
+	reason: string;
+};
 
 const DEFAULT_RULES: UiRecommendationRule[] = [
-	{ element: 'button', component: 'Button', import: '@/components/ui/button', reason: 'Use the shared button primitive to keep action variants and interaction states consistent.' },
+	{
+		element: 'button',
+		component: 'Button',
+		import: '@/components/ui/button',
+		reason: 'Use the shared button primitive to keep action variants and interaction states consistent.',
+	},
 	{
 		element: 'input',
 		component: 'Input',
@@ -48,8 +71,20 @@ const DEFAULT_RULES: UiRecommendationRule[] = [
 		types: ['button', 'reset', 'submit'],
 		reason: 'Use the shared button primitive for this input-based action while preserving its type.',
 	},
-	{ element: 'a', component: 'ButtonLink', import: '@/components/ui/button', when: 'button-like', reason: 'This action-styled link can use ButtonLink while retaining anchor navigation semantics.' },
-	{ element: 'a', component: 'ButtonLink', import: '@/components/ui/button', when: 'text-link', reason: 'This styled text link can use ButtonLink while retaining anchor navigation semantics.' },
+	{
+		element: 'a',
+		component: 'ButtonLink',
+		import: '@/components/ui/button',
+		when: 'button-like',
+		reason: 'This action-styled link can use ButtonLink while retaining anchor navigation semantics.',
+	},
+	{
+		element: 'a',
+		component: 'ButtonLink',
+		import: '@/components/ui/button',
+		when: 'text-link',
+		reason: 'This styled text link can use ButtonLink while retaining anchor navigation semantics.',
+	},
 ];
 
 const DEFAULT_EXTS = ['.astro', '.jsx', '.tsx'];
@@ -65,7 +100,7 @@ HELPERS
  *
  * @return Static string value, or undefined when the value is dynamic or absent.
  */
-function staticAttrVal(attr: ts.JsxAttribute | undefined): string | undefined {
+function staticAttrValue(attr: ts.JsxAttribute | undefined): string | undefined {
 	const init = attr?.initializer;
 	if (!init) return attr ? '' : undefined;
 	if (ts.isStringLiteral(init) || ts.isNoSubstitutionTemplateLiteral(init)) return init.text;
@@ -90,12 +125,12 @@ function jsxAttr(element: ts.JsxOpeningLikeElement, name: string): ts.JsxAttribu
 /**
  * Checks whether static anchor classes resemble an action control.
  *
- * @param val Static class attribute value.
+ * @param value Static class attribute value.
  *
  * @return `true` when the link has button-like spacing and shape.
  */
-function isButtonLike(val: string | undefined): boolean {
-	const classes = new Set((val ?? '').split(S_U_REGEX).filter(Boolean));
+function isButtonLike(value: string | undefined): boolean {
+	const classes = new Set((value ?? '').split(/\s+/u).filter(Boolean));
 	const hasHorizontalPadding = [...classes].some((className) => /^px-/u.test(className));
 	const hasVerticalPadding = [...classes].some((className) => /^py-/u.test(className));
 	const hasShape = [...classes].some((className) => className === 'border' || className === 'inline-flex' || className === 'flex' || className.startsWith('rounded'));
@@ -106,12 +141,12 @@ function isButtonLike(val: string | undefined): boolean {
 /**
  * Resolves the shared text-link variant represented by static anchor classes.
  *
- * @param val Static class attribute value.
+ * @param value Static class attribute value.
  *
  * @return A ButtonLink variant for recognized text-link styling.
  */
-function textLinkVariant(val: string | undefined): string | undefined {
-	const classes = new Set((val ?? '').split(S_U_REGEX).filter(Boolean));
+function textLinkVariant(value: string | undefined): string | undefined {
+	const classes = new Set((value ?? '').split(/\s+/u).filter(Boolean));
 	const color = classes.has('text-primary')
 		? 'primary'
 		: classes.has('text-secondary-foreground')
@@ -134,7 +169,7 @@ function textLinkVariant(val: string | undefined): string | undefined {
  * @return Static class string when available.
  */
 function staticClasses(element: ts.JsxOpeningLikeElement): string | undefined {
-	return staticAttrVal(jsxAttr(element, 'className')) ?? staticAttrVal(jsxAttr(element, 'class'));
+	return staticAttrValue(jsxAttr(element, 'className')) ?? staticAttrValue(jsxAttr(element, 'class'));
 }
 
 /**
@@ -148,8 +183,8 @@ function staticClasses(element: ts.JsxOpeningLikeElement): string | undefined {
 function ruleMatches(rule: UiRecommendationRule, element: ts.JsxOpeningLikeElement): boolean {
 	const type = jsxAttr(element, 'type');
 	if (rule.types) {
-		const typeVal = type ? staticAttrVal(type) : 'text';
-		if (typeVal === undefined || !rule.types.includes(typeVal.toLowerCase())) return false;
+		const typeValue = type ? staticAttrValue(type) : 'text';
+		if (typeValue === undefined || !rule.types.includes(typeValue.toLowerCase())) return false;
 	}
 	if (rule.when === 'button-like') {
 		return isButtonLike(staticClasses(element));
@@ -188,7 +223,7 @@ RECOMMENDATIONS
 /**
  * Finds UI elements that have a configured or conventional shared-component equivalent.
  *
- * The scan is advisory and does not alter files or participate in normal quality/test runs.
+ * The scan reports quality errors on demand and does not alter files or run in normal full-quality checks.
  * Astro, JSX, and TSX are parsed so comments, text, and already-shared components are not reported.
  *
  * @param cfg Repository quality configuration and optional UI recommendation policy.
@@ -199,21 +234,21 @@ export function uiComponentRecommendations(cfg: QualityCfg): UiComponentRecommen
 	const settings = cfg.uiRecommendations;
 	const rules = settings?.rules ?? DEFAULT_RULES;
 	const exts = settings?.extensions ?? DEFAULT_EXTS;
-	const ignoredFiles = new Set((settings?.ignoredFiles ?? []).map((f) => f.replaceAll('\\', '/')));
+	const ignoredFiles = new Set((settings?.ignoredFiles ?? []).map((file) => file.replaceAll('\\', '/')));
 	const findings: UiComponentRecommendation[] = [];
 
 	for (const file of srcFiles({ ...cfg, extensions: exts })) {
 		const relativeFile = displayPath(cfg, file).replaceAll('\\', '/');
 		if (isIgnoredFile(relativeFile, settings?.ignoredDirectories ?? [], ignoredFiles)) continue;
-		const src = readFileSync(file, 'utf8');
+		const source = readFileSync(file, 'utf8');
 		const scriptKind = file.endsWith('.jsx') ? ts.ScriptKind.JSX : ts.ScriptKind.TSX;
-		const parsed = ts.createSourceFile(file, src, ts.ScriptTarget.Latest, true, scriptKind);
+		const parsed = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, scriptKind);
 
 		const visit = (node: ts.Node): void => {
 			if ((ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) && ts.isIdentifier(node.tagName)) {
 				const element = node.tagName.text;
 				if (element === element.toLowerCase()) {
-					const rule = rules.find((c) => c.element === element && ruleMatches(c, node));
+					const rule = rules.find((candidate) => candidate.element === element && ruleMatches(candidate, node));
 					if (rule) {
 						const { line, character } = parsed.getLineAndCharacterOfPosition(node.getStart(parsed));
 						const variant = rule.variant ?? (element === 'a' && rule.when === 'text-link' ? textLinkVariant(staticClasses(node)) : undefined);

@@ -28,39 +28,22 @@ export const IDENTIFIER_REPLACEMENTS = replacementMap([
 	['intelligence', 'intel'],
 	['command', 'cmd'],
 	['column', 'col'],
-	['context', 'ctx'],
-	['configured', 'cfgd'],
 	[['compare', 'comp'], 'comp'],
-	['definition', 'def'],
 	['difference', 'diff'],
 	['directory', 'dir'],
-	['destination', 'dest'],
-	['event', 'e'],
+	['error', 'err'],
 	['expression', 'expr'],
 	['extension', 'ext'],
 	[['format', 'formatted', 'formatting', 'formatter'], 'fmt'],
 	['function', 'fn'],
 	[['generation', 'generate', 'generated', 'generating'], 'gen'],
-	['image', 'img'],
 	[['identify', 'indentifier'], 'id'],
-	['index', 'idx'],
 	[['initialise', 'initialised', 'initialises', 'initialising', 'initialisation', 'initialize', 'initialized', 'initializes', 'initializing', 'initialization'], 'init'],
 	[['initialiser', 'initializer'], 'init'],
 	['language', 'lang'],
-	['member', 'mem'],
-	['message', 'msg'],
 	[['organization', 'organisation'], 'org'],
 	['operation', 'op'],
-	['option', 'opt'],
-	['parameter', 'param'],
-	['previous', 'prev'],
-	['position', 'pos'],
-	['record', 'rec'],
 	['repository', 'repo'],
-	[['request', 'requested'], 'req'],
-	['response', 'res'],
-	['source', 'src'],
-	['value', 'val'],
 ]);
 export const PREFIX_REPLACEMENTS = replacementMap([
 	['active', 'a'],
@@ -74,22 +57,8 @@ export const PREFIX_REPLACEMENTS = replacementMap([
 ]);
 export const CALLBACK_ALIASES = replacementMap(
 	[
-		['workshop', 'w'],
-		[['candidate', 'column'], 'c'],
-		[['opportunity', 'organization', 'organisation', 'option'], 'o'],
-		['member', 'm'],
-		[['record', 'result', 'row'], 'r'],
-		[['stage', 'section'], 's'],
 		['item', 'i'],
 		['index', 'i'],
-		[['entry', 'event', 'edge'], 'e'],
-		[['value', 'intent'], 'v'],
-		['group', 'g'],
-		['file', 'f'],
-		['problem', 'p'],
-		['node', 'n'],
-		['link', 'l'],
-		['data', 'd'],
 	],
 	false,
 );
@@ -137,7 +106,7 @@ export const PROTECTED_PATH_PARTS = new Set(['node_modules', '.next', 'out', 'bu
 export const PROTECTED_FILENAMES = new Set(['page.tsx', 'page.ts', 'layout.tsx', 'layout.ts', 'route.ts', 'route.tsx', 'error.tsx', 'loading.tsx', 'not-found.tsx', 'index.ts', 'index.tsx']);
 export const CODE_EXTS = new Set(['.js', '.jsx', '.mjs', '.cjs', '.ts', '.tsx', '.mts', '.cts']);
 /** A naming issue or concise-name suggestion found in one source file. */
-export type NamingFinding = { file: string; name: string; suggestion: string; severity: 'error' | 'warning'; start: number };
+export type NamingFinding = { file: string; name: string; suggestion: string; severity: 'error'; start: number };
 
 /*//////////////////////////////////////////////////
 ALIASES
@@ -531,7 +500,7 @@ export function namingFindings(cfg: QualityCfg, analysis?: QualityAnalysis): Nam
 				const suggestion = renameDeclaration(n);
 				const safety = safetyByScope.get(declarationScope(n));
 				if (!isCallbackDeclaration(n) && (safety?.declared.has(suggestion) || declaredNames.has(suggestion) || (safety?.proposals.get(suggestion) ?? 0) > 1)) return;
-				if (suggestion !== n.text) findings.push({ file: displayPath(cfg, f), name: n.text, suggestion, severity: hasPrefixReplacement(n.text) ? 'warning' : 'error', start: n.getStart(file) });
+				if (suggestion !== n.text) findings.push({ file: displayPath(cfg, f), name: n.text, suggestion, severity: 'error', start: n.getStart(file) });
 			}
 			ts.forEachChild(n, inspect);
 		};

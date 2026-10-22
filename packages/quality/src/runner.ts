@@ -34,7 +34,6 @@ import { srcFiles, workingSrcFiles } from './files.js';
 import { writeHistoryReport } from './history-report.js';
 
 // DATA
-import { DOCUMENTATION_DESCRIPTION_NOTICE } from './documentation.js';
 import { PROTECTED_IDENTIFIERS } from './naming.js';
 
 // TYPES
@@ -147,7 +146,21 @@ export type QualityCheckName =
 	| 'ui-recommendations'
 	| 'github';
 /** Names accepted in the `autofix` configuration map. */
-export type QualityAutofixName = 'document' | 'format' | 'name' | 'lint' | 'knip' | 'dead-code' | 'alias' | 'forward' | 'repeatedClasses' | 'tailwindCanonical' | 'regexDedup' | 'accessibility' | 'displayName' | 'documentedCommands';
+export type QualityAutofixName =
+	| 'document'
+	| 'format'
+	| 'name'
+	| 'lint'
+	| 'knip'
+	| 'dead-code'
+	| 'alias'
+	| 'forward'
+	| 'repeatedClasses'
+	| 'tailwindCanonical'
+	| 'regexDedup'
+	| 'accessibility'
+	| 'displayName'
+	| 'documentedCommands';
 /** Normalized repository paths, source scope, policies, and tool settings. */
 export type QualityCfg = {
 	root: string;
@@ -160,13 +173,7 @@ export type QualityCfg = {
 	frameworkEntryExports?: Record<string, string[]>;
 	renameExports?: boolean;
 	qualityCommands?: { name: string; command: string; args?: string[] }[];
-<<<<<<< HEAD
-=======
 	excludeTests?: boolean;
-	warningsAsErrors?: boolean;
-	/** Deprecated compatibility alias for older quality.json files. @deprecated Use warningsAsErrors. */
->>>>>>> e66c45d (fix(quality): block warnings by default)
-	manualWarnings?: 'error' | 'warning';
 	enabledChecks?: Partial<Record<QualityCheckName, boolean>>;
 	autofix?: Partial<Record<QualityAutofixName, boolean>>;
 	documentation?: { required?: DocumentationRequirements; commandRoots?: string[] };
@@ -312,7 +319,7 @@ export function qualityCmdEnabled(cfg: QualityCfg, name: string): boolean {
 }
 
 /**
- * Checks whether a configured advisory command is enabled.
+ * Checks whether a configured recommendation command is enabled.
  *
  * @param cfg Quality configuration containing recommendation toggles.
  * @param name Recommendation name to query.
@@ -346,7 +353,6 @@ export function loadQualityCfg(file = resolve(process.cwd(), 'quality.json')): Q
 export function createQualityCfg(cfg: QualityCfg): QualityCfg {
 	return {
 		...cfg,
-		warningsAsErrors: cfg.warningsAsErrors ?? cfg.manualWarnings !== 'warning',
 		renameExports: cfg.renameExports ?? false,
 		root: resolve(cfg.root),
 		sourceRoots: cfg.sourceRoots.map((p) => resolve(cfg.root, p)),
@@ -949,7 +955,7 @@ function scopedCfg(cfg: QualityCfg, all: boolean): QualityCfg {
  *
  * @param cfg Quality configuration defining the repository and ESLint executable.
  * @param opts CLI options controlling scope and autofix.
- * @param exhaustive Whether warnings should fail the run.
+ * @param exhaustive Whether ESLint must report zero warnings.
  * @param deadCodeCoordinated Whether the canonical dead-code coordinator owns unused-variable reporting.
  *
  * @return Nothing; failures are reflected in the process exit code.
@@ -973,7 +979,7 @@ function runLint(cfg: QualityCfg, opts: QualityOptions, exhaustive = false, dead
 	const before = opts.fix ? snapshotFiles(cfg, files) : undefined;
 	let completed = 0;
 	qualityProgress('ESLint', completed, files.length);
-	for (const filesBatch of batches(files, (10))) {
+	for (const filesBatch of batches(files, 10)) {
 		const status = run(cfg, toolPath(cfg, cfg.tools?.eslint, 'eslint'), [...flags, ...filesBatch], { quietSuccess: opts.fix });
 		completed += filesBatch.length;
 		qualityProgress('ESLint', completed, files.length);
@@ -1103,7 +1109,7 @@ function isPureUnusedInit(node: ts.Expression): boolean {
 /** One file's parsed ESLint messages used by the dead-code coordinator. */
 type EslintReport = { filePath: string; messages: Array<{ ruleId?: string; line: number; column: number; message?: string }> };
 /** A safe-to-fix or manual-review result from a dead-code detector. */
-type DeadCodeFinding = { rule: string; file: string; line: number; name: string; severity: 'error' | 'warning'; autofixable: boolean; reason: string; agentAction: string };
+type DeadCodeFinding = { rule: string; file: string; line: number; name: string; severity: 'error'; autofixable: boolean; reason: string; agentAction: string };
 /** One named item reported by Knip, with an optional source line. */
 type KnipItem = { name: string; line?: number };
 /** One source-file record in Knip's machine-readable issue inventory. */
@@ -1381,7 +1387,7 @@ function unusedDeclarationFindings(cfg: QualityCfg, reports: EslintReport[]): De
 				file: relative(cfg.root, report.filePath),
 				line: msg.line,
 				name,
-				severity: autofixable ? 'error' : 'warning',
+				severity: 'error',
 				autofixable,
 				reason,
 				agentAction: autofixable
@@ -1414,18 +1420,19 @@ function runCfgdCmd(cfg: QualityCfg, name: string): void {
 }
 
 /**
- * Runs configured advisory checks after Knip without turning recommendations into failures.
+ * Runs configured recommendation commands after Knip and fails when a command fails.
  *
- * @param cfg Quality configuration containing advisory commands.
+ * @param cfg Quality configuration containing recommendation commands.
  *
- * @return Nothing; advisory failures do not alter the process exit code.
+ * @return Nothing; command failures set the process exit code.
  */
 function runRecommendationCmds(cfg: QualityCfg): void {
 	for (const check of cfg.recommendationCommands ?? []) {
 		if (!qualityRecommendationEnabled(cfg, check.name)) continue;
 		qualityHeader(`recommendation:${check.name}`, `Running ${check.command} ${(check.args ?? []).join(' ')}`.trim());
 		const status = run(cfg, check.command, check.args ?? []);
-		console.error(`  ${status ? '✗ failed (advisory)' : '✓ passed'}`);
+		if (status) process.exitCode = status;
+		console.error(`  ${status ? '✗ failed' : '✓ passed'}`);
 	}
 }
 
@@ -1633,7 +1640,7 @@ function collectKnipFindings(cfg: QualityCfg, importedConsumers = importedExport
 						: importedConsumers.get(filePath)?.has(item.name)
 							? 'Reconcile the reported consumer with Knip configuration and module resolution. Preserve the export while it has a real consumer; do not add a broad ignore.'
 							: `Inspect the exact ${kind} and its consumers. Remove it only if it is truly unused; otherwise add the concrete framework/public contract to the explicit entry model.`;
-				findings.push({ rule: `knip/${kind}`, file: location, line: item.line ?? 1, name: item.name, severity: autoFixable ? 'error' : 'warning', autofixable: autoFixable, reason, agentAction });
+				findings.push({ rule: `knip/${kind}`, file: location, line: item.line ?? 1, name: item.name, severity: 'error', autofixable: autoFixable, reason, agentAction });
 			}
 		}
 	}
@@ -1895,10 +1902,9 @@ function acceptTypeSafeEdits(
  * Prints dead-code findings and fails when errors or blocking manual findings remain.
  *
  * @param findings Findings collected by the dead-code coordinator.
- * @param warningsAsErrors Whether advisory findings block quality.
  * @param typeSafetyVerified Whether the candidate autofixes passed TypeScript safety checks.
  */
-function printDeadCodeFindings(findings: DeadCodeFinding[], warningsAsErrors: boolean, typeSafetyVerified = true): void {
+function printDeadCodeFindings(findings: DeadCodeFinding[], typeSafetyVerified = true): void {
 	if (reportStages) {
 		const stage = reportStages.get('dead-code');
 		if (stage) {
@@ -1907,26 +1913,20 @@ function printDeadCodeFindings(findings: DeadCodeFinding[], warningsAsErrors: bo
 		}
 	}
 	if (!findings.length) {
-		console.error('  ✓ dead-code checks passed; no autofixable findings or manual warnings remain');
+		console.error('  ✓ dead-code checks passed; no findings remain');
 		return;
 	}
-	const errs = findings.filter((finding) => finding.severity === 'error' || warningsAsErrors);
-	const warnings = findings.filter((finding) => finding.severity === 'warning' && !warningsAsErrors);
-	const manualCount = findings.filter((finding) => finding.severity === 'warning').length;
+	const errs = findings;
 	for (const finding of [...findings].sort(
 		(left, right) => left.file.localeCompare(right.file) || left.line - right.line || left.rule.localeCompare(right.rule) || left.name.localeCompare(right.name),
 	)) {
-		const severity = finding.severity === 'warning' && warningsAsErrors ? 'ERROR' : finding.severity.toUpperCase();
-		console.error(`  - [${severity}] ${finding.rule}: ${finding.file}:${finding.line} ${finding.name}`);
+		console.error(`  - [ERROR] ${finding.rule}: ${finding.file}:${finding.line} ${finding.name}`);
 		console.error(`      Reason: ${finding.reason}`);
 		const autofix = !finding.autofixable ? 'not safe or not supported' : typeSafetyVerified ? 'available' : 'candidate; fix mode checks TypeScript before writing';
 		console.error(`      Autofix: ${autofix}`);
 		console.error(`      Agent action: ${finding.agentAction}`);
 	}
-	console.error(
-		`  ${errs.length} error${errs.length === 1 ? '' : 's'}; ${manualCount} manual finding${manualCount === 1 ? '' : 's'}${warningsAsErrors ? '' : ` (${warnings.length} warning${warnings.length === 1 ? '' : 's'})`}.`,
-	);
-	if (warningsAsErrors && manualCount > 0) console.error('  Resolve each manual finding one by one, in the order listed, before committing.');
+	console.error(`  ${errs.length} error${errs.length === 1 ? '' : 's'}.`);
 	if (errs.length) process.exitCode = 1;
 }
 
@@ -2051,7 +2051,7 @@ function runDeadCode(cfg: QualityCfg, fix: boolean, all: boolean, verify = true,
 			file: single.file,
 			line: single.line,
 			name: single.name,
-			severity: single.autofixable ? 'error' : 'warning',
+			severity: 'error',
 			autofixable: single.autofixable,
 			reason: single.reason,
 			agentAction: single.agentAction,
@@ -2062,7 +2062,7 @@ function runDeadCode(cfg: QualityCfg, fix: boolean, all: boolean, verify = true,
 			file: finding.file,
 			line: finding.line,
 			name: finding.name,
-			severity: 'warning',
+			severity: 'error',
 			autofixable: false,
 			reason: finding.reason,
 			agentAction:
@@ -2072,14 +2072,14 @@ function runDeadCode(cfg: QualityCfg, fix: boolean, all: boolean, verify = true,
 		typeRejectedFiles.has(finding.file) && finding.autofixable
 			? {
 					...finding,
-					severity: 'warning' as const,
+					severity: 'error' as const,
 					autofixable: false,
 					reason: `The proposed rewrite in this file introduced TypeScript diagnostics and was rolled back: ${finding.reason}`,
 					agentAction: 'Inspect the exact declaration and proposed rewrite, preserve semantics and types, then apply a source-level fix or leave this case manual.',
 				}
 			: finding,
 	);
-	if (emit) printDeadCodeFindings(finalFindings, cfg.warningsAsErrors ?? true, fix);
+	if (emit) printDeadCodeFindings(finalFindings, fix);
 	return finalFindings;
 }
 
@@ -2239,7 +2239,7 @@ function runGenericChecks(cfg: QualityCfg, analysis?: QualityAnalysis): void {
 			(f) =>
 				`${'file' in f ? `${f.file}: ` : ''}${'message' in f ? `${'line' in f ? `${f.line}:${f.column} ` : ''}${f.message}` : 'component' in f ? `${f.line}:${f.column} ${f.component}: ${f.recommendation}` : 'method' in f ? `${f.line}:${f.column} ${f.method}(${f.receiver}): ${f.recommendation}` : 'command' in f ? `${f.line}: ${f.recommendation} (${f.command})` : 'value' in f ? `${f.count}x ${f.value} (${f.locations.join(', ')})` : 'source' in f ? `${f.count}x ${f.source} (${f.locations.join(', ')})` : f.pattern}`,
 		);
-		if (findings.length && (name === 'accessibility' || name === 'display-name' || name === 'documented-commands' || name === 'security' || name === 'ui-patterns')) process.exitCode = 1;
+		if (findings.length) process.exitCode = 1;
 	}
 }
 
@@ -2524,7 +2524,7 @@ function fixNames(cfg: QualityCfg, all: boolean): void {
  * Runs the core static quality checks against one source scope.
  *
  * @param cfg Quality configuration defining checks, paths, and protections.
- * @param strict Whether naming errors should contribute to failure status.
+ * @param _strict Retained for call compatibility; all findings now fail quality.
  * @param all Whether to inspect every configured file instead of changed files.
  * @param analysis Optional analysis context for the selected source scope.
  *
@@ -2532,7 +2532,7 @@ function fixNames(cfg: QualityCfg, all: boolean): void {
  */
 export function runQuality(
 	cfg: QualityCfg,
-	strict = false,
+	_strict = false,
 	all = true,
 	analysis?: QualityAnalysis,
 ): {
@@ -2542,6 +2542,7 @@ export function runQuality(
 	forwarding: ReturnType<typeof objectForwardingFindings>;
 	documentation: ReturnType<typeof documentationFindings>;
 } {
+	void _strict;
 	const scoped = scopedCfg(cfg, all);
 	const ctx = analysis ?? createQualityAnalysis(scoped);
 	const result = {
@@ -2562,7 +2563,7 @@ export function runQuality(
 	}
 	if (qualityCheckEnabled(cfg, 'name')) {
 		qualityHeader('naming', 'Checking concise, consistent symbol names');
-		printFindings(result.naming, (f) => `${f.severity === 'error' ? 'Naming drift' : 'Naming suggestion'}: ${f.file}: ${f.name} -> ${f.suggestion}`);
+		printFindings(result.naming, (f) => `Naming error: ${f.file}: ${f.name} -> ${f.suggestion}`);
 	}
 	if (qualityCheckEnabled(cfg, 'alias')) {
 		qualityHeader('aliases', 'Checking for unnecessary compatibility aliases');
@@ -2570,21 +2571,13 @@ export function runQuality(
 	}
 	if (qualityCheckEnabled(cfg, 'forward')) {
 		qualityHeader('forwarding', 'Checking object-forwarding opportunities');
-		printFindings(result.forwarding, (f) => `Forwarding suggestion: ${f.file}:${f.line}:${f.column} ${f.callee} repeats ${f.source}.${f.properties.join(', ')}; ${f.recommendation}.`);
+		printFindings(result.forwarding, (f) => `Forwarding error: ${f.file}:${f.line}:${f.column} ${f.callee} repeats ${f.source}.${f.properties.join(', ')}; ${f.recommendation}.`);
 	}
 	if (qualityCheckEnabled(cfg, 'document')) {
 		qualityHeader('documentation', 'Checking meaningful file, function, and parameter documentation');
-		if (result.documentation.length) console.warn(`  note: ${DOCUMENTATION_DESCRIPTION_NOTICE}`);
-		printFindings(result.documentation, (f) => `${f.severity === 'warning' ? 'Documentation warning' : 'Documentation requirement'}: ${f.file}:${f.line}:${f.column} ${f.name}; ${f.reason}.`);
+		printFindings(result.documentation, (f) => `Documentation error: ${f.file}:${f.line}:${f.column} ${f.name}; ${f.reason}.`);
 	}
-	if (
-		result.imports.length ||
-		duplicateImports.length ||
-		result.aliases.length ||
-		result.documentation.some((f) => f.severity === 'error') ||
-		(strict && result.naming.some((f) => f.severity === 'error'))
-	)
-		process.exitCode = 1;
+	if (result.imports.length || duplicateImports.length || result.aliases.length || result.documentation.length > 0 || result.naming.length > 0 || result.forwarding.length > 0) process.exitCode = 1;
 	return result;
 }
 
@@ -2710,15 +2703,15 @@ function runFullQuality(cfg: QualityCfg, args: string[], opts: QualityOptions): 
 	if (fix('documentedCommands') && qualityCheckEnabled(cfg, 'documented-commands')) fixDocumentedCommands(cfg);
 	if (fix('forward') && qualityCheckEnabled(cfg, 'forward')) {
 		const result = fixObjectForwarding(scoped);
-		if (result.fixed || result.skipped) console.info(`Forwarding fixer: ${result.fixed} exact duplicates removed${result.skipped ? `; ${result.skipped} advisory cases retained` : ''}.`);
+		if (result.fixed || result.skipped) console.info(`Forwarding fixer: ${result.fixed} exact duplicates removed${result.skipped ? `; ${result.skipped} unsafe cases left unchanged` : ''}.`);
 	}
 	if (fix('repeatedClasses') && qualityCheckEnabled(cfg, 'repeated-classes')) {
 		const result = fixRepeatedClasses(scoped);
-		if (result.fixed || result.skipped) console.info(`Class fixer: ${result.fixed} attributes replaced${result.skipped ? `; ${result.skipped} advisory cases retained` : ''}.`);
+		if (result.fixed || result.skipped) console.info(`Class fixer: ${result.fixed} attributes replaced${result.skipped ? `; ${result.skipped} unsafe cases left unchanged` : ''}.`);
 	}
 	if (fix('regexDedup') && qualityCheckEnabled(cfg, 'regex-dedup')) {
 		const result = fixRegexDedup(scoped);
-		if (result.fixed || result.skipped) console.info(`Regex fixer: ${result.fixed} literals replaced${result.skipped ? `; ${result.skipped} advisory cases retained` : ''}.`);
+		if (result.fixed || result.skipped) console.info(`Regex fixer: ${result.fixed} literals replaced${result.skipped ? `; ${result.skipped} unsafe cases left unchanged` : ''}.`);
 	}
 	if (fix('lint') && qualityCheckEnabled(cfg, 'lint')) runLint(cfg, { ...opts, fix: true }, true, true);
 	if (opts.fix && qualityCheckEnabled(cfg, 'alias')) aliasFindings(scoped, true);
@@ -2861,11 +2854,11 @@ function dispatchQualityCli(cfg: QualityCfg, args: string[]): void | Promise<voi
 	if (cmd === 'security' || cmd === 'repeated-classes' || cmd === 'regex-dedup' || cmd === 'ui-patterns') {
 		if (cmd === 'repeated-classes' && fix('repeatedClasses')) {
 			const result = fixRepeatedClasses(cfg);
-			console.info(`  fixed ${result.fixed} class attributes${result.skipped ? `; ${result.skipped} left advisory` : ''}`);
+			console.info(`  fixed ${result.fixed} class attributes${result.skipped ? `; ${result.skipped} unsafe cases left unchanged` : ''}`);
 		}
 		if (cmd === 'regex-dedup' && fix('regexDedup')) {
 			const result = fixRegexDedup(cfg);
-			console.info(`  fixed ${result.fixed} regex literals${result.skipped ? `; ${result.skipped} left advisory` : ''}`);
+			console.info(`  fixed ${result.fixed} regex literals${result.skipped ? `; ${result.skipped} unsafe cases left unchanged` : ''}`);
 		}
 		if (cmd === 'security' || cmd === 'ui-patterns') {
 			const findings = cmd === 'security' ? securityFindings(cfg) : uiPatternFindings(cfg);
@@ -2883,18 +2876,19 @@ function dispatchQualityCli(cfg: QualityCfg, args: string[]): void | Promise<voi
 		printFindings(
 			findings as readonly GenericFinding[],
 			(f) =>
-					`${'file' in f ? `${f.file}: ` : ''}${'message' in f ? f.message : 'component' in f ? `${f.line}:${f.column} ${f.component}: ${f.recommendation}` : 'method' in f ? `${f.line}:${f.column} ${f.method}(${f.receiver}): ${f.recommendation}` : 'command' in f ? `${f.line}: ${f.recommendation} (${f.command})` : 'value' in f ? `${f.count}x ${f.value} (${f.locations.join(', ')})` : 'source' in f ? `${f.count}x ${f.source} (${f.locations.join(', ')})` : f.pattern}`,
+				`${'file' in f ? `${f.file}: ` : ''}${'message' in f ? f.message : 'component' in f ? `${f.line}:${f.column} ${f.component}: ${f.recommendation}` : 'method' in f ? `${f.line}:${f.column} ${f.method}(${f.receiver}): ${f.recommendation}` : 'command' in f ? `${f.line}: ${f.recommendation} (${f.command})` : 'value' in f ? `${f.count}x ${f.value} (${f.locations.join(', ')})` : 'source' in f ? `${f.count}x ${f.source} (${f.locations.join(', ')})` : f.pattern}`,
 		);
 		if (findings.length) process.exitCode = 1;
 		return;
 	}
 	if (cmd === 'ui-recommendations') {
 		const findings = uiComponentRecommendations(cfg);
-		console.info(`UI component recommendations (${findings.length})`);
+		console.error(`UI component findings (${findings.length})`);
 		for (const finding of findings) {
 			const component = finding.variant ? `<${finding.component} variant="${finding.variant}">` : `<${finding.component}>`;
-			console.info(`  ${finding.file}:${finding.line}:${finding.column} <${finding.element}> → ${component} (import from '${finding.import}') — ${finding.reason}`);
+			console.error(`  [ERROR] ${finding.file}:${finding.line}:${finding.column} <${finding.element}> should use ${component} (import from '${finding.import}') — ${finding.reason}`);
 		}
+		if (findings.length) process.exitCode = 1;
 		return;
 	}
 	if (cfg.qualityCommands?.some((c) => c.name === cmd)) {

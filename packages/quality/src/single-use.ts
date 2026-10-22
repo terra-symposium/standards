@@ -262,7 +262,7 @@ function classify(candidate: Candidate): [SingleUseFinding['decision'], string] 
 	return ['INLINE', `${candidate.kind} declaration has one in-scope consumer`];
 }
 /**
- * Builds the review action for an eligible or advisory single-use candidate.
+ * Builds the safe action for an eligible single-use candidate.
  *
  * @param candidate Declaration whose only consumer is being considered.
  * @param use The source reference that consumes the declaration.
@@ -558,35 +558,6 @@ function containsAwait(candidate: Candidate): boolean {
 }
 
 /**
- * Detects a saved DOM currentTarget value that would be read after its event callback returns.
- *
- * @param candidate Variable whose initializer snapshots the event target.
- * @param reference The only consumer of the saved value.
- *
- * @return Whether inlining would move the currentTarget read into a nested callback.
- */
-function isCurrentTargetSnapshot(candidate: Candidate, reference: Reference): boolean {
-	if (candidate.kind !== 'variable' || !ts.isVariableStatement(candidate.statement)) return false;
-	const init = candidate.statement.declarationList.declarations[0]?.initializer;
-	if (!init || reference.file !== candidate.file) return false;
-	let readsCurrentTarget = false;
-	const visit = (node: ts.Node): void => {
-		if (ts.isPropertyAccessExpression(node) && node.name.text === 'currentTarget') readsCurrentTarget = true;
-		ts.forEachChild(node, visit);
-	};
-	visit(init);
-	if (!readsCurrentTarget) return false;
-	for (let parent: ts.Node | undefined = reference.node.parent; parent && !ts.isSourceFile(parent); parent = parent.parent) {
-		if (
-			(ts.isArrowFunction(parent) || ts.isFunctionExpression(parent) || ts.isFunctionDeclaration(parent) || ts.isMethodDeclaration(parent)) &&
-			parent.getStart(candidate.source) > candidate.statement.end
-		)
-			return true;
-	}
-	return false;
-}
-
-/**
  * Rejects expressions whose timing, hook order, or observable identity can change when moved.
  *
  * @param candidate Candidate declaration whose initializer is checked for safe substitution.
@@ -606,6 +577,24 @@ function initSafeToInline(candidate: Candidate): boolean {
 		init.kind === ts.SyntaxKind.FalseKeyword ||
 		init.kind === ts.SyntaxKind.NullKeyword
 	);
+}
+
+/**
+ * Keeps event values captured for callbacks, because currentTarget only remains valid during dispatch.
+ *
+ * @param candidate Candidate declaration whose initializer captures the event value.
+ * @param reference The callback's reference to the captured value.
+ *
+ * @return `true` when moving the read into a callback could outlive event dispatch.
+ */
+function isDeferredCurrentTargetSnapshot(candidate: Candidate, reference: Reference): boolean {
+	if (candidate.kind !== 'variable' || !ts.isVariableStatement(candidate.statement)) return false;
+	const init = candidate.statement.declarationList.declarations[0]?.initializer;
+	if (!init || !ts.isPropertyAccessExpression(init) || init.name.text !== 'value' || !ts.isPropertyAccessExpression(init.expression) || init.expression.name.text !== 'currentTarget') return false;
+	for (let node: ts.Node | undefined = reference.node; node && node !== candidate.statement; node = node.parent) {
+		if (ts.isArrowFunction(node) || ts.isFunctionExpression(node) || ts.isFunctionDeclaration(node)) return true;
+	}
+	return false;
 }
 
 /**
@@ -696,7 +685,7 @@ function findingsFromAnalysis(cfg: QualityCfg, checker: ts.TypeChecker, candidat
 		const use = uses[0]!;
 		if (!inSingleUseScope(cfg, use.file)) continue;
 		if (isRequiredLifecycleVal(c, use)) continue;
-		if (isCurrentTargetSnapshot(c, use)) continue;
+		if (isDeferredCurrentTargetSnapshot(c, use)) continue;
 		const [initialDecision, initialReason] = classify(c);
 		let reason = initialReason;
 		let canInline = initialDecision === 'INLINE';
