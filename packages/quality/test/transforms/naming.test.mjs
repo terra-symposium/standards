@@ -61,9 +61,9 @@ test('callback aliases shorten only configured idioms and choose deterministic f
 	assert.equal(callbackAlias('label'), 'label');
 	assert.equal(callbackAlias('customer', ['c']), 'customer');
 	assert.equal(callbackAlias('customer', ['c', 'v', 'r', 'x', 'd', 'e', 'n', 's']), 'customer');
-	assert.equal(renameId('index', { numericIndex: true }), 'index');
-	assert.equal(renameId('node', { callback: true }), 'node');
-	assert.equal(renameId('node', { callback: true, reserved: ['n'] }), 'node');
+	assert.equal(renameId('index', { numericIndex: true }), 'i');
+	assert.equal(renameId('node', { callback: true }), 'n');
+	assert.equal(renameId('node', { callback: true, reserved: ['n'] }), 'v');
 	assert.equal(renameId('Request'), 'Request');
 	assert.equal(renameId('_'), '_');
 });
@@ -75,14 +75,12 @@ test('renameId shortens category, intelligence, and other configured words witho
 		customerCategory: 'customerCategory',
 		intelligence: 'intel',
 		customerIntelligence: 'customerIntel',
-		responseValue: 'responseValue',
-		workflowContext: 'workflowContext',
 		categories: 'categories',
 		intelligences: 'intels',
 		commitment: 'commitment',
 		terror: 'terror',
 		isActive: 'isActive',
-		normalizedResponse: 'normResponse',
+		normalizedResponse: 'normRes',
 	};
 	for (const [name, expected] of Object.entries(cases)) assert.equal(renameId(name), expected, name);
 	assert.equal(hasPrefixReplacement('activeCard'), true);
@@ -149,10 +147,10 @@ void [mapped, rendered, ordinary, handle, view];
 	const supported = callbacks.filter((n) => isCallbackDeclaration(n));
 	assert.equal(supported.length, 5);
 	assert.equal(renameDeclaration(supported[0]), 'customer');
-	assert.equal(renameDeclaration(supported[1]), 'index');
+	assert.equal(renameDeclaration(supported[1]), 'i');
 	assert.equal(renameDeclaration(supported[2]), 'block');
 	assert.equal(renameDeclaration(supported[3]), 'customer');
-	assert.equal(renameDeclaration(supported[4]), 'event');
+	assert.equal(renameDeclaration(supported[4]), 'e');
 });
 test('alias analysis keeps only stable local identifier and type aliases', () => {
 	const root = fixtureRoot('terra-quality-alias-api-');
@@ -309,6 +307,6 @@ test('naming findings use shared analysis, report severity by replacement kind, 
 	const analysis = createQualityAnalysis(cfg);
 	assert.deepEqual(
 		namingFindings(cfg, analysis).map((f) => [f.name, f.suggestion, f.severity]),
-		[['activeValue', 'aValue', 'warning']],
+		[['activeValue', 'aVal', 'warning']],
 	);
 });

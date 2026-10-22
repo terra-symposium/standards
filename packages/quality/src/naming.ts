@@ -28,12 +28,14 @@ export const IDENTIFIER_REPLACEMENTS = replacementMap([
 	['intelligence', 'intel'],
 	['command', 'cmd'],
 	['column', 'col'],
+	['context', 'ctx'],
 	['configured', 'cfgd'],
 	[['compare', 'comp'], 'comp'],
 	['definition', 'def'],
 	['difference', 'diff'],
 	['directory', 'dir'],
 	['destination', 'dest'],
+	['event', 'e'],
 	['expression', 'expr'],
 	['extension', 'ext'],
 	[['format', 'formatted', 'formatting', 'formatter'], 'fmt'],
@@ -41,14 +43,24 @@ export const IDENTIFIER_REPLACEMENTS = replacementMap([
 	[['generation', 'generate', 'generated', 'generating'], 'gen'],
 	['image', 'img'],
 	[['identify', 'indentifier'], 'id'],
+	['index', 'idx'],
 	[['initialise', 'initialised', 'initialises', 'initialising', 'initialisation', 'initialize', 'initialized', 'initializes', 'initializing', 'initialization'], 'init'],
 	[['initialiser', 'initializer'], 'init'],
 	['language', 'lang'],
+	['member', 'mem'],
+	['message', 'msg'],
 	[['organization', 'organisation'], 'org'],
+	['operation', 'op'],
+	['option', 'opt'],
 	['parameter', 'param'],
 	['previous', 'prev'],
 	['position', 'pos'],
+	['record', 'rec'],
 	['repository', 'repo'],
+	[['request', 'requested'], 'req'],
+	['response', 'res'],
+	['source', 'src'],
+	['value', 'val'],
 ]);
 export const PREFIX_REPLACEMENTS = replacementMap([
 	['active', 'a'],
@@ -63,11 +75,19 @@ export const PREFIX_REPLACEMENTS = replacementMap([
 export const CALLBACK_ALIASES = replacementMap(
 	[
 		['workshop', 'w'],
-		['column', 'c'],
-		[['opportunity', 'organization', 'organisation'], 'o'],
+		[['candidate', 'column'], 'c'],
+		[['opportunity', 'organization', 'organisation', 'option'], 'o'],
+		['member', 'm'],
+		[['record', 'result', 'row'], 'r'],
 		[['stage', 'section'], 's'],
+		['item', 'i'],
+		['index', 'i'],
+		[['entry', 'event', 'edge'], 'e'],
+		[['value', 'intent'], 'v'],
+		['group', 'g'],
 		['file', 'f'],
 		['problem', 'p'],
+		['node', 'n'],
 		['link', 'l'],
 		['data', 'd'],
 	],
@@ -242,7 +262,7 @@ export function callbackAlias(name: string, reserved: string[] = []): string {
  */
 export function renameId(name: string, kind: RenameKind = {}): string {
 	if (PROTECTED_IDENTIFIERS.has(name) || name === '_') return name;
-	if (kind.numericIndex && name === 'index') return name;
+	if (kind.numericIndex && name === 'index') return callbackAlias('item', kind.reserved);
 	if (kind.callback) return callbackAlias(name, kind.reserved);
 	const tokens = identifierTokens(name);
 	if (!tokens.some((t) => Object.hasOwn(IDENTIFIER_REPLACEMENTS, t.toLowerCase()) || Object.hasOwn(PREFIX_REPLACEMENTS, t.toLowerCase()))) return name;
