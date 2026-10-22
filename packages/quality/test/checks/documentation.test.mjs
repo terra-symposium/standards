@@ -13,7 +13,17 @@ IMPORTS
 // API
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { createQualityCfg, documentSrcFile, documentationFindings, documentedCommandFindings, duplicateImportFindings, fixDocumentedCommands, maintainSrcFile, protectLongImports, removeNonCodeComments } from '../../dist/index.js';
+import {
+	createQualityCfg,
+	documentSrcFile,
+	documentationFindings,
+	documentedCommandFindings,
+	duplicateImportFindings,
+	fixDocumentedCommands,
+	maintainSrcFile,
+	protectLongImports,
+	removeNonCodeComments,
+} from '../../dist/index.js';
 import { fixtureFile, fixtureRoot, fixtureText } from '../../support/fixtures.mjs';
 
 /*//////////////////////////////////////////////////
@@ -38,22 +48,28 @@ test('documented commands diagnose and fix only deprecated pnpm directory flags 
 		].join('\n'),
 	);
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], documentation: { commandRoots: ['docs'] } });
-	assert.deepEqual(documentedCommandFindings(cfg).map(({ line, command }) => [line, command]), [
-		[3, 'pnpm -C packages/app test'],
-		[4, 'pnpm --prefix "packages/docs" build -- --watch'],
-	]);
+	assert.deepEqual(
+		documentedCommandFindings(cfg).map(({ line, command }) => [line, command]),
+		[
+			[3, 'pnpm -C packages/app test'],
+			[4, 'pnpm --prefix "packages/docs" build -- --watch'],
+		],
+	);
 	assert.equal(fixDocumentedCommands(cfg), 2);
-	assert.equal(fixtureText(root, 'docs/commands.md'), [
-		'Historical note: `pnpm -C old-tool test` is preserved as prose.',
-		'```sh',
-		'pnpm --dir packages/app test',
-		'  pnpm --dir "packages/docs" build -- --watch',
-		'npm --prefix packages/legacy test',
-		'```',
-		'```text',
-		'pnpm -C examples test',
-		'```',
-	].join('\n'));
+	assert.equal(
+		fixtureText(root, 'docs/commands.md'),
+		[
+			'Historical note: `pnpm -C old-tool test` is preserved as prose.',
+			'```sh',
+			'pnpm --dir packages/app test',
+			'  pnpm --dir "packages/docs" build -- --watch',
+			'npm --prefix packages/legacy test',
+			'```',
+			'```text',
+			'pnpm -C examples test',
+			'```',
+		].join('\n'),
+	);
 	assert.equal(fixDocumentedCommands(cfg), 0, 'the transformation is idempotent');
 	assert.deepEqual(documentedCommandFindings(cfg), []);
 });
@@ -135,7 +151,7 @@ export function useDashboardConfigurationDialog(initialConfigure: string | undef
 		],
 	);
 });
-test('documentation findings warn for detached TSDoc and accept declaration and file-header comments', () => {
+test('documentation errors identify detached TSDoc and accept declaration and file-header comments', () => {
 	const root = fixtureRoot('terra-quality-detached-tsdoc-');
 	fixtureFile(
 		root,
@@ -147,7 +163,7 @@ test('documentation findings warn for detached TSDoc and accept declaration and 
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
 	assert.deepEqual(
 		documentationFindings(cfg).map(({ kind, name, severity }) => [kind, name, severity]),
-		[['orphan', '<detached TSDoc>', 'warning']],
+		[['orphan', '<detached TSDoc>', 'error']],
 	);
 	assert.equal(removeNonCodeComments(`${root}/src/main.ts`), true);
 	assert.doesNotMatch(fixtureText(root, 'src/main.ts'), /Describes a declaration that was removed/);
@@ -220,7 +236,7 @@ void [read, incomplete, commentText];
 			['tag', '@deprecated', 'add a meaningful description for @deprecated'],
 		],
 	);
-	assert.ok(findings.every((f) => f.severity === 'warning'));
+	assert.ok(findings.every((f) => f.severity === 'error'));
 });
 test('documentation description audit continues after nested template expressions and ignores comment-shaped string content', () => {
 	const root = fixtureRoot('terra-quality-documentation-after-template-');

@@ -1,5 +1,5 @@
 ---
-'@terra-symposium/standards-quality': minor
+'@terra-symposium/standards-quality': major
 ---
 
-Block quality warnings by default, preserve browser event snapshots, and avoid recommending misleading domain-name abbreviations.
+Treat every quality finding as an error and remove non-blocking warning policies.

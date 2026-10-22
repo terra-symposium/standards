@@ -545,6 +545,45 @@ test('single-use analysis keeps cross-file closures and write-target values inta
 	assert.ok(fixSingleUseDeclarations(cfg) <= 2);
 	assert.match(fixtureText(root, 'src/consumer.ts'), /position\+\+/);
 });
+test('single-use analysis preserves values captured from event currentTarget for callbacks', () => {
+	const root = fixtureRoot('terra-quality-single-use-current-target-');
+	fixtureFile(
+		root,
+		'src/main.ts',
+		`function onChange(event: { currentTarget: { value: string } }, setValue: (update: (current: string) => string) => void) {
+	const value = event.currentTarget.value;
+	setValue((current) => (current === value ? current : value));
+}
+void onChange;
+`,
+	);
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
+	assert.equal(
+		singleUseFindings(cfg).some((finding) => finding.name === 'value'),
+		false,
+	);
+});
+test('single-use analysis preserves event currentTarget snapshots referenced by named callbacks', () => {
+	const root = fixtureRoot('terra-quality-single-use-current-target-named-');
+	fixtureFile(
+		root,
+		'src/main.ts',
+		`function onChange(event: { currentTarget: { value: string } }, schedule: (callback: () => void) => void) {
+	const value = event.currentTarget.value;
+	function update() {
+		console.log(value);
+	}
+	schedule(update);
+}
+void onChange;
+`,
+	);
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
+	assert.equal(
+		singleUseFindings(cfg).some((finding) => finding.name === 'value'),
+		false,
+	);
+});
 test('single-use fixing retains object values referenced through typeof', () => {
 	const root = fixtureRoot('terra-quality-single-use-value-type-query-');
 	fixtureFile(root, 'src/main.ts', `const value = { status: 'ready' as const };\ntype Value = typeof value;\nvoid (null as unknown as Value);\n`);

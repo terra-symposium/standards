@@ -130,7 +130,7 @@ export type DocumentationFinding = {
 	name: string;
 	kind: 'file' | 'summary' | 'param' | 'return' | 'tag' | 'type' | 'function' | 'inline' | 'orphan';
 	reason: string;
-	severity: 'warning' | 'error';
+	severity: 'error';
 };
 export const DOCUMENTATION_DESCRIPTION_NOTICE = 'Ask an agent for meaningful documentation prose; this check only reports missing descriptions and never generates them in bulk.';
 /** Source offsets and exact comment text for one TSDoc block. */
@@ -1134,7 +1134,7 @@ function descriptionFindingsForFile(cfg: QualityCfg, file: string, src: string, 
 		if (block === header) continue;
 		if (!attached.has(block.start)) {
 			const finding = documentationCommentReport(file, parsed, block.start, '<detached TSDoc>', 'orphan', 'remove or attach this TSDoc to a declaration', cfg);
-			findings.push({ ...finding, severity: 'warning' });
+			findings.push(finding);
 			continue;
 		}
 		const lines = tsdocLines(block);
@@ -1155,7 +1155,7 @@ function descriptionFindingsForFile(cfg: QualityCfg, file: string, src: string, 
 }
 
 /**
- * Creates a warning finding anchored to a TSDoc comment offset.
+ * Creates an error finding anchored to a TSDoc comment offset.
  *
  * @param file Absolute source path containing the comment.
  * @param parsed Parsed source file used to calculate the location.
@@ -1165,11 +1165,11 @@ function descriptionFindingsForFile(cfg: QualityCfg, file: string, src: string, 
  * @param reason Human-readable remediation reason.
  * @param cfg Quality configuration defining the repository root.
  *
- * @return Warning documentation finding.
+ * @return Documentation error.
  */
 function documentationCommentReport(file: string, parsed: ts.SourceFile, offset: number, name: string, kind: DocumentationFinding['kind'], reason: string, cfg: QualityCfg): DocumentationFinding {
 	const pos = parsed.getLineAndCharacterOfPosition(offset);
-	return { file: displayPath(cfg, file), line: pos.line + 1, column: pos.character + 1, name, kind, reason, severity: 'warning' };
+	return { file: displayPath(cfg, file), line: pos.line + 1, column: pos.character + 1, name, kind, reason, severity: 'error' };
 }
 
 /**

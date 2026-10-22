@@ -11,18 +11,17 @@ IMPORTS
 import assert from 'node:assert/strict';
 import test, { afterEach } from 'node:test';
 // prettier-ignore
-import { QualityPlaywrightReporter, aliasFindings, checkImports, collapseInlineIfs, collapseTypesAndObjects, createQualityAnalysis, createQualityCfg, documentationFindings, maintainSrcFile, namingFindings, objectForwardingFindings, protectLongImports, qualityNodeReporter, regexFindings, renameId, runQualityCli, runTailwindCanonical, srcFiles } from '../../dist/index.js';
+import { QualityPlaywrightReporter, aliasFindings, checkImports, collapseInlineIfs, collapseTypesAndObjects, createQualityAnalysis, createQualityCfg, documentationFindings, maintainSrcFile, namingFindings, objectForwardingFindings, protectLongImports, qualityNodeReporter, regexFindings, renameId, runQuality, runQualityCli, runTailwindCanonical, srcFiles } from '../../dist/index.js';
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
-afterEach(() => {
-	process.exitCode = 0;
-});
-
 // DATA
 import { DOCUMENTATION_DESCRIPTION_NOTICE } from '../../dist/index.js';
+afterEach(() => {
+	process.exitCode = undefined;
+});
 test('consolidated quality modules expose their behavior from the public package entrypoint', () => {
 	for (const check of [aliasFindings, createQualityAnalysis, documentationFindings, QualityPlaywrightReporter, qualityNodeReporter, regexFindings, runTailwindCanonical])
 		assert.equal(typeof check, 'function');
@@ -51,9 +50,65 @@ function read(value: string): string { return value; }
 	const cfg = createQualityCfg({ root, sourceRoots: ['.'], extensions: ['.ts'] });
 	const findings = documentationFindings(cfg);
 	assert.deepEqual(new Set(findings.map((f) => f.kind)), new Set(['summary', 'param', 'return']));
-	assert.ok(findings.every((f) => f.severity === 'warning'));
+	assert.ok(findings.every((f) => f.severity === 'error'));
 	assert.match(DOCUMENTATION_DESCRIPTION_NOTICE, /Ask an agent/);
 	assert.match(DOCUMENTATION_DESCRIPTION_NOTICE, /never generates them in bulk/);
+});
+test('documentation findings fail quality as errors', () => {
+	const previousExitCode = process.exitCode;
+	process.exitCode = 0;
+	try {
+		const root = mkdtempSync(join(tmpdir(), 'terra-quality-warning-policy-'));
+		writeFileSync(join(root, 'main.ts'), '/** main.ts */\n/** @return */\nfunction read(): string { return "value"; }\n');
+		const cfg = createQualityCfg({
+			root,
+			sourceRoots: ['.'],
+			extensions: ['.ts'],
+			enabledChecks: { import: false, name: false, alias: false, forward: false },
+		});
+		runQuality(cfg);
+		assert.equal(process.exitCode, 1);
+	} finally {
+		process.exitCode = previousExitCode;
+	}
+});
+test('regex advisories fail full quality by default', () => {
+	const previousExitCode = process.exitCode;
+	process.exitCode = 0;
+	try {
+		const root = mkdtempSync(join(tmpdir(), 'terra-quality-regex-policy-'));
+		mkdirSync(join(root, 'src'));
+		writeFileSync(join(root, 'src', 'first.ts'), 'const first = /duplicate/;\nvoid first;\n');
+		writeFileSync(join(root, 'src', 'second.ts'), 'const second = /duplicate/;\nvoid second;\n');
+		const cfg = createQualityCfg({
+			root,
+			sourceRoots: ['src'],
+			extensions: ['.ts'],
+			regexDedup: { extensions: ['.ts'], minimumCount: 2 },
+			enabledChecks: {
+				document: false,
+				format: false,
+				import: false,
+				name: false,
+				alias: false,
+				forward: false,
+				lint: false,
+				knip: false,
+				'dead-code': false,
+				type: false,
+				command: false,
+				recommend: false,
+				diff: false,
+				security: false,
+				'repeated-classes': false,
+				'ui-patterns': false,
+			},
+		});
+		runQualityCli(cfg, ['quality', '--all', '--skip-commands', '--skip-recommendations']);
+		assert.equal(process.exitCode, 1);
+	} finally {
+		process.exitCode = previousExitCode;
+	}
 });
 
 /*//////////////////////////////////////////////////
@@ -97,39 +152,39 @@ test('reports concise-name drift without changing source', () => {
 });
 test('renames requested words across casing, separators, compounds, plurals, and inflections', () => {
 	const cases = {
-		error: 'error',
-		Error: 'Error',
-		ERROR: 'ERROR',
-		ErrorBoundary: 'ErrorBoundary',
-		articleError: 'articleError',
-		article_error: 'article_error',
-		Article_Error: 'Article_Error',
-		ARTICLE_ERROR: 'ARTICLE_ERROR',
-		'ARTICLE-error': 'ARTICLE-error',
-		'article-error': 'article-error',
-		errors: 'errors',
+		error: 'err',
+		Error: 'Err',
+		ERROR: 'ERR',
+		ErrorBoundary: 'ErrBoundary',
+		articleError: 'articleErr',
+		article_error: 'article_err',
+		Article_Error: 'Article_Err',
+		ARTICLE_ERROR: 'ARTICLE_ERR',
+		'ARTICLE-error': 'ARTICLE-err',
+		'article-error': 'article-err',
+		errors: 'errs',
 		format: 'fmt',
-		FormatOptions: 'FmtOpts',
-		FORMAT_OPTIONS: 'FMT_OPTS',
-		formattedValue: 'fmtVal',
+		FormatOptions: 'FmtOptions',
+		FORMAT_OPTIONS: 'FMT_OPTIONS',
+		formattedValue: 'fmtValue',
 		formatters: 'fmts',
 		initialise: 'init',
 		InitialiseRepository: 'InitRepo',
 		initialisedRepositories: 'initRepos',
-		INITIALIZATION_ERROR: 'INIT_ERROR',
+		INITIALIZATION_ERROR: 'INIT_ERR',
 		initialize_format: 'init_fmt',
 		repository: 'repo',
 		Repositories: 'Repos',
-		articleRepositoryError: 'articleRepoError',
+		articleRepositoryError: 'articleRepoErr',
 		attributes: 'attrs',
 		commands: 'cmds',
 		directories: 'dirs',
 		functions: 'fns',
-		images: 'imgs',
 		organisations: 'orgs',
-		responses: 'res',
 	};
 	for (const [name, expected] of Object.entries(cases)) assert.equal(renameId(name), expected, name);
+	for (const name of ['articleDefinition', 'category', 'context', 'event', 'image', 'index', 'request', 'requestId', 'response', 'source', 'target', 'value'])
+		assert.equal(renameId(name), name, `${name} remains a complete domain or API name`);
 });
 test('does not rename substrings, protected platform names, or underscore placeholders', () => {
 	for (const name of ['terror', 'deformat', 'repositoryFactory', 'FormData', 'NextResponse', '_']) {
@@ -650,7 +705,7 @@ test('alias fixer preserves generic aliases and generic references', () => {
 	assert.deepEqual(aliasFindings(cfg, true), []);
 	assert.equal(readFileSync(file, 'utf8'), src);
 });
-test('naming findings block read-only checks and automatic fixes apply the configured names', () => {
+test('naming supports read-only and automatic-fix modes', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-'));
 	mkdirSync(join(root, 'src'), { recursive: true });
 	const file = join(root, 'src', 'main.ts');
@@ -658,16 +713,15 @@ test('naming findings block read-only checks and automatic fixes apply the confi
 	writeFileSync(file, src);
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
 	runQualityCli(cfg, ['naming', '--all', '--warn']);
-	assert.equal(process.exitCode, 1, 'naming recommendations always block quality');
 	assert.equal(readFileSync(file, 'utf8'), src);
 	runQualityCli(cfg, ['naming', '--all']);
 	assert.equal(readFileSync(file, 'utf8'), 'const org = true;\nconst genPattern = /ok/;\nexport const result = [org, genPattern];\n');
 });
-test('naming applies whole-word image aliases and prefix-only state aliases', () => {
-	assert.equal(renameId('image'), 'img');
-	assert.equal(renameId('Image'), 'Img');
-	assert.equal(renameId('heroImage'), 'heroImg');
-	assert.equal(renameId('images'), 'imgs');
+test('naming preserves complete domain words and applies safe prefix aliases', () => {
+	assert.equal(renameId('image'), 'image');
+	assert.equal(renameId('Image'), 'Image');
+	assert.equal(renameId('heroImage'), 'heroImage');
+	assert.equal(renameId('images'), 'images');
 	assert.equal(renameId('activeCard'), 'aCard');
 	assert.equal(renameId('ActiveCard'), 'ACard');
 	assert.equal(renameId('nextCard'), 'nCard');
@@ -695,16 +749,16 @@ test('naming preserves shorthand property keys while renaming their values', () 
 	writeFileSync(file, 'function result(error: Error) { return { error }; }\nvoid result;\n');
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
 	runQualityCli(cfg, ['naming', '--all']);
-	assert.equal(readFileSync(file, 'utf8'), 'function result(error: Error) { return { error }; }\nvoid result;\n');
+	assert.equal(readFileSync(file, 'utf8'), 'function result(err: Error) { return { error: err }; }\nvoid result;\n');
 });
-test('naming preserves call punctuation when expanding a shorthand parameter', () => {
+test('naming preserves full request parameters and their call punctuation', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-shorthand-param-'));
 	mkdirSync(join(root, 'src'));
 	const file = join(root, 'src', 'main.ts');
 	writeFileSync(file, 'function result({ request }: { request: Request }) { return handle(request, true); }\nvoid result;\n');
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
 	runQualityCli(cfg, ['naming', '--all']);
-	assert.equal(readFileSync(file, 'utf8'), 'function result({ request: req }: { request: Request }) { return handle(req, true); }\nvoid result;\n');
+	assert.equal(readFileSync(file, 'utf8'), 'function result({ request }: { request: Request }) { return handle(request, true); }\nvoid result;\n');
 });
 test('naming shortens map callback parameters and all symbol references', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-callbacks-'));
@@ -713,7 +767,7 @@ test('naming shortens map callback parameters and all symbol references', () => 
 	writeFileSync(file, 'const output = input.map((node, index) => ({ node, index }));\nvoid output;\n');
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
 	runQualityCli(cfg, ['naming', '--all']);
-	assert.equal(readFileSync(file, 'utf8'), 'const output = input.map((n, i) => ({ node: n, index: i }));\nvoid output;\n');
+	assert.equal(readFileSync(file, 'utf8'), 'const output = input.map((node, i) => ({ node, index: i }));\nvoid output;\n');
 	assert.deepEqual(namingFindings(cfg), []);
 });
 test('naming keeps full words when no callback alias is an established idiom', () => {
@@ -725,23 +779,23 @@ test('naming keeps full words when no callback alias is an established idiom', (
 	runQualityCli(cfg, ['naming', '--all']);
 	assert.equal(readFileSync(file, 'utf8'), 'const output = content.map((line) => (line ? ` * ${line}` : " *"));\nvoid output;\n');
 });
-test('naming shortens TypeScript traversal callbacks with conflict checks', () => {
+test('naming preserves full TypeScript traversal callback names', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-callbacks-'));
 	mkdirSync(join(root, 'src'));
 	const file = join(root, 'src', 'main.ts');
 	writeFileSync(file, 'ts.forEachChild(file, (node) => { if (ts.isIdentifier(node)) output.push(node.text); });\n');
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
 	runQualityCli(cfg, ['naming', '--all']);
-	assert.equal(readFileSync(file, 'utf8'), 'ts.forEachChild(file, (n) => { if (ts.isIdentifier(n)) output.push(n.text); });\n');
+	assert.equal(readFileSync(file, 'utf8'), 'ts.forEachChild(file, (node) => { if (ts.isIdentifier(node)) output.push(node.text); });\n');
 });
-test('naming chooses a free map callback alias when preferred names conflict', () => {
+test('naming preserves a descriptive map callback when no documented alias is free', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-callbacks-'));
 	mkdirSync(join(root, 'src'));
 	const file = join(root, 'src', 'main.ts');
 	writeFileSync(file, 'const n = 1;\nconst v = 2;\nconst output = input.map((node) => node + n + v);\nvoid output;\n');
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
 	runQualityCli(cfg, ['naming', '--all']);
-	assert.equal(readFileSync(file, 'utf8'), 'const n = 1;\nconst v = 2;\nconst output = input.map((r) => r + n + v);\nvoid output;\n');
+	assert.equal(readFileSync(file, 'utf8'), 'const n = 1;\nconst v = 2;\nconst output = input.map((node) => node + n + v);\nvoid output;\n');
 });
 test('naming reuses concise aliases safely across independent map scopes', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-callbacks-'));
@@ -750,7 +804,7 @@ test('naming reuses concise aliases safely across independent map scopes', () =>
 	writeFileSync(file, 'const first = input.map((node) => node.id);\nconst second = input.flatMap((node) => node.children);\nvoid [first, second];\n');
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
 	runQualityCli(cfg, ['naming', '--all']);
-	assert.equal(readFileSync(file, 'utf8'), 'const first = input.map((n) => n.id);\nconst second = input.flatMap((n) => n.children);\nvoid [first, second];\n');
+	assert.equal(readFileSync(file, 'utf8'), 'const first = input.map((node) => node.id);\nconst second = input.flatMap((node) => node.children);\nvoid [first, second];\n');
 });
 test('naming allows a callback alias used only in a sibling function scope', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-callback-sibling-scope-'));
@@ -759,7 +813,7 @@ test('naming allows a callback alias used only in a sibling function scope', () 
 	writeFileSync(file, 'function unrelated() { const v = 1; return v; }\nconst output = input.map((value) => value);\nvoid [unrelated, output];\n');
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
 	runQualityCli(cfg, ['naming', '--all']);
-	assert.equal(readFileSync(file, 'utf8'), 'function unrelated() { const v = 1; return v; }\nconst output = input.map((v) => v);\nvoid [unrelated, output];\n');
+	assert.equal(readFileSync(file, 'utf8'), 'function unrelated() { const v = 1; return v; }\nconst output = input.map((value) => value);\nvoid [unrelated, output];\n');
 	assert.deepEqual(namingFindings(cfg), []);
 });
 test('naming preserves object keys but not positional syntax in destructured map parameters', () => {
@@ -769,16 +823,16 @@ test('naming preserves object keys but not positional syntax in destructured map
 	writeFileSync(file, 'const first = input.map(({ node }) => node.id);\nconst second = pairs.map(([node, index]) => node[index]);\nvoid [first, second];\n');
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
 	runQualityCli(cfg, ['naming', '--all']);
-	assert.equal(readFileSync(file, 'utf8'), 'const first = input.map(({ node: n }) => n.id);\nconst second = pairs.map(([n, i]) => n[i]);\nvoid [first, second];\n');
+	assert.equal(readFileSync(file, 'utf8'), 'const first = input.map(({ node }) => node.id);\nconst second = pairs.map(([node, i]) => node[i]);\nvoid [first, second];\n');
 });
 test('naming allocates distinct aliases across one destructured callback parameter', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-callback-collisions-'));
 	mkdirSync(join(root, 'src'));
 	const file = join(root, 'src', 'main.ts');
-	writeFileSync(file, 'const output = pairs.map(([record, result]) => result(record));\nvoid output;\n');
+	writeFileSync(file, 'const output = pairs.map(([item, index]) => index(item));\nvoid output;\n');
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
 	runQualityCli(cfg, ['naming', '--all']);
-	assert.equal(readFileSync(file, 'utf8'), 'const output = pairs.map(([r, v]) => v(r));\nvoid output;\n');
+	assert.equal(readFileSync(file, 'utf8'), 'const output = pairs.map(([i, v]) => v(i));\nvoid output;\n');
 });
 test('callback renames do not alter unrelated JSDoc parameters with the same name', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-callbacks-'));
@@ -826,11 +880,11 @@ void [articleError, ErrorBoundary];
 	runQualityCli(cfg, ['naming', '--all']);
 	assert.equal(
 		readFileSync(file, 'utf8'),
-		`class ErrorBoundary {}
-const articleError = new ErrorBoundary();
-const { error, repository: repo } = { error: articleError, repository: 'shared' };
-try { throw error; } catch (fmt) { console.log(fmt, repo); }
-void [articleError, ErrorBoundary];
+		`class ErrBoundary {}
+const articleErr = new ErrBoundary();
+const { error: err, repository: repo } = { error: articleErr, repository: 'shared' };
+try { throw err; } catch (fmt) { console.log(fmt, repo); }
+void [articleErr, ErrBoundary];
 `,
 	);
 	assert.deepEqual(namingFindings(cfg), []);
@@ -846,14 +900,14 @@ test('naming preserves exported contracts and configurable protected identifiers
 	assert.equal(readFileSync(file, 'utf8'), src);
 	assert.deepEqual(namingFindings(cfg), []);
 });
-test('naming updates JSDoc parameter tags with parameter declarations', () => {
+test('naming preserves full-value parameter names and their JSDoc tags', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-'));
 	mkdirSync(join(root, 'src'), { recursive: true });
 	const file = join(root, 'src', 'main.ts');
 	writeFileSync(file, '/** @param value - Input value. */\nfunction result(value: string) { return value; }\nvoid result;\n');
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
 	runQualityCli(cfg, ['naming', '--all']);
-	assert.equal(readFileSync(file, 'utf8'), '/** @param val - Input value. */\nfunction result(val: string) { return val; }\nvoid result;\n');
+	assert.equal(readFileSync(file, 'utf8'), '/** @param value - Input value. */\nfunction result(value: string) { return value; }\nvoid result;\n');
 });
 test('naming preserves explicitly unused underscore parameters', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-'));

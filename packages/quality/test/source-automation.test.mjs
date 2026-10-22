@@ -130,7 +130,10 @@ const view = <>
 	<progress aria-label="Upload progress" value={0.5} />
 </>;
 `);
-	assert.deepEqual(accessibilityFindings(cfg).map(({ element }) => element), ['<progress>', '<div>[role="progressbar"]']);
+	assert.deepEqual(
+		accessibilityFindings(cfg).map(({ element }) => element),
+		['<progress>', '<div>[role="progressbar"]'],
+	);
 });
 
 test('title fixes copy only literal titles from controls with no visible or uncertain label', () => {
@@ -169,10 +172,13 @@ const view = <>
 	<button aria-label="Play"><svg role="img" aria-label="Play preview"><path /></svg></button>
 </>;
 `);
-	assert.deepEqual(accessibilityFindings(cfg).map(({ element, fixable }) => [element, fixable]), [
-		['<svg>', true],
-		['<svg>', true],
-	]);
+	assert.deepEqual(
+		accessibilityFindings(cfg).map(({ element, fixable }) => [element, fixable]),
+		[
+			['<svg>', true],
+			['<svg>', true],
+		],
+	);
 	assert.deepEqual(fixAccessibleNames(cfg), { fixed: 2 });
 	const fixed = fixtureText(root, 'src/view.tsx');
 	assert.equal((fixed.match(/aria-hidden="true"/g) ?? []).length, 2);
@@ -225,7 +231,10 @@ test('displayName assignments resolve within lexical scope when component names 
 		`function first() {\n\tconst Button = forwardRef(() => null);\n\tButton.displayName = 'Button';\n}\nfunction second() {\n\tconst Button = forwardRef(() => null);\n}\n`,
 	);
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.tsx'] });
-	assert.deepEqual(displayNameFindings(cfg).map(({ component, line }) => ({ component, line })), [{ component: 'Button', line: 6 }]);
+	assert.deepEqual(
+		displayNameFindings(cfg).map(({ component, line }) => ({ component, line })),
+		[{ component: 'Button', line: 6 }],
+	);
 	assert.deepEqual(fixDisplayNames(cfg), { fixed: 1, skipped: 0 });
 	assert.match(fixtureText(root, 'src/components.tsx'), /function second\(\) \{\n\tconst Button = forwardRef\(\(\) => null\);\n\tButton\.displayName = 'Button';/);
 	assert.deepEqual(displayNameFindings(cfg), []);

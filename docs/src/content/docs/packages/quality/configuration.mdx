@@ -40,8 +40,6 @@ Runtime paths resolve from `root`. By default, `root` is the directory containin
 | `frameworkEntryExports`        | Explicit framework-discovered exports that Knip should retain, keyed by a source file path or supported `/**/*.ts` / `/**/*.tsx` pattern.           |
 | `protectedIdentifiers`         | Names that naming maintenance must preserve.                                                                                                        |
 | `renameExports`                | Whether eligible exported names can be renamed. Defaults to `false`.                                                                                |
-| `warningsAsErrors`             | Whether warnings and advisory findings block quality. Defaults to `true`; set to `false` only for a non-blocking policy.                            |
-| `manualWarnings`               | Deprecated compatibility alias. Prefer `warningsAsErrors`.                                                                                          |
 
 Quality checks scan every matching source file below the configured roots, except standard generated and dependency output directories.
 
@@ -194,7 +192,7 @@ Tool names are resolved from `<root>/node_modules/.bin` first, then from the env
 
 Use `enabledCommands` to toggle one configured command. Set `enabledChecks.command` to `false` to disable the category or pass `--skip-commands` for one run.
 
-`recommendationCommands` uses the same entry shape. Use `enabledRecommendations` to toggle an advisory command or `enabledChecks.recommend` to disable all recommendations. Recommendation subprocess output is shown, but its exit status does not fail the quality run. Pass `--skip-recommendations` to omit recommendations once.
+`recommendationCommands` uses the same entry shape. Use `enabledRecommendations` to toggle a command or `enabledChecks.recommend` to disable all recommendation commands. A nonzero subprocess status fails the quality run. Pass `--skip-recommendations` to omit these commands once.
 
 Commands run from `root`, inherit the caller's environment, and are not automatically limited to changed files. The runner does not provision credentials, databases, browsers, or other services.
 

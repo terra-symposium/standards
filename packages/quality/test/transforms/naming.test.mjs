@@ -54,7 +54,7 @@ test('naming maps are immutable and identifier tokenisation preserves separators
 	assert.deepEqual(identifierTokens('article_error-2_value'), ['article', 'error', '2', 'value']);
 	assert.deepEqual(identifierTokens(''), []);
 });
-test('callback aliases shorten only configured idioms and choose deterministic fallbacks on collision', () => {
+test('callback aliases shorten only documented idioms and preserve domain-specific names', () => {
 	assert.equal(callbackAlias('customer'), 'customer');
 	assert.equal(callbackAlias('unknownValue'), 'unknownValue');
 	assert.equal(callbackAlias('field'), 'field');
@@ -62,16 +62,14 @@ test('callback aliases shorten only configured idioms and choose deterministic f
 	assert.equal(callbackAlias('customer', ['c']), 'customer');
 	assert.equal(callbackAlias('customer', ['c', 'v', 'r', 'x', 'd', 'e', 'n', 's']), 'customer');
 	assert.equal(renameId('index', { numericIndex: true }), 'i');
-	assert.equal(renameId('node', { callback: true }), 'n');
-	assert.equal(renameId('node', { callback: true, reserved: ['n'] }), 'v');
+	assert.equal(renameId('node', { callback: true }), 'node');
+	assert.equal(renameId('node', { callback: true, reserved: ['n'] }), 'node');
 	assert.equal(renameId('Request'), 'Request');
 	assert.equal(renameId('_'), '_');
 });
-test('renameId shortens category, intelligence, and other configured words without touching substrings', () => {
+test('renameId shortens established terms without abbreviating domain words or touching substrings', () => {
 	const cases = {
 		category: 'category',
-		config: 'config',
-		customer: 'customer',
 		customerCategory: 'customerCategory',
 		intelligence: 'intel',
 		customerIntelligence: 'customerIntel',
@@ -80,7 +78,7 @@ test('renameId shortens category, intelligence, and other configured words witho
 		commitment: 'commitment',
 		terror: 'terror',
 		isActive: 'isActive',
-		normalizedResponse: 'normRes',
+		normalizedResponse: 'normResponse',
 	};
 	for (const [name, expected] of Object.entries(cases)) assert.equal(renameId(name), expected, name);
 	assert.equal(hasPrefixReplacement('activeCard'), true);
@@ -125,7 +123,7 @@ class WithProperty { constructor(readonly destination: string) {} }
 	assert.equal(isRenamableDeclaration(dest), false);
 	assert.equal(declarationScope(param).kind, ts.SyntaxKind.FunctionDeclaration);
 	assert.equal(declarationScope(declaration('localValue')), file);
-	assert.equal(renameDeclaration(param), 'param');
+	assert.equal(renameDeclaration(param), 'parameter');
 });
 test('callback declaration APIs classify inline helper, collection, and event-handler callbacks', () => {
 	const src = `
@@ -150,7 +148,7 @@ void [mapped, rendered, ordinary, handle, view];
 	assert.equal(renameDeclaration(supported[1]), 'i');
 	assert.equal(renameDeclaration(supported[2]), 'block');
 	assert.equal(renameDeclaration(supported[3]), 'customer');
-	assert.equal(renameDeclaration(supported[4]), 'e');
+	assert.equal(renameDeclaration(supported[4]), 'event');
 });
 test('alias analysis keeps only stable local identifier and type aliases', () => {
 	const root = fixtureRoot('terra-quality-alias-api-');
@@ -307,6 +305,6 @@ test('naming findings use shared analysis, report severity by replacement kind, 
 	const analysis = createQualityAnalysis(cfg);
 	assert.deepEqual(
 		namingFindings(cfg, analysis).map((f) => [f.name, f.suggestion, f.severity]),
-		[['activeValue', 'aVal', 'warning']],
+		[['activeValue', 'aValue', 'error']],
 	);
 });

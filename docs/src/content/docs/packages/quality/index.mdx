@@ -19,7 +19,7 @@ Terra Quality does not install project tools or create their native configuratio
 
 The CLI reads `quality.json` from the current working directory unless a library caller supplies another path. It resolves configured paths from the config file's directory or its explicit `root`, selects changed and untracked files by default, and runs enabled checks in order. Pass `--all` to scan the full configured source scope.
 
-Fix mode is the default for the normal quality workflow. It applies enabled, syntax-aware transformations and tool fixes. Pass `--warn` for a read-only run. Configured quality commands run unless skipped; advisory recommendations do not fail the run.
+Fix mode is the default for the normal quality workflow. It applies enabled, syntax-aware transformations and tool fixes. Pass `--warn` for a read-only run. Configured quality commands run unless skipped; every reported quality finding fails the run.
 
 ## Compatibility
 
@@ -138,7 +138,7 @@ Find naming drift and apply safe syntax-aware identifier renames.
 
 Finds naming drift and safely renames whole words or prefixes after checking syntax, scope, collisions, protected paths, exports, shorthand properties, and JSX. Ambiguous or conflicting edits remain findings.
 
-Use `protectedIdentifiers` for stable domain names, public vocabulary, and abbreviations. Export renaming is off by default; enable it with `renameExports`. `--strict` fails on naming errors; `--warn` reports without renaming. Review API-facing edits before accepting them.
+Use `protectedIdentifiers` for stable domain names, public vocabulary, and abbreviations. Export renaming is off by default; enable it with `renameExports`. `--warn` checks without renaming, and naming findings still fail the run. Review API-facing edits before accepting them.
 
 **Before** — `command` is a configured long-word replacement:
 
@@ -273,7 +273,7 @@ Identify repeated property forwarding and distinguish it from intentional projec
 
 **Toggle:** `enabledChecks.forward` · **Fix:** `autofix.forward`
 
-Finds object literals forwarding at least three properties from one source (for example, `userId: input.userId`). Safe fixes remove exact redundant properties after an existing spread; whole-object replacement and projections remain advisory.
+Finds object literals forwarding at least three properties from one source (for example, `userId: input.userId`). Safe fixes remove exact redundant properties after an existing spread. Whole-object replacement and projections are excluded because they can change object shape.
 
 “Forwarding” is syntactic repetition, not proof of equal object contracts; a “projection” intentionally selects a subset. Keep projections explicit at persistence, authorization, redaction, schema, versioning, and API boundaries. Common mutation names (`insert`, `update`, `upsert`, `set`, `assign`) are ignored.
 
@@ -390,7 +390,7 @@ Detect and optionally extract repeated static class strings.
 
 **Toggle:** `enabledChecks.repeated-classes` plus `repeatedClasses` config · **Fix:** `autofix.repeatedClasses` · **Command:** `repeated-classes`
 
-Counts repeated static class strings in configured extensions. Safe fixes extract repeated file-local literals into `CONFIG` or `CLASSES` constants; dynamic class expressions and cross-file design decisions remain advisory.
+Counts repeated static class strings in configured extensions. Safe fixes extract repeated file-local literals into `CONFIG` or `CLASSES` constants; dynamic class expressions and cross-file design decisions are excluded.
 
 Configure `minimumCount` and `extensions`. Move repetition that indicates a shared UI primitive into the appropriate component or design-system abstraction.
 
@@ -420,7 +420,7 @@ Detect duplicate regular-expression sources and consolidate supported literals.
 
 Detects duplicate regex literals and supported constructors. Safe fixes extract file-local, non-stateful duplicates into `CONFIG` or `REGEX` constants. Set `sharedModule` to a repository-relative `.mjs` path and provide a matching `.d.mts` declaration to enable cross-file ESM factories; otherwise fixes stay file-local.
 
-Configure `minimumCount` and `extensions`. Stateful regex flags and incompatible CommonJS consumers remain advisory because sharing may change behavior.
+Configure `minimumCount`, `extensions`, and `ignoredFiles`. Stateful regex flags and incompatible CommonJS consumers are excluded because sharing may change behavior.
 
 **Before** — the same non-stateful expression is constructed twice:
 
@@ -568,11 +568,11 @@ Run one configured command with `pnpm exec terra-quality domain test`.
 
 #### Recommend
 
-Run optional advisory repository commands without blocking delivery.
+Run optional repository commands as part of quality validation.
 
 **Toggle:** `enabledChecks.recommend` and `enabledRecommendations.<name>` · **Fix:** none
 
-Runs `recommendationCommands` after primary checks and shows output. Its subprocess status never fails the quality run, making it suitable for migration hints and cleanup reports.
+Runs `recommendationCommands` after primary checks and shows output. A nonzero subprocess status fails the quality run.
 
 Items use `name`, `command`, and optional `args`; changes they make follow the command's own contract. Use `--skip-recommendations` to skip once.
 
@@ -582,7 +582,7 @@ Items use `name`, `command`, and optional `args`; changes they make follow the c
 { "recommendationCommands": [] }
 ```
 
-**After** — add a non-blocking advisory command:
+**After** — add an optional validation command:
 
 ```json
 {
@@ -590,4 +590,4 @@ Items use `name`, `command`, and optional `args`; changes they make follow the c
 }
 ```
 
-The output is shown, but a nonzero recommendation status does not fail the quality run.
+The command output is shown and a nonzero status fails the quality run.
