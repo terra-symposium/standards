@@ -209,7 +209,7 @@ test('the executable handles help without a config and rejects unknown commands 
 	assert.match(unknown.stderr, /Unknown quality CLI arguments: unknown-command/);
 	assert.doesNotMatch(unknown.stderr, /invalid config|Unexpected token/);
 });
-test('the executable shows configured check names and results during a full quality run', () => {
+test('the executable shows only configured check names and completion indicators', () => {
 	const root = fixtureRoot('terra-quality-cli-visible-checks-');
 	fixtureFile(
 		root,
@@ -248,9 +248,70 @@ test('the executable shows configured check names and results during a full qual
 	const result = spawnSync(process.execPath, [runner, 'quality:all', '--all', '--warn', '--skip-commands', '--skip-recommendations'], { cwd: root, encoding: 'utf8' });
 	assert.equal(result.status, 0, result.stderr);
 	assert.match(result.stderr, /STATIC QUALITY/);
-	assert.match(result.stderr, /Regex Dedup[\s\S]*✓ Regex Dedup · clean/);
+	assert.match(result.stderr, /⠋ Regex Dedup[\s\S]*✓ Regex Dedup/);
 	assert.doesNotMatch(result.stderr, /Accessibility|Display Name/);
-	assert.match(result.stderr, /SUMMARY checks complete · 0 suites/);
+	assert.match(result.stderr, /✓ Quality complete/);
+	assert.doesNotMatch(result.stderr, /Checking regex dedup|Preparing shared source analysis|No configured test suites/);
+});
+test('full quality continues after failed scripts and prints every failure at the end', () => {
+	const root = fixtureRoot('terra-quality-cli-continue-failures-');
+	const marker = join(root, 'ran.txt');
+	const command = (message, exitCode = 1) => ({
+		command: process.execPath,
+		args: [
+			'-e',
+			`require('node:fs').appendFileSync(${JSON.stringify(marker)}, ${JSON.stringify(`${message}\n`)}); process.stderr.write(${JSON.stringify(`${message}\n`)}); process.exitCode = ${exitCode};`,
+		],
+	});
+	fixtureFile(root, 'src/main.ts', 'export const value = 1;\n');
+	fixtureFile(
+		root,
+		'quality.json',
+		JSON.stringify({
+			sourceRoots: ['src'],
+			extensions: ['.ts'],
+			qualityCommands: [
+				{ name: 'static-first', ...command('ERROR_FIRST') },
+				{ name: 'static-second', ...command('ERROR_SECOND', 2) },
+				{ name: 'production-build', ...command('BUILD_RAN', 0) },
+			],
+			enabledChecks: {
+				format: false,
+				import: false,
+				name: false,
+				alias: false,
+				forward: false,
+				document: false,
+				lint: false,
+				knip: false,
+				'dead-code': false,
+				type: false,
+				command: true,
+				recommend: false,
+				diff: false,
+				security: false,
+				accessibility: false,
+				'display-name': false,
+				'performance-patterns': false,
+				'documented-commands': false,
+				'repeated-classes': false,
+				'regex-dedup': false,
+				'ui-patterns': false,
+			},
+		}),
+	);
+	const runner = fileURLToPath(new URL('../../dist/runner.js', import.meta.url));
+	const result = spawnSync(process.execPath, [runner, 'quality:all', '--all', '--skip-recommendations'], { cwd: root, encoding: 'utf8' });
+	assert.equal(result.status, 1, result.stderr);
+	assert.deepEqual(fixtureText(root, 'ran.txt').trim().split('\n'), ['ERROR_FIRST', 'ERROR_SECOND', 'BUILD_RAN']);
+	assert.match(result.stderr, /⠋ Static First[\s\S]*✗ Static First/);
+	assert.match(result.stderr, /⠋ Static Second[\s\S]*✗ Static Second/);
+	assert.match(result.stderr, /⠋ Production Build[\s\S]*✓ Production Build/);
+	const summary = result.stderr.indexOf('FINDINGS SUMMARY');
+	assert.ok(summary > result.stderr.indexOf('✓ Quality complete'));
+	assert.ok(result.stderr.indexOf('ERROR_FIRST') > summary);
+	assert.ok(result.stderr.indexOf('ERROR_SECOND') > summary);
+	assert.doesNotMatch(result.stderr.slice(0, summary), /ERROR_FIRST|ERROR_SECOND/);
 });
 test('the executable rejects linting without an ESLint flat config before running quality', () => {
 	const root = fixtureRoot('terra-quality-eslint-config-required-');

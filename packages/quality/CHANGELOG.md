@@ -1,5 +1,11 @@
 # @terra-symposium/standards-quality
 
+## 2.0.5
+
+### Patch Changes
+
+- Show each quality check as it starts and finishes, and continue the full run after individual checks fail so all errors are reported together.
+
 ## 2.0.4
 
 ### Patch Changes
