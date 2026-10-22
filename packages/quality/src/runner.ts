@@ -94,8 +94,6 @@ const CLI_CMDS = new Set([
 const CLI_FLAGS = new Set(['--all', '--warn', '--strict', '--skip-commands', '--skip-recommendations', '--help', '-h', '--version', '-v', '--report-json', '--branch', '--base-sha', '--repository']);
 const TOOL_OUTPUT_MAX_BUFFER = 64 * 1024 * 1024;
 const ESLINT_BATCH_SIZE = 50;
-const ESLINT_CONCURRENCY = 4;
-const ESLINT_MEMORY_PER_WORKER = 4 * 1024 ** 3;
 const ESLINT_API_FALLBACK = 78;
 const ESLINT_ARGUMENT_BUDGET = 64 * 1024;
 const FOCUSED_ESLINT_FALLBACK = 'TERRA_QUALITY_FOCUSED_ESLINT_UNAVAILABLE';
@@ -988,8 +986,6 @@ function eslintApiSource(cfg: QualityCfg, files: string[], opts: QualityOptions,
 		root: cfg.root,
 		files,
 		batchSize: ESLINT_BATCH_SIZE,
-		concurrency: ESLINT_CONCURRENCY,
-		memoryPerWorker: ESLINT_MEMORY_PER_WORKER,
 		fix: opts.fix,
 		exhaustive,
 		deadCodeCoordinated,
@@ -997,7 +993,6 @@ function eslintApiSource(cfg: QualityCfg, files: string[], opts: QualityOptions,
 	const progressUrl = new URL('./progress.js', import.meta.url).href;
 	return `
 import { createRequire } from 'node:module';
-import { availableParallelism, totalmem } from 'node:os';
 import { resolve } from 'node:path';
 
 const options = ${payload};
@@ -1013,11 +1008,6 @@ try {
 		cacheLocation: 'node_modules/.cache/eslint',
 		cacheStrategy: 'content',
 		warnIgnored: false,
-		concurrency: Math.min(
-			options.concurrency,
-			Math.max(1, Math.floor(totalmem() / options.memoryPerWorker)),
-			Math.max(1, Math.floor(availableParallelism() / 2)),
-		),
 		fix: options.fix,
 		...(options.deadCodeCoordinated ? { overrideConfig: { rules: { 'unused-imports/no-unused-vars': 'off' } } } : {}),
 	});
