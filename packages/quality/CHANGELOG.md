@@ -1,5 +1,15 @@
 # @terra-symposium/standards-quality
 
+## 2.0.0
+
+### Major Changes
+
+- acdba7a: Treat every quality finding as an error and remove non-blocking warning policies.
+
+### Patch Changes
+
+- Wait for each test suite's progress to finish before printing its output, and group all quality findings at the end of the run.
+
 ## 1.0.0
 
 ### Major Changes
