@@ -111,7 +111,6 @@ let reportStages: Map<string, QualityJsonReport['checks'][number]> | undefined;
 let reportStageName: string | undefined;
 let reportGitHubData: GitHubReport | undefined;
 let outputPhase: string | undefined;
-let quietOutput = false;
 let qualityFindings: string[] = [];
 let qualityFindingCount = 0;
 let qualityDiagnostics: string[] = [];
@@ -404,7 +403,6 @@ function qualityHeader(name: string, detail: string): void {
 		reportStages.set(name, { name, status: 'passed', findings: 0 });
 	}
 	if (outputPhase) {
-		if (quietOutput) return;
 		const indent = name.startsWith('dead-code/') || (outputPhase === 'Tests' && name.startsWith('command:')) ? '    ' : '  ';
 		const labels: Record<string, string> = {
 			'dead-code/safe-fixes': 'Safe fixes',
@@ -421,9 +419,23 @@ function qualityHeader(name: string, detail: string): void {
 		if (detail) console.error(`${indent}  ${detail}`);
 		return;
 	}
-	if (quietOutput) return;
 	console.error(`\n=== ${name} ===`);
 	console.error(detail);
+}
+
+/**
+ * Reports whether a named quality check completed cleanly or found issues.
+ *
+ * @param name Check identifier used by the quality runner.
+ * @param findings Number of findings produced by the check.
+ *
+ * @return Nothing; a concise completion line is written to standard error.
+ */
+function printCheckStatus(name: string, findings: number): void {
+	if (!outputPhase) return;
+	const label = name.replace(/(^|[-/])([a-z])/gu, (_match, separator: string, letter: string) => `${separator === '-' ? ' ' : separator}${letter.toUpperCase()}`);
+	const result = findings ? `${findings} finding${findings === 1 ? '' : 's'}` : 'clean';
+	console.error(`  ${findings ? '✗' : '✓'} ${label} · ${result}`);
 }
 
 /**
@@ -435,7 +447,7 @@ function qualityHeader(name: string, detail: string): void {
  */
 function beginQualityPhase(phase: QualityPhase): void {
 	outputPhase = phase;
-	if (!quietOutput) console.error(`\n${phase.toUpperCase()}`);
+	console.error(`\n${phase.toUpperCase()}`);
 }
 
 /**
@@ -895,18 +907,6 @@ function snapshotFiles(cfg: QualityCfg, files: string[]): Map<string, string> {
  */
 function changedFileCount(cfg: QualityCfg, files: string[], before: Map<string, string>): number {
 	return files.filter((f) => before.get(f) !== readFileSync(resolve(cfg.root, f), 'utf8')).length;
-}
-
-/**
- * Splits a list into bounded batches for command-line tools.
- *
- * @param vals Values to divide into batches.
- * @param size Maximum number of values per batch.
- *
- * @return Ordered batches covering the input values.
- */
-function batches<T>(vals: T[], size = 100): T[][] {
-	return Array.from({ length: Math.ceil(vals.length / size) }, (_, i) => vals.slice(i * size, (i + 1) * size));
 }
 
 /**
@@ -2072,9 +2072,9 @@ function runDeadCode(cfg: QualityCfg, fix: boolean, all: boolean, verify = true,
 	const changedFiles = new Set<string>();
 	const srcSnapshot = fix ? new Map(filesFor(cfg, true).map((f) => [f, readFileSync(f, 'utf8')])) : new Map<string, string>();
 	const initialInventory = fix ? new Set(srcSnapshot.keys()) : new Set<string>();
-	if (fix && emit && !quietOutput) console.error(`  Preparing TypeScript baseline for ${srcSnapshot.size} configured source files...`);
+	if (fix && emit) console.error(`  Preparing TypeScript baseline for ${srcSnapshot.size} configured source files...`);
 	const typeProgram = fix ? deadCodeTypeProgram(cfg) : null;
-	if (fix && emit && !quietOutput) console.error('  TypeScript baseline ready.');
+	if (fix && emit) console.error('  TypeScript baseline ready.');
 	const typeRejectedFiles = new Set<string>();
 	const singleUseVerificationFindings: ReturnType<typeof singleUseFindings> = [];
 	const eslintReportsByPath = new Map<string, EslintReport>();
@@ -2105,7 +2105,7 @@ function runDeadCode(cfg: QualityCfg, fix: boolean, all: boolean, verify = true,
 			let reportsToFix = scanEslint();
 			for (let round = 0; round < 5; round++) {
 				if (!reportsToFix.some((report) => report.messages.some((message) => message.ruleId === 'unused-imports/no-unused-vars'))) break;
-				if (emit && !quietOutput) console.error(`  ESLint unused-declaration pass ${round + 1}/5...`);
+				if (emit) console.error(`  ESLint unused-declaration pass ${round + 1}/5...`);
 				const passChangedFiles = new Set<string>();
 				if (!fixUnusedDeclarations(cfg, reportsToFix, passChangedFiles, importedConsumersForRun)) break;
 				for (const file of passChangedFiles) changedFiles.add(file);
@@ -2118,7 +2118,7 @@ function runDeadCode(cfg: QualityCfg, fix: boolean, all: boolean, verify = true,
 			cfg,
 			singleUseChangedFiles,
 			(pass, filesChanged) => {
-				if (emit && !quietOutput) console.error(`  Single-use rewrite pass ${pass} starting (${filesChanged} source files changed so far).`);
+				if (emit) console.error(`  Single-use rewrite pass ${pass} starting (${filesChanged} source files changed so far).`);
 			},
 			singleUseVerificationFindings,
 		);
@@ -2138,9 +2138,9 @@ function runDeadCode(cfg: QualityCfg, fix: boolean, all: boolean, verify = true,
 		if (verify) beginVerification();
 		if (proposed.size) {
 			if (!typeProgram) throw new Error('Dead-code edit validation requires its baseline TypeScript program.');
-			if (emit && !quietOutput) console.error(`  Validating ${proposed.size} changed files against TypeScript diagnostics...`);
+			if (emit) console.error(`  Validating ${proposed.size} changed files against TypeScript diagnostics...`);
 			const { accepted, rejected } = acceptTypeSafeEdits(typeProgram, proposed, srcSnapshot, (checked, count) => {
-				if (emit && !quietOutput) console.error(`  TypeScript safety check ${checked} (${count} candidate files).`);
+				if (emit) console.error(`  TypeScript safety check ${checked} (${count} candidate files).`);
 			});
 			for (const file of rejected) {
 				const original = srcSnapshot.get(file);
@@ -2359,23 +2359,24 @@ function inferGitHubRepo(root: string): string | undefined {
  * @return Nothing; blocking generic findings are reflected in the process exit code.
  */
 function runGenericChecks(cfg: QualityCfg, analysis?: QualityAnalysis): void {
-	const checks = [
-		['accessibility', qualityCheckEnabled(cfg, 'accessibility') ? accessibilityFindings(cfg, analysis) : []],
-		['display-name', qualityCheckEnabled(cfg, 'display-name') ? displayNameFindings(cfg, analysis) : []],
-		['performance-patterns', cfg.performancePatterns && qualityCheckEnabled(cfg, 'performance-patterns') ? performancePatternFindings(cfg, analysis) : []],
-		['documented-commands', cfg.documentation?.commandRoots?.length && qualityCheckEnabled(cfg, 'documented-commands') ? documentedCommandFindings(cfg) : []],
-		['security', cfg.security ? securityFindings(cfg) : []],
-		['repeated-classes', cfg.repeatedClasses ? repeatedClassFindings(cfg, analysis) : []],
-		['regex-dedup', cfg.regexDedup ? regexFindings(cfg, analysis) : []],
-		['ui-patterns', cfg.uiPatterns ? uiPatternFindings(cfg, analysis) : []],
-	] as const;
-	for (const [name, findings] of checks) {
+	const checks: [string, () => readonly GenericFinding[]][] = [];
+	if (qualityCheckEnabled(cfg, 'accessibility')) checks.push(['accessibility', () => accessibilityFindings(cfg, analysis)]);
+	if (qualityCheckEnabled(cfg, 'display-name')) checks.push(['display-name', () => displayNameFindings(cfg, analysis)]);
+	if (cfg.performancePatterns && qualityCheckEnabled(cfg, 'performance-patterns')) checks.push(['performance-patterns', () => performancePatternFindings(cfg, analysis)]);
+	if (cfg.documentation?.commandRoots?.length && qualityCheckEnabled(cfg, 'documented-commands')) checks.push(['documented-commands', () => documentedCommandFindings(cfg)]);
+	if (cfg.security && qualityCheckEnabled(cfg, 'security')) checks.push(['security', () => securityFindings(cfg)]);
+	if (cfg.repeatedClasses && qualityCheckEnabled(cfg, 'repeated-classes')) checks.push(['repeated-classes', () => repeatedClassFindings(cfg, analysis)]);
+	if (cfg.regexDedup && qualityCheckEnabled(cfg, 'regex-dedup')) checks.push(['regex-dedup', () => regexFindings(cfg, analysis)]);
+	if (cfg.uiPatterns && qualityCheckEnabled(cfg, 'ui-patterns')) checks.push(['ui-patterns', () => uiPatternFindings(cfg, analysis)]);
+	for (const [name, check] of checks) {
 		qualityHeader(name, `Checking ${name.replace(G_REGEX(), ' ')}`);
+		const findings = check();
 		printFindings(
-			findings as readonly GenericFinding[],
+			findings,
 			(f) =>
 				`${'file' in f ? `${f.file}: ` : ''}${'message' in f ? `${'line' in f ? `${f.line}:${f.column} ` : ''}${f.message}` : 'component' in f ? `${f.line}:${f.column} ${f.component}: ${f.recommendation}` : 'method' in f ? `${f.line}:${f.column} ${f.method}(${f.receiver}): ${f.recommendation}` : 'command' in f ? `${f.line}: ${f.recommendation} (${f.command})` : 'value' in f ? `${f.count}x ${f.value} (${f.locations.join(', ')})` : 'source' in f ? `${f.count}x ${f.source} (${f.locations.join(', ')})` : f.pattern}`,
 		);
+		printCheckStatus(name, findings.length);
 		if (findings.length) process.exitCode = 1;
 	}
 }
@@ -2683,36 +2684,44 @@ export function runQuality(
 	const scoped = scopedCfg(cfg, all);
 	const ctx = analysis ?? createQualityAnalysis(scoped);
 	const result = {
-		imports: qualityCheckEnabled(cfg, 'import') ? checkImports(scoped) : [],
-		naming: qualityCheckEnabled(cfg, 'name') ? namingFindings(scoped, ctx) : [],
-		aliases: qualityCheckEnabled(cfg, 'alias') ? aliasFindings(scoped, ctx) : [],
-		forwarding: qualityCheckEnabled(cfg, 'forward') ? objectForwardingFindings(scoped, ctx) : [],
-		documentation: qualityCheckEnabled(cfg, 'document') ? documentationFindings(scoped, ctx) : [],
+		imports: [] as ReturnType<typeof checkImports>,
+		naming: [] as ReturnType<typeof namingFindings>,
+		aliases: [] as ReturnType<typeof aliasFindings>,
+		forwarding: [] as ReturnType<typeof objectForwardingFindings>,
+		documentation: [] as ReturnType<typeof documentationFindings>,
 	};
-	const duplicateImports = qualityCheckEnabled(cfg, 'import') ? duplicateImportFindings(ctx.files) : [];
+	let duplicateImports: ReturnType<typeof duplicateImportFindings> = [];
 	if (qualityCheckEnabled(cfg, 'import')) {
 		qualityHeader('imports', 'Checking local import resolution');
-		if (!result.imports.length && !duplicateImports.length) console.error('  ✓ clean');
-		else {
-			if (result.imports.length) printFindings(result.imports, (f) => `Unresolved import: ${f.importer} -> ${f.specifier}`);
-			if (duplicateImports.length) printFindings(duplicateImports, (f) => `Duplicate named import: ${f.file}:${f.line} repeats an import from ${f.module}`);
-		}
+		result.imports = checkImports(scoped);
+		duplicateImports = duplicateImportFindings(ctx.files);
+		if (result.imports.length) printFindings(result.imports, (f) => `Unresolved import: ${f.importer} -> ${f.specifier}`);
+		if (duplicateImports.length) printFindings(duplicateImports, (f) => `Duplicate named import: ${f.file}:${f.line} repeats an import from ${f.module}`);
+		printCheckStatus('imports', result.imports.length + duplicateImports.length);
 	}
 	if (qualityCheckEnabled(cfg, 'name')) {
 		qualityHeader('naming', 'Checking concise, consistent symbol names');
+		result.naming = namingFindings(scoped, ctx);
 		printFindings(result.naming, (f) => `Naming error: ${f.file}: ${f.name} -> ${f.suggestion}`);
+		printCheckStatus('naming', result.naming.length);
 	}
 	if (qualityCheckEnabled(cfg, 'alias')) {
 		qualityHeader('aliases', 'Checking for unnecessary compatibility aliases');
+		result.aliases = aliasFindings(scoped, ctx);
 		printFindings(result.aliases, (f) => `Alias: ${f.file}:${f.line} ${f.kind} ${f.name} -> ${f.replacement}`);
+		printCheckStatus('aliases', result.aliases.length);
 	}
 	if (qualityCheckEnabled(cfg, 'forward')) {
 		qualityHeader('forwarding', 'Checking object-forwarding opportunities');
+		result.forwarding = objectForwardingFindings(scoped, ctx);
 		printFindings(result.forwarding, (f) => `Forwarding error: ${f.file}:${f.line}:${f.column} ${f.callee} repeats ${f.source}.${f.properties.join(', ')}; ${f.recommendation}.`);
+		printCheckStatus('forwarding', result.forwarding.length);
 	}
 	if (qualityCheckEnabled(cfg, 'document')) {
 		qualityHeader('documentation', 'Checking meaningful file, function, and parameter documentation');
+		result.documentation = documentationFindings(scoped, ctx);
 		printFindings(result.documentation, (f) => `Documentation error: ${f.file}:${f.line}:${f.column} ${f.name}; ${f.reason}.`);
+		printCheckStatus('documentation', result.documentation.length);
 	}
 	if (result.imports.length || duplicateImports.length || result.aliases.length || result.documentation.length > 0 || result.naming.length > 0 || result.forwarding.length > 0) process.exitCode = 1;
 	return result;
@@ -2832,7 +2841,7 @@ function runFullQuality(cfg: QualityCfg, args: string[], opts: QualityOptions): 
 	const scoped = scopedCfg(cfg, opts.all);
 	if (opts.fix) {
 		outputPhase = 'PREPARING SAFE FIXES';
-		if (!quietOutput) console.error('\nPREPARING SAFE FIXES');
+		console.error('\nPREPARING SAFE FIXES');
 	}
 	if (opts.fix && qualityCheckEnabled(cfg, 'name') && fix('name')) {
 		const namingScope = scopedCfg(cfg, opts.all);
@@ -2871,7 +2880,9 @@ function runFullQuality(cfg: QualityCfg, args: string[], opts: QualityOptions): 
 	const continueStaticAndLater = (): void => {
 		if (qualityCheckEnabled(cfg, 'dead-code')) runDeadCodeCmd(cfg, qualityAutofixEnabled(cfg, 'dead-code', opts.fix), opts.all);
 		if (qualityCheckEnabled(cfg, 'lint')) runLint(cfg, { ...opts, fix: false }, true, true);
+		console.error('  Preparing shared source analysis...');
 		const analysis = createQualityAnalysis(scoped);
+		console.error('  ✓ Shared source analysis ready');
 		runGenericChecks(scoped, analysis);
 		runQuality(cfg, opts.strict, opts.all, analysis);
 		if (!opts.skipCommands) runQualityPhase(cfg, 'Static quality');
@@ -3238,7 +3249,6 @@ export function runTypecheck(cfg: QualityCfg, args: string[] = []): void {
 	console.error(`  ${status ? '✗ failed' : '✓ passed'}`);
 }
 if (process.argv[1] && realpathSync(resolve(process.argv[1])) === realpathSync(fileURLToPath(import.meta.url))) {
-	quietOutput = true;
 	setQualityProgressSuppressed(true);
 	Promise.resolve(runQualityFromCfg()).catch((error: unknown) => {
 		console.error(error instanceof Error ? error.message : error);
