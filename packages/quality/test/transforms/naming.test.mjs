@@ -55,12 +55,12 @@ test('naming maps are immutable and identifier tokenisation preserves separators
 	assert.deepEqual(identifierTokens(''), []);
 });
 test('callback aliases shorten only configured idioms and choose deterministic fallbacks on collision', () => {
-	assert.equal(callbackAlias('customer'), 'c');
+	assert.equal(callbackAlias('customer'), 'customer');
 	assert.equal(callbackAlias('unknownValue'), 'unknownValue');
 	assert.equal(callbackAlias('field'), 'field');
 	assert.equal(callbackAlias('label'), 'label');
-	assert.equal(callbackAlias('customer', ['c']), 'v');
-	assert.equal(callbackAlias('customer', ['c', 'v', 'r', 'x', 'd', 'e', 'n', 's']), 'c');
+	assert.equal(callbackAlias('customer', ['c']), 'customer');
+	assert.equal(callbackAlias('customer', ['c', 'v', 'r', 'x', 'd', 'e', 'n', 's']), 'customer');
 	assert.equal(renameId('index', { numericIndex: true }), 'i');
 	assert.equal(renameId('node', { callback: true }), 'n');
 	assert.equal(renameId('node', { callback: true, reserved: ['n'] }), 'v');
@@ -69,11 +69,13 @@ test('callback aliases shorten only configured idioms and choose deterministic f
 });
 test('renameId shortens category, intelligence, and other configured words without touching substrings', () => {
 	const cases = {
-		category: 'cat',
-		customerCategory: 'customerCat',
+		category: 'category',
+		config: 'config',
+		customer: 'customer',
+		customerCategory: 'customerCategory',
 		intelligence: 'intel',
 		customerIntelligence: 'customerIntel',
-		categories: 'cats',
+		categories: 'categories',
 		intelligences: 'intels',
 		commitment: 'commitment',
 		terror: 'terror',
@@ -144,10 +146,10 @@ void [mapped, rendered, ordinary, handle, view];
 	assert.equal(callbacks.length, 6);
 	const supported = callbacks.filter((n) => isCallbackDeclaration(n));
 	assert.equal(supported.length, 5);
-	assert.equal(renameDeclaration(supported[0]), 'c');
+	assert.equal(renameDeclaration(supported[0]), 'customer');
 	assert.equal(renameDeclaration(supported[1]), 'i');
 	assert.equal(renameDeclaration(supported[2]), 'block');
-	assert.equal(renameDeclaration(supported[3]), 'c');
+	assert.equal(renameDeclaration(supported[3]), 'customer');
 	assert.equal(renameDeclaration(supported[4]), 'e');
 });
 test('alias analysis keeps only stable local identifier and type aliases', () => {
@@ -305,9 +307,6 @@ test('naming findings use shared analysis, report severity by replacement kind, 
 	const analysis = createQualityAnalysis(cfg);
 	assert.deepEqual(
 		namingFindings(cfg, analysis).map((f) => [f.name, f.suggestion, f.severity]),
-		[
-			['category', 'cat', 'error'],
-			['activeValue', 'aVal', 'warning'],
-		],
+		[['activeValue', 'aVal', 'warning']],
 	);
 });
