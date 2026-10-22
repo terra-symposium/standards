@@ -736,6 +736,7 @@ test('full quality routes unused-variable findings through dead-code once and tr
 	const marker = join(root, 'eslint-args.jsonl');
 	const cmdMarker = join(root, 'command-ran.txt');
 	const testMarker = join(root, 'test-command-ran.txt');
+	const outputEvents = [];
 	const eslint = fixtureFile(
 		root,
 		'bin/eslint.mjs',
@@ -755,7 +756,11 @@ if (args.includes('--format') && args.includes('json'))
 		tools: { eslint },
 		qualityCommands: [
 			{ name: 'followup', command: process.execPath, args: ['-e', `require('node:fs').writeFileSync(${JSON.stringify(cmdMarker)}, 'ok')`] },
-			{ name: 'contracts', command: process.execPath, args: ['-e', `require('node:fs').writeFileSync(${JSON.stringify(testMarker)}, 'ok')`] },
+			{
+				name: 'contract',
+				command: process.execPath,
+				args: ['-e', `require('node:fs').writeFileSync(${JSON.stringify(testMarker)}, 'ok'); process.stdout.write('test feedback\\n')`],
+			},
 		],
 		enabledChecks: {
 			document: false,
@@ -780,7 +785,16 @@ if (args.includes('--format') && args.includes('json'))
 	resetExitCode();
 	const output = [];
 	const originalErr = console.error;
-	console.error = (...parts) => output.push(parts.join(' '));
+	const originalStderrWrite = process.stderr.write;
+	console.error = (...parts) => {
+		const line = parts.join(' ');
+		output.push(line);
+		outputEvents.push(line);
+	};
+	process.stderr.write = (chunk) => {
+		outputEvents.push(chunk.toString());
+		return true;
+	};
 	try {
 		runQualityCli(cfg, ['quality', '--all', '--warn', '--skip-recommendations']);
 		const invocations = recordedCmds(root, 'eslint-args.jsonl');
@@ -795,11 +809,13 @@ if (args.includes('--format') && args.includes('json'))
 		assert.equal(process.exitCode, 1);
 	} finally {
 		console.error = originalErr;
+		process.stderr.write = originalStderrWrite;
 	}
 	const outputText = output.join('\n');
 	assert.match(outputText, /\[ERROR\] eslint\/unused-private-declaration/);
 	assert.doesNotMatch(outputText, /\[WARNING\]/);
-	assert.ok(outputText.indexOf('[ERROR] eslint/unused-private-declaration') < outputText.indexOf('\nTESTS'));
+	assert.ok(outputText.indexOf('[ERROR] eslint/unused-private-declaration') > outputText.indexOf('\nFINDINGS SUMMARY'));
+	assert.ok(outputEvents.findLastIndex((line) => line.includes('Test suites') && line.includes('1/1')) < outputEvents.lastIndexOf('    test feedback'));
 	resetExitCode();
 });
 test('the fixing quality command inlines safe values without broad comment cleanup', () => {
@@ -1459,7 +1475,7 @@ if (issues.length) process.exitCode = 1;
 	assert.doesNotMatch(fixtureText(root, 'src/reexports.ts'), /obsolete|export \{ extra/);
 	assert.match(fixtureText(root, 'src/reexports.ts'), /import '\.\/other';/);
 });
-test('dead-code keeps an unreachable source file for explicit agent review', () => {
+test('dead-code keeps an unreachable source file and reports an error for agent review', () => {
 	const root = fixtureRoot('terra-quality-knip-unused-file-');
 	const unused = fixtureFile(root, 'src/orphan.ts', 'export const orphan = true;\n');
 	const knip = fixtureFile(
@@ -1476,8 +1492,9 @@ if (issues.length) process.exitCode = 1;
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], tools: { knip }, enabledChecks: { lint: false } });
 	resetExitCode();
 	runQualityCli(cfg, ['dead-code', '--all']);
-	assert.equal(process.exitCode, 0);
+	assert.equal(process.exitCode, 1);
 	assert.equal(existsSync(unused), true);
+	resetExitCode();
 });
 test('dead-code preserves safe file-local fixes when TypeScript rejects another source file', () => {
 	const root = fixtureRoot('terra-quality-dead-code-type-rollback-');

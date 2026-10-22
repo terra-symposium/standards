@@ -112,6 +112,8 @@ let reportStageName: string | undefined;
 let reportGitHubData: GitHubReport | undefined;
 let outputPhase: string | undefined;
 let quietOutput = false;
+let qualityFindings: string[] = [];
+let qualityFindingCount = 0;
 
 /*//////////////////////////////////////////////////
 REGEX
@@ -732,15 +734,14 @@ function run(cfg: QualityCfg, cmd: string, args: string[], opts: { quietSuccess?
  * @param total Number of selected, deduplicated suites.
  * @param lastGroup Previously printed test category, if any.
  *
- * @return Updated group label and the command exit status.
+ * @return Test group, exit status, and captured output to print after progress completes.
  */
-function runTestSuite(cfg: QualityCfg, check: QualityInvocation, completed: number, total: number, lastGroup?: QualityTestGroup): { group: QualityTestGroup; status: number } {
+function runTestSuite(cfg: QualityCfg, check: QualityInvocation, completed: number, total: number, lastGroup?: QualityTestGroup): { group: QualityTestGroup; status: number; output: string[] } {
 	const group = testGroup(cfg, check);
 	if (group !== lastGroup) console.error(`\n  ${group}`);
 	const runner = testRunner(cfg, check);
 	const args = [...(check.args ?? [])];
 	const env = { ...process.env };
-	let inheritOutput = runner !== 'unknown';
 	if (runner === 'node') {
 		const reporterUrl = new URL('./node-reporter.js', import.meta.url).href;
 		env.NODE_OPTIONS = qualityNodeReporterOptions(env.NODE_OPTIONS, reporterUrl);
@@ -768,25 +769,19 @@ function runTestSuite(cfg: QualityCfg, check: QualityInvocation, completed: numb
 			if (separator < 0) args.push(reporterArg);
 			else args.splice(separator, 0, reporterArg);
 		}
-	} else {
-		inheritOutput = false;
 	}
 	qualityHeader(`command:${check.name}`, `Running ${check.command} ${(check.args ?? []).join(' ')}`.trim());
-	const result = spawnSync(check.command, args, { cwd: cfg.root, stdio: inheritOutput ? 'inherit' : ['inherit', 'pipe', 'pipe'], env, maxBuffer: TOOL_OUTPUT_MAX_BUFFER });
-	if (!inheritOutput) {
-		printChildOutput(result.stdout);
-		printChildOutput(result.stderr);
-	}
-	if (result.error) console.error(`    ${check.command} failed: ${result.error.message}`);
+	const result = spawnSync(check.command, args, { cwd: cfg.root, stdio: ['inherit', 'pipe', 'pipe'], env, maxBuffer: TOOL_OUTPUT_MAX_BUFFER });
+	const output = [...compactOutput(result.stdout?.toString() ?? ''), ...compactOutput(result.stderr?.toString() ?? '')];
+	if (result.error) output.push(`${check.command} failed: ${result.error.message}`);
 	const status = result.status ?? 1;
 	if (reportStages && reportStageName) {
 		const stage = reportStages.get(reportStageName);
 		if (stage && status) stage.status = 'failed';
 	}
 	if (status) process.exitCode = status;
-	console.error(`  ${status ? '✗ failed' : '✓ passed'}`);
 	qualityProgress('Test suites', completed, total);
-	return { group, status };
+	return { group, status, output };
 }
 
 /**
@@ -811,10 +806,16 @@ function runQualityPhase(cfg: QualityCfg, phase: QualityPhase): number {
 		suites.sort((left, right) => groupOrder.indexOf(testGroup(cfg, left)) - groupOrder.indexOf(testGroup(cfg, right)));
 		qualityProgress('Test suites', 0, suites.length);
 		console.error('');
+		const results: Array<{ check: QualityInvocation; status: number; output: string[] }> = [];
 		for (const [idx, check] of suites.entries()) {
 			const result = runTestSuite(cfg, check, idx + 1, suites.length, lastGroup);
 			lastGroup = result.group;
 			if (result.status) failures += 1;
+			results.push({ check, status: result.status, output: result.output });
+		}
+		for (const result of results) {
+			for (const line of result.output) console.error(`    ${line}`);
+			console.error(`  ${result.check.name}: ${result.status ? '✗ failed' : '✓ passed'}`);
 		}
 		return failures;
 	}
@@ -1913,20 +1914,25 @@ function printDeadCodeFindings(findings: DeadCodeFinding[], typeSafetyVerified =
 		}
 	}
 	if (!findings.length) {
-		console.error('  ✓ dead-code checks passed; no findings remain');
+		if (!outputPhase) console.error('  ✓ dead-code checks passed; no findings remain');
 		return;
 	}
 	const errs = findings;
+	const lines: string[] = [];
 	for (const finding of [...findings].sort(
 		(left, right) => left.file.localeCompare(right.file) || left.line - right.line || left.rule.localeCompare(right.rule) || left.name.localeCompare(right.name),
 	)) {
-		console.error(`  - [ERROR] ${finding.rule}: ${finding.file}:${finding.line} ${finding.name}`);
-		console.error(`      Reason: ${finding.reason}`);
+		lines.push(`  - [ERROR] ${finding.rule}: ${finding.file}:${finding.line} ${finding.name}`);
+		lines.push(`      Reason: ${finding.reason}`);
 		const autofix = !finding.autofixable ? 'not safe or not supported' : typeSafetyVerified ? 'available' : 'candidate; fix mode checks TypeScript before writing';
-		console.error(`      Autofix: ${autofix}`);
-		console.error(`      Agent action: ${finding.agentAction}`);
+		lines.push(`      Autofix: ${autofix}`);
+		lines.push(`      Agent action: ${finding.agentAction}`);
 	}
-	console.error(`  ${errs.length} error${errs.length === 1 ? '' : 's'}.`);
+	lines.push(`  ${errs.length} error${errs.length === 1 ? '' : 's'}.`);
+	if (outputPhase) {
+		qualityFindingCount += errs.length;
+		qualityFindings.push(...lines.slice(0, -1));
+	} else for (const line of lines) console.error(line);
 	if (errs.length) process.exitCode = 1;
 }
 
@@ -2135,11 +2141,26 @@ function printFindings<T>(findings: readonly T[], fmt: (finding: T) => string): 
 		}
 	}
 	if (!findings.length) {
-		console.error('  ✓ clean');
+		if (!outputPhase) console.error('  ✓ clean');
 		return;
 	}
-	console.warn(`  ${findings.length} finding${findings.length === 1 ? '' : 's'}:`);
-	for (const finding of findings) console.warn(`  - ${compactOutput(fmt(finding)).join(' ')}`);
+	const lines = findings.map((finding) => `  - ${compactOutput(fmt(finding)).join(' ')}`);
+	if (outputPhase) {
+		qualityFindingCount += findings.length;
+		qualityFindings.push(...lines);
+	} else {
+		console.error(`  ${findings.length} error${findings.length === 1 ? '' : 's'}:`);
+		for (const line of lines) console.error(line);
+	}
+}
+
+/** Prints findings collected during the full quality progress phases. */
+function printQualityFindings(): void {
+	if (!qualityFindings.length) return;
+	console.error(`\nFINDINGS SUMMARY · ${qualityFindingCount} error${qualityFindingCount === 1 ? '' : 's'}`);
+	for (const finding of qualityFindings) console.error(finding);
+	qualityFindings = [];
+	qualityFindingCount = 0;
 }
 
 /**
@@ -2688,6 +2709,8 @@ export function runQualityCli(cfg: QualityCfg, args = process.argv.slice(2)): vo
  * @return A promise only when the asynchronous Tailwind check is selected.
  */
 function runFullQuality(cfg: QualityCfg, args: string[], opts: QualityOptions): void | Promise<void> {
+	qualityFindings = [];
+	qualityFindingCount = 0;
 	const fix = (check: QualityAutofixName): boolean => qualityAutofixEnabled(cfg, check, opts.fix);
 	const scoped = scopedCfg(cfg, opts.all);
 	if (opts.fix) {
@@ -2751,6 +2774,7 @@ function runFullQuality(cfg: QualityCfg, args: string[], opts: QualityOptions): 
 		if (!opts.skipCommands) runQualityPhase(cfg, 'Repository health');
 		if (qualityCheckEnabled(cfg, 'diff') && !hasCfgdGitDiffCheck(cfg)) runDiffCheck(cfg);
 		if (qualityCheckEnabled(cfg, 'github') && cfg.github?.repositories?.length) runGitHubCheck(cfg, [], false, args.includes('--warn'));
+		printQualityFindings();
 		console.error(`\nSUMMARY checks complete · ${testSuites} suites · ${testFailures} failed ${testFailures === 1 ? 'suite' : 'suites'} · ${process.exitCode ? 'checks failed' : 'all checks passed'}`);
 		outputPhase = undefined;
 	};
