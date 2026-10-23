@@ -1,0 +1,3 @@
+interface:
+  display_name: "Terra Agents"
+  short_description: "Initialize website agent docs, personas, plans, and skills"
