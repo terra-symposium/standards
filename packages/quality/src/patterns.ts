@@ -423,7 +423,14 @@ export async function runTailwindCanonical(cfg: QualityCfg, fix = false, output:
 	if (!existsSync(stylesheetPath)) throw new Error(`Tailwind stylesheet not found: ${stylesheetPath}`);
 	const consumerRequire = createRequire(resolve(cfg.root, 'package.json'));
 	let tailwind: {
-		__unstable__loadDesignSystem?: (css: string, options: { base: string }) => Promise<{ canonicalizeCandidates: (candidates: string[]) => string[] }>;
+		__unstable__loadDesignSystem?: (
+			css: string,
+			options: { base: string },
+		) => Promise<{
+			canonicalizeCandidates: (candidates: string[]) => string[];
+			candidatesToAst?: (candidates: string[]) => unknown[];
+			resolveThemeValue?: (key: string, value?: string) => string | undefined;
+		}>;
 	};
 	try {
 		const packagePath = resolveTailwindNodeImport(consumerRequire, cfg.root, stylesheetPath);
@@ -438,6 +445,60 @@ export async function runTailwindCanonical(cfg: QualityCfg, fix = false, output:
 	}
 	const stylesheet = readFileSync(stylesheetPath, 'utf8');
 	const designSystem = await tailwind.__unstable__loadDesignSystem(stylesheet, { base: dirname(stylesheetPath) });
+	const lengthInPixels = (value: string): number | undefined => {
+		const match = /^(-?\d+(?:\.\d+)?)(px|rem)$/.exec(value);
+		if (!match) return undefined;
+		const amount = Number(match[1]);
+		return match[2] === 'rem' ? amount * 16 : amount;
+	};
+	const spacing = designSystem.resolveThemeValue?.('--spacing');
+	const spacingInPixels = spacing ? lengthInPixels(spacing) : undefined;
+	const spacingSuggestions = new Map<string, string | undefined>();
+	const spacingSuggestion = (original: string): string | undefined => {
+		if (spacingSuggestions.has(original)) return spacingSuggestions.get(original);
+		const arbitrary = /^(?<utility>.+)-\[(?<value>-?\d+(?:\.\d+)?(?:px|rem))\](?<important>!)?$/.exec(original);
+		const valueInPixels = arbitrary?.groups?.value ? lengthInPixels(arbitrary.groups.value) : undefined;
+		const ratio = valueInPixels !== undefined && spacingInPixels ? valueInPixels / spacingInPixels : undefined;
+		if (!arbitrary?.groups?.utility || valueInPixels === undefined || valueInPixels <= 0 || !spacingInPixels || !ratio || !Number.isInteger(ratio) || !designSystem.candidatesToAst) {
+			spacingSuggestions.set(original, undefined);
+			return undefined;
+		}
+		const proposal = `${arbitrary.groups.utility}-${ratio}${arbitrary.groups.important ?? ''}`;
+		const declarations = (candidate: string): { property: string; value: string; important: boolean }[] => {
+			const found: { property: string; value: string; important: boolean }[] = [];
+			const collect = (node: unknown): void => {
+				if (Array.isArray(node)) {
+					for (const child of node) collect(child);
+					return;
+				}
+				if (!node || typeof node !== 'object') return;
+				const record = node as Record<string, unknown>;
+				if (record.kind === 'declaration' && typeof record.property === 'string' && typeof record.value === 'string') {
+					found.push({ property: record.property, value: record.value, important: record.important === true });
+					return;
+				}
+				if (Array.isArray(record.nodes)) collect(record.nodes);
+			};
+			collect(designSystem.candidatesToAst?.([candidate]));
+			return found;
+		};
+		const before = declarations(original);
+		const after = declarations(proposal);
+		const equivalent =
+			before.length > 0 &&
+			before.length === after.length &&
+			before.every((declaration, index) => {
+				const replacement = after[index];
+				if (!replacement || declaration.property !== replacement.property || declaration.important !== replacement.important) return false;
+				const pixels = lengthInPixels(declaration.value);
+				if (pixels === undefined) return declaration.value === replacement.value;
+				const spacingScale = /^calc\(var\(--spacing\)\s\*\s*(-?\d+(?:\.\d+)?)\)$/.exec(replacement.value);
+				return spacingScale !== null && Math.abs(Number(spacingScale[1]) * spacingInPixels - pixels) < 0.0001;
+			});
+		const suggestion = equivalent ? proposal : undefined;
+		spacingSuggestions.set(original, suggestion);
+		return suggestion;
+	};
 	const scanCfg = cfg.tailwindCanonical.sourceRoots ? { ...cfg, sourceRoots: cfg.tailwindCanonical.sourceRoots.map((r) => resolve(cfg.root, r)) } : cfg;
 	const files = srcFiles(scanCfg).filter((f) => /\.(?:astro|cjs|js|jsx|mjs|ts|tsx)$/.test(f));
 	const findings: { file: string; start: number; end: number; original: string; replacement: string; line: number; column: number }[] = [];
@@ -446,7 +507,8 @@ export async function runTailwindCanonical(cfg: QualityCfg, fix = false, output:
 		for (const val of classVals(source)) {
 			for (const token of val.value.matchAll(/\S+/g)) {
 				const original = token[0]!;
-				const replacement = designSystem.canonicalizeCandidates([original])[0];
+				const canonical = designSystem.canonicalizeCandidates([original])[0];
+				const replacement = canonical && canonical !== original ? canonical : spacingSuggestion(original);
 				if (!replacement || replacement === original || replacement.includes(' ')) continue;
 				const start = val.start + token.index!;
 				findings.push({ file, start, end: start + original.length, original, replacement, ...locationAt(source, start) });

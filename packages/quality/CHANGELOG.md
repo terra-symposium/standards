@@ -1,5 +1,11 @@
 # @terra-symposium/standards-quality
 
+## 2.0.8
+
+### Patch Changes
+
+- Autofix arbitrary length utilities to Tailwind spacing utilities when the generated declarations match.
+
 ## 2.0.7
 
 ### Patch Changes
