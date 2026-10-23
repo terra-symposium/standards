@@ -1,0 +1,27 @@
+---
+import { DocsNavigation } from '@terra-symposium/docs';
+import '@terra-symposium/docs/style.css';
+import '../tailwind.css';
+import { entries } from '../docs-data.js';
+
+export function getStaticPaths() {
+  return entries.map(page => ({ params: { slug: page.slug || undefined }, props: { page } }));
+}
+const { page } = Astro.props;
+const Content = page.Component;
+const nav = entries.map(entry => ({ title: entry.title, href: `/${entry.slug}${entry.slug ? '/' : ''}` }));
+---
+<!doctype html>
+<html lang="en">
+  <head><meta charset="utf-8" /><meta name="viewport" content="width=device-width,initial-scale=1" /><meta name="robots" content="noindex, nofollow" /><title>{page.title} · Standards</title><meta name="description" content={page.description} /></head>
+  <body><div class="layout"><aside><a class="brand" href="/">Standards</a><DocsNavigation nodes={nav} currentPath={Astro.url.pathname} /></aside><main class="prose"><Content /></main></div></body>
+</html>
+<style>
+  :global(:root){--sl-color-text:#1f2924;--sl-color-text-accent:#185c41;--sl-color-gray-6:#eaf0eb;--sl-color-gray-5:#cbd8ce;--sl-color-accent-low:#dcefe2}
+  :global(body){margin:0;font:16px/1.65 system-ui,sans-serif;color:#1f2924;background:#f8faf8}
+  .layout{display:grid;grid-template-columns:250px minmax(0,800px);gap:40px;max-width:1200px;margin:auto;padding:32px 24px}
+  aside{position:sticky;top:20px;align-self:start;max-height:calc(100vh - 40px);overflow:auto}
+  .brand{display:block;font-size:20px;font-weight:700;color:#183e2b;margin-bottom:20px;text-decoration:none}
+  main{min-width:0}.prose :global(a){color:#185c41}.prose :global(pre){overflow:auto;padding:16px;background:#eaf0eb;border-radius:8px}.prose :global(code){font-family:ui-monospace,monospace}
+  @media(max-width:720px){.layout{display:block;padding:20px}aside{position:static;max-height:none;margin-bottom:32px}}
+</style>
