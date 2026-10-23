@@ -9,11 +9,11 @@ Use for standups, weekly reviews, and contributor reports.
 
 ## Workflow
 
-1. Set the reporting window and timezone. Read goals from authorized sources.
+1. Set the reporting window and timezone. For an unspecified “last week,” use the previous seven calendar days ending at report time; honor a clearly requested Monday–Sunday week. Record the exact bounds and timezone. Read goals from authorized sources.
 2. Record unavailable sources as evidence gaps.
    Do not infer goals or progress from filenames.
 3. Verify repo, remote, branch, and commit range.
-   Exclude mirrors and duplicate history.
+   Use the authoritative repository and ref; exclude mirrors and duplicate history.
 4. Inspect diffs, merges, reverts, and commit identities.
    Subjects alone do not prove outcomes.
 5. Compare findings with each goal using neutral, evidence-based statuses.

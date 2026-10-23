@@ -1,0 +1,3 @@
+interface:
+  display_name: 'Jules'
+  short_description: 'Bundle Jules PRs, resolve reviews, and commit reviewed changes'

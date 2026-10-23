@@ -1,12 +1,45 @@
 # Terra Skill Library
 
-- `ui` — shared interface review guidance
-- `standards` — shared coding and review conventions
-- `standup` — evidence-based contributor reporting
-- `quality` — Terra Quality workflows
-- `cloud-playwright` — verified Cloud browser testing
-- `efficiency` — measure and improve workflow runtime
-- `git/issues` — audit open GitHub issues against repository evidence
-- `git/issue-completion` — delegate ready issues through tested pull requests
+## Catalog
 
-Repository-specific instructions belong in the consuming repository.
+- [`cloud-playwright`](./cloud-playwright/SKILL.md) (`cloud-playwright`) — Run Playwright suites in Terra Cloud tasks.
+- [`daily-review`](./daily-review/SKILL.md) (`daily-review`) — Run the four-repository quality and maintenance review, fix actionable issues safely, and deliver verified changes through reviewed pull requests.
+- [`documenting/align`](./documenting/align/SKILL.md) (`align`) — Iterate Gemini generated content comparing to production Docs references, to improve the generation's adherence to strict guidelines via local-only headless Chrome checks.
+- [`documenting/author`](./documenting/author/SKILL.md) (`author`) — Author, review, preserve, restore, and visually restructure general Terra Symposium Docs leaves with the terra_docs MCP. Use for Terra, executive, development, and university documentation from verified source material or existing Docs leaves.
+- [`documenting/canvas-scraping`](./documenting/canvas-scraping/SKILL.md) (`canvas-scraping`) — Collect Canvas course modules, files, pages, and separate Zoom/Kaltura lecture transcripts into a verified local export for Terra Docs authoring.
+- [`documenting/gem`](./documenting/gem/SKILL.md) (`gem`) — Capture, update, and verify Terra's Gemini Document Gem instructions, knowledge, and metadata through the authenticated browser session.
+- [`documenting/gem/content`](./documenting/gem/content/SKILL.md) (`gem-content`) — Prepare and audit the Terra Document Gem's saved instructions and persistent knowledge attachments.
+- [`documenting/gem/metadata`](./documenting/gem/metadata/SKILL.md) (`gem-metadata`) — Capture and maintain Terra Document Gem identity and editable metadata with a local audit snapshot.
+- [`efficiency`](./efficiency/SKILL.md) (`efficiency`) — Measure workflow runtime and improve evidenced bottlenecks when asked.
+- [`generation/authoring`](./generation/authoring/SKILL.md) (`generation-content-authoring`) — Run the OpenAI Topic/Arc/Problem generation pipeline from the terminal and verify the results in Studio and the dashboard. Use when generating new content, re-running a generation spec, or checking what a generation run wrote.
+- [`git/atomic-commits`](./git/atomic-commits/SKILL.md) (`atomic-commits`) — Split a requested working copy into dependency-ordered, reviewable Git commits with conventional imperative titles and factual bodies. Use only when the user explicitly invokes $atomic-commits or attaches this skill and asks to create commits; otherwise plan or report commit groups without committing.
+- [`git/dependabot-remediation`](./git/dependabot-remediation/SKILL.md) (`dependabot-remediation`) — Read a repository's Dependabot security alerts, trace them to affected dependencies, and implement and verify appropriate fixes. Use when asked to review or fix Dependabot alerts; does not publish, push, or dismiss alerts unless separately requested.
+- [`git/deploying`](./git/deploying/SKILL.md) (`terra-deploy`) — Deploy Terra changes safely while conserving scarce Netlify deploy capacity and verifying the actual remote runtime.
+- [`git/issue-completion`](./git/issue-completion/SKILL.md) (`issue-completion`) — Complete clear GitHub issues in isolated, tested pull requests.
+- [`git/issues`](./git/issues/SKILL.md) (`issues`) — Audit open GitHub issues against code, history, and pull requests.
+- [`git/jules`](./git/jules/SKILL.md) (`jules`) — Bundle Jules-created pull requests into a small set of coherent PRs, carry review feedback forward, commit the verified changes, and retire superseded branches.
+- [`git/pr-review`](./git/pr-review/SKILL.md) (`pr-review`) — Review and disposition requested Git branches and pull requests, fix actionable defects, and verify integration and cleanup. Report evidence, validation gaps, and retained work.
+- [`git/pruning`](./git/pruning/SKILL.md) (`pruning`) — Review and retire requested Git branches and worktrees after confirming their changes are integrated, preserved, superseded, or explicitly abandoned.
+- [`git/semver-retcon`](./git/semver-retcon/SKILL.md) (`semver-retcon`) — Rewrite a repository history into a linear, semantically grouped record while preserving production behaviour, commit authorship, and release traceability.
+- [`quality/commenting`](./quality/commenting/SKILL.md) (`commenting`) — Improve source readability by grouping code with meaningful comments, decomposing monolithic modules, and completing accurate TSDoc/JSDoc. Use when reorganizing code or repairing sparse, duplicated, or misleading comments.
+- [`quality/compact`](./quality/compact/SKILL.md) (`compact`) — Reduce documents and source files by removing duplication while preserving meaning, behavior, and comments.
+- [`quality/hygiene`](./quality/hygiene/SKILL.md) (`environment-hardening`) — Audit repo builds, Netlify deployment health, and GitHub security findings, then remediate actionable warnings and verify the result.
+- [`quality/test`](./quality/test/SKILL.md) (`test`) — Coordinate Terra's test-writing, test-ordering, test-repair, and visual-report workflows with exhaustive coverage and efficient execution.
+- [`quality/test/fixing`](./quality/test/fixing/SKILL.md) (`test-fixing`) — Diagnose and repair Terra test failures at the canonical source, fixture, test, or Cloud setup boundary until the requested inventory is genuinely green.
+- [`quality/test/ordering`](./quality/test/ordering/SKILL.md) (`ordering`) — Plan and run Terra test suites in dependency order with efficient workers, explicit contexts, and complete coverage accounting.
+- [`quality/test/represent`](./quality/test/represent/SKILL.md) (`test-represent`) — Run Terra evaluations and produce auditable Excel and PowerPoint test evidence with complete viewport and diagnostic review.
+- [`quality/test/writing`](./quality/test/writing/SKILL.md) (`test-writing`) — Design and maintain exhaustive Terra tests, fixtures, contracts, and browser coverage without duplicating or weakening behavior.
+- [`sanity/attribute-read-audit`](./sanity/attribute-read-audit/SKILL.md) (`sanity-attribute-read-audit`) — Compare a Sanity inventory export with repository reads to find unread paths.
+- [`sanity/query/adding`](./sanity/query/adding/SKILL.md) (`sanity-add-query`) — Add a new Sanity GROQ query accessor to astro/src/lib/queries using the schema-aware groqd builder (@lib/groq-builder). Use when adding a new query, a new query function to an existing query file, or a new query file for a document type that doesn't have one yet.
+- [`sanity/query/migration`](./sanity/query/migration/SKILL.md) (`sanity-query-migration`) — Migrate Terra Symposium Sanity GROQ queries in astro/src/lib/queries from defineQuery/plain-string strings onto the schema-aware groqd builder. Use when continuing groqd migration work, generating sanity.types.ts with Sanity CLI typegen, or rewriting a query with `@lib/groq-builder`'s `q`/`runQuery`.
+- [`standards`](./standards/SKILL.md) (`standards`) — Apply shared Terra coding and review conventions.
+- [`standup`](./standup/SKILL.md) (`standup`) — Compare contributor activity with stated goals.
+- [`terra-cloud-playwright`](./terra-cloud-playwright/SKILL.md) (`terra-cloud-playwright`) — Run Terra Symposium Playwright suites in the published Cloud environment using this repository's checkout, service, and test contracts.
+- [`terra-developer`](./terra-developer/SKILL.md) (`terra-developer`) — Apply Terra Symposium-specific repository setup, code, UI, and environment rules when implementing or reviewing this website.
+- [`terra-weekly-review`](./terra-weekly-review/SKILL.md) (`terra-weekly-review`) — Review the last seven days of Terra Git activity against stated meeting goals and intern plans, then create a verified presentation grouped by contributor, with code evidence and UI screenshots when available.
+- [`ui`](./ui/SKILL.md) (`ui`) — Review Terra interfaces for clarity, access, and responsive behavior.
+- [`ui/responsiveness`](./ui/responsiveness/SKILL.md) (`terra-responsive`) — Design, debug, and verify responsive Terra UI layouts with headed-browser screenshots, measured viewport criteria, and explicit preview/control geometry. Use for responsive regressions, card grids, breakpoint changes, overflow bugs, and screenshot-driven layout work.
+- [`ui/styling`](./ui/styling/SKILL.md) (`terra-styling-accessibility`) — Style and verify Terra interfaces when visual hierarchy, legibility, interaction states, or accessibility are part of the request. Use for any UI presentation change that requires headed-browser evidence; not for source-only refactors.
+- [`ui/ui-variants`](./ui/ui-variants/SKILL.md) (`ui-variants`) — Audit and consolidate Terra Symposium UI color, treatment, size, text, state, overlay, and menu variants while preserving component geometry and public behavior.
+
+All Terra agent skills live in this repository as their canonical source, including workflows scoped to a particular consuming repository. Keep repository code, configuration, and durable product rules in their owning repository; do not copy skill files into consuming repositories.

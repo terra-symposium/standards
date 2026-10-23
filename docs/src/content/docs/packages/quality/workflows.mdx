@@ -27,6 +27,28 @@ Every naming finding fails the run. To disable one fixer for every run, set its 
 
 Changed-file mode requires a Git worktree. Use `--all` when running from a source archive or when you need a complete scan. `--warn` is review-only for Terra Quality's source and tool autofixes. Dead-code analysis runs once and reports rule-level autofix candidates from that scan; fix mode type-checks proposed edits before writing and can reject a candidate. Configured commands still run and follow their own behavior.
 
+## Run, repair, and report findings
+
+Before working through findings in a consuming repository, read its `quality.json`, package scripts, and installed Quality README. Record the branch, worktree status, selected source scope, and existing changes so unrelated work stays intact.
+
+Run the configured quality command and keep its complete output, warnings, and exit status. If you omit configured commands, state that in the report and run the required checks separately. Treat unavailable access or inputs as unknown rather than as zero findings, and do not include secret values in output or reports.
+
+Group findings by root cause and owning package, then fix the smallest complete set at its canonical source. Shared runner behavior belongs in `packages/quality`; consumer policy belongs in that repository's `quality.json`.
+
+Review autofixes and the full diff. A successful exit status means the configured checks passed; it does not establish runtime correctness, application security, or visual quality. Rerun affected checks and the required repository command after fixing findings.
+
+Report the commands and scope, exit status, finding counts, warnings, fixes, and any remaining blockers.
+
+## Propose reusable automation
+
+Move repeated, deterministic maintenance into the shared package only when repository evidence shows a recurring pattern. Separate repeated symptoms from one-off work, then choose a conservative autofix for exact transformations, a diagnostic for context-sensitive patterns, or manual review when intent cannot be established from source.
+
+Before adding a rule, inspect the existing runner, schema, parsers, analysis caches, focused tests, and documentation. Extend the current analysis and test family instead of introducing a competing tool. Parse source syntax where needed, preserve comments and formatting, make fixes idempotent, fail closed on ambiguous input, and add negative fixtures for similar cases that must remain unchanged.
+
+Measure the existing check and test runtime, then estimate the new rule's incremental cost. Keep fast deterministic contract coverage in the default suite; put browser, broad integration, and benchmark checks behind explicit or scheduled commands unless their measured value justifies default execution. Reuse a parse or setup when tests share the same behavior boundary.
+
+Update package documentation and schema, identify consumer configuration and release steps, and state that consumers need a published version before they can adopt the change. Report recurrence evidence, the selected automation level, expected benefit, runtime impact, validation run or skipped, and remaining manual cases.
+
 ## Fixed check and test order
 
 Terra Quality owns the full-run order: **Format → Static quality → Tests → Framework / type checks → Build → Repository health**. `quality.json` continues to select checks and commands but does not set their order or test grouping. Test commands are grouped as **Unit / Contract**, **Integration**, **Browser / Cloud**, and **Other tests**. Every selected suite gets an overall progress bar; Node and Playwright also report per-case progress, while unknown runners show only suite progress. Commands keep their configured order within ordinary phases, and tests keep their configured order within each category.
