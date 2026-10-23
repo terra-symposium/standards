@@ -2,6 +2,7 @@
 
 ## Catalog
 
+- [`agents`](./agents/SKILL.md) (`agents`) — Initialize or maintain the Terra Symposium website agent context, documentation, personas, plans, and shared skills.
 - [`cloud-playwright`](./cloud-playwright/SKILL.md) (`cloud-playwright`) — Run Playwright suites in Terra Cloud tasks.
 - [`documenting/align`](./documenting/align/SKILL.md) (`align`) — Iterate Gemini generated content comparing to production Docs references, to improve the generation's adherence to strict guidelines via local-only headless Chrome checks.
 - [`documenting/author`](./documenting/author/SKILL.md) (`author`) — Author, review, preserve, restore, and visually restructure general Terra Symposium Docs leaves with the terra_docs MCP. Use for Terra, executive, development, and university documentation from verified source material or existing Docs leaves.
