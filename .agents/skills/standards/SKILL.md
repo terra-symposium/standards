@@ -1,6 +1,6 @@
 ---
 name: standards
-description: Apply shared Terra coding and review conventions.
+description: Apply shared Terra coding and review conventions, and measure workflow runtime when asked.
 ---
 
 # Standards
@@ -63,6 +63,10 @@ When working in `terra-symposium-website`, read the root `README.md` and `.agent
 - Do not run local `drizzle-kit studio`; database operations run only on trusted deployments.
 
 For website tasks, report source checks separately from observed browser or runtime evidence.
+
+## Workflow efficiency
+
+For explicit requests to measure or improve the runtime of commands, builds, reports, or repository workflows, follow the [workflow efficiency guide](references/workflow-efficiency.md). Apply this specialized workflow only when runtime measurement or improvement is requested.
 
 ## Report
 
