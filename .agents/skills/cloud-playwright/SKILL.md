@@ -21,6 +21,8 @@ Use for browser tests in an authorized Terra Codex Cloud task.
 7. Read the task's current executor readiness and enforced network policy.
 8. Use Codex task controls. Never simulate Cloud in a browser or local guard.
 
+The shared environment supplies reviewed test setup and service access, not repository permission or task state. Each person uses their own Cloud permission, included allowance, and GitHub connection; verify those independently.
+
 ## Run
 
 1. Read the repository's Cloud test instructions and environment manifest.

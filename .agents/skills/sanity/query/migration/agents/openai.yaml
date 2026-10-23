@@ -1,0 +1,4 @@
+interface:
+  display_name: 'Sanity Query Migration'
+  short_description: 'Move Terra GROQ queries into typed accessors'
+  default_prompt: 'Use $sanity-query-migration to migrate TODO(queries) Sanity queries into @lib/queries.'
