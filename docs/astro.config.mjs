@@ -1,10 +1,10 @@
 import { defineConfig } from 'astro/config';
 import tailwindcss from '@tailwindcss/vite';
 import react from '@astrojs/react';
-import starlight from '@astrojs/starlight';
+import mdx from '@astrojs/mdx';
 
 export default defineConfig({
-	site: 'https://standards-docs.netlify.app',
+  site: 'https://standards-docs.netlify.app',
 	redirects: {
 		'/getting-started': '/packages/quality/setup/',
 		'/quality/overview': '/packages/quality/',
@@ -31,48 +31,6 @@ export default defineConfig({
 		'/quality/checks/type': '/packages/quality/#type',
 		'/quality/checks/ui-patterns': '/packages/quality/#ui-patterns',
 	},
-	vite: {
-		plugins: [tailwindcss()],
-	},
-	integrations: [
-		react(),
-		starlight({
-			title: 'Standards',
-			description: 'Documentation for shared Terra Symposium packages, repository quality tooling, and package development.',
-			customCss: ['./src/tailwind.css'],
-			sidebar: [
-				{
-					label: 'Packages',
-					items: [
-						{ label: 'Error Boundaries', link: '/packages/error-boundaries/' },
-						{
-							label: 'Quality',
-							items: [
-								{ label: 'Overview', link: '/packages/quality/' },
-								{ label: 'Setup', link: '/packages/quality/setup/' },
-								{ label: 'Configuration', link: '/packages/quality/configuration/' },
-								{ label: 'Workflows', link: '/packages/quality/workflows/' },
-								{ label: 'Troubleshooting', link: '/packages/quality/troubleshooting/' },
-							],
-						},
-						{
-							label: 'Reporting',
-							items: [
-								{ label: 'Overview', link: '/packages/reporting/' },
-								{ label: 'Playwright', link: '/packages/reporting/playwright/' },
-								{ label: 'Artifacts', link: '/packages/reporting/artifacts/' },
-								{ label: 'Load testing', link: '/packages/reporting/load-testing/' },
-							],
-						},
-					],
-				},
-				{ label: 'Getting Started', link: '/packages/quality/setup/' },
-				{ label: 'Skills', link: '/skills/' },
-				{ label: 'Contributing', link: '/contributing/' },
-			],
-			tableOfContents: { minHeadingLevel: 2, maxHeadingLevel: 3 },
-			head: [{ tag: 'meta', attrs: { name: 'robots', content: 'noindex, nofollow' } }],
-			social: [{ icon: 'github', label: 'GitHub', href: 'https://github.com/Terra-Symposium/standards' }],
-		}),
-	],
+  vite: { plugins: [tailwindcss()] },
+  integrations: [react(), mdx()],
 });
