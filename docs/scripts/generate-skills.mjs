@@ -1,13 +1,21 @@
-import { mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { access, mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { join, relative, resolve } from 'node:path';
 
 const repositoryRoot = resolve(fileURLToPath(new URL('../..', import.meta.url)));
+const siteRoot = resolve(fileURLToPath(new URL('..', import.meta.url)));
 const skillsRoot = join(repositoryRoot, '.agents', 'skills');
-const outputDirectory = join(repositoryRoot, 'docs/src/content/docs/skills');
-const generatedDirectory = join(repositoryRoot, 'docs/src/generated');
+const outputDirectory = join(siteRoot, 'src/content/docs/skills');
+const generatedDirectory = join(siteRoot, 'src/generated');
 const indexPath = join(outputDirectory, 'index.mdx');
 const dataPath = join(generatedDirectory, 'skills.json');
+
+// The portfolio build vendors this Docs site without the Standards repository root.
+// Its committed skills snapshot remains the source until the next repository build.
+if (!(await access(skillsRoot).then(() => true).catch(() => false))) {
+  await access(dataPath);
+  process.exit(0);
+}
 
 async function findSkills(directory) {
 	const entries = await readdir(directory, { withFileTypes: true });
