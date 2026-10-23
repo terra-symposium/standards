@@ -253,7 +253,7 @@ test('the executable shows only configured check names and completion indicators
 	assert.match(result.stderr, /✓ Quality complete/);
 	assert.doesNotMatch(result.stderr, /Checking regex dedup|Preparing shared source analysis|No configured test suites/);
 });
-test('full quality continues after failed scripts and prints every failure at the end', () => {
+test('full quality continues after failed scripts and prints their details under each check', () => {
 	const root = fixtureRoot('terra-quality-cli-continue-failures-');
 	const marker = join(root, 'ran.txt');
 	const command = (message, exitCode = 1) => ({
@@ -307,11 +307,10 @@ test('full quality continues after failed scripts and prints every failure at th
 	assert.match(result.stderr, /⠋ Static First[\s\S]*✗ Static First/);
 	assert.match(result.stderr, /⠋ Static Second[\s\S]*✗ Static Second/);
 	assert.match(result.stderr, /⠋ Production Build[\s\S]*✓ Production Build/);
-	const summary = result.stderr.indexOf('FINDINGS SUMMARY');
-	assert.ok(summary > result.stderr.indexOf('✓ Quality complete'));
-	assert.ok(result.stderr.indexOf('ERROR_FIRST') > summary);
-	assert.ok(result.stderr.indexOf('ERROR_SECOND') > summary);
-	assert.doesNotMatch(result.stderr.slice(0, summary), /ERROR_FIRST|ERROR_SECOND/);
+	assert.match(result.stderr, /✗ Static First\n    - .*failed \(exit 1\)\n    - ERROR_FIRST/);
+	assert.match(result.stderr, /✗ Static Second\n    - .*failed \(exit 2\)\n    - ERROR_SECOND/);
+	assert.doesNotMatch(result.stderr, /FINDINGS SUMMARY/);
+	assert.ok(result.stderr.indexOf('✓ Production Build') > result.stderr.indexOf('ERROR_SECOND'));
 });
 test('the executable rejects linting without an ESLint flat config before running quality', () => {
 	const root = fixtureRoot('terra-quality-eslint-config-required-');
@@ -915,7 +914,8 @@ if (args.includes('--format') && args.includes('json'))
 	const outputText = output.join('\n');
 	assert.match(outputText, /\[ERROR\] eslint\/unused-private-declaration/);
 	assert.doesNotMatch(outputText, /\[WARNING\]/);
-	assert.ok(outputText.indexOf('[ERROR] eslint/unused-private-declaration') > outputText.indexOf('\nFINDINGS SUMMARY'));
+	assert.ok(outputText.indexOf('✗ Dead Code') < outputText.indexOf('[ERROR] eslint/unused-private-declaration'));
+	assert.doesNotMatch(outputText, /FINDINGS SUMMARY/);
 	assert.doesNotMatch(outputEvents.join(''), /(?:^|\n)\s*test feedback(?:\n|$)/u);
 	assert.ok(outputEvents.findLastIndex((line) => line.includes('Test suites') && line.includes('1/1')) < outputEvents.findLastIndex((line) => line.includes('contract: ✓ passed')));
 	resetExitCode();
