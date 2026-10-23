@@ -30,6 +30,7 @@ import { accessibilityFindings, fixAccessibleNames } from './accessibility.js';
 import { displayNameFindings, fixDisplayNames } from './display-name.js';
 import { uiComponentRecommendations } from './ui-recommendations.js';
 import { spawnSync } from 'node:child_process';
+import { Worker } from 'node:worker_threads';
 import { srcFiles, workingSrcFiles } from './files.js';
 import { writeHistoryReport } from './history-report.js';
 
@@ -111,8 +112,9 @@ let reportStages: Map<string, QualityJsonReport['checks'][number]> | undefined;
 let reportStageName: string | undefined;
 let reportGitHubData: GitHubReport | undefined;
 let outputPhase: string | undefined;
-let qualityFindings: string[] = [];
-let qualityDiagnostics: string[] = [];
+let qualityCheckName: string | undefined;
+let qualityDetails: string[] = [];
+let qualitySpinner: { worker: Worker; state: Int32Array } | undefined;
 
 /*//////////////////////////////////////////////////
 REGEX
@@ -384,13 +386,11 @@ function toolPath(cfg: QualityCfg, cfgd: string | undefined, fallback: string): 
 	return existsSync(local) ? local : executable;
 }
 
-/**
- * Prints a readable heading for one quality stage.
+/** Formats one check identifier for terminal output.
  *
- * @param name Short name identifying the quality stage.
- * @param detail Human-readable description of the work being performed.
+ * @param name Internal quality check identifier.
  *
- * @return Nothing; the heading is written to standard error with the other quality messages.
+ * @return Readable check name.
  */
 function qualityLabel(name: string): string {
 	const key = name.replace(/^(?:command|recommendation):/u, '').replace(/^dead-code\//u, '');
@@ -416,6 +416,13 @@ function qualityLabel(name: string): string {
 		.replace(/\bEslint\b/gu, 'ESLint');
 }
 
+/** Starts the spinner and records the active check for a full quality run.
+ *
+ * @param name Internal quality check identifier.
+ * @param detail Human-readable description for non-full output.
+ *
+ * @return Nothing; full output starts the check's terminal spinner.
+ */
 function qualityHeader(name: string, detail: string): void {
 	if (reportStages) {
 		reportStageName = name;
@@ -423,7 +430,9 @@ function qualityHeader(name: string, detail: string): void {
 	}
 	if (outputPhase) {
 		if (outputPhase === 'PREPARING SAFE FIXES' || name.includes('/')) return;
-		console.error(`  ⠋ ${qualityLabel(name)}`);
+		qualityCheckName = qualityLabel(name);
+		qualityDetails = [];
+		startQualitySpinner(qualityCheckName);
 		return;
 	}
 	console.error(`\n=== ${name} ===`);
@@ -440,25 +449,110 @@ function qualityHeader(name: string, detail: string): void {
  */
 function printCheckStatus(name: string, findings: number): void {
 	if (!outputPhase || outputPhase === 'PREPARING SAFE FIXES') return;
+	stopQualitySpinner();
 	console.error(`  ${findings ? '✗' : '✓'} ${qualityLabel(name)}`);
+	printQualityDetails();
 }
 
+/** Ends a skipped check's spinner and writes its status.
+ *
+ * @param name Internal quality check identifier.
+ *
+ * @return Nothing; the skipped status is written to standard error.
+ */
 function printSkippedCheckStatus(name: string): void {
 	if (!outputPhase || outputPhase === 'PREPARING SAFE FIXES') return;
+	stopQualitySpinner();
 	console.error(`  ↷ ${qualityLabel(name)}`);
+	printQualityDetails();
 }
 
-/** Records one failed check and keeps its complete diagnostic for the final summary. */
+/** Starts a terminal spinner outside the blocked main JavaScript thread.
+ *
+ * @param label Readable check name shown in the terminal.
+ *
+ * @return Nothing; interactive terminals receive animated frames.
+ */
+function startQualitySpinner(label: string): void {
+	if (!process.stderr.isTTY) {
+		console.error(`  ⠋ ${label}`);
+		return;
+	}
+	const state = new Int32Array(new SharedArrayBuffer(Int32Array.BYTES_PER_ELEMENT * 3));
+	const worker = new Worker(new URL('./spinner-worker.js', import.meta.url), { workerData: { label, sharedBuffer: state.buffer } });
+	worker.unref();
+	if (Atomics.wait(state, 1, 0, 1000) === 'timed-out') {
+		void worker.terminate();
+		console.error(`  ⠋ ${label}`);
+		return;
+	}
+	qualitySpinner = { worker, state };
+}
+
+/** Stops the active spinner and clears its terminal line.
+ *
+ * @return Nothing; the check status can be written on a clean line.
+ */
+function stopQualitySpinner(): void {
+	const spinner = qualitySpinner;
+	if (!spinner) return;
+	qualitySpinner = undefined;
+	Atomics.store(spinner.state, 0, 1);
+	Atomics.notify(spinner.state, 0);
+	if (Atomics.wait(spinner.state, 2, 0, 1000) === 'timed-out') void spinner.worker.terminate();
+}
+
+/** Buffers one diagnostic as a bullet under the active quality check.
+ *
+ * @param detail Diagnostic text to show below the check status.
+ *
+ * @return Nothing; text is buffered during a full quality run.
+ */
+function recordQualityDetail(detail: string): void {
+	if (!outputPhase) {
+		for (const line of compactOutput(detail)) console.error(`  ${line}`);
+		return;
+	}
+	if (!qualityCheckName) qualityCheckName = 'Quality Runner';
+	qualityDetails.push(...compactOutput(detail).map((line) => `    - ${line.trim().replace(/^[-•]\s*/u, '')}`));
+}
+
+/** Prints and clears the active check's buffered diagnostic bullets.
+ *
+ * @return Nothing; buffered details are written to standard error.
+ */
+function printQualityDetails(): void {
+	for (const detail of qualityDetails) console.error(detail);
+	qualityDetails = [];
+	qualityCheckName = undefined;
+}
+
+/** Records one failed check and keeps its complete diagnostic under that check.
+ *
+ * @param name Check identifier used by the quality runner.
+ * @param error Error thrown by the check.
+ */
 function recordQualityFailure(name: string, error: unknown): void {
 	const detail = error instanceof Error ? error.message : String(error);
 	const stage = reportStages?.get(name);
 	if (stage) stage.status = 'failed';
 	process.exitCode = 1;
-	if (outputPhase) qualityDiagnostics.push(`${qualityLabel(name)}: ${detail}`);
-	else console.error(`${qualityLabel(name)}: ${detail}`);
+	if (outputPhase) {
+		if (!qualityCheckName) {
+			qualityCheckName = qualityLabel(name);
+			startQualitySpinner(qualityCheckName);
+		}
+		recordQualityDetail(detail);
+	} else console.error(`${qualityLabel(name)}: ${detail}`);
 }
 
-/** Runs an independent action and records its error without interrupting later checks. */
+/** Runs an independent action and records its error without interrupting later checks.
+ *
+ * @param name Check identifier used if the action throws.
+ * @param action Check action to run.
+ *
+ * @return Whether the action completed without throwing.
+ */
 function continueAfterFailure(name: string, action: () => void): boolean {
 	try {
 		action();
@@ -763,14 +857,15 @@ function run(cfg: QualityCfg, cmd: string, args: string[], opts: { quietSuccess?
 	}
 	if (outputPhase && status) {
 		const output = [...compactOutput(result.stdout?.toString() ?? ''), ...compactOutput(result.stderr?.toString() ?? '')];
-		qualityDiagnostics.push(`${cmd} ${args.join(' ')} failed${status ? ` (exit ${status})` : ''}${output.length ? `:\n${output.map((line) => `  ${line}`).join('\n')}` : ''}`);
+		recordQualityDetail(`${basename(cmd)} failed (exit ${status})`);
+		for (const line of output) recordQualityDetail(line);
 	} else if (!outputPhase && (!opts.quietSuccess || status)) {
 		printChildOutput(result.stdout);
 		printChildOutput(result.stderr);
 	}
 	if (result.error) {
 		const message = `${cmd} failed: ${result.error.message}`;
-		if (outputPhase) qualityDiagnostics.push(message);
+		if (outputPhase) recordQualityDetail(message);
 		else console.error(`  ${message}`);
 	}
 	return status;
@@ -784,7 +879,7 @@ function run(cfg: QualityCfg, cmd: string, args: string[], opts: { quietSuccess?
  * @param completed One-based completed-suite count.
  * @param total Number of selected, deduplicated suites.
  *
- * @return Exit status and captured output for the final findings summary.
+ * @return Exit status and captured output for this check's detail list.
  */
 function runTestSuite(cfg: QualityCfg, check: QualityInvocation): { status: number; output: string[] } {
 	const runner = testRunner(cfg, check);
@@ -835,8 +930,10 @@ function runTestSuite(cfg: QualityCfg, check: QualityInvocation): { status: numb
 	}
 	if (status) {
 		process.exitCode = 1;
-		if (outputPhase) qualityDiagnostics.push(`${qualityLabel(check.name)} failed (exit ${status})${output.length ? `:\n${output.map((line) => `  ${line}`).join('\n')}` : ''}`);
-		else for (const line of output) console.error(`  ${line}`);
+		if (outputPhase) {
+			recordQualityDetail(`Command failed (exit ${status})`);
+			for (const line of output) recordQualityDetail(line);
+		} else for (const line of output) console.error(`  ${line}`);
 	} else if (!outputPhase) for (const line of output) console.error(`  ${line}`);
 	printCheckStatus(check.name, status ? 1 : 0);
 	return { status, output };
@@ -1103,8 +1200,10 @@ function runLint(cfg: QualityCfg, opts: QualityOptions, exhaustive = false, dead
 				process.exitCode = status;
 				const details = compactOutput(childOutput);
 				if (result.error) details.push(result.error.message);
-				if (outputPhase) qualityDiagnostics.push(`ESLint failed (exit ${status})${details.length ? `:\n${details.map((line) => `  ${line}`).join('\n')}` : ''}`);
-				else printChildOutput(childOutput);
+				if (outputPhase) {
+					recordQualityDetail(`ESLint failed (exit ${status})`);
+					for (const line of details) recordQualityDetail(line);
+				} else printChildOutput(childOutput);
 			} else if (!outputPhase && childOutput) printChildOutput(childOutput);
 		}
 	}
@@ -1601,11 +1700,10 @@ function runProjectTypecheck(cfg: QualityCfg): void {
 	const status = result.status ?? 1;
 	if (status || diagnosticsReported) {
 		const lines = compactOutput(output);
-		if (outputPhase)
-			qualityDiagnostics.push(
-				`${cfg.typecheckCommand.command} ${cfg.typecheckCommand.args?.join(' ') ?? ''} ${status ? `failed (exit ${status})` : 'reported diagnostics'}${lines.length ? `:\n${lines.map((line) => `  ${line}`).join('\n')}` : ''}`,
-			);
-		else printChildOutput(output);
+		if (outputPhase) {
+			recordQualityDetail(`${cfg.typecheckCommand.command} ${status ? `failed (exit ${status})` : 'reported diagnostics'}`);
+			for (const line of lines) recordQualityDetail(line);
+		} else printChildOutput(output);
 	}
 	if (status || diagnosticsReported) process.exitCode = status || 1;
 	printCheckStatus('typecheck', status || diagnosticsReported ? 1 : 0);
@@ -2079,7 +2177,7 @@ function printDeadCodeFindings(findings: DeadCodeFinding[], typeSafetyVerified =
 	}
 	lines.push(`  ${errs.length} error${errs.length === 1 ? '' : 's'}.`);
 	if (outputPhase) {
-		qualityFindings.push(...lines.slice(0, -1));
+		for (const line of lines.slice(0, -1)) recordQualityDetail(line.replace(/^\s*-\s*/u, ''));
 	} else for (const line of lines) console.error(line);
 	if (errs.length) process.exitCode = 1;
 }
@@ -2278,7 +2376,7 @@ function runDiffCheck(cfg: QualityCfg): void {
  * @param findings Findings produced by one quality stage.
  * @param fmt Converts one finding into a human-readable message.
  *
- * @return Nothing; findings and a clean summary are written to the console.
+ * @return Nothing; findings are printed under the active check or directly to the console.
  */
 function printFindings<T>(findings: readonly T[], fmt: (finding: T) => string): void {
 	if (reportStages && reportStageName && findings.length) {
@@ -2292,16 +2390,24 @@ function printFindings<T>(findings: readonly T[], fmt: (finding: T) => string): 
 		if (!outputPhase) console.error('  ✓ clean');
 		return;
 	}
-	const lines = findings.map((finding) => `  - ${compactOutput(fmt(finding)).join(' ')}`);
 	if (outputPhase) {
-		qualityFindings.push(...lines);
+		for (const finding of findings) recordQualityDetail(fmt(finding));
 	} else {
+		const lines = findings.map((finding) => `  - ${compactOutput(fmt(finding)).join(' ')}`);
 		console.error(`  ${findings.length} error${findings.length === 1 ? '' : 's'}:`);
 		for (const line of lines) console.error(line);
 	}
 }
 
-/** Runs one independent finding check and keeps failures from blocking later checks. */
+/** Runs one independent finding check and keeps failures from blocking later checks.
+ *
+ * @param name Check identifier shown in the output.
+ * @param detail Human-readable description of the check.
+ * @param check Function that collects findings.
+ * @param format Converts one finding into a human-readable message.
+ *
+ * @return Findings produced by the check.
+ */
 function runFindingCheck<T>(name: string, detail: string, check: () => T[], format: (finding: T) => string): T[] {
 	qualityHeader(name, detail);
 	try {
@@ -2315,16 +2421,6 @@ function runFindingCheck<T>(name: string, detail: string, check: () => T[], form
 		printCheckStatus(name, 1);
 		return [];
 	}
-}
-
-/** Prints findings collected during the full quality progress phases. */
-function printQualityFindings(): void {
-	if (!qualityFindings.length && !qualityDiagnostics.length) return;
-	console.error('\nFINDINGS SUMMARY');
-	for (const diagnostic of qualityDiagnostics) console.error(`  - ${diagnostic}`);
-	for (const finding of qualityFindings) console.error(finding);
-	qualityFindings = [];
-	qualityDiagnostics = [];
 }
 
 /**
@@ -2342,7 +2438,7 @@ function runGitHubCheck(cfg: QualityCfg, repos: string[] = [], explicit = false,
 		const detail = 'Set github.repositories in quality.json or pass --repository owner/name.';
 		reportGitHubData = { schemaVersion: 1, generatedAt: new Date().toISOString(), state: 'partial', detail, repositories: [] };
 		updateGitHubStage('failed', 0);
-		if (outputPhase) qualityDiagnostics.push(`GitHub: ${detail}`);
+		if (outputPhase) recordQualityDetail(detail);
 		else console.error(`  GitHub: ${detail}`);
 		process.exitCode = 1;
 		printCheckStatus('github', 1);
@@ -2353,7 +2449,7 @@ function runGitHubCheck(cfg: QualityCfg, repos: string[] = [], explicit = false,
 		reportGitHubData = { schemaVersion: 1, generatedAt: new Date().toISOString(), state: 'skipped', detail, repositories: [] };
 		updateGitHubStage(explicit ? 'failed' : 'skipped', 0);
 		if (explicit) {
-			if (outputPhase) qualityDiagnostics.push(`GitHub: ${detail}`);
+			if (outputPhase) recordQualityDetail(detail);
 			else console.error(`  GitHub: ${detail}`);
 			process.exitCode = 1;
 			printCheckStatus('github', 1);
@@ -2366,7 +2462,7 @@ function runGitHubCheck(cfg: QualityCfg, repos: string[] = [], explicit = false,
 		const failed = reportGitHubData.state === 'partial';
 		updateGitHubStage(failed ? 'failed' : findings.length ? 'findings' : 'passed', findings.length);
 		const blockingFindings = findings.some((finding) => finding.category !== 'issue' && finding.category !== 'setting');
-		if (outputPhase) qualityFindings.push(...formatGitHubReport(reportGitHubData).map((line) => `  - ${line}`));
+		if (outputPhase) for (const line of formatGitHubReport(reportGitHubData)) recordQualityDetail(line);
 		else for (const line of formatGitHubReport(reportGitHubData)) console.warn(`  ${line}`);
 		if (!warn && blockingFindings) process.exitCode = 1;
 		if (failed && !warn) process.exitCode = 1;
@@ -2375,7 +2471,7 @@ function runGitHubCheck(cfg: QualityCfg, repos: string[] = [], explicit = false,
 		const detail = err instanceof Error ? err.message : 'Unknown GitHub report error.';
 		reportGitHubData = { schemaVersion: 1, generatedAt: new Date().toISOString(), state: 'partial', detail, repositories: [] };
 		updateGitHubStage('failed', 0);
-		if (outputPhase) qualityDiagnostics.push(`GitHub: ${detail}`);
+		if (outputPhase) recordQualityDetail(detail);
 		else console.error(`  GitHub: ${detail}`);
 		process.exitCode = 1;
 		printCheckStatus('github', 1);
@@ -2457,7 +2553,7 @@ function runTailwindCanonicalCheck(cfg: QualityCfg, fix: boolean): Promise<void>
 	let skipped = false;
 	return runTailwindCanonical(cfg, fix, {
 		quiet: Boolean(outputPhase),
-		onFinding: (finding) => qualityDiagnostics.push(finding),
+		onFinding: recordQualityDetail,
 		onSkip: () => {
 			skipped = true;
 		},
@@ -2922,14 +3018,16 @@ export function runQualityCli(cfg: QualityCfg, args = process.argv.slice(2)): vo
  */
 function runFullQuality(cfg: QualityCfg, args: string[], opts: QualityOptions): void | Promise<void> {
 	process.exitCode = 0;
-	qualityFindings = [];
-	qualityDiagnostics = [];
+	qualityCheckName = undefined;
+	qualityDetails = [];
 	const fix = (check: QualityAutofixName): boolean => qualityAutofixEnabled(cfg, check, opts.fix);
 	const scoped = scopedCfg(cfg, opts.all);
 	if (opts.fix) {
 		outputPhase = 'PREPARING SAFE FIXES';
 		console.error('\nPREPARING SAFE FIXES');
-		console.error('  ⠋ Safe Fixes');
+		qualityCheckName = 'Safe Fixes';
+		qualityDetails = [];
+		startQualitySpinner(qualityCheckName);
 	}
 	let safeFixFailed = false;
 	const safeFix = (name: string, action: () => void): void => {
@@ -2977,7 +3075,11 @@ function runFullQuality(cfg: QualityCfg, args: string[], opts: QualityOptions): 
 			for (const file of new Set(repeated.map((finding) => finding.file))) maintainSrcFile(cfg.root, file);
 		});
 	}
-	if (opts.fix) console.error(`  ${safeFixFailed ? '✗' : '✓'} Safe Fixes`);
+	if (opts.fix) {
+		stopQualitySpinner();
+		console.error(`  ${safeFixFailed ? '✗' : '✓'} Safe Fixes`);
+		printQualityDetails();
+	}
 	outputPhase = undefined;
 	beginQualityPhase('Format');
 	if (qualityCheckEnabled(cfg, 'format')) continueAfterFailure('format', () => runFormatter(cfg, { ...opts, fix: fix('format') }, opts.all ? [] : filesFor(cfg, false)));
@@ -3016,7 +3118,6 @@ function runFullQuality(cfg: QualityCfg, args: string[], opts: QualityOptions): 
 		if (qualityCheckEnabled(cfg, 'diff') && !hasCfgdGitDiffCheck(cfg)) continueAfterFailure('diff', () => runDiffCheck(cfg));
 		if (qualityCheckEnabled(cfg, 'github') && cfg.github?.repositories?.length) continueAfterFailure('github', () => runGitHubCheck(cfg, [], false, args.includes('--warn')));
 		console.error(`\n${process.exitCode ? '✗' : '✓'} Quality complete`);
-		printQualityFindings();
 		outputPhase = undefined;
 	};
 	if (cfg.tailwindCanonical && qualityCheckEnabled(cfg, 'tailwind-canonical'))
@@ -3352,9 +3453,10 @@ export function runTypecheck(cfg: QualityCfg, args: string[] = []): void {
 	const status = result.status ?? 1;
 	if (status) {
 		const output = [...compactOutput(result.stdout?.toString() ?? ''), ...compactOutput(result.stderr?.toString() ?? '')];
-		if (outputPhase)
-			qualityDiagnostics.push(`${toolPath(cfg, tsc, 'tsc')} ${compilerArgs.join(' ')} failed (exit ${status})${output.length ? `:\n${output.map((line) => `  ${line}`).join('\n')}` : ''}`);
-		else {
+		if (outputPhase) {
+			recordQualityDetail(`${toolPath(cfg, tsc, 'tsc')} failed (exit ${status})`);
+			for (const line of output) recordQualityDetail(line);
+		} else {
 			printChildOutput(result.stdout);
 			printChildOutput(result.stderr);
 		}
@@ -3365,6 +3467,7 @@ export function runTypecheck(cfg: QualityCfg, args: string[] = []): void {
 if (process.argv[1] && realpathSync(resolve(process.argv[1])) === realpathSync(fileURLToPath(import.meta.url))) {
 	setQualityProgressSuppressed(true);
 	Promise.resolve(runQualityFromCfg()).catch((error: unknown) => {
+		stopQualitySpinner();
 		console.error(error instanceof Error ? error.message : error);
 		process.exitCode = 1;
 	});

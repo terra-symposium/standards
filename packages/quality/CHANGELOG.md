@@ -1,5 +1,11 @@
 # @terra-symposium/standards-quality
 
+## 2.0.6
+
+### Patch Changes
+
+- Animate quality check spinners during synchronous work and print each check's findings immediately under its result.
+
 ## 2.0.5
 
 ### Patch Changes

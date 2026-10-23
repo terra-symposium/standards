@@ -31,6 +31,8 @@ Changed-file mode requires a Git worktree. Use `--all` when running from a sourc
 
 Terra Quality owns the full-run order: **Format → Static quality → Tests → Framework / type checks → Build → Repository health**. `quality.json` continues to select checks and commands but does not set their order or test grouping. Test commands are grouped as **Unit / Contract**, **Integration**, **Browser / Cloud**, and **Other tests**. Every selected suite gets an overall progress bar; Node and Playwright also report per-case progress, while unknown runners show only suite progress. Commands keep their configured order within ordinary phases, and tests keep their configured order within each category.
 
+In interactive terminals, each full-run check shows an animated spinner while work is in progress. After completion, its findings appear as a bullet list directly beneath its status.
+
 The dead-code section keeps safe edits and verification separate. Safe fixes scan Knip import consumers, ESLint unused declarations, and single-use declarations/references, classify candidates, and apply only proven changes. Verification checks unused-file/export/dependency reachability, final ESLint and single-use findings, and TypeScript safety. All findings are listed in stable order and fail quality; later configured checks still run before the command returns failure.
 
 ## Local GitHub analytics
