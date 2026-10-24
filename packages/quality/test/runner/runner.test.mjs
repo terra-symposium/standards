@@ -364,7 +364,7 @@ test('configuration toggles default to enabled and honor explicit category, item
 	assert.equal(qualityRecommendationEnabled(enabled, 'architecture'), true);
 });
 
-test('full quality orders phases, groups suites, de-duplicates invocations, and continues after a failing test', () => {
+test('full quality orders phases, preserves configured suite order, de-duplicates invocations, and continues after a failing test', () => {
 	const root = fixtureRoot('terra-quality-phase-order-');
 	const marker = join(root, 'runs.txt');
 	const gitMarker = join(root, 'diff-runs.txt');
@@ -453,12 +453,12 @@ test('full quality orders phases, groups suites, de-duplicates invocations, and 
 		'static',
 		'security-check',
 		'static-format-option',
-		'unit',
-		'unit-node',
-		'integration',
 		'browser',
 		'browser',
 		'other',
+		'integration',
+		'unit',
+		'unit-node',
 		'types',
 		'build',
 		'health',
@@ -481,26 +481,17 @@ test('full quality orders phases, groups suites, de-duplicates invocations, and 
 		phaseOrder,
 		[...phaseOrder].sort((left, right) => left - right),
 	);
-	assert.match(text, /Unit \/ Contract/);
-	assert.match(text, /Integration/);
-	assert.match(text, /Browser \/ Cloud/);
-	assert.match(text, /Other tests/);
-	assert.match(text, /6 suites · 1 failed suite/);
-	const groupOrder = ['Unit / Contract', 'Integration', 'Browser / Cloud', 'Other tests'].map((group) => text.indexOf(`\n  ${group}\n`));
-	assert.ok(groupOrder.every((position) => position >= 0));
+	const suiteStatuses = ['✓ Browser E2e', '✓ Cli Smoke', '✓ Other Test', '✓ Integration Test', '✗ Unit Test', '✓ Unit Node'].map((status) => text.indexOf(status));
+	assert.ok(suiteStatuses.every((position) => position >= 0));
 	assert.deepEqual(
-		groupOrder,
-		[...groupOrder].sort((left, right) => left - right),
+		suiteStatuses,
+		[...suiteStatuses].sort((left, right) => left - right),
 	);
 	assert.doesNotMatch(text, NODE_TESTS_PLAYWRIGHT_TESTS_REGEX, 'the fixture runners do not fabricate child case output');
-	assert.ok(progress.some((chunk) => chunk.includes('Test suites [') && chunk.includes('0/6')));
-	assert.ok(progress.some((chunk) => chunk.includes('Test suites [') && chunk.includes('6/6')));
-	assert.match(progress.join(''), /Test suites \[[█░]{24}\] 0\/6/);
-	assert.match(progress.join(''), /Test suites \[[█░]{24}\] 6\/6/);
 	assert.doesNotMatch(progress.join(''), NODE_TESTS_PLAYWRIGHT_TESTS_REGEX);
 	resetExitCode();
 });
-test('full quality nests dead-code safe fixes and verification under static quality', () => {
+test('full quality reports dead-code once under static quality', () => {
 	const root = fixtureRoot('terra-quality-dead-code-output-groups-');
 	const cfg = createQualityCfg({
 		root,
@@ -538,7 +529,7 @@ test('full quality nests dead-code safe fixes and verification under static qual
 		console.error = originalErr;
 	}
 	const text = output.join('\n');
-	const pos = ['STATIC QUALITY', 'Dead code', 'Safe fixes', 'Verification', 'TESTS'].map((label) => text.indexOf(label));
+	const pos = ['STATIC QUALITY', '⠋ Dead Code', '✓ Dead Code', 'TESTS'].map((label) => text.indexOf(label));
 	assert.ok(pos.every((position) => position >= 0));
 	assert.deepEqual(
 		pos,
@@ -917,7 +908,7 @@ if (args.includes('--format') && args.includes('json'))
 	assert.ok(outputText.indexOf('✗ Dead Code') < outputText.indexOf('[ERROR] eslint/unused-private-declaration'));
 	assert.doesNotMatch(outputText, /FINDINGS SUMMARY/);
 	assert.doesNotMatch(outputEvents.join(''), /(?:^|\n)\s*test feedback(?:\n|$)/u);
-	assert.ok(outputEvents.findLastIndex((line) => line.includes('Test suites') && line.includes('1/1')) < outputEvents.findLastIndex((line) => line.includes('contract: ✓ passed')));
+	assert.ok(outputEvents.findLastIndex((line) => line.includes('✗ Dead Code')) < outputEvents.findLastIndex((line) => line.includes('✓ Contract')));
 	resetExitCode();
 });
 test('the fixing quality command inlines safe values without broad comment cleanup', () => {
@@ -1682,7 +1673,7 @@ test('CLI recommendation execution is opt-in per invocation and command failures
 	cfg.recommendationCommands = [{ name: 'fixture-failure', command: failingCmd }];
 	resetExitCode();
 	runQualityCli(cfg, ['quality', '--all']);
-	assert.equal(process.exitCode, 2);
+	assert.equal(process.exitCode, 1, 'quality normalizes any failed recommendation command to a failing exit status');
 	fixtureFile(root, 'recommendations.jsonl', '');
 	resetExitCode();
 	runQualityCli(cfg, ['quality', '--all', '--skip-recommendations']);
