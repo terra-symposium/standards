@@ -9,6 +9,7 @@ export * from './history-report.js';
 export * from './github-report.js';
 export * from './imports.js';
 export * from './inline-if.js';
+export * from './language-profiles.js';
 export * from './documentation.js';
 export * from './naming.js';
 export { qualityNodeReporter } from './node-reporter.js';

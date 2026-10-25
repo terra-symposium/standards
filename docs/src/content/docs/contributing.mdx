@@ -22,7 +22,7 @@ pnpm quality:all
 
 ## Work on the documentation
 
-The documentation site uses Astro and Starlight. Start the development server, build the static site, or preview that build with:
+The documentation site uses Astro and the shared Terra Docs layout. Start the development server, build the static site, or preview that build with:
 
 ```sh
 pnpm docs:dev
@@ -30,7 +30,7 @@ pnpm docs:build
 pnpm docs:preview
 ```
 
-Documentation source is under `docs/src/content/docs/`. Use Markdown or MDX, include a concise `title` and `description` in each page's frontmatter, and link to other guides with their site paths. Run `pnpm docs:build` after editing pages so Starlight can validate content and internal links.
+Documentation source is under `docs/src/content/docs/`. Use Markdown or MDX, include a concise `title` and `description` in each page's frontmatter, and link to other guides with their site paths. Run `pnpm docs:build` after editing pages to render the site and catch build errors.
 
 ## Change and release a package
 

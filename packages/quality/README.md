@@ -1,16 +1,18 @@
 # @terra-symposium/standards-quality
 
-A configurable quality runner for JavaScript and TypeScript repositories. Define source scope, policy, tools, and repository commands in `quality.json`; run them locally with the `terra-quality` CLI or in CI.
+A configurable quality runner for JavaScript and TypeScript analysis plus native-language command profiles. Define source scope, policy, tools, and repository commands in `quality.json`; run them locally with the `terra-quality` CLI or in CI.
 
 - Requires Node.js `>=18.18`.
 - Published on the public npm registry.
-- Does not install or configure Prettier, ESLint, Knip, TypeScript, or repository commands.
+- Does not install or configure language toolchains, formatters, linters, or repository commands.
 
 ## Install
 
 ```sh
 pnpm add -D @terra-symposium/standards-quality
 ```
+
+In an npm-managed repository, use `npm install --save-dev @terra-symposium/standards-quality` instead.
 
 Create `quality.json` in the repository root:
 
@@ -31,6 +33,51 @@ Create `quality.json` in the repository root:
 Every quality finding is an error. The runner completes the remaining checks and configured commands before returning failure; there is no warning or non-blocking finding policy.
 
 This starting configuration uses the built-in checks without requiring external tools. Enable integrations as you install and configure the corresponding repository tools. When lint is enabled, add an ESLint flat config such as `eslint.config.mjs`.
+
+## Native language profiles
+
+Terra Quality keeps its built-in syntax analysis scoped to JavaScript and TypeScript. Opt into native checks with `languageProfiles`; each profile discovers its own file extensions under `sourceRoots`, so `.c`, `.java`, and `.py` files are not sent through the TypeScript analyzer. For a repository with no JavaScript or TypeScript sources, leave `extensions` empty:
+
+```json
+{
+	"$schema": "./node_modules/@terra-symposium/standards-quality/quality.schema.json",
+	"sourceRoots": ["src"],
+	"extensions": [],
+	"languageProfiles": ["c", "java", "python"]
+}
+```
+
+Profiles run only when matching source exists. They skip checks for absent source or optional project configuration, and fail with the required minimum version and installation guidance when a needed tool is missing or too old. Terra Quality never installs tools. Pin native tool versions in the repository or CI image for reproducible runs.
+
+| Profile  | Default checks                                                                                                                                                                                                                                               | Native prerequisites                                         |
+| -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------ |
+| `c`      | [`clang-format`](https://clang.llvm.org/docs/ClangFormat.html) format check; [Clang Static Analyzer](https://clang.llvm.org/docs/ClangStaticAnalyzer.html) of `.c` files; [Doxygen](https://www.doxygen.nl/manual/config.html) when a root `Doxyfile` exists | LLVM/Clang 14+; Doxygen 1.9+ for configured docs             |
+| `java`   | [`google-java-format`](https://github.com/google/google-java-format) format check; [Checkstyle](https://checkstyle.org/getting-started.html) using its bundled `google_checks.xml`                                                                           | `google-java-format` 1.14+; Checkstyle 10+; a compatible JDK |
+| `python` | [Ruff](https://docs.astral.sh/ruff/) format and lint checks for `.py` and `.pyi`                                                                                                                                                                             | Ruff 0.1+                                                    |
+
+For example, on macOS install the native tools with Homebrew and add Ruff to a Python project with uv:
+
+```sh
+brew install llvm doxygen google-java-format checkstyle
+export PATH="$(brew --prefix llvm)/bin:$PATH"
+uv add --dev ruff
+```
+
+On Debian or Ubuntu, install the C tools with `sudo apt-get install clang clang-format doxygen`; install the Java and Python tools with the package manager or project wrappers used by that repository. The profile check prints its tested minimum if the installed version is too old.
+
+Build and test commands remain repository-owned. Add them to `qualityCommands` using the project’s existing Make, Maven, Gradle, Python, or other wrapper. A configured command whose name matches a profile check replaces that default; other commands run alongside the profiles. For example:
+
+```json
+{
+	"qualityCommands": [
+		{ "name": "c-build", "command": "make", "args": ["test"] },
+		{ "name": "java-test", "command": "./mvnw", "args": ["test"] },
+		{ "name": "python-tests", "command": "uv", "args": ["run", "pytest"] }
+	]
+}
+```
+
+Use the same command mechanism for unknown languages or industry-specific rules; Terra Quality does not imply regulatory compliance. To add a built-in language later, add its identifier, profile data record, and schema enum rather than a language parser.
 
 Run the changed-file pass with safe configured fixes enabled:
 

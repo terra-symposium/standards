@@ -29,6 +29,7 @@ import { securityFindings } from './security.js';
 import { accessibilityFindings, fixAccessibleNames } from './accessibility.js';
 import { displayNameFindings, fixDisplayNames } from './display-name.js';
 import { uiComponentRecommendations } from './ui-recommendations.js';
+import { inspectLanguageProfileTool, isLanguageProfileId, resolveLanguageProfiles } from './language-profiles.js';
 import { spawnSync } from 'node:child_process';
 import { Worker } from 'node:worker_threads';
 import { srcFiles, workingSrcFiles } from './files.js';
@@ -42,6 +43,7 @@ import type { DocumentationRequirements } from './documentation.js';
 import type { GitHubFeature, GitHubReport } from './github-report.js';
 import type { UiRecommendationSettings } from './ui-recommendations.js';
 import type { Dirent } from 'node:fs';
+import type { LanguageProfileId, LanguageProfileTool, LanguageQualityPhase, ResolvedLanguageCheck, SkippedLanguageCheck } from './language-profiles.js';
 
 /*//////////////////////////////////////////////////
 REGEX
@@ -179,6 +181,7 @@ export type QualityCfg = {
 	frameworkEntryExports?: Record<string, string[]>;
 	renameExports?: boolean;
 	qualityCommands?: { name: string; command: string; args?: string[] }[];
+	languageProfiles?: LanguageProfileId[];
 	excludeTests?: boolean;
 	enabledChecks?: Partial<Record<QualityCheckName, boolean>>;
 	autofix?: Partial<Record<QualityAutofixName, boolean>>;
@@ -212,11 +215,15 @@ export type QualityCfg = {
 /**
  * Normalized shape for one configured quality command.
  */
-type QualityInvocation = NonNullable<QualityCfg['qualityCommands']>[number];
+type QualityInvocation = NonNullable<QualityCfg['qualityCommands']>[number] & {
+	phase?: LanguageQualityPhase;
+	profileId?: string;
+	profileTool?: LanguageProfileTool;
+};
 /**
  * Fixed phase assigned to a selected quality command.
  */
-type QualityPhase = 'Format' | 'Static quality' | 'Tests' | 'Framework / type checks' | 'Build' | 'Repository health';
+type QualityPhase = LanguageQualityPhase;
 /** Workspace package metadata used only to identify a selected package script. */
 type WorkspaceManifest = { directory: string; name?: string; scripts: Record<string, unknown> };
 const WORKSPACE_MANIFESTS = new Map<string, WorkspaceManifest[]>();
@@ -353,8 +360,15 @@ export function loadQualityCfg(file = resolve(process.cwd(), 'quality.json')): Q
  * @return Configuration ready for quality checks and subprocess execution.
  */
 export function createQualityCfg(cfg: QualityCfg): QualityCfg {
+	const languageProfiles = cfg.languageProfiles ?? [];
+	if (!Array.isArray(languageProfiles)) throw new Error('languageProfiles must be an array of profile names.');
+	for (const profile of languageProfiles) {
+		if (typeof profile !== 'string' || !isLanguageProfileId(profile)) throw new Error(`Unknown language profile "${profile}". Available profiles: c, java, python.`);
+	}
+	if (new Set(languageProfiles).size !== languageProfiles.length) throw new Error('languageProfiles must not contain duplicate profile names.');
 	return {
 		...cfg,
+		languageProfiles,
 		renameExports: cfg.renameExports ?? false,
 		root: resolve(cfg.root),
 		sourceRoots: cfg.sourceRoots.map((p) => resolve(cfg.root, p)),
@@ -738,6 +752,7 @@ function isTestInvocation(cfg: QualityCfg, check: QualityInvocation): boolean {
  * @return The output and execution phase selected by Terra Quality.
  */
 function phaseForInvocation(cfg: QualityCfg, check: QualityInvocation): QualityPhase {
+	if (check.phase) return check.phase;
 	const text = invocationText(cfg, check);
 	if (isTestInvocation(cfg, check)) return 'Tests';
 	if (/\b(?:format|prettier)\b/u.test(text)) return 'Format';
@@ -940,20 +955,52 @@ function runTestSuite(cfg: QualityCfg, check: QualityInvocation): { status: numb
 }
 
 /**
- * Runs configured checks assigned to one fixed phase.
+ * Combines selected profile checks with repository commands, letting same-name commands replace defaults.
  *
- * @param cfg Quality configuration containing selected repository commands.
+ * @param cfg Repository configuration containing commands and command toggles.
+ * @param profileChecks Native checks resolved from selected language profiles.
+ *
+ * @return Profile defaults or same-name overrides, followed by unrelated repository commands.
+ */
+function qualityInvocations(cfg: QualityCfg, profileChecks: ResolvedLanguageCheck[]): QualityInvocation[] {
+	const configured = cfg.qualityCommands ?? [];
+	const profileNames = new Set(profileChecks.map((check) => check.name));
+	const configuredByName = new Map(configured.map((check) => [check.name, check]));
+	const profileInvocations = profileChecks.map((check): QualityInvocation => {
+		const override = configuredByName.get(check.name);
+		return override ? { ...override, phase: check.phase } : { name: check.name, command: check.command, args: check.args, phase: check.phase, profileId: check.profileId, profileTool: check.tool };
+	});
+	return [...profileInvocations, ...configured.filter((check) => !profileNames.has(check.name))];
+}
+
+/**
+ * Runs configured and profile-provided checks assigned to one fixed phase.
+ *
+ * @param cfg Quality configuration containing the repository root and command toggles.
  * @param phase Fixed Quality runner phase to execute.
+ * @param profileChecks Native profile checks resolved for this full quality run.
+ * @param toolResults Cached native-tool version probes shared across profile checks.
  *
  * @return Number of commands that failed in this phase.
  */
-function runQualityPhase(cfg: QualityCfg, phase: QualityPhase): number {
-	const cmds = (cfg.qualityCommands ?? []).filter((check) => qualityCmdEnabled(cfg, check.name) && phaseForInvocation(cfg, check) === phase);
+function runQualityPhase(cfg: QualityCfg, phase: QualityPhase, profileChecks: ResolvedLanguageCheck[], toolResults: Map<string, ReturnType<typeof inspectLanguageProfileTool>>): number {
+	const cmds = qualityInvocations(cfg, profileChecks).filter((check) => qualityCmdEnabled(cfg, check.name) && phaseForInvocation(cfg, check) === phase);
+	const requireProfileTool = (check: QualityInvocation): void => {
+		if (!check.profileTool) return;
+		const toolKey = JSON.stringify([check.profileTool.command, check.profileTool.versionArgs, check.profileTool.minimumVersion]);
+		let toolResult = toolResults.get(toolKey);
+		if (!toolResult) {
+			toolResult = inspectLanguageProfileTool(check.profileTool, cfg.root);
+			toolResults.set(toolKey, toolResult);
+		}
+		if (toolResult.error) throw new Error(toolResult.error);
+	};
 	let failures = 0;
 	if (phase === 'Tests') {
 		const suites = uniqueTestSuites(cmds);
 		for (const check of suites) {
 			try {
+				requireProfileTool(check);
 				if (runTestSuite(cfg, check).status) failures += 1;
 			} catch (error) {
 				failures += 1;
@@ -967,9 +1014,13 @@ function runQualityPhase(cfg: QualityCfg, phase: QualityPhase): number {
 		qualityHeader(`command:${check.name}`, '');
 		let status = 1;
 		try {
+			requireProfileTool(check);
 			status = run(cfg, check.command, check.args ?? []);
 		} catch (error) {
-			recordQualityFailure(`command:${check.name}`, error);
+			const stage = reportStages?.get(`command:${check.name}`);
+			if (stage) stage.status = 'failed';
+			process.exitCode = 1;
+			recordQualityDetail(error instanceof Error ? error.message : String(error));
 		}
 		if (status) {
 			failures += 1;
@@ -978,6 +1029,23 @@ function runQualityPhase(cfg: QualityCfg, phase: QualityPhase): number {
 		printCheckStatus(`command:${check.name}`, status ? 1 : 0);
 	}
 	return failures;
+}
+
+/**
+ * Records selected profile checks that cannot run because their source or optional config is absent.
+ *
+ * @param cfg Repository configuration controlling individual command toggles.
+ * @param skipped Profile checks and their source-discovery reasons.
+ *
+ * @return Nothing; terminal output and an optional JSON report mark each check skipped.
+ */
+function reportSkippedLanguageChecks(cfg: QualityCfg, skipped: SkippedLanguageCheck[]): void {
+	for (const check of skipped) {
+		if (!qualityCmdEnabled(cfg, check.name)) continue;
+		const name = `command:${check.name}`;
+		if (reportStages) reportStages.set(name, { name, status: 'skipped', findings: 0 });
+		console.error(`  ↷ ${qualityLabel(check.name)} skipped: ${check.reason}.`);
+	}
 }
 
 /**
@@ -3020,6 +3088,10 @@ function runFullQuality(cfg: QualityCfg, args: string[], opts: QualityOptions): 
 	process.exitCode = 0;
 	qualityCheckName = undefined;
 	qualityDetails = [];
+	const profileResolution = opts.skipCommands ? { checks: [], skipped: [] } : resolveLanguageProfiles(cfg);
+	const profileToolResults = new Map<string, ReturnType<typeof inspectLanguageProfileTool>>();
+	if (!opts.skipCommands) reportSkippedLanguageChecks(cfg, profileResolution.skipped);
+	const runConfiguredCommands = (phase: QualityPhase): number => runQualityPhase(cfg, phase, profileResolution.checks, profileToolResults);
 	const fix = (check: QualityAutofixName): boolean => qualityAutofixEnabled(cfg, check, opts.fix);
 	const scoped = scopedCfg(cfg, opts.all);
 	if (opts.fix) {
@@ -3083,7 +3155,7 @@ function runFullQuality(cfg: QualityCfg, args: string[], opts: QualityOptions): 
 	outputPhase = undefined;
 	beginQualityPhase('Format');
 	if (qualityCheckEnabled(cfg, 'format')) continueAfterFailure('format', () => runFormatter(cfg, { ...opts, fix: fix('format') }, opts.all ? [] : filesFor(cfg, false)));
-	if (!opts.skipCommands) continueAfterFailure('format', () => void runQualityPhase(cfg, 'Format'));
+	if (!opts.skipCommands) continueAfterFailure('format', () => void runConfiguredCommands('Format'));
 	beginQualityPhase('Static quality');
 	const continueStaticAndLater = (): void => {
 		if (qualityCheckEnabled(cfg, 'dead-code')) continueAfterFailure('dead-code', () => runDeadCodeCmd(cfg, qualityAutofixEnabled(cfg, 'dead-code', opts.fix), opts.all));
@@ -3099,10 +3171,10 @@ function runFullQuality(cfg: QualityCfg, args: string[], opts: QualityOptions): 
 		}
 		continueAfterFailure('static checks', () => runGenericChecks(scoped, analysis));
 		continueAfterFailure('static checks', () => void runQuality(cfg, opts.strict, opts.all, analysis));
-		if (!opts.skipCommands) continueAfterFailure('static quality', () => void runQualityPhase(cfg, 'Static quality'));
+		if (!opts.skipCommands) continueAfterFailure('static quality', () => void runConfiguredCommands('Static quality'));
 		if (!opts.skipRecommendations) continueAfterFailure('recommendations', () => runRecommendationCmds(cfg));
 		beginQualityPhase('Tests');
-		if (!opts.skipCommands) continueAfterFailure('tests', () => void runQualityPhase(cfg, 'Tests'));
+		if (!opts.skipCommands) continueAfterFailure('tests', () => void runConfiguredCommands('Tests'));
 		beginQualityPhase('Framework / type checks');
 		if (qualityCheckEnabled(cfg, 'type') && (cfg.tools?.tsc || cfg.typecheckCommand)) {
 			continueAfterFailure('typecheck', () => {
@@ -3110,11 +3182,11 @@ function runFullQuality(cfg: QualityCfg, args: string[], opts: QualityOptions): 
 				if (cfg.typecheckExtensions?.length && !cfg.typecheckRoots?.length && !cfg.typecheckCommand) runProjectTypecheck(cfg);
 			});
 		}
-		if (!opts.skipCommands) continueAfterFailure('framework checks', () => void runQualityPhase(cfg, 'Framework / type checks'));
+		if (!opts.skipCommands) continueAfterFailure('framework checks', () => void runConfiguredCommands('Framework / type checks'));
 		beginQualityPhase('Build');
-		if (!opts.skipCommands) continueAfterFailure('build', () => void runQualityPhase(cfg, 'Build'));
+		if (!opts.skipCommands) continueAfterFailure('build', () => void runConfiguredCommands('Build'));
 		beginQualityPhase('Repository health');
-		if (!opts.skipCommands) continueAfterFailure('repository health', () => void runQualityPhase(cfg, 'Repository health'));
+		if (!opts.skipCommands) continueAfterFailure('repository health', () => void runConfiguredCommands('Repository health'));
 		if (qualityCheckEnabled(cfg, 'diff') && !hasCfgdGitDiffCheck(cfg)) continueAfterFailure('diff', () => runDiffCheck(cfg));
 		if (qualityCheckEnabled(cfg, 'github') && cfg.github?.repositories?.length) continueAfterFailure('github', () => runGitHubCheck(cfg, [], false, args.includes('--warn')));
 		console.error(`\n${process.exitCode ? '✗' : '✓'} Quality complete`);

@@ -1,3 +1,8 @@
 @layer theme, utilities;
 @import 'tailwindcss/theme.css' layer(theme);
 @import 'tailwindcss/utilities.css' layer(utilities) important;
+.standards-docs-hero { margin: 0 0 28px; padding: 18px 20px; border: 1px solid #dfe4df; border-radius: 10px; background: #eef3ef; }
+.standards-docs-hero > p { margin: 0 0 14px; color: #202321; font-size: 1.15rem; }
+.standards-docs-hero-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.standards-docs-hero-actions a { display: inline-flex; gap: 6px; align-items: center; padding: 8px 12px; border: 1px solid #216750; border-radius: 6px; color: #fff; background: #216750; text-decoration: none; font-weight: 600; }
+.standards-docs-hero-actions a.subtle { color: #216750; background: transparent; }

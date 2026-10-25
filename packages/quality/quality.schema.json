@@ -140,6 +140,12 @@
 		},
 		"enabledCommands": { "type": "object", "additionalProperties": { "type": "boolean" } },
 		"enabledRecommendations": { "type": "object", "additionalProperties": { "type": "boolean" } },
+		"languageProfiles": {
+			"type": "array",
+			"uniqueItems": true,
+			"items": { "enum": ["c", "java", "python"] },
+			"description": "Optional native-language command profiles. Profiles only run checks when matching source files are present."
+		},
 		"qualityCommands": {
 			"$ref": "#/$defs/commands",
 			"description": "Commands selected for the quality run. Terra Quality owns phase order and test grouping; array order is preserved within ordinary phases and within each test group."

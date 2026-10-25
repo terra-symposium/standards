@@ -1,27 +1,42 @@
 ---
-import { DocsNavigation } from '@terra-symposium/docs';
+import { DocsLocalWorkspace } from '@terra-symposium/docs';
+import type { DocsHostTreeNode, DocsLocalPage } from '@terra-symposium/docs';
 import '@terra-symposium/docs/style.css';
 import '../tailwind.css';
+import SkillsExplorer from '../components/SkillsExplorer.tsx';
 import { entries } from '../docs-data.js';
 
 export function getStaticPaths() {
-  return entries.map(page => ({ params: { slug: page.slug || undefined }, props: { page } }));
+	return entries.map(page => ({ params: { slug: page.slug || undefined }, props: { page } }));
 }
 const { page } = Astro.props;
-const Content = page.Component;
-const nav = entries.map(entry => ({ title: entry.title, href: `/${entry.slug}${entry.slug ? '/' : ''}` }));
+const categories = [...new Set(entries.map(entry => entry.slug.split('/')[0] || 'Overview'))];
+const docs: DocsLocalPage[] = entries.map(entry => ({
+	id: entry.slug || 'index',
+	path: `content/docs/${entry.slug || 'index'}.mdx`,
+	pathname: entry.slug ? `/${entry.slug}/` : '/',
+	title: entry.title,
+	...(entry.description ? { description: entry.description } : {}),
+	markdown: entry.markdown,
+}));
+const tree: DocsHostTreeNode[] = categories.map(category => {
+	const slug = category === 'Overview' ? 'overview' : category;
+	return {
+		type: 'branch', origName: slug, title: category === 'Overview' ? 'Overview' : category.replace(/-/g, ' ').replace(/\b\w/g, letter => letter.toUpperCase()), path: slug,
+		children: [{
+			type: 'branch', origName: `${slug}/guides`, title: 'Guides', path: `${slug}/guides`,
+			children: entries.filter(entry => (entry.slug.split('/')[0] || 'Overview') === category).map(entry => ({
+				type: 'leaf' as const, origName: entry.slug || 'index', title: entry.title, path: `content/docs/${entry.slug || 'index'}.mdx`, url: entry.slug ? `/${entry.slug}/` : '/', permission: 'read' as const,
+			})),
+		}],
+	};
+});
 ---
 <!doctype html>
 <html lang="en">
-  <head><meta charset="utf-8" /><meta name="viewport" content="width=device-width,initial-scale=1" /><meta name="robots" content="noindex, nofollow" /><title>{page.title} · Standards</title><meta name="description" content={page.description} /></head>
-  <body><div class="layout"><aside><a class="brand" href="/">Standards</a><DocsNavigation nodes={nav} currentPath={Astro.url.pathname} /></aside><main class="prose"><Content /></main></div></body>
+	<head><meta charset="utf-8" /><meta name="viewport" content="width=device-width,initial-scale=1" /><meta name="robots" content="noindex, nofollow" /><title>{page.title} · Standards</title><meta name="description" content={page.description} /></head>
+	<body>
+		<DocsLocalWorkspace client:load tree={tree} pages={docs} pathname={Astro.url.pathname} title="Standards" description="Documentation for shared Terra Symposium packages and tools." rootPath="/" homePath="/" />
+		{page.slug === 'skills' && <section class="standards-docs-hero"><SkillsExplorer client:load /></section>}
+	</body>
 </html>
-<style>
-  :global(:root){--sl-color-text:#1f2924;--sl-color-text-accent:#185c41;--sl-color-gray-6:#eaf0eb;--sl-color-gray-5:#cbd8ce;--sl-color-accent-low:#dcefe2}
-  :global(body){margin:0;font:16px/1.65 system-ui,sans-serif;color:#1f2924;background:#f8faf8}
-  .layout{display:grid;grid-template-columns:250px minmax(0,800px);gap:40px;max-width:1200px;margin:auto;padding:32px 24px}
-  aside{position:sticky;top:20px;align-self:start;max-height:calc(100vh - 40px);overflow:auto}
-  .brand{display:block;font-size:20px;font-weight:700;color:#183e2b;margin-bottom:20px;text-decoration:none}
-  main{min-width:0}.prose :global(a){color:#185c41}.prose :global(pre){overflow:auto;padding:16px;background:#eaf0eb;border-radius:8px}.prose :global(code){font-family:ui-monospace,monospace}
-  @media(max-width:720px){.layout{display:block;padding:20px}aside{position:static;max-height:none;margin-bottom:32px}}
-</style>

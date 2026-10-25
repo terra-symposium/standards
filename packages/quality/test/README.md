@@ -162,7 +162,7 @@ Each bullet is one top-level `node:test` case. Nested assertions remain within t
 - single-use fixing retains object values referenced through typeof
 - single-use fixer reports functions in call, JSX, and type-query positions for review
 
-### Runner and progress (118)
+### Runner and progress (125)
 
 #### `port.test.mjs` (2)
 
@@ -172,6 +172,16 @@ Each bullet is one top-level `node:test` case. Nested assertions remain within t
 #### `progress.test.mjs` (1)
 
 - progress updates always include a bar and rewrite one line even without a TTY
+
+#### `language-profiles.test.mjs` (7)
+
+- language profiles resolve only matching source files and optional project checks
+- selected profiles with no matching sources are reported as skipped
+- configuration rejects duplicate and unknown language profile identifiers
+- profile tool checks enforce their minimum version and include installation guidance
+- selected profiles fail clearly when a required tool is missing
+- C, Java, and Python profiles invoke their native checks in phase order
+- profile defaults can be overridden while arbitrary language commands remain available
 
 #### `quality.test.mjs` (61)
 

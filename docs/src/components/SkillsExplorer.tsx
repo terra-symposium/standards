@@ -58,11 +58,11 @@ function SkillTree({ expanded, node, onSelect, onToggle, pathPrefix = '', select
 							{hasChildren ? (
 								<button
 									aria-expanded={isExpanded}
-									className="inline-flex min-h-9 cursor-pointer items-center gap-1 rounded-md border-0 bg-transparent px-2 py-1 text-left font-[inherit] font-semibold text-(--sl-color-text) hover:bg-(--sl-color-gray-6) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--sl-color-text-accent)"
+									className="inline-flex min-h-9 cursor-pointer items-center gap-1 rounded-md border-0 bg-transparent px-2 py-1 text-left font-[inherit] font-semibold text-[#202321] hover:bg-[#edf1ed] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#216750]"
 									onClick={() => onToggle(path)}
 									type="button"
 								>
-									<span aria-hidden="true" className="w-4 text-(--sl-color-text-accent)">
+									<span aria-hidden="true" className="w-4 text-[#216750]">
 										{isExpanded ? '⌄' : '›'}
 									</span>
 									<span>{skill?.title ?? humanize(name)}</span>
@@ -71,8 +71,8 @@ function SkillTree({ expanded, node, onSelect, onToggle, pathPrefix = '', select
 							{skill ? (
 								<button
 									aria-current={selectedName === skill.name ? 'true' : undefined}
-									className={`min-h-9 cursor-pointer rounded-md border-0 bg-transparent px-2 py-1 text-left font-[inherit] text-(--sl-color-text-accent) hover:bg-(--sl-color-gray-6) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--sl-color-text-accent) max-[40rem]:mx-0 ${
-										selectedName === skill.name ? 'bg-[var(--sl-color-accent-low)] font-bold' : ''
+									className={`min-h-9 cursor-pointer rounded-md border-0 bg-transparent px-2 py-1 text-left font-[inherit] text-[#216750] hover:bg-[#edf1ed] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#216750] max-[40rem]:mx-0 ${
+										selectedName === skill.name ? 'bg-[#eaf1ec] font-bold' : ''
 									}`}
 									onClick={() => onSelect(skill)}
 									type="button"
@@ -82,7 +82,7 @@ function SkillTree({ expanded, node, onSelect, onToggle, pathPrefix = '', select
 							) : null}
 						</div>
 						{hasChildren && isExpanded ? (
-							<div className="ml-4 mt-1 border-l border-(--sl-color-gray-5) py-1 pl-3">
+							<div className="ml-4 mt-1 border-l border-[#dfe4df] py-1 pl-3">
 								<SkillTree expanded={expanded} node={child} onSelect={onSelect} onToggle={onToggle} pathPrefix={path} selectedName={selectedName} />
 							</div>
 						) : null}
@@ -109,28 +109,28 @@ export default function SkillsExplorer() {
 
 	return (
 		<section aria-label="Skills browser" className="my-8 space-y-4">
-			<div className="rounded-xl border border-(--sl-color-gray-5) bg-(--sl-color-bg) p-2">
+			<div className="rounded-xl border border-[#dfe4df] bg-white p-2">
 				<SkillTree expanded={expanded} node={tree} onSelect={setActiveSkill} onToggle={toggle} selectedName={activeSkill?.name} />
 			</div>
-			<section aria-atomic="false" aria-live="polite" className="overflow-hidden rounded-xl border border-(--sl-color-gray-5) bg-(--sl-color-bg)">
+			<section aria-atomic="false" aria-live="polite" className="overflow-hidden rounded-xl border border-[#dfe4df] bg-white">
 				{activeSkill ? (
 					<>
 						<div className="flex items-end justify-between gap-4 px-5 pt-5 max-[40rem]:items-start max-[40rem]:flex-col">
 							<div>
-								<p className="mb-1 text-xs font-bold uppercase tracking-wider text-(--sl-color-gray-3)">Selected skill</p>
+								<p className="mb-1 text-xs font-bold uppercase tracking-wider text-[#626762]">Selected skill</p>
 								<h2 className="m-0">{activeSkill.title}</h2>
 							</div>
-							<span className="wrap-break-word text-right font-mono text-xs text-(--sl-color-gray-3) max-[40rem]:text-left">.agents/skills/{activeSkill.directory}/SKILL.md</span>
+							<span className="wrap-break-word text-right font-mono text-xs text-[#626762] max-[40rem]:text-left">.agents/skills/{activeSkill.directory}/SKILL.md</span>
 						</div>
-						<p className="mx-5 mt-3 text-(--sl-color-gray-3)">{activeSkill.description}</p>
-						<pre className="m-0 max-h-[70vh] overflow-auto whitespace-pre-wrap break-normal border-t border-(--sl-color-gray-5) bg-(--sl-color-gray-7) p-5 font-mono text-sm leading-relaxed text-(--sl-color-text)">
+						<p className="mx-5 mt-3 text-[#626762]">{activeSkill.description}</p>
+						<pre className="m-0 max-h-[70vh] overflow-auto whitespace-pre-wrap break-normal border-t border-[#dfe4df] bg-[#f1f4f1] p-5 font-mono text-sm leading-relaxed text-[#202321]">
 							<code>{activeSkill.body}</code>
 						</pre>
 					</>
 				) : (
 					<div className="p-5">
-						<p className="mb-1 text-xs font-bold uppercase tracking-wider text-(--sl-color-gray-3)">Skill source</p>
-						<p className="m-0 text-(--sl-color-gray-3)">Choose a skill above to view its Markdown content.</p>
+						<p className="mb-1 text-xs font-bold uppercase tracking-wider text-[#626762]">Skill source</p>
+						<p className="m-0 text-[#626762]">Choose a skill above to view its Markdown content.</p>
 					</div>
 				)}
 			</section>
