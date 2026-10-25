@@ -134,6 +134,8 @@ export type ResponsivePlaywrightOptions = {
 	qualityConfigFile?: string;
 	/** Explicit timing settings that override matching quality.json values. */
 	loadTesting?: LoadTestingConfig;
+	/** Write the shared PowerPoint from keyed screenshots only, with no text slides. */
+	screenshotOnlySlideshow?: boolean;
 };
 
 /**
@@ -178,7 +180,13 @@ export const withResponsivePlaywright = <T extends PlaywrightTestConfig>(cfg: T,
 		}));
 	});
 	const cfgdReporters = cfg.reporter ? (Array.isArray(cfg.reporter) ? cfg.reporter : [cfg.reporter]) : [];
-	const reportingOpts = { outputRoot: opts.outputRoot, supplementalResultsFile: opts.supplementalResultsFile, qualityConfigFile: opts.qualityConfigFile, loadTesting };
+	const reportingOpts = {
+		outputRoot: opts.outputRoot,
+		supplementalResultsFile: opts.supplementalResultsFile,
+		qualityConfigFile: opts.qualityConfigFile,
+		loadTesting,
+		screenshotOnlySlideshow: opts.screenshotOnlySlideshow,
+	};
 	const reporters = [
 		...cfgdReporters.filter((r) => {
 			const name = Array.isArray(r) ? r[0] : r;

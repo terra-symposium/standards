@@ -34,7 +34,7 @@ const {
 	timeLoadOperation: timeLoadOp,
 } = await import('@terra-symposium/standards-reporting/load-testing');
 const { writeSpreadsheet } = await import('@terra-symposium/standards-reporting/spreadsheet');
-const { writeSlideshow } = await import('@terra-symposium/standards-reporting/slideshow');
+const { writeScreenshotSlideshow, writeSlideshow } = await import('@terra-symposium/standards-reporting/slideshow');
 
 /*//////////////////////////////////////////////////
 HELPERS
@@ -100,11 +100,11 @@ test('captures page navigation for tests that do not destructure the load fixtur
 	const reportFile = path.join(root, 'playwright-report.json');
 	await fs.writeFile(
 		specFile,
-		`import { loadTest as test } from ${JSON.stringify(new URL('../dist/playwright.js', import.meta.url).href)};\ntest('navigates without using load', async ({ page }) => { await page.goto('data:text/html,<title>loaded</title>'); });\n`,
+		`import { visualTest as test } from ${JSON.stringify(new URL('../dist/playwright.js', import.meta.url).href)};\ntest('captures a keyed screenshot', async ({ page, visuals }) => { await page.goto('data:text/html,<title>loaded</title>'); await visuals.capture('/example'); });\n`,
 	);
 	await fs.writeFile(
 		cfgFile,
-		`export default { testDir: ${JSON.stringify(root)}, reporter: [['json', { outputFile: ${JSON.stringify(reportFile)} }]], projects: [{ name: 'chromium', use: { browserName: 'chromium' } }] };\n`,
+		`export default { testDir: ${JSON.stringify(root)}, outputDir: ${JSON.stringify(path.join(root, 'output'))}, reporter: [['json', { outputFile: ${JSON.stringify(reportFile)} }]], projects: [{ name: 'chromium', use: { browserName: 'chromium' } }] };\n`,
 	);
 	try {
 		await execFileAsync('pnpm', ['--filter', '@terra-symposium/standards-reporting', 'exec', 'playwright', 'test', '--config', cfgFile], {
@@ -120,6 +120,14 @@ test('captures page navigation for tests that do not destructure the load fixtur
 			payload.measurements.some((measurement) => measurement.kind === 'page' && measurement.durationMs > 0),
 			JSON.stringify(payload),
 		);
+		const capturesAttachment = results.flatMap((r) => r.attachments).find((e) => e.name === 'visual-captures');
+		assert.ok(capturesAttachment, 'the visual fixture should attach capture metadata');
+		const captures = JSON.parse(Buffer.from(capturesAttachment.body, 'base64').toString('utf8'));
+		assert.equal(captures.length, 1);
+		assert.equal(captures[0].key, '/example');
+		const screenshot = results.flatMap((r) => r.attachments).find((e) => e.name === captures[0].attachmentName);
+		assert.equal(screenshot.contentType, 'image/jpeg');
+		assert.ok((await fs.stat(screenshot.path)).size > 0);
 	} finally {
 		await fs.rm(root, { recursive: true, force: true });
 	}
@@ -157,6 +165,8 @@ test('expands regular Playwright projects and preserves single-run setup/capture
 	assert.deepEqual(cfg.projects.find(({ name: n }) => n === 'app-mobile').dependencies, ['auth-setup']);
 	assert.equal(cfg.projects.find(({ name: n }) => n === 'browser-mobile').use.viewport.width, 390);
 	assert.ok(cfg.reporter.some((r) => Array.isArray(r) && r[0] === '@terra-symposium/standards-reporting/playwright'));
+	const screenshotsOnly = withResponsivePlaywright({ projects: [{ name: 'browser' }] }, { screenshotOnlySlideshow: true });
+	assert.equal(screenshotsOnly.reporter.find((r) => Array.isArray(r) && r[0] === '@terra-symposium/standards-reporting/playwright')[1].screenshotOnlySlideshow, true);
 	process.env.PW_VIEWPORTS = 'md,xl';
 	assert.deepEqual(
 		resolveVisualViewports().map(({ name: n }) => n),
@@ -303,6 +313,72 @@ test('writes neutral spreadsheet and slideshow artifacts', async () => {
 	await writeSlideshow(emptySlideshow, []);
 	const { stdout: emptyNotes } = await execFileAsync('unzip', ['-p', emptySlideshow, 'ppt/slides/slide1.xml']);
 	assert.match(emptyNotes, /No browser test results were collected/);
+});
+
+/* Ensures keyed viewport captures produce image-only PowerPoint slides. */
+test('writes responsive screenshot-only slides', async () => {
+	const root = await fs.mkdtemp(path.join(os.tmpdir(), 'terra-screenshot-slideshow-'));
+	try {
+		const { default: sharp } = await import('sharp');
+		const screenshot = path.join(root, 'capture.png');
+		await sharp({ create: { width: 32, height: 18, channels: 3, background: { r: 40, g: 80, b: 120 } } })
+			.png()
+			.toFile(screenshot);
+		const viewports = [
+			['mobile', '390×844'],
+			['sm', '640×800'],
+			['md', '768×900'],
+			['lg', '1024×768'],
+			['xl', '1280×720'],
+			['2xl', '1536×864'],
+		];
+		const slideshow = path.join(root, 'screenshots.pptx');
+		await writeScreenshotSlideshow(
+			slideshow,
+			viewports.map(([viewport, viewportSize]) => ({ group: 'example route', key: '/example', title: 'Example route', viewport, viewportSize, screenshot })),
+		);
+		const { stdout: slide } = await execFileAsync('unzip', ['-p', slideshow, 'ppt/slides/slide1.xml']);
+		assert.equal((slide.match(/<p:pic>/g) || []).length, 6);
+		assert.doesNotMatch(slide, /<p:sp>/);
+		assert.doesNotMatch(slide, /Example route|mobile|desktop|Load timing/);
+		const { stdout: archive } = await execFileAsync('unzip', ['-l', slideshow]);
+		assert.doesNotMatch(archive, /ppt\/slides\/slide2\.xml/);
+		const reporter = new ProgressReporter({ outputRoot: path.join(root, 'reporter'), screenshotOnlySlideshow: true, loadTesting: { enabled: false } });
+		for (const [viewport] of viewports) {
+			const captureName = 'visual-capture-00001';
+			reporter.onTestEnd(
+				{
+					id: `test-${viewport}`,
+					location: { file: path.join(root, 'routes.spec.ts') },
+					title: 'captures route screenshots',
+					titlePath: () => ['routes.spec.ts', 'captures route screenshots'],
+					parent: { project: () => ({ name: `root-routes-${viewport}` }) },
+				},
+				{
+					attachments: [
+						{
+							name: 'visual-captures',
+							contentType: 'application/json',
+							body: Buffer.from(JSON.stringify([{ attachmentName: captureName, contentType: 'image/jpeg', key: '/example', title: 'Example route' }])),
+						},
+						{ name: captureName, contentType: 'image/jpeg', path: screenshot },
+					],
+					duration: 100,
+					error: undefined,
+					retry: 0,
+					status: 'passed',
+				},
+			);
+		}
+		assert.equal(await reporter.onEnd(), undefined);
+		const runDirectory = (await fs.readdir(path.join(root, 'reporter')))[0];
+		const reporterSlides = path.join(root, 'reporter', runDirectory, 'report.pptx');
+		const { stdout: reporterSlide } = await execFileAsync('unzip', ['-p', reporterSlides, 'ppt/slides/slide1.xml']);
+		assert.equal((reporterSlide.match(/<p:pic>/g) || []).length, 6);
+		assert.doesNotMatch(reporterSlide, /<p:sp>/);
+	} finally {
+		await fs.rm(root, { recursive: true, force: true });
+	}
 });
 
 // Covers timing artifacts, supplemental runner rows, reporter enforcement, and the legacy opt-out. */
