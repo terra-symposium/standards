@@ -14,6 +14,7 @@ import sharp from 'sharp';
 import { createRequire } from 'node:module';
 import { loadGradeCounts } from './load-testing.js';
 import { neutralizeApplicationMetadata } from './metadata.js';
+import { VISUAL_VIEWPORTS } from './viewports.js';
 
 // TYPES
 import type { VisualResult } from './core.js';
@@ -201,6 +202,27 @@ const addResponsiveSlide = async (presentation: Presentation, group: readonly Vi
 };
 /** Optional visible and metadata overrides for a slideshow artifact. */
 export type SlideshowOptions = { title?: string; author?: string; company?: string; subject?: string; loadTestingEnabled?: boolean };
+
+/** A named screenshot collected by the shared Playwright visual-capture fixture. */
+export type ScreenshotCapture = {
+	/** Stable test- and application-scoped group key shared across viewports. */
+	group: string;
+	/** Stable capture key shared across responsive projects. */
+	key: string;
+	/** Optional human-readable label retained as metadata, never printed on a slide. */
+	title: string;
+	/** Responsive viewport name. */
+	viewport: string;
+	/** Human-readable viewport dimensions. */
+	viewportSize: string;
+	/** Accessible screenshot file. */
+	screenshot: string;
+	/** Retry number used to select the final capture for each viewport. */
+	retry?: number;
+};
+
+/** Presentation metadata for screenshot-only captures. */
+export type ScreenshotSlideshowOptions = { title?: string; author?: string; company?: string; subject?: string };
 /** One test result paired with a graded timing measurement for the report. */
 type LoadRow = { result: VisualResult; measurement: NonNullable<VisualResult['loadMeasurements']>[number] };
 /** Adds a run-level load summary slide and names the slowest measurements. */
@@ -303,6 +325,70 @@ export const writeSlideshow = async (file: string, results: readonly VisualResul
 		slide.addText('No browser test results were collected in this run.', { align: 'center', color: COLOURS.muted, fontFace: 'Aptos', fontSize: 16, x: 1.2, y: 3.35, w: 10.9, h: 0.5 });
 	}
 	if (loadEnabled) addLoadDetailSlides(presentation, results);
+	await presentation.writeFile({ fileName: file });
+	await neutralizeApplicationMetadata(file);
+};
+
+/**
+ * Writes keyed Playwright screenshots as responsive comparison slides containing images only.
+ *
+ * @param file Output path for the slideshow artifact.
+ * @param captures Screenshots collected across test projects and viewports.
+ * @param opts Optional presentation metadata overrides.
+ * @returns A promise that resolves after the image-only slideshow has been written.
+ */
+export const writeScreenshotSlideshow = async (file: string, captures: readonly ScreenshotCapture[], opts: ScreenshotSlideshowOptions = {}): Promise<void> => {
+	if (!captures.length) throw new Error('No keyed Playwright screenshots were captured for the screenshot-only slideshow.');
+	const presentation = new /* The runtime package is CommonJS while NodeNext exposes its constructor through a namespace type. */ (
+		createRequire(import.meta.url)('pptxgenjs') as new () => Presentation
+	)();
+	presentation.layout = 'LAYOUT_WIDE';
+	presentation.author = opts.author || 'Test evidence reporter';
+	presentation.company = opts.company || 'Test evidence';
+	presentation.subject = opts.subject || 'Responsive Playwright screenshots';
+	presentation.title = opts.title || 'Playwright screenshots';
+	const groups = new Map<string, ScreenshotCapture[]>();
+	for (const capture of captures) groups.set(capture.group, [...(groups.get(capture.group) || []), capture]);
+	const knownViewports = Object.keys(VISUAL_VIEWPORTS);
+	const viewportWidth = (capture: ScreenshotCapture): number => Number.parseInt(capture.viewportSize.split('×')[0] || '', 10) || Number.MAX_SAFE_INTEGER;
+	const orderedGroups = [...groups.entries()].sort(([first], [second]) => first.localeCompare(second));
+	const slideWidth = 13.333;
+	const slideHeight = 7.5;
+	const margin = 0.08;
+	const gap = 0.08;
+	const columns = 3;
+	const cellWidth = (slideWidth - margin * 2 - gap * (columns - 1)) / columns;
+	for (const [, group] of orderedGroups) {
+		const byViewport = new Map<string, ScreenshotCapture>();
+		for (const capture of group) {
+			const previous = byViewport.get(capture.viewport);
+			if (!previous || (capture.retry || 0) >= (previous.retry || 0)) byViewport.set(capture.viewport, capture);
+		}
+		const ordered = [...byViewport.values()].sort((first, second) => {
+			const firstIndex = knownViewports.indexOf(first.viewport);
+			const secondIndex = knownViewports.indexOf(second.viewport);
+			if (firstIndex >= 0 || secondIndex >= 0) return (firstIndex < 0 ? Number.MAX_SAFE_INTEGER : firstIndex) - (secondIndex < 0 ? Number.MAX_SAFE_INTEGER : secondIndex);
+			return viewportWidth(first) - viewportWidth(second);
+		});
+		const rows = Math.ceil(ordered.length / columns);
+		const cellHeight = (slideHeight - margin * 2 - gap * Math.max(0, rows - 1)) / rows;
+		const slide = presentation.addSlide();
+		slide.background = { color: 'FFFFFF' };
+		for (const [index, capture] of ordered.entries()) {
+			if (!fs.existsSync(capture.screenshot)) throw new Error(`Screenshot is missing for ${capture.key} (${capture.viewport}): ${capture.screenshot}`);
+			const column = index % columns;
+			const row = Math.floor(index / columns);
+			const x = margin + column * (cellWidth + gap);
+			const y = margin + row * (cellHeight + gap);
+			const { data, info } = await sharp(capture.screenshot)
+				.rotate()
+				.resize({ width: 720, height: 405, fit: 'inside', withoutEnlargement: true })
+				.jpeg({ quality: 62, mozjpeg: true })
+				.toBuffer({ resolveWithObject: true });
+			slide.addImage({ data: `data:image/jpeg;base64,${data.toString('base64')}`, ...fitImg(info.width, info.height, x, y, cellWidth, cellHeight) });
+		}
+	}
+	await fs.promises.mkdir(path.dirname(file), { recursive: true });
 	await presentation.writeFile({ fileName: file });
 	await neutralizeApplicationMetadata(file);
 };

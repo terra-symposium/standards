@@ -1,5 +1,11 @@
 # @terra-symposium/standards-reporting
 
+## 0.4.0
+
+### Minor Changes
+
+- Add keyed screenshot capture fixtures and responsive screenshot-only slideshow output.
+
 ## 0.3.0
 
 ### Minor Changes
