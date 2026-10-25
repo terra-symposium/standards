@@ -17,14 +17,14 @@ The package supports Node.js `>=18.18` and `@playwright/test >=1.52.0 <2`. Sprea
 
 ## Entry points
 
-| Import path                             | Use                                                                                                        |
-| --------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| Import path                                       | Use                                                                                                        |
+| ------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
 | `@terra-symposium/standards-reporting` or `/core` | Shared result types and helpers such as `VisualResult`, `ReportRun`, `statusCounts`, and `resultsForFile`. |
-| `/playwright`                           | The `diagnosticsTest` and `loadTest` fixtures, `ReportingOptions`, and `ProgressReporter`.                 |
-| `/viewports`                            | Responsive configuration, the default viewport catalog, and project-name helpers.                          |
-| `/load-testing`                         | Load budget configuration, validation, and grading helpers.                                                |
-| `/spreadsheet`                          | `writeSpreadsheet()` for a normalized `ReportRun`.                                                         |
-| `/slideshow`                            | `writeSlideshow()` for visual results.                                                                     |
+| `/playwright`                                     | The `diagnosticsTest`, `loadTest`, and `visualTest` fixtures, `ReportingOptions`, and `ProgressReporter`.  |
+| `/viewports`                                      | Responsive configuration, the default viewport catalog, and project-name helpers.                          |
+| `/load-testing`                                   | Load budget configuration, validation, and grading helpers.                                                |
+| `/spreadsheet`                                    | `writeSpreadsheet()` for a normalized `ReportRun`.                                                         |
+| `/slideshow`                                      | `writeSlideshow()` for review reports and `writeScreenshotSlideshow()` for image-only screenshot decks.    |
 
 Start with [responsive Playwright integration](/packages/reporting/playwright/). See [load testing](/packages/reporting/load-testing/) for budget setup and [artifact writers](/packages/reporting/artifacts/) for workbook and slideshow output.
 

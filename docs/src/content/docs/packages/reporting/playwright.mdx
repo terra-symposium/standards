@@ -65,11 +65,31 @@ test('account page is healthy', async ({ page }) => {
 
 The fixture records browser console errors and warnings, uncaught page errors, and failed requests, then attaches them as JSON to the Playwright test result. The shared reporter combines these attachments with terminal diagnostics and test outcomes.
 
+## Capture screenshots from a test
+
+Import `visualTest` when one test visits multiple routes or states and each view needs its own screenshot:
+
+```ts
+import { visualTest as test } from '@terra-symposium/standards-reporting/playwright';
+
+test('opens every discovered record', async ({ page, visuals }) => {
+	for (const route of await discoverRoutes(page)) {
+		await page.goto(route);
+		await expect(page.getByRole('main')).toBeVisible();
+		await visuals.capture(route, { title: route });
+	}
+});
+```
+
+Use a stable key such as the route so the reporter matches the same capture across responsive projects. The fixture attaches each screenshot and a manifest to the Playwright result. Its default image is a viewport JPEG; pass `screenshot` options to change the capture settings. Keys must be unique within one test result.
+
+Set `screenshotOnlySlideshow: true` on `withResponsivePlaywright(config, options)` or `ProgressReporter` when the PowerPoint should contain only responsive screenshot slides. `TERRA_SCREENSHOT_ONLY_SLIDESHOW=1` enables the same mode for a single run. Each slide contains the keyed captures as images, with no captions, diagnostics, or timing slides. The workbook and Playwright results continue to contain the test outcomes.
+
 ## Outputs and options
 
 The reporter writes to a timestamped directory under `test-results/visual` by default. It copies native screenshots into the run directory and creates `report.xlsx` and `report.pptx`. The helper uses `test-results/playwright-output` for Playwright's intermediate output directory.
 
-`withResponsivePlaywright(config, options)` accepts `singleRunProjects`, `outputDir`, `outputRoot`, `supplementalResultsFile`, `qualityConfigFile`, and explicit `loadTesting` settings. Supplemental results are added to the workbook. With load timing enabled they also appear in slideshow output without screenshot previews; otherwise the slideshow contains browser results only. See [load testing](/packages/reporting/load-testing/) for timing settings and [artifact writers](/packages/reporting/artifacts/) for direct report generation.
+`withResponsivePlaywright(config, options)` accepts `singleRunProjects`, `outputDir`, `outputRoot`, `supplementalResultsFile`, `qualityConfigFile`, `screenshotOnlySlideshow`, and explicit `loadTesting` settings. Supplemental results are added to the workbook. With load timing enabled they also appear in slideshow output without screenshot previews; otherwise the slideshow contains browser results only. See [load testing](/packages/reporting/load-testing/) for timing settings and [artifact writers](/packages/reporting/artifacts/) for direct report generation.
 
 ## Configure the reporter directly
 
