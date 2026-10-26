@@ -7,7 +7,7 @@
 	"scripts": {
 		"build": "pnpm -r build",
 		"pretest": "pnpm --filter './packages/**' -r build",
-		"test": "node packages/quality/dist/app/workspace-test-runner.js",
+		"test": "node packages/testing/src/cli.mjs run --manifest .terra-tests.json",
 		"prepare": "husky",
 		"prequality": "pnpm --filter @terra-symposium/standards-quality build",
 		"quality": "node packages/quality/dist/lib/runner.js quality --skip-commands --skip-recommendations",

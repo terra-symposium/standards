@@ -1,0 +1,34 @@
+name: Terra test plan
+description: Run a repository test plan once with shared suite validation and reporting.
+inputs:
+  manifest:
+    description: Repository-relative JSON test-plan path.
+    required: false
+    default: .terra-tests.json
+  suites:
+    description: Optional comma-separated suite names. Empty runs every suite in manifest order.
+    required: false
+    default: ''
+  shared-only:
+    description: Run Standards-owned shared checks without repository-specific suites.
+    required: false
+    default: 'false'
+runs:
+  using: composite
+  steps:
+    - name: Run declared test suites
+      shell: bash
+      env:
+        TERRA_TEST_MANIFEST: ${{ inputs.manifest }}
+        TERRA_TEST_SUITES: ${{ inputs.suites }}
+        TERRA_TEST_SHARED_ONLY: ${{ inputs.shared-only }}
+      run: |
+        set -euo pipefail
+        args=(run --root "$GITHUB_WORKSPACE" --manifest "$TERRA_TEST_MANIFEST")
+        if [[ -n "$TERRA_TEST_SUITES" ]]; then
+          args+=(--suites "$TERRA_TEST_SUITES")
+        fi
+        if [[ "$TERRA_TEST_SHARED_ONLY" == "true" ]]; then
+          args+=(--shared-only)
+        fi
+        node "$GITHUB_ACTION_PATH/src/cli.mjs" "${args[@]}"
