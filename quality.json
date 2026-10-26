@@ -12,7 +12,7 @@
 	"renameExports": true,
 	"prettierPrintWidth": 200,
 	"singleUse": {
-		"skippedDirectories": ["test", "tests"]
+		"skippedDirectories": ["test", "tests", "packages/testing/src"]
 	},
 	"github": {
 		"repositories": ["salesphere-vh/salesphere", "Terra-Symposium/terra-symposium-website", "Terra-Symposium/standards", "kaimacann/portfolio"],
