@@ -19,6 +19,7 @@
 - [`git/jules`](./git/jules/SKILL.md) (`jules`) — Bundle Jules-created pull requests into a small set of coherent PRs, carry review feedback forward, commit the verified changes, and retire superseded branches.
 - [`git/pr-review`](./git/pr-review/SKILL.md) (`pr-review`) — Review and disposition requested Git branches and pull requests, fix actionable defects, and verify integration and cleanup. Report evidence, validation gaps, and retained work.
 - [`git/pruning`](./git/pruning/SKILL.md) (`pruning`) — Review and retire requested Git branches and worktrees after confirming their changes are integrated, preserved, superseded, or explicitly abandoned.
+- [`git/repo-file-audit`](./git/repo-file-audit/SKILL.md) (`repo-file-audit`) — Enforce deterministic source ownership, move files into canonical domains, repair affected references, and remove proven dead files.
 - [`git/semver-retcon`](./git/semver-retcon/SKILL.md) (`semver-retcon`) — Rewrite a repository history into a linear, semantically grouped record while preserving production behaviour, commit authorship, and release traceability.
 - [`quality/commenting`](./quality/commenting/SKILL.md) (`commenting`) — Improve source readability by grouping code with meaningful comments, decomposing monolithic modules, and completing accurate TSDoc/JSDoc. Use when reorganizing code or repairing sparse, duplicated, or misleading comments.
 - [`quality/compact`](./quality/compact/SKILL.md) (`compact`) — Reduce documents and source files by removing duplication while preserving meaning, behavior, and comments.
