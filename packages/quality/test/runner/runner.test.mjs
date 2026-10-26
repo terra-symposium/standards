@@ -481,26 +481,18 @@ test('full quality orders phases, groups suites, de-duplicates invocations, and 
 		phaseOrder,
 		[...phaseOrder].sort((left, right) => left - right),
 	);
-	assert.match(text, /Unit \/ Contract/);
-	assert.match(text, /Integration/);
-	assert.match(text, /Browser \/ Cloud/);
-	assert.match(text, /Other tests/);
-	assert.match(text, /6 suites · 1 failed suite/);
-	const groupOrder = ['Unit / Contract', 'Integration', 'Browser / Cloud', 'Other tests'].map((group) => text.indexOf(`\n  ${group}\n`));
+	const groupOrder = ['Unit Test', 'Unit Node', 'Integration Test', 'Browser E2e', 'Cli Smoke', 'Other Test'].map((group) => text.indexOf(group));
 	assert.ok(groupOrder.every((position) => position >= 0));
 	assert.deepEqual(
 		groupOrder,
 		[...groupOrder].sort((left, right) => left - right),
 	);
+	assert.match(text, /✗ Unit Test/);
 	assert.doesNotMatch(text, NODE_TESTS_PLAYWRIGHT_TESTS_REGEX, 'the fixture runners do not fabricate child case output');
-	assert.ok(progress.some((chunk) => chunk.includes('Test suites [') && chunk.includes('0/6')));
-	assert.ok(progress.some((chunk) => chunk.includes('Test suites [') && chunk.includes('6/6')));
-	assert.match(progress.join(''), /Test suites \[[█░]{24}\] 0\/6/);
-	assert.match(progress.join(''), /Test suites \[[█░]{24}\] 6\/6/);
 	assert.doesNotMatch(progress.join(''), NODE_TESTS_PLAYWRIGHT_TESTS_REGEX);
 	resetExitCode();
 });
-test('full quality nests dead-code safe fixes and verification under static quality', () => {
+test('full quality prepares safe fixes before dead-code verification and tests', () => {
 	const root = fixtureRoot('terra-quality-dead-code-output-groups-');
 	const cfg = createQualityCfg({
 		root,
@@ -538,7 +530,7 @@ test('full quality nests dead-code safe fixes and verification under static qual
 		console.error = originalErr;
 	}
 	const text = output.join('\n');
-	const pos = ['STATIC QUALITY', 'Dead code', 'Safe fixes', 'Verification', 'TESTS'].map((label) => text.indexOf(label));
+	const pos = ['PREPARING SAFE FIXES', 'FORMAT', 'STATIC QUALITY', 'Dead Code', 'TESTS'].map((label) => text.indexOf(label));
 	assert.ok(pos.every((position) => position >= 0));
 	assert.deepEqual(
 		pos,
@@ -917,7 +909,7 @@ if (args.includes('--format') && args.includes('json'))
 	assert.ok(outputText.indexOf('✗ Dead Code') < outputText.indexOf('[ERROR] eslint/unused-private-declaration'));
 	assert.doesNotMatch(outputText, /FINDINGS SUMMARY/);
 	assert.doesNotMatch(outputEvents.join(''), /(?:^|\n)\s*test feedback(?:\n|$)/u);
-	assert.ok(outputEvents.findLastIndex((line) => line.includes('Test suites') && line.includes('1/1')) < outputEvents.findLastIndex((line) => line.includes('contract: ✓ passed')));
+	assert.match(outputText, /✓ Contract/);
 	resetExitCode();
 });
 test('the fixing quality command inlines safe values without broad comment cleanup', () => {

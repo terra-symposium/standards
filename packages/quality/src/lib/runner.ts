@@ -818,12 +818,20 @@ function withoutNodeReporterArgs(args: string[]): string[] {
  */
 function uniqueTestSuites(checks: QualityInvocation[]): QualityInvocation[] {
 	const seen = new Set<string>();
-	return checks.filter((check) => {
+	const unique = checks.filter((check) => {
 		const key = JSON.stringify([check.command, check.args ?? []]);
 		if (seen.has(key)) return false;
 		seen.add(key);
 		return true;
 	});
+	const rank = (check: QualityInvocation): number => {
+		const name = check.name.toLowerCase();
+		if (/\bunit\b/u.test(name)) return 0;
+		if (/\bintegration\b/u.test(name)) return 1;
+		if (/\b(?:browser|e2e|playwright)\b/u.test(name) || /\bplaywright\b/u.test([check.command, ...(check.args ?? [])].join(' '))) return 2;
+		return 3;
+	};
+	return unique.sort((left, right) => rank(left) - rank(right));
 }
 
 /**
@@ -1612,7 +1620,7 @@ function parseEslintReports(result: ReturnType<typeof spawnSync>, files: string[
 		if (missing.length) throw new Error(`missing reports for ${missing.join(', ')}`);
 		return reports as EslintReport[];
 	} catch (err) {
-		throw new Error(`ESLint dead-code detector could not read reports for ${files.length} source files: ${err instanceof Error ? err.message : String(err)}`, { cause: err });
+		throw new Error(`ESLint dead-code detector returned invalid JSON or reports for ${files.length} source files: ${err instanceof Error ? err.message : String(err)}`, { cause: err });
 	}
 }
 
@@ -1742,7 +1750,7 @@ function runRecommendationCmds(cfg: QualityCfg): void {
 		} catch (error) {
 			recordQualityFailure(`recommendation:${check.name}`, error);
 		}
-		if (status) process.exitCode = 1;
+		if (status) process.exitCode = status;
 		printCheckStatus(`recommendation:${check.name}`, status ? 1 : 0);
 	}
 }

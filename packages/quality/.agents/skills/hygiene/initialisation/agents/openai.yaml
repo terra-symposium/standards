@@ -1,0 +1,4 @@
+interface:
+  display_name: "Initialisation"
+  short_description: "Set up Husky checks and Changesets versioning"
+  default_prompt: "Use $initialisation to add a safe Husky pre-commit check and Changesets semver tracking to a repository."

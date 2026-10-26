@@ -7,6 +7,8 @@ description: Audit repository environment, build, and security health; improve s
 
 Use for repository hygiene across environment and security health, source readability, and behavior-preserving compaction. Apply the sections that match the requested scope and keep each change within the repository's ownership and validation rules.
 
+For first-time Husky and Changesets setup, use [Initialisation](initialisation/SKILL.md).
+
 ## Repository and environment health
 
 Use for end-to-end build, deployment, and GitHub security health reviews. Read-only inspection is the default; deployment, dependency updates, and vulnerability dismissals require authorization.

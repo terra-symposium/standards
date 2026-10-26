@@ -49,7 +49,6 @@ Use the ordered `tests/suites.json` inventory and the repository's configured sc
 
 ```sh
 pnpm run test:visual
-pnpm run test:visual:all
 pnpm exec playwright test --project=root-public tests/astro/public/public.spec.ts
 pnpm run quality
 pnpm run typecheck:strict
