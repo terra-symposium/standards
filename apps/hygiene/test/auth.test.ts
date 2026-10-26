@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { cookieSecurityAttribute, sessionCookie } from '../src/server/auth.js';
+import { cookieSecurityAttribute, sessionCookie } from '../src/lib/server/auth.js';
 
 test('local loopback sign-in cookies work over the HTTP development server', () => {
   assert.equal(cookieSecurityAttribute('http://127.0.0.1:8888'), '');

@@ -582,7 +582,7 @@ function fnParamName(p: ts.ParameterDeclaration, i: number): string {
  * @param existing Existing TSDoc block, when one is present.
  * @returns Normalized TSDoc text; missing prose remains blank for later authoring.
  */
-function genFnDoc(n: ts.FunctionDeclaration, parsed: ts.SourceFile, eol: string, existing = ''): string {
+function genFnDoc(n: ts.SignatureDeclaration, parsed: ts.SourceFile, eol: string, existing = ''): string {
 	const params = n.parameters.map(fnParamName);
 	const body = existing
 		.slice(3, -2)
@@ -639,17 +639,18 @@ function genFnDoc(n: ts.FunctionDeclaration, parsed: ts.SourceFile, eol: string,
 function maintainFnDocs(src: string, fileName: string, eol: string): string {
 	const parsed = ts.createSourceFile(fileName, src, ts.ScriptTarget.Latest, true, srcKind(fileName));
 	const updates: { start: number; end: number; text: string }[] = [];
-	const fns: ts.FunctionDeclaration[] = [];
+	const fns: ts.SignatureDeclaration[] = [];
 	const visit = (node: ts.Node): void => {
-		if (ts.isFunctionDeclaration(node)) fns.push(node);
+		if (isNamedDocumentationFunction(node)) fns.push(node);
 		ts.forEachChild(node, visit);
 	};
 	visit(parsed);
 	for (const node of fns) {
-		const leading = src.slice(node.getFullStart(), node.getStart(parsed));
+		const target = documentationTarget(node);
+		const leading = src.slice(target.getFullStart(), target.getStart(parsed));
 		const doc = [...leading.matchAll(S_S_G_REGEX())].at(-1);
 		if (!doc || doc.index === undefined) continue;
-		const start = node.getFullStart() + doc.index;
+		const start = target.getFullStart() + doc.index;
 		const indentation = src.slice(src.lastIndexOf('\n', start - 1) + 1, start);
 		const text = genFnDoc(node, parsed, eol, doc[0]).replace(/\r?\n/g, `${eol}${indentation}`);
 		if (text !== doc[0]) updates.push({ start, end: start + doc[0].length, text });
@@ -908,6 +909,17 @@ function documentationSupported(fileName: string): boolean {
 	return /\.(?:c|m)?(?:js|jsx|ts|tsx)$/.test(fileName);
 }
 
+/** Excludes generated and vendored sources from documentation policy checks.
+ * @param cfg Quality configuration defining the repository root.
+ * @param file Absolute source path to classify.
+ * @return Whether the file is outside generated and vendor directories.
+ */
+function documentationSourceIncluded(cfg: QualityCfg, file: string): boolean {
+	return !relative(cfg.root, file)
+		.split(sep)
+		.some((directory) => ['generated', 'vendor', 'target', 'out'].includes(directory));
+}
+
 /**
  * Checks whether a node has a JSDoc or TSDoc block in its leading trivia.
  *
@@ -917,7 +929,8 @@ function documentationSupported(fileName: string): boolean {
  * @return `true` when a documentation comment directly precedes the node.
  */
 function documented(node: ts.Node, src: string): boolean {
-	const leading = src.slice(node.getFullStart(), node.getStart());
+	const target = documentationTarget(node);
+	const leading = src.slice(target.getFullStart(), target.getStart());
 	const docs = [...leading.matchAll(S_S_G_REGEX())];
 	const doc = docs.at(-1);
 	if (!doc) return false;
@@ -925,7 +938,7 @@ function documented(node: ts.Node, src: string): boolean {
 	// the first declaration. Only exclude it when the block is the first
 	// path-bearing TSDoc in the file; a declaration's own later TSDoc remains
 	// valid even when the file also has a header.
-	const blockStart = node.getFullStart() + doc.index!;
+	const blockStart = target.getFullStart() + doc.index!;
 	let prefix = src.slice(0, blockStart).replace(UFEFF_REGEX, '');
 	if (prefix.startsWith('#!')) prefix = prefix.slice(prefix.indexOf('\n') + 1);
 	const docLines = doc[0]!
@@ -955,8 +968,59 @@ function exported(node: ts.Node): boolean {
  * @return Identifier text, or `<anonymous>` when the declaration has no identifier.
  */
 function documentationNodeName(node: ts.Node): string {
+	if (ts.isConstructorDeclaration(node)) return 'constructor';
+	const target = documentationTarget(node);
+	if (target !== node && ts.isVariableStatement(target)) {
+		const declaration = target.declarationList.declarations.find((candidate) => containsNode(candidate, node));
+		if (declaration) return declaration.name.getText();
+	}
 	const candidate = (node as unknown as { name?: ts.Node }).name ?? node;
-	return ts.isIdentifier(candidate) ? candidate.text : '<anonymous>';
+	return ts.isIdentifier(candidate) ? candidate.text : ts.isStringLiteral(candidate) || ts.isNumericLiteral(candidate) ? candidate.text : candidate === node ? '<anonymous>' : candidate.getText();
+}
+
+/** Finds the declaration that owns documentation for a named function value.
+ * @param node Function-like declaration or expression to resolve.
+ * @return Variable statement for a named function value, otherwise node itself.
+ */
+function documentationTarget(node: ts.Node): ts.Node {
+	if (ts.isArrowFunction(node) || ts.isFunctionExpression(node)) {
+		if (ts.isVariableDeclaration(node.parent) && node.parent.initializer === node) {
+			let target: ts.Node = node.parent;
+			while (target.parent && !ts.isVariableStatement(target)) target = target.parent;
+			return target;
+		}
+	}
+	return node;
+}
+
+/** Checks whether a function-like declaration has a stable name and needs its own documentation.
+ * @param node Syntax node to inspect.
+ * @return Whether node is a named function, method, constructor, or named function value.
+ */
+function isNamedDocumentationFunction(node: ts.Node): node is ts.SignatureDeclaration {
+	if (!ts.isFunctionLike(node)) return false;
+	if (
+		ts.isFunctionDeclaration(node) ||
+		ts.isMethodDeclaration(node) ||
+		ts.isConstructorDeclaration(node) ||
+		ts.isGetAccessorDeclaration(node) ||
+		ts.isSetAccessorDeclaration(node) ||
+		ts.isMethodSignature(node)
+	)
+		return true;
+	if (ts.isFunctionExpression(node)) return Boolean(node.name) || documentationTarget(node) !== node;
+	if (ts.isArrowFunction(node)) return documentationTarget(node) !== node;
+	return false;
+}
+
+/** Tests whether an AST node is nested under a declaration.
+ * @param parent Candidate ancestor node.
+ * @param target Node whose ancestors should be searched.
+ * @return Whether target is parent or a descendant of parent.
+ */
+function containsNode(parent: ts.Node, target: ts.Node): boolean {
+	for (let node: ts.Node | undefined = target; node; node = node.parent) if (node === parent) return true;
+	return false;
 }
 
 /**
@@ -1052,7 +1116,8 @@ function tsdocTagEntries(lines: TSDocLine[]): { tag: string; subject: string; de
 			n += 1;
 		}
 		const rawContent = content.join(' ').trim();
-		const subject = tag.toLowerCase() === 'param' || tag.toLowerCase() === 'typeparam' ? (rawContent.replace(S_CLASS_5, '').split(/\s+/)[0] ?? '') : '';
+		const paramText = rawContent.replace(/^\{[^}]*\}\s*/, '').split(/\s+/)[0] ?? '';
+		const subject = tag.toLowerCase() === 'param' ? paramText.replace(/^\[/, '').replace(/\]$/, '').split('=')[0]! : tag.toLowerCase() === 'typeparam' ? paramText : '';
 		entries.push({ tag, subject, description: tagDescription(tag, rawContent), offset: lines[idx]!.offset });
 		idx = n - 1;
 	}
@@ -1066,7 +1131,9 @@ function tsdocTagEntries(lines: TSDocLine[]): { tag: string; subject: string; de
  *
  * @return `true` when callers can receive a value rather than only completion.
  */
-function returnsVal(node: ts.FunctionDeclaration): boolean {
+function returnsVal(node: ts.SignatureDeclaration): boolean {
+	if (ts.isConstructorDeclaration(node) || ts.isSetAccessorDeclaration(node)) return false;
+	if (ts.isArrowFunction(node) && !ts.isBlock(node.body)) return true;
 	const returnType = node.type?.getText().replace(/\s+/g, '') ?? '';
 	if (returnType === 'void' || returnType === 'Promise<void>') return false;
 	if (node.type) return true;
@@ -1076,7 +1143,7 @@ function returnsVal(node: ts.FunctionDeclaration): boolean {
 		if (ts.isReturnStatement(child) && child.expression) valReturn = true;
 		ts.forEachChild(child, visit);
 	};
-	if (node.body) visit(node.body);
+	if ('body' in node && node.body) visit(node.body);
 	return valReturn;
 }
 
@@ -1089,7 +1156,8 @@ function returnsVal(node: ts.FunctionDeclaration): boolean {
  * @return The attached TSDoc block, or `undefined` when the declaration is undocumented.
  */
 function documentationBlockFor(src: string, node: ts.Node): TSDocBlock | undefined {
-	const ranges = ts.getLeadingCommentRanges(src, node.getFullStart()) ?? [];
+	const target = documentationTarget(node);
+	const ranges = ts.getLeadingCommentRanges(src, target.getFullStart()) ?? [];
 	const range = ranges.at(-1);
 	if (!range || range.kind !== ts.SyntaxKind.MultiLineCommentTrivia || !src.slice(range.pos, range.end).startsWith('/**')) return undefined;
 	return { start: range.pos, end: range.end, text: src.slice(range.pos, range.end) };
@@ -1208,7 +1276,7 @@ function documentationFindingsForFile(cfg: QualityCfg, file: string, requirement
 	const visit = (node: ts.Node): void => {
 		const isType = ts.isClassDeclaration(node) || ts.isEnumDeclaration(node) || ts.isInterfaceDeclaration(node) || ts.isTypeAliasDeclaration(node);
 		if (requirements.types && isType && !documented(node, src)) findings.push(documentationReport(file, parsed, node, documentationNodeName(node), 'type', 'add TSDoc for this type', cfg));
-		if (ts.isFunctionDeclaration(node)) {
+		if (isNamedDocumentationFunction(node)) {
 			const needsDoc = requirements.functions || (requirements.exportedFunctions && exported(node));
 			if (needsDoc) {
 				if (!documented(node, src)) {
@@ -1245,10 +1313,12 @@ function documentationFindingsForFile(cfg: QualityCfg, file: string, requirement
  * @return Documentation findings across the configured source scope.
  */
 export function documentationFindings(cfg: QualityCfg, analysis?: QualityAnalysis): DocumentationFinding[] {
-	const requirements = cfg.documentation?.required ?? {};
+	const requirements = { functions: true, ...cfg.documentation?.required };
 	return analysis?.files
-		? analysis.files.flatMap((f) => documentationFindingsForFile(cfg, f, requirements, analysis))
-		: srcFiles(cfg).flatMap((f) => documentationFindingsForFile(cfg, f, requirements));
+		? analysis.files.filter((file) => documentationSourceIncluded(cfg, file)).flatMap((f) => documentationFindingsForFile(cfg, f, requirements, analysis))
+		: srcFiles(cfg)
+				.filter((file) => documentationSourceIncluded(cfg, file))
+				.flatMap((f) => documentationFindingsForFile(cfg, f, requirements));
 }
 
 /**
@@ -1261,17 +1331,16 @@ export function documentationFindings(cfg: QualityCfg, analysis?: QualityAnalysi
  * @return `true` when one or more scaffolds were inserted.
  */
 export function documentSrcFile(cfg: QualityCfg, file: string): boolean {
-	if (!documentationSupported(file)) return false;
-	const requirements = cfg.documentation?.required;
-	if (!requirements) return false;
+	if (!documentationSupported(file) || !documentationSourceIncluded(cfg, file)) return false;
+	const requirements = { functions: true, ...cfg.documentation?.required };
 	const src = readFileSync(file, 'utf8');
 	const parsed = ts.createSourceFile(file, src, ts.ScriptTarget.Latest, true, documentationScriptKind(file));
 	const insertions: number[] = [];
 	const visit = (node: ts.Node): void => {
 		const isType = ts.isClassDeclaration(node) || ts.isEnumDeclaration(node) || ts.isInterfaceDeclaration(node) || ts.isTypeAliasDeclaration(node);
-		const isFn = ts.isFunctionDeclaration(node);
+		const isFn = isNamedDocumentationFunction(node);
 		const needsFn = isFn && (requirements.functions || (requirements.exportedFunctions && exported(node)));
-		if (((requirements.types && isType) || needsFn) && !documented(node, src)) insertions.push(node.getStart(parsed));
+		if (((requirements.types && isType) || needsFn) && !documented(node, src)) insertions.push(documentationTarget(node).getStart(parsed));
 		ts.forEachChild(node, visit);
 	};
 	visit(parsed);

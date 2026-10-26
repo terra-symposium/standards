@@ -29,7 +29,7 @@ import { securityFindings } from './security.js';
 import { accessibilityFindings, fixAccessibleNames } from './accessibility.js';
 import { displayNameFindings, fixDisplayNames } from './display-name.js';
 import { uiComponentRecommendations } from './ui-recommendations.js';
-import { inspectLanguageProfileTool, isLanguageProfileId, resolveLanguageProfiles } from './language-profiles.js';
+import { inspectLanguageProfileTool, isLanguageProfileId, LANGUAGE_CAPABILITIES, resolveLanguageProfiles } from './language-profiles.js';
 import { spawnSync } from 'node:child_process';
 import { Worker } from 'node:worker_threads';
 import { srcFiles, workingSrcFiles } from './files.js';
@@ -107,7 +107,8 @@ export type QualityJsonReport = {
 	generatedAt: string;
 	command: string;
 	scope: 'all' | 'changed';
-	checks: { name: string; status: 'passed' | 'findings' | 'failed' | 'skipped'; findings: number }[];
+	checks: { name: string; status: 'passed' | 'findings' | 'failed' | 'skipped' | 'not-applicable'; findings: number; reason?: string }[];
+	capabilities: { language: string; kind: 'check' | 'autofix'; name: string; status: 'supported' | 'not-applicable'; provider: string; reason?: string }[];
 	github?: GitHubReport;
 };
 let reportStages: Map<string, QualityJsonReport['checks'][number]> | undefined;
@@ -219,6 +220,7 @@ type QualityInvocation = NonNullable<QualityCfg['qualityCommands']>[number] & {
 	phase?: LanguageQualityPhase;
 	profileId?: string;
 	profileTool?: LanguageProfileTool;
+	qualityChecks?: QualityCheckName[];
 };
 /**
  * Fixed phase assigned to a selected quality command.
@@ -976,7 +978,9 @@ function qualityInvocations(cfg: QualityCfg, profileChecks: ResolvedLanguageChec
 	const configuredByName = new Map(configured.map((check) => [check.name, check]));
 	const profileInvocations = profileChecks.map((check): QualityInvocation => {
 		const override = configuredByName.get(check.name);
-		return override ? { ...override, phase: check.phase } : { name: check.name, command: check.command, args: check.args, phase: check.phase, profileId: check.profileId, profileTool: check.tool };
+		return override
+			? { ...override, phase: check.phase, profileId: check.profileId, qualityChecks: check.qualityChecks }
+			: { name: check.name, command: check.command, args: check.args, phase: check.phase, profileId: check.profileId, profileTool: check.tool, qualityChecks: check.qualityChecks };
 	});
 	return [...profileInvocations, ...configured.filter((check) => !profileNames.has(check.name))];
 }
@@ -1023,7 +1027,13 @@ function runQualityPhase(cfg: QualityCfg, phase: QualityPhase, profileChecks: Re
 		let status = 1;
 		try {
 			requireProfileTool(check);
-			status = run(cfg, check.command, check.args ?? []);
+			const args = [...(check.args ?? [])].flatMap((argument) => {
+				if (argument !== '{classes}') return [argument];
+				const classes = [resolve(cfg.root, 'target/classes'), resolve(cfg.root, 'build/classes/java/main')].filter((path) => existsSync(path) && statSync(path).isDirectory());
+				if (!classes.length) throw new Error('SpotBugs requires compiled Java classes. Configure a build command before repository health checks or override java-spotbugs for the project.');
+				return classes;
+			});
+			status = run(cfg, check.command, args);
 		} catch (error) {
 			const stage = reportStages?.get(`command:${check.name}`);
 			if (stage) stage.status = 'failed';
@@ -1051,8 +1061,39 @@ function reportSkippedLanguageChecks(cfg: QualityCfg, skipped: SkippedLanguageCh
 	for (const check of skipped) {
 		if (!qualityCmdEnabled(cfg, check.name)) continue;
 		const name = `command:${check.name}`;
-		if (reportStages) reportStages.set(name, { name, status: 'skipped', findings: 0 });
+		if (reportStages) reportStages.set(name, { name, status: 'skipped', findings: 0, reason: check.reason });
 		console.error(`  ↷ ${qualityLabel(check.name)} skipped: ${check.reason}.`);
+	}
+}
+
+/** Marks required profile configuration failures without stopping unrelated checks. */
+function reportFailedLanguageChecks(cfg: QualityCfg, failed: SkippedLanguageCheck[]): void {
+	for (const check of failed) {
+		if (!qualityCmdEnabled(cfg, check.name)) continue;
+		const name = `command:${check.name}`;
+		if (reportStages) reportStages.set(name, { name, status: 'failed', findings: 1, reason: check.reason });
+		process.exitCode = 1;
+		console.error(`  ✗ ${qualityLabel(check.name)} failed: ${check.reason}.`);
+	}
+}
+
+/** Applies profile-provided safe fixes while preserving the normal read-only check commands. */
+function runLanguageProfileFixes(cfg: QualityCfg, checks: ResolvedLanguageCheck[], toolResults: Map<string, ReturnType<typeof inspectLanguageProfileTool>>): void {
+	for (const check of checks) {
+		if (!check.autofix || cfg.qualityCommands?.some((command) => command.name === check.name) || !qualityAutofixEnabled(cfg, check.autofix.name) || !qualityCmdEnabled(cfg, check.name)) continue;
+		if (check.tool) {
+			const toolKey = JSON.stringify([check.tool.command, check.tool.versionArgs, check.tool.minimumVersion]);
+			let toolResult = toolResults.get(toolKey);
+			if (!toolResult) {
+				toolResult = inspectLanguageProfileTool(check.tool, cfg.root);
+				toolResults.set(toolKey, toolResult);
+			}
+			if (toolResult.error) throw new Error(toolResult.error);
+		}
+		const args = check.autofix.args.flatMap((argument) => (argument === '{files}' ? check.files : [argument]));
+		const result = spawnSync(check.autofix.command, args, { cwd: cfg.root, stdio: 'inherit' });
+		if (result.error) throw result.error;
+		if (result.status !== 0) throw new Error(`${check.autofix.command} exited with status ${result.status ?? 1}`);
 	}
 }
 
@@ -3061,12 +3102,20 @@ export function runQualityCli(cfg: QualityCfg, args = process.argv.slice(2)): vo
 			'ui-patterns',
 			'github',
 		];
+		const capabilities = Object.entries(LANGUAGE_CAPABILITIES).flatMap(([language, capability]) => [
+			...Object.entries(capability.checks).map(([name, item]) => ({ language, kind: 'check' as const, name, ...item })),
+			...Object.entries(capability.autofixes).map(([name, item]) => ({ language, kind: 'autofix' as const, name, ...item })),
+		]);
+		const notApplicableChecks = capabilities
+			.filter((item) => item.kind === 'check' && item.status === 'not-applicable')
+			.map((item) => ({ name: `${item.language}:${item.name}`, status: 'not-applicable' as const, findings: 0, reason: item.reason }));
 		const report: QualityJsonReport = {
 			schemaVersion: 1,
 			generatedAt: new Date().toISOString(),
 			command: cmdArgs.find((arg) => !arg.startsWith('-')) ?? 'quality',
 			scope: cmdArgs.includes('--all') || cmdArgs.includes('quality:all') ? 'all' : 'changed',
-			checks: [...executed, ...standard.filter((name) => !executed.some((s) => s.name === name)).map((name) => ({ name, status: 'skipped' as const, findings: 0 }))],
+			checks: [...executed, ...standard.filter((name) => !executed.some((s) => s.name === name)).map((name) => ({ name, status: 'skipped' as const, findings: 0 })), ...notApplicableChecks],
+			capabilities,
 			...(reportGitHubData ? { github: reportGitHubData } : {}),
 		};
 		writeFileSync(resolve(cfg.root, reportPath), `${JSON.stringify(report, null, 2)}\n`);
@@ -3096,9 +3145,12 @@ function runFullQuality(cfg: QualityCfg, args: string[], opts: QualityOptions): 
 	process.exitCode = 0;
 	qualityCheckName = undefined;
 	qualityDetails = [];
-	const profileResolution = opts.skipCommands ? { checks: [], skipped: [] } : resolveLanguageProfiles(cfg);
+	const profileResolution = opts.skipCommands ? { checks: [], skipped: [], failed: [] } : resolveLanguageProfiles(cfg);
 	const profileToolResults = new Map<string, ReturnType<typeof inspectLanguageProfileTool>>();
-	if (!opts.skipCommands) reportSkippedLanguageChecks(cfg, profileResolution.skipped);
+	if (!opts.skipCommands) {
+		reportSkippedLanguageChecks(cfg, profileResolution.skipped);
+		reportFailedLanguageChecks(cfg, profileResolution.failed);
+	}
 	const runConfiguredCommands = (phase: QualityPhase): number => runQualityPhase(cfg, phase, profileResolution.checks, profileToolResults);
 	const fix = (check: QualityAutofixName): boolean => qualityAutofixEnabled(cfg, check, opts.fix);
 	const scoped = scopedCfg(cfg, opts.all);
@@ -3155,6 +3207,8 @@ function runFullQuality(cfg: QualityCfg, args: string[], opts: QualityOptions): 
 			for (const file of new Set(repeated.map((finding) => finding.file))) maintainSrcFile(cfg.root, file);
 		});
 	}
+	if (opts.fix && !opts.skipCommands && profileResolution.checks.some((check) => check.autofix))
+		safeFix('native language fixes', () => runLanguageProfileFixes(cfg, profileResolution.checks, profileToolResults));
 	if (opts.fix) {
 		stopQualitySpinner();
 		console.error(`  ${safeFixFailed ? '✗' : '✓'} Safe Fixes`);

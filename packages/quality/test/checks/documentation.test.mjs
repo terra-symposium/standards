@@ -30,6 +30,18 @@ import { fixtureFile, fixtureRoot, fixtureText } from '../../support/fixtures.mj
 TESTS
 //////////////////////////////////////////////////*/
 
+test('documentation policy excludes generated and vendor source trees', () => {
+	const root = fixtureRoot('terra-quality-documentation-pruned-');
+	fixtureFile(root, 'src/main.ts', 'function documentedScope() { return true; }\n');
+	fixtureFile(root, 'src/generated/generated.ts', 'function generatedHelper() { return true; }\n');
+	fixtureFile(root, 'src/vendor/vendor.ts', 'function vendorHelper() { return true; }\n');
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
+	assert.deepEqual(
+		documentationFindings(cfg).map(({ name }) => name),
+		['documentedScope'],
+	);
+});
+
 test('documented commands diagnose and fix only deprecated pnpm directory flags in configured shell fences', () => {
 	const root = fixtureRoot('terra-quality-documented-commands-');
 	fixtureFile(
@@ -125,8 +137,39 @@ void [privateHelper, publicHelper, arrowHelper, expressionHelper, documented];
 			['type', 'MissingClass', 'error'],
 			['type', 'MissingStatus', 'error'],
 			['function', 'publicHelper', 'error'],
-			['inline', '<anonymous>', 'error'],
-			['inline', '<anonymous>', 'error'],
+			['inline', 'arrowHelper', 'error'],
+			['inline', 'expressionHelper', 'error'],
+		],
+	);
+});
+
+test('default function policy requires docs for private methods, constructors, and named function values but ignores callbacks', () => {
+	const root = fixtureRoot('terra-quality-document-all-named-functions-');
+	fixtureFile(
+		root,
+		'src/main.ts',
+		`/** src/main.ts */
+class Box {
+  /** Describes a value lookup. */
+  private lookup(key: string): string { return key; }
+  constructor(seed: string) { void seed; }
+  close(): void {}
+}
+function helper(value: number): number { return value; }
+const namedArrow = (flag: boolean) => flag;
+[1].forEach((item) => void item);
+`,
+	);
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
+	assert.deepEqual(
+		documentationFindings(cfg).map(({ kind, name }) => [kind, name]),
+		[
+			['param', '@param key'],
+			['return', '@return'],
+			['function', 'constructor'],
+			['function', 'close'],
+			['function', 'helper'],
+			['function', 'namedArrow'],
 		],
 	);
 });
@@ -234,6 +277,7 @@ void [read, incomplete, commentText];
 			['summary', '<TSDoc summary>', 'add a meaningful description for this TSDoc block'],
 			['param', '@param missing', 'add a meaningful description for @param missing'],
 			['tag', '@deprecated', 'add a meaningful description for @deprecated'],
+			['return', '@return', 'document the value returned by this function'],
 		],
 	);
 	assert.ok(findings.every((f) => f.severity === 'error'));
@@ -265,6 +309,7 @@ test('documentation description audit continues after nested template expression
 			['summary', '<TSDoc summary>'],
 			['param', '@param value'],
 			['return', '@return'],
+			['param', '@param input'],
 		],
 	);
 });
@@ -293,7 +338,7 @@ void [existing, missing, publicMissing, inline];
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], documentation: { required: { types: true, functions: true, exportedFunctions: true, noInlineFunctions: true } } });
 	assert.equal(documentSrcFile(cfg, file), true);
 	const first = fixtureText(root, 'src/main.ts');
-	assert.equal((first.match(/\/\*\*\n \*\n \*\//g) ?? []).length, 3);
+	assert.equal((first.match(/\/\*\*\n \*\n \*\//g) ?? []).length, 4);
 	assert.equal(first.includes('Existing description.'), true);
 	assert.equal(first.includes('function missing'), true);
 	assert.equal(first.includes('export function publicMissing'), true);

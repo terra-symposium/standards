@@ -717,12 +717,14 @@ export function useDashboardConfigurationDialog(initialConfigure: DashboardConfi
 	runQualityCli(cfg, ['quality', '--all', '--skip-commands', '--skip-recommendations']);
 	const src = fixtureText(root, 'src/main.ts');
 	assert.match(src, /@param initialConfigure\n \* @param allowed\n \*\n \* @return/);
-	assert.equal(fixtureText(root, 'src/unrelated.ts'), 'function privateHelper() { return true; }\n');
+	assert.match(fixtureText(root, 'src/unrelated.ts'), /@return[\s\S]*function privateHelper\(\)/);
 	assert.deepEqual(
 		runQuality(cfg).documentation.map((f) => [f.kind, f.name, f.severity]),
 		[
 			['param', '@param initialConfigure', 'error'],
 			['param', '@param allowed', 'error'],
+			['return', '@return', 'error'],
+			['summary', '<TSDoc summary>', 'error'],
 			['return', '@return', 'error'],
 		],
 	);

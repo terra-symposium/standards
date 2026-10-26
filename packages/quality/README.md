@@ -36,7 +36,7 @@ This starting configuration uses the built-in checks without requiring external 
 
 ## Native language profiles
 
-Terra Quality keeps its built-in syntax analysis scoped to JavaScript and TypeScript. Opt into native checks with `languageProfiles`; each profile discovers its own file extensions under `sourceRoots`, so `.c`, `.java`, and `.py` files are not sent through the TypeScript analyzer. For a repository with no JavaScript or TypeScript sources, leave `extensions` empty:
+Terra Quality keeps its built-in syntax analysis scoped to JavaScript and TypeScript. Opt into the full C, Java, or Python check suite with `languageProfiles`; each profile discovers its own file extensions under `sourceRoots`, so native files are not sent through the TypeScript analyzer. Function documentation checks are discovered automatically for all four supported language groups whenever their sources appear under `sourceRoots`. For a repository with no JavaScript or TypeScript sources, leave `extensions` empty:
 
 ```json
 {
@@ -47,25 +47,25 @@ Terra Quality keeps its built-in syntax analysis scoped to JavaScript and TypeSc
 }
 ```
 
-Profiles run only when matching source exists. They skip checks for absent source or optional project configuration, and fail with the required minimum version and installation guidance when a needed tool is missing or too old. Terra Quality never installs tools. Pin native tool versions in the repository or CI image for reproducible runs.
+Selected profiles run only when matching source exists. Checks skip when their language source is absent and fail with the required minimum version and installation guidance when a needed tool or required configuration is missing. Terra Quality never installs tools. Pin native tool versions in the repository or CI image for reproducible runs. JSON reports include the complete check/autofix capability map, including explicit not-applicable entries and reasons.
 
-| Profile  | Default checks                                                                                                                                                                                                                                               | Native prerequisites                                         |
-| -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------ |
-| `c`      | [`clang-format`](https://clang.llvm.org/docs/ClangFormat.html) format check; [Clang Static Analyzer](https://clang.llvm.org/docs/ClangStaticAnalyzer.html) of `.c` files; [Doxygen](https://www.doxygen.nl/manual/config.html) when a root `Doxyfile` exists | LLVM/Clang 14+; Doxygen 1.9+ for configured docs             |
-| `java`   | [`google-java-format`](https://github.com/google/google-java-format) format check; [Checkstyle](https://checkstyle.org/getting-started.html) using its bundled `google_checks.xml`                                                                           | `google-java-format` 1.14+; Checkstyle 10+; a compatible JDK |
-| `python` | [Ruff](https://docs.astral.sh/ruff/) format and lint checks for `.py` and `.pyi`                                                                                                                                                                             | Ruff 0.1+                                                    |
+| Profile  | Default checks                                                                                                 | Native prerequisites                                                                                 |
+| -------- | -------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `c`      | clang-format; clang-tidy and Clang Static Analyzer; strict Doxygen documentation coverage                      | LLVM/Clang 14+; Doxygen 1.9+ and a root `Doxyfile`                                                   |
+| `java`   | google-java-format; Checkstyle with all-access Javadocs; PMD source rules; SpotBugs on compiled classes        | google-java-format 1.14+; Checkstyle 10+; PMD 7+; SpotBugs 4.8+; compatible JDK and compiled classes |
+| `python` | Ruff format/lint; mypy; Bandit; Vulture; interrogate and pydoclint documentation coverage for `.py` and `.pyi` | Ruff 0.1+; mypy 1+; Bandit 1.7+; Vulture 2+; interrogate 1.7+; pydoclint 0.11+                       |
 
 For example, on macOS install the native tools with Homebrew and add Ruff to a Python project with uv:
 
 ```sh
-brew install llvm doxygen google-java-format checkstyle
+brew install llvm doxygen google-java-format checkstyle pmd spotbugs
 export PATH="$(brew --prefix llvm)/bin:$PATH"
-uv add --dev ruff
+uv add --dev ruff mypy bandit vulture interrogate pydoclint
 ```
 
-On Debian or Ubuntu, install the C tools with `sudo apt-get install clang clang-format doxygen`; install the Java and Python tools with the package manager or project wrappers used by that repository. The profile check prints its tested minimum if the installed version is too old.
+On Debian or Ubuntu, install the C tools with `sudo apt-get install clang clang-format clang-tidy doxygen`; install the Java and Python tools with the package manager or project wrappers used by that repository. The profile check prints its tested minimum if the installed version is too old.
 
-Build and test commands remain repository-owned. Add them to `qualityCommands` using the project’s existing Make, Maven, Gradle, Python, or other wrapper. A configured command whose name matches a profile check replaces that default; other commands run alongside the profiles. For example:
+Build and test commands remain repository-owned. Add them to `qualityCommands` using the project’s existing Make, Maven, Gradle, Python, or other wrapper. A configured command whose name matches a profile check replaces that default; other commands run alongside the profiles. SpotBugs runs in repository health after build commands and accepts Maven `target/classes` or Gradle `build/classes/java/main`; override `java-spotbugs` for a different build layout. For example:
 
 ```json
 {

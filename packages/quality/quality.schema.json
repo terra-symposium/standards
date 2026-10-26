@@ -38,7 +38,11 @@
 					"type": "object",
 					"properties": {
 						"types": { "type": "boolean" },
-						"functions": { "type": "boolean", "description": "Require TSDoc for named functions, including substantive descriptions for every parameter." },
+						"functions": {
+							"type": "boolean",
+							"default": true,
+							"description": "Require documentation for every named function, method, and constructor in configured source roots, including parameter and return documentation where applicable. Defaults to true for every supported language."
+						},
 						"exportedFunctions": { "type": "boolean", "description": "Require TSDoc for exported named functions, including substantive descriptions for every parameter." },
 						"noInlineFunctions": { "type": "boolean" }
 					},
@@ -144,7 +148,7 @@
 			"type": "array",
 			"uniqueItems": true,
 			"items": { "enum": ["c", "java", "python"] },
-			"description": "Optional native-language command profiles. Profiles only run checks when matching source files are present."
+			"description": "Optional native-language quality profiles. Documentation coverage is always discovered for supported languages with source files; selecting a profile enables its remaining native checks."
 		},
 		"qualityCommands": {
 			"$ref": "#/$defs/commands",

@@ -30,11 +30,13 @@
 	},
 	"files": [
 		"dist",
-		"quality.schema.json"
+		"quality.schema.json",
+		"quality-configs"
 	],
 	"scripts": {
 		"build": "tsc -p tsconfig.json",
 		"prepare": "npm run build",
+		"pretest": "npm run build",
 		"test": "node --test"
 	},
 	"dependencies": {

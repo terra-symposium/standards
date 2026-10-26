@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto';
-import { session, canReadRepository } from '../../src/server/auth.js';
-import { db } from '../../src/server/db.js';
-import { hashReportToken } from '../../src/server/report-auth.js';
+import { session, canReadRepository } from '../../src/lib/server/auth.js';
+import { db } from '../../src/lib/server/db.js';
+import { hashReportToken } from '../../src/lib/server/report-auth.js';
 
 export default async function handler(request: Request): Promise<Response> {
 	if (request.method !== 'POST') return new Response('Method not allowed', { status: 405 });
