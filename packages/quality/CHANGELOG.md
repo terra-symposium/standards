@@ -1,5 +1,63 @@
 # @terra-symposium/standards-quality
 
+## 2.0.6
+
+### Patch Changes
+
+- Animate quality check spinners during synchronous work and print each check's findings immediately under its result.
+
+## 2.0.5
+
+### Patch Changes
+
+- Show each quality check as it starts and finishes, and continue the full run after individual checks fail so all errors are reported together.
+
+## 2.0.4
+
+### Patch Changes
+
+- Show each configured quality check before it runs and report its result afterward.
+
+## 2.0.3
+
+### Patch Changes
+
+- Run full ESLint and Prettier file sets in one invocation when they fit the argument limit, avoiding repeated project and file discovery.
+
+## 2.0.2
+
+### Patch Changes
+
+- Disable ESLint's internal concurrency after its runtime reported a lower linting ratio. Keep the reused ESLint engine and file batches, which measured faster for the website's full check without changing findings.
+
+## 2.0.1
+
+### Patch Changes
+
+- Honor configured source exclusions, group full-run diagnostics after completed progress, and reuse a bounded ESLint engine to reduce quality-run overhead.
+
+## 2.0.0
+
+### Major Changes
+
+- acdba7a: Treat every quality finding as an error and remove non-blocking warning policies.
+
+### Patch Changes
+
+- Wait for each test suite's progress to finish before printing its output, and group all quality findings at the end of the run.
+
+## 1.0.0
+
+### Major Changes
+
+- Remove repository-specific source exclusion settings so configured source roots are scanned consistently. Update consumer `quality.json` files that use removed exclusion fields.
+
+## 0.10.0
+
+### Minor Changes
+
+- 7e75525: Add safe JSX accessible-name and React forwardRef display-name checks and autofixes.
+
 ## 0.9.1
 
 ### Patch Changes

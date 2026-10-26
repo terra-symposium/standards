@@ -1,7 +1,7 @@
-import { db } from '../../src/server/db.js';
-import { ingestBuildReport } from '../../src/server/ingest.js';
-import { parseBuildReport } from '../../src/server/history.js';
-import { matchesReportToken } from '../../src/server/report-auth.js';
+import { db } from '../../src/lib/server/db.js';
+import { ingestBuildReport } from '../../src/lib/server/ingest.js';
+import { parseBuildReport } from '../../src/lib/server/history.js';
+import { matchesReportToken } from '../../src/lib/server/report-auth.js';
 
 const MAX_REPORT_BYTES = 5_500_000;
 const SNAPSHOT_INTERVAL_MS = 7 * 24 * 60 * 60 * 1000;

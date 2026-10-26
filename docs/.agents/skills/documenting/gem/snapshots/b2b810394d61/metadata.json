@@ -1,0 +1,31 @@
+{
+	"snapshotStatus": "live-metadata-captured-in-dia-instruction-partial",
+	"gem": {
+		"id": "b2b810394d61",
+		"name": "Document",
+		"description": "Write markdown docs for terra docs."
+	},
+	"lastObserved": "2026-10-23",
+	"source": "Live Gemini Gem editor inspected in Dia during this task.",
+	"citationSetting": {
+		"disableKnowledgeCitations": true
+	},
+	"generationContext": {
+		"conversationMode": "Thinking",
+		"note": "Conversation model mode is separate from saved Gem metadata."
+	},
+	"unverifiedFields": [
+		"exact saved instruction text (the accessibility capture truncates long text fields)"
+	],
+	"repositoryReferences": {
+		"localGenerationPrompt": "scripts/generation/_gemini.ts#geminiPrompt",
+		"generationConfig": "scripts/generation/_config.json",
+		"gemMaintenanceSkill": ".agents/skills/documenting/gem/SKILL.md"
+	},
+	"notes": [
+		"The local generation prompt is not evidence of the saved Gem instruction.",
+		"The editor shows two persistent knowledge attachments: 003-fast-mode-contract-mtwdj8lj.md and docs-mtwdj8n8.tsx.",
+		"Conversation uploads are not the same as persistent Gem knowledge attachments.",
+		"Do not copy authentication state, cookies, or credentials into this snapshot."
+	]
+}

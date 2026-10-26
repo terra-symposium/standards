@@ -10,7 +10,7 @@ IMPORTS
 // API
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import QualityPlaywrightReporter from '../../dist/playwright-reporter.js';
+import QualityPlaywrightReporter from '../../dist/lib/playwright-reporter.js';
 
 /*//////////////////////////////////////////////////
 HELPERS

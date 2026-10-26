@@ -1,0 +1,7 @@
+interface:
+  display_name: 'Hygiene'
+  short_description: 'Audit repo health, improve source clarity, and compact files safely'
+  default_prompt: 'Use $hygiene to audit build, deployment, and security health; improve source readability with useful comments; or compact documents and code without changing behavior.'
+
+policy:
+  allow_implicit_invocation: true

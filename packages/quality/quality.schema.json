@@ -9,30 +9,40 @@
 		"root": { "type": "string" },
 		"sourceRoots": { "type": "array", "items": { "type": "string" } },
 		"includeRoots": { "type": "array", "items": { "type": "string" } },
+		"skippedDirectories": { "type": "array", "items": { "type": "string" }, "description": "Directory names or repository-relative directory paths excluded from source discovery." },
+		"skippedFiles": { "type": "array", "items": { "type": "string" }, "description": "Repository-relative files excluded from source discovery." },
+		"singleUse": {
+			"type": "object",
+			"properties": {
+				"skippedDirectories": {
+					"type": "array",
+					"items": { "type": "string" },
+					"description": "Directory names, repository-relative paths, or files excluded as single-use declaration candidates while remaining available as references."
+				}
+			},
+			"additionalProperties": false
+		},
 		"extensions": { "type": "array", "items": { "type": "string", "pattern": "^\\." } },
 		"aliases": { "type": "object", "additionalProperties": { "type": "string" } },
 		"frameworkEntryExports": { "type": "object", "additionalProperties": { "type": "array", "items": { "type": "string" } } },
 		"externalPrefixes": { "type": "array", "items": { "type": "string" } },
-		"skippedDirectories": { "type": "array", "items": { "type": "string" } },
-		"skippedFiles": { "type": "array", "items": { "type": "string" } },
-		"excludeTests": { "type": "boolean", "description": "Exclude files ending in .test.* and .spec.* from configured quality source scans." },
-		"singleUse": {
-			"type": "object",
-			"properties": { "skippedDirectories": { "type": "array", "items": { "type": "string" } } },
-			"additionalProperties": false
-		},
 		"renameExports": { "type": "boolean" },
 		"protectedIdentifiers": { "type": "array", "items": { "type": "string" } },
-		"enabledChecks": { "$ref": "#/$defs/toggles" },
-		"autofix": { "$ref": "#/$defs/toggles" },
+		"enabledChecks": { "$ref": "#/$defs/checkToggles" },
+		"autofix": { "$ref": "#/$defs/autofixToggles" },
 		"documentation": {
 			"type": "object",
 			"properties": {
+				"commandRoots": { "type": "array", "items": { "type": "string" }, "description": "Markdown roots where fenced pnpm commands are checked for deprecated directory flags." },
 				"required": {
 					"type": "object",
 					"properties": {
 						"types": { "type": "boolean" },
-						"functions": { "type": "boolean", "description": "Require TSDoc for named functions, including substantive descriptions for every parameter." },
+						"functions": {
+							"type": "boolean",
+							"default": true,
+							"description": "Require documentation for every named function, method, and constructor in configured source roots, including parameter and return documentation where applicable. Defaults to true for every supported language."
+						},
 						"exportedFunctions": { "type": "boolean", "description": "Require TSDoc for exported named functions, including substantive descriptions for every parameter." },
 						"noInlineFunctions": { "type": "boolean" }
 					},
@@ -64,8 +74,7 @@
 			"type": "object",
 			"properties": {
 				"minimumCount": { "type": "number" },
-				"extensions": { "type": "array", "items": { "type": "string" } },
-				"ignoredDirectories": { "type": "array", "items": { "type": "string" } }
+				"extensions": { "type": "array", "items": { "type": "string" } }
 			},
 			"additionalProperties": false
 		},
@@ -74,7 +83,6 @@
 			"properties": {
 				"minimumCount": { "type": "number" },
 				"extensions": { "type": "array", "items": { "type": "string" } },
-				"ignoredFiles": { "type": "array", "items": { "type": "string" } },
 				"sharedModule": { "type": "string", "minLength": 1 }
 			},
 			"additionalProperties": false
@@ -83,10 +91,18 @@
 			"type": "object",
 			"properties": {
 				"forbidden": { "type": "array", "items": { "type": "string" } },
-				"ignoredFiles": { "type": "array", "items": { "type": "string" } },
 				"extensions": { "type": "array", "items": { "type": "string" } }
 			},
 			"additionalProperties": false
+		},
+		"performancePatterns": {
+			"type": "object",
+			"properties": {
+				"extensions": { "type": "array", "items": { "type": "string", "pattern": "^\\." } },
+				"ignoredFiles": { "type": "array", "items": { "type": "string" } }
+			},
+			"additionalProperties": false,
+			"description": "Opt-in advisory scan for repeated linear collection lookups inside collection callbacks."
 		},
 		"uiRecommendations": {
 			"type": "object",
@@ -122,27 +138,23 @@
 					"type": "array",
 					"uniqueItems": true,
 					"items": { "enum": ["dependencyGraph", "dependabotAlerts", "malwareAlerts", "securityUpdates", "versionUpdates", "groupedUpdates", "secretScanning", "pushProtection", "codeScanning"] }
-				},
-				"featureExemptions": {
-					"type": "object",
-					"propertyNames": { "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$" },
-					"additionalProperties": {
-						"type": "array",
-						"uniqueItems": true,
-						"items": { "enum": ["dependencyGraph", "dependabotAlerts", "malwareAlerts", "securityUpdates", "versionUpdates", "groupedUpdates", "secretScanning", "pushProtection", "codeScanning"] }
-					}
 				}
 			},
 			"additionalProperties": false
 		},
 		"enabledCommands": { "type": "object", "additionalProperties": { "type": "boolean" } },
 		"enabledRecommendations": { "type": "object", "additionalProperties": { "type": "boolean" } },
+		"languageProfiles": {
+			"type": "array",
+			"uniqueItems": true,
+			"items": { "enum": ["c", "java", "python"] },
+			"description": "Optional native-language quality profiles. Documentation coverage is always discovered for supported languages with source files; selecting a profile enables its remaining native checks."
+		},
 		"qualityCommands": {
 			"$ref": "#/$defs/commands",
 			"description": "Commands selected for the quality run. Terra Quality owns phase order and test grouping; array order is preserved within ordinary phases and within each test group."
 		},
 		"recommendationCommands": { "$ref": "#/$defs/commands" },
-		"manualWarnings": { "enum": ["error", "warning"], "default": "error", "description": "Whether dead-code findings that require manual review block quality. Defaults to error." },
 		"tsconfig": { "type": "string" },
 		"oneLineImports": { "type": "boolean" },
 		"prettierPrintWidth": { "type": "number" },
@@ -171,7 +183,28 @@
 		"tools": { "type": "object", "additionalProperties": { "type": "string" } }
 	},
 	"$defs": {
-		"toggles": { "type": "object", "additionalProperties": { "type": "boolean" } },
+		"checkToggles": {
+			"type": "object",
+			"properties": {
+				"accessibility": {
+					"type": "boolean",
+					"description": "Opt-in check for source-evident accessible names and decorative inline SVG exposure on native JSX controls and explicit interactive roles."
+				},
+				"display-name": { "type": "boolean", "description": "Opt-in check for direct React forwardRef declarations without displayName." },
+				"performance-patterns": { "type": "boolean", "description": "Reports configured syntax patterns that may repeat work in collection callbacks; advisory only." },
+				"documented-commands": { "type": "boolean", "description": "Checks deprecated pnpm directory flags in configured Markdown shell fences." }
+			},
+			"additionalProperties": { "type": "boolean" }
+		},
+		"autofixToggles": {
+			"type": "object",
+			"properties": {
+				"accessibility": { "type": "boolean", "description": "Copies a literal title into aria-label or hides an unnamed inline SVG inside an already named control." },
+				"displayName": { "type": "boolean", "description": "Adds a conventional displayName to a direct named forwardRef declaration." },
+				"documentedCommands": { "type": "boolean", "description": "Rewrites pnpm -C and --prefix to the repository's canonical --dir flag in configured Markdown shell fences." }
+			},
+			"additionalProperties": { "type": "boolean" }
+		},
 		"loadBudget": {
 			"type": "object",
 			"properties": {

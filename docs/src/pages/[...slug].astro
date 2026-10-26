@@ -1,0 +1,42 @@
+---
+import { DocsLocalWorkspace } from '@terra-symposium/docs';
+import type { DocsHostTreeNode, DocsLocalPage } from '@terra-symposium/docs';
+import '@terra-symposium/docs/style.css';
+import '../styles/tailwind.css';
+import SkillsExplorer from '../components/SkillsExplorer.tsx';
+import { entries } from '../lib/docs-data.js';
+
+export function getStaticPaths() {
+	return entries.map(page => ({ params: { slug: page.slug || undefined }, props: { page } }));
+}
+const { page } = Astro.props;
+const categories = [...new Set(entries.map(entry => entry.slug.split('/')[0] || 'Overview'))];
+const docs: DocsLocalPage[] = entries.map(entry => ({
+	id: entry.slug || 'index',
+	path: `content/docs/${entry.slug || 'index'}.mdx`,
+	pathname: entry.slug ? `/${entry.slug}/` : '/',
+	title: entry.title,
+	...(entry.description ? { description: entry.description } : {}),
+	markdown: entry.markdown,
+}));
+const tree: DocsHostTreeNode[] = categories.map(category => {
+	const slug = category === 'Overview' ? 'overview' : category;
+	return {
+		type: 'branch', origName: slug, title: category === 'Overview' ? 'Overview' : category.replace(/-/g, ' ').replace(/\b\w/g, letter => letter.toUpperCase()), path: slug,
+		children: [{
+			type: 'branch', origName: `${slug}/guides`, title: 'Guides', path: `${slug}/guides`,
+			children: entries.filter(entry => (entry.slug.split('/')[0] || 'Overview') === category).map(entry => ({
+				type: 'leaf' as const, origName: entry.slug || 'index', title: entry.title, path: `content/docs/${entry.slug || 'index'}.mdx`, url: entry.slug ? `/${entry.slug}/` : '/', permission: 'read' as const,
+			})),
+		}],
+	};
+});
+---
+<!doctype html>
+<html lang="en">
+	<head><meta charset="utf-8" /><meta name="viewport" content="width=device-width,initial-scale=1" /><meta name="robots" content="noindex, nofollow" /><title>{page.title} · Standards</title><meta name="description" content={page.description} /></head>
+	<body>
+		<DocsLocalWorkspace client:load tree={tree} pages={docs} pathname={Astro.url.pathname} title="Standards" description="Documentation for shared Terra Symposium packages and tools." rootPath="/" homePath="/" />
+		{page.slug === 'skills' && <section class="standards-docs-hero"><SkillsExplorer client:load /></section>}
+	</body>
+</html>

@@ -1,5 +1,5 @@
-import { session, canReadRepository } from '../../src/server/auth.js';
-import { db } from '../../src/server/db.js';
+import { session, canReadRepository } from '../../src/lib/server/auth.js';
+import { db } from '../../src/lib/server/db.js';
 
 export default async function handler(request: Request): Promise<Response> {
   const user = await session(request);

@@ -14,7 +14,7 @@ Dead-code is one static-quality group with two explicit stages:
 
 - **Safe fixes:** Knip import consumers; ESLint unused declarations; single-use declaration/reference scans and candidate classification; apply only proven rewrites.
 - **Verification:** Knip unused-file/export/dependency reachability; final ESLint and single-use findings; TypeScript safety checks for proposed edits.
-- **Manual findings:** stable file/line/rule/name order; blocking errors by default; `manualWarnings: "warning"` is the explicit override. Continue every configured check before returning failure. Print: “Resolve each manual finding one by one, in the order listed, before committing.”
+- **Manual findings:** stable file/line/rule/name order; all findings are errors. Continue every configured check before returning failure.
 
 ```text
 Before                         After
@@ -67,8 +67,8 @@ Each bullet is one top-level `node:test` case. Nested assertions remain within t
 
 #### `files.test.mjs` (4)
 
-- source discovery handles nested roots, include roots, exclusions, direct files, and files created during a run
-- excludeTests omits test and spec files from quality source discovery
+- source discovery handles nested roots, include roots, direct files, and files created during a run
+- Test and spec files are included in quality source discovery when their extensions are configured
 - working-tree discovery includes modified and untracked sources but excludes ignored files
 - path utilities distinguish files, directories, missing paths, and repository-relative display names
 
@@ -79,14 +79,14 @@ Each bullet is one top-level `node:test` case. Nested assertions remain within t
 
 #### `patterns.test.mjs` (11)
 
-- repeated-class detection normalizes whitespace and ignores dynamic, one-word, test, and configured paths
-- UI pattern detection applies configured extensions and ignored repository-relative files
+- repeated-class detection normalizes whitespace and ignores dynamic and one-word values
+- UI pattern detection applies configured extensions to all matching files
 - regex deduplication inventories literals and RegExp constructors across configured source files
 - repeated-class fixer creates deterministic file-local CLASSES constants and leaves dynamic/HTML sources alone
 - regex fixer deduplicates stateless literals and preserves fresh stateful instances through factories
 - shared regex registry rewrites TypeScript and MJS literals and constructors with relative namespace imports
 - shared regex export allocation avoids names already owned by the registry
-- shared regex fixer leaves a duplicate group advisory when any consumer is CommonJS
+- shared regex fixer leaves a duplicate group unchanged when any consumer is CommonJS
 - shared regex fixer does not overwrite an unowned registry or partially rewrite consumers
 - Tailwind canonical diagnostics support missing configuration, missing stylesheets, skipped v4 packages, fixes, and nested stylesheet loading
 - Tailwind canonical diagnostics cleanly skip a package without the unstable v4 API
@@ -155,14 +155,14 @@ Each bullet is one top-level `node:test` case. Nested assertions remain within t
 - package entry exports are preserved without exempting private declarations in the same module
 - single-use fixing never removes a multi-use explicit-any compatibility alias
 - single-use scope includes every configured directory and reports manual cases explicitly
-- single-use skipped directories exclude candidates but still count their references
+- single-use analysis includes candidates in every configured directory
 - single-use fixer does not treat an export specifier as a local consumer
 - single-use analysis ignores destructuring bindings as declaration consumers
 - single-use analysis keeps cross-file closures and write-target values intact
 - single-use fixing retains object values referenced through typeof
 - single-use fixer reports functions in call, JSX, and type-query positions for review
 
-### Runner and progress (118)
+### Runner and progress (125)
 
 #### `port.test.mjs` (2)
 
@@ -173,11 +173,21 @@ Each bullet is one top-level `node:test` case. Nested assertions remain within t
 
 - progress updates always include a bar and rewrite one line even without a TTY
 
+#### `language-profiles.test.mjs` (7)
+
+- language profiles resolve only matching source files and optional project checks
+- selected profiles with no matching sources are reported as skipped
+- configuration rejects duplicate and unknown language profile identifiers
+- profile tool checks enforce their minimum version and include installation guidance
+- selected profiles fail clearly when a required tool is missing
+- C, Java, and Python profiles invoke their native checks in phase order
+- profile defaults can be overridden while arbitrary language commands remain available
+
 #### `quality.test.mjs` (61)
 
 - consolidated quality modules expose their behavior from the public package entrypoint
 - the published runtime dependency stays within the supported TypeScript API major
-- documentation warnings identify missing summary and tag descriptions without generating prose
+- documentation errors identify missing summary and tag descriptions without generating prose
 - resolves aliases and extensionless relative imports
 - does not recommend shape-changing forwarding or persistence payload rewrites
 - quality accepts individual changed files as scoped source roots
@@ -207,7 +217,7 @@ Each bullet is one top-level `node:test` case. Nested assertions remain within t
 - protects long one-line imports from Prettier wrapping
 - domain runs one configured quality command
 - alias fixer preserves generic aliases and generic references
-- naming supports warning-only and automatic-fix modes
+- naming supports read-only and automatic-fix modes
 - naming applies whole-word image aliases and prefix-only state aliases
 - naming leaves Astro frontmatter, framework properties, and markup unchanged
 - naming preserves shorthand property keys while renaming their values
@@ -261,23 +271,23 @@ Each bullet is one top-level `node:test` case. Nested assertions remain within t
 - runQuality honors disabled findings categories without leaking a failure status
 - quality autofix fills missing TSDoc tags then reports blank prose for agent assistance
 - CLI lint applies its autofix policy while the Knip audit remains read-only
-- CLI lint updates progress after each ten-file ESLint batch
+- CLI lint passes the complete source set to ESLint in one invocation
 - quality:all reports duplicate imports read-only and consolidates them idempotently in autofix mode
-- full quality routes unused-variable findings through dead-code once and honors the manual warning policy
+- full quality routes unused-variable findings through dead-code once and treats findings as errors
 - the fixing quality command inlines safe values without broad comment cleanup
 - dead-code reports private unused functions and removes only the proven declaration
 - dead-code scans the full scope once and applies same-file fixes before rescanning only changed files
 - dead-code runs only the configured unused-variable rule through the local flat-config API
 - dead-code CLI fails read-only for safe single-use fixes, then inlines the primitive value
 - dead-code warn preview copies formatter and browser-test configs before comparing Knip findings
-- dead-code CLI reports detached TSDoc as a read-only, actionable warning when configured
+- dead-code CLI reports detached TSDoc as a read-only, actionable error
 - dead-code removes unused private type declarations with their attached TSDoc
-- dead-code removes inert unused values and reports effectful initializers as configurable agent warnings
+- dead-code removes inert unused values and reports effectful initializers as errors
 - dead-code never removes an exported function because one nested callback parameter is unused
 - dead-code fails closed when ESLint returns malformed detector output
 - dead-code accepts complete ESLint reports larger than the default subprocess buffer
 - dead-code retains private Knip exports beside named framework entry exports
-- dead-code reports a contradictory Knip result as a non-blocking actionable warning
+- dead-code reports a contradictory Knip result as a blocking error
 - dead-code warn reports manual findings with explicit autofix status and makes no source edits
 - dead-code reports Astro-consumed exports when Knip disagrees without modifying them
 - read-only dead-code preview copies shared support modules outside configured source roots
@@ -290,7 +300,7 @@ Each bullet is one top-level `node:test` case. Nested assertions remain within t
 - dead-code fails closed when Knip exits unsuccessfully with an empty inventory
 - dead-code validates the full Knip inventory before changing any export
 - dead-code fails closed when ESLint omits a configured source file
-- CLI recommendation execution is opt-in per invocation and recommendation failures remain non-blocking
+- CLI recommendation execution is opt-in per invocation and command failures block quality
 - CLI UI-pattern dispatch reports findings through the process exit status
 - quality CLI checks and autofixes Tailwind canonical-class suggestions
 

@@ -1,0 +1,4 @@
+interface:
+  display_name: 'Terra Weekly Review'
+  short_description: 'Create a verified weekly contributor deck'
+  default_prompt: 'Review the last seven days of Terra commits and create a presentation grouped by contributor, with concise code evidence and verified UI screenshots when available.'

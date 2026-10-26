@@ -3,23 +3,50 @@
 	"root": ".",
 	"sourceRoots": ["packages", "scripts"],
 	"extensions": [".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx", ".mts", ".cts"],
-	"tools": { "eslint": "eslint", "knip": "knip", "prettier": "prettier" },
+	"tools": {
+		"eslint": "eslint",
+		"knip": "knip",
+		"prettier": "prettier"
+	},
 	"oneLineImports": true,
-	"singleUse": { "skippedDirectories": ["packages/quality", "packages/reporting"] },
 	"renameExports": true,
 	"prettierPrintWidth": 200,
 	"github": {
 		"repositories": ["salesphere-vh/salesphere", "Terra-Symposium/terra-symposium-website", "Terra-Symposium/standards", "kaimacann/portfolio"],
-		"requiredFeatures": ["dependencyGraph", "dependabotAlerts", "malwareAlerts", "securityUpdates", "versionUpdates", "groupedUpdates"],
-		"featureExemptions": {
-			"salesphere-vh/salesphere": ["dependencyGraph", "dependabotAlerts", "malwareAlerts", "securityUpdates", "versionUpdates", "groupedUpdates"]
-		}
+		"requiredFeatures": ["dependencyGraph", "dependabotAlerts", "malwareAlerts", "securityUpdates", "versionUpdates", "groupedUpdates"]
 	},
 	"qualityCommands": [
-		{ "name": "build", "command": "pnpm", "args": ["run", "build"] },
-		{ "name": "test", "command": "pnpm", "args": ["run", "test"] }
+		{
+			"name": "build",
+			"command": "pnpm",
+			"args": ["run", "build"]
+		},
+		{
+			"name": "test",
+			"command": "pnpm",
+			"args": ["run", "test"]
+		}
 	],
-	"documentation": { "required": { "types": true, "functions": true, "exportedFunctions": true, "noInlineFunctions": false } },
-	"tailwindCanonical": { "stylesheet": "docs/src/tailwind.css", "sourceRoots": ["docs/src/components"] },
-	"enabledChecks": { "format": true, "lint": true, "knip": true, "type": true, "recommend": true, "name": true, "alias": true, "tailwind-canonical": true }
+	"documentation": {
+		"required": {
+			"types": true,
+			"functions": true,
+			"exportedFunctions": true,
+			"noInlineFunctions": false
+		}
+	},
+	"tailwindCanonical": {
+		"stylesheet": "docs/src/styles/tailwind.css",
+		"sourceRoots": ["docs/src/components"]
+	},
+	"enabledChecks": {
+		"format": true,
+		"lint": true,
+		"knip": true,
+		"type": true,
+		"recommend": true,
+		"name": true,
+		"alias": true,
+		"tailwind-canonical": true
+	}
 }

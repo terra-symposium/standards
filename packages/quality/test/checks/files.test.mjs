@@ -21,7 +21,7 @@ import { join } from 'node:path';
 TESTS
 //////////////////////////////////////////////////*/
 
-test('source discovery handles nested roots, include roots, exclusions, direct files, and files created during a run', () => {
+test('source discovery scans configured roots and include roots, handles direct files, and sees files created during a run', () => {
 	const root = fixtureRoot('terra-quality-files-');
 	const main = fixtureFile(root, 'src/main.ts', 'export const main = true;\n');
 	fixtureFile(root, 'src/nested/keep.ts', 'export const keep = true;\n');
@@ -30,22 +30,21 @@ test('source discovery handles nested roots, include roots, exclusions, direct f
 	fixtureFile(root, 'src/ignored/generated.ts', 'export const generated = true;\n');
 	fixtureFile(root, 'include/index.js', 'export const included = true;\n');
 	fixtureFile(root, 'include/notes.md', '# not source\n');
-	const cfg = createQualityCfg({ root, sourceRoots: ['src'], includeRoots: ['include'], extensions: ['.ts', '.js'], skippedDirectories: ['ignored'], skippedFiles: ['src/nested/skip.ts'] });
-	assert.deepEqual(srcFiles(cfg), [main, join(root, 'include/index.js'), join(root, 'src/nested/keep.ts')].sort());
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], includeRoots: ['include'], extensions: ['.ts', '.js'] });
+	const discovered = [main, join(root, 'include/index.js'), join(root, 'src/ignored/generated.ts'), join(root, 'src/nested/keep.ts'), join(root, 'src/nested/skip.ts')].sort();
+	assert.deepEqual(srcFiles(cfg), discovered);
 	fixtureFile(root, 'src/new.ts', 'export const newFile = true;\n');
-	assert.deepEqual(srcFiles(cfg), [main, join(root, 'include/index.js'), join(root, 'src/nested/keep.ts'), join(root, 'src/new.ts')].sort());
+	assert.deepEqual(srcFiles(cfg), [...discovered, join(root, 'src/new.ts')].sort());
 	assert.deepEqual(srcFiles(createQualityCfg({ root, sourceRoots: [main], extensions: ['.ts'] })), [main]);
 	assert.deepEqual(srcFiles(createQualityCfg({ root, sourceRoots: ['does-not-exist'], extensions: ['.ts'] })), []);
 });
-test('excludeTests omits test and spec files from quality source discovery', () => {
+test('source discovery includes test and spec files under configured roots', () => {
 	const root = fixtureRoot('terra-quality-exclude-tests-');
 	const implementation = fixtureFile(root, 'src/feature.ts', 'export const feature = true;\n');
 	fixtureFile(root, 'src/feature.test.ts', 'export const testFeature = true;\n');
 	fixtureFile(root, 'src/feature.spec.tsx', 'export const specFeature = true;\n');
-	const withTests = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts', '.tsx'] });
-	const withoutTests = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts', '.tsx'], excludeTests: true });
-	assert.equal(srcFiles(withTests).length, 3);
-	assert.deepEqual(srcFiles(withoutTests), [implementation]);
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts', '.tsx'] });
+	assert.deepEqual(srcFiles(cfg), [implementation, join(root, 'src/feature.spec.tsx'), join(root, 'src/feature.test.ts')].sort());
 });
 test('working-tree discovery includes modified and untracked sources but excludes ignored files', () => {
 	const root = fixtureRoot('terra-quality-working-files-');

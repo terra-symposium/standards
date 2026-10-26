@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import { cookieSecurityAttribute } from '../../src/server/auth.js';
+import { cookieSecurityAttribute } from '../../src/lib/server/auth.js';
 
 export default async function handler(): Promise<Response> {
   const state = randomBytes(24).toString('base64url');

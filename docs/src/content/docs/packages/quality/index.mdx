@@ -19,7 +19,7 @@ Terra Quality does not install project tools or create their native configuratio
 
 The CLI reads `quality.json` from the current working directory unless a library caller supplies another path. It resolves configured paths from the config file's directory or its explicit `root`, selects changed and untracked files by default, and runs enabled checks in order. Pass `--all` to scan the full configured source scope.
 
-Fix mode is the default for the normal quality workflow. It applies enabled, syntax-aware transformations and tool fixes. Pass `--warn` for a read-only run. Configured quality commands run unless skipped; advisory recommendations do not fail the run.
+Fix mode is the default for the normal quality workflow. It applies enabled, syntax-aware transformations and tool fixes. Pass `--warn` for a read-only run. Configured quality commands run unless skipped; every reported quality finding fails the run.
 
 ## Compatibility
 
@@ -116,7 +116,7 @@ Resolve local imports using configured roots, extensions, and aliases.
 
 Resolves relative and aliased imports in the configured source scope, including supported extensionless paths, index modules, and module forms. It reports unresolved local targets; there is no autofix because choosing a replacement requires semantic judgment.
 
-Configure `sourceRoots`, `extensions`, `aliases`, `externalPrefixes`, `skippedDirectories`, and `skippedFiles`. External prefixes mark intentionally external namespaces; aliases map import prefixes to repository paths. Keep exemptions narrow so they do not hide broken local imports.
+Configure `sourceRoots`, `extensions`, `aliases`, and `externalPrefixes`. External prefixes mark intentionally external namespaces; aliases map import prefixes to repository paths. All matching files under configured roots are scanned.
 
 **Before** — the relative target does not exist:
 
@@ -138,7 +138,7 @@ Find naming drift and apply safe syntax-aware identifier renames.
 
 Finds naming drift and safely renames whole words or prefixes after checking syntax, scope, collisions, protected paths, exports, shorthand properties, and JSX. Ambiguous or conflicting edits remain findings.
 
-Use `protectedIdentifiers` for stable domain names, public vocabulary, and abbreviations. Export renaming is off by default; enable it with `renameExports`. `--strict` fails on naming errors; `--warn` reports without renaming. Review API-facing edits before accepting them.
+Use `protectedIdentifiers` for stable domain names, public vocabulary, and abbreviations. Export renaming is off by default; enable it with `renameExports`. `--warn` checks without renaming, and naming findings still fail the run. Review API-facing edits before accepting them.
 
 **Before** — `command` is a configured long-word replacement:
 
@@ -153,6 +153,22 @@ run(commandName);
 const cmdName = 'build';
 run(cmdName);
 ```
+
+#### Accessibility
+
+Opt in with `enabledChecks.accessibility: true`. The check inspects native JSX controls and elements with explicit interactive roles for a source-evident accessible name. It recognizes ARIA names, associated labels, static child text, and image alternatives. Fix mode copies a literal `title` to `aria-label` only when the element has no visible or uncertain content, and adds `aria-hidden="true"` to an unnamed inline SVG only when its parent control already has a clear name. It does not invent labels or alter keyboard behavior.
+
+#### React display names
+
+Opt in with `enabledChecks.display-name: true`. The check finds direct named `forwardRef` components without a conventional `displayName`. Fix mode adds the component's own name only when the declaration and insertion point are unambiguous; existing custom assignments and wrapped components are left unchanged.
+
+#### Documented package commands
+
+Opt in with `enabledChecks.documented-commands: true` and configure `documentation.commandRoots`. The check scans fenced `sh`, `bash`, `zsh`, or `shell` blocks for pnpm directory flags `-C` and `--prefix`. Fix mode changes those exact command forms to `--dir`; prose, other executables, and other code fences are preserved. This filesystem-only scan is cheap and can stay on the changed-file path when the configured roots are scoped to maintained documentation.
+
+#### Performance patterns
+
+The opt-in `performancePatterns` check reports stable linear lookups such as `find`, `filter`, `includes`, `indexOf`, and `some` nested inside collection callbacks. It is advisory and never rewrites loops: use representative before/after measurements to decide whether precomputing an index preserves ordering, duplicate handling, and update semantics. Keep browser, broad integration, and benchmark validation in explicit or scheduled commands, and share expensive setup across cases in an existing suite.
 
 #### Lint
 
@@ -257,7 +273,7 @@ Identify repeated property forwarding and distinguish it from intentional projec
 
 **Toggle:** `enabledChecks.forward` · **Fix:** `autofix.forward`
 
-Finds object literals forwarding at least three properties from one source (for example, `userId: input.userId`). Safe fixes remove exact redundant properties after an existing spread; whole-object replacement and projections remain advisory.
+Finds object literals forwarding at least three properties from one source (for example, `userId: input.userId`). Safe fixes remove exact redundant properties after an existing spread. Whole-object replacement and projections are excluded because they can change object shape.
 
 “Forwarding” is syntactic repetition, not proof of equal object contracts; a “projection” intentionally selects a subset. Keep projections explicit at persistence, authorization, redaction, schema, versioning, and API boundaries. Common mutation names (`insert`, `update`, `upsert`, `set`, `assign`) are ignored.
 
@@ -304,7 +320,7 @@ Find declarations with one in-scope consumer and optionally inline them.
 
 Counts in-scope consumers of types, interfaces, functions, and variables. The fixing run can inline declarations with exactly one; rewrites are syntax-checked before writing, generated grouping comments/detached TSDoc are cleaned, and declaration docs/meaningful inline comments are preserved.
 
-Set `singleUse.skippedDirectories` to exempt component or shared-code folders without disabling other checks. `--warn` checks without edits. One in-scope consumer does not prove conceptual privacy; review API and framework conventions.
+Single-use analysis covers all matching files under configured roots. `--warn` checks without edits. One consumer does not prove conceptual privacy; review API and framework conventions.
 
 **Before** — a local value has exactly one consumer:
 
@@ -374,9 +390,9 @@ Detect and optionally extract repeated static class strings.
 
 **Toggle:** `enabledChecks.repeated-classes` plus `repeatedClasses` config · **Fix:** `autofix.repeatedClasses` · **Command:** `repeated-classes`
 
-Counts repeated static class strings in configured extensions. Safe fixes extract repeated file-local literals into `CONFIG` or `CLASSES` constants; dynamic class expressions and cross-file design decisions remain advisory.
+Counts repeated static class strings in configured extensions. Safe fixes extract repeated file-local literals into `CONFIG` or `CLASSES` constants; dynamic class expressions and cross-file design decisions are excluded.
 
-Configure `minimumCount`, `extensions`, and `ignoredDirectories`. Move repetition that indicates a shared UI primitive into the appropriate component or design-system abstraction.
+Configure `minimumCount` and `extensions`. Move repetition that indicates a shared UI primitive into the appropriate component or design-system abstraction.
 
 **Before** — the same static classes appear in several JSX nodes:
 
@@ -404,7 +420,7 @@ Detect duplicate regular-expression sources and consolidate supported literals.
 
 Detects duplicate regex literals and supported constructors. Safe fixes extract file-local, non-stateful duplicates into `CONFIG` or `REGEX` constants. Set `sharedModule` to a repository-relative `.mjs` path and provide a matching `.d.mts` declaration to enable cross-file ESM factories; otherwise fixes stay file-local.
 
-Configure `minimumCount`, `extensions`, and `ignoredFiles`. Stateful regex flags and incompatible CommonJS consumers remain advisory because sharing may change behavior.
+Configure `minimumCount`, `extensions`, and `ignoredFiles`. Stateful regex flags and incompatible CommonJS consumers are excluded because sharing may change behavior.
 
 **Before** — the same non-stateful expression is constructed twice:
 
@@ -431,7 +447,7 @@ Report configured UI patterns that should use shared primitives.
 
 Searches configured extensions for forbidden UI pattern strings and reports matches; it does not rewrite components because choosing the shared primitive requires design judgment.
 
-Configure `uiPatterns.forbidden`, `extensions`, and `ignoredFiles`. Keep patterns specific enough to catch duplication without flagging intentional exceptions.
+Configure `uiPatterns.forbidden` and `extensions`. Keep patterns specific enough to catch duplication.
 
 For example, configure a repeated bespoke button class as a forbidden pattern:
 
@@ -499,7 +515,7 @@ terra-quality tailwind-canonical --warn
 terra-quality tailwind-canonical
 ```
 
-For example, `border-[var(--sl-color-gray-5)]` becomes `border-(--sl-color-gray-5)`. Disable the check with `enabledChecks["tailwind-canonical"]: false`, or keep diagnostics while disabling writes with `autofix.tailwindCanonical: false`.
+For example, `border-[var(--color-border)]` becomes `border-(--color-border)`. Disable the check with `enabledChecks["tailwind-canonical"]: false`, or keep diagnostics while disabling writes with `autofix.tailwindCanonical: false`.
 
 The package API is also available:
 
@@ -552,11 +568,11 @@ Run one configured command with `pnpm exec terra-quality domain test`.
 
 #### Recommend
 
-Run optional advisory repository commands without blocking delivery.
+Run optional repository commands as part of quality validation.
 
 **Toggle:** `enabledChecks.recommend` and `enabledRecommendations.<name>` · **Fix:** none
 
-Runs `recommendationCommands` after primary checks and shows output. Its subprocess status never fails the quality run, making it suitable for migration hints and cleanup reports.
+Runs `recommendationCommands` after primary checks and shows output. A nonzero subprocess status fails the quality run.
 
 Items use `name`, `command`, and optional `args`; changes they make follow the command's own contract. Use `--skip-recommendations` to skip once.
 
@@ -566,7 +582,7 @@ Items use `name`, `command`, and optional `args`; changes they make follow the c
 { "recommendationCommands": [] }
 ```
 
-**After** — add a non-blocking advisory command:
+**After** — add an optional validation command:
 
 ```json
 {
@@ -574,4 +590,4 @@ Items use `name`, `command`, and optional `args`; changes they make follow the c
 }
 ```
 
-The output is shown, but a nonzero recommendation status does not fail the quality run.
+The command output is shown and a nonzero status fails the quality run.
