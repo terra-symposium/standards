@@ -28,12 +28,14 @@ After adding the package as a development dependency, run it locally with:
 pnpm exec terra-test run --manifest .terra-tests.json
 ```
 
-Select custom suites with `--suites unit,contracts`; shared checks still run. Use `--shared-only` for workflows that should run the Standards checks without local suites. The same runner is available as a GitHub Action from this package directory:
+Select custom suites with `--suites unit,contracts`; shared checks still run. Use `--shared-only` for workflows that should run the Standards checks without local suites. The GitHub Action is published as a public distribution mirror so public repositories can consume the Standards-owned implementation:
 
 ```yaml
-- uses: Terra-Symposium/standards/packages/testing@development
+- uses: Terra-Symposium/standards-testing@1225bf06532e68d315aa2474001a67eea1924ec5
   with:
     manifest: .terra-tests.json
 ```
+
+Standards remains the source of truth for changes under `packages/testing`; update the public mirror when publishing an implementation change.
 
 The Action executes one plan in one job, so repositories can expose one test check even when the plan has several suites.
