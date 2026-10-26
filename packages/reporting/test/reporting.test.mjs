@@ -100,7 +100,7 @@ test('captures page navigation for tests that do not destructure the load fixtur
 	const reportFile = path.join(root, 'playwright-report.json');
 	await fs.writeFile(
 		specFile,
-		`import { loadTest as test } from ${JSON.stringify(new URL('../dist/playwright.js', import.meta.url).href)};\ntest('navigates without using load', async ({ page }) => { await page.goto('data:text/html,<title>loaded</title>'); });\n`,
+		`import { loadTest as test } from ${JSON.stringify(new URL('../dist/lib/playwright.js', import.meta.url).href)};\ntest('navigates without using load', async ({ page }) => { await page.goto('data:text/html,<title>loaded</title>'); });\n`,
 	);
 	await fs.writeFile(
 		cfgFile,

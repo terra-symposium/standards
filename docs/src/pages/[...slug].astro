@@ -2,9 +2,9 @@
 import { DocsLocalWorkspace } from '@terra-symposium/docs';
 import type { DocsHostTreeNode, DocsLocalPage } from '@terra-symposium/docs';
 import '@terra-symposium/docs/style.css';
-import '../tailwind.css';
+import '../styles/tailwind.css';
 import SkillsExplorer from '../components/SkillsExplorer.tsx';
-import { entries } from '../docs-data.js';
+import { entries } from '../lib/docs-data.js';
 
 export function getStaticPaths() {
 	return entries.map(page => ({ params: { slug: page.slug || undefined }, props: { page } }));

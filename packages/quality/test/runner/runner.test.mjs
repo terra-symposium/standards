@@ -118,7 +118,7 @@ test('CLI version and invalid arguments never dispatch quality work', () => {
 	assert.throws(() => runQualityCli(cfg, ['unknown-command']), UNKNOWN_QUALITY_CLI_ARGUMENT_REGEX);
 	assert.throws(() => runQualityCli(cfg, ['quality', '--unknown']), UNKNOWN_QUALITY_CLI_ARGUMENT_REGEX);
 	assert.equal(fixtureText(root, 'src/main.ts'), src);
-	const result = spawnSync(process.execPath, [fileURLToPath(new URL('../../dist/runner.js', import.meta.url)), '--version'], { cwd: root, encoding: 'utf8' });
+	const result = spawnSync(process.execPath, [fileURLToPath(new URL('../../dist/lib/runner.js', import.meta.url)), '--version'], { cwd: root, encoding: 'utf8' });
 	assert.equal(result.status, 0);
 	const { version } = JSON.parse(readFileSync(fileURLToPath(new URL('../../package.json', import.meta.url)), 'utf8'));
 	assert.equal(result.stdout.trim(), version);
@@ -195,7 +195,7 @@ test('naming autofix never text-rewrites Astro properties or string literals', (
 test('the executable handles help without a config and rejects unknown commands before config loading', () => {
 	const root = fixtureRoot('terra-quality-cli-early-dispatch-');
 	fixtureFile(root, 'quality.json', '{ invalid config');
-	const runner = fileURLToPath(new URL('../../dist/runner.js', import.meta.url));
+	const runner = fileURLToPath(new URL('../../dist/lib/runner.js', import.meta.url));
 	const help = spawnSync(process.execPath, [runner, '--help'], { cwd: root, encoding: 'utf8' });
 	assert.equal(help.status, 0);
 	assert.match(help.stdout, /Usage: terra-quality/);
@@ -244,7 +244,7 @@ test('the executable shows only configured check names and completion indicators
 		}),
 	);
 	fixtureFile(root, 'src/main.ts', 'export const pattern = /alpha/;\n');
-	const runner = fileURLToPath(new URL('../../dist/runner.js', import.meta.url));
+	const runner = fileURLToPath(new URL('../../dist/lib/runner.js', import.meta.url));
 	const result = spawnSync(process.execPath, [runner, 'quality:all', '--all', '--warn', '--skip-commands', '--skip-recommendations'], { cwd: root, encoding: 'utf8' });
 	assert.equal(result.status, 0, result.stderr);
 	assert.match(result.stderr, /STATIC QUALITY/);
@@ -300,7 +300,7 @@ test('full quality continues after failed scripts and prints their details under
 			},
 		}),
 	);
-	const runner = fileURLToPath(new URL('../../dist/runner.js', import.meta.url));
+	const runner = fileURLToPath(new URL('../../dist/lib/runner.js', import.meta.url));
 	const result = spawnSync(process.execPath, [runner, 'quality:all', '--all', '--skip-recommendations'], { cwd: root, encoding: 'utf8' });
 	assert.equal(result.status, 1, result.stderr);
 	assert.deepEqual(fixtureText(root, 'ran.txt').trim().split('\n'), ['ERROR_FIRST', 'ERROR_SECOND', 'BUILD_RAN']);
@@ -316,7 +316,7 @@ test('the executable rejects linting without an ESLint flat config before runnin
 	const root = fixtureRoot('terra-quality-eslint-config-required-');
 	fixtureFile(root, 'quality.json', JSON.stringify({ sourceRoots: ['src'], extensions: ['.ts'] }));
 	fixtureFile(root, 'src/main.ts', 'const value = true;\n');
-	const runner = fileURLToPath(new URL('../../dist/runner.js', import.meta.url));
+	const runner = fileURLToPath(new URL('../../dist/lib/runner.js', import.meta.url));
 	const result = spawnSync(process.execPath, [runner, 'quality', '--all'], { cwd: root, encoding: 'utf8' });
 	assert.notEqual(result.status, 0);
 	assert.match(result.stderr, /ESLint flat config is required for quality/);
@@ -810,7 +810,7 @@ export type Result = RecordData;
 		},
 	});
 	fixtureFile(root, 'quality.json', JSON.stringify({ ...cfg, root: '.' }));
-	const runnerUrl = new URL('../../dist/runner.js', import.meta.url).href;
+	const runnerUrl = new URL('../../dist/lib/runner.js', import.meta.url).href;
 	const script = fixtureFile(
 		root,
 		'run-quality.mjs',

@@ -15,9 +15,9 @@
 	},
 	"exports": {
 		".": "./dist/index.js",
-		"./react": "./dist/react.js",
-		"./astro": "./dist/astro.js",
-		"./next": "./dist/next.js"
+		"./react": "./dist/components/react.js",
+		"./astro": "./dist/lib/astro.js",
+		"./next": "./dist/lib/next.js"
 	},
 	"files": [
 		"dist"

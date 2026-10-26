@@ -3,7 +3,7 @@ import { existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createHistoryReport } from '../../../packages/quality/src/history-report.js';
+import { createHistoryReport } from '../../../packages/quality/src/lib/history-report.js';
 import { db } from '../src/server/db.js';
 import { parseHistoryReport } from '../src/server/history.js';
 import { ingestHistoryReport } from '../src/server/ingest.js';

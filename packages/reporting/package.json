@@ -3,8 +3,8 @@
 	"version": "0.3.0",
 	"description": "Reusable Playwright evidence reporting for Terra repositories",
 	"type": "module",
-	"main": "./dist/core.js",
-	"types": "./dist/core.d.ts",
+	"main": "./dist/index.js",
+	"types": "./dist/index.d.ts",
 	"engines": {
 		"node": ">=18.18"
 	},
@@ -17,13 +17,13 @@
 		"url": "git+https://github.com/Terra-Symposium/standards.git"
 	},
 	"exports": {
-		".": "./dist/core.js",
-		"./core": "./dist/core.js",
-		"./playwright": "./dist/playwright.js",
-		"./viewports": "./dist/viewports.js",
-		"./load-testing": "./dist/load-testing.js",
-		"./spreadsheet": "./dist/spreadsheet.js",
-		"./slideshow": "./dist/slideshow.js"
+		".": "./dist/index.js",
+		"./core": "./dist/lib/core.js",
+		"./playwright": "./dist/lib/playwright.js",
+		"./viewports": "./dist/lib/viewports.js",
+		"./load-testing": "./dist/lib/load-testing.js",
+		"./spreadsheet": "./dist/lib/spreadsheet.js",
+		"./slideshow": "./dist/lib/slideshow.js"
 	},
 	"files": [
 		"dist"

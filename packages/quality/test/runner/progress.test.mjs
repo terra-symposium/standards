@@ -10,7 +10,7 @@ IMPORTS
 // API
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { qualityProgress, setQualityProgressSuppressed } from '../../dist/progress.js';
+import { qualityProgress, setQualityProgressSuppressed } from '../../dist/lib/progress.js';
 
 /*//////////////////////////////////////////////////
 TESTS

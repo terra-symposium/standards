@@ -6,6 +6,8 @@ type Skill = {
 	description: string;
 	directory: string;
 	name: string;
+	package?: string;
+	sourcePath?: string;
 	title: string;
 };
 
@@ -20,20 +22,24 @@ type SkillTreeProps = {
 	onSelect: (skill: Skill) => void;
 	onToggle: (path: string) => void;
 	pathPrefix?: string;
-	selectedName?: string;
+	selectedPath?: string;
 };
 
 function createTree(entries: Skill[]): SkillNode {
 	const root: SkillNode = { children: new Map() };
 	for (const skill of entries) {
 		let current = root;
-		for (const segment of skill.directory.split('/')) {
+		for (const segment of [skill.package ?? 'shared', ...skill.directory.split('/')]) {
 			if (!current.children.has(segment)) current.children.set(segment, { children: new Map() });
 			current = current.children.get(segment)!;
 		}
 		current.skill = skill;
 	}
 	return root;
+}
+
+function sourcePathForSkill(skill: Skill) {
+	return skill.sourcePath ?? `.agents/skills/${skill.directory}/SKILL.md`;
 }
 
 function humanize(value: string) {
@@ -43,7 +49,7 @@ function humanize(value: string) {
 		.join(' ');
 }
 
-function SkillTree({ expanded, node, onSelect, onToggle, pathPrefix = '', selectedName }: SkillTreeProps) {
+function SkillTree({ expanded, node, onSelect, onToggle, pathPrefix = '', selectedPath }: SkillTreeProps) {
 	return (
 		<ul aria-label={pathPrefix ? undefined : 'Available skills'} className="m-0 grid list-none gap-1 p-0">
 			{[...node.children.entries()].map(([name, child]) => {
@@ -70,9 +76,9 @@ function SkillTree({ expanded, node, onSelect, onToggle, pathPrefix = '', select
 							) : null}
 							{skill ? (
 								<button
-									aria-current={selectedName === skill.name ? 'true' : undefined}
+									aria-current={selectedPath === sourcePathForSkill(skill) ? 'true' : undefined}
 									className={`min-h-9 cursor-pointer rounded-md border-0 bg-transparent px-2 py-1 text-left font-[inherit] text-[#216750] hover:bg-[#edf1ed] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#216750] max-[40rem]:mx-0 ${
-										selectedName === skill.name ? 'bg-[#eaf1ec] font-bold' : ''
+										selectedPath === sourcePathForSkill(skill) ? 'bg-[#eaf1ec] font-bold' : ''
 									}`}
 									onClick={() => onSelect(skill)}
 
@@ -83,7 +89,7 @@ function SkillTree({ expanded, node, onSelect, onToggle, pathPrefix = '', select
 						</div>
 						{hasChildren && isExpanded ? (
 							<div className="ml-4 mt-1 border-l border-[#dfe4df] py-1 pl-3">
-								<SkillTree expanded={expanded} node={child} onSelect={onSelect} onToggle={onToggle} pathPrefix={path} selectedName={selectedName} />
+								<SkillTree expanded={expanded} node={child} onSelect={onSelect} onToggle={onToggle} pathPrefix={path} selectedPath={selectedPath} />
 							</div>
 						) : null}
 					</li>
@@ -110,7 +116,7 @@ export default function SkillsExplorer() {
 	return (
 		<section aria-label="Skills browser" className="my-8 space-y-4">
 			<div className="rounded-xl border border-[#dfe4df] bg-white p-2">
-				<SkillTree expanded={expanded} node={tree} onSelect={setActiveSkill} onToggle={toggle} selectedName={activeSkill?.name} />
+				<SkillTree expanded={expanded} node={tree} onSelect={setActiveSkill} onToggle={toggle} selectedPath={activeSkill ? sourcePathForSkill(activeSkill) : undefined} />
 			</div>
 			<section aria-atomic="false" aria-live="polite" className="overflow-hidden rounded-xl border border-[#dfe4df] bg-white">
 				{activeSkill ? (
@@ -120,7 +126,7 @@ export default function SkillsExplorer() {
 								<p className="mb-1 text-xs font-bold uppercase tracking-wider text-[#626762]">Selected skill</p>
 								<h2 className="m-0">{activeSkill.title}</h2>
 							</div>
-							<span className="wrap-break-word text-right font-mono text-xs text-[#626762] max-[40rem]:text-left">.agents/skills/{activeSkill.directory}/SKILL.md</span>
+							<span className="wrap-break-word text-right font-mono text-xs text-[#626762] max-[40rem]:text-left">{sourcePathForSkill(activeSkill)}</span>
 						</div>
 						<p className="mx-5 mt-3 text-[#626762]">{activeSkill.description}</p>
 						<pre className="m-0 max-h-[70vh] overflow-auto whitespace-pre-wrap break-normal border-t border-[#dfe4df] bg-[#f1f4f1] p-5 font-mono text-sm leading-relaxed text-[#202321]">

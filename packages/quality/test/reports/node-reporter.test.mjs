@@ -10,8 +10,8 @@ IMPORTS
 // API
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import defaultQualityNodeReporter from '../../dist/node-reporter.js';
-import { qualityNodeReporter, qualityNodeReporterOptions } from '../../dist/node-reporter.js';
+import defaultQualityNodeReporter from '../../dist/lib/node-reporter.js';
+import { qualityNodeReporter, qualityNodeReporterOptions } from '../../dist/lib/node-reporter.js';
 
 /*//////////////////////////////////////////////////
 HELPERS
