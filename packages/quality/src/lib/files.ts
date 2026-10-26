@@ -63,11 +63,11 @@ export function srcFiles(cfg: QualityCfg): string[] {
 	const isSkippedDir = (dir: string): boolean => {
 		const repoPath = relative(cfg.root, dir);
 		return (cfg.skippedDirectories ?? []).some((skipped) => {
-			const normalized = normalize(skipped.replaceAll('\\', '/'));
-			if (!normalized || normalized === '.') return false;
-			if (!normalized.includes(sep)) return basename(dir) === normalized;
-			const skippedPath = resolve(cfg.root, normalized);
-			return dir === skippedPath || dir.startsWith(`${skippedPath}${sep}`) || repoPath === normalized;
+			const norm = normalize(skipped.replaceAll('\\', '/'));
+			if (!norm || norm === '.') return false;
+			if (!norm.includes(sep)) return basename(dir) === norm;
+			const skippedPath = resolve(cfg.root, norm);
+			return dir === skippedPath || dir.startsWith(`${skippedPath}${sep}`) || repoPath === norm;
 		});
 	};
 	/**
