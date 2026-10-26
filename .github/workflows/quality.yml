@@ -10,17 +10,22 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+        id: checkout
         with:
           fetch-depth: 0
       - uses: pnpm/action-setup@v6
+        id: setup_pnpm
         with:
           version: 10.30.3
       - uses: actions/setup-node@v7
+        id: setup_node
         with:
           node-version: 22.19.0
           cache: pnpm
-      - run: pnpm install --frozen-lockfile
+      - id: install
+        run: pnpm install --frozen-lockfile
       - run: pnpm quality:all
       - uses: ./packages/testing
+        if: always() && steps.checkout.outcome == 'success' && steps.setup_pnpm.outcome == 'success' && steps.setup_node.outcome == 'success' && steps.install.outcome == 'success'
         with:
           manifest: .terra-tests.json
