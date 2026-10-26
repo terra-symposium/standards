@@ -162,7 +162,7 @@ export function validateTestPlan(value, root) {
 /**
  * Runs the requested suites serially and aggregates failures into one process result.
  *
- * @param {{root: string, manifest?: string, suites?: string[], sharedOnly?: boolean}} options - Runner configuration.
+ * @param {{root: string, manifest?: string, suites?: string[], sharedOnly?: boolean}} props - Repository root, manifest selection, and optional suite filter.
  *
  * @return {{passed: number, failed: number, selected: string[]}}
  */

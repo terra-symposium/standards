@@ -8,7 +8,8 @@
       "owns": [
         "packages/error-boundaries/test",
         "packages/quality/test",
-        "packages/reporting/test"
+        "packages/reporting/test",
+        "packages/testing/test"
       ]
     }
   ]
