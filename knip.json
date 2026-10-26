@@ -13,11 +13,15 @@
 			"entry": ["src/core.ts", "src/playwright.ts", "src/viewports.ts", "src/load-testing.ts", "src/spreadsheet.ts", "src/slideshow.ts", "src/metadata.ts", "test/*.test.mjs"],
 			"project": ["src/**/*.ts", "test/**/*.mjs"]
 		},
+		"packages/testing": {
+			"entry": ["src/index.mjs", "src/cli.mjs"],
+			"project": ["src/**/*.mjs"]
+		},
 		"packages/quality": {
 			"entry": [
 				"src/index.ts",
 				"src/runner.ts",
-				"src/workspace-test-runner.ts",
+				"src/app/workspace-test-runner.ts",
 				"src/naming.ts",
 				"src/object-forwarding.ts",
 				"src/single-use.ts",
@@ -26,6 +30,11 @@
 				"test/**/*.test.mjs"
 			],
 			"project": ["src/**/*.ts", "test/**/*.mjs"]
+		},
+		"docs": {
+			"entry": ["src/pages/**/*.astro", "astro.config.mjs", "scripts/*.mjs"],
+			"project": ["src/**/*.astro", "src/**/*.tsx", "src/**/*.ts", "src/**/*.mdx", "scripts/**/*.mjs"],
+			"ignoreDependencies": ["@terra-symposium/styling"]
 		},
 		"apps/hygiene": {
 			"entry": ["src/pages/index.astro", "netlify/functions/*.mts", "scripts/*.ts", "test/*.test.ts"],
