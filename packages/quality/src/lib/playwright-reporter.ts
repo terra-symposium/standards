@@ -18,10 +18,7 @@ TYPES
  * Status values reported by Playwright for an individual test attempt.
  */
 type PlaywrightStatus = 'passed' | 'failed' | 'timedOut' | 'skipped' | 'interrupted';
-/**
- * Normalized status rendered by the shared quality reporter.
- */
-type QualityStatus = 'PASS' | 'FAIL' | 'SKIP';
+
 /**
  * Result data retained for one Playwright test attempt.
  */
@@ -37,18 +34,11 @@ type PlaywrightTestCase = {
 	results?: PlaywrightTestResult[];
 	outcome?: () => 'skipped' | 'expected' | 'unexpected' | 'flaky';
 };
-/**
- * Minimal Playwright suite contract used to enumerate discovered tests.
- */
-type PlaywrightSuite = { allTests(): PlaywrightTestCase[] };
-/**
- * Final run status passed to the Playwright reporter's `onEnd` callback.
- */
-type PlaywrightFullResult = { status: 'passed' | 'failed' | 'timedout' | 'interrupted' };
-/**
- * Optional output sinks for the Playwright progress reporter.
- */
-export type QualityPlaywrightReporterOptions = { write?: (text: string) => void; writeProgress?: (text: string) => void };
+
+export type QualityPlaywrightReporterOptions = {
+	write?: (text: string) => void;
+	writeProgress?: (text: string) => void;
+};
 
 /*//////////////////////////////////////////////////
 HELPERS
@@ -62,7 +52,7 @@ HELPERS
  *
  * @return Normalized pass, fail, or skip status.
  */
-function qualityStatus(test: PlaywrightTestCase, result?: PlaywrightTestResult): QualityStatus {
+function qualityStatus(test: PlaywrightTestCase, result?: PlaywrightTestResult): 'PASS' | 'FAIL' | 'SKIP' {
 	if (!result || result.status === 'skipped' || test.expectedStatus === 'skipped') return 'SKIP';
 	const outcome = test.outcome?.();
 	if (outcome === 'skipped') return 'SKIP';
@@ -117,7 +107,16 @@ export default class QualityPlaywrightReporter {
 	 * @param _config Playwright's resolved configuration.
 	 * @param suite Root test suite supplied by Playwright.
 	 */
-	onBegin(_config: unknown, suite: PlaywrightSuite): void {
+	onBegin(
+		_config: unknown,
+		suite: {
+			/**
+			 *
+			 * @return
+			 */
+			allTests(): PlaywrightTestCase[];
+		},
+	): void {
 		this.tests = suite.allTests();
 		qualityProgress('Cases', 0, this.tests.length, this.writeProgress);
 	}
@@ -148,7 +147,7 @@ export default class QualityPlaywrightReporter {
 	 *
 	 * @param result Final Playwright run result.
 	 */
-	onEnd(result: PlaywrightFullResult): void {
+	onEnd(result: { status: 'passed' | 'failed' | 'timedout' | 'interrupted' }): void {
 		const counts = { PASS: 0, FAIL: 0, SKIP: 0 };
 		for (const test of this.tests) {
 			const latestResult = this.lastResults.get(test) ?? test.results?.at(-1);

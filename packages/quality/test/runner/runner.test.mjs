@@ -20,18 +20,31 @@ import { fileURLToPath } from 'node:url';
 import { fixtureFile, fixtureRoot, fixtureText, resetExitCode } from '../../support/fixtures.mjs';
 import { join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
+
 /*//////////////////////////////////////////////////
 REGEX
 //////////////////////////////////////////////////*/
+
+const FINDINGS_SUMMARY_REGEX = /FINDINGS SUMMARY/;
+const ERR_KNIP_EXPORTS_SRC_MAIN_TS_1_CLIENT_REGEX = /\[ERROR\] knip\/exports: src\/main\.ts:1 Client/;
+
+/*//////////////////////////////////////////////////
+REGEX
+//////////////////////////////////////////////////*/
+
 const UNKNOWN_QUALITY_CLI_ARGUMENT_REGEX = /Unknown quality CLI argument/;
+/**
+ *
+ * @return
+ */
 const IMPORT_TYPE_RECORDDATA_FROM_TYPES_G_REGEX = () => /import type \{ RecordData \} from '\.\/types';/g;
 const REPORTER_PLAYWRIGHT_REPORTER_JS_U_REGEX = /^--reporter=.*playwright-reporter\.js$/u;
 const NODE_TESTS_PLAYWRIGHT_TESTS_REGEX = /Node tests|Playwright tests/;
 const CONFIG_10_REGEX = /CONFIG|\/{10,}/;
-const FUNCTION_UNUSED_REGEX = /function unused/;
+const FN_UNUSED_REGEX = /function unused/;
 const AUTOFIX_NOT_SAFE_OR_NOT_SUPPORTED_REGEX = /Autofix: not safe or not supported/;
 const EXPORT_CONST_EXTRA_REGEX = /export const extra/;
-const EXPORT_FUNCTION_CREATECLIENT_REGEX = /export function createClient/;
+const EXPORT_FN_CREATECLIENT_REGEX = /export function createClient/;
 const EXPORT_CONST_GET_REGEX = /export const GET/;
 
 /*//////////////////////////////////////////////////
@@ -256,7 +269,14 @@ test('the executable shows only configured check names and completion indicators
 test('full quality continues after failed scripts and prints their details under each check', () => {
 	const root = fixtureRoot('terra-quality-cli-continue-failures-');
 	const marker = join(root, 'ran.txt');
-	const command = (message, exitCode = 1) => ({
+	/**
+	 *
+	 * @param message
+	 * @param exitCode
+	 *
+	 * @return
+	 */
+	const cmd = (message, exitCode = 1) => ({
 		command: process.execPath,
 		args: [
 			'-e',
@@ -271,9 +291,9 @@ test('full quality continues after failed scripts and prints their details under
 			sourceRoots: ['src'],
 			extensions: ['.ts'],
 			qualityCommands: [
-				{ name: 'static-first', ...command('ERROR_FIRST') },
-				{ name: 'static-second', ...command('ERROR_SECOND', 2) },
-				{ name: 'production-build', ...command('BUILD_RAN', 0) },
+				{ name: 'static-first', ...cmd('ERROR_FIRST') },
+				{ name: 'static-second', ...cmd('ERROR_SECOND', 2) },
+				{ name: 'production-build', ...cmd('BUILD_RAN', 0) },
 			],
 			enabledChecks: {
 				format: false,
@@ -307,9 +327,9 @@ test('full quality continues after failed scripts and prints their details under
 	assert.match(result.stderr, /⠋ Static First[\s\S]*✗ Static First/);
 	assert.match(result.stderr, /⠋ Static Second[\s\S]*✗ Static Second/);
 	assert.match(result.stderr, /⠋ Production Build[\s\S]*✓ Production Build/);
-	assert.match(result.stderr, /✗ Static First\n    - .*failed \(exit 1\)\n    - ERROR_FIRST/);
-	assert.match(result.stderr, /✗ Static Second\n    - .*failed \(exit 2\)\n    - ERROR_SECOND/);
-	assert.doesNotMatch(result.stderr, /FINDINGS SUMMARY/);
+	assert.match(result.stderr, /✗ Static First\n {4}- .*failed \(exit 1\)\n {4}- ERROR_FIRST/);
+	assert.match(result.stderr, /✗ Static Second\n {4}- .*failed \(exit 2\)\n {4}- ERROR_SECOND/);
+	assert.doesNotMatch(result.stderr, FINDINGS_SUMMARY_REGEX);
 	assert.ok(result.stderr.indexOf('✓ Production Build') > result.stderr.indexOf('ERROR_SECOND'));
 });
 test('the executable rejects linting without an ESLint flat config before running quality', () => {
@@ -363,7 +383,6 @@ test('configuration toggles default to enabled and honor explicit category, item
 	assert.equal(qualityCmdEnabled(enabled, 'build'), true);
 	assert.equal(qualityRecommendationEnabled(enabled, 'architecture'), true);
 });
-
 test('full quality orders phases, groups suites, de-duplicates invocations, and continues after a failing test', () => {
 	const root = fixtureRoot('terra-quality-phase-order-');
 	const marker = join(root, 'runs.txt');
@@ -378,6 +397,13 @@ test('full quality orders phases, groups suites, de-duplicates invocations, and 
 		0o755,
 	);
 	fixtureFile(root, 'bin/node', `#!/bin/sh\nprintf '%s\\n' "$@" > ${JSON.stringify(nodeArgsMarker)}\nprintf 'unit-node\\n' >> ${JSON.stringify(marker)}\n`, 0o755);
+	/**
+	 *
+	 * @param label
+	 * @param failure
+	 *
+	 * @return
+	 */
 	const recorded = (label, failure = false) => ({
 		command: process.execPath,
 		args: ['-e', `require('node:fs').appendFileSync(${JSON.stringify(marker)}, ${JSON.stringify(`${label}\n`)});${failure ? 'process.exitCode = 1;' : ''}`],
@@ -810,6 +836,12 @@ export type Result = RecordData;
 		'run-quality.mjs',
 		`import { runQualityFromCfg } from ${JSON.stringify(runnerUrl)};\nawait runQualityFromCfg(new URL('./quality.json', import.meta.url).pathname, process.argv.slice(2));\n`,
 	);
+	/**
+	 *
+	 * @param args
+	 *
+	 * @return
+	 */
 	const runQuality = (...args) => spawnSync(process.execPath, [script, ...args], { cwd: root, encoding: 'utf8' });
 	const original = readFileSync(src, 'utf8');
 	const readOnly = runQuality('quality:all', '--all', '--warn', '--skip-commands', '--skip-recommendations');
@@ -909,7 +941,7 @@ if (args.includes('--format') && args.includes('json'))
 	assert.match(outputText, /\[ERROR\] eslint\/unused-private-declaration/);
 	assert.doesNotMatch(outputText, /\[WARNING\]/);
 	assert.ok(outputText.indexOf('✗ Dead Code') < outputText.indexOf('[ERROR] eslint/unused-private-declaration'));
-	assert.doesNotMatch(outputText, /FINDINGS SUMMARY/);
+	assert.doesNotMatch(outputText, FINDINGS_SUMMARY_REGEX);
 	assert.doesNotMatch(outputEvents.join(''), /(?:^|\n)\s*test feedback(?:\n|$)/u);
 	assert.match(outputText, /✓ Contract/);
 	resetExitCode();
@@ -975,11 +1007,11 @@ process.stdout.write(JSON.stringify([{ filePath: file, messages: text.includes('
 	resetExitCode();
 	runQualityCli(cfg, ['dead-code', '--all', '--warn']);
 	assert.equal(process.exitCode, 1);
-	assert.match(readFileSync(src, 'utf8'), FUNCTION_UNUSED_REGEX);
+	assert.match(readFileSync(src, 'utf8'), FN_UNUSED_REGEX);
 	resetExitCode();
 	runQualityCli(cfg, ['dead-code', '--all']);
 	assert.equal(process.exitCode, 0);
-	assert.doesNotMatch(readFileSync(src, 'utf8'), FUNCTION_UNUSED_REGEX);
+	assert.doesNotMatch(readFileSync(src, 'utf8'), FN_UNUSED_REGEX);
 	assert.match(readFileSync(src, 'utf8'), /function used/);
 });
 test('dead-code scans the full scope once and applies same-file fixes before rescanning only changed files', () => {
@@ -1364,7 +1396,7 @@ test('dead-code reports a contradictory Knip result as an error', () => {
 	resetExitCode();
 	runQualityCli(cfg, ['dead-code', '--all']);
 	assert.equal(process.exitCode, 1, 'a detector disagreement is an error');
-	assert.match(fixtureText(root, 'src/auth.ts'), EXPORT_FUNCTION_CREATECLIENT_REGEX);
+	assert.match(fixtureText(root, 'src/auth.ts'), EXPORT_FN_CREATECLIENT_REGEX);
 	assert.match(fixtureText(root, 'src/consumer.ts'), /makeClient\(\)/);
 	assert.match(fixtureText(root, 'src/namespace-consumer.ts'), /Auth\.createClient\(\)/);
 	assert.equal(readFileSync(owner, 'utf8'), `export function createClient() { return 'ready'; }\n`);
@@ -1395,7 +1427,7 @@ test('dead-code warn reports manual findings with explicit autofix status and ma
 	}
 	assert.equal(process.exitCode, 1, `manual findings fail by default even in read-only mode:\n${output.join('\n')}`);
 	assert.deepEqual([readFileSync(src, 'utf8'), readFileSync(consumer, 'utf8')], original);
-	assert.match(output.join('\n'), /\[ERROR\] knip\/exports: src\/main\.ts:1 Client/);
+	assert.match(output.join('\n'), ERR_KNIP_EXPORTS_SRC_MAIN_TS_1_CLIENT_REGEX);
 	assert.match(output.join('\n'), AUTOFIX_NOT_SAFE_OR_NOT_SUPPORTED_REGEX);
 	assert.match(output.join('\n'), /Agent action: Reconcile the reported consumer/);
 	output.length = 0;
@@ -1407,7 +1439,7 @@ test('dead-code warn reports manual findings with explicit autofix status and ma
 		console.error = originalErr;
 	}
 	assert.equal(process.exitCode, 1, `manual findings always fail quality:\n${output.join('\n')}`);
-	assert.match(output.join('\n'), /\[ERROR\] knip\/exports: src\/main\.ts:1 Client/);
+	assert.match(output.join('\n'), ERR_KNIP_EXPORTS_SRC_MAIN_TS_1_CLIENT_REGEX);
 	resetExitCode();
 });
 test('dead-code reports Astro-consumed exports when Knip disagrees without modifying them', () => {
@@ -1480,7 +1512,7 @@ process.stdout.write(JSON.stringify([{ filePath: ${JSON.stringify(src)}, message
 	resetExitCode();
 	runQualityCli(cfg, ['dead-code', '--all']);
 	assert.equal(process.exitCode, 1, 'the unsupported ESLint location is an error');
-	assert.match(fixtureText(root, 'src/auth.ts'), EXPORT_FUNCTION_CREATECLIENT_REGEX);
+	assert.match(fixtureText(root, 'src/auth.ts'), EXPORT_FN_CREATECLIENT_REGEX);
 	assert.match(fixtureText(root, 'src/auth.ts'), /const extra = 1/);
 	assert.doesNotMatch(fixtureText(root, 'src/auth.ts'), EXPORT_CONST_EXTRA_REGEX);
 	resetExitCode();
@@ -1520,14 +1552,7 @@ test('dead-code preserves Astro frontmatter consumers resolved through configure
 		`#!/usr/bin/env node\nprocess.stdout.write(JSON.stringify({ issues: [{ file: 'astro/src/lib/auth.server.ts', exports: [{ name: 'createClient', line: 1 }] }] }));\nprocess.exitCode = 1;\n`,
 		0o755,
 	);
-	const cfg = createQualityCfg({
-		root,
-		sourceRoots: ['astro/src'],
-		extensions: ['.ts', '.astro'],
-		aliases: { '@/': 'astro/src/' },
-		tools: { knip },
-		enabledChecks: { lint: false },
-	});
+	const cfg = createQualityCfg({ root, sourceRoots: ['astro/src'], extensions: ['.ts', '.astro'], aliases: { '@/': 'astro/src/' }, tools: { knip }, enabledChecks: { lint: false } });
 	resetExitCode();
 	runQualityCli(cfg, ['dead-code', '--all']);
 	assert.equal(process.exitCode, 1, 'a detector disagreement is an error');

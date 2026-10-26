@@ -69,6 +69,10 @@ function findingsForFile(cfg: QualityCfg, file: string, analysis?: QualityAnalys
 	const src = analysis?.texts.get(file) ?? readFileSync(file, 'utf8');
 	const parsed = analysis?.sources.get(file) ?? ts.createSourceFile(file, src, ts.ScriptTarget.Latest, true, scriptKind(file));
 	const findings: ObjectForwardingFinding[] = [];
+	/**
+	 *
+	 * @param node
+	 */
 	const visit = (node: ts.Node): void => {
 		if (ts.isCallExpression(node) && !isIgnoredCallee(node.expression)) {
 			for (const argument of node.arguments) {
@@ -141,6 +145,10 @@ export function fixObjectForwarding(cfg: QualityCfg, analysis?: QualityAnalysis)
 		const src = analysis?.texts.get(file) ?? readFileSync(file, 'utf8');
 		const parsed = analysis?.sources.get(file) ?? ts.createSourceFile(file, src, ts.ScriptTarget.Latest, true, scriptKind(file));
 		const edits: Array<{ start: number; end: number }> = [];
+		/**
+		 *
+		 * @param node
+		 */
 		const visit = (node: ts.Node): void => {
 			if (ts.isCallExpression(node) && !isIgnoredCallee(node.expression)) {
 				for (const argument of node.arguments) {

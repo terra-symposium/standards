@@ -16,14 +16,17 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import type { QualityAnalysis, QualityCfg } from './runner.js';
 
 /*//////////////////////////////////////////////////
+REGEX
+//////////////////////////////////////////////////*/
+
+const S_REGEX = /^\s*$/;
+
+/*//////////////////////////////////////////////////
 TYPES
 //////////////////////////////////////////////////*/
 
 /** A forwardRef component declaration without an explicit displayName assignment. */
 export type DisplayNameFinding = { file: string; line: number; column: number; component: string; recommendation: string };
-
-/** Counts inserted display names and declarations left unchanged because an edit was unsafe. */
-export type DisplayNameFixResult = { fixed: number; skipped: number };
 
 /** A candidate declaration and its owning variable statement. */
 type Candidate = { name: string; declaration: ts.VariableDeclaration; statement: ts.VariableStatement; scope: ts.Node; assignment: 'missing' | 'matching' | 'conflicting' };
@@ -49,13 +52,13 @@ function scriptKind(fileName: string): ts.ScriptKind {
 /**
  * Checks for a direct React forwardRef call without unwrapping casts or other wrappers.
  *
- * @param initializer Variable initializer to inspect.
+ * @param init Variable initializer to inspect.
  *
  * @return `true` when the initializer is `forwardRef(...)` or `React.forwardRef(...)`.
  */
-function isForwardRef(initializer: ts.Expression | undefined): initializer is ts.CallExpression {
-	if (!initializer || !ts.isCallExpression(initializer) || initializer.questionDotToken) return false;
-	const callee = initializer.expression;
+function isForwardRef(init: ts.Expression | undefined): init is ts.CallExpression {
+	if (!init || !ts.isCallExpression(init) || init.questionDotToken) return false;
+	const callee = init.expression;
 	if (ts.isIdentifier(callee)) return callee.text === 'forwardRef';
 	return ts.isPropertyAccessExpression(callee) && !callee.questionDotToken && ts.isIdentifier(callee.expression) && callee.expression.text === 'React' && callee.name.text === 'forwardRef';
 }
@@ -80,7 +83,13 @@ function assignedComponent(left: ts.Expression): string | undefined {
 	return undefined;
 }
 
-/** Returns whether a node introduces a lexical or function-scoped binding boundary. */
+/**
+ * Returns whether a node introduces a lexical or function-scoped binding boundary.
+ *
+ * @param node
+ *
+ * @return
+ */
 function isBindingScope(node: ts.Node): boolean {
 	return (
 		ts.isSourceFile(node) ||
@@ -95,7 +104,13 @@ function isBindingScope(node: ts.Node): boolean {
 	);
 }
 
-/** Finds the scope that owns a variable declaration, accounting for `var` hoisting. */
+/**
+ * Finds the scope that owns a variable declaration, accounting for `var` hoisting.
+ *
+ * @param declaration
+ *
+ * @return
+ */
 function declarationScope(declaration: ts.VariableDeclaration): ts.Node {
 	const list = declaration.parent;
 	const blockScoped = (list.flags & (ts.NodeFlags.Let | ts.NodeFlags.Const)) !== 0;
@@ -108,7 +123,15 @@ function declarationScope(declaration: ts.VariableDeclaration): ts.Node {
 	return declaration.getSourceFile();
 }
 
-/** Resolves a component property assignment to the nearest same-named candidate binding. */
+/**
+ * Resolves a component property assignment to the nearest same-named candidate binding.
+ *
+ * @param node
+ * @param name
+ * @param byName
+ *
+ * @return
+ */
 function candidatesForAssignment(node: ts.Node, name: string, byName: Map<string, Candidate[]>): Candidate[] {
 	const candidates = byName.get(name);
 	if (!candidates) return [];
@@ -123,9 +146,9 @@ function candidatesForAssignment(node: ts.Node, name: string, byName: Map<string
 /**
  * Collects direct forwardRef variable declarations and classifies explicit displayName writes.
  *
- * @param cfg Quality configuration used to render diagnostic paths.
  * @param file Absolute source filename to inspect.
  * @param analysis Optional shared parse context that avoids repeated reads and AST construction.
+ * @param cfg Quality configuration used to render diagnostic paths.
  *
  * @return Eligible named declarations, including whether an existing assignment is matching or conflicting.
  */
@@ -135,6 +158,10 @@ function candidatesForFile(file: string, analysis?: QualityAnalysis): Candidate[
 	if ((parsed as ts.SourceFile & { parseDiagnostics?: readonly ts.Diagnostic[] }).parseDiagnostics?.length) return [];
 	const candidates: Candidate[] = [];
 	const byName = new Map<string, Candidate[]>();
+	/**
+	 *
+	 * @param node
+	 */
 	const collect = (node: ts.Node): void => {
 		if (ts.isVariableStatement(node)) {
 			for (const declaration of node.declarationList.declarations) {
@@ -147,6 +174,10 @@ function candidatesForFile(file: string, analysis?: QualityAnalysis): Candidate[
 		ts.forEachChild(node, collect);
 	};
 	collect(parsed);
+	/**
+	 *
+	 * @param node
+	 */
 	const inspectAssignments = (node: ts.Node): void => {
 		if (ts.isBinaryExpression(node) && node.operatorToken.kind >= ts.SyntaxKind.FirstAssignment && node.operatorToken.kind <= ts.SyntaxKind.LastAssignment) {
 			const name = assignedComponent(node.left);
@@ -217,7 +248,7 @@ export function displayNameFindings(cfg: QualityCfg, analysis?: QualityAnalysis)
  *
  * @return Counts of assignments inserted and declarations skipped as conflicting or unsafe to edit.
  */
-export function fixDisplayNames(cfg: QualityCfg, analysis?: QualityAnalysis): DisplayNameFixResult {
+export function fixDisplayNames(cfg: QualityCfg, analysis?: QualityAnalysis): { fixed: number; skipped: number } {
 	let fixed = 0;
 	let skipped = 0;
 	for (const file of analysis?.files ?? srcFiles(cfg)) {
@@ -239,7 +270,7 @@ export function fixDisplayNames(cfg: QualityCfg, analysis?: QualityAnalysis): Di
 			const lineEnd = src.indexOf('\n', statement.end);
 			const insertAt = lineEnd < 0 ? src.length : lineEnd > 0 && src[lineEnd - 1] === '\r' ? lineEnd - 1 : lineEnd;
 			const tail = src.slice(statement.end, insertAt);
-			if (!/^\s*$/.test(indent) || !/^\s*$/.test(tail)) {
+			if (!S_REGEX.test(indent) || !S_REGEX.test(tail)) {
 				skipped++;
 				continue;
 			}
@@ -255,8 +286,8 @@ export function fixDisplayNames(cfg: QualityCfg, analysis?: QualityAnalysis): Di
 			updated = `${updated.slice(0, at)}${lineBreak}${lines}${updated.slice(at)}`;
 			fixed += edit.names.length;
 		}
-		const validation = ts.createSourceFile(file, updated, ts.ScriptTarget.Latest, true, scriptKind(file));
-		if ((validation as ts.SourceFile & { parseDiagnostics?: readonly ts.Diagnostic[] }).parseDiagnostics?.length) {
+		const valid = ts.createSourceFile(file, updated, ts.ScriptTarget.Latest, true, scriptKind(file));
+		if ((valid as ts.SourceFile & { parseDiagnostics?: readonly ts.Diagnostic[] }).parseDiagnostics?.length) {
 			skipped += [...edits.values()].reduce((count, edit) => count + edit.names.length, 0);
 			continue;
 		}

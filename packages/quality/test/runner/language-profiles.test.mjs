@@ -11,22 +11,13 @@ IMPORTS
 // API
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {
-	createQualityCfg,
-	inspectLanguageProfileTool,
-	LANGUAGE_CAPABILITIES,
-	QUALITY_CAPABILITY_AUTOFIXES,
-	QUALITY_CAPABILITY_CHECKS,
-	resolveLanguageProfiles,
-	runQualityCli,
-} from '../../dist/index.js';
-
-// NODE
+import { createQualityCfg, inspectLanguageProfileTool, resolveLanguageProfiles, runQualityCli } from '../../dist/index.js';
 import { delimiter, dirname, join } from 'node:path';
+import { fixtureFile, fixtureRoot, fixtureText, resetExitCode } from '../../support/fixtures.mjs';
 import { readFileSync } from 'node:fs';
 
-// TEST SUPPORT
-import { fixtureFile, fixtureRoot, fixtureText, resetExitCode } from '../../support/fixtures.mjs';
+// DATA
+import { LANGUAGE_CAPABILITIES, QUALITY_CAPABILITY_AUTOFIXES, QUALITY_CAPABILITY_CHECKS } from '../../dist/index.js';
 
 /*//////////////////////////////////////////////////
 DATA
@@ -136,7 +127,6 @@ test('language profiles resolve only matching source files and optional project 
 	assert.deepEqual(resolved.failed, []);
 	assert.equal(cfg.extensions.includes('.java'), false);
 });
-
 test('selected profiles with no matching sources are reported as skipped', () => {
 	const root = fixtureRoot('terra-quality-language-profile-empty-');
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: [], languageProfiles: ['java'], enabledChecks: DISABLED_SOURCE_CHECKS });
@@ -152,17 +142,15 @@ test('selected profiles with no matching sources are reported as skipped', () =>
 	assert.equal(report.checks.find(({ name }) => name === 'command:java-format')?.status, 'skipped');
 	assert.equal(report.checks.find(({ name }) => name === 'command:java-checkstyle')?.status, 'skipped');
 });
-
 test('configuration rejects duplicate and unknown language profile identifiers', () => {
 	const root = fixtureRoot('terra-quality-language-profile-validation-');
 	const base = { root, sourceRoots: [], extensions: [] };
 	assert.throws(() => createQualityCfg({ ...base, languageProfiles: ['c', 'c'] }), /must not contain duplicate/);
 	assert.throws(() => createQualityCfg({ ...base, languageProfiles: ['rust'] }), /Unknown language profile/);
 });
-
 test('every built-in check and autofix has an explicit per-language capability disposition', () => {
-	for (const language of ['js-ts', 'c', 'java', 'python']) {
-		const capability = LANGUAGE_CAPABILITIES[language];
+	for (const lang of ['js-ts', 'c', 'java', 'python']) {
+		const capability = LANGUAGE_CAPABILITIES[lang];
 		assert.deepEqual(Object.keys(capability.checks).sort(), [...QUALITY_CAPABILITY_CHECKS].sort());
 		assert.deepEqual(Object.keys(capability.autofixes).sort(), [...QUALITY_CAPABILITY_AUTOFIXES].sort());
 		for (const item of [...Object.values(capability.checks), ...Object.values(capability.autofixes)]) {
@@ -171,7 +159,6 @@ test('every built-in check and autofix has an explicit per-language capability d
 		}
 	}
 });
-
 test('documentation commands resolve automatically for detected source even when a full profile is not selected', () => {
 	const root = fixtureRoot('terra-quality-auto-documentation-profile-');
 	fixtureFile(root, 'src/private.py', 'def helper(value): return value\n');
@@ -182,14 +169,13 @@ test('documentation commands resolve automatically for detected source even when
 		['python-docstring-coverage', 'python-docstring-signatures'],
 	);
 });
-
 test('missing required documentation configuration fails and JSON reports explicit N/A capabilities', () => {
 	const root = fixtureRoot('terra-quality-documentation-prerequisite-');
 	fixtureFile(root, 'src/main.c', 'static int helper(void) { return 1; }\n');
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: [], enabledChecks: { ...DISABLED_SOURCE_CHECKS, document: true } });
 	const resolved = resolveLanguageProfiles(cfg);
 	assert.deepEqual(resolved.failed, [{ name: 'c-documentation', profileId: 'c', reason: 'required configuration Doxyfile is absent' }]);
-	const previousError = console.error;
+	const previousErr = console.error;
 	console.error = () => {};
 	try {
 		runQualityCli(cfg, ['quality', '--all', '--warn', '--report-json', 'report.json']);
@@ -200,11 +186,10 @@ test('missing required documentation configuration fails and JSON reports explic
 		assert.equal(inaccessible?.status, 'not-applicable');
 		assert.match(inaccessible?.reason ?? '', /JSX\/TSX/);
 	} finally {
-		console.error = previousError;
+		console.error = previousErr;
 		resetExitCode();
 	}
 });
-
 test('profile tool checks enforce their minimum version and include installation guidance', () => {
 	const root = fixtureRoot('terra-quality-language-tool-version-');
 	const toolPath = fixtureFile(root, 'bin/fixture-tool', '#!/bin/sh\nprintf "fixture-tool 1.2.3\\n"\n', 0o755);
@@ -216,29 +201,27 @@ test('profile tool checks enforce their minimum version and include installation
 	assert.match(missing.error ?? '', /unavailable/);
 	assert.match(missing.error ?? '', /Install the missing tool/);
 });
-
 test('selected profiles fail clearly when a required tool is missing', () => {
 	const root = fixtureRoot('terra-quality-language-profile-missing-tool-');
 	fixtureFile(root, 'src/app.py', 'print("ready")\n');
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: [], languageProfiles: ['python'], enabledChecks: DISABLED_SOURCE_CHECKS });
 	const previousPath = process.env.PATH;
-	const previousError = console.error;
-	const errors = [];
+	const previousErr = console.error;
+	const errs = [];
 	process.env.PATH = join(root, 'empty-bin');
-	console.error = (...values) => errors.push(values.join(' '));
+	console.error = (...values) => errs.push(values.join(' '));
 	try {
 		runQualityCli(cfg, ['quality', '--all']);
 		assert.equal(process.exitCode, 1);
-		assert.ok(errors.some((line) => line.includes('Required tool "ruff" is unavailable')));
-		assert.ok(errors.some((line) => line.includes('uv add --dev ruff')));
+		assert.ok(errs.some((line) => line.includes('Required tool "ruff" is unavailable')));
+		assert.ok(errs.some((line) => line.includes('uv add --dev ruff')));
 	} finally {
 		if (previousPath === undefined) delete process.env.PATH;
 		else process.env.PATH = previousPath;
-		console.error = previousError;
+		console.error = previousErr;
 		resetExitCode();
 	}
 });
-
 test('C, Java, and Python profiles invoke their native checks in phase order', () => {
 	const root = fixtureRoot('terra-quality-language-profile-tools-');
 	fixtureFile(root, 'src/image.c', 'int main(void) { return 0; }\n');
@@ -289,11 +272,16 @@ test('C, Java, and Python profiles invoke their native checks in phase order', (
 		else process.env.TERRA_QUALITY_PROFILE_MARKER = previousMarker;
 	}
 });
-
 test('profile defaults can be overridden while arbitrary language commands remain available', () => {
 	const root = fixtureRoot('terra-quality-language-command-overrides-');
 	fixtureFile(root, 'src/app.py', 'print("ready")\n');
 	const marker = join(root, 'commands.txt');
+	/**
+	 *
+	 * @param phase
+	 *
+	 * @return
+	 */
 	const append = (phase) => ['-e', `require('node:fs').appendFileSync(${JSON.stringify(marker)}, ${JSON.stringify(`${phase}\n`)})`];
 	const cfg = createQualityCfg({
 		root,
@@ -312,7 +300,6 @@ test('profile defaults can be overridden while arbitrary language commands remai
 	assert.equal(fixtureText(root, 'commands.txt'), 'format\nlint\ncustom\n');
 	resetExitCode();
 });
-
 test('profile safe fixes run only in fix mode and use their native formatter/linter commands', () => {
 	const root = fixtureRoot('terra-quality-language-profile-fixes-');
 	fixtureFile(root, 'src/app.py', 'def greet(name): return name\n');
@@ -323,8 +310,8 @@ test('profile safe fixes run only in fix mode and use their native formatter/lin
 	process.env.PATH = [join(root, 'bin'), dirname(process.execPath), previousPath].filter(Boolean).join(delimiter);
 	process.env.TERRA_QUALITY_PROFILE_MARKER = marker;
 	try {
-		const enabledCommands = { 'python-mypy': false, 'python-bandit': false, 'python-vulture': false };
-		const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: [], languageProfiles: ['python'], enabledChecks: DISABLED_SOURCE_CHECKS, enabledCommands });
+		const enabledCmds = { 'python-mypy': false, 'python-bandit': false, 'python-vulture': false };
+		const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: [], languageProfiles: ['python'], enabledChecks: DISABLED_SOURCE_CHECKS, enabledCommands: enabledCmds });
 		runQualityCli(cfg, ['quality', '--all']);
 		const calls = readFileSync(marker, 'utf8')
 			.trim()

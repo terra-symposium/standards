@@ -11,14 +11,30 @@ IMPORTS
 import assert from 'node:assert/strict';
 import test, { afterEach } from 'node:test';
 // prettier-ignore
-import { QualityPlaywrightReporter, aliasFindings, checkImports, collapseInlineIfs, collapseTypesAndObjects, createQualityAnalysis, createQualityCfg, documentationFindings, maintainSrcFile, namingFindings, objectForwardingFindings, protectLongImports, qualityNodeReporter, regexFindings, renameId, runQuality, runQualityCli, runTailwindCanonical, srcFiles } from '../../dist/index.js';
+import { aliasFindings, checkImports, collapseInlineIfs, collapseTypesAndObjects, createQualityAnalysis, createQualityCfg, documentationFindings, maintainSrcFile, namingFindings, objectForwardingFindings, protectLongImports, qualityNodeReporter, regexFindings, renameId, runQuality, runQualityCli, runTailwindCanonical, srcFiles } from '../../dist/index.js';
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
+
+// COMPONENTS
+import { QualityPlaywrightReporter } from '../../dist/index.js';
 
 // DATA
 import { DOCUMENTATION_DESCRIPTION_NOTICE } from '../../dist/index.js';
+
+/**
+ * Creates a fresh pattern for finding the HELPERS section label.
+ *
+ * @return
+ */
+const NHELPERS_N_G_REGEX = () => /\nHELPERS\n/g;
+/**
+ * Creates a fresh pattern for finding the COMPONENTS section label.
+ *
+ * @return
+ */
+const NCOMPONENTS_N_G_REGEX = () => /\nCOMPONENTS\n/g;
 afterEach(() => {
 	process.exitCode = undefined;
 });
@@ -81,12 +97,7 @@ test('documentation findings fail quality as errors', () => {
 	try {
 		const root = mkdtempSync(join(tmpdir(), 'terra-quality-warning-policy-'));
 		writeFileSync(join(root, 'main.ts'), '/** main.ts */\n/** @return */\nfunction read(): string { return "value"; }\n');
-		const cfg = createQualityCfg({
-			root,
-			sourceRoots: ['.'],
-			extensions: ['.ts'],
-			enabledChecks: { import: false, name: false, alias: false, forward: false },
-		});
+		const cfg = createQualityCfg({ root, sourceRoots: ['.'], extensions: ['.ts'], enabledChecks: { import: false, name: false, alias: false, forward: false } });
 		runQuality(cfg);
 		assert.equal(process.exitCode, 1);
 	} finally {
@@ -168,15 +179,15 @@ test('source discovery honors configured skips and prunes generated build folder
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-source-skips-'));
 	const retained = join(root, 'src', 'retained.ts');
 	const skippedFile = join(root, 'src', 'generated-types.ts');
-	const skippedDirectory = join(root, 'src', 'vendor', 'generated.ts');
+	const skippedDir = join(root, 'src', 'vendor', 'generated.ts');
 	const nestedBuild = join(root, 'sanity', 'functions', 'arc', '.build', 'bundle.js');
-	for (const file of [retained, skippedFile, skippedDirectory, nestedBuild]) {
+	for (const file of [retained, skippedFile, skippedDir, nestedBuild]) {
 		mkdirSync(dirname(file), { recursive: true });
 		writeFileSync(file, 'export {}\n');
 	}
 	const cfg = createQualityCfg({
 		root,
-		sourceRoots: ['src', 'sanity', skippedDirectory, nestedBuild],
+		sourceRoots: ['src', 'sanity', skippedDir, nestedBuild],
 		extensions: ['.js', '.ts'],
 		skippedDirectories: ['.build', 'src/vendor'],
 		skippedFiles: ['src/generated-types.ts'],
@@ -513,7 +524,6 @@ class Service {}
 /*//////////////////////////////////////////////////
 CONFIG
 //////////////////////////////////////////////////*/
-
 export interface Settings { enabled: boolean }
 const OPEN = 'open';
 export type Mode = 'read' | 'write';
@@ -541,8 +551,8 @@ void [Service, runtime, OPEN];
 	assert.ok(remaining < src.indexOf('let runtime'));
 	assert.match(src, /function readValue\(\) \{\n\tconst nested = 1;/);
 	assert.equal(src.match(/\nCONFIG\n/g)?.length, 1);
-	assert.equal(src.match(/\nHELPERS\n/g)?.length, 1);
-	assert.equal(src.match(/\nCOMPONENTS\n/g)?.length ?? 0, 0);
+	assert.equal(src.match(NHELPERS_N_G_REGEX())?.length, 1);
+	assert.equal(src.match(NCOMPONENTS_N_G_REGEX())?.length ?? 0, 0);
 	assert.equal(maintainSrcFile(root, file), false);
 });
 test('maintenance does not interpret section-shaped string content as managed headers', () => {
@@ -682,8 +692,8 @@ void component;
 	);
 	assert.equal(maintainSrcFile(root, file), true);
 	const src = readFileSync(file, 'utf8');
-	assert.equal(src.match(/\nHELPERS\n/g)?.length ?? 0, 0);
-	assert.equal(src.match(/\nCOMPONENTS\n/g)?.length, 1);
+	assert.equal(src.match(NHELPERS_N_G_REGEX())?.length ?? 0, 0);
+	assert.equal(src.match(NCOMPONENTS_N_G_REGEX())?.length, 1);
 	assert.doesNotMatch(src, /HELPERS\n\/{10,}\*\/\n\n\/\*\/{10,}\nCOMPONENTS/);
 	assert.match(src, /nullableText = z\.string\(\)\.nullable\(\);\n\n\/\*\/{10,}/);
 	assert.match(src, /\/{10,}\*\/\n\n(?:\/\/|\S)/);

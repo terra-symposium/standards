@@ -11,6 +11,7 @@ IMPORTS
 
 // API
 import ts from 'typescript';
+import { accessibilityFindings, fixAccessibleNames } from './accessibility.js';
 import { aliasFindings, declarationScope, isCallbackDeclaration, isProtectedPath, isRenamableDeclaration, namingFindings, renameDeclaration, renameId } from './naming.js';
 import { basename, dirname, isAbsolute, relative, resolve, sep } from 'node:path';
 import { buildGitHubReport, formatGitHubReport, hasGitHubAuth } from './github-report.js';
@@ -18,32 +19,34 @@ import { checkImports } from './imports.js';
 import { collapseInlineIfs } from './inline-if.js';
 import { collapseTypesAndObjects } from './collapse.js';
 import { deadCodeEditsIntroduceTypeErrors, deadCodeTypeProgram, fixSingleUseDeclarations, singleUseFindings } from './single-use.js';
+import { displayNameFindings, fixDisplayNames } from './display-name.js';
 import { documentSrcFile, documentationFindings, documentedCommandFindings, duplicateImportFindings, fixDocumentedCommands, maintainSrcFile, protectLongImports } from './documentation.js';
-import { existsSync, readdirSync, readFileSync, realpathSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, realpathSync, statSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { fixObjectForwarding, objectForwardingFindings } from './object-forwarding.js';
 import { fixRegexDedup, fixRepeatedClasses, performancePatternFindings, regexFindings, repeatedClassFindings, runTailwindCanonical, uiPatternFindings } from './patterns.js';
-import { qualityProgress, setQualityProgressSuppressed } from './progress.js';
+import { inspectLanguageProfileTool, isLanguageProfileId, resolveLanguageProfiles } from './language-profiles.js';
 import { qualityNodeReporterOptions } from './node-reporter.js';
+import { qualityProgress, setQualityProgressSuppressed } from './progress.js';
 import { securityFindings } from './security.js';
-import { accessibilityFindings, fixAccessibleNames } from './accessibility.js';
-import { displayNameFindings, fixDisplayNames } from './display-name.js';
-import { uiComponentRecommendations } from './ui-recommendations.js';
-import { inspectLanguageProfileTool, isLanguageProfileId, LANGUAGE_CAPABILITIES, resolveLanguageProfiles } from './language-profiles.js';
 import { spawnSync } from 'node:child_process';
-import { Worker } from 'node:worker_threads';
 import { srcFiles, workingSrcFiles } from './files.js';
+import { uiComponentRecommendations } from './ui-recommendations.js';
 import { writeHistoryReport } from './history-report.js';
 
+// COMPONENTS
+import { Worker } from 'node:worker_threads';
+
 // DATA
+import { LANGUAGE_CAPABILITIES } from './language-profiles.js';
 import { PROTECTED_IDENTIFIERS } from './naming.js';
 
 // TYPES
+import type { Dirent } from 'node:fs';
 import type { DocumentationRequirements } from './documentation.js';
 import type { GitHubFeature, GitHubReport } from './github-report.js';
-import type { UiRecommendationSettings } from './ui-recommendations.js';
-import type { Dirent } from 'node:fs';
 import type { LanguageProfileId, LanguageProfileTool, LanguageQualityPhase, ResolvedLanguageCheck, SkippedLanguageCheck } from './language-profiles.js';
+import type { UiRecommendationSettings } from './ui-recommendations.js';
 
 /*//////////////////////////////////////////////////
 REGEX
@@ -65,6 +68,10 @@ REGEX
 //////////////////////////////////////////////////*/
 
 const CJS_JS_JSX_MJS_TS_TSX_REGEX = /\.(?:cjs|js|jsx|mjs|ts|tsx)$/;
+/**
+ *
+ * @return
+ */
 const G_REGEX = () => /-/g;
 const C_M_JS_TS_REGEX = /\.(?:c|m)?(?:js|ts)$/;
 const CLI_CMDS = new Set([
@@ -362,15 +369,15 @@ export function loadQualityCfg(file = resolve(process.cwd(), 'quality.json')): Q
  * @return Configuration ready for quality checks and subprocess execution.
  */
 export function createQualityCfg(cfg: QualityCfg): QualityCfg {
-	const languageProfiles = cfg.languageProfiles ?? [];
-	if (!Array.isArray(languageProfiles)) throw new Error('languageProfiles must be an array of profile names.');
-	for (const profile of languageProfiles) {
+	const langProfiles = cfg.languageProfiles ?? [];
+	if (!Array.isArray(langProfiles)) throw new Error('languageProfiles must be an array of profile names.');
+	for (const profile of langProfiles) {
 		if (typeof profile !== 'string' || !isLanguageProfileId(profile)) throw new Error(`Unknown language profile "${profile}". Available profiles: c, java, python.`);
 	}
-	if (new Set(languageProfiles).size !== languageProfiles.length) throw new Error('languageProfiles must not contain duplicate profile names.');
+	if (new Set(langProfiles).size !== langProfiles.length) throw new Error('languageProfiles must not contain duplicate profile names.');
 	return {
 		...cfg,
-		languageProfiles,
+		languageProfiles: langProfiles,
 		renameExports: cfg.renameExports ?? false,
 		root: resolve(cfg.root),
 		sourceRoots: cfg.sourceRoots.map((p) => resolve(cfg.root, p)),
@@ -402,7 +409,8 @@ function toolPath(cfg: QualityCfg, cfgd: string | undefined, fallback: string): 
 	return existsSync(local) ? local : executable;
 }
 
-/** Formats one check identifier for terminal output.
+/**
+ * Formats one check identifier for terminal output.
  *
  * @param name Internal quality check identifier.
  *
@@ -432,7 +440,8 @@ function qualityLabel(name: string): string {
 		.replace(/\bEslint\b/gu, 'ESLint');
 }
 
-/** Starts the spinner and records the active check for a full quality run.
+/**
+ * Starts the spinner and records the active check for a full quality run.
  *
  * @param name Internal quality check identifier.
  * @param detail Human-readable description for non-full output.
@@ -470,7 +479,8 @@ function printCheckStatus(name: string, findings: number): void {
 	printQualityDetails();
 }
 
-/** Ends a skipped check's spinner and writes its status.
+/**
+ * Ends a skipped check's spinner and writes its status.
  *
  * @param name Internal quality check identifier.
  *
@@ -483,7 +493,8 @@ function printSkippedCheckStatus(name: string): void {
 	printQualityDetails();
 }
 
-/** Starts a terminal spinner outside the blocked main JavaScript thread.
+/**
+ * Starts a terminal spinner outside the blocked main JavaScript thread.
  *
  * @param label Readable check name shown in the terminal.
  *
@@ -505,7 +516,8 @@ function startQualitySpinner(label: string): void {
 	qualitySpinner = { worker, state };
 }
 
-/** Stops the active spinner and clears its terminal line.
+/**
+ * Stops the active spinner and clears its terminal line.
  *
  * @return Nothing; the check status can be written on a clean line.
  */
@@ -518,7 +530,8 @@ function stopQualitySpinner(): void {
 	if (Atomics.wait(spinner.state, 2, 0, 1000) === 'timed-out') void spinner.worker.terminate();
 }
 
-/** Buffers one diagnostic as a bullet under the active quality check.
+/**
+ * Buffers one diagnostic as a bullet under the active quality check.
  *
  * @param detail Diagnostic text to show below the check status.
  *
@@ -533,7 +546,8 @@ function recordQualityDetail(detail: string): void {
 	qualityDetails.push(...compactOutput(detail).map((line) => `    - ${line.trim().replace(/^[-•]\s*/u, '')}`));
 }
 
-/** Prints and clears the active check's buffered diagnostic bullets.
+/**
+ * Prints and clears the active check's buffered diagnostic bullets.
  *
  * @return Nothing; buffered details are written to standard error.
  */
@@ -543,13 +557,14 @@ function printQualityDetails(): void {
 	qualityCheckName = undefined;
 }
 
-/** Records one failed check and keeps its complete diagnostic under that check.
+/**
+ * Records one failed check and keeps its complete diagnostic under that check.
  *
  * @param name Check identifier used by the quality runner.
- * @param error Error thrown by the check.
+ * @param err Error thrown by the check.
  */
-function recordQualityFailure(name: string, error: unknown): void {
-	const detail = error instanceof Error ? error.message : String(error);
+function recordQualityFailure(name: string, err: unknown): void {
+	const detail = err instanceof Error ? err.message : String(err);
 	const stage = reportStages?.get(name);
 	if (stage) stage.status = 'failed';
 	process.exitCode = 1;
@@ -562,7 +577,8 @@ function recordQualityFailure(name: string, error: unknown): void {
 	} else console.error(`${qualityLabel(name)}: ${detail}`);
 }
 
-/** Runs an independent action and records its error without interrupting later checks.
+/**
+ * Runs an independent action and records its error without interrupting later checks.
  *
  * @param name Check identifier used if the action throws.
  * @param action Check action to run.
@@ -573,8 +589,8 @@ function continueAfterFailure(name: string, action: () => void): boolean {
 	try {
 		action();
 		return true;
-	} catch (error) {
-		recordQualityFailure(name, error);
+	} catch (err) {
+		recordQualityFailure(name, err);
 		printCheckStatus(name, 1);
 		return false;
 	}
@@ -603,6 +619,10 @@ function workspaceManifests(root: string): WorkspaceManifest[] {
 	const cached = WORKSPACE_MANIFESTS.get(root);
 	if (cached) return cached;
 	const manifests: WorkspaceManifest[] = [];
+	/**
+	 *
+	 * @param dir
+	 */
 	const visit = (dir: string): void => {
 		let entries: Dirent[];
 		try {
@@ -826,6 +846,12 @@ function uniqueTestSuites(checks: QualityInvocation[]): QualityInvocation[] {
 		seen.add(key);
 		return true;
 	});
+	/**
+	 *
+	 * @param check
+	 *
+	 * @return
+	 */
 	const rank = (check: QualityInvocation): number => {
 		const name = check.name.toLowerCase();
 		if (/\bunit\b/u.test(name)) return 0;
@@ -946,8 +972,8 @@ function runTestSuite(cfg: QualityCfg, check: QualityInvocation): { status: numb
 		output = [...compactOutput(result.stdout?.toString() ?? ''), ...compactOutput(result.stderr?.toString() ?? '')];
 		if (result.error) output.push(result.error.message);
 		status = result.status ?? 1;
-	} catch (error) {
-		output.push(error instanceof Error ? error.message : String(error));
+	} catch (err) {
+		output.push(err instanceof Error ? err.message : String(err));
 	}
 	if (reportStages && reportStageName) {
 		const stage = reportStages.get(reportStageName);
@@ -997,6 +1023,10 @@ function qualityInvocations(cfg: QualityCfg, profileChecks: ResolvedLanguageChec
  */
 function runQualityPhase(cfg: QualityCfg, phase: QualityPhase, profileChecks: ResolvedLanguageCheck[], toolResults: Map<string, ReturnType<typeof inspectLanguageProfileTool>>): number {
 	const cmds = qualityInvocations(cfg, profileChecks).filter((check) => qualityCmdEnabled(cfg, check.name) && phaseForInvocation(cfg, check) === phase);
+	/**
+	 *
+	 * @param check
+	 */
 	const requireProfileTool = (check: QualityInvocation): void => {
 		if (!check.profileTool) return;
 		const toolKey = JSON.stringify([check.profileTool.command, check.profileTool.versionArgs, check.profileTool.minimumVersion]);
@@ -1057,7 +1087,7 @@ function runQualityPhase(cfg: QualityCfg, phase: QualityPhase, profileChecks: Re
  *
  * @return Nothing; terminal output and an optional JSON report mark each check skipped.
  */
-function reportSkippedLanguageChecks(cfg: QualityCfg, skipped: SkippedLanguageCheck[]): void {
+function reportSkippedLangChecks(cfg: QualityCfg, skipped: SkippedLanguageCheck[]): void {
 	for (const check of skipped) {
 		if (!qualityCmdEnabled(cfg, check.name)) continue;
 		const name = `command:${check.name}`;
@@ -1066,8 +1096,13 @@ function reportSkippedLanguageChecks(cfg: QualityCfg, skipped: SkippedLanguageCh
 	}
 }
 
-/** Marks required profile configuration failures without stopping unrelated checks. */
-function reportFailedLanguageChecks(cfg: QualityCfg, failed: SkippedLanguageCheck[]): void {
+/**
+ * Marks required profile configuration failures without stopping unrelated checks.
+ *
+ * @param cfg
+ * @param failed
+ */
+function reportFailedLangChecks(cfg: QualityCfg, failed: SkippedLanguageCheck[]): void {
 	for (const check of failed) {
 		if (!qualityCmdEnabled(cfg, check.name)) continue;
 		const name = `command:${check.name}`;
@@ -1077,8 +1112,14 @@ function reportFailedLanguageChecks(cfg: QualityCfg, failed: SkippedLanguageChec
 	}
 }
 
-/** Applies profile-provided safe fixes while preserving the normal read-only check commands. */
-function runLanguageProfileFixes(cfg: QualityCfg, checks: ResolvedLanguageCheck[], toolResults: Map<string, ReturnType<typeof inspectLanguageProfileTool>>): void {
+/**
+ * Applies profile-provided safe fixes while preserving the normal read-only check commands.
+ *
+ * @param cfg
+ * @param checks
+ * @param toolResults
+ */
+function runLangProfileFixes(cfg: QualityCfg, checks: ResolvedLanguageCheck[], toolResults: Map<string, ReturnType<typeof inspectLanguageProfileTool>>): void {
 	for (const check of checks) {
 		if (!check.autofix || cfg.qualityCommands?.some((command) => command.name === check.name) || !qualityAutofixEnabled(cfg, check.autofix.name) || !qualityCmdEnabled(cfg, check.name)) continue;
 		if (check.tool) {
@@ -1217,18 +1258,11 @@ function scopedCfg(cfg: QualityCfg, all: boolean): QualityCfg {
  * @return ESM source for the ESLint API child process.
  */
 function eslintApiSource(cfg: QualityCfg, files: string[], opts: QualityOptions, exhaustive: boolean, deadCodeCoordinated: boolean): string {
-	const payload = JSON.stringify({
-		root: cfg.root,
-		files,
-		fix: opts.fix,
-		exhaustive,
-		deadCodeCoordinated,
-	});
+	const payload = JSON.stringify({ root: cfg.root, files, fix: opts.fix, exhaustive, deadCodeCoordinated });
 	const progressUrl = new URL('./progress.js', import.meta.url).href;
 	return `
 import { createRequire } from 'node:module';
 import { resolve } from 'node:path';
-
 const options = ${payload};
 const { qualityProgress } = await import(${JSON.stringify(progressUrl)});
 let ESLint;
@@ -1248,7 +1282,6 @@ try {
 } catch {
 	process.exit(${ESLINT_API_FALLBACK});
 }
-
 try {
 	const results = await engine.lintFiles(options.files);
 	if (options.fix) await ESLint.outputFixes(results);
@@ -1370,6 +1403,10 @@ function fixUnusedDeclarations(cfg: QualityCfg, reports: EslintReport[], changed
 			throw new Error(`ESLint reported unused declarations in unparsable source: ${report.filePath}`);
 		const starts = new Set(unusedMsgs.map((message) => ast.getPositionOfLineAndCharacter(message.line - 1, message.column - 1)));
 		const edits: Array<{ start: number; end: number; text?: string }> = [];
+		/**
+		 *
+		 * @param node
+		 */
 		const visit = (node: ts.Node): void => {
 			let declaration: ts.Node | undefined;
 			const name =
@@ -1379,9 +1416,21 @@ function fixUnusedDeclarations(cfg: QualityCfg, reports: EslintReport[], changed
 						? node.name.text
 						: undefined;
 			const externallyConsumed = name ? importedConsumers.get(resolve(report.filePath))?.has(name) : false;
+			/**
+			 *
+			 * @param candidate
+			 *
+			 * @return
+			 */
 			const isTopLevel = (candidate: ts.Node): boolean =>
 				candidate.parent === ast ||
 				(ts.isVariableDeclaration(candidate) && ts.isVariableDeclarationList(candidate.parent) && ts.isVariableStatement(candidate.parent.parent) && candidate.parent.parent.parent === ast);
+			/**
+			 *
+			 * @param candidate
+			 *
+			 * @return
+			 */
 			const isExported = (candidate: ts.Node): boolean => ts.canHaveModifiers(candidate) && Boolean(ts.getModifiers(candidate)?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword));
 			if (ts.isFunctionDeclaration(node) && node.name && starts.has(node.name.getStart(ast)) && isTopLevel(node) && !isExported(node) && !externallyConsumed) declaration = node;
 			if ((ts.isTypeAliasDeclaration(node) || ts.isInterfaceDeclaration(node)) && starts.has(node.name.getStart(ast)) && isTopLevel(node) && !isExported(node) && !externallyConsumed)
@@ -1692,6 +1741,10 @@ function unusedDeclarationFindings(cfg: QualityCfg, reports: EslintReport[]): De
 			const name = text.match(/^[A-Za-z_$][\w$]*/)?.[0] ?? msg.message?.match(/^'([^']+)'/)?.[1] ?? '<unknown>';
 			const pos = ast.getPositionOfLineAndCharacter(msg.line - 1, msg.column - 1);
 			let declaration: ts.Node | undefined;
+			/**
+			 *
+			 * @param node
+			 */
 			const find = (node: ts.Node): void => {
 				if (
 					(node as ts.Node & { name?: ts.Node }).name &&
@@ -1767,8 +1820,8 @@ function runCfgdCmd(cfg: QualityCfg, name: string): void {
 	let status = 1;
 	try {
 		status = run(cfg, check.command, check.args ?? []);
-	} catch (error) {
-		recordQualityFailure(`command:${name}`, error);
+	} catch (err) {
+		recordQualityFailure(`command:${name}`, err);
 	}
 	if (status) process.exitCode = 1;
 	printCheckStatus(`command:${name}`, status ? 1 : 0);
@@ -1788,8 +1841,8 @@ function runRecommendationCmds(cfg: QualityCfg): void {
 		let status = 1;
 		try {
 			status = run(cfg, check.command, check.args ?? []);
-		} catch (error) {
-			recordQualityFailure(`recommendation:${check.name}`, error);
+		} catch (err) {
+			recordQualityFailure(`recommendation:${check.name}`, err);
 		}
 		if (status) process.exitCode = status;
 		printCheckStatus(`recommendation:${check.name}`, status ? 1 : 0);
@@ -1849,6 +1902,12 @@ function repairMissingImports(cfg: QualityCfg, program: ts.Program, checker: ts.
 			candidates.set(exported.name, list);
 		}
 	}
+	/**
+	 *
+	 * @param n
+	 *
+	 * @return
+	 */
 	const isTypePos = (n: ts.Identifier): boolean => {
 		for (let parent: ts.Node | undefined = n.parent; parent; parent = parent.parent) {
 			if (ts.isImportDeclaration(parent) || ts.isVariableDeclaration(parent) || ts.isFunctionDeclaration(parent)) return false;
@@ -1870,6 +1929,10 @@ function repairMissingImports(cfg: QualityCfg, program: ts.Program, checker: ts.
 			if (statement.importClause.namedBindings && ts.isNamedImports(statement.importClause.namedBindings))
 				for (const element of statement.importClause.namedBindings.elements) importedNames.add(element.name.text);
 		}
+		/**
+		 *
+		 * @param n
+		 */
 		const visit = (n: ts.Node): void => {
 			const intrinsicJsxTag = ts.isIdentifier(n) && (ts.isJsxOpeningLikeElement(n.parent) || ts.isJsxClosingElement(n.parent)) && n.parent.tagName === n && /^[a-z]/.test(n.text);
 			const propertyName =
@@ -2178,9 +2241,19 @@ function importedExportConsumers(cfg: QualityCfg): Map<string, Set<string>> {
 		const frontmatter = astro?.[1] ?? raw;
 		const markup = astro ? raw.slice(astro[0].length) : '';
 		const src = ts.createSourceFile(file, frontmatter, ts.ScriptTarget.Latest, true, file.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
+		/**
+		 *
+		 * @param name
+		 *
+		 * @return
+		 */
 		const markupUses = (name: string): boolean => Boolean(markup) && markup.includes(name);
 		const referencedIdentifiers = new Set<string>();
 		const namespaceProperties = new Map<string, Set<string>>();
+		/**
+		 *
+		 * @param node
+		 */
 		const collectReferences = (node: ts.Node): void => {
 			if (ts.isImportDeclaration(node)) return;
 			if (ts.isIdentifier(node)) referencedIdentifiers.add(node.text);
@@ -2240,6 +2313,13 @@ function acceptTypeSafeEdits(
 ): { accepted: Map<string, string>; rejected: Set<string> } {
 	const rejected = new Set<string>();
 	let checks = 0;
+	/**
+	 *
+	 * @param entries
+	 * @param base
+	 *
+	 * @return
+	 */
 	const accept = (entries: [string, string][], base: Map<string, string>): Map<string, string> => {
 		if (!entries.length) return base;
 		onBatch?.(++checks, entries.length);
@@ -2313,6 +2393,9 @@ function printDeadCodeFindings(findings: DeadCodeFinding[], typeSafetyVerified =
 function runDeadCode(cfg: QualityCfg, fix: boolean, all: boolean, verify = true, emit = true): DeadCodeFinding[] {
 	if (emit) qualityHeader('dead-code', `${fix ? 'Fixing safe cases and checking' : 'Read-only check of'} unused files, exports, declarations, and single-use code`);
 	let verificationStarted = false;
+	/**
+	 *
+	 */
 	const beginVerification = (): void => {
 		if (verificationStarted) return;
 		verificationStarted = true;
@@ -2329,6 +2412,12 @@ function runDeadCode(cfg: QualityCfg, fix: boolean, all: boolean, verify = true,
 	const eslintReportsByPath = new Map<string, EslintReport>();
 	const eslintScannedContents = new Map<string, string>();
 	let importedConsumersForRun: Map<string, Set<string>> | undefined;
+	/**
+	 *
+	 * @param selectedFiles
+	 *
+	 * @return
+	 */
 	const scanEslint = (selectedFiles?: string[]): EslintReport[] => {
 		const reports = collectEslintReports(cfg, all, selectedFiles);
 		for (const report of reports) {
@@ -2338,6 +2427,10 @@ function runDeadCode(cfg: QualityCfg, fix: boolean, all: boolean, verify = true,
 		}
 		return reports;
 	};
+	/**
+	 *
+	 * @return
+	 */
 	const scanDirtyEslintFiles = (): EslintReport[] => {
 		const dirtyFiles = [...eslintScannedContents].filter(([f, content]) => existsSync(f) && readFileSync(f, 'utf8') !== content).map(([f]) => f);
 		return dirtyFiles.length ? scanEslint(dirtyFiles) : [];
@@ -2457,6 +2550,8 @@ function runDeadCode(cfg: QualityCfg, fix: boolean, all: boolean, verify = true,
  *
  * @param cfg Quality configuration defining source scope and tools.
  * @param all Whether to inspect all configured source files.
+ *
+ * @return
  */
 function runDeadCodeReadOnly(cfg: QualityCfg, all: boolean): DeadCodeFinding[] {
 	return runDeadCode(cfg, false, all);
@@ -2516,25 +2611,26 @@ function printFindings<T>(findings: readonly T[], fmt: (finding: T) => string): 
 	}
 }
 
-/** Runs one independent finding check and keeps failures from blocking later checks.
+/**
+ * Runs one independent finding check and keeps failures from blocking later checks.
  *
  * @param name Check identifier shown in the output.
  * @param detail Human-readable description of the check.
  * @param check Function that collects findings.
- * @param format Converts one finding into a human-readable message.
+ * @param fmt Converts one finding into a human-readable message.
  *
  * @return Findings produced by the check.
  */
-function runFindingCheck<T>(name: string, detail: string, check: () => T[], format: (finding: T) => string): T[] {
+function runFindingCheck<T>(name: string, detail: string, check: () => T[], fmt: (finding: T) => string): T[] {
 	qualityHeader(name, detail);
 	try {
 		const findings = check();
-		printFindings(findings, format);
+		printFindings(findings, fmt);
 		if (findings.length) process.exitCode = 1;
 		printCheckStatus(name, findings.length);
 		return findings;
-	} catch (error) {
-		recordQualityFailure(name, error);
+	} catch (err) {
+		recordQualityFailure(name, err);
 		printCheckStatus(name, 1);
 		return [];
 	}
@@ -2650,8 +2746,8 @@ function runGenericChecks(cfg: QualityCfg, analysis?: QualityAnalysis): void {
 			);
 			printCheckStatus(name, findings.length);
 			if (findings.length) process.exitCode = 1;
-		} catch (error) {
-			recordQualityFailure(name, error);
+		} catch (err) {
+			recordQualityFailure(name, err);
 			printCheckStatus(name, 1);
 		}
 	}
@@ -2730,20 +2826,54 @@ function fixNames(cfg: QualityCfg, all: boolean): void {
 		},
 	});
 	checker = program.getTypeChecker();
+	/**
+	 *
+	 * @param n
+	 *
+	 * @return
+	 */
 	const isIntrinsicJsxTag = (n: ts.Identifier): boolean => {
 		return (ts.isJsxOpeningLikeElement(n.parent) || ts.isJsxClosingElement(n.parent)) && n.parent.tagName === n && n.text.length > 0 && n.text[0] === n.text[0]!.toLowerCase();
 	};
+	/**
+	 *
+	 * @param symbol
+	 *
+	 * @return
+	 */
 	const canonical = (symbol: ts.Symbol | undefined): ts.Symbol | undefined => (symbol && symbol.flags & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(symbol) : symbol);
+	/**
+	 *
+	 * @param n
+	 *
+	 * @return
+	 */
 	const identifierSymbol = (n: ts.Identifier): ts.Symbol | undefined =>
 		canonical(ts.isShorthandPropertyAssignment(n.parent) ? (checker.getShorthandAssignmentValueSymbol(n.parent) ?? checker.getSymbolAtLocation(n)) : checker.getSymbolAtLocation(n));
+	/**
+	 *
+	 * @param n
+	 *
+	 * @return
+	 */
 	const isPropertyName = (n: ts.Identifier): boolean =>
 		(ts.isPropertyAccessExpression(n.parent) && n.parent.name === n) ||
 		(ts.isQualifiedName(n.parent) && n.parent.right === n) ||
 		((ts.isPropertyAssignment(n.parent) || ts.isMethodDeclaration(n.parent) || ts.isMethodSignature(n.parent)) && n.parent.name === n);
+	/**
+	 *
+	 * @param n
+	 *
+	 * @return
+	 */
 	const hasInitShadow = (n: ts.Identifier): boolean => {
 		if (!ts.isVariableDeclaration(n.parent) || !n.parent.initializer) return false;
 		const tgt = checker.getSymbolAtLocation(n);
 		let found = false;
+		/**
+		 *
+		 * @param child
+		 */
 		const visit = (child: ts.Node): void => {
 			if (found || child === n) return;
 			if (ts.isIdentifier(child) && !isPropertyName(child) && child.text === n.text && checker.getSymbolAtLocation(child) === tgt) found = true;
@@ -2752,10 +2882,20 @@ function fixNames(cfg: QualityCfg, all: boolean): void {
 		visit(n.parent.initializer);
 		return found;
 	};
+	/**
+	 *
+	 * @param n
+	 *
+	 * @return
+	 */
 	const hasInitReferenceToOtherSymbol = (n: ts.Identifier): boolean => {
 		if (!ts.isVariableDeclaration(n.parent) || !n.parent.initializer) return false;
 		const tgt = checker.getSymbolAtLocation(n);
 		let found = false;
+		/**
+		 *
+		 * @param child
+		 */
 		const visit = (child: ts.Node): void => {
 			if (found || child === n) return;
 			if (ts.isIdentifier(child) && !isPropertyName(child) && child.text === n.text && checker.getSymbolAtLocation(child) !== tgt) found = true;
@@ -2764,9 +2904,20 @@ function fixNames(cfg: QualityCfg, all: boolean): void {
 		visit(n.parent.initializer);
 		return found;
 	};
+	/**
+	 *
+	 * @param n
+	 * @param suggestion
+	 *
+	 * @return
+	 */
 	const hasInitRenameCollision = (n: ts.Identifier, suggestion: string): boolean => {
 		if (!ts.isVariableDeclaration(n.parent) || !n.parent.initializer) return false;
 		let found = false;
+		/**
+		 *
+		 * @param child
+		 */
 		const visit = (child: ts.Node): void => {
 			if (found) return;
 			if (ts.isIdentifier(child) && !isPropertyName(child)) {
@@ -2784,6 +2935,13 @@ function fixNames(cfg: QualityCfg, all: boolean): void {
 		visit(n.parent.initializer);
 		return found;
 	};
+	/**
+	 *
+	 * @param n
+	 * @param suggestion
+	 *
+	 * @return
+	 */
 	const hasInitConsumerCollision = (n: ts.Identifier, suggestion: string): boolean => {
 		const tgt = checker.getSymbolAtLocation(n);
 		if (!tgt) return false;
@@ -2791,9 +2949,17 @@ function fixNames(cfg: QualityCfg, all: boolean): void {
 		if (!allowed.has(src.fileName)) return false;
 		{
 			let found = false;
+			/**
+			 *
+			 * @param n
+			 */
 			const visit = (n: ts.Node): void => {
 				if (found) return;
 				if (ts.isVariableDeclaration(n) && ts.isIdentifier(n.name) && n.name.text === suggestion && n.initializer) {
+					/**
+					 *
+					 * @param child
+					 */
 					const check = (child: ts.Node): void => {
 						if (found) return;
 						if (ts.isIdentifier(child) && checker.getSymbolAtLocation(child) === tgt) found = true;
@@ -2818,6 +2984,10 @@ function fixNames(cfg: QualityCfg, all: boolean): void {
 	const renameSafetyByScope = new Map<ts.Node, { declared: Set<string>; proposals: Map<string, number> }>();
 	for (const src of program.getSourceFiles()) {
 		if (!allowed.has(src.fileName)) continue;
+		/**
+		 *
+		 * @param n
+		 */
 		const inspect = (n: ts.Node): void => {
 			if (ts.isIdentifier(n) && isRenamableDeclaration(n)) {
 				const scope = declarationScope(n);
@@ -2842,6 +3012,10 @@ function fixNames(cfg: QualityCfg, all: boolean): void {
 	}
 	for (const src of program.getSourceFiles()) {
 		if (!allowed.has(src.fileName)) continue;
+		/**
+		 *
+		 * @param n
+		 */
 		const inspect = (n: ts.Node): void => {
 			if (ts.isIdentifier(n) && isRenamableDeclaration(n) && !n.text.startsWith('_') && !protectedNames.has(n.text) && !hasInitShadow(n) && !hasInitReferenceToOtherSymbol(n)) {
 				const suggestion = renameDeclaration(n);
@@ -2860,6 +3034,10 @@ function fixNames(cfg: QualityCfg, all: boolean): void {
 	const edits = new Map<string, ts.TextChange[]>();
 	for (const src of program.getSourceFiles()) {
 		if (!allowed.has(src.fileName)) continue;
+		/**
+		 *
+		 * @param n
+		 */
 		const inspect = (n: ts.Node): void => {
 			if (ts.isIdentifier(n) && !isIntrinsicJsxTag(n)) {
 				const replacement = replacements.get(identifierSymbol(n) as ts.Symbol);
@@ -2915,6 +3093,10 @@ function fixNames(cfg: QualityCfg, all: boolean): void {
 	for (const src of program.getSourceFiles()) {
 		if (!allowed.has(src.fileName)) continue;
 		const fileEdits: ts.TextChange[] = [];
+		/**
+		 *
+		 * @param node
+		 */
 		const visit = (node: ts.Node): void => {
 			if (ts.isImportDeclaration(node) && ts.isStringLiteral(node.moduleSpecifier) && node.importClause?.namedBindings && ts.isNamedImports(node.importClause.namedBindings)) {
 				const module = checker.getSymbolAtLocation(node.moduleSpecifier);
@@ -3071,6 +3253,9 @@ export function runQualityCli(cfg: QualityCfg, args = process.argv.slice(2)): vo
 	reportStages = new Map();
 	reportStageName = undefined;
 	reportGitHubData = undefined;
+	/**
+	 *
+	 */
 	const writeReport = (): void => {
 		const executed = [...(reportStages?.values() ?? [])].filter((s) => {
 			if (s.name.includes('/') || s.name.startsWith('recommendation:')) return false;
@@ -3103,12 +3288,12 @@ export function runQualityCli(cfg: QualityCfg, args = process.argv.slice(2)): vo
 			'github',
 		];
 		const capabilities = Object.entries(LANGUAGE_CAPABILITIES).flatMap(([language, capability]) => [
-			...Object.entries(capability.checks).map(([name, item]) => ({ language, kind: 'check' as const, name, ...item })),
-			...Object.entries(capability.autofixes).map(([name, item]) => ({ language, kind: 'autofix' as const, name, ...item })),
+			...Object.entries(capability.checks).map(([name, i]) => ({ language, kind: 'check' as const, name, ...i })),
+			...Object.entries(capability.autofixes).map(([name, i]) => ({ language, kind: 'autofix' as const, name, ...i })),
 		]);
 		const notApplicableChecks = capabilities
-			.filter((item) => item.kind === 'check' && item.status === 'not-applicable')
-			.map((item) => ({ name: `${item.language}:${item.name}`, status: 'not-applicable' as const, findings: 0, reason: item.reason }));
+			.filter((i) => i.kind === 'check' && i.status === 'not-applicable')
+			.map((i) => ({ name: `${i.language}:${i.name}`, status: 'not-applicable' as const, findings: 0, reason: i.reason }));
 		const report: QualityJsonReport = {
 			schemaVersion: 1,
 			generatedAt: new Date().toISOString(),
@@ -3148,10 +3333,22 @@ function runFullQuality(cfg: QualityCfg, args: string[], opts: QualityOptions): 
 	const profileResolution = opts.skipCommands ? { checks: [], skipped: [], failed: [] } : resolveLanguageProfiles(cfg);
 	const profileToolResults = new Map<string, ReturnType<typeof inspectLanguageProfileTool>>();
 	if (!opts.skipCommands) {
-		reportSkippedLanguageChecks(cfg, profileResolution.skipped);
-		reportFailedLanguageChecks(cfg, profileResolution.failed);
+		reportSkippedLangChecks(cfg, profileResolution.skipped);
+		reportFailedLangChecks(cfg, profileResolution.failed);
 	}
-	const runConfiguredCommands = (phase: QualityPhase): number => runQualityPhase(cfg, phase, profileResolution.checks, profileToolResults);
+	/**
+	 *
+	 * @param phase
+	 *
+	 * @return
+	 */
+	const runConfiguredCmds = (phase: QualityPhase): number => runQualityPhase(cfg, phase, profileResolution.checks, profileToolResults);
+	/**
+	 *
+	 * @param check
+	 *
+	 * @return
+	 */
 	const fix = (check: QualityAutofixName): boolean => qualityAutofixEnabled(cfg, check, opts.fix);
 	const scoped = scopedCfg(cfg, opts.all);
 	if (opts.fix) {
@@ -3161,64 +3358,66 @@ function runFullQuality(cfg: QualityCfg, args: string[], opts: QualityOptions): 
 		qualityDetails = [];
 		startQualitySpinner(qualityCheckName);
 	}
-	let safeFixFailed = false;
-	const safeFix = (name: string, action: () => void): void => {
-		if (!continueAfterFailure(name, action)) safeFixFailed = true;
+	let sFixFailed = false;
+	/**
+	 *
+	 * @param name
+	 * @param action
+	 */
+	const sFix = (name: string, action: () => void): void => {
+		if (!continueAfterFailure(name, action)) sFixFailed = true;
 	};
-	if (opts.fix && qualityCheckEnabled(cfg, 'name') && fix('name')) {
-		safeFix('naming', () => {
+	if (opts.fix && qualityCheckEnabled(cfg, 'name') && fix('name'))
+		sFix('naming', () => {
 			const namingScope = scopedCfg(cfg, opts.all);
 			if (namingFindings(namingScope).length) fixNames(cfg, opts.all);
 		});
-	}
-	if (fix('accessibility') && qualityCheckEnabled(cfg, 'accessibility')) safeFix('accessibility', () => fixAccessibleNames(scoped));
-	if (fix('displayName') && qualityCheckEnabled(cfg, 'display-name')) safeFix('display-name', () => fixDisplayNames(scoped));
-	if (fix('documentedCommands') && qualityCheckEnabled(cfg, 'documented-commands')) safeFix('documented-commands', () => fixDocumentedCommands(cfg));
-	if (fix('forward') && qualityCheckEnabled(cfg, 'forward')) {
-		safeFix('forwarding', () => {
+	if (fix('accessibility') && qualityCheckEnabled(cfg, 'accessibility')) sFix('accessibility', () => fixAccessibleNames(scoped));
+	if (fix('displayName') && qualityCheckEnabled(cfg, 'display-name')) sFix('display-name', () => fixDisplayNames(scoped));
+	if (fix('documentedCommands') && qualityCheckEnabled(cfg, 'documented-commands')) sFix('documented-commands', () => fixDocumentedCommands(cfg));
+	if (fix('forward') && qualityCheckEnabled(cfg, 'forward'))
+		sFix('forwarding', () => {
 			const result = fixObjectForwarding(scoped);
 			if ((result.fixed || result.skipped) && !outputPhase)
 				console.info(`Forwarding fixer: ${result.fixed} exact duplicates removed${result.skipped ? `; ${result.skipped} unsafe cases left unchanged` : ''}.`);
 		});
-	}
-	if (fix('repeatedClasses') && qualityCheckEnabled(cfg, 'repeated-classes')) {
-		safeFix('repeated-classes', () => {
+	if (fix('repeatedClasses') && qualityCheckEnabled(cfg, 'repeated-classes'))
+		sFix('repeated-classes', () => {
 			const result = fixRepeatedClasses(scoped);
 			if ((result.fixed || result.skipped) && !outputPhase) console.info(`Class fixer: ${result.fixed} attributes replaced${result.skipped ? `; ${result.skipped} unsafe cases left unchanged` : ''}.`);
 		});
-	}
-	if (fix('regexDedup') && qualityCheckEnabled(cfg, 'regex-dedup')) {
-		safeFix('regex-dedup', () => {
+	if (fix('regexDedup') && qualityCheckEnabled(cfg, 'regex-dedup'))
+		sFix('regex-dedup', () => {
 			const result = fixRegexDedup(scoped);
 			if ((result.fixed || result.skipped) && !outputPhase) console.info(`Regex fixer: ${result.fixed} literals replaced${result.skipped ? `; ${result.skipped} unsafe cases left unchanged` : ''}.`);
 		});
-	}
-	if (fix('lint') && qualityCheckEnabled(cfg, 'lint')) safeFix('lint', () => runLint(cfg, { ...opts, fix: true }, true, true));
-	if (opts.fix && qualityCheckEnabled(cfg, 'alias')) safeFix('aliases', () => void aliasFindings(scoped, true));
-	if (qualityCheckEnabled(cfg, 'document')) {
-		safeFix('documentation', () => {
+	if (fix('lint') && qualityCheckEnabled(cfg, 'lint')) sFix('lint', () => runLint(cfg, { ...opts, fix: true }, true, true));
+	if (opts.fix && qualityCheckEnabled(cfg, 'alias')) sFix('aliases', () => void aliasFindings(scoped, true));
+	if (qualityCheckEnabled(cfg, 'document'))
+		sFix('documentation', () => {
 			const documentationIssues = documentationFindings(scopedCfg(cfg, opts.all)).filter((finding) => finding.severity === 'error');
 			if (documentationIssues.length) runDocumentation(cfg, opts, ['document', ...new Set(documentationIssues.map((finding) => resolve(cfg.root, finding.file))), '--quiet'], true);
 		});
-	}
-	if (opts.fix && qualityCheckEnabled(cfg, 'import') && qualityAutofixEnabled(cfg, 'document', opts.fix)) {
-		safeFix('imports', () => {
+	if (opts.fix && qualityCheckEnabled(cfg, 'import') && qualityAutofixEnabled(cfg, 'document', opts.fix))
+		sFix('imports', () => {
 			const repeated = duplicateImportFindings(filesFor(cfg, opts.all));
 			for (const file of new Set(repeated.map((finding) => finding.file))) maintainSrcFile(cfg.root, file);
 		});
-	}
 	if (opts.fix && !opts.skipCommands && profileResolution.checks.some((check) => check.autofix))
-		safeFix('native language fixes', () => runLanguageProfileFixes(cfg, profileResolution.checks, profileToolResults));
+		sFix('native language fixes', () => runLangProfileFixes(cfg, profileResolution.checks, profileToolResults));
 	if (opts.fix) {
 		stopQualitySpinner();
-		console.error(`  ${safeFixFailed ? '✗' : '✓'} Safe Fixes`);
+		console.error(`  ${sFixFailed ? '✗' : '✓'} Safe Fixes`);
 		printQualityDetails();
 	}
 	outputPhase = undefined;
 	beginQualityPhase('Format');
 	if (qualityCheckEnabled(cfg, 'format')) continueAfterFailure('format', () => runFormatter(cfg, { ...opts, fix: fix('format') }, opts.all ? [] : filesFor(cfg, false)));
-	if (!opts.skipCommands) continueAfterFailure('format', () => void runConfiguredCommands('Format'));
+	if (!opts.skipCommands) continueAfterFailure('format', () => void runConfiguredCmds('Format'));
 	beginQualityPhase('Static quality');
+	/**
+	 *
+	 */
 	const continueStaticAndLater = (): void => {
 		if (qualityCheckEnabled(cfg, 'dead-code')) continueAfterFailure('dead-code', () => runDeadCodeCmd(cfg, qualityAutofixEnabled(cfg, 'dead-code', opts.fix), opts.all));
 		if (qualityCheckEnabled(cfg, 'lint')) continueAfterFailure('lint', () => runLint(cfg, { ...opts, fix: false }, true, true));
@@ -3227,28 +3426,27 @@ function runFullQuality(cfg: QualityCfg, args: string[], opts: QualityOptions): 
 		try {
 			analysis = createQualityAnalysis(scoped);
 			printCheckStatus('source-analysis', 0);
-		} catch (error) {
-			recordQualityFailure('source-analysis', error);
+		} catch (err) {
+			recordQualityFailure('source-analysis', err);
 			printCheckStatus('source-analysis', 1);
 		}
 		continueAfterFailure('static checks', () => runGenericChecks(scoped, analysis));
 		continueAfterFailure('static checks', () => void runQuality(cfg, opts.strict, opts.all, analysis));
-		if (!opts.skipCommands) continueAfterFailure('static quality', () => void runConfiguredCommands('Static quality'));
+		if (!opts.skipCommands) continueAfterFailure('static quality', () => void runConfiguredCmds('Static quality'));
 		if (!opts.skipRecommendations) continueAfterFailure('recommendations', () => runRecommendationCmds(cfg));
 		beginQualityPhase('Tests');
-		if (!opts.skipCommands) continueAfterFailure('tests', () => void runConfiguredCommands('Tests'));
+		if (!opts.skipCommands) continueAfterFailure('tests', () => void runConfiguredCmds('Tests'));
 		beginQualityPhase('Framework / type checks');
-		if (qualityCheckEnabled(cfg, 'type') && (cfg.tools?.tsc || cfg.typecheckCommand)) {
+		if (qualityCheckEnabled(cfg, 'type') && (cfg.tools?.tsc || cfg.typecheckCommand))
 			continueAfterFailure('typecheck', () => {
 				runTypecheck(cfg);
 				if (cfg.typecheckExtensions?.length && !cfg.typecheckRoots?.length && !cfg.typecheckCommand) runProjectTypecheck(cfg);
 			});
-		}
-		if (!opts.skipCommands) continueAfterFailure('framework checks', () => void runConfiguredCommands('Framework / type checks'));
+		if (!opts.skipCommands) continueAfterFailure('framework checks', () => void runConfiguredCmds('Framework / type checks'));
 		beginQualityPhase('Build');
-		if (!opts.skipCommands) continueAfterFailure('build', () => void runConfiguredCommands('Build'));
+		if (!opts.skipCommands) continueAfterFailure('build', () => void runConfiguredCmds('Build'));
 		beginQualityPhase('Repository health');
-		if (!opts.skipCommands) continueAfterFailure('repository health', () => void runConfiguredCommands('Repository health'));
+		if (!opts.skipCommands) continueAfterFailure('repository health', () => void runConfiguredCmds('Repository health'));
 		if (qualityCheckEnabled(cfg, 'diff') && !hasCfgdGitDiffCheck(cfg)) continueAfterFailure('diff', () => runDiffCheck(cfg));
 		if (qualityCheckEnabled(cfg, 'github') && cfg.github?.repositories?.length) continueAfterFailure('github', () => runGitHubCheck(cfg, [], false, args.includes('--warn')));
 		console.error(`\n${process.exitCode ? '✗' : '✓'} Quality complete`);
@@ -3295,6 +3493,12 @@ function dispatchQualityCli(cfg: QualityCfg, args: string[]): void | Promise<voi
 		skipCommands: args.includes('--skip-commands'),
 		skipRecommendations: args.includes('--skip-recommendations'),
 	};
+	/**
+	 *
+	 * @param check
+	 *
+	 * @return
+	 */
 	const fix = (check: QualityAutofixName): boolean => qualityAutofixEnabled(cfg, check, opts.fix);
 	if (
 		cfg.tailwindCanonical &&

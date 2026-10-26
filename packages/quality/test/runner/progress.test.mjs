@@ -18,6 +18,12 @@ TESTS
 
 test('progress updates always include a bar and rewrite one line even without a TTY', () => {
 	const writes = [];
+	/**
+	 *
+	 * @param chunk
+	 *
+	 * @return
+	 */
 	const capture = (chunk) => writes.push(chunk);
 	const stderr = process.stderr;
 	const hadTTY = Object.hasOwn(stderr, 'isTTY');
@@ -61,7 +67,6 @@ test('progress updates always include a bar and rewrite one line even without a 
 		[false, false, true],
 	);
 });
-
 test('quiet output suppresses progress writes', () => {
 	const writes = [];
 	setQualityProgressSuppressed(true);

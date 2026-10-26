@@ -116,28 +116,67 @@ export async function* qualityNodeReporter(src: AsyncIterable<NodeTestE>, opts?:
 	type Pending = { counted: boolean };
 	const pendingByIdentity = new Map<string, Pending[]>();
 	const seenTerminal = new Set<string>();
+	/**
+	 *
+	 * @param data
+	 * @param terminal
+	 *
+	 * @return
+	 */
 	const identity = (data: NodeTestE['data'], terminal = false): string => {
 		const file = data?.file ?? '';
 		if (data?.testId !== undefined) return JSON.stringify([file, 'id', data.testId]) ?? '';
 		if (terminal && data?.testNumber !== undefined) return JSON.stringify([file, 'number', data.testNumber]) ?? '';
 		return JSON.stringify([file, 'source', data?.line ?? null, data?.nesting ?? 0, data?.name ?? 'unnamed test']) ?? '';
 	};
+	/**
+	 *
+	 * @param data
+	 *
+	 * @return
+	 */
 	const isFileSuite = (data: NodeTestE['data']): boolean => {
 		if (data?.nesting !== 0 || !data.name) return false;
+		/**
+		 *
+		 * @param path
+		 *
+		 * @return
+		 */
 		const normPath = (path: string): string => path.replace(/^file:\/\//u, '').replace(/\\/gu, '/');
+		/**
+		 *
+		 * @param path
+		 *
+		 * @return
+		 */
 		const basename = (path: string): string => normPath(path).split('/').at(-1) ?? '';
 		const fileLikeName = /(?:^|[/\\])[^/\\]+\.(?:test|spec)\.(?:[cm]?js|tsx?)$/u.test(data.name);
 		return data.name === data.file || (data.file !== undefined && basename(data.name) === basename(data.file)) || (fileLikeName && (data.file === undefined || data.line === 1));
 	};
+	/**
+	 *
+	 */
 	const liveProgress = (): void => {
 		lastProgressCompleted = completed;
 		lastProgressTotal = Math.max(completed, enqueued);
 		qualityProgress('Cases', lastProgressCompleted, lastProgressTotal, reportProgress, { finalize: false });
 	};
+	/**
+	 *
+	 * @param data
+	 * @param counted
+	 */
 	const rememberPending = (data: NodeTestE['data'], counted: boolean): void => {
 		const key = identity(data);
 		pendingByIdentity.set(key, [...(pendingByIdentity.get(key) ?? []), { counted }]);
 	};
+	/**
+	 *
+	 * @param data
+	 *
+	 * @return
+	 */
 	const takePending = (data: NodeTestE['data']): Pending | undefined => {
 		const key = identity(data);
 		const entries = pendingByIdentity.get(key) ?? [];

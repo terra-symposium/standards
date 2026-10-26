@@ -28,6 +28,12 @@ const C_M_JS_JSX_TS_TSX_REGEX = /\.(?:c|m)?(?:js|jsx|ts|tsx)$/;
 HELPERS
 //////////////////////////////////////////////////*/
 
+/**
+ *
+ * @param label
+ * @param idx
+ * @param total
+ */
 const reportProgress = (label: string, idx: number, total: number): void => {
 	if (idx === 0 || idx === total || idx % Math.max(1, Math.ceil(total / 20)) === 0) qualityProgress(label, idx, total);
 };
@@ -39,7 +45,20 @@ type Candidate = { file: string; source: ts.SourceFile; statement: ts.Statement;
 type Reference = { file: string; source: ts.SourceFile; node: ts.Identifier };
 const rejectedInlineCandidates = new Map<string, string>();
 const astroConsumerCache = new WeakMap<QualityCfg, { signature: string; consumers: Set<string> }>();
+/**
+ *
+ * @param c
+ * @param s
+ *
+ * @return
+ */
 const canonical = (c: ts.TypeChecker, s: ts.Symbol | undefined): ts.Symbol | undefined => (s && s.flags & ts.SymbolFlags.Alias ? c.getAliasedSymbol(s) : s);
+/**
+ *
+ * @param s
+ *
+ * @return
+ */
 const isCandidateStatement = (s: ts.Statement): boolean => {
 	if (ts.canHaveModifiers(s) && ts.getModifiers(s)?.some((m) => m.kind === ts.SyntaxKind.DeclareKeyword)) return false;
 	return (
@@ -49,6 +68,12 @@ const isCandidateStatement = (s: ts.Statement): boolean => {
 		(ts.isVariableStatement(s) && s.declarationList.declarations.length === 1 && ts.isIdentifier(s.declarationList.declarations[0]?.name))
 	);
 };
+/**
+ *
+ * @param n
+ *
+ * @return
+ */
 const isImportNode = (n: ts.Node): boolean => {
 	const src = n.getSourceFile();
 	if (src.statements.some((s) => ts.isImportDeclaration(s) && n.getStart(src) >= s.getStart(src) && n.getEnd() <= s.getEnd())) return true;
@@ -154,6 +179,10 @@ function collect(cfg: QualityCfg, program: ts.Program, checker: ts.TypeChecker):
 	reportProgress('Single-use declaration scan:', 0, scopedSrcs.length);
 	for (const [sourceIndex, source] of scopedSrcs.entries()) {
 		reportProgress('Single-use declaration scan:', sourceIndex + 1, scopedSrcs.length);
+		/**
+		 *
+		 * @param node
+		 */
 		const visitCandidates = (node: ts.Node): void => {
 			if (!isCandidateStatement(node as ts.Statement)) {
 				ts.forEachChild(node, visitCandidates);
@@ -188,6 +217,10 @@ function collect(cfg: QualityCfg, program: ts.Program, checker: ts.TypeChecker):
 	const referenceSrcs = program.getSourceFiles().filter((source) => !source.isDeclarationFile && inSingleUseRoots(cfg, source.fileName) && C_M_JS_JSX_TS_TSX_REGEX.test(source.fileName));
 	const requiredExports = new Map<ts.Symbol, ts.Symbol>();
 	for (const src of referenceSrcs) {
+		/**
+		 *
+		 * @param node
+		 */
 		const visitRequires = (node: ts.Node): void => {
 			if (
 				ts.isVariableDeclaration(node) &&
@@ -223,6 +256,10 @@ function collect(cfg: QualityCfg, program: ts.Program, checker: ts.TypeChecker):
 	reportProgress('Single-use reference scan:', 0, referenceSrcs.length);
 	for (const [sourceIndex, src] of referenceSrcs.entries()) {
 		reportProgress('Single-use reference scan:', sourceIndex + 1, referenceSrcs.length);
+		/**
+		 *
+		 * @param node
+		 */
 		const visit = (node: ts.Node): void => {
 			if (ts.isIdentifier(node)) {
 				if (ts.isBindingElement(node.parent)) {
@@ -355,6 +392,10 @@ function astroConsumersFor(cfg: QualityCfg, program: ts.Program): Set<string> {
 				for (const imported of bindings.elements) {
 					if (!markup.includes(imported.name.text)) {
 						let used = false;
+						/**
+						 *
+						 * @param node
+						 */
 						const inspect = (node: ts.Node): void => {
 							if (node === statement || used) return;
 							if (ts.isIdentifier(node) && node.text === imported.name.text && !isImportNode(node)) used = true;
@@ -421,6 +462,10 @@ function isPackageEntryExport(cfg: QualityCfg, candidate: Candidate, checker: ts
 		try {
 			const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as { exports?: unknown; main?: string; module?: string; types?: string; typings?: string };
 			const tgts: string[] = [];
+			/**
+			 *
+			 * @param val
+			 */
 			const collectTgts = (val: unknown): void => {
 				if (typeof val === 'string') tgts.push(val);
 				else if (Array.isArray(val)) val.forEach(collectTgts);
@@ -489,6 +534,10 @@ function hasImportedTypeAnnotation(candidate: Candidate, checker: ts.TypeChecker
 	return candidate.statement.declarationList.declarations.some((d) => {
 		if (!d.type) return false;
 		let imported = false;
+		/**
+		 *
+		 * @param node
+		 */
 		const inspect = (node: ts.Node): void => {
 			const symbol = ts.isIdentifier(node) ? checker.getSymbolAtLocation(node) : undefined;
 			if (symbol?.flags && symbol.flags & ts.SymbolFlags.Alias) imported = true;
@@ -511,6 +560,10 @@ function hasImportedTypeAnnotation(candidate: Candidate, checker: ts.TypeChecker
 function crossFileTypeSafe(candidate: Candidate, reference: Reference, checker: ts.TypeChecker): boolean {
 	if (candidate.file === reference.file) return true;
 	let s = true;
+	/**
+	 *
+	 * @param node
+	 */
 	const visit = (node: ts.Node): void => {
 		if (ts.isTypeReferenceNode(node)) {
 			const symbol = checker.getSymbolAtLocation(node.typeName);
@@ -536,6 +589,10 @@ function crossFileTypeSafe(candidate: Candidate, reference: Reference, checker: 
  */
 function containsExplicitAny(candidate: Candidate): boolean {
 	let found = false;
+	/**
+	 *
+	 * @param node
+	 */
 	const visit = (node: ts.Node): void => {
 		if (node.kind === ts.SyntaxKind.AnyKeyword) found = true;
 		ts.forEachChild(node, visit);
@@ -555,6 +612,10 @@ function containsExplicitAny(candidate: Candidate): boolean {
 function containsAwait(candidate: Candidate): boolean {
 	if (!ts.isVariableStatement(candidate.statement)) return false;
 	let found = false;
+	/**
+	 *
+	 * @param node
+	 */
 	const visit = (node: ts.Node): void => {
 		if (ts.isAwaitExpression(node)) found = true;
 		ts.forEachChild(node, visit);
@@ -616,6 +677,10 @@ function crossFileVariableSafe(candidate: Candidate): boolean {
 	const init = candidate.statement.declarationList.declarations[0]?.initializer;
 	if (!init) return false;
 	let s = true;
+	/**
+	 *
+	 * @param node
+	 */
 	const visit = (node: ts.Node): void => {
 		if (ts.isIdentifier(node) && !((ts.isPropertyAssignment(node.parent) && node.parent.name === node) || (ts.isMethodDeclaration(node.parent) && node.parent.name === node))) s = false;
 		ts.forEachChild(node, visit);
@@ -835,6 +900,12 @@ function inlineGenericType(declaration: ts.TypeAliasDeclaration | ts.InterfaceDe
 	const substitutions = new Map(params.map((p, i) => [p.name.text, arguments_[i]!]));
 	const transformed = ts.transform(type, [
 		(ctx) => {
+			/**
+			 *
+			 * @param node
+			 *
+			 * @return
+			 */
 			const visit: ts.Visitor = (node) => {
 				if (ts.isTypeReferenceNode(node) && ts.isIdentifier(node.typeName) && substitutions.has(node.typeName.text)) return substitutions.get(node.typeName.text)!;
 				if (ts.isTypeQueryNode(node) && ts.isIdentifier(node.exprName) && substitutions.has(node.exprName.text)) return substitutions.get(node.exprName.text)!;
@@ -1002,6 +1073,12 @@ function filesWithNewTypeErrs(program: ts.Program, updates: Map<string, string>)
 	const originalFileExists = host.fileExists.bind(host);
 	host.fileExists = (fileName) => virtualFiles.has(fileName) || originalFileExists(fileName);
 	const updatedProgram = ts.createProgram({ rootNames: program.getRootFileNames(), options: opts, host });
+	/**
+	 *
+	 * @param diagnostic
+	 *
+	 * @return
+	 */
 	const diagnosticKey = (diagnostic: ts.Diagnostic): string => `${diagnostic.code}:${ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n')}`;
 	const prevCounts = new Map<string, Map<string, number>>();
 	for (const diagnostic of originalDiagnostics) {

@@ -17,7 +17,13 @@ import { fixtureFile, fixtureRoot, fixtureText } from '../support/fixtures.mjs';
 HELPERS
 //////////////////////////////////////////////////*/
 
-/** Creates a quality config scoped to one JSX fixture. */
+/**
+ * Creates a quality config scoped to one JSX fixture.
+ *
+ * @param source
+ *
+ * @return
+ */
 function fixtureConfig(source) {
 	const root = fixtureRoot('terra-quality-accessibility-');
 	fixtureFile(root, 'src/view.tsx', source);
@@ -51,7 +57,6 @@ const view = <>
 `);
 	assert.deepEqual(accessibilityFindings(cfg), []);
 });
-
 test('new default-path checks require an explicit rollout toggle', () => {
 	const root = fixtureRoot('terra-quality-check-rollout-');
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.tsx'] });
@@ -63,7 +68,6 @@ test('new default-path checks require an explicit rollout toggle', () => {
 	assert.equal(qualityCheckEnabled(enabled, 'display-name'), true);
 	assert.equal(qualityCheckEnabled(enabled, 'documented-commands'), true);
 });
-
 test('aria-labelledby requires a literal reference with source-evident content', () => {
 	const { cfg } = fixtureConfig(`
 const view = <>
@@ -89,7 +93,6 @@ const view = <>
 		['<button>', '<button>'],
 	);
 });
-
 test('findings are limited to unnamed visible native and explicitly role-based controls', () => {
 	const { cfg } = fixtureConfig(`
 const view = <>
@@ -121,7 +124,6 @@ const view = <>
 	);
 	assert.ok(findings.every(({ message }) => message.includes('add static text')));
 });
-
 test('progress values and aria-valuetext do not substitute for a progressbar accessible name', () => {
 	const { cfg } = fixtureConfig(`
 const view = <>
@@ -135,7 +137,6 @@ const view = <>
 		['<progress>', '<div>[role="progressbar"]'],
 	);
 });
-
 test('title fixes copy only literal titles from controls with no visible or uncertain label', () => {
 	const { root, cfg } = fixtureConfig(`
 const view = <>
@@ -163,7 +164,6 @@ const view = <>
 	assert.match(fixed, /<button title="Uncertain"><Icon \/><\/button>/);
 	assert.deepEqual(fixAccessibleNames(cfg), { fixed: 0 });
 });
-
 test('decorative SVG fixes require an already named control and leave informative icons alone', () => {
 	const { root, cfg } = fixtureConfig(`
 const view = <>
@@ -185,7 +185,6 @@ const view = <>
 	assert.match(fixed, /role="img" aria-label="Play preview"/);
 	assert.deepEqual(fixAccessibleNames(cfg), { fixed: 0 });
 });
-
 test('malformed JSX is reported without edits', () => {
 	const { root, cfg } = fixtureConfig('<button title="Save" aria-label=>');
 	const before = fixtureText(root, 'src/view.tsx');
@@ -193,7 +192,6 @@ test('malformed JSX is reported without edits', () => {
 	assert.deepEqual(fixAccessibleNames(cfg), { fixed: 0 });
 	assert.equal(fixtureText(root, 'src/view.tsx'), before);
 });
-
 test('displayName findings report direct forwardRef components and ignore wrapped forms', () => {
 	const root = fixtureRoot('terra-quality-display-name-findings-');
 	fixtureFile(
@@ -208,7 +206,6 @@ test('displayName findings report direct forwardRef components and ignore wrappe
 	]);
 	assert.equal(fixtureText(root, 'src/components.tsx').includes("Missing.displayName = 'Missing'"), false);
 });
-
 test('displayName autofix is idempotent and preserves conflicting assignments', () => {
 	const root = fixtureRoot('terra-quality-display-name-fix-');
 	fixtureFile(
@@ -222,7 +219,6 @@ test('displayName autofix is idempotent and preserves conflicting assignments', 
 	assert.match(fixtureText(root, 'src/components.tsx'), /Existing\.displayName = 'SpecializedName'/);
 	assert.deepEqual(fixDisplayNames(cfg), { fixed: 0, skipped: 3 });
 });
-
 test('displayName assignments resolve within lexical scope when component names repeat', () => {
 	const root = fixtureRoot('terra-quality-display-name-scopes-');
 	fixtureFile(
@@ -239,7 +235,6 @@ test('displayName assignments resolve within lexical scope when component names 
 	assert.match(fixtureText(root, 'src/components.tsx'), /function second\(\) \{\n\tconst Button = forwardRef\(\(\) => null\);\n\tButton\.displayName = 'Button';/);
 	assert.deepEqual(displayNameFindings(cfg), []);
 });
-
 test('displayName fixer leaves malformed source untouched', () => {
 	const root = fixtureRoot('terra-quality-display-name-malformed-');
 	fixtureFile(root, 'src/components.tsx', 'const Broken = forwardRef(() => <button>');

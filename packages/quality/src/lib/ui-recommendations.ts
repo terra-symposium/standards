@@ -9,54 +9,28 @@ IMPORTS
 
 // API
 import ts from 'typescript';
-import { readFileSync } from 'node:fs';
 import { displayPath, srcFiles } from './files.js';
+import { readFileSync } from 'node:fs';
 
 // TYPES
 import type { QualityCfg } from './runner.js';
 
 /*//////////////////////////////////////////////////
-CONFIG
+REGEX
 //////////////////////////////////////////////////*/
 
+const S_U_REGEX = /\s+/u;
+
 /** One configured native JSX element and its suggested shared component. */
-export type UiRecommendationRule = {
-	element: string;
-	component: string;
-	import: string;
-	variant?: string;
-	types?: string[];
-	when?: 'always' | 'button-like' | 'text-link';
-	reason?: string;
-};
+export type UiRecommendationRule = { element: string; component: string; import: string; variant?: string; types?: string[]; when?: 'always' | 'button-like' | 'text-link'; reason?: string };
 
 /** Source scope and native-element mappings for the on-demand recommendation pass. */
-export type UiRecommendationSettings = {
-	rules?: UiRecommendationRule[];
-	extensions?: string[];
-	ignoredFiles?: string[];
-	ignoredDirectories?: string[];
-};
+export type UiRecommendationSettings = { rules?: UiRecommendationRule[]; extensions?: string[]; ignoredFiles?: string[]; ignoredDirectories?: string[] };
 
 /** A source location and the shared component that may replace its native JSX element. */
-export type UiComponentRecommendation = {
-	file: string;
-	line: number;
-	column: number;
-	element: string;
-	component: string;
-	import: string;
-	variant?: string;
-	reason: string;
-};
-
+export type UiComponentRecommendation = { file: string; line: number; column: number; element: string; component: string; import: string; variant?: string; reason: string };
 const DEFAULT_RULES: UiRecommendationRule[] = [
-	{
-		element: 'button',
-		component: 'Button',
-		import: '@/components/ui/button',
-		reason: 'Use the shared button primitive to keep action variants and interaction states consistent.',
-	},
+	{ element: 'button', component: 'Button', import: '@/components/ui/button', reason: 'Use the shared button primitive to keep action variants and interaction states consistent.' },
 	{
 		element: 'input',
 		component: 'Input',
@@ -71,22 +45,9 @@ const DEFAULT_RULES: UiRecommendationRule[] = [
 		types: ['button', 'reset', 'submit'],
 		reason: 'Use the shared button primitive for this input-based action while preserving its type.',
 	},
-	{
-		element: 'a',
-		component: 'ButtonLink',
-		import: '@/components/ui/button',
-		when: 'button-like',
-		reason: 'This action-styled link can use ButtonLink while retaining anchor navigation semantics.',
-	},
-	{
-		element: 'a',
-		component: 'ButtonLink',
-		import: '@/components/ui/button',
-		when: 'text-link',
-		reason: 'This styled text link can use ButtonLink while retaining anchor navigation semantics.',
-	},
+	{ element: 'a', component: 'ButtonLink', import: '@/components/ui/button', when: 'button-like', reason: 'This action-styled link can use ButtonLink while retaining anchor navigation semantics.' },
+	{ element: 'a', component: 'ButtonLink', import: '@/components/ui/button', when: 'text-link', reason: 'This styled text link can use ButtonLink while retaining anchor navigation semantics.' },
 ];
-
 const DEFAULT_EXTS = ['.astro', '.jsx', '.tsx'];
 
 /*//////////////////////////////////////////////////
@@ -130,7 +91,7 @@ function jsxAttr(element: ts.JsxOpeningLikeElement, name: string): ts.JsxAttribu
  * @return `true` when the link has button-like spacing and shape.
  */
 function isButtonLike(value: string | undefined): boolean {
-	const classes = new Set((value ?? '').split(/\s+/u).filter(Boolean));
+	const classes = new Set((value ?? '').split(S_U_REGEX).filter(Boolean));
 	const hasHorizontalPadding = [...classes].some((className) => /^px-/u.test(className));
 	const hasVerticalPadding = [...classes].some((className) => /^py-/u.test(className));
 	const hasShape = [...classes].some((className) => className === 'border' || className === 'inline-flex' || className === 'flex' || className.startsWith('rounded'));
@@ -146,7 +107,7 @@ function isButtonLike(value: string | undefined): boolean {
  * @return A ButtonLink variant for recognized text-link styling.
  */
 function textLinkVariant(value: string | undefined): string | undefined {
-	const classes = new Set((value ?? '').split(/\s+/u).filter(Boolean));
+	const classes = new Set((value ?? '').split(S_U_REGEX).filter(Boolean));
 	const color = classes.has('text-primary')
 		? 'primary'
 		: classes.has('text-secondary-foreground')
@@ -186,9 +147,7 @@ function ruleMatches(rule: UiRecommendationRule, element: ts.JsxOpeningLikeEleme
 		const typeValue = type ? staticAttrValue(type) : 'text';
 		if (typeValue === undefined || !rule.types.includes(typeValue.toLowerCase())) return false;
 	}
-	if (rule.when === 'button-like') {
-		return isButtonLike(staticClasses(element));
-	}
+	if (rule.when === 'button-like') return isButtonLike(staticClasses(element));
 	if (rule.when === 'text-link') return Boolean(textLinkVariant(staticClasses(element)));
 	return true;
 }
@@ -236,14 +195,16 @@ export function uiComponentRecommendations(cfg: QualityCfg): UiComponentRecommen
 	const exts = settings?.extensions ?? DEFAULT_EXTS;
 	const ignoredFiles = new Set((settings?.ignoredFiles ?? []).map((file) => file.replaceAll('\\', '/')));
 	const findings: UiComponentRecommendation[] = [];
-
 	for (const file of srcFiles({ ...cfg, extensions: exts })) {
 		const relativeFile = displayPath(cfg, file).replaceAll('\\', '/');
 		if (isIgnoredFile(relativeFile, settings?.ignoredDirectories ?? [], ignoredFiles)) continue;
 		const source = readFileSync(file, 'utf8');
 		const scriptKind = file.endsWith('.jsx') ? ts.ScriptKind.JSX : ts.ScriptKind.TSX;
 		const parsed = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, scriptKind);
-
+		/**
+		 *
+		 * @param node
+		 */
 		const visit = (node: ts.Node): void => {
 			if ((ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) && ts.isIdentifier(node.tagName)) {
 				const element = node.tagName.text;
@@ -267,9 +228,7 @@ export function uiComponentRecommendations(cfg: QualityCfg): UiComponentRecommen
 			}
 			ts.forEachChild(node, visit);
 		};
-
 		visit(parsed);
 	}
-
 	return findings.sort((a, b) => a.file.localeCompare(b.file) || a.line - b.line || a.column - b.column);
 }
