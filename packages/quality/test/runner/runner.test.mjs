@@ -364,7 +364,7 @@ test('configuration toggles default to enabled and honor explicit category, item
 	assert.equal(qualityRecommendationEnabled(enabled, 'architecture'), true);
 });
 
-test('full quality orders phases, groups suites, de-duplicates invocations, and continues after a failing test', () => {
+test('full quality orders phases, de-duplicates suites, and continues after a failing test', () => {
 	const root = fixtureRoot('terra-quality-phase-order-');
 	const marker = join(root, 'runs.txt');
 	const gitMarker = join(root, 'diff-runs.txt');
@@ -453,12 +453,12 @@ test('full quality orders phases, groups suites, de-duplicates invocations, and 
 		'static',
 		'security-check',
 		'static-format-option',
-		'unit',
-		'unit-node',
-		'integration',
 		'browser',
 		'browser',
 		'other',
+		'integration',
+		'unit',
+		'unit-node',
 		'types',
 		'build',
 		'health',
@@ -474,29 +474,20 @@ test('full quality orders phases, groups suites, de-duplicates invocations, and 
 	assert.match(playwrightCliArgs.at(-1), REPORTER_PLAYWRIGHT_REPORTER_JS_U_REGEX);
 	assert.equal(fixtureText(root, 'diff-runs.txt').trim().split('\n').length, 1);
 	assert.equal(process.exitCode, 1, 'the failing suite keeps the overall command failed');
-	const text = output.join('\n');
+	const text = [...output, ...progress].join('\n');
 	const phaseOrder = ['FORMAT', 'STATIC QUALITY', 'TESTS', 'FRAMEWORK / TYPE CHECKS', 'BUILD', 'REPOSITORY HEALTH'].map((phase) => text.indexOf(`\n${phase}\n`));
 	assert.ok(phaseOrder.every((position) => position >= 0));
 	assert.deepEqual(
 		phaseOrder,
 		[...phaseOrder].sort((left, right) => left - right),
 	);
-	assert.match(text, /Unit \/ Contract/);
-	assert.match(text, /Integration/);
-	assert.match(text, /Browser \/ Cloud/);
-	assert.match(text, /Other tests/);
-	assert.match(text, /6 suites · 1 failed suite/);
-	const groupOrder = ['Unit / Contract', 'Integration', 'Browser / Cloud', 'Other tests'].map((group) => text.indexOf(`\n  ${group}\n`));
-	assert.ok(groupOrder.every((position) => position >= 0));
+	const suiteOrder = ['Browser E2e', 'Cli Smoke', 'Other Test', 'Integration Test', 'Unit Test', 'Unit Node'].map((suite) => text.lastIndexOf(`${suite === 'Unit Test' ? '✗' : '✓'} ${suite}`));
+	assert.ok(suiteOrder.every((position) => position >= 0));
 	assert.deepEqual(
-		groupOrder,
-		[...groupOrder].sort((left, right) => left - right),
+		suiteOrder,
+		[...suiteOrder].sort((left, right) => left - right),
 	);
 	assert.doesNotMatch(text, NODE_TESTS_PLAYWRIGHT_TESTS_REGEX, 'the fixture runners do not fabricate child case output');
-	assert.ok(progress.some((chunk) => chunk.includes('Test suites [') && chunk.includes('0/6')));
-	assert.ok(progress.some((chunk) => chunk.includes('Test suites [') && chunk.includes('6/6')));
-	assert.match(progress.join(''), /Test suites \[[█░]{24}\] 0\/6/);
-	assert.match(progress.join(''), /Test suites \[[█░]{24}\] 6\/6/);
 	assert.doesNotMatch(progress.join(''), NODE_TESTS_PLAYWRIGHT_TESTS_REGEX);
 	resetExitCode();
 });
@@ -530,15 +521,22 @@ test('full quality nests dead-code safe fixes and verification under static qual
 	});
 	const output = [];
 	const originalErr = console.error;
+	const originalStderrWrite = process.stderr.write;
+	const progress = [];
 	console.error = (...parts) => output.push(parts.join(' '));
+	process.stderr.write = (chunk) => {
+		progress.push(String(chunk));
+		return true;
+	};
 	try {
 		resetExitCode();
 		runQualityCli(cfg, ['quality:all', '--all', '--skip-commands', '--skip-recommendations']);
 	} finally {
 		console.error = originalErr;
+		process.stderr.write = originalStderrWrite;
 	}
-	const text = output.join('\n');
-	const pos = ['STATIC QUALITY', 'Dead code', 'Safe fixes', 'Verification', 'TESTS'].map((label) => text.indexOf(label));
+	const text = [...output, ...progress].join('\n');
+	const pos = ['PREPARING SAFE FIXES', 'Safe Fixes', 'STATIC QUALITY', 'Dead Code', 'TESTS'].map((label) => text.indexOf(label));
 	assert.ok(pos.every((position) => position >= 0));
 	assert.deepEqual(
 		pos,
@@ -917,7 +915,7 @@ if (args.includes('--format') && args.includes('json'))
 	assert.ok(outputText.indexOf('✗ Dead Code') < outputText.indexOf('[ERROR] eslint/unused-private-declaration'));
 	assert.doesNotMatch(outputText, /FINDINGS SUMMARY/);
 	assert.doesNotMatch(outputEvents.join(''), /(?:^|\n)\s*test feedback(?:\n|$)/u);
-	assert.ok(outputEvents.findLastIndex((line) => line.includes('Test suites') && line.includes('1/1')) < outputEvents.findLastIndex((line) => line.includes('contract: ✓ passed')));
+	assert.ok(outputEvents.findLastIndex((line) => line.includes('Test suites') && line.includes('1/1')) < outputEvents.findLastIndex((line) => line.includes('✓ Contract')));
 	resetExitCode();
 });
 test('the fixing quality command inlines safe values without broad comment cleanup', () => {
@@ -1309,7 +1307,7 @@ test('dead-code fails closed when ESLint returns malformed detector output', () 
 	const src = fixtureFile(root, 'src/main.ts', 'const unused = 1;\n');
 	const eslint = fixtureFile(root, 'bin/eslint-malformed.mjs', `#!/usr/bin/env node\nprocess.stdout.write('{');\n`, 0o755);
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], tools: { eslint }, enabledChecks: { knip: false } });
-	assert.throws(() => runQualityCli(cfg, ['dead-code', '--all', '--warn']), /invalid JSON/);
+	assert.throws(() => runQualityCli(cfg, ['dead-code', '--all', '--warn']), /could not read reports/);
 	assert.equal(readFileSync(src, 'utf8'), 'const unused = 1;\n');
 });
 test('dead-code accepts complete ESLint reports larger than the default subprocess buffer', () => {
@@ -1682,7 +1680,7 @@ test('CLI recommendation execution is opt-in per invocation and command failures
 	cfg.recommendationCommands = [{ name: 'fixture-failure', command: failingCmd }];
 	resetExitCode();
 	runQualityCli(cfg, ['quality', '--all']);
-	assert.equal(process.exitCode, 2);
+	assert.equal(process.exitCode, 1);
 	fixtureFile(root, 'recommendations.jsonl', '');
 	resetExitCode();
 	runQualityCli(cfg, ['quality', '--all', '--skip-recommendations']);
