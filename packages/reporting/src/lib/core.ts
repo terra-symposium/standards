@@ -86,8 +86,10 @@ HELPERS
 /**
  * Converts an external status into the normalized reporting status set.
  *
+ * @param val
  * @param value External status value.
- * @returns A supported reporting status, defaulting to `failed` for unknown values.
+ *
+ * @return A supported reporting status, defaulting to `failed` for unknown values.
  */
 export const normalizeVisualStatus = (val: string): VisualStatus => (VISUAL_STATUSES.includes(val as VisualStatus) ? (val as VisualStatus) : 'failed');
 
@@ -95,15 +97,18 @@ export const normalizeVisualStatus = (val: string): VisualStatus => (VISUAL_STAT
  * Converts internal status casing into the label shown in artifacts.
  *
  * @param status Normalized reporting status.
- * @returns The human-readable artifact label.
+ *
+ * @return The human-readable artifact label.
  */
 export const statusLabel = (status: VisualStatus): string => (status === 'timedOut' ? 'timed out' : status);
 
 /**
  * Counts newline-delimited diagnostic messages while treating an empty value as zero.
  *
+ * @param val
  * @param value Newline-delimited diagnostic text.
- * @returns The number of non-empty diagnostic lines.
+ *
+ * @return The number of non-empty diagnostic lines.
  */
 export const diagnosticCount = (val: string): number => (val ? val.split('\n').filter(Boolean).length : 0);
 
@@ -111,7 +116,8 @@ export const diagnosticCount = (val: string): number => (val ? val.split('\n').f
  * Returns one count for every supported status, including statuses absent from the run.
  *
  * @param results Normalized results to count.
- * @returns A complete status-to-count map.
+ *
+ * @return A complete status-to-count map.
  */
 export const statusCounts = (results: readonly VisualResult[]): Record<VisualStatus, number> => {
 	const counts = Object.fromEntries(VISUAL_STATUSES.map((s) => [s, 0])) as Record<VisualStatus, number>;
@@ -123,7 +129,8 @@ export const statusCounts = (results: readonly VisualResult[]): Record<VisualSta
  * Preserves configured feature-file order and appends unexpected result files once.
  *
  * @param run Normalized run whose configured and observed files are ordered.
- * @returns Unique feature-file names in report order.
+ *
+ * @return Unique feature-file names in report order.
  */
 export const orderedFiles = (run: ReportRun): string[] => [
 	...run.featureFiles.filter((f) => run.results.some((r) => r.file === f)),
@@ -138,6 +145,7 @@ export const orderedFiles = (run: ReportRun): string[] => [
  *
  * @param run Normalized run to search.
  * @param file Feature-file name to select.
- * @returns Results associated with the requested feature file.
+ *
+ * @return Results associated with the requested feature file.
  */
 export const resultsForFile = (run: ReportRun, file: string): VisualResult[] => run.results.filter((r) => r.file === file);

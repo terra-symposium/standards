@@ -47,7 +47,8 @@ type ImgReview = { cues: string[]; height: number; width: number };
  *
  * @param file Screenshot path used for dimension analysis.
  * @param r Result metadata and diagnostics used to derive review cues.
- * @returns Screenshot dimensions and prompts for visual review.
+ *
+ * @return Screenshot dimensions and prompts for visual review.
  */
 const reviewImg = async (file: string, r: VisualResult): Promise<ImgReview> => {
 	const metadata = await sharp(file).metadata();
@@ -71,7 +72,8 @@ const reviewImg = async (file: string, r: VisualResult): Promise<ImgReview> => {
  * @param y Top edge of the target region.
  * @param maxWidth Maximum target width.
  * @param maxHeight Maximum target height.
- * @returns Positioned dimensions that fit inside the target region.
+ *
+ * @return Positioned dimensions that fit inside the target region.
  */
 const fitImg = (width: number, height: number, x: number, y: number, maxWidth: number, maxHeight: number): { h: number; w: number; x: number; y: number } => {
 	const scale = Math.min(maxWidth / Math.max(width, 1), maxHeight / Math.max(height, 1));
@@ -83,7 +85,9 @@ const fitImg = (width: number, height: number, x: number, y: number, maxWidth: n
  * Crops a tall screenshot into a slide-friendly preview while retaining the original in notes.
  *
  * @param file Screenshot path to preview.
- * @returns Base64 image data and preview dimensions.
+ * @param viewportSize
+ *
+ * @return Base64 image data and preview dimensions.
  */
 const previewImg = async (file: string, viewportSize: string): Promise<{ data: string; height: number; width: number }> => {
 	const metadata = await sharp(file).metadata();
@@ -98,7 +102,8 @@ const previewImg = async (file: string, viewportSize: string): Promise<{ data: s
  * Sorts responsive results by their rendered viewport width.
  *
  * @param r Result whose viewport label should be parsed.
- * @returns Numeric viewport width, or a final sort value when unavailable.
+ *
+ * @return Numeric viewport width, or a final sort value when unavailable.
  */
 const viewportWidth = (r: VisualResult): number => Number.parseInt(r.viewportSize.split('×')[0] || '', 10) || Number.MAX_SAFE_INTEGER;
 /**
@@ -106,12 +111,20 @@ const viewportWidth = (r: VisualResult): number => Number.parseInt(r.viewportSiz
  *
  * @param r Result metadata and diagnostics to describe.
  * @param review Screenshot review cues to include.
- * @returns Text shown beside the screenshot and in speaker notes.
+ *
+ * @return Text shown beside the screenshot and in speaker notes.
  */
 const resultLoadGrade = (r: VisualResult): string => {
 	const counts = loadGradeCounts(r.loadMeasurements || []);
 	return counts.fail ? 'fail' : counts.warning ? 'warning' : counts.pass ? 'pass' : '';
 };
+/**
+ *
+ * @param r
+ * @param review
+ *
+ * @return
+ */
 const slideCopy = (r: VisualResult, review: ImgReview): string => {
 	const grade = resultLoadGrade(r);
 	const measurements = r.loadMeasurements || [];
@@ -142,7 +155,8 @@ const slideCopy = (r: VisualResult, review: ImgReview): string => {
  * @param presentation Presentation receiving the slide.
  * @param group Results for the same test across one or more viewports.
  * @param slideNumber One-based slide number shown in the title.
- * @returns A promise that resolves after the comparison slide is added.
+ *
+ * @return A promise that resolves after the comparison slide is added.
  */
 const addResponsiveSlide = async (presentation: Presentation, group: readonly VisualResult[], slideNumber: number): Promise<void> => {
 	const first = group[0];
@@ -203,7 +217,12 @@ const addResponsiveSlide = async (presentation: Presentation, group: readonly Vi
 export type SlideshowOptions = { title?: string; author?: string; company?: string; subject?: string; loadTestingEnabled?: boolean };
 /** One test result paired with a graded timing measurement for the report. */
 type LoadRow = { result: VisualResult; measurement: NonNullable<VisualResult['loadMeasurements']>[number] };
-/** Adds a run-level load summary slide and names the slowest measurements. */
+/**
+ * Adds a run-level load summary slide and names the slowest measurements.
+ *
+ * @param presentation
+ * @param results
+ */
 const addLoadSummarySlide = (presentation: Presentation, results: readonly VisualResult[]): void => {
 	const measurements: LoadRow[] = results.flatMap((r) => (r.loadMeasurements || []).map((measurement) => ({ result: r, measurement })));
 	const counts = loadGradeCounts(measurements.map(({ measurement }) => measurement));
@@ -229,7 +248,14 @@ const addLoadSummarySlide = (presentation: Presentation, results: readonly Visua
 		{ color: COLOURS.ink, fontFace: 'Aptos', fontSize: 13, fit: 'shrink', margin: 0.08, valign: 'mid', x: 0.58, y: 2.05, w: 12.1, h: 4.3 },
 	);
 };
-/** Adds paginated slides containing every individual test, page, and operation measurement. */
+/**
+ * Adds paginated slides containing every individual test, page, and operation measurement.
+ *
+ * @param presentation
+ * @param results
+ *
+ * @return
+ */
 const addLoadDetailSlides = (presentation: Presentation, results: readonly VisualResult[]): number => {
 	const measurements: LoadRow[] = results.flatMap((r) => (r.loadMeasurements || []).map((measurement) => ({ result: r, measurement })));
 	const pageSize = 12;
@@ -265,7 +291,8 @@ const addLoadDetailSlides = (presentation: Presentation, results: readonly Visua
  * @param file Output path for the slideshow artifact.
  * @param results Normalized results to group and render.
  * @param opts Optional visible title and document metadata overrides.
- * @returns A promise that resolves after the slideshow has been written.
+ *
+ * @return A promise that resolves after the slideshow has been written.
  */
 export const writeSlideshow = async (file: string, results: readonly VisualResult[], opts: SlideshowOptions = {}): Promise<void> => {
 	const loadEnabled = opts.loadTestingEnabled ?? results.some((r) => !!r.loadMeasurements?.length);

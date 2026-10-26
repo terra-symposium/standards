@@ -42,7 +42,8 @@ const LOAD_STYLES: Record<string, { fill: string; font: string }> = {
  * Applies the shared header layout to a worksheet.
  *
  * @param sheet Worksheet whose header and columns should be styled.
- * @returns Nothing; the worksheet is mutated in place.
+ *
+ * @return Nothing; the worksheet is mutated in place.
  */
 const styleHeader = (sheet: ExcelJS.Worksheet): void => {
 	sheet.views = [{ showGridLines: false, state: 'frozen', ySplit: 1 }];
@@ -57,7 +58,8 @@ const styleHeader = (sheet: ExcelJS.Worksheet): void => {
  *
  * @param cell Cell that will display the status.
  * @param status Normalized status key used to select the style.
- * @returns Nothing; the cell is mutated in place.
+ *
+ * @return Nothing; the cell is mutated in place.
  */
 const styleStatus = (cell: ExcelJS.Cell, status: string): void => {
 	const style = STATUS_STYLES[status] || STATUS_STYLES.failed;
@@ -72,7 +74,12 @@ const styleStatus = (cell: ExcelJS.Cell, status: string): void => {
 		top: { color: { argb: style.font }, style: 'thin' },
 	};
 };
-/** Applies a timing grade and its semantic color treatment to a cell. */
+/**
+ * Applies a timing grade and its semantic color treatment to a cell.
+ *
+ * @param cell
+ * @param grade
+ */
 const styleLoadGrade = (cell: ExcelJS.Cell, grade: string): void => {
 	const style = LOAD_STYLES[grade] || LOAD_STYLES.fail;
 	cell.value = grade;
@@ -84,9 +91,11 @@ const styleLoadGrade = (cell: ExcelJS.Cell, grade: string): void => {
  * Adds one feature-file result sheet, including available screenshot evidence.
  *
  * @param book Workbook receiving the sheet.
+ * @param src
  * @param name Feature-file name used as the worksheet name.
  * @param vals Results belonging to the feature file.
- * @returns Nothing; the workbook is mutated in place.
+ *
+ * @return Nothing; the workbook is mutated in place.
  */
 const resultSheetName = (book: ExcelJS.Workbook, src: string): string => {
 	const base =
@@ -105,10 +114,23 @@ const resultSheetName = (book: ExcelJS.Workbook, src: string): string => {
 	}
 	return name;
 };
+/**
+ *
+ * @param val
+ *
+ * @return
+ */
 const resultLoadGrade = (val: VisualResult): string => {
 	const counts = loadGradeCounts(val.loadMeasurements || []);
 	return counts.fail ? 'fail' : counts.warning ? 'warning' : counts.pass ? 'pass' : '';
 };
+/**
+ *
+ * @param book
+ * @param name
+ * @param vals
+ * @param loadEnabled
+ */
 const addResultSheet = (book: ExcelJS.Workbook, name: string, vals: readonly VisualResult[], loadEnabled: boolean): void => {
 	const sheet = book.addWorksheet(resultSheetName(book, name));
 	sheet.addRow([
@@ -183,7 +205,9 @@ const addResultSheet = (book: ExcelJS.Workbook, name: string, vals: readonly Vis
  *
  * @param book Workbook receiving the summary sheet.
  * @param run Normalized report run to summarize.
- * @returns Nothing; the workbook is mutated in place.
+ * @param loadEnabled
+ *
+ * @return Nothing; the workbook is mutated in place.
  */
 const addSummary = (book: ExcelJS.Workbook, run: ReportRun, loadEnabled: boolean): void => {
 	const sheet = book.addWorksheet('Summary');
@@ -197,7 +221,12 @@ const addSummary = (book: ExcelJS.Workbook, run: ReportRun, loadEnabled: boolean
 	styleHeader(sheet);
 	sheet.columns = [{ width: 32 }, ...Array.from({ length: loadEnabled ? 9 : 6 }, () => ({ width: 14 }))];
 };
-/** Adds a row for every timed test, page navigation, and named operation. */
+/**
+ * Adds a row for every timed test, page navigation, and named operation.
+ *
+ * @param book
+ * @param results
+ */
 const addLoadTimings = (book: ExcelJS.Workbook, results: readonly VisualResult[]): void => {
 	const sheet = book.addWorksheet('Load timings');
 	sheet.addRow(['File', 'Test title', 'Project', 'Viewport', 'Kind', 'Measurement', 'Duration (ms)', 'Warn at (ms)', 'Fail at (ms)', 'Grade']);
@@ -230,7 +259,8 @@ const addLoadTimings = (book: ExcelJS.Workbook, results: readonly VisualResult[]
  *
  * @param book Workbook receiving the project sheet.
  * @param run Normalized report run to summarize.
- * @returns Nothing; the workbook is mutated in place.
+ *
+ * @return Nothing; the workbook is mutated in place.
  */
 const addProjects = (book: ExcelJS.Workbook, run: ReportRun): void => {
 	const sheet = book.addWorksheet('Projects');
@@ -248,7 +278,8 @@ const addProjects = (book: ExcelJS.Workbook, run: ReportRun): void => {
  *
  * @param book Workbook receiving the diagnostics sheet.
  * @param run Normalized report run whose diagnostics should be written.
- * @returns Nothing; the workbook is mutated in place.
+ *
+ * @return Nothing; the workbook is mutated in place.
  */
 const addDiagnostics = (book: ExcelJS.Workbook, run: ReportRun): void => {
 	const sheet = book.addWorksheet('Run diagnostics');
@@ -264,7 +295,8 @@ const addDiagnostics = (book: ExcelJS.Workbook, run: ReportRun): void => {
  *
  * @param file Output path for the spreadsheet artifact.
  * @param run Normalized results, project metadata, and diagnostics to write.
- * @returns A promise that resolves after the workbook has been written.
+ *
+ * @return A promise that resolves after the workbook has been written.
  */
 export const writeSpreadsheet = async (file: string, run: ReportRun): Promise<void> => {
 	const loadEnabled = run.loadTestingEnabled ?? run.results.some((r) => !!r.loadMeasurements?.length);

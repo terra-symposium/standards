@@ -18,9 +18,12 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 
 /*//////////////////////////////////////////////////
-CONFIG
+REGEX
 //////////////////////////////////////////////////*/
 
+const POWERPOINT_EXCEL_TERRA_REGEX = /PowerPoint|Excel|Terra/;
+const TEST_EVIDENCE_REPORTER_REGEX = /Test evidence reporter/;
+const LOAD_TIMING_SUMMARY_REGEX = /Load timing summary/;
 const execFileAsync = promisify(execFile);
 const { diagnosticCount, normalizeVisualStatus: normVisualStatus, orderedFiles, statusCounts } = await import('@terra-symposium/standards-reporting/core');
 const { parseDiagnostics, stripAnsi, default: ProgressReporter } = await import('@terra-symposium/standards-reporting/playwright');
@@ -41,6 +44,12 @@ HELPERS
 //////////////////////////////////////////////////*/
 
 /* Creates the smallest complete normalized result fixture for reporting tests. */
+/**
+ *
+ * @param overrides
+ *
+ * @return
+ */
 const result = (overrides = {}) => ({
 	browserErrors: '',
 	duration: 10,
@@ -243,12 +252,12 @@ test('writes neutral spreadsheet and slideshow artifacts', async () => {
 	assert.ok((await fs.stat(slideshow)).size > 0);
 	const { stdout: coreProperties } = await execFileAsync('unzip', ['-p', slideshow, 'docProps/core.xml']);
 	assert.match(coreProperties, /Test evidence slideshow/);
-	assert.doesNotMatch(coreProperties, /PowerPoint|Excel|Terra/);
+	assert.doesNotMatch(coreProperties, POWERPOINT_EXCEL_TERRA_REGEX);
 	const { stdout: slideshowProperties } = await execFileAsync('unzip', ['-p', slideshow, 'docProps/app.xml']);
-	assert.match(slideshowProperties, /Test evidence reporter/);
-	assert.doesNotMatch(slideshowProperties, /PowerPoint|Excel|Terra/);
+	assert.match(slideshowProperties, TEST_EVIDENCE_REPORTER_REGEX);
+	assert.doesNotMatch(slideshowProperties, POWERPOINT_EXCEL_TERRA_REGEX);
 	const { stdout: slideText } = await execFileAsync('unzip', ['-p', slideshow, 'ppt/slides/slide1.xml']);
-	assert.doesNotMatch(slideText, /PowerPoint|Excel|Terra/);
+	assert.doesNotMatch(slideText, POWERPOINT_EXCEL_TERRA_REGEX);
 	const { stdout: notes } = await execFileAsync('unzip', ['-p', slideshow, 'ppt/notesSlides/notesSlide1.xml']);
 	assert.match(notes, /full-page screenshot/);
 	const workbook = new ExcelJS.Workbook();
@@ -256,8 +265,8 @@ test('writes neutral spreadsheet and slideshow artifacts', async () => {
 	assert.equal(workbook.creator, 'Test evidence reporter');
 	assert.equal(workbook.title, 'Test evidence spreadsheet');
 	const { stdout: spreadsheetProperties } = await execFileAsync('unzip', ['-p', spreadsheet, 'docProps/app.xml']);
-	assert.match(spreadsheetProperties, /Test evidence reporter/);
-	assert.doesNotMatch(spreadsheetProperties, /PowerPoint|Excel|Terra/);
+	assert.match(spreadsheetProperties, TEST_EVIDENCE_REPORTER_REGEX);
+	assert.doesNotMatch(spreadsheetProperties, POWERPOINT_EXCEL_TERRA_REGEX);
 	assert.deepEqual(
 		workbook.worksheets.map((s) => s.name),
 		['Summary', 'example.spec.ts', 'interrupted.spec.ts', 'Projects', 'Run diagnostics'],
@@ -351,7 +360,7 @@ test('reports load timing details and fails only when enabled budgets are exceed
 	const { stdout: slide1 } = await execFileAsync('unzip', ['-p', slideshow, 'ppt/slides/slide1.xml']);
 	const { stdout: slide2 } = await execFileAsync('unzip', ['-p', slideshow, 'ppt/slides/slide2.xml']);
 	const { stdout: slide4 } = await execFileAsync('unzip', ['-p', slideshow, 'ppt/slides/slide4.xml']);
-	assert.match(slide1, /Load timing summary/);
+	assert.match(slide1, LOAD_TIMING_SUMMARY_REGEX);
 	assert.match(slide1, /2 pass/);
 	assert.match(slide1, /1 warning/);
 	assert.match(slide1, /1 fail/);
@@ -392,5 +401,5 @@ test('reports load timing details and fails only when enabled budgets are exceed
 	);
 	const optedOutSlideshow = path.join(root, 'opted-out', optedOutRun, 'report.pptx');
 	const { stdout: legacySlide } = await execFileAsync('unzip', ['-p', optedOutSlideshow, 'ppt/slides/slide1.xml']);
-	assert.doesNotMatch(legacySlide, /Load timing summary/);
+	assert.doesNotMatch(legacySlide, LOAD_TIMING_SUMMARY_REGEX);
 });

@@ -17,7 +17,11 @@ import JSZip from 'jszip';
 CONFIG
 //////////////////////////////////////////////////*/
 
-/** Replaces library-generated application labels with neutral evidence metadata. */
+/**
+ * Replaces library-generated application labels with neutral evidence metadata.
+ *
+ * @param file
+ */
 export const neutralizeApplicationMetadata = async (file: string): Promise<void> => {
 	const archive = await JSZip.loadAsync(await fs.readFile(file));
 	const applicationProperties = archive.file('docProps/app.xml');

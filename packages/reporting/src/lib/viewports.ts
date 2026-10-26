@@ -52,7 +52,9 @@ HELPERS
  *
  * @param raw - or whitespace-separated viewport names, aliases, or `all`.
  * @param catalog Viewport catalog against which names are validated.
- * @returns The selected viewport definitions in request order.
+ *
+ * @return The selected viewport definitions in request order.
+ *
  * @throws When the selection contains a name absent from the catalog.
  */
 export const resolveVisualViewports = (raw = process.env.PW_VIEWPORTS, catalog: ViewportCatalog = VISUAL_VIEWPORTS): VisualViewport[] => {
@@ -77,7 +79,8 @@ export const resolveVisualViewports = (raw = process.env.PW_VIEWPORTS, catalog: 
  * @param baseName Base Playwright project name.
  * @param viewport Viewport being assigned to the project.
  * @param selected All viewports selected for the run.
- * @returns The project name used for this viewport.
+ *
+ * @return The project name used for this viewport.
  */
 export const visualProjectName = (baseName: string, viewport: VisualViewport, selected: readonly VisualViewport[]): string =>
 	selected.length === 1 && viewport.name === 'xl' ? baseName : `${baseName}-${viewport.name}`;
@@ -87,7 +90,8 @@ export const visualProjectName = (baseName: string, viewport: VisualViewport, se
  *
  * @param projectName Playwright project name to inspect.
  * @param catalog Viewport catalog containing recognized suffixes.
- * @returns The matching viewport name, or the default `xl` name.
+ *
+ * @return The matching viewport name, or the default `xl` name.
  */
 export const projectViewportName = (projectName: string, catalog: ViewportCatalog = VISUAL_VIEWPORTS): string => {
 	const names = Object.keys(catalog).sort((a, b) => b.length - a.length);
@@ -101,7 +105,8 @@ export const projectViewportName = (projectName: string, catalog: ViewportCatalo
  *
  * @param projectName Playwright project name to normalize.
  * @param catalog Viewport catalog containing recognized suffixes.
- * @returns The base project name without its viewport suffix.
+ *
+ * @return The base project name without its viewport suffix.
  */
 export const baseVisualProjectName = (projectName: string, catalog: ViewportCatalog = VISUAL_VIEWPORTS): string => {
 	const viewport = projectViewportName(projectName, catalog);
@@ -113,7 +118,8 @@ export const baseVisualProjectName = (projectName: string, catalog: ViewportCata
  *
  * @param viewport Viewport name to format.
  * @param catalog Viewport catalog containing dimensions.
- * @returns A width-by-height label using the multiplication sign.
+ *
+ * @return A width-by-height label using the multiplication sign.
  */
 export const viewportSizeLabel = (viewport: string, catalog: ViewportCatalog = VISUAL_VIEWPORTS): string => {
 	const size = catalog[viewport] || catalog.xl || VISUAL_VIEWPORTS.xl;
@@ -144,9 +150,11 @@ export type ResponsivePlaywrightOptions = {
  * `singleRunProjects`. The helper adds full-page automatic screenshots and the shared
  * evidence reporter while preserving any other configured reporters.
  *
- * @param config Existing Playwright configuration.
+ * @param cfg
  * @param opts Shared matrix and reporting options.
- * @returns Configuration with responsive projects, native screenshots, and reporting.
+ * @param config Existing Playwright configuration.
+ *
+ * @return Configuration with responsive projects, native screenshots, and reporting.
  */
 export const withResponsivePlaywright = <T extends PlaywrightTestConfig>(cfg: T, opts: ResponsivePlaywrightOptions = {}): T => {
 	const viewports = resolveVisualViewports();
@@ -162,6 +170,13 @@ export const withResponsivePlaywright = <T extends PlaywrightTestConfig>(cfg: T,
 	const projects = (cfg.projects || []) as Array<{ dependencies?: readonly string[]; name?: string; testMatch?: unknown; use?: Record<string, unknown> }>;
 	const dependencyProjects = new Set(projects.flatMap((p) => p.dependencies || []));
 	const singleRun = new Set(opts.singleRunProjects || []);
+	/**
+	 *
+	 * @param project
+	 * @param idx
+	 *
+	 * @return
+	 */
 	const isSetup = (project: (typeof projects)[number], idx: number): boolean => {
 		const name = project.name || `project-${idx + 1}`;
 		const match = Array.isArray(project.testMatch) ? project.testMatch : [project.testMatch];
