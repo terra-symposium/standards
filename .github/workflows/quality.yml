@@ -26,6 +26,6 @@ jobs:
         run: pnpm install --frozen-lockfile
       - run: pnpm quality:all
       - uses: ./packages/testing
-        if: always() && steps.checkout.outcome == 'success' && steps.setup_pnpm.outcome == 'success' && steps.setup_node.outcome == 'success' && steps.install.outcome == 'success'
+        if: always() && github.event_name == 'pull_request' && steps.checkout.outcome == 'success' && steps.setup_pnpm.outcome == 'success' && steps.setup_node.outcome == 'success' && steps.install.outcome == 'success'
         with:
           manifest: .terra-tests.json
