@@ -10,22 +10,64 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-        id: checkout
         with:
           fetch-depth: 0
       - uses: pnpm/action-setup@v6
-        id: setup_pnpm
         with:
           version: 10.30.3
       - uses: actions/setup-node@v7
-        id: setup_node
         with:
           node-version: 22.19.0
           cache: pnpm
-      - id: install
-        run: pnpm install --frozen-lockfile
+      - run: pnpm install --frozen-lockfile
       - run: pnpm quality:all
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 10.30.3
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.19.0
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm -r build
+
+  tests:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 10.30.3
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.19.0
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
       - uses: ./packages/testing
-        if: always() && github.event_name == 'pull_request' && steps.checkout.outcome == 'success' && steps.setup_pnpm.outcome == 'success' && steps.setup_node.outcome == 'success' && steps.install.outcome == 'success'
         with:
           manifest: .terra-tests.json
+
+  package:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 10.30.3
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.19.0
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @terra-symposium/standards-testing pack --dry-run
