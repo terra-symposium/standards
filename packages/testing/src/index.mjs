@@ -160,9 +160,19 @@ export function validateTestPlan(value, root) {
 }
 
 /**
+ * Settings for selecting the repository manifest and requested test suites.
+ *
+ * @typedef {object} TestPlanOptions
+ * @property {string} root - Absolute repository root where the test plan is loaded.
+ * @property {string} [manifest] - Repository-relative test manifest path.
+ * @property {string[]} [suites] - Optional suite names to run from the manifest.
+ * @property {boolean} [sharedOnly] - Run only shared checks without custom suites.
+ */
+
+/**
  * Runs the requested suites serially and aggregates failures into one process result.
  *
- * @param {{root: string, manifest?: string, suites?: string[], sharedOnly?: boolean}} props - Repository root, manifest selection, and optional suite filter.
+ * @param {TestPlanOptions} props - Repository root and optional test-plan selections.
  *
  * @return {{passed: number, failed: number, selected: string[]}}
  */
