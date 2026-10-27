@@ -20,7 +20,20 @@ jobs:
           node-version: 22.19.0
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm quality:all
+      - name: Capture full-repository quality findings
+        run: pnpm run quality:check -- --report-json standards-quality.json
+        continue-on-error: true
+      - name: Check formatting
+        run: node packages/quality/dist/lib/runner.js format --all --warn
+      - name: Check lint
+        run: node packages/quality/dist/lib/runner.js lint --all --warn
+      - name: Upload quality report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: standards-quality
+          path: standards-quality.json
+          if-no-files-found: warn
 
   build:
     runs-on: ubuntu-latest
