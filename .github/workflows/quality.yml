@@ -21,7 +21,7 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - name: Capture full-repository quality findings
-        run: pnpm run quality:check -- --report-json standards-quality.json
+        run: pnpm run quality:check --report-json standards-quality.json
         continue-on-error: true
       - name: Check formatting
         run: node packages/quality/dist/lib/runner.js format --all --warn
