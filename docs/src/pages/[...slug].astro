@@ -1,9 +1,7 @@
 ---
-import { DocsLocalWorkspace } from '@terra-symposium/docs';
 import type { DocsHostTreeNode, DocsLocalPage } from '@terra-symposium/docs';
 import '@terra-symposium/docs/style.css';
-import '../styles/tailwind.css';
-import SkillsExplorer from '../components/SkillsExplorer.tsx';
+import { StandardsDocsWorkspace } from '../components/StandardsDocsWorkspace.js';
 import { entries } from '../lib/docs-data.js';
 
 export function getStaticPaths() {
@@ -36,7 +34,6 @@ const tree: DocsHostTreeNode[] = categories.map(category => {
 <html lang="en">
 	<head><meta charset="utf-8" /><meta name="viewport" content="width=device-width,initial-scale=1" /><meta name="robots" content="noindex, nofollow" /><title>{page.title} · Standards</title><meta name="description" content={page.description} /></head>
 	<body>
-		<DocsLocalWorkspace client:load tree={tree} pages={docs} pathname={Astro.url.pathname} title="Standards" description="Documentation for shared Terra Symposium packages and tools." rootPath="/" homePath="/" />
-		{page.slug === 'skills' && <section class="standards-docs-hero"><SkillsExplorer client:load /></section>}
+		<StandardsDocsWorkspace client:load tree={tree} pages={docs} pathname={Astro.url.pathname} title="Standards" description="Documentation for shared Terra Symposium packages and tools." rootPath="/" homePath="/" showSkillsExplorer={page.slug === 'skills'} />
 	</body>
 </html>
