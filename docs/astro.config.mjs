@@ -1,10 +1,10 @@
 import { defineConfig } from 'astro/config';
-import tailwindcss from '@tailwindcss/vite';
 import react from '@astrojs/react';
 import mdx from '@astrojs/mdx';
+import { DOCS_VITE_OPTIMIZE_DEPS } from '@terra-symposium/docs/astro';
 
 export default defineConfig({
-  site: 'https://standards-docs.netlify.app',
+	site: 'https://standards-docs.netlify.app',
 	redirects: {
 		'/getting-started': '/packages/quality/setup/',
 		'/quality/overview': '/packages/quality/',
@@ -31,6 +31,8 @@ export default defineConfig({
 		'/quality/checks/type': '/packages/quality/#type',
 		'/quality/checks/ui-patterns': '/packages/quality/#ui-patterns',
 	},
-  vite: { plugins: [tailwindcss()] },
-  integrations: [react(), mdx()],
+	vite: {
+		optimizeDeps: { include: [...DOCS_VITE_OPTIMIZE_DEPS] },
+	},
+	integrations: [react(), mdx()],
 });

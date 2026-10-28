@@ -17,9 +17,9 @@
 		"quality:check": "node packages/quality/dist/lib/runner.js quality --all --warn --skip-commands --skip-recommendations",
 		"prequality:github": "pnpm --filter @terra-symposium/standards-quality build",
 		"quality:github": "node packages/quality/dist/lib/runner.js github --report-json .quality-github-report.json",
-		"docs:dev": "pnpm --filter @terra-symposium/docs dev",
-		"docs:build": "pnpm --filter @terra-symposium/docs build",
-		"docs:preview": "pnpm --filter @terra-symposium/docs build && pnpm --filter @terra-symposium/docs preview",
+		"docs:dev": "pnpm --filter @terra-symposium/standards-docs dev",
+		"docs:build": "pnpm --filter @terra-symposium/standards-docs build",
+		"docs:preview": "pnpm --filter @terra-symposium/standards-docs build && pnpm --filter @terra-symposium/standards-docs preview",
 		"release": "changeset publish"
 	},
 	"devDependencies": {

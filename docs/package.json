@@ -1,25 +1,23 @@
 {
-  "name": "@terra-symposium/docs",
-  "private": true,
-  "type": "module",
-  "scripts": {
-    "dev": "node ./scripts/generate-skills.mjs && astro dev",
-    "build": "node ./scripts/generate-skills.mjs && astro build",
-    "preview": "astro preview"
-  },
-  "dependencies": {
-    "@astrojs/mdx": "^8.1.1",
-    "@astrojs/react": "^7.1.0",
-    "@tailwindcss/vite": "^4.3.3",
-    "@terra-symposium/docs": "file:vendor/terra-symposium-docs-0.1.23.tgz",
-    "@terra-symposium/styling": "file:vendor/terra-symposium-styling-0.1.16.tgz",
-    "astro": "^7.4.0",
-    "react": "^19.3.1",
-    "react-dom": "^19.3.1",
-    "tailwindcss": "^4.3.3"
-  },
-  "devDependencies": {
-    "@types/react": "^19.3.0",
-    "@types/react-dom": "^19.3.0"
-  }
+	"name": "@terra-symposium/standards-docs",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"dev": "node ./scripts/generate-skills.mjs && astro dev",
+		"build": "node ./scripts/generate-skills.mjs && astro build",
+		"preview": "astro preview"
+	},
+	"dependencies": {
+		"@astrojs/mdx": "^8.1.1",
+		"@astrojs/react": "^7.1.0",
+		"@terra-symposium/docs": "file:vendor/terra-symposium-docs-0.1.42.tgz",
+		"@terra-symposium/styling": "file:vendor/terra-symposium-styling-0.1.27.tgz",
+		"astro": "^7.4.0",
+		"react": "^19.3.1",
+		"react-dom": "^19.3.1"
+	},
+	"devDependencies": {
+		"@types/react": "^19.3.0",
+		"@types/react-dom": "^19.3.0"
+	}
 }
