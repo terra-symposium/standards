@@ -1,6 +1,6 @@
-import { session, canReadRepository } from '../../src/server/auth.js';
-import { db } from '../../src/server/db.js';
-import { score } from '../../src/server/metrics.js';
+import { session, canReadRepository } from '../../src/lib/server/auth.js';
+import { db } from '../../src/lib/server/db.js';
+import { score } from '../../src/lib/server/metrics.js';
 
 type Row = Record<string, unknown>;
 const COMMIT_PAGE_SIZE = 25;

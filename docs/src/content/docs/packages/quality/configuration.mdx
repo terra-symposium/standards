@@ -29,23 +29,46 @@ Install and configure a tool before enabling the check that invokes it. For exam
 
 Runtime paths resolve from `root`. By default, `root` is the directory containing `quality.json`; an explicit relative `root` is resolved from the config file. The editor-only `$schema` value is a path to the installed JSON Schema and is not read by the runner.
 
-| Field                          | Purpose                                                                                                                                             |
-| ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `root`                         | Repository root used for source discovery and child-process working directories. Relative to the config file; defaults to its containing directory. |
-| `sourceRoots`                  | Required source roots scanned by regular checks.                                                                                                    |
-| `includeRoots`                 | Additional source roots appended to `sourceRoots` during discovery.                                                                                 |
-| `extensions`                   | Required file extensions for source discovery, including the leading dot.                                                                           |
-| `skippedDirectories`           | Additional directory names excluded at any depth. Common generated and dependency folder names are excluded by default.                             |
-| `skippedFiles`                 | Repository-relative files excluded from checks.                                                                                                     |
-| `singleUse.skippedDirectories` | Repository-relative directory paths excluded from single-use and dead-code analysis only.                                                           |
-| `aliases`                      | Internal import prefixes mapped to repository paths, such as `{ "@/": "src/" }`.                                                                    |
-| `externalPrefixes`             | Import prefixes that the import checker should treat as external.                                                                                   |
-| `frameworkEntryExports`        | Explicit framework-discovered exports that Knip should retain, keyed by a source file path or supported `/**/*.ts` / `/**/*.tsx` pattern.           |
-| `protectedIdentifiers`         | Names that naming maintenance must preserve.                                                                                                        |
-| `renameExports`                | Whether eligible exported names can be renamed. Defaults to `false`.                                                                                |
-| `manualWarnings`               | Whether dead-code findings requiring manual review block quality. Defaults to `error`; set to `warning` to keep them visible without failing.       |
+| Field                   | Purpose                                                                                                                                             |
+| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `root`                  | Repository root used for source discovery and child-process working directories. Relative to the config file; defaults to its containing directory. |
+| `sourceRoots`           | Required source roots scanned by regular checks.                                                                                                    |
+| `includeRoots`          | Additional source roots appended to `sourceRoots` during discovery.                                                                                 |
+| `skippedDirectories`    | Directory names or repository-relative directory paths omitted from source discovery. A directory name such as `.build` is skipped at every depth.  |
+| `skippedFiles`          | Repository-relative files omitted from source discovery and source-based checks.                                                                    |
+| `extensions`            | Required file extensions for source discovery, including the leading dot.                                                                           |
+| `aliases`               | Internal import prefixes mapped to repository paths, such as `{ "@/": "src/" }`.                                                                    |
+| `externalPrefixes`      | Import prefixes that the import checker should treat as external.                                                                                   |
+| `frameworkEntryExports` | Explicit framework-discovered exports that Knip should retain, keyed by a source file path or supported `/**/*.ts` / `/**/*.tsx` pattern.           |
+| `protectedIdentifiers`  | Names that naming maintenance must preserve.                                                                                                        |
+| `renameExports`         | Whether eligible exported names can be renamed. Defaults to `false`.                                                                                |
 
-Keep scope and exclusions narrow. A broad root or external prefix can hide unresolved imports, unreachable files, or other source findings.
+Quality checks scan every matching source file below the configured roots, except standard generated and dependency output directories, including `.build` directories at any depth. Use `skippedDirectories` and `skippedFiles` for repository-specific generated or vendored sources. A skipped file is omitted as a discovered source root; TypeScript can still load it as an imported dependency when another retained file references it.
+
+The `singleUse.skippedDirectories` setting has a narrower effect: it leaves files in source discovery and the TypeScript program, so they can count as consumers, while declarations inside the configured paths are not suggested for inlining. This is useful for generated types that should protect shared declarations from a false single-use finding.
+
+```json
+{
+	"skippedDirectories": [".build", "src/vendor"],
+	"skippedFiles": ["src/lib/generated-types.ts"],
+	"singleUse": {
+		"skippedDirectories": ["src/lib/generated-types.ts"]
+	}
+}
+```
+
+## Optional performance-pattern scan
+
+Set `performancePatterns` to scan for linear collection lookups nested inside collection callbacks. This diagnostic is opt-in, advisory, and never rewrites loops or changes lookup order. Confirm the path is performance-sensitive and benchmark it before applying an indexing change.
+
+```json
+{
+	"performancePatterns": {
+		"extensions": [".js", ".jsx", ".ts", ".tsx"],
+		"ignoredFiles": ["src/generated/client.ts"]
+	}
+}
+```
 
 ## Check and autofix controls
 
@@ -59,6 +82,10 @@ Every built-in check is enabled unless its `enabledChecks` entry is `false`. Som
 		"import": true,
 		"name": true,
 		"forward": true,
+		"accessibility": true,
+		"display-name": true,
+		"performance-patterns": true,
+		"documented-commands": true,
 		"lint": true,
 		"knip": true,
 		"dead-code": true,
@@ -76,7 +103,7 @@ Every built-in check is enabled unless its `enabledChecks` entry is `false`. Som
 }
 ```
 
-A missing or `true` entry enables the check; `false` disables it. `--warn` disables all Terra Quality autofixes for one CLI run. To disable a particular fixer by default, set its name to `false` under `autofix`:
+A missing or `true` entry enables existing checks; the new `accessibility`, `display-name`, and `documented-commands` checks require an explicit `true` during rollout. `false` disables any check. `--warn` disables all Terra Quality autofixes for one CLI run. To disable a particular fixer by default, set its name to `false` under `autofix`:
 
 ```json
 {
@@ -89,11 +116,35 @@ A missing or `true` entry enables the check; `false` disables it. `--warn` disab
 		"dead-code": true,
 		"alias": true,
 		"forward": true,
+		"accessibility": true,
+		"displayName": true,
+		"documentedCommands": true,
 		"repeatedClasses": true,
 		"regexDedup": true
 	}
 }
 ```
+
+The accessibility, display-name, and documented-command checks are opt-in so publishing the package does not make existing consumers fail before they have reviewed or fixed their findings. Set their `enabledChecks` entries to `true` when ready. `performance-patterns` is advisory and runs only when a `performancePatterns` settings block is present. Configure `documentation.commandRoots` to check Markdown command examples and permit the source-evident pnpm flag correction:
+
+```json
+{
+	"enabledChecks": {
+		"accessibility": true,
+		"display-name": true,
+		"documented-commands": true
+	},
+	"documentation": {
+		"commandRoots": ["docs", ".agents"]
+	},
+	"performancePatterns": {
+		"extensions": [".js", ".jsx", ".ts", ".tsx"],
+		"ignoredFiles": ["src/generated/client.ts"]
+	}
+}
+```
+
+The performance check suggests indexing but does not make a rewrite or fail quality. Measure the representative path before deciding whether the change is worthwhile. Browser, broad integration, and benchmark checks should stay behind explicit or scheduled commands, with expensive setup shared within each suite.
 
 The `autofix` keys use camel case for `repeatedClasses` and `regexDedup`, while `enabledChecks` uses kebab case. A missing or `true` fixer entry permits its supported fixes when the CLI is in fix mode. Individual transformations remain conservative and may leave ambiguous cases for review.
 
@@ -155,7 +206,7 @@ Tool names are resolved from `<root>/node_modules/.bin` first, then from the env
 
 Use `enabledCommands` to toggle one configured command. Set `enabledChecks.command` to `false` to disable the category or pass `--skip-commands` for one run.
 
-`recommendationCommands` uses the same entry shape. Use `enabledRecommendations` to toggle an advisory command or `enabledChecks.recommend` to disable all recommendations. Recommendation subprocess output is shown, but its exit status does not fail the quality run. Pass `--skip-recommendations` to omit recommendations once.
+`recommendationCommands` uses the same entry shape. Use `enabledRecommendations` to toggle a command or `enabledChecks.recommend` to disable all recommendation commands. A nonzero subprocess status fails the quality run. Pass `--skip-recommendations` to omit these commands once.
 
 Commands run from `root`, inherit the caller's environment, and are not automatically limited to changed files. The runner does not provision credentials, databases, browsers, or other services.
 
@@ -174,9 +225,9 @@ These checks require the corresponding policy object. See [check behavior](/pack
 | Field               | Options                                                                     | Purpose                                                                                                                                                              |
 | ------------------- | --------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `security`          | `forbiddenTerms`, `forbiddenImports`, `clientRoots`, `allowProcessEnvRoots` | Report configured terms/imports, root-level or committed environment files, secret-shaped access in client roots, and process-environment use outside allowed roots. |
-| `repeatedClasses`   | `minimumCount`, `extensions`, `ignoredDirectories`                          | Find repeated static class strings in selected source files.                                                                                                         |
-| `regexDedup`        | `minimumCount`, `extensions`, `ignoredFiles`, `sharedModule`                | Find duplicate regex sources; an optional repository-relative `.mjs` module with a matching `.d.mts` declaration supports shared extraction.                         |
-| `uiPatterns`        | `forbidden`, `extensions`, `ignoredFiles`                                   | Report configured UI source patterns for review.                                                                                                                     |
+| `repeatedClasses`   | `minimumCount`, `extensions`                                                | Find repeated static class strings in selected source files.                                                                                                         |
+| `regexDedup`        | `minimumCount`, `extensions`, `sharedModule`                                | Find duplicate regex sources; an optional repository-relative `.mjs` module with a matching `.d.mts` declaration supports shared extraction.                         |
+| `uiPatterns`        | `forbidden`, `extensions`                                                   | Report configured UI source patterns for review.                                                                                                                     |
 | `uiRecommendations` | `rules`, `extensions`, `ignoredFiles`, `ignoredDirectories`                 | Configure the on-demand Astro/JSX shared-component recommendation report.                                                                                            |
 | `tailwindCanonical` | required `stylesheet`, optional `sourceRoots`                               | Configure the Tailwind v4 canonical-class check and autofix.                                                                                                         |
 

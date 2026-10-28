@@ -10,11 +10,11 @@ IMPORTS
 // API
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { withErrorBoundary } from '../dist/react.js';
+import { withErrorBoundary } from '../dist/components/react.js';
 
 // COMPONENTS
 import React from 'react';
-import { ErrorBoundary } from '../dist/react.js';
+import { ErrorBoundary } from '../dist/components/react.js';
 test('exports the shared boundary lifecycle and HOC', () => {
 	assert.equal(typeof ErrorBoundary, 'function');
 	assert.equal(typeof withErrorBoundary, 'function');
@@ -28,9 +28,16 @@ test('captures component metadata and exposes reset-key recovery state', () => {
 	});
 	assert.deepEqual(reports, [{ error: err, name: 'Component', componentStack: '\n    at Panel' }]);
 	assert.equal(
-		withErrorBoundary(function Panel() {
-			return React.createElement('div');
-		}, 'Panel').displayName,
+		withErrorBoundary(
+			/**
+			 *
+			 * @return
+			 */
+			function Panel() {
+				return React.createElement('div');
+			},
+			'Panel',
+		).displayName,
 		'withErrorBoundary(Panel)',
 	);
 });

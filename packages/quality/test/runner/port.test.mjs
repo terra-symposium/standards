@@ -10,7 +10,7 @@ IMPORTS
 // API
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { acquirePort, portOwners } from '../../dist/port.js';
+import { acquirePort, portOwners } from '../../dist/lib/port.js';
 import { spawn } from 'node:child_process';
 
 /*//////////////////////////////////////////////////

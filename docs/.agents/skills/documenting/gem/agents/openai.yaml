@@ -1,0 +1,4 @@
+interface:
+  display_name: 'Document Gem maintenance'
+  short_description: 'Maintain Gemini document instructions safely'
+  default_prompt: 'Use $document-gem-maintenance to update and verify the Terra Document Gem.'

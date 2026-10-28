@@ -2,6 +2,7 @@
 	"$schema": "https://unpkg.com/knip@6/schema.json",
 	"ignoreDependencies": ["pptxgenjs", "prettier"],
 	"ignoreFiles": ["packages/*/dist/**"],
+	"ignoreIssues": { "vendor/braces/lib/utils.js": ["exports"] },
 	"workspaces": {
 		"packages/error-boundaries": {
 			"entry": ["src/index.ts", "src/react.tsx", "src/astro.ts", "src/next.ts", "test/*.test.mjs"],

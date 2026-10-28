@@ -1,7 +1,7 @@
 {
 	"name": "@terra-symposium/standards-quality",
-	"version": "0.9.1",
-	"description": "Configurable quality checks and maintenance tooling for Terra Symposium repositories",
+	"version": "2.0.6",
+	"description": "Configurable quality checks and maintenance tooling for software repositories",
 	"homepage": "https://standards-docs.netlify.app/",
 	"type": "module",
 	"engines": {
@@ -10,7 +10,7 @@
 	"main": "./dist/index.js",
 	"types": "./dist/index.d.ts",
 	"bin": {
-		"terra-quality": "dist/runner.js"
+		"terra-quality": "dist/lib/runner.js"
 	},
 	"publishConfig": {
 		"registry": "https://registry.npmjs.org",
@@ -22,25 +22,27 @@
 	},
 	"exports": {
 		".": "./dist/index.js",
-		"./cli": "./dist/runner.js",
-		"./naming": "./dist/naming.js",
-		"./object-forwarding": "./dist/object-forwarding.js",
-		"./single-use": "./dist/single-use.js",
-		"./port": "./dist/port.js"
+		"./cli": "./dist/lib/runner.js",
+		"./naming": "./dist/lib/naming.js",
+		"./object-forwarding": "./dist/lib/object-forwarding.js",
+		"./single-use": "./dist/lib/single-use.js",
+		"./port": "./dist/lib/port.js"
 	},
 	"files": [
 		"dist",
-		"quality.schema.json"
+		"quality.schema.json",
+		"quality-configs"
 	],
 	"scripts": {
 		"build": "tsc -p tsconfig.json",
 		"prepare": "npm run build",
+		"pretest": "npm run build",
 		"test": "node --test"
 	},
 	"dependencies": {
 		"typescript": "^5.0.0"
 	},
 	"devDependencies": {
-		"@types/node": "^22.14.1"
+		"@types/node": "^26.6.5"
 	}
 }

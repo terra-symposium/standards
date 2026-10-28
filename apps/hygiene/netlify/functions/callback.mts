@@ -1,4 +1,4 @@
-import { createSession, equalSecret, sessionCookie } from '../../src/server/auth.js';
+import { createSession, equalSecret, sessionCookie } from '../../src/lib/server/auth.js';
 
 export default async function handler(request: Request): Promise<Response> {
   const url = new URL(request.url);

@@ -34,6 +34,10 @@ HELPERS
 function identifiers(src) {
 	const file = ts.createSourceFile('fixture.ts', src, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
 	const nodes = [];
+	/**
+	 *
+	 * @param node
+	 */
 	const visit = (node) => {
 		if (ts.isIdentifier(node)) nodes.push(node);
 		ts.forEachChild(node, visit);
@@ -54,31 +58,31 @@ test('naming maps are immutable and identifier tokenisation preserves separators
 	assert.deepEqual(identifierTokens('article_error-2_value'), ['article', 'error', '2', 'value']);
 	assert.deepEqual(identifierTokens(''), []);
 });
-test('callback aliases shorten only configured idioms and choose deterministic fallbacks on collision', () => {
-	assert.equal(callbackAlias('customer'), 'c');
+test('callback aliases shorten only documented idioms and preserve domain-specific names', () => {
+	assert.equal(callbackAlias('customer'), 'customer');
 	assert.equal(callbackAlias('unknownValue'), 'unknownValue');
 	assert.equal(callbackAlias('field'), 'field');
 	assert.equal(callbackAlias('label'), 'label');
-	assert.equal(callbackAlias('customer', ['c']), 'v');
-	assert.equal(callbackAlias('customer', ['c', 'v', 'r', 'x', 'd', 'e', 'n', 's']), 'c');
+	assert.equal(callbackAlias('customer', ['c']), 'customer');
+	assert.equal(callbackAlias('customer', ['c', 'v', 'r', 'x', 'd', 'e', 'n', 's']), 'customer');
 	assert.equal(renameId('index', { numericIndex: true }), 'i');
-	assert.equal(renameId('node', { callback: true }), 'n');
-	assert.equal(renameId('node', { callback: true, reserved: ['n'] }), 'v');
+	assert.equal(renameId('node', { callback: true }), 'node');
+	assert.equal(renameId('node', { callback: true, reserved: ['n'] }), 'node');
 	assert.equal(renameId('Request'), 'Request');
 	assert.equal(renameId('_'), '_');
 });
-test('renameId shortens category, intelligence, and other configured words without touching substrings', () => {
+test('renameId shortens established terms without abbreviating domain words or touching substrings', () => {
 	const cases = {
-		category: 'cat',
-		customerCategory: 'customerCat',
+		category: 'category',
+		customerCategory: 'customerCategory',
 		intelligence: 'intel',
 		customerIntelligence: 'customerIntel',
-		categories: 'cats',
+		categories: 'categories',
 		intelligences: 'intels',
 		commitment: 'commitment',
 		terror: 'terror',
 		isActive: 'isActive',
-		normalizedResponse: 'normRes',
+		normalizedResponse: 'normResponse',
 	};
 	for (const [name, expected] of Object.entries(cases)) assert.equal(renameId(name), expected, name);
 	assert.equal(hasPrefixReplacement('activeCard'), true);
@@ -114,6 +118,12 @@ const expression = function namedExpression() { return true; };
 class WithProperty { constructor(readonly destination: string) {} }
 `;
 	const { file, nodes } = identifiers(src);
+	/**
+	 *
+	 * @param name
+	 *
+	 * @return
+	 */
 	const declaration = (name) => nodes.find((n) => n.text === name && n.parent.name === n);
 	for (const name of ['localValue', 'localFunction', 'LocalClass', 'LocalContract', 'LocalType', 'namedExpression']) assert.equal(isRenamableDeclaration(declaration(name)), true, name);
 	for (const name of ['publicValue', 'publicFunction', 'PublicClass', 'PublicContract', 'PublicType']) assert.equal(isRenamableDeclaration(declaration(name)), false, name);
@@ -123,7 +133,7 @@ class WithProperty { constructor(readonly destination: string) {} }
 	assert.equal(isRenamableDeclaration(dest), false);
 	assert.equal(declarationScope(param).kind, ts.SyntaxKind.FunctionDeclaration);
 	assert.equal(declarationScope(declaration('localValue')), file);
-	assert.equal(renameDeclaration(param), 'param');
+	assert.equal(renameDeclaration(param), 'parameter');
 });
 test('callback declaration APIs classify inline helper, collection, and event-handler callbacks', () => {
 	const src = `
@@ -136,6 +146,10 @@ void [mapped, rendered, ordinary, handle, view];
 `;
 	const file = ts.createSourceFile('fixture.tsx', src, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
 	const callbacks = [];
+	/**
+	 *
+	 * @param node
+	 */
 	const visit = (node) => {
 		if (ts.isIdentifier(node) && ['block', 'customer', 'index', 'event'].includes(node.text) && ts.isParameter(node.parent)) callbacks.push(node);
 		ts.forEachChild(node, visit);
@@ -144,11 +158,11 @@ void [mapped, rendered, ordinary, handle, view];
 	assert.equal(callbacks.length, 6);
 	const supported = callbacks.filter((n) => isCallbackDeclaration(n));
 	assert.equal(supported.length, 5);
-	assert.equal(renameDeclaration(supported[0]), 'c');
+	assert.equal(renameDeclaration(supported[0]), 'customer');
 	assert.equal(renameDeclaration(supported[1]), 'i');
 	assert.equal(renameDeclaration(supported[2]), 'block');
-	assert.equal(renameDeclaration(supported[3]), 'c');
-	assert.equal(renameDeclaration(supported[4]), 'e');
+	assert.equal(renameDeclaration(supported[3]), 'customer');
+	assert.equal(renameDeclaration(supported[4]), 'event');
 });
 test('alias analysis keeps only stable local identifier and type aliases', () => {
 	const root = fixtureRoot('terra-quality-alias-api-');
@@ -305,9 +319,6 @@ test('naming findings use shared analysis, report severity by replacement kind, 
 	const analysis = createQualityAnalysis(cfg);
 	assert.deepEqual(
 		namingFindings(cfg, analysis).map((f) => [f.name, f.suggestion, f.severity]),
-		[
-			['category', 'cat', 'error'],
-			['activeValue', 'aVal', 'warning'],
-		],
+		[['activeValue', 'aValue', 'error']],
 	);
 });

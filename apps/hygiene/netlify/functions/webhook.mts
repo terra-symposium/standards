@@ -1,6 +1,6 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
-import { db } from '../../src/server/db.js';
-import type { GithubRepository } from '../../src/server/github.js';
+import { db } from '../../src/lib/server/db.js';
+import type { GithubRepository } from '../../src/lib/server/github.js';
 
 type Event = { action?: string; installation?: { id: number; account?: { login?: string } }; repositories?: GithubRepository[]; repositories_added?: GithubRepository[]; repositories_removed?: GithubRepository[] };
 

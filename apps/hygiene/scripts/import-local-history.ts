@@ -3,10 +3,10 @@ import { existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createHistoryReport } from '../../../packages/quality/src/history-report.js';
-import { db } from '../src/server/db.js';
-import { parseHistoryReport } from '../src/server/history.js';
-import { ingestHistoryReport } from '../src/server/ingest.js';
+import { createHistoryReport } from '../../../packages/quality/src/lib/history-report.js';
+import { db } from '../src/lib/server/db.js';
+import { parseHistoryReport } from '../src/lib/server/history.js';
+import { ingestHistoryReport } from '../src/lib/server/ingest.js';
 
 const appRoot = resolve(fileURLToPath(new URL('..', import.meta.url)));
 const args = process.argv.slice(2);

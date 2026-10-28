@@ -3,9 +3,9 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, 
 import { tmpdir } from 'node:os';
 import { basename, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { db } from '../src/server/db.js';
-import { parseBuildReport } from '../src/server/history.js';
-import { ingestBuildReport } from '../src/server/ingest.js';
+import { db } from '../src/lib/server/db.js';
+import { parseBuildReport } from '../src/lib/server/history.js';
+import { ingestBuildReport } from '../src/lib/server/ingest.js';
 
 const appRoot = resolve(fileURLToPath(new URL('..', import.meta.url)));
 const args = process.argv.slice(2);

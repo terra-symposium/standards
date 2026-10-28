@@ -13,12 +13,96 @@ IMPORTS
 // API
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { createQualityCfg, documentSrcFile, documentationFindings, duplicateImportFindings, maintainSrcFile, protectLongImports, removeNonCodeComments } from '../../dist/index.js';
+import {
+	createQualityCfg,
+	documentSrcFile,
+	documentationFindings,
+	documentedCommandFindings,
+	duplicateImportFindings,
+	fixDocumentedCommands,
+	maintainSrcFile,
+	protectLongImports,
+	removeNonCodeComments,
+} from '../../dist/index.js';
 import { fixtureFile, fixtureRoot, fixtureText } from '../../support/fixtures.mjs';
 
 /*//////////////////////////////////////////////////
 TESTS
 //////////////////////////////////////////////////*/
+
+test('documentation policy excludes generated and vendor source trees', () => {
+	const root = fixtureRoot('terra-quality-documentation-pruned-');
+	fixtureFile(root, 'src/main.ts', 'function documentedScope() { return true; }\n');
+	fixtureFile(root, 'src/generated/generated.ts', 'function generatedHelper() { return true; }\n');
+	fixtureFile(root, 'src/vendor/vendor.ts', 'function vendorHelper() { return true; }\n');
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
+	assert.deepEqual(
+		documentationFindings(cfg).map(({ name }) => name),
+		['documentedScope'],
+	);
+});
+
+test('documented commands diagnose and fix only deprecated pnpm directory flags in configured shell fences', () => {
+	const root = fixtureRoot('terra-quality-documented-commands-');
+	fixtureFile(
+		root,
+		'docs/commands.md',
+		[
+			'Historical note: `pnpm -C old-tool test` is preserved as prose.',
+			'```sh',
+			'pnpm -C packages/app test',
+			'  pnpm --prefix "packages/docs" build -- --watch',
+			'npm --prefix packages/legacy test',
+			'```',
+			'```text',
+			'pnpm -C examples test',
+			'```',
+		].join('\n'),
+	);
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], documentation: { commandRoots: ['docs'] } });
+	assert.deepEqual(
+		documentedCommandFindings(cfg).map(({ line, command }) => [line, command]),
+		[
+			[3, 'pnpm -C packages/app test'],
+			[4, 'pnpm --prefix "packages/docs" build -- --watch'],
+		],
+	);
+	assert.equal(fixDocumentedCommands(cfg), 2);
+	assert.equal(
+		fixtureText(root, 'docs/commands.md'),
+		[
+			'Historical note: `pnpm -C old-tool test` is preserved as prose.',
+			'```sh',
+			'pnpm --dir packages/app test',
+			'  pnpm --dir "packages/docs" build -- --watch',
+			'npm --prefix packages/legacy test',
+			'```',
+			'```text',
+			'pnpm -C examples test',
+			'```',
+		].join('\n'),
+	);
+	assert.equal(fixDocumentedCommands(cfg), 0, 'the transformation is idempotent');
+	assert.deepEqual(documentedCommandFindings(cfg), []);
+});
+
+test('documented command check is disabled without explicit roots and preserves CRLF', () => {
+	const root = fixtureRoot('terra-quality-document-command-disabled-');
+	fixtureFile(root, 'docs/commands.md', '```bash\r\npnpm -C packages/app test\r\n```\r\n');
+	const disabled = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
+	assert.deepEqual(documentedCommandFindings(disabled), []);
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], documentation: { commandRoots: ['docs'] } });
+	assert.equal(fixDocumentedCommands(cfg), 1);
+	assert.equal(fixtureText(root, 'docs/commands.md'), '```bash\r\npnpm --dir packages/app test\r\n```\r\n');
+});
+
+test('documented command autofix preserves mixed line endings', () => {
+	const root = fixtureRoot('terra-quality-document-command-mixed-lines-');
+	fixtureFile(root, 'docs/commands.md', '```sh\r\npnpm -C packages/app test\r\npnpm --prefix packages/docs build\n```\n');
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], documentation: { commandRoots: ['docs'] } });
+	assert.equal(fixDocumentedCommands(cfg), 2);
+	assert.equal(fixtureText(root, 'docs/commands.md'), '```sh\r\npnpm --dir packages/app test\r\npnpm --dir packages/docs build\n```\n');
+});
 
 test('documentation policy independently reports types, exported functions, and inline functions', () => {
 	const root = fixtureRoot('terra-quality-documentation-policy-');
@@ -53,8 +137,39 @@ void [privateHelper, publicHelper, arrowHelper, expressionHelper, documented];
 			['type', 'MissingClass', 'error'],
 			['type', 'MissingStatus', 'error'],
 			['function', 'publicHelper', 'error'],
-			['inline', '<anonymous>', 'error'],
-			['inline', '<anonymous>', 'error'],
+			['inline', 'arrowHelper', 'error'],
+			['inline', 'expressionHelper', 'error'],
+		],
+	);
+});
+
+test('default function policy requires docs for private methods, constructors, and named function values but ignores callbacks', () => {
+	const root = fixtureRoot('terra-quality-document-all-named-functions-');
+	fixtureFile(
+		root,
+		'src/main.ts',
+		`/** src/main.ts */
+class Box {
+  /** Describes a value lookup. */
+  private lookup(key: string): string { return key; }
+  constructor(seed: string) { void seed; }
+  close(): void {}
+}
+function helper(value: number): number { return value; }
+const namedArrow = (flag: boolean) => flag;
+[1].forEach((item) => void item);
+`,
+	);
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
+	assert.deepEqual(
+		documentationFindings(cfg).map(({ kind, name }) => [kind, name]),
+		[
+			['param', '@param key'],
+			['return', '@return'],
+			['function', 'constructor'],
+			['function', 'close'],
+			['function', 'helper'],
+			['function', 'namedArrow'],
 		],
 	);
 });
@@ -79,7 +194,7 @@ export function useDashboardConfigurationDialog(initialConfigure: string | undef
 		],
 	);
 });
-test('documentation findings warn for detached TSDoc and accept declaration and file-header comments', () => {
+test('documentation errors identify detached TSDoc and accept declaration and file-header comments', () => {
 	const root = fixtureRoot('terra-quality-detached-tsdoc-');
 	fixtureFile(
 		root,
@@ -91,7 +206,7 @@ test('documentation findings warn for detached TSDoc and accept declaration and 
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
 	assert.deepEqual(
 		documentationFindings(cfg).map(({ kind, name, severity }) => [kind, name, severity]),
-		[['orphan', '<detached TSDoc>', 'warning']],
+		[['orphan', '<detached TSDoc>', 'error']],
 	);
 	assert.equal(removeNonCodeComments(`${root}/src/main.ts`), true);
 	assert.doesNotMatch(fixtureText(root, 'src/main.ts'), /Describes a declaration that was removed/);
@@ -162,9 +277,10 @@ void [read, incomplete, commentText];
 			['summary', '<TSDoc summary>', 'add a meaningful description for this TSDoc block'],
 			['param', '@param missing', 'add a meaningful description for @param missing'],
 			['tag', '@deprecated', 'add a meaningful description for @deprecated'],
+			['return', '@return', 'document the value returned by this function'],
 		],
 	);
-	assert.ok(findings.every((f) => f.severity === 'warning'));
+	assert.ok(findings.every((f) => f.severity === 'error'));
 });
 test('documentation description audit continues after nested template expressions and ignores comment-shaped string content', () => {
 	const root = fixtureRoot('terra-quality-documentation-after-template-');
@@ -193,6 +309,7 @@ test('documentation description audit continues after nested template expression
 			['summary', '<TSDoc summary>'],
 			['param', '@param value'],
 			['return', '@return'],
+			['param', '@param input'],
 		],
 	);
 });
@@ -221,7 +338,7 @@ void [existing, missing, publicMissing, inline];
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], documentation: { required: { types: true, functions: true, exportedFunctions: true, noInlineFunctions: true } } });
 	assert.equal(documentSrcFile(cfg, file), true);
 	const first = fixtureText(root, 'src/main.ts');
-	assert.equal((first.match(/\/\*\*\n \*\n \*\//g) ?? []).length, 3);
+	assert.equal((first.match(/\/\*\*\n \*\n \*\//g) ?? []).length, 4);
 	assert.equal(first.includes('Existing description.'), true);
 	assert.equal(first.includes('function missing'), true);
 	assert.equal(first.includes('export function publicMissing'), true);

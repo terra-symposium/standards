@@ -1,12 +1,12 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { parseJUnit, parseQualityReport, score } from '../src/server/metrics.js';
-import { buildReportCounts, buildRunId } from '../src/server/ingest.js';
-import { parseBuildReport, parseHistoryReport, reportTargetsTrackedBranch } from '../src/server/history.js';
-import { repositoryAdmin } from '../src/server/github.js';
+import { parseJUnit, parseQualityReport, score } from '../src/lib/server/metrics.js';
+import { buildReportCounts, buildRunId } from '../src/lib/server/ingest.js';
+import { parseBuildReport, parseHistoryReport, reportTargetsTrackedBranch } from '../src/lib/server/history.js';
+import { repositoryAdmin } from '../src/lib/server/github.js';
 import { acceptDelivery, repositoryOwner, verifySignature } from '../netlify/functions/webhook.mts';
 import { createHmac } from 'node:crypto';
-import { hashReportToken, matchesReportToken } from '../src/server/report-auth.js';
+import { hashReportToken, matchesReportToken } from '../src/lib/server/report-auth.js';
 
 test('JUnit counts failures, errors and skipped cases without suite double counting', () => {
   const xml = '<testsuites><testsuite tests="4"><testcase name="a"/><testcase name="b"><failure/></testcase><testcase name="c"><error/></testcase><testcase name="d"><skipped/></testcase></testsuite></testsuites>';

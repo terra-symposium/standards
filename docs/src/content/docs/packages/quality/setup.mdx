@@ -69,7 +69,7 @@ The default run selects changed and untracked source files from the Git worktree
 pnpm exec terra-quality quality --all --warn
 ```
 
-Add `--skip-commands` when the repository's build and test commands run in another CI step. Add `--skip-recommendations` to omit advisory commands. See [CLI workflows](/packages/quality/workflows/) for the full mode table.
+Add `--skip-commands` when the repository's build and test commands run in another CI step. Add `--skip-recommendations` to omit optional recommendation commands. See [CLI workflows](/packages/quality/workflows/) for the full mode table.
 
 ## React and TSX projects
 
@@ -93,10 +93,10 @@ When a framework preset disables JSX for editor tooling, set a valid option in t
 ## Run lifecycle
 
 1. The CLI loads `quality.json` from the current working directory.
-2. It resolves `root`, discovers files under `sourceRoots`, applies extensions and exclusions, and chooses changed/untracked files or the full set.
+2. It resolves `root`, discovers matching files under `sourceRoots`, and chooses changed/untracked files or the full set.
 3. Enabled built-in checks inspect the selected sources. Configured tools and commands run from `root`.
 4. In fix mode, enabled transformations and tool fixes can write changes. `--warn` disables these writes.
 
-Common generated directories—including `.git`, `node_modules`, `dist`, `build`, `coverage`, `test-results`, `.next`, and `.astro`—are excluded by default. Add repository-specific exclusions with `skippedDirectories` or `skippedFiles`.
+Common generated and dependency directories—including `.git`, `node_modules`, `dist`, `build`, `coverage`, `test-results`, `.next`, and `.astro`—are pruned from source discovery. Every matching file under configured source roots is checked.
 
 The checker can identify source patterns and static issues, but it cannot prove runtime behavior, test coverage, application security, or the intent of framework conventions. Review changes that affect public APIs, persistence, authorization, or other domain boundaries.

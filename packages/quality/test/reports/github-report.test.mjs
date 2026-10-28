@@ -1,13 +1,31 @@
+/**
+ * packages/quality/test/reports/github-report.test.mjs
+ */
+
+/*//////////////////////////////////////////////////
+IMPORTS
+//////////////////////////////////////////////////*/
+
+// API
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { buildGitHubReport, runQualityCli } from '../../dist/index.js';
-import { chmodSync, mkdtempSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
-const repo = 'acme/project';
-const apiPath = (endpoint) => `repos/acme/project${endpoint ? `/${endpoint}` : ''}`;
+/*//////////////////////////////////////////////////
+CONFIG
+//////////////////////////////////////////////////*/
 
+const repo = 'acme/project';
+/**
+ *
+ * @param endpoint
+ *
+ * @return
+ */
+const apiPath = (endpoint) => `repos/acme/project${endpoint ? `/${endpoint}` : ''}`;
 test('GitHub report classifies open issues and security alerts without exposing secret values', () => {
 	const calls = new Map([
 		[
@@ -112,8 +130,13 @@ test('GitHub report classifies open issues and security alerts without exposing 
 	assert.match(result.findings.find((finding) => finding.category === 'malware').agentInstructions, /Remove the affected package/);
 	assert.match(result.findings.find((finding) => finding.category === 'secret-scanning').agentInstructions, /Never read, copy, print/);
 });
-
 test('GitHub report keeps unavailable alert counts unknown instead of reporting zero', () => {
+	/**
+	 *
+	 * @param path
+	 *
+	 * @return
+	 */
 	const api = (path) => {
 		if (path === apiPath('')) return { ok: true, value: { default_branch: 'main' } };
 		if (path.includes('/issues?')) return { ok: true, value: [[]] };
@@ -130,7 +153,6 @@ test('GitHub report keeps unavailable alert counts unknown instead of reporting 
 	assert.equal(result.features.dependencyGraph, 'enabled');
 	assert.equal(result.features.groupedUpdates, 'unknown');
 });
-
 test('github CLI writes the analytics stage and agent instructions to the quality JSON report', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-github-'));
 	const bin = join(root, 'bin');
