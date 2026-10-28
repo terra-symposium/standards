@@ -128,6 +128,8 @@ export type ResponsivePlaywrightOptions = {
 	outputDir?: string;
 	/** Parent directory for timestamped reports and their shared images folder. */
 	outputRoot?: string;
+	/** Persistent directory used to accumulate screenshot and metadata pairs across runs. */
+	screenshotsDirectory?: string;
 	/** Optional structured results file to add to the workbook exactly once. */
 	supplementalResultsFile?: string;
 	/** Optional path to the repository's quality.json; defaults to the current directory. */
@@ -182,10 +184,11 @@ export const withResponsivePlaywright = <T extends PlaywrightTestConfig>(cfg: T,
 	const cfgdReporters = cfg.reporter ? (Array.isArray(cfg.reporter) ? cfg.reporter : [cfg.reporter]) : [];
 	const reportingOpts = {
 		outputRoot: opts.outputRoot,
+		screenshotsDirectory: opts.screenshotsDirectory,
 		supplementalResultsFile: opts.supplementalResultsFile,
 		qualityConfigFile: opts.qualityConfigFile,
 		loadTesting,
-		screenshotOnlySlideshow: opts.screenshotOnlySlideshow,
+		screenshotOnlySlideshow: opts.screenshotOnlySlideshow ?? process.env.TERRA_SCREENSHOT_ONLY_SLIDESHOW !== '0',
 	};
 	const reporters = [
 		...cfgdReporters.filter((r) => {

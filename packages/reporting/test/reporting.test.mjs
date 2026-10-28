@@ -34,7 +34,7 @@ const {
 	timeLoadOperation: timeLoadOp,
 } = await import('@terra-symposium/standards-reporting/load-testing');
 const { writeSpreadsheet } = await import('@terra-symposium/standards-reporting/spreadsheet');
-const { writeScreenshotSlideshow, writeSlideshow } = await import('@terra-symposium/standards-reporting/slideshow');
+const { writeScreenshotSlideshow, writeScreenshotSlideshowFromDirectory, writeSlideshow } = await import('@terra-symposium/standards-reporting/slideshow');
 
 /*//////////////////////////////////////////////////
 HELPERS
@@ -178,8 +178,54 @@ test('expands regular Playwright projects and preserves single-run setup/capture
 		['browser-md', 'browser-xl'],
 	);
 	assert.equal(focused.metadata.terraLoadTestingEnabled, true);
+	assert.equal(focused.reporter.find((r) => Array.isArray(r) && r[0] === '@terra-symposium/standards-reporting/playwright')[1].screenshotOnlySlideshow, true);
 	if (original === undefined) delete process.env.PW_VIEWPORTS;
 	else process.env.PW_VIEWPORTS = original;
+});
+
+/* Persists default Playwright result screenshots across partial runs and rebuilds a deduplicated deck from the folder. */
+test('rebuilds the default screenshot deck from accumulated captures', async () => {
+	const root = await fs.mkdtemp(path.join(os.tmpdir(), 'terra-reporting-capture-folder-'));
+	try {
+		const { default: sharp } = await import('sharp');
+		const screenshot = path.join(root, 'source.png');
+		await sharp({ create: { width: 24, height: 16, channels: 3, background: { r: 60, g: 100, b: 140 } } })
+			.png()
+			.toFile(screenshot);
+		const outputRoot = path.join(root, 'visual');
+		const testCase = {
+			id: 'result-screenshot',
+			location: { file: path.join(root, 'tests', 'responsive.spec.ts') },
+			title: 'renders the page',
+			titlePath: () => ['responsive.spec.ts', 'renders the page'],
+			parent: { project: () => ({ name: 'browser-mobile' }) },
+		};
+		const run = async (projectName) => {
+			const reporter = new ProgressReporter({ outputRoot, loadTesting: { enabled: false } });
+			reporter.onTestEnd(
+				{ ...testCase, parent: { project: () => ({ name: projectName }) } },
+				{ attachments: [{ name: 'screenshot', contentType: 'image/png', path: screenshot }], duration: 5, error: undefined, retry: 0, status: 'passed' },
+			);
+			assert.equal(await reporter.onEnd(), undefined);
+		};
+		await run('browser-mobile');
+		await run('browser-xl');
+		await run('browser-mobile');
+		const evidenceDirectory = path.join(outputRoot, 'screenshots');
+		const entries = await fs.readdir(evidenceDirectory);
+		assert.equal(entries.filter((name) => name.endsWith('.png')).length, 2);
+		assert.equal(entries.filter((name) => name.endsWith('.json')).length, 2);
+		await fs.writeFile(path.join(evidenceDirectory, 'interrupted-write.json'), '{');
+		const rebuilt = path.join(root, 'rebuilt.pptx');
+		await writeScreenshotSlideshowFromDirectory(evidenceDirectory, rebuilt);
+		const { stdout: slide } = await execFileAsync('unzip', ['-p', rebuilt, 'ppt/slides/slide1.xml']);
+		assert.equal((slide.match(/<p:pic>/g) || []).length, 2);
+		assert.doesNotMatch(slide, /<p:sp>/);
+		const { stdout: archive } = await execFileAsync('unzip', ['-l', rebuilt]);
+		assert.doesNotMatch(archive, /ppt\/slides\/slide2\.xml/);
+	} finally {
+		await fs.rm(root, { recursive: true, force: true });
+	}
 });
 
 /* Covers default timing thresholds, grading boundaries, config overrides, and failure-safe measurement. */
@@ -434,7 +480,7 @@ test('reports load timing details and fails only when enabled budgets are exceed
 	assert.match(slide2, /Load fail/);
 	assert.match(slide4, /bulk import/);
 	assert.match(slide4, /disk staging/);
-	const reporter = new ProgressReporter({ outputRoot: path.join(root, 'enforced'), loadTesting: { defaultBudget: { warnMs: 1000, failMs: 2000 } } });
+	const reporter = new ProgressReporter({ outputRoot: path.join(root, 'enforced'), loadTesting: { defaultBudget: { warnMs: 1000, failMs: 2000 } }, screenshotOnlySlideshow: false });
 	const testCase = {
 		id: 'slow-test',
 		location: { file: path.join(root, 'tests', 'slow.spec.ts') },
@@ -444,10 +490,10 @@ test('reports load timing details and fails only when enabled budgets are exceed
 	};
 	reporter.onTestEnd(testCase, { attachments: [], duration: 2501, error: undefined, retry: 0, status: 'passed' });
 	assert.equal(await reporter.onEnd(), 'failed');
-	const warningOnly = new ProgressReporter({ outputRoot: path.join(root, 'warning-only'), loadTesting: { defaultBudget: { warnMs: 1000, failMs: 3000 } } });
+	const warningOnly = new ProgressReporter({ outputRoot: path.join(root, 'warning-only'), loadTesting: { defaultBudget: { warnMs: 1000, failMs: 3000 } }, screenshotOnlySlideshow: false });
 	warningOnly.onTestEnd(testCase, { attachments: [], duration: 2501, error: undefined, retry: 0, status: 'passed' });
 	assert.equal(await warningOnly.onEnd(), undefined);
-	const testOverride = new ProgressReporter({ outputRoot: path.join(root, 'test-override'), loadTesting: { defaultBudget: { warnMs: 1000, failMs: 2000 } } });
+	const testOverride = new ProgressReporter({ outputRoot: path.join(root, 'test-override'), loadTesting: { defaultBudget: { warnMs: 1000, failMs: 2000 } }, screenshotOnlySlideshow: false });
 	testOverride.onTestEnd(testCase, {
 		attachments: [{ name: 'load-testing', contentType: 'application/json', body: Buffer.from(JSON.stringify({ testBudget: { failMs: 3000 }, measurements: [] })) }],
 		duration: 2501,
@@ -456,7 +502,7 @@ test('reports load timing details and fails only when enabled budgets are exceed
 		status: 'passed',
 	});
 	assert.equal(await testOverride.onEnd(), undefined);
-	const optedOut = new ProgressReporter({ outputRoot: path.join(root, 'opted-out'), loadTesting: { enabled: false } });
+	const optedOut = new ProgressReporter({ outputRoot: path.join(root, 'opted-out'), loadTesting: { enabled: false }, screenshotOnlySlideshow: false });
 	optedOut.onTestEnd(testCase, { attachments: [], duration: 2501, error: undefined, retry: 0, status: 'passed' });
 	assert.equal(await optedOut.onEnd(), undefined);
 	const legacyWorkbook = new ExcelJS.Workbook();
