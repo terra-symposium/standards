@@ -10,11 +10,12 @@ IMPORTS
 // API
 import fs from 'node:fs';
 import path from 'node:path';
+import { createHash } from 'node:crypto';
 import { baseVisualProjectName, projectViewportName, viewportSizeLabel } from './viewports.js';
 import { diagnosticCount, normalizeVisualStatus } from './core.js';
 import { gradeLoadMeasurement, loadGradeCounts, loadTestId, readLoadTestingConfig, timeLoadOperation, validateLoadBudgetOverride } from './load-testing.js';
 import { test as base } from '@playwright/test';
-import { writeSlideshow } from './slideshow.js';
+import { writeSlideshowFromDirectory } from './slideshow.js';
 import { writeSpreadsheet } from './spreadsheet.js';
 
 // DATA
@@ -145,6 +146,7 @@ export type ReportingOptions = {
 	projects?: readonly ProjectDefinition[];
 	viewportCatalog?: ViewportCatalog;
 	outputRoot?: string;
+	screenshotsDirectory?: string;
 	reportFile?: string;
 	slideshowFile?: string;
 	supplementalResultsFile?: string;
@@ -322,6 +324,32 @@ const screenshotName = (result: VisualResult, idx: number): string => {
 	}.png`;
 };
 
+/** Persists one screenshot and its normalized metadata under a stable test-and-viewport identity. */
+const persistScreenshot = (directory: string, result: VisualResult): VisualResult => {
+	if (!result.screenshot || !fs.existsSync(result.screenshot)) return result;
+	const identity = [result.project, result.file, result.groups, result.title, result.viewport].join('\0');
+	const key = createHash('sha256').update(identity).digest('hex');
+	const imageFile = path.join(directory, `${key}.png`);
+	const recordFile = path.join(directory, `${key}.json`);
+	fs.mkdirSync(directory, { recursive: true });
+	if (fs.existsSync(recordFile)) {
+		try {
+			const previous = JSON.parse(fs.readFileSync(recordFile, 'utf8')) as VisualResult;
+			if (previous.retry > result.retry) return { ...previous, screenshot: imageFile };
+		} catch {
+			// Replace a stale or partially written record with this valid capture.
+		}
+	}
+	const temporaryImage = `${imageFile}.${process.pid}.tmp`;
+	fs.copyFileSync(result.screenshot, temporaryImage);
+	fs.renameSync(temporaryImage, imageFile);
+	const persisted = { ...result, screenshot: imageFile };
+	const temporaryRecord = `${recordFile}.${process.pid}.tmp`;
+	fs.writeFileSync(temporaryRecord, JSON.stringify(persisted));
+	fs.renameSync(temporaryRecord, recordFile);
+	return persisted;
+};
+
 /**
  * Copies captured screenshots into the timestamped run directory.
  * @param results Results whose screenshot paths should be relocated.
@@ -431,7 +459,7 @@ const supplementalResults = (file: string, loadTesting: ReturnType<typeof readLo
 
 /** Creates the reusable Playwright reporter with application-specific output configuration. */
 export default class ProgressReporter {
-	private readonly options: Required<Pick<ReportingOptions, 'featureFiles' | 'projects' | 'viewportCatalog' | 'outputRoot' | 'reportFile' | 'slideshowFile'>> &
+	private readonly options: Required<Pick<ReportingOptions, 'featureFiles' | 'projects' | 'viewportCatalog' | 'outputRoot' | 'reportFile' | 'slideshowFile' | 'screenshotsDirectory'>> &
 		Pick<ReportingOptions, 'supplementalResultsFile'> & { loadTesting: ReturnType<typeof readLoadTestingConfig> };
 	private readonly results: VisualResult[] = [];
 	private readonly terminalDiagnostics = new Map<object, string[]>();
@@ -450,6 +478,7 @@ export default class ProgressReporter {
 			projects: opts.projects || [],
 			viewportCatalog: opts.viewportCatalog || VISUAL_VIEWPORTS,
 			outputRoot: opts.outputRoot || 'test-results/visual',
+			screenshotsDirectory: opts.screenshotsDirectory || path.join(opts.outputRoot || 'test-results/visual', 'screenshots'),
 			reportFile: opts.reportFile || 'report.xlsx',
 			slideshowFile: opts.slideshowFile || 'report.pptx',
 			supplementalResultsFile: opts.supplementalResultsFile,
@@ -556,6 +585,7 @@ export default class ProgressReporter {
 			visual: screenshot ? 'Embedded' : result.attachments.some((v) => v.name === 'visual-error') ? 'Capture failed' : 'No visual surface',
 		};
 		this.results.push(addLoadMeasurements(norm, testId, attachedLoad.measurements, attachedLoad.testBudget, this.options.loadTesting));
+		persistScreenshot(path.resolve(this.options.screenshotsDirectory), norm);
 		this.terminalDiagnostics.delete(result);
 	}
 
@@ -600,9 +630,9 @@ export default class ProgressReporter {
 			loadTestingEnabled: this.options.loadTesting.enabled,
 		};
 		const spreadsheet = path.join(runDir, this.options.reportFile);
-		const slideshow = path.join(runDir, this.options.slideshowFile);
+		const slideshow = path.resolve(this.options.outputRoot, this.options.slideshowFile);
 		await writeSpreadsheet(spreadsheet, run);
-		await writeSlideshow(slideshow, this.options.loadTesting.enabled ? results : browserResults, { loadTestingEnabled: this.options.loadTesting.enabled });
+		await writeSlideshowFromDirectory(path.resolve(this.options.screenshotsDirectory), slideshow);
 		process.stdout.write(`Test spreadsheet: ${spreadsheet}\nTest slideshow: ${slideshow}\n`);
 		const measurements = results.flatMap((r) => r.loadMeasurements || []);
 		const loadCounts = loadGradeCounts(measurements);

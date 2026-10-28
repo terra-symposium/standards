@@ -200,7 +200,7 @@ const addResponsiveSlide = async (presentation: Presentation, group: readonly Vi
 	slide.addNotes(notes.join('\n\n'));
 };
 /** Optional visible and metadata overrides for a slideshow artifact. */
-export type SlideshowOptions = { title?: string; author?: string; company?: string; subject?: string; loadTestingEnabled?: boolean };
+export type SlideshowOptions = { title?: string; author?: string; company?: string; subject?: string; loadTestingEnabled?: boolean; screenshotOnly?: boolean };
 /** One test result paired with a graded timing measurement for the report. */
 type LoadRow = { result: VisualResult; measurement: NonNullable<VisualResult['loadMeasurements']>[number] };
 /** Adds a run-level load summary slide and names the slowest measurements. */
@@ -277,6 +277,43 @@ export const writeSlideshow = async (file: string, results: readonly VisualResul
 	presentation.company = opts.company || 'Test evidence';
 	presentation.subject = opts.subject || 'Screenshot evidence and UI review prompts';
 	presentation.title = opts.title || 'Test evidence slideshow';
+	if (opts.screenshotOnly) {
+		const captures = results
+			.filter((r) => r.screenshot && fs.existsSync(r.screenshot))
+			.sort((a, b) => {
+				const identity = `${a.project}|${a.file}|${a.groups}|${a.title}`.localeCompare(`${b.project}|${b.file}|${b.groups}|${b.title}`);
+				return identity || viewportWidth(a) - viewportWidth(b);
+			});
+		for (const [index, result] of captures.entries()) {
+			const slide = presentation.addSlide();
+			slide.background = { color: 'FFFFFF' };
+			const image = await sharp(result.screenshot).metadata();
+			const data = fs.readFileSync(result.screenshot).toString('base64');
+			slide.addImage({ data: `data:image/png;base64,${data}`, ...fitImg(image.width || 1, image.height || 1, 0.25, 0.25, 12.83, 6.5) });
+			slide.addText(`${result.project} · ${result.file} · ${result.groups || result.title} · ${result.viewport} (${result.viewportSize})`, {
+				color: 'FFFFFF',
+				fill: { color: '16202A', transparency: 12 },
+				fontFace: 'Aptos',
+				fontSize: 9,
+				margin: 0.06,
+				fit: 'shrink',
+				x: 0.35,
+				y: 6.85,
+				w: 12.6,
+				h: 0.35,
+			});
+			slide.addNotes(`${index + 1}. ${result.project} · ${result.file} · ${result.groups || result.title} · ${result.viewport} (${result.viewportSize})`);
+		}
+		if (!captures.length) {
+			const slide = presentation.addSlide();
+			slide.background = { color: COLOURS.surface };
+			slide.addText('No saved Playwright screenshots were found.', { align: 'center', color: COLOURS.muted, fontFace: 'Aptos', fontSize: 18, x: 1, y: 3.2, w: 11.3, h: 0.5 });
+		}
+		await fs.promises.mkdir(path.dirname(file), { recursive: true });
+		await presentation.writeFile({ fileName: file });
+		await neutralizeApplicationMetadata(file);
+		return;
+	}
 	let slideNumber = 0;
 	if (loadEnabled) {
 		addLoadSummarySlide(presentation, results);
@@ -305,4 +342,22 @@ export const writeSlideshow = async (file: string, results: readonly VisualResul
 	if (loadEnabled) addLoadDetailSlides(presentation, results);
 	await presentation.writeFile({ fileName: file });
 	await neutralizeApplicationMetadata(file);
+};
+
+/** Reads persisted screenshot records and rebuilds a screenshot-only deck from a run-independent evidence folder. */
+export const writeSlideshowFromDirectory = async (directory: string, file: string, opts: SlideshowOptions = {}): Promise<void> => {
+	const records: VisualResult[] = [];
+	if (fs.existsSync(directory)) {
+		for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+			if (!entry.isFile() || !entry.name.endsWith('.json')) continue;
+			try {
+				const record = JSON.parse(fs.readFileSync(path.join(directory, entry.name), 'utf8')) as VisualResult;
+				if (!record || typeof record !== 'object' || typeof record.screenshot !== 'string' || !fs.existsSync(record.screenshot)) continue;
+				records.push(record);
+			} catch {
+				// An interrupted write or malformed record does not prevent the remaining evidence from being used.
+			}
+		}
+	}
+	await writeSlideshow(file, records, { ...opts, loadTestingEnabled: false, screenshotOnly: true, title: opts.title || 'Playwright screenshot evidence' });
 };

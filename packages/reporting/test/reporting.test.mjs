@@ -34,7 +34,7 @@ const {
 	timeLoadOperation: timeLoadOp,
 } = await import('@terra-symposium/standards-reporting/load-testing');
 const { writeSpreadsheet } = await import('@terra-symposium/standards-reporting/spreadsheet');
-const { writeSlideshow } = await import('@terra-symposium/standards-reporting/slideshow');
+const { writeSlideshow, writeSlideshowFromDirectory } = await import('@terra-symposium/standards-reporting/slideshow');
 
 /*//////////////////////////////////////////////////
 HELPERS
@@ -305,6 +305,78 @@ test('writes neutral spreadsheet and slideshow artifacts', async () => {
 	assert.match(emptyNotes, /No browser test results were collected/);
 });
 
+/* Rebuilds an image-only presentation from accumulated screenshot metadata, tolerating partial runs and corrupt sidecars. */
+test('rebuilds screenshot-only slides from a persistent partial evidence folder', async () => {
+	const root = await fs.mkdtemp(path.join(os.tmpdir(), 'terra-reporting-evidence-'));
+	const evidence = path.join(root, 'screenshots');
+	const { default: sharp } = await import('sharp');
+	const screenshot = path.join(evidence, 'capture.png');
+	await fs.mkdir(evidence, { recursive: true });
+	await sharp({ create: { width: 12, height: 8, channels: 4, background: { r: 40, g: 90, b: 140, alpha: 1 } } })
+		.png()
+		.toFile(screenshot);
+	const mobile = result({ screenshot, viewport: 'mobile', viewportSize: '390×844' });
+	const desktop = result({ screenshot, viewport: 'xl', viewportSize: '1280×720' });
+	await fs.writeFile(path.join(evidence, 'mobile.json'), JSON.stringify(mobile));
+	await fs.writeFile(path.join(evidence, 'desktop.json'), JSON.stringify(desktop));
+	await fs.writeFile(path.join(evidence, 'interrupted-write.json'), '{');
+	const slideshow = path.join(root, 'from-folder.pptx');
+	await writeSlideshowFromDirectory(evidence, slideshow);
+	const { stdout: archive } = await execFileAsync('unzip', ['-l', slideshow]);
+	assert.match(archive, /ppt\/slides\/slide2\.xml/);
+	const { stdout: firstSlide } = await execFileAsync('unzip', ['-p', slideshow, 'ppt/slides/slide1.xml']);
+	const { stdout: secondSlide } = await execFileAsync('unzip', ['-p', slideshow, 'ppt/slides/slide2.xml']);
+	assert.match(firstSlide, /<p:pic>/);
+	assert.match(secondSlide, /<p:pic>/);
+	assert.match(firstSlide + secondSlide, /mobile/);
+	assert.match(firstSlide + secondSlide, /xl/);
+	assert.doesNotMatch(firstSlide + secondSlide, /Status:|Load timing|No browser test results/);
+	await fs.rm(root, { recursive: true, force: true });
+});
+
+/* Persists reporter captures at result time and combines captures across separately completed viewport runs. */
+test('Playwright reporter refreshes one screenshot deck from captures accumulated across runs', async () => {
+	const root = await fs.mkdtemp(path.join(os.tmpdir(), 'terra-reporting-reporter-captures-'));
+	const source = path.join(root, 'source.png');
+	const { default: sharp } = await import('sharp');
+	await sharp({ create: { width: 8, height: 6, channels: 4, background: { r: 90, g: 50, b: 30, alpha: 1 } } })
+		.png()
+		.toFile(source);
+	const testCase = {
+		id: 'stable-test-id',
+		location: { file: path.join(root, 'tests', 'layout.spec.ts') },
+		title: 'renders layout',
+		titlePath: () => ['layout.spec.ts', 'renders layout'],
+		parent: { project: () => ({ name: 'web-mobile' }) },
+	};
+	const reportRoot = path.join(root, 'test-results', 'visual');
+	const run = async (projectName) => {
+		const reporter = new ProgressReporter({ outputRoot: reportRoot });
+		const captureTest = { ...testCase, parent: { project: () => ({ name: projectName }) } };
+		reporter.onTestEnd(captureTest, {
+			attachments: [{ name: 'screenshot', contentType: 'image/png', path: source }],
+			duration: 12,
+			error: undefined,
+			retry: 0,
+			status: 'passed',
+		});
+		const screenshotFiles = (await fs.readdir(path.join(reportRoot, 'screenshots'))).filter((name) => name.endsWith('.png'));
+		assert.ok(screenshotFiles.length >= 1, 'the screenshot should be durable before reporter onEnd');
+		await reporter.onEnd();
+	};
+	await run('web-mobile');
+	await run('web-xl');
+	await run('web-mobile');
+	const deck = path.join(reportRoot, 'report.pptx');
+	const { stdout: archive } = await execFileAsync('unzip', ['-l', deck]);
+	assert.match(archive, /ppt\/slides\/slide2\.xml/);
+	assert.doesNotMatch(archive, /ppt\/slides\/slide3\.xml/);
+	const evidence = await fs.readdir(path.join(reportRoot, 'screenshots'));
+	assert.equal(evidence.filter((name) => name.endsWith('.png')).length, 2);
+	assert.equal(evidence.filter((name) => name.endsWith('.json')).length, 2);
+	await fs.rm(root, { recursive: true, force: true });
+});
+
 // Covers timing artifacts, supplemental runner rows, reporter enforcement, and the legacy opt-out. */
 test('reports load timing details and fails only when enabled budgets are exceeded', async () => {
 	const root = await fs.mkdtemp(path.join(os.tmpdir(), 'terra-load-report-'));
@@ -390,7 +462,7 @@ test('reports load timing details and fails only when enabled budgets are exceed
 		legacyWorkbook.worksheets.map((sheet) => sheet.name),
 		['Summary', 'slow.spec.ts', 'Projects', 'Run diagnostics'],
 	);
-	const optedOutSlideshow = path.join(root, 'opted-out', optedOutRun, 'report.pptx');
+	const optedOutSlideshow = path.join(root, 'opted-out', 'report.pptx');
 	const { stdout: legacySlide } = await execFileAsync('unzip', ['-p', optedOutSlideshow, 'ppt/slides/slide1.xml']);
 	assert.doesNotMatch(legacySlide, /Load timing summary/);
 });
