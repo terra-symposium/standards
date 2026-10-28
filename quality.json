@@ -38,10 +38,6 @@
 			"noInlineFunctions": false
 		}
 	},
-	"tailwindCanonical": {
-		"stylesheet": "docs/src/styles/tailwind.css",
-		"sourceRoots": ["docs/src/components"]
-	},
 	"enabledChecks": {
 		"format": true,
 		"lint": true,
@@ -49,7 +45,6 @@
 		"type": true,
 		"recommend": true,
 		"name": true,
-		"alias": true,
-		"tailwind-canonical": true
+		"alias": true
 	}
 }
