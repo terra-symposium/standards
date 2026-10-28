@@ -95,7 +95,15 @@ await writeScreenshotSlideshowFromDirectory('test-results/visual/screenshots', '
 
 ## Outputs and options
 
-The reporter writes to a timestamped directory under `test-results/visual` by default. It copies native screenshots into the run directory and creates `report.xlsx` and `report.pptx`. The helper uses `test-results/playwright-output` for Playwright's intermediate output directory.
+The reporter writes each run's workbook and copied screenshots to a timestamped directory under `test-results/visual`. It also saves each test/viewport screenshot with normalized metadata under `test-results/visual/screenshots` and regenerates the screenshot-only `test-results/visual/report.pptx` from that entire folder. Repeated test captures replace the matching test/viewport image, while captures from other viewport subsets remain available. This lets a deck be regenerated after an interrupted or partial run. The helper uses `test-results/playwright-output` for Playwright's intermediate output directory.
+
+To rebuild the deck later without rerunning Playwright, call the same reporting package API:
+
+```ts
+import { writeSlideshowFromDirectory } from '@terra-symposium/standards-reporting/slideshow';
+
+await writeSlideshowFromDirectory('test-results/visual/screenshots', 'test-results/visual/report.pptx');
+```
 
 `withResponsivePlaywright(config, options)` accepts `singleRunProjects`, `outputDir`, `outputRoot`, `screenshotsDirectory`, `supplementalResultsFile`, `qualityConfigFile`, `screenshotOnlySlideshow`, and explicit `loadTesting` settings. Supplemental results are added to the workbook. See [load testing](/packages/reporting/load-testing/) for timing settings and [artifact writers](/packages/reporting/artifacts/) for direct report generation.
 
@@ -112,6 +120,7 @@ export default {
 				outputRoot: 'test-results/visual',
 				reportFile: 'report.xlsx',
 				slideshowFile: 'report.pptx',
+				screenshotsDirectory: 'test-results/visual/screenshots',
 				qualityConfigFile: 'quality.json',
 			},
 		],
