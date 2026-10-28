@@ -1544,7 +1544,8 @@ function parseEslintReports(result: ReturnType<typeof spawnSync>, files: string[
 		if (missing.length) throw new Error(`missing reports for ${missing.join(', ')}`);
 		return reports as EslintReport[];
 	} catch (err) {
-		throw new Error(`ESLint dead-code detector could not read reports for ${files.length} source files: ${err instanceof Error ? err.message : String(err)}`, { cause: err });
+		const detail = err instanceof SyntaxError ? `invalid JSON: ${err.message}` : err instanceof Error ? err.message : String(err);
+		throw new Error(`ESLint dead-code detector could not read reports for ${files.length} source files: ${detail}`, { cause: err });
 	}
 }
 

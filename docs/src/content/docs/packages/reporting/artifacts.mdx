@@ -33,9 +33,9 @@ await writeSpreadsheet('test-results/report.xlsx', run);
 await writeSlideshow('test-results/report.pptx', run.results);
 ```
 
-A slideshow needs accessible screenshot paths on results to create visual previews; missing captures are labeled in the slide. The workbook can also record results without screenshots.
+A review slideshow needs accessible screenshot paths on results to create visual previews; missing captures are labeled in the slide. The workbook can also record results without screenshots. For route or state sweeps, use `visualTest` to collect keyed captures and enable `screenshotOnlySlideshow` to create a responsive deck made only of those screenshots.
 
-The `writeSpreadsheet(file, run)` function accepts normalized run metadata. `writeSlideshow(file, results, options?)` accepts optional title and document-metadata overrides. When load testing is enabled, set `run.loadTestingEnabled` or `options.loadTestingEnabled` so empty timing sections are still represented.
+The `writeSpreadsheet(file, run)` function accepts normalized run metadata. `writeSlideshow(file, results, options?)` accepts optional title and document-metadata overrides. `writeScreenshotSlideshow(file, captures, options?)` writes image-only responsive slides from captures. `writeScreenshotSlideshowFromDirectory(directory, file, options?)` reads the reporter's saved capture metadata and regenerates a deck, even when the previous run was interrupted or only some viewports completed. When load testing is enabled, set `run.loadTestingEnabled` or `options.loadTestingEnabled` so empty timing sections are still represented.
 
 ## Supplemental results
 
