@@ -1,5 +1,11 @@
 # @terra-symposium/standards-reporting
 
+## 0.5.0
+
+### Minor Changes
+
+- d00b64a: Persist Playwright screenshots across runs and rebuild the default PowerPoint from the accumulated evidence folder.
+
 ## 0.4.0
 
 ### Minor Changes
