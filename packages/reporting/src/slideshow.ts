@@ -392,3 +392,31 @@ export const writeScreenshotSlideshow = async (file: string, captures: readonly 
 	await presentation.writeFile({ fileName: file });
 	await neutralizeApplicationMetadata(file);
 };
+
+/** Rebuilds a screenshot-only slideshow from the reporter's durable capture directory. */
+export const writeScreenshotSlideshowFromDirectory = async (directory: string, file: string, opts: ScreenshotSlideshowOptions = {}): Promise<void> => {
+	const captures: ScreenshotCapture[] = [];
+	if (fs.existsSync(directory)) {
+		for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+			if (!entry.isFile() || !entry.name.endsWith('.json')) continue;
+			try {
+				const capture = JSON.parse(fs.readFileSync(path.join(directory, entry.name), 'utf8')) as ScreenshotCapture;
+				if (
+					capture &&
+					typeof capture === 'object' &&
+					typeof capture.group === 'string' &&
+					typeof capture.key === 'string' &&
+					typeof capture.title === 'string' &&
+					typeof capture.viewport === 'string' &&
+					typeof capture.viewportSize === 'string' &&
+					typeof capture.screenshot === 'string' &&
+					fs.existsSync(capture.screenshot)
+				)
+					captures.push(capture);
+			} catch {
+				// A partial record does not block using the other saved screenshots.
+			}
+		}
+	}
+	if (captures.length) await writeScreenshotSlideshow(file, captures, opts);
+};
