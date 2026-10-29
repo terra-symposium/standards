@@ -128,6 +128,10 @@ export const viewportSizeLabel = (viewport: string, catalog: ViewportCatalog = V
 
 /** Options for the shared responsive Playwright configuration helper. */
 export type ResponsivePlaywrightOptions = {
+	/** Run each scenario only in projects named by its native @viewport:<name> tag. */
+	viewportPolicy?: 'all' | 'declared';
+	/** Viewports available to the suite; defaults to the shared catalog. */
+	viewportCatalog?: ViewportCatalog;
 	/** Project names that represent manual, single-run browser captures. */
 	singleRunProjects?: readonly string[];
 	/** Disposable Playwright output directory, separate from timestamped reports. */
@@ -157,7 +161,7 @@ export type ResponsivePlaywrightOptions = {
  * @return Configuration with responsive projects, native screenshots, and reporting.
  */
 export const withResponsivePlaywright = <T extends PlaywrightTestConfig>(cfg: T, opts: ResponsivePlaywrightOptions = {}): T => {
-	const viewports = resolveVisualViewports();
+	const viewports = resolveVisualViewports(process.env.PW_VIEWPORTS, opts.viewportCatalog);
 	const loadTesting = readLoadTestingConfig(opts.qualityConfigFile, opts.loadTesting);
 	const sharedDistCandidates = [
 		path.resolve(process.cwd(), 'node_modules/@terra-symposium/standards-reporting/dist'),
@@ -167,7 +171,7 @@ export const withResponsivePlaywright = <T extends PlaywrightTestConfig>(cfg: T,
 	const sharedDist = sharedDistCandidates.find((c) => fs.existsSync(c)) || sharedDistCandidates[0];
 	const resolvedSharedDist = fs.existsSync(sharedDist) ? fs.realpathSync(sharedDist) : sharedDist;
 	const external = [...(cfg.build?.external || []), path.join(resolvedSharedDist, '**')];
-	const projects = (cfg.projects || []) as Array<{ dependencies?: readonly string[]; name?: string; testMatch?: unknown; use?: Record<string, unknown> }>;
+	const projects = (cfg.projects || []) as Array<{ dependencies?: readonly string[]; name?: string; testMatch?: unknown; grep?: unknown; use?: Record<string, unknown> }>;
 	const dependencyProjects = new Set(projects.flatMap((p) => p.dependencies || []));
 	const singleRun = new Set(opts.singleRunProjects || []);
 	/**
@@ -186,9 +190,11 @@ export const withResponsivePlaywright = <T extends PlaywrightTestConfig>(cfg: T,
 	const responsiveProjects = projects.flatMap((p, i) => {
 		const baseName = p.name || `project-${i + 1}`;
 		if (isSetup(p, i) || singleRun.has(baseName)) return [p];
+		if (opts.viewportPolicy === 'declared' && p.grep) throw new Error(`Project ${baseName} already defines grep; move its selector into testMatch before using declared viewports.`);
 		return viewports.map((v) => ({
 			...p,
 			name: visualProjectName(baseName, v, viewports),
+			...(opts.viewportPolicy === 'declared' ? { grep: new RegExp(`(?:^|\\s)@viewport:${v.name.replace(/[^a-z0-9-]/gi, '\\$&')}(?=\\s|$)`) } : {}),
 			use: { ...(p.use || {}), viewport: { width: v.width, height: v.height }, screenshot: { mode: 'on', fullPage: true, caret: 'initial' } },
 		}));
 	});

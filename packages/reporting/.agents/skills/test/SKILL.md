@@ -7,6 +7,8 @@ description: Coordinate Terra's test-writing, test-ordering, test-repair, and vi
 
 Use for work that creates, expands, orders, repairs, evaluates, or represents Terra test coverage. Route to the narrowest child skill:
 
+For repository-wide restructuring or responsive suite design, read [test ownership and viewport selection](references/ownership-and-viewport-policy.md) before choosing files or projects.
+
 1. `test/writing` — add or redesign tests, fixtures, contracts, selectors, or coverage.
 2. `test/ordering` — choose commands, dependency order, workers, environments, and rerun scope.
 3. `test/fixing` — classify failures and repair the appropriate test, fixture, or infrastructure boundary.
