@@ -10,7 +10,7 @@ IMPORTS
 // API
 import fs from 'node:fs';
 import path from 'node:path';
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { baseVisualProjectName, projectViewportName, viewportSizeLabel } from './viewports.js';
 import { diagnosticCount, normalizeVisualStatus } from './core.js';
 import { gradeLoadMeasurement, loadGradeCounts, loadTestId, readLoadTestingConfig, timeLoadOperation, validateLoadBudgetOverride } from './load-testing.js';
@@ -305,7 +305,7 @@ const persistScreenshotCapture = (directory: string, capture: ScreenshotCapture)
 	if (fs.existsSync(recordFile)) {
 		try {
 			const previous = JSON.parse(fs.readFileSync(recordFile, 'utf8')) as ScreenshotCapture;
-			if ((previous.retry || 0) > (capture.retry || 0)) return { ...previous, screenshot };
+			if (previous.runId === capture.runId && (previous.retry || 0) > (capture.retry || 0)) return { ...previous, screenshot };
 		} catch {
 			// Replace an incomplete record with the next valid result.
 		}
@@ -318,6 +318,18 @@ const persistScreenshotCapture = (directory: string, capture: ScreenshotCapture)
 	fs.writeFileSync(temporaryRecord, JSON.stringify(persisted));
 	fs.renameSync(temporaryRecord, recordFile);
 	return persisted;
+};
+
+const screenshotRunFile = '.terra-playwright-run.json';
+/** Latest reporter collection state persisted beside accumulated screenshots. */
+type ScreenshotRun = { runId: string; startedAt: string; expectedTestCount: number; completedTestCount: number; finishedAt?: string; collectionFinished: boolean };
+/** Atomically writes the latest run marker so interrupted captures remain identifiable. */
+const writeScreenshotRun = (directory: string, run: ScreenshotRun): void => {
+	fs.mkdirSync(directory, { recursive: true });
+	const file = path.join(directory, screenshotRunFile);
+	const temporaryFile = `${file}.${process.pid}.tmp`;
+	fs.writeFileSync(temporaryFile, JSON.stringify(run));
+	fs.renameSync(temporaryFile, file);
 };
 
 /** Validates the keyed-capture manifest emitted by the `visualTest` fixture. */
@@ -545,6 +557,8 @@ export default class ProgressReporter {
 	private readonly runDiagnostics: string[] = [];
 	private readonly expectedTests = new Map<string, { location: { file: string }; title: string; titlePath: () => string[]; parent: { project: () => { name: string } | undefined } }>();
 	private readonly completedTests = new Set<string>();
+	private readonly screenshotRunId = randomUUID();
+	private readonly screenshotRunStartedAt = new Date().toISOString();
 
 	/**
 	 * Creates a reporter that writes application-specific visual test artifacts.
@@ -577,6 +591,14 @@ export default class ProgressReporter {
 		suite: Parameters<NonNullable<import('@playwright/test/reporter').Reporter['onBegin']>>[1],
 	): void {
 		for (const test of suite.allTests()) this.expectedTests.set(test.id, test);
+		if (!process.argv.includes('--list'))
+			writeScreenshotRun(path.resolve(this.options.screenshotsDirectory), {
+				collectionFinished: false,
+				completedTestCount: 0,
+				expectedTestCount: this.expectedTests.size,
+				runId: this.screenshotRunId,
+				startedAt: this.screenshotRunStartedAt,
+			});
 		if (!this.options.featureFiles.length || !this.options.projects.length) {
 			const projectFiles = new Map<string, Set<string>>();
 			const files = new Set<string>();
@@ -677,6 +699,8 @@ export default class ProgressReporter {
 					viewportSize: identity.viewportSize,
 					screenshot,
 					retry: result.retry,
+					runId: this.screenshotRunId,
+					capturedAt: new Date().toISOString(),
 				}),
 			);
 		}
@@ -706,6 +730,8 @@ export default class ProgressReporter {
 					viewportSize: identity.viewportSize,
 					screenshot: capturePath,
 					retry: result.retry,
+					runId: this.screenshotRunId,
+					capturedAt: new Date().toISOString(),
 				}),
 			);
 		}
@@ -732,6 +758,15 @@ export default class ProgressReporter {
 				visual: 'No visual surface',
 			});
 		}
+		if (!process.argv.includes('--list'))
+			writeScreenshotRun(path.resolve(this.options.screenshotsDirectory), {
+				collectionFinished: true,
+				completedTestCount: this.completedTests.size,
+				expectedTestCount: this.expectedTests.size,
+				finishedAt: new Date().toISOString(),
+				runId: this.screenshotRunId,
+				startedAt: this.screenshotRunStartedAt,
+			});
 		const runDir = path.resolve(this.options.outputRoot, new Date().toISOString().replace(/[:.]/g, '-'));
 		fs.mkdirSync(runDir, { recursive: true });
 		const browserResults = copyScreenshots(this.results, runDir);

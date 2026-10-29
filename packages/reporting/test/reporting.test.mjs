@@ -34,7 +34,7 @@ const {
 	timeLoadOperation: timeLoadOp,
 } = await import('@terra-symposium/standards-reporting/load-testing');
 const { writeSpreadsheet } = await import('@terra-symposium/standards-reporting/spreadsheet');
-const { writeScreenshotSlideshow, writeScreenshotSlideshowFromDirectory, writeSlideshow } = await import('@terra-symposium/standards-reporting/slideshow');
+const { readScreenshotCapturesFromDirectory, writeScreenshotSlideshow, writeScreenshotSlideshowFromDirectory, writeSlideshow } = await import('@terra-symposium/standards-reporting/slideshow');
 
 /*//////////////////////////////////////////////////
 HELPERS
@@ -185,11 +185,11 @@ test('expands regular Playwright projects and preserves single-run setup/capture
 
 test('collects only declared viewport scenarios and passes custom dimensions to reporting', () => {
 	const viewportCatalog = { compact: { width: 767, height: 900 }, expanded: { width: 768, height: 900 } };
-	const config = withResponsivePlaywright(
-		{ projects: [{ name: 'dashboard', testMatch: '**/dashboard.spec.ts' }] },
-		{ viewportPolicy: 'declared', viewportCatalog, loadTesting: { enabled: false } },
+	const config = withResponsivePlaywright({ projects: [{ name: 'dashboard', testMatch: '**/dashboard.spec.ts' }] }, { viewportPolicy: 'declared', viewportCatalog, loadTesting: { enabled: false } });
+	assert.deepEqual(
+		config.projects.map(({ name }) => name),
+		['dashboard-compact', 'dashboard-expanded'],
 	);
-	assert.deepEqual(config.projects.map(({ name }) => name), ['dashboard-compact', 'dashboard-expanded']);
 	assert.match('@viewport:compact', config.projects[0].grep);
 	assert.doesNotMatch('@viewport:expanded', config.projects[0].grep);
 	assert.deepEqual(config.reporter.find((entry) => Array.isArray(entry) && entry[0] === '@terra-symposium/standards-reporting/playwright')[1].viewportCatalog, viewportCatalog);
@@ -213,29 +213,51 @@ test('rebuilds the default screenshot deck from accumulated captures', async () 
 			titlePath: () => ['responsive.spec.ts', 'renders the page'],
 			parent: { project: () => ({ name: 'browser-mobile' }) },
 		};
-		const run = async (projectName) => {
+		const run = async (projectName, retry = 0) => {
 			const reporter = new ProgressReporter({ outputRoot, loadTesting: { enabled: false } });
-			reporter.onTestEnd(
-				{ ...testCase, parent: { project: () => ({ name: projectName }) } },
-				{ attachments: [{ name: 'screenshot', contentType: 'image/png', path: screenshot }], duration: 5, error: undefined, retry: 0, status: 'passed' },
-			);
+			const selectedTest = { ...testCase, parent: { project: () => ({ name: projectName }) } };
+			reporter.onBegin({}, { allTests: () => [selectedTest] });
+			reporter.onTestEnd(selectedTest, { attachments: [{ name: 'screenshot', contentType: 'image/png', path: screenshot }], duration: 5, error: undefined, retry, status: 'passed' });
 			assert.equal(await reporter.onEnd(), undefined);
 		};
-		await run('browser-mobile');
+		await run('browser-mobile', 2);
 		await run('browser-xl');
 		await run('browser-mobile');
 		const evidenceDirectory = path.join(outputRoot, 'screenshots');
 		const entries = await fs.readdir(evidenceDirectory);
 		assert.equal(entries.filter((name) => name.endsWith('.png')).length, 2);
-		assert.equal(entries.filter((name) => name.endsWith('.json')).length, 2);
+		assert.equal(entries.filter((name) => name.endsWith('.json') && name !== '.terra-playwright-run.json').length, 2);
+		const persisted = readScreenshotCapturesFromDirectory(evidenceDirectory);
+		const currentRun = JSON.parse(await fs.readFile(path.join(evidenceDirectory, '.terra-playwright-run.json'), 'utf8'));
+		assert.equal(currentRun.collectionFinished, true);
+		assert.equal(currentRun.expectedTestCount, 1);
+		assert.equal(currentRun.completedTestCount, 1);
+		assert.deepEqual(persisted.map(({ viewport, historical }) => [viewport, historical]).sort(), [
+			['mobile', false],
+			['xl', true],
+		]);
+		assert.equal(persisted.find(({ viewport }) => viewport === 'mobile').retry, 0, 'a fresh run replaces a previous run even when its retry number is lower');
 		await fs.writeFile(path.join(evidenceDirectory, 'interrupted-write.json'), '{');
 		const rebuilt = path.join(root, 'rebuilt.pptx');
 		await writeScreenshotSlideshowFromDirectory(evidenceDirectory, rebuilt);
-		const { stdout: slide } = await execFileAsync('unzip', ['-p', rebuilt, 'ppt/slides/slide1.xml']);
-		assert.equal((slide.match(/<p:pic>/g) || []).length, 2);
-		assert.doesNotMatch(slide, /<p:sp>/);
 		const { stdout: archive } = await execFileAsync('unzip', ['-l', rebuilt]);
-		assert.doesNotMatch(archive, /ppt\/slides\/slide2\.xml/);
+		assert.match(archive, /ppt\/slides\/slide2\.xml/);
+		const { stdout: currentSlide } = await execFileAsync('unzip', ['-p', rebuilt, 'ppt/slides/slide1.xml']);
+		const { stdout: historicalSlide } = await execFileAsync('unzip', ['-p', rebuilt, 'ppt/slides/slide2.xml']);
+		assert.equal((currentSlide.match(/<p:pic>/g) || []).length, 1);
+		assert.equal((historicalSlide.match(/<p:pic>/g) || []).length, 1);
+		assert.match(`${currentSlide}${historicalSlide}`, /CURRENT RUN/);
+		assert.match(`${currentSlide}${historicalSlide}`, /HISTORICAL CAPTURE/);
+
+		const interruptedReporter = new ProgressReporter({ outputRoot, loadTesting: { enabled: false } });
+		interruptedReporter.onBegin({}, { allTests: () => [testCase] });
+		const interruptedRun = JSON.parse(await fs.readFile(path.join(evidenceDirectory, '.terra-playwright-run.json'), 'utf8'));
+		assert.equal(interruptedRun.collectionFinished, false);
+		const interruptedDeck = path.join(root, 'interrupted-rebuilt.pptx');
+		await writeScreenshotSlideshowFromDirectory(evidenceDirectory, interruptedDeck);
+		const { stdout: interruptedSlide } = await execFileAsync('unzip', ['-p', interruptedDeck, 'ppt/slides/slide1.xml']);
+		assert.match(interruptedSlide, /HISTORICAL CAPTURE/);
+		assert.doesNotMatch(interruptedSlide, /CURRENT RUN/);
 
 		const legacyDirectory = path.join(root, 'legacy-screenshots');
 		await fs.mkdir(legacyDirectory, { recursive: true });
@@ -248,6 +270,7 @@ test('rebuilds the default screenshot deck from accumulated captures', async () 
 		await writeScreenshotSlideshowFromDirectory(legacyDirectory, legacyDeck);
 		const { stdout: legacySlide } = await execFileAsync('unzip', ['-p', legacyDeck, 'ppt/slides/slide1.xml']);
 		assert.equal((legacySlide.match(/<p:pic>/g) || []).length, 1);
+		assert.match(legacySlide, /HISTORICAL CAPTURE/);
 	} finally {
 		await fs.rm(root, { recursive: true, force: true });
 	}
@@ -386,7 +409,7 @@ test('writes neutral spreadsheet and slideshow artifacts', async () => {
 	assert.match(emptyNotes, /No browser test results were collected/);
 });
 
-/* Ensures keyed viewport captures produce image-only PowerPoint slides. */
+/* Ensures keyed viewport captures produce screenshot-backed PowerPoint slides. */
 test('writes responsive screenshot-only slides', async () => {
 	const root = await fs.mkdtemp(path.join(os.tmpdir(), 'terra-screenshot-slideshow-'));
 	try {
@@ -410,21 +433,23 @@ test('writes responsive screenshot-only slides', async () => {
 		);
 		const { stdout: slide } = await execFileAsync('unzip', ['-p', slideshow, 'ppt/slides/slide1.xml']);
 		assert.equal((slide.match(/<p:pic>/g) || []).length, 6);
-		assert.doesNotMatch(slide, /<p:sp>/);
-		assert.doesNotMatch(slide, /Example route|mobile|desktop|Load timing/);
+		assert.match(slide, /CURRENT RUN/);
+		assert.doesNotMatch(slide, /mobile|desktop|Load timing/);
 		const { stdout: archive } = await execFileAsync('unzip', ['-l', slideshow]);
 		assert.doesNotMatch(archive, /ppt\/slides\/slide2\.xml/);
 		const reporter = new ProgressReporter({ outputRoot: path.join(root, 'reporter'), screenshotOnlySlideshow: true, loadTesting: { enabled: false } });
+		const reporterTests = viewports.map(([viewport]) => ({
+			id: `test-${viewport}`,
+			location: { file: path.join(root, 'routes.spec.ts') },
+			title: 'captures route screenshots',
+			titlePath: () => ['routes.spec.ts', 'captures route screenshots'],
+			parent: { project: () => ({ name: `root-routes-${viewport}` }) },
+		}));
+		reporter.onBegin({}, { allTests: () => reporterTests });
 		for (const [viewport] of viewports) {
 			const captureName = 'visual-capture-00001';
 			reporter.onTestEnd(
-				{
-					id: `test-${viewport}`,
-					location: { file: path.join(root, 'routes.spec.ts') },
-					title: 'captures route screenshots',
-					titlePath: () => ['routes.spec.ts', 'captures route screenshots'],
-					parent: { project: () => ({ name: `root-routes-${viewport}` }) },
-				},
+				reporterTests.find(({ id }) => id === `test-${viewport}`),
 				{
 					attachments: [
 						{
@@ -446,7 +471,7 @@ test('writes responsive screenshot-only slides', async () => {
 		const reporterSlides = path.join(root, 'reporter', runDirectory, 'report.pptx');
 		const { stdout: reporterSlide } = await execFileAsync('unzip', ['-p', reporterSlides, 'ppt/slides/slide1.xml']);
 		assert.equal((reporterSlide.match(/<p:pic>/g) || []).length, 6);
-		assert.doesNotMatch(reporterSlide, /<p:sp>/);
+		assert.match(reporterSlide, /CURRENT RUN/);
 	} finally {
 		await fs.rm(root, { recursive: true, force: true });
 	}
