@@ -401,6 +401,12 @@ export const writeScreenshotSlideshowFromDirectory = async (directory: string, f
 			if (!entry.isFile() || !entry.name.endsWith('.json')) continue;
 			try {
 				const capture = JSON.parse(fs.readFileSync(path.join(directory, entry.name), 'utf8')) as ScreenshotCapture;
+				const screenshot =
+					capture && typeof capture.screenshot === 'string'
+						? path.isAbsolute(capture.screenshot)
+							? capture.screenshot
+							: [path.resolve(directory, capture.screenshot), path.resolve(capture.screenshot)].find((candidate) => fs.existsSync(candidate))
+						: undefined;
 				if (
 					capture &&
 					typeof capture === 'object' &&
@@ -409,10 +415,10 @@ export const writeScreenshotSlideshowFromDirectory = async (directory: string, f
 					typeof capture.title === 'string' &&
 					typeof capture.viewport === 'string' &&
 					typeof capture.viewportSize === 'string' &&
-					typeof capture.screenshot === 'string' &&
-					fs.existsSync(capture.screenshot)
+					screenshot &&
+					fs.existsSync(screenshot)
 				)
-					captures.push(capture);
+					captures.push({ ...capture, screenshot });
 			} catch {
 				// A partial record does not block using the other saved screenshots.
 			}

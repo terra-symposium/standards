@@ -223,6 +223,18 @@ test('rebuilds the default screenshot deck from accumulated captures', async () 
 		assert.doesNotMatch(slide, /<p:sp>/);
 		const { stdout: archive } = await execFileAsync('unzip', ['-l', rebuilt]);
 		assert.doesNotMatch(archive, /ppt\/slides\/slide2\.xml/);
+
+		const legacyDirectory = path.join(root, 'legacy-screenshots');
+		await fs.mkdir(legacyDirectory, { recursive: true });
+		await fs.copyFile(screenshot, path.join(legacyDirectory, 'legacy.png'));
+		await fs.writeFile(
+			path.join(legacyDirectory, 'legacy.json'),
+			JSON.stringify({ group: 'legacy', key: 'test-result', title: 'legacy capture', viewport: 'mobile', viewportSize: '390×844', screenshot: 'legacy.png' }),
+		);
+		const legacyDeck = path.join(root, 'legacy-rebuilt.pptx');
+		await writeScreenshotSlideshowFromDirectory(legacyDirectory, legacyDeck);
+		const { stdout: legacySlide } = await execFileAsync('unzip', ['-p', legacyDeck, 'ppt/slides/slide1.xml']);
+		assert.equal((legacySlide.match(/<p:pic>/g) || []).length, 1);
 	} finally {
 		await fs.rm(root, { recursive: true, force: true });
 	}
