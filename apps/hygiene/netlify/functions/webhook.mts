@@ -38,7 +38,7 @@ export default async function handler(request: Request): Promise<Response> {
   if (!installationId) return new Response('Missing installation', { status: 400 });
   const sql = db();
   const delivery = request.headers.get('x-github-delivery');
-  const accepted = await acceptDelivery(
+  await acceptDelivery(
     delivery,
     async () => (await sql`INSERT INTO deliveries (id) VALUES (${delivery}) ON CONFLICT (id) DO UPDATE SET received_at = now()
       WHERE deliveries.received_at < now() - INTERVAL '15 minutes' RETURNING id`).length > 0,
@@ -57,6 +57,5 @@ export default async function handler(request: Request): Promise<Response> {
     },
     async () => { await sql`DELETE FROM deliveries WHERE id = ${delivery}`; },
   );
-  if (!accepted) return new Response(null, { status: 202 });
   return new Response(null, { status: 202 });
 }

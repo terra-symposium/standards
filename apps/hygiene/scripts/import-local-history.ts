@@ -1,4 +1,3 @@
-import { execFileSync } from 'node:child_process';
 import { existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, join, resolve } from 'node:path';
@@ -7,39 +6,18 @@ import { createHistoryReport } from '../../../packages/quality/src/lib/history-r
 import { db } from '../src/lib/server/db.js';
 import { parseHistoryReport } from '../src/lib/server/history.js';
 import { ingestHistoryReport } from '../src/lib/server/ingest.js';
+import { git, option, resolveRevision, validateImportTarget } from './local-import-utils.js';
 
 const appRoot = resolve(fileURLToPath(new URL('..', import.meta.url)));
 const args = process.argv.slice(2);
 
-function option(name: string): string {
-	const index = args.indexOf(name);
-	const value = args[index + 1];
-	if (index < 0 || !value || value.startsWith('--') || args.lastIndexOf(name) !== index) {
-		throw new Error(`Pass ${name} <value>.`);
-	}
-	return value;
-}
-
-function git(root: string, args: string[]): string {
-	return execFileSync('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
-}
-
-function githubRepository(remote: string): string | null {
-	const match = /(?:github\.com[:/])([^/]+\/[^/]+?)(?:\.git)?$/i.exec(remote);
-	return match?.[1]?.toLowerCase() ?? null;
-}
-
 async function main(): Promise<void> {
 	const localEnv = resolve(appRoot, '.env.local');
 	if (existsSync(localEnv)) process.loadEnvFile(localEnv);
-	const repository = option('--repository');
-	const checkout = resolve(option('--checkout'));
-	const branch = option('--branch');
-	if (!/^[^/\s]+\/[^/\s]+$/.test(repository)) throw new Error('Repository must use owner/name format.');
-	if (!/^[A-Za-z0-9._/-]{1,100}$/.test(branch) || branch.includes('..') || branch.startsWith('/')) throw new Error('Invalid branch name.');
-	if (githubRepository(git(checkout, ['remote', 'get-url', 'origin'])) !== repository.toLowerCase()) {
-		throw new Error('Checkout origin does not match the requested GitHub repository.');
-	}
+	const repository = option(args, '--repository');
+	const checkout = resolve(option(args, '--checkout'));
+	const branch = option(args, '--branch');
+	validateImportTarget(repository, checkout, branch);
 
 	const sql = db();
 	const repositoryRows = await sql`SELECT id FROM repositories WHERE active AND lower(owner || '/' || name) = lower(${repository})`;
@@ -48,12 +26,7 @@ async function main(): Promise<void> {
 	const branchRows = await sql`SELECT name FROM branches WHERE repository_id = ${repositoryRow.id} AND name = ${branch} AND enabled`;
 	if (!branchRows.length) throw new Error(`Branch ${branch} is not enabled for ${repository}.`);
 
-	let revision: string;
-	try {
-		revision = git(checkout, ['rev-parse', '--verify', `refs/remotes/origin/${branch}^{commit}`]);
-	} catch {
-		revision = git(checkout, ['rev-parse', '--verify', `refs/heads/${branch}^{commit}`]);
-	}
+	const revision = resolveRevision(checkout, branch);
 
 	const temporaryRoot = mkdtempSync(join(tmpdir(), 'terra-hygiene-history-'));
 	const worktree = join(temporaryRoot, basename(checkout) || 'checkout');

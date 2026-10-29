@@ -35,70 +35,66 @@ export type NormalizedLoadTestingConfig = {
 /** Optional inputs that have higher precedence than quality.json values. */
 export type LoadTestingOverrides = LoadTestingConfig;
 /**
+ * Checks whether a parsed configuration value is a non-array record.
+ * @param value Candidate value read from repository or test configuration.
  *
- * @param val
- *
- * @return
+ * @return `true` when the value is a non-array object.
  */
-const isRec = (val: unknown): val is Record<string, unknown> => !!val && typeof val === 'object' && !Array.isArray(val);
+const isRec = (value: unknown): value is Record<string, unknown> => !!value && typeof value === 'object' && !Array.isArray(value);
 /**
  * Validates one partial budget and returns a fresh object.
  *
- * @param val
+ * @param value Budget from quality.json or test code.
  * @param label Location used in configuration errors.
- * @param valandidate budget from quality.json or test code.
  *
  * @return A validated partial budget.
  */
-const budgetOverride = (val: unknown, label: string): LoadBudgetOverride => {
-	if (!isRec(val)) throw new Error(`${label} must be an object with optional warnMs and failMs numbers.`);
+const budgetOverride = (value: unknown, label: string): LoadBudgetOverride => {
+	if (!isRec(value)) throw new Error(`${label} must be an object with optional warnMs and failMs numbers.`);
 	const output: LoadBudgetOverride = {};
 	for (const key of ['warnMs', 'failMs'] as const) {
-		if (val[key] === undefined) continue;
-		if (typeof val[key] !== 'number' || !Number.isFinite(val[key]) || val[key] < 0) throw new Error(`${label}.${key} must be a finite non-negative number.`);
-		output[key] = val[key];
+		if (value[key] === undefined) continue;
+		if (typeof value[key] !== 'number' || !Number.isFinite(value[key]) || value[key] < 0) throw new Error(`${label}.${key} must be a finite non-negative number.`);
+		output[key] = value[key];
 	}
 	return output;
 };
 /**
  * Validates and copies a partial budget supplied by a test helper.
  *
- * @param val
- * @param valandidate partial threshold override.
+ * @param value Partial threshold override supplied by the test helper.
  *
  * @return A validated partial budget.
  */
-export const validateLoadBudgetOverride = (val: LoadBudgetOverride): LoadBudgetOverride => {
-	const result = budgetOverride(val, 'load budget override');
+export const validateLoadBudgetOverride = (value: LoadBudgetOverride): LoadBudgetOverride => {
+	const result = budgetOverride(value, 'load budget override');
 	if (result.warnMs !== undefined && result.failMs !== undefined && result.failMs <= result.warnMs) throw new Error('load budget override.failMs must be greater than warnMs.');
 	return result;
 };
 /**
  * Validates a named budget map.
  *
- * @param val
+ * @param value Named budget map from configuration.
  * @param label Location used in configuration errors.
- * @param valandidate map from configuration.
  *
  * @return A validated map keyed by test identity or measurement name.
  */
-const budgetMap = (val: unknown, label: string): Record<string, LoadBudgetOverride> => {
-	if (val === undefined) return {};
-	if (!isRec(val)) throw new Error(`${label} must be an object keyed by test identity or measurement name.`);
-	return Object.fromEntries(Object.entries(val).map(([key, budget]) => [key, budgetOverride(budget, `${label}.${key}`)]));
+const budgetMap = (value: unknown, label: string): Record<string, LoadBudgetOverride> => {
+	if (value === undefined) return {};
+	if (!isRec(value)) throw new Error(`${label} must be an object keyed by test identity or measurement name.`);
+	return Object.fromEntries(Object.entries(value).map(([key, budget]) => [key, budgetOverride(budget, `${label}.${key}`)]));
 };
 /**
  * Checks that a complete budget has an ordered warning/failure boundary.
  *
- * @param val
+ * @param value Complete warning and failure thresholds to validate.
  * @param label Location used in configuration errors.
- * @param valudget to validate.
  *
  * @return The validated budget.
  */
-const completeBudget = (val: LoadBudget, label: string): LoadBudget => {
-	if (val.failMs <= val.warnMs) throw new Error(`${label}.failMs must be greater than warnMs.`);
-	return val;
+const completeBudget = (value: LoadBudget, label: string): LoadBudget => {
+	if (value.failMs <= value.warnMs) throw new Error(`${label}.failMs must be greater than warnMs.`);
+	return value;
 };
 /**
  * Normalizes raw settings and applies explicit options over quality.json settings.
@@ -116,11 +112,11 @@ export const normalizeLoadTestingConfig = (raw: LoadTestingConfig = {}, override
 		'loadTesting.defaultBudget',
 	);
 	/**
+	 * Merges one named budget map over another while retaining unmentioned entries.
+	 * @param base Existing named budgets that retain lower precedence.
+	 * @param additional Named budgets that override matching base entries.
 	 *
-	 * @param base
-	 * @param additional
-	 *
-	 * @return
+	 * @return A new map with additional budgets merged over the base entries.
 	 */
 	const mergeMaps = (base: Record<string, LoadBudgetOverride>, additional: Record<string, LoadBudgetOverride>): Record<string, LoadBudgetOverride> => {
 		const merged: Record<string, LoadBudgetOverride> = { ...base };
@@ -190,19 +186,18 @@ export const gradeLoad = (durationMs: number, budget: LoadBudget): LoadGrade => 
  * Resolves and grades one measurement using test/helper overrides, named config, and defaults.
  *
  * @param input Raw timing measurement.
- * @param cfg
+ * @param cfg Normalized timing settings used as the fallback budget source.
  * @param testId Stable test key for per-test budgets.
  * @param testOverride Optional budget set directly by the test fixture.
- * @param cfgrmalized repository timing settings.
  *
  * @return A normalized measurement ready for artifacts.
  */
 export const gradeLoadMeasurement = (input: LoadMeasurementInput, cfg: NormalizedLoadTestingConfig, testId: string, testOverride?: LoadBudgetOverride): LoadMeasurement => {
-	const cfgd = input.kind === 'test' ? cfg.testBudgets[testId] : cfg.operationBudgets[input.name];
+	const configuredBudget = input.kind === 'test' ? cfg.testBudgets[testId] : cfg.operationBudgets[input.name];
 	const budget = completeBudget(
 		{
-			warnMs: input.budget?.warnMs ?? (input.kind === 'test' ? testOverride?.warnMs : undefined) ?? cfgd?.warnMs ?? cfg.defaultBudget.warnMs,
-			failMs: input.budget?.failMs ?? (input.kind === 'test' ? testOverride?.failMs : undefined) ?? cfgd?.failMs ?? cfg.defaultBudget.failMs,
+			warnMs: input.budget?.warnMs ?? (input.kind === 'test' ? testOverride?.warnMs : undefined) ?? configuredBudget?.warnMs ?? cfg.defaultBudget.warnMs,
+			failMs: input.budget?.failMs ?? (input.kind === 'test' ? testOverride?.failMs : undefined) ?? configuredBudget?.failMs ?? cfg.defaultBudget.failMs,
 		},
 		`load budget for ${input.name}`,
 	);
@@ -224,11 +219,9 @@ export const loadGradeCounts = (measurements: readonly Pick<LoadMeasurement, 'gr
  * Times an operation, records its duration even when it throws, and preserves its value/error.
  *
  * @param name Stable human-readable operation name.
- * @param op
- * @param rec
+ * @param op Operation whose elapsed time is recorded, including when it throws.
+ * @param rec Callback that receives the completed measurement.
  * @param budget Optional helper-level budget override.
- * @param opo time.
- * @param recllback receiving the elapsed measurement.
  *
  * @return The operation result.
  */

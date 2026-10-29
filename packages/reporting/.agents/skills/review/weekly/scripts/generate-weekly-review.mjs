@@ -33,20 +33,22 @@ HELPERS
 //////////////////////////////////////////////////*/
 
 /**
+ * Runs Git in the report repository and returns trimmed command output.
  *
- * @param args
+ * @param args Git arguments for the requested repository operation.
  *
- * @return
+ * @return The command's standard output with trailing whitespace removed.
  */
 function git(args) {
 	return execFileSync('git', args, { cwd: repo, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }).trimEnd();
 }
 
 /**
+ * Reads a line range from a file at a specific commit.
  *
- * @param props
+ * @param props Commit SHA, repository path, and inclusive start/end line numbers.
  *
- * @return
+ * @return The selected source lines joined with newline characters.
  */
 function readExcerpt({ sha, path, start, end }) {
 	return git(['show', `${sha}:${path}`])
@@ -56,8 +58,9 @@ function readExcerpt({ sha, path, start, end }) {
 }
 
 /**
+ * Selects a hue that remains visually distinct from earlier report colors.
  *
- * @return
+ * @return A hue angle in degrees.
  */
 function hue() {
 	for (let attempt = 0; attempt < 100; attempt += 1) {
@@ -72,20 +75,22 @@ function hue() {
 }
 
 /**
+ * Converts an OKLCH color to a hexadecimal sRGB color.
  *
- * @param value
- * @param lightness
- * @param chroma
+ * @param value Hue angle in degrees.
+ * @param lightness OKLCH lightness component.
+ * @param chroma OKLCH chroma component.
  *
- * @return
+ * @return Hexadecimal color string.
  */
 function hex(value, lightness, chroma) {
 	return new Color('oklch', [lightness, chroma, value]).to('srgb').toString({ format: 'hex' });
 }
 
 /**
+ * Builds a coordinated color palette from two distinct generated hues.
  *
- * @return
+ * @return Surface, text, rule, and accent colors for one slide group.
  */
 function theme() {
 	const primaryHue = hue();
@@ -101,10 +106,11 @@ function theme() {
 }
 
 /**
+ * Rejects text whose lines exceed the selected frame's character limit.
  *
- * @param value
- * @param maxChars
- * @param name
+ * @param value Text content to inspect.
+ * @param maxChars Maximum allowed characters per line.
+ * @param name Text element label used in any error message.
  */
 function assertLines(value, maxChars, name) {
 	for (const line of String(value).split('\n')) {
@@ -113,14 +119,15 @@ function assertLines(value, maxChars, name) {
 }
 
 /**
+ * Adds a text shape using the shared type and layout defaults.
  *
- * @param slide
- * @param value
- * @param position
- * @param style
- * @param name
+ * @param slide Slide that owns the text shape.
+ * @param value Text content to render.
+ * @param position Shape bounds in slide coordinates.
+ * @param style Optional typography, alignment, and line-length overrides.
+ * @param name Stable shape name for artifact inspection.
  *
- * @return
+ * @return The created text shape.
  */
 function addText(slide, value, position, style = {}, name = 'text') {
 	assertLines(value, style.maxChars ?? Math.floor(position.width / Math.max(7, (style.fontSize ?? 16) * 0.52)), name);
@@ -142,52 +149,56 @@ function addText(slide, value, position, style = {}, name = 'text') {
 }
 
 /**
+ * Adds a rectangular shape to a slide.
  *
- * @param slide
- * @param position
- * @param fill
- * @param line
- * @param name
+ * @param slide Slide that owns the rectangle.
+ * @param position Rectangle bounds in slide coordinates.
+ * @param fill Fill color or `none`.
+ * @param line Optional border color; `none` omits the border.
+ * @param name Stable shape name for artifact inspection.
  *
- * @return
+ * @return The created rectangle shape.
  */
 function rect(slide, position, fill, line = 'none', name = 'panel') {
 	return slide.shapes.add({ geometry: 'rect', name, position, fill, line: { style: 'solid', fill: line, width: line === 'none' ? 0 : 1 } });
 }
 
 /**
+ * Adds a rounded card using the palette's rule color.
  *
- * @param slide
- * @param position
- * @param colors
- * @param name
- * @param fill
+ * @param slide Slide that owns the card.
+ * @param position Card bounds in slide coordinates.
+ * @param colors Palette used for its border and default fill.
+ * @param name Stable shape name for artifact inspection.
+ * @param fill Optional fill override.
  *
- * @return
+ * @return The created card shape.
  */
 function card(slide, position, colors, name, fill = colors.tone) {
 	return slide.shapes.add({ geometry: 'roundRect', name, position, fill, line: { style: 'solid', fill: colors.rule, width: 1 } });
 }
 
 /**
+ * Adds a one-pixel horizontal rule.
  *
- * @param slide
- * @param left
- * @param top
- * @param width
- * @param color
- * @param name
+ * @param slide Slide that owns the rule.
+ * @param left Left position in slide coordinates.
+ * @param top Top position in slide coordinates.
+ * @param width Rule width in slide coordinates.
+ * @param color Rule color.
+ * @param name Stable shape name for artifact inspection.
  *
- * @return
+ * @return The created rule shape.
  */
 function rule(slide, left, top, width, color, name) {
 	return rect(slide, { left, top, width, height: 1 }, color, 'none', name);
 }
 
 /**
+ * Writes source references to the slide's visible speaker notes.
  *
- * @param slide
- * @param lines
+ * @param slide Slide that receives the notes.
+ * @param lines Evidence references to list under the Sources heading.
  */
 function notes(slide, lines) {
 	slide.speakerNotes.textFrame.setText(`[Sources]\n${lines.map((line) => `- ${line}`).join('\n')}`);
@@ -195,11 +206,12 @@ function notes(slide, lines) {
 }
 
 /**
+ * Wraps text at word boundaries while preserving explicit line breaks.
  *
- * @param value
- * @param maxChars
+ * @param value Text to wrap.
+ * @param maxChars Maximum characters per output line.
  *
- * @return
+ * @return Wrapped text with newline-separated lines.
  */
 function wrapLines(value, maxChars) {
 	return String(value)
@@ -222,11 +234,12 @@ function wrapLines(value, maxChars) {
 }
 
 /**
+ * Adds the standard title, page number, and divider to a slide.
  *
- * @param slide
- * @param title
- * @param page
- * @param colors
+ * @param slide Slide to decorate.
+ * @param title Heading shown at the top of the slide.
+ * @param page One-based page number used in labels and shape names.
+ * @param colors Palette supplying title and rule colors.
  */
 function header(slide, title, page, colors) {
 	addText(slide, title, { left: 48, top: 42, width: 1136, height: 42 }, { fontSize: 30, color: colors.text, maxChars: 62 }, `title-${page}`);
@@ -235,11 +248,12 @@ function header(slide, title, page, colors) {
 }
 
 /**
+ * Adds the standard footer and divider to a slide.
  *
- * @param slide
- * @param value
- * @param page
- * @param colors
+ * @param slide Slide to decorate.
+ * @param value Footer text.
+ * @param page One-based page number used in shape names.
+ * @param colors Palette supplying the rule and muted text colors.
  */
 function footer(slide, value, page, colors) {
 	rule(slide, 48, 674, 1184, colors.rule, `footer-rule-${page}`);
@@ -247,10 +261,11 @@ function footer(slide, value, page, colors) {
 }
 
 /**
+ * Tokenizes one code line into colored text runs for a slide.
  *
- * @param line
+ * @param line Source line to tokenize.
  *
- * @return
+ * @return Styled runs that preserve the original line text.
  */
 function codeRuns(line) {
 	const pattern =
@@ -279,13 +294,14 @@ function codeRuns(line) {
 }
 
 /**
+ * Adds a syntax-colored source excerpt and records its citation.
  *
- * @param slide
- * @param codeInput
- * @param position
- * @param colors
+ * @param slide Slide that owns the code panel.
+ * @param codeInput Commit SHA, path, and line range to read.
+ * @param position Code panel bounds in slide coordinates.
+ * @param colors Palette supplying the panel border color.
  *
- * @return
+ * @return Source citation for the rendered excerpt.
  */
 function addCode(slide, codeInput, position, colors) {
 	const source = readExcerpt(codeInput);
@@ -317,14 +333,15 @@ function addCode(slide, codeInput, position, colors) {
 }
 
 /**
+ * Adds a screenshot with a frame and returns its source citation.
  *
- * @param slide
- * @param image
- * @param position
- * @param colors
- * @param page
+ * @param slide Slide that owns the image.
+ * @param image Image path, route, and alternative text.
+ * @param position Image frame bounds in slide coordinates.
+ * @param colors Palette used for the frame.
+ * @param page One-based page number used in the frame name.
  *
- * @return
+ * @return Route and file path identifying the screenshot source.
  */
 async function addScreenshot(slide, image, position, colors, page) {
 	card(slide, position, colors, `screenshot-frame-${page}`, colors.tone);
@@ -342,8 +359,9 @@ async function addScreenshot(slide, image, position, colors, page) {
 }
 
 /**
+ * Reads non-merge commits from the requested refs and reporting window.
  *
- * @return
+ * @return Commits with author, date, subject, and changed paths.
  */
 function parseCommits() {
 	const fmt = '%H%x09%h%x09%aN%x09%aI%x09%s';
@@ -357,8 +375,9 @@ function parseCommits() {
 }
 
 /**
+ * Reads non-merge commits from the full requested history through the report cutoff.
  *
- * @return
+ * @return Commits with author, date, and subject for the history assessment.
  */
 function parseHistoryCommits() {
 	if (git(['rev-parse', '--is-shallow-repository']) === 'true') throw new Error('A complete Big Five assessment requires full Git history; fetch or unshallow the authoritative refs first.');
@@ -373,18 +392,12 @@ function parseHistoryCommits() {
 }
 
 /**
+ * Maps a calendar date to its rounded day position in a 90-day plan.
  *
- * @param value
- * @param length
+ * @param date Date being mapped, in ISO calendar-date form.
+ * @param plan Plan with start and end dates defining the 90-day span.
  *
- * @return
- */
-/**
- *
- * @param date
- * @param plan
- *
- * @return
+ * @return Rounded day offset from the plan start.
  */
 function planDay(date, plan) {
 	const start = new Date(`${plan.start}T00:00:00Z`).getTime();
@@ -394,12 +407,14 @@ function planDay(date, plan) {
 }
 
 /**
+ * Checks that a contributor's plan contains complete, ordered milestones.
  *
- * @param plan
- * @param contributor
- * @param props
+ * @param plan Plan data to validate.
+ * @param contributor Contributor whose name is used in validation errors.
+ * @param props Options controlling prior-objective and unknown-progress requirements.
  *
- * @return
+ * @return `false` when no plan is supplied; otherwise `true` when valid.
+ * @throws When the supplied plan violates required fields or milestone bounds.
  */
 function validPlan(plan, contributor, { requirePreviousObjective = true, allowUnknownProgress = false } = {}) {
 	if (!plan) return false;
@@ -426,11 +441,12 @@ function validPlan(plan, contributor, { requirePreviousObjective = true, allowUn
 }
 
 /**
+ * Derives an objective timeline from deliverable assessments and full Git history.
  *
- * @param plan
- * @param historyCommits
+ * @param plan Big Five plan containing five source-backed objectives.
+ * @param historyCommits Complete non-merge commit history for the requested refs.
  *
- * @return
+ * @return Timeline milestones with evidence-linked progress and date ranges.
  */
 function assessBigFiveTimeline(plan, historyCommits) {
 	if (typeof plan?.source !== 'string' || !plan.source.trim() || !Array.isArray(plan.objectives) || plan.objectives.length !== 5)
@@ -483,12 +499,13 @@ function assessBigFiveTimeline(plan, historyCommits) {
 }
 
 /**
+ * Renders a contributor's 90-day action plan and evidence in a slide.
  *
- * @param deck
- * @param section
- * @param colors
- * @param page
- * @param sources
+ * @param deck Presentation receiving the slide.
+ * @param section Contributor section containing the plan.
+ * @param colors Palette used by the slide.
+ * @param page One-based page number.
+ * @param sources Report-level sources added to speaker notes.
  */
 function addPlanSlide(deck, section, colors, page, sources) {
 	const plan = section.plan;
@@ -548,12 +565,13 @@ function addPlanSlide(deck, section, colors, page, sources) {
 }
 
 /**
+ * Renders meeting columns and their source references in a slide.
  *
- * @param deck
- * @param section
- * @param colors
- * @param page
- * @param sources
+ * @param deck Presentation receiving the slide.
+ * @param section Contributor section containing meeting notes.
+ * @param colors Palette used by the slide.
+ * @param page One-based page number.
+ * @param sources Report-level sources added to speaker notes.
  */
 function addMeetingSlide(deck, section, colors, page, sources) {
 	const meeting = section.meeting;
@@ -572,13 +590,14 @@ function addMeetingSlide(deck, section, colors, page, sources) {
 }
 
 /**
+ * Summarizes one contributor's recorded outcomes and matched goal.
  *
- * @param deck
- * @param section
- * @param goal
- * @param colors
- * @param page
- * @param sources
+ * @param deck Presentation receiving the slide.
+ * @param section Contributor activity and slide evidence.
+ * @param goal Optional goal matched to this Git identity.
+ * @param colors Palette used by the slide.
+ * @param page One-based page number.
+ * @param sources Report-level sources added to speaker notes.
  */
 function addContributorSummary(deck, section, goal, colors, page, sources) {
 	const slide = deck.slides.add();
@@ -618,12 +637,13 @@ function addContributorSummary(deck, section, goal, colors, page, sources) {
 }
 
 /**
+ * Records a goal comparison when no commits were attributed to its person.
  *
- * @param deck
- * @param goal
- * @param colors
- * @param page
- * @param sources
+ * @param deck Presentation receiving the slide.
+ * @param goal Goal and source evidence for the person.
+ * @param colors Palette used by the slide.
+ * @param page One-based page number.
+ * @param sources Report-level sources added to speaker notes.
  */
 function addNoCommitsSlide(deck, goal, colors, page, sources) {
 	const slide = deck.slides.add();
@@ -653,8 +673,9 @@ function addNoCommitsSlide(deck, goal, colors, page, sources) {
 }
 
 /**
+ * Builds the weekly review deck and writes it to the requested output path.
  *
- * @return
+ * @return Resolves after the presentation has been written to disk.
  */
 async function main() {
 	const historyCommits = parseHistoryCommits();
@@ -744,10 +765,11 @@ async function main() {
 		const rangeEnd = new Date(`${plan.end}T00:00:00Z`).valueOf();
 		const range = Math.max(1, rangeEnd - rangeStart);
 		/**
+		 * Maps a date within the full history window to its chart position.
 		 *
-		 * @param date
+		 * @param date ISO calendar date to position on the timeline.
 		 *
-		 * @return
+		 * @return Horizontal position in slide coordinates.
 		 */
 		const timelineX = (date) => chartLeft + ((new Date(`${date}T00:00:00Z`).valueOf() - rangeStart) / range) * chartWidth;
 		const marker = timelineX(plan.asOf);

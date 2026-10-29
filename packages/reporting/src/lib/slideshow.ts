@@ -85,7 +85,7 @@ const fitImg = (width: number, height: number, x: number, y: number, maxWidth: n
  * Crops a tall screenshot into a slide-friendly preview while retaining the original in notes.
  *
  * @param file Screenshot path to preview.
- * @param viewportSize
+ * @param viewportSize Rendered viewport dimensions, formatted as width-by-height.
  *
  * @return Base64 image data and preview dimensions.
  */
@@ -107,23 +107,23 @@ const previewImg = async (file: string, viewportSize: string): Promise<{ data: s
  */
 const viewportWidth = (r: VisualResult): number => Number.parseInt(r.viewportSize.split('×')[0] || '', 10) || Number.MAX_SAFE_INTEGER;
 /**
- * Builds the visible review copy and diagnostics for one result.
+ * Returns the highest-priority load grade recorded for one result.
  *
- * @param r Result metadata and diagnostics to describe.
- * @param review Screenshot review cues to include.
+ * @param r Result whose load measurements are summarized.
  *
- * @return Text shown beside the screenshot and in speaker notes.
+ * @return `fail`, `warning`, or `pass`, or an empty string when no grade exists.
  */
 const resultLoadGrade = (r: VisualResult): string => {
 	const counts = loadGradeCounts(r.loadMeasurements || []);
 	return counts.fail ? 'fail' : counts.warning ? 'warning' : counts.pass ? 'pass' : '';
 };
 /**
+ * Builds the visible review copy and diagnostics for one result.
  *
- * @param r
- * @param review
+ * @param r Result metadata and diagnostics to describe.
+ * @param review Screenshot review cues to include.
  *
- * @return
+ * @return Text shown beside the screenshot and in speaker notes.
  */
 const slideCopy = (r: VisualResult, review: ImgReview): string => {
 	const grade = resultLoadGrade(r);
@@ -141,14 +141,6 @@ const slideCopy = (r: VisualResult, review: ImgReview): string => {
 	if (r.terminalErrors) lines.push('', `Terminal: ${r.terminalErrors}`);
 	return lines.join('\n');
 };
-/**
- * Adds a single-result slide with its screenshot and review prompts.
- *
- * @param presentation Presentation receiving the slide.
- * @param r Screenshot-backed result to render.
- * @param slideNumber One-based slide number shown in the title.
- * @returns A promise that resolves after the slide and notes are added.
- */
 /**
  * Adds a responsive comparison slide for results sharing one test identity.
  *
@@ -220,8 +212,8 @@ type LoadRow = { result: VisualResult; measurement: NonNullable<VisualResult['lo
 /**
  * Adds a run-level load summary slide and names the slowest measurements.
  *
- * @param presentation
- * @param results
+ * @param presentation Presentation receiving the summary slide.
+ * @param results Results whose load measurements are summarized.
  */
 const addLoadSummarySlide = (presentation: Presentation, results: readonly VisualResult[]): void => {
 	const measurements: LoadRow[] = results.flatMap((r) => (r.loadMeasurements || []).map((measurement) => ({ result: r, measurement })));
@@ -251,10 +243,10 @@ const addLoadSummarySlide = (presentation: Presentation, results: readonly Visua
 /**
  * Adds paginated slides containing every individual test, page, and operation measurement.
  *
- * @param presentation
- * @param results
+ * @param presentation Presentation receiving the detail slides.
+ * @param results Results whose individual load measurements are listed.
  *
- * @return
+ * @return Number of detail slides added.
  */
 const addLoadDetailSlides = (presentation: Presentation, results: readonly VisualResult[]): number => {
 	const measurements: LoadRow[] = results.flatMap((r) => (r.loadMeasurements || []).map((measurement) => ({ result: r, measurement })));

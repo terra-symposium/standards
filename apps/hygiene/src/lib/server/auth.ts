@@ -33,6 +33,10 @@ function decrypt(value: string): string {
   return Buffer.concat([decipher.update(data.subarray(28)), decipher.final()]).toString('utf8');
 }
 
+function sessionToken(request: Request): string | undefined {
+  return request.headers.get('cookie')?.split(';').map((part) => part.trim()).find((part) => part.startsWith(`${COOKIE}=`))?.slice(COOKIE.length + 1);
+}
+
 export async function createSession(userId: number, login: string, accessToken: string, refreshToken?: string, expiresIn?: number): Promise<string> {
   const token = randomBytes(32).toString('base64url');
   const sql = db();
@@ -46,7 +50,7 @@ export function sessionCookie(token: string, maxAge = 604800, origin = process.e
 }
 
 export async function session(request: Request): Promise<Session | null> {
-  const raw = request.headers.get('cookie')?.split(';').map((part) => part.trim()).find((part) => part.startsWith(`${COOKIE}=`))?.slice(COOKIE.length + 1);
+  const raw = sessionToken(request);
   if (!raw) return null;
   const sql = db();
   const rows = await sql`SELECT github_user_id, github_login, access_token_ciphertext, refresh_token_ciphertext, token_expires_at FROM sessions WHERE token_hash = ${digest(raw)} AND expires_at > now()`;
@@ -70,7 +74,7 @@ export async function session(request: Request): Promise<Session | null> {
 }
 
 export async function removeSession(request: Request): Promise<void> {
-  const raw = request.headers.get('cookie')?.split(';').map((part) => part.trim()).find((part) => part.startsWith(`${COOKIE}=`))?.slice(COOKIE.length + 1);
+  const raw = sessionToken(request);
   if (raw) { const sql = db(); await sql`DELETE FROM sessions WHERE token_hash = ${digest(raw)}`; }
 }
 

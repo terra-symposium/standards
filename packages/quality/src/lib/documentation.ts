@@ -12,6 +12,7 @@ import ts from 'typescript';
 import { displayPath, srcFiles } from './files.js';
 import { extname, relative, resolve, sep } from 'node:path';
 import { readFileSync, renameSync, unlinkSync, writeFileSync } from 'node:fs';
+import { sourceKind } from './source-kind.js';
 
 // TYPES
 import type { QualityAnalysis, QualityCfg } from './runner.js';
@@ -29,10 +30,6 @@ const R_N_REGEX = /\r?\n/;
  * @return
  */
 const S_S_G_REGEX = () => /\/\*\*[\s\S]*?\*\//g;
-
-/*//////////////////////////////////////////////////
-REGEX
-//////////////////////////////////////////////////*/
 
 const T_R_N_S_S_R_N_T_T_R_N_REGEX = /^\/\*\*[ \t]*\r?\n([\s\S]*?)\r?\n[ \t]*\*\/[ \t]*(?:\r?\n)*/;
 const T_T_REGEX = /^[ \t]*\*[ \t]?/;
@@ -969,20 +966,6 @@ export function protectLongImports(fileName: string, printWidth = 200): boolean 
 }
 
 /**
- * Selects the TypeScript parser mode used by documentation checks.
- *
- * @param fileName Filename whose extension determines the parser mode.
- *
- * @return TypeScript compiler script kind for the filename.
- */
-function documentationScriptKind(fileName: string): ts.ScriptKind {
-	if (/\.[cm]?tsx$/.test(fileName)) return ts.ScriptKind.TSX;
-	if (/\.[cm]?jsx$/.test(fileName)) return ts.ScriptKind.JSX;
-	if (/\.[cm]?js$/.test(fileName)) return ts.ScriptKind.JS;
-	return ts.ScriptKind.TS;
-}
-
-/**
  * Checks whether a filename is supported by the documentation policy.
  *
  * @param fileName Source filename to test.
@@ -1383,7 +1366,7 @@ function documentationReport(file: string, parsed: ts.SourceFile, node: ts.Node,
 function documentationFindingsForFile(cfg: QualityCfg, file: string, requirements: DocumentationRequirements, analysis?: QualityAnalysis): DocumentationFinding[] {
 	if (!documentationSupported(file)) return [];
 	const src = analysis?.texts.get(file) ?? readFileSync(file, 'utf8');
-	const parsed = analysis?.sources.get(file) ?? ts.createSourceFile(file, src, ts.ScriptTarget.Latest, true, documentationScriptKind(file));
+	const parsed = analysis?.sources.get(file) ?? ts.createSourceFile(file, src, ts.ScriptTarget.Latest, true, sourceKind(file));
 	const findings = descriptionFindingsForFile(cfg, file, src, parsed);
 	/**
 	 *
@@ -1450,7 +1433,7 @@ export function documentSrcFile(cfg: QualityCfg, file: string): boolean {
 	if (!documentationSupported(file) || !documentationSourceIncluded(cfg, file)) return false;
 	const requirements = { functions: true, ...cfg.documentation?.required };
 	const src = readFileSync(file, 'utf8');
-	const parsed = ts.createSourceFile(file, src, ts.ScriptTarget.Latest, true, documentationScriptKind(file));
+	const parsed = ts.createSourceFile(file, src, ts.ScriptTarget.Latest, true, sourceKind(file));
 	const insertions: number[] = [];
 	/**
 	 *

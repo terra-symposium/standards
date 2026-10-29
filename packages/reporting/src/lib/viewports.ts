@@ -50,7 +50,7 @@ HELPERS
 /**
  * Resolves an environment selection or alias list against an application catalog.
  *
- * @param raw - or whitespace-separated viewport names, aliases, or `all`.
+ * @param raw Optional comma- or whitespace-separated viewport names, aliases, or `all`; defaults to `PW_VIEWPORTS`.
  * @param catalog Viewport catalog against which names are validated.
  *
  * @return The selected viewport definitions in request order.
@@ -150,9 +150,8 @@ export type ResponsivePlaywrightOptions = {
  * `singleRunProjects`. The helper adds full-page automatic screenshots and the shared
  * evidence reporter while preserving any other configured reporters.
  *
- * @param cfg
+ * @param cfg Existing Playwright configuration to extend.
  * @param opts Shared matrix and reporting options.
- * @param config Existing Playwright configuration.
  *
  * @return Configuration with responsive projects, native screenshots, and reporting.
  */
@@ -171,11 +170,11 @@ export const withResponsivePlaywright = <T extends PlaywrightTestConfig>(cfg: T,
 	const dependencyProjects = new Set(projects.flatMap((p) => p.dependencies || []));
 	const singleRun = new Set(opts.singleRunProjects || []);
 	/**
+	 * Identifies projects that should run once instead of expanding across viewports.
+	 * @param project Playwright project whose dependencies and test pattern are inspected.
+	 * @param idx Project index used to create a stable fallback name.
 	 *
-	 * @param project
-	 * @param idx
-	 *
-	 * @return
+	 * @return `true` when the project is setup-only and should not expand across viewports.
 	 */
 	const isSetup = (project: (typeof projects)[number], idx: number): boolean => {
 		const name = project.name || `project-${idx + 1}`;

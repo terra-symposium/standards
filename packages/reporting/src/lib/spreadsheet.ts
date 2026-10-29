@@ -77,8 +77,8 @@ const styleStatus = (cell: ExcelJS.Cell, status: string): void => {
 /**
  * Applies a timing grade and its semantic color treatment to a cell.
  *
- * @param cell
- * @param grade
+ * @param cell Cell that will display the load grade.
+ * @param grade Load grade label used to select the cell style.
  */
 const styleLoadGrade = (cell: ExcelJS.Cell, grade: string): void => {
 	const style = LOAD_STYLES[grade] || LOAD_STYLES.fail;
@@ -88,14 +88,12 @@ const styleLoadGrade = (cell: ExcelJS.Cell, grade: string): void => {
 	cell.alignment = { horizontal: 'center', vertical: 'middle' };
 };
 /**
- * Adds one feature-file result sheet, including available screenshot evidence.
+ * Creates a unique, Excel-safe worksheet name for one feature file.
  *
- * @param book Workbook receiving the sheet.
- * @param src
- * @param name Feature-file name used as the worksheet name.
- * @param vals Results belonging to the feature file.
+ * @param book Workbook whose existing sheet names must be avoided.
+ * @param src Feature-file name used to form the base worksheet name.
  *
- * @return Nothing; the workbook is mutated in place.
+ * @return An available worksheet name within Excel's 31-character limit.
  */
 const resultSheetName = (book: ExcelJS.Workbook, src: string): string => {
 	const base =
@@ -115,21 +113,23 @@ const resultSheetName = (book: ExcelJS.Workbook, src: string): string => {
 	return name;
 };
 /**
+ * Returns the highest-priority load grade recorded for one result.
  *
- * @param val
+ * @param val Result whose load measurements are summarized.
  *
- * @return
+ * @return `fail`, `warning`, or `pass`, or an empty string when no grade exists.
  */
 const resultLoadGrade = (val: VisualResult): string => {
 	const counts = loadGradeCounts(val.loadMeasurements || []);
 	return counts.fail ? 'fail' : counts.warning ? 'warning' : counts.pass ? 'pass' : '';
 };
 /**
+ * Adds one feature-file result sheet, including available screenshot evidence.
  *
- * @param book
- * @param name
- * @param vals
- * @param loadEnabled
+ * @param book Workbook receiving the sheet.
+ * @param name Feature-file name used as the worksheet name.
+ * @param vals Results belonging to the feature file.
+ * @param loadEnabled Whether to include load-grade columns and cell styles.
  */
 const addResultSheet = (book: ExcelJS.Workbook, name: string, vals: readonly VisualResult[], loadEnabled: boolean): void => {
 	const sheet = book.addWorksheet(resultSheetName(book, name));
@@ -205,7 +205,7 @@ const addResultSheet = (book: ExcelJS.Workbook, name: string, vals: readonly Vis
  *
  * @param book Workbook receiving the summary sheet.
  * @param run Normalized report run to summarize.
- * @param loadEnabled
+ * @param loadEnabled Whether to include load pass, warning, and failure totals.
  *
  * @return Nothing; the workbook is mutated in place.
  */
@@ -224,8 +224,8 @@ const addSummary = (book: ExcelJS.Workbook, run: ReportRun, loadEnabled: boolean
 /**
  * Adds a row for every timed test, page navigation, and named operation.
  *
- * @param book
- * @param results
+ * @param book Workbook receiving the load timings sheet.
+ * @param results Results whose test, page, and operation measurements are written.
  */
 const addLoadTimings = (book: ExcelJS.Workbook, results: readonly VisualResult[]): void => {
 	const sheet = book.addWorksheet('Load timings');

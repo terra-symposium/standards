@@ -28,16 +28,9 @@ test('captures component metadata and exposes reset-key recovery state', () => {
 	});
 	assert.deepEqual(reports, [{ error: err, name: 'Component', componentStack: '\n    at Panel' }]);
 	assert.equal(
-		withErrorBoundary(
-			/**
-			 *
-			 * @return
-			 */
-			function Panel() {
-				return React.createElement('div');
-			},
-			'Panel',
-		).displayName,
+		withErrorBoundary(function Panel() {
+			return React.createElement('div');
+		}, 'Panel').displayName,
 		'withErrorBoundary(Panel)',
 	);
 });

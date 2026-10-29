@@ -11,6 +11,7 @@ IMPORTS
 import ts from 'typescript';
 import { displayPath, srcFiles } from './files.js';
 import { readFileSync, writeFileSync } from 'node:fs';
+import { sourceKind } from './source-kind.js';
 
 // TYPES
 import type { QualityAnalysis, QualityCfg } from './runner.js';
@@ -34,20 +35,6 @@ type Candidate = { name: string; declaration: ts.VariableDeclaration; statement:
 /*//////////////////////////////////////////////////
 HELPERS
 //////////////////////////////////////////////////*/
-
-/**
- * Selects the TypeScript parser mode that matches a source filename.
- *
- * @param fileName Source filename whose extension determines the parser mode.
- *
- * @return TypeScript compiler script kind for the filename.
- */
-function scriptKind(fileName: string): ts.ScriptKind {
-	if (/\.[cm]?tsx$/.test(fileName)) return ts.ScriptKind.TSX;
-	if (/\.[cm]?jsx$/.test(fileName)) return ts.ScriptKind.JSX;
-	if (/\.[cm]?js$/.test(fileName)) return ts.ScriptKind.JS;
-	return ts.ScriptKind.TS;
-}
 
 /**
  * Checks for a direct React forwardRef call without unwrapping casts or other wrappers.
@@ -154,7 +141,7 @@ function candidatesForAssignment(node: ts.Node, name: string, byName: Map<string
  */
 function candidatesForFile(file: string, analysis?: QualityAnalysis): Candidate[] {
 	const src = analysis?.texts.get(file) ?? readFileSync(file, 'utf8');
-	const parsed = analysis?.sources.get(file) ?? ts.createSourceFile(file, src, ts.ScriptTarget.Latest, true, scriptKind(file));
+	const parsed = analysis?.sources.get(file) ?? ts.createSourceFile(file, src, ts.ScriptTarget.Latest, true, sourceKind(file));
 	if ((parsed as ts.SourceFile & { parseDiagnostics?: readonly ts.Diagnostic[] }).parseDiagnostics?.length) return [];
 	const candidates: Candidate[] = [];
 	const byName = new Map<string, Candidate[]>();
@@ -254,7 +241,7 @@ export function fixDisplayNames(cfg: QualityCfg, analysis?: QualityAnalysis): { 
 	for (const file of analysis?.files ?? srcFiles(cfg)) {
 		if (!/\.(?:c|m)?(?:js|jsx|ts|tsx)$/.test(file)) continue;
 		const src = analysis?.texts.get(file) ?? readFileSync(file, 'utf8');
-		const parsed = analysis?.sources.get(file) ?? ts.createSourceFile(file, src, ts.ScriptTarget.Latest, true, scriptKind(file));
+		const parsed = analysis?.sources.get(file) ?? ts.createSourceFile(file, src, ts.ScriptTarget.Latest, true, sourceKind(file));
 		if ((parsed as ts.SourceFile & { parseDiagnostics?: readonly ts.Diagnostic[] }).parseDiagnostics?.length) continue;
 		const edits = new Map<number, { indent: string; names: string[] }>();
 		for (const candidate of candidatesForFile(file, analysis)) {
@@ -286,7 +273,7 @@ export function fixDisplayNames(cfg: QualityCfg, analysis?: QualityAnalysis): { 
 			updated = `${updated.slice(0, at)}${lineBreak}${lines}${updated.slice(at)}`;
 			fixed += edit.names.length;
 		}
-		const valid = ts.createSourceFile(file, updated, ts.ScriptTarget.Latest, true, scriptKind(file));
+		const valid = ts.createSourceFile(file, updated, ts.ScriptTarget.Latest, true, sourceKind(file));
 		if ((valid as ts.SourceFile & { parseDiagnostics?: readonly ts.Diagnostic[] }).parseDiagnostics?.length) {
 			skipped += [...edits.values()].reduce((count, edit) => count + edit.names.length, 0);
 			continue;

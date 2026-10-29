@@ -40,8 +40,8 @@ export const diagnosticsTest = base.extend({
 	page: async ({ page, context: ctx }, use, info): Promise<void> => {
 		const diagnostics: BrowserDiagnostic[] = [];
 		/**
-		 *
-		 * @param tgt
+		 * Captures browser console errors, uncaught page errors, and failed requests.
+		 * @param tgt Page whose console, page errors, and failed requests should be observed.
 		 */
 		const observe = (tgt: typeof page): void => {
 			tgt.on('console', (m) => {
@@ -89,8 +89,8 @@ export const loadTest = diagnosticsTest.extend<{ load: LoadTestController }>({
 			const pending: Promise<void>[] = [];
 			let testBudget: LoadBudgetOverride | undefined;
 			/**
-			 *
-			 * @param tgt
+			 * Records navigation timing for each page opened during the test.
+			 * @param tgt Page whose navigation timings should be recorded.
 			 */
 			const observe = (tgt: typeof page): void => {
 				tgt.on('load', () => {
@@ -167,8 +167,7 @@ HELPERS
 /**
  * Removes terminal color escapes before diagnostics enter an artifact.
  *
- * @param val
- * @param valerminal output that may contain ANSI escape sequences.
+ * @param val Terminal output that may contain ANSI escape sequences.
  *
  * @return Terminal output with ANSI formatting removed.
  */
@@ -208,8 +207,7 @@ const terminalText = (chunk: string | Buffer): string => stripAnsi(chunk.toStrin
 /**
  * Identifies terminal output that should be retained as diagnostic evidence.
  *
- * @param val
- * @param valormalized terminal output.
+ * @param val Normalized terminal output to check for diagnostic keywords.
  *
  * @return Whether the output contains a diagnostic keyword.
  */
@@ -248,7 +246,7 @@ const diagnosticText = (attachments: readonly ReporterAttachment[], name: string
  *
  * @param attachments Attachments emitted for one test result.
  *
- * @return Screenshot path, or an empty string when no screenshot exists.
+ * @return Matching screenshot attachment, or `undefined` when none exists.
  */
 const screenshotAttachment = (attachments: readonly ReporterAttachment[]): ReporterAttachment | undefined =>
 	attachments.find((v) => ['visual', 'screenshot'].includes(v.name || '') && v.contentType === 'image/png');
@@ -256,9 +254,9 @@ const screenshotAttachment = (attachments: readonly ReporterAttachment[]): Repor
 /**
  * Reads timing samples and a test override from the fixture attachment.
  *
- * @param attachments
+ * @param attachments Attachments emitted for one test result.
  *
- * @return
+ * @return Valid timing samples and the optional test-level budget from the fixture attachment.
  */
 const loadAttachment = (attachments: readonly ReporterAttachment[]): { measurements: LoadMeasurementInput[]; testBudget?: LoadBudgetOverride } => {
 	const attachment = attachments.find((v) => v.name === 'load-testing' && v.contentType === 'application/json');
@@ -286,13 +284,13 @@ const loadAttachment = (attachments: readonly ReporterAttachment[]): { measureme
 /**
  * Grades the test duration and attached page/operation samples for one result.
  *
- * @param result
- * @param id
- * @param inputs
- * @param testBudget
- * @param cfg
+ * @param result Result to augment with graded load measurements.
+ * @param id Stable test identity used to resolve per-test thresholds.
+ * @param inputs Valid page-load and operation measurements attached by the fixture.
+ * @param testBudget Optional test-level threshold override.
+ * @param cfg Normalized load-testing settings used to grade the measurements.
  *
- * @return
+ * @return The original result when load testing is disabled, or the result with graded timing data.
  */
 const addLoadMeasurements = (
 	result: VisualResult,
@@ -313,9 +311,8 @@ const addLoadMeasurements = (
  * Creates the framework-neutral identity fields shared by all result records.
  *
  * @param test Playwright test identity.
- * @param cfgdProject
+ * @param cfgdProject Configured Playwright project name used to derive project and viewport labels.
  * @param viewportCatalog Catalog used to resolve viewport labels and sizes.
- * @param cfgdProjectgured Playwright project name.
  *
  * @return Framework-neutral identity fields for a visual result.
  */
@@ -342,9 +339,9 @@ const testIdentity = (
 /**
  * Resolves the title path portion used by the stable test budget key.
  *
- * @param test
+ * @param test Playwright test identity whose file and title path should be resolved.
  *
- * @return
+ * @return Title and group segments with the test file path removed.
  */
 const testTitleParts = (test: { location: { file: string }; title: string; titlePath: () => string[] }): string[] => {
 	const file = path.basename(test.location.file);
@@ -357,8 +354,7 @@ const testTitleParts = (test: { location: { file: string }; title: string; title
  * Generates a stable filename for a copied screenshot.
  *
  * @param result Result whose identity contributes to the filename.
- * @param idx
- * @param idxesult position used to keep duplicate names distinct.
+ * @param idx Zero-based result position used to keep duplicate names distinct.
  *
  * @return A filesystem-safe screenshot filename.
  */
@@ -375,8 +371,7 @@ const screenshotName = (result: VisualResult, idx: number): string => {
  * Copies captured screenshots into the timestamped run directory.
  *
  * @param results Results whose screenshot paths should be relocated.
- * @param runDir
- * @param runDirtamped output directory for the current run.
+ * @param runDir Timestamped output directory where screenshots are copied.
  *
  * @return Results with copied screenshot paths.
  */
@@ -394,9 +389,9 @@ const copyScreenshots = (results: readonly VisualResult[], runDir: string): Visu
 /**
  * Redacts personal identifiers and configured secrets from report text.
  *
- * @param val
+ * @param val Untrusted value that may contain personal identifiers or secrets.
  *
- * @return
+ * @return Text with identifiers, configured secrets, and the workspace path redacted.
  */
 const redactEvidence = (val: unknown): string => {
 	let text = Array.from(stripAnsi(String(val ?? '')))
@@ -416,9 +411,9 @@ const redactEvidence = (val: unknown): string => {
 /**
  * Converts untrusted supplemental timing values to supported measurement inputs.
  *
- * @param val
+ * @param val Untrusted supplemental value expected to contain timing measurements.
  *
- * @return
+ * @return Supported page and operation measurements with validated budgets.
  */
 const supplementalMeasurements = (val: unknown): LoadMeasurementInput[] => {
 	if (!Array.isArray(val)) return [];
@@ -440,17 +435,17 @@ const supplementalMeasurements = (val: unknown): LoadMeasurementInput[] => {
 /**
  * Converts an optional structured results file into the shared row model.
  *
- * @param file
- * @param loadTesting
+ * @param file Optional structured results file to read.
+ * @param loadTesting Normalized timing settings for any measurements in the file.
  *
- * @return
+ * @return Normalized result rows and run-level diagnostics.
  */
 const supplementalResults = (file: string, loadTesting: ReturnType<typeof readLoadTestingConfig>): { results: VisualResult[]; diagnostics: string[] } => {
 	/**
+	 * Creates an interrupted row when the supplemental results file is unavailable or invalid.
+	 * @param err Explanation included in the interrupted result when the file cannot be used.
 	 *
-	 * @param err
-	 *
-	 * @return
+	 * @return An interrupted result row describing the unavailable supplemental source.
 	 */
 	const unavailable = (err: string): VisualResult => ({
 		browserErrors: '',

@@ -43,12 +43,12 @@ const { writeSlideshow } = await import('@terra-symposium/standards-reporting/sl
 HELPERS
 //////////////////////////////////////////////////*/
 
-/* Creates the smallest complete normalized result fixture for reporting tests. */
 /**
+ * Creates the smallest complete normalized result fixture for reporting tests.
  *
- * @param overrides
+ * @param overrides Optional fields that replace the fixture defaults.
  *
- * @return
+ * @return A complete normalized result with the requested overrides applied.
  */
 const result = (overrides = {}) => ({
 	browserErrors: '',

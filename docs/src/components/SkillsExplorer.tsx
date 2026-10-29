@@ -66,7 +66,6 @@ function SkillTree({ expanded, node, onSelect, onToggle, pathPrefix = '', select
 									aria-expanded={isExpanded}
 									className="inline-flex min-h-9 cursor-pointer items-center gap-1 rounded-md border-0 bg-transparent px-2 py-1 text-left font-[inherit] font-semibold text-[#202321] hover:bg-[#edf1ed] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#216750]"
 									onClick={() => onToggle(path)}
-
 								>
 									<span aria-hidden="true" className="w-4 text-[#216750]">
 										{isExpanded ? '⌄' : '›'}
@@ -81,7 +80,6 @@ function SkillTree({ expanded, node, onSelect, onToggle, pathPrefix = '', select
 										selectedPath === sourcePathForSkill(skill) ? 'bg-[#eaf1ec] font-bold' : ''
 									}`}
 									onClick={() => onSelect(skill)}
-
 								>
 									{hasChildren ? `Open ${skill.title} skill` : skill.title}
 								</button>
