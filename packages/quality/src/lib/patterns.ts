@@ -43,21 +43,11 @@ const G_CLASS_2 = () => /\\/g;
  * @return
  */
 const EXPORT_CONST_A_ZA_Z_W_B_GM_REGEX = () => /^export const ([A-Za-z_$][\w$]*)\b/gm;
-
-/*//////////////////////////////////////////////////
-REGEX
-//////////////////////////////////////////////////*/
-
 /**
  *
  * @return
  */
 const S_G_REGEX = () => /\s+/g;
-
-/*//////////////////////////////////////////////////
-REGEX
-//////////////////////////////////////////////////*/
-
 /** Counts exact edits applied and conservative candidates left for review. */
 export type PatternFixResult = { fixed: number; skipped: number };
 

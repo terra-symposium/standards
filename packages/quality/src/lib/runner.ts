@@ -55,18 +55,8 @@ REGEX
 const BPLAYWRIGHT_B_U_REGEX = /\bplaywright\b/u;
 const BWORKSPACE_TEST_RUNNER_JS_B_U_REGEX = /\bworkspace-test-runner\.js\b/u;
 const NON_WORKSPACE_DIRS = new Set(['.git', '.next', '.nuxt', '.turbo', '.vercel', '.vite', '.astro', 'build', 'coverage', 'dist', 'node_modules', 'out', 'vendor']);
-
-/*//////////////////////////////////////////////////
-REGEX
-//////////////////////////////////////////////////*/
-
 const R_N_REGEX = /\r?\n/;
 const SHARED_REGEX = /\/\*|\/\//;
-
-/*//////////////////////////////////////////////////
-REGEX
-//////////////////////////////////////////////////*/
-
 const CJS_JS_JSX_MJS_TS_TSX_REGEX = /\.(?:cjs|js|jsx|mjs|ts|tsx)$/;
 /**
  *
@@ -74,6 +64,8 @@ const CJS_JS_JSX_MJS_TS_TSX_REGEX = /\.(?:cjs|js|jsx|mjs|ts|tsx)$/;
  */
 const G_REGEX = () => /-/g;
 const C_M_JS_TS_REGEX = /\.(?:c|m)?(?:js|ts)$/;
+const C_M_JS_TS_X_REGEX = /\.(?:c|m)?(?:js|ts)x?$/;
+const C_M_JS_TS_X_CLASS_2 = /\.(?:(?:c|m)?(?:js|ts)x?)$/;
 const CLI_CMDS = new Set([
 	'quality',
 	'history',
@@ -126,12 +118,6 @@ let qualityCheckName: string | undefined;
 let qualityDetails: string[] = [];
 let qualitySpinner: { worker: Worker; state: Int32Array } | undefined;
 
-/*//////////////////////////////////////////////////
-REGEX
-//////////////////////////////////////////////////*/
-
-const C_M_JS_TS_X_REGEX = /\.(?:c|m)?(?:js|ts)x?$/;
-const C_M_JS_TS_X_CLASS_2 = /\.(?:(?:c|m)?(?:js|ts)x?)$/;
 /** Names accepted in the `enabledChecks` configuration map. */
 export type QualityCheckName =
 	| 'document'

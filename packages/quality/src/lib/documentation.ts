@@ -22,17 +22,7 @@ REGEX
 
 const N_REGEX = /(?<=\n)/;
 const R_N_END_REGEX = /\r?\n$/;
-
-/*//////////////////////////////////////////////////
-REGEX
-//////////////////////////////////////////////////*/
-
 const TYPE_S_REGEX = /^type\s+/;
-
-/*//////////////////////////////////////////////////
-REGEX
-//////////////////////////////////////////////////*/
-
 const R_N_REGEX = /\r?\n/;
 /**
  *
@@ -58,6 +48,9 @@ const S_CLASS_5 = /^\{[^}]+\}\s*/;
 const OPEN = `/*${'/'.repeat(50)}`;
 const CLOSE = `${'/'.repeat(50)}*/`;
 const SUPPORTED = new Set(['.cjs', '.cts', '.js', '.jsx', '.mjs', '.mts', '.ts', '.tsx']);
+const PNPM_FENCE = /^\s*```(?:sh|bash|zsh|shell)\s*$/i;
+const FENCE_CLOSE = /^\s*```\s*$/;
+const PNPM_DIR_FLAG = /^(\s*(?:\$\s*)?pnpm)\s+(?:-C|--prefix)(\s+)("[^"]+"|'[^']+'|\S+)(.*)$/;
 /** Canonical groups used to order and label source imports. */
 type ImportGroup = 'API' | 'COMPONENTS' | 'DATA' | 'TYPES';
 /** Source-code sections maintained by the documentation formatter. */
@@ -66,10 +59,6 @@ type SrcGroup = 'CONFIG' | 'HELPERS';
 export type DocumentationRequirements = { types?: boolean; functions?: boolean; exportedFunctions?: boolean; noInlineFunctions?: boolean };
 /** A repeated named import reported within one source file. */
 export type DuplicateImportFinding = { file: string; line: number; module: string };
-const PNPM_FENCE = /^\s*```(?:sh|bash|zsh|shell)\s*$/i;
-const FENCE_CLOSE = /^\s*```\s*$/;
-const PNPM_DIR_FLAG = /^(\s*(?:\$\s*)?pnpm)\s+(?:-C|--prefix)(\s+)("[^"]+"|'[^']+'|\S+)(.*)$/;
-
 /**
  * Finds obsolete pnpm directory flags in configured Markdown shell fences.
  *
