@@ -199,7 +199,7 @@ export const withResponsivePlaywright = <T extends PlaywrightTestConfig>(cfg: T,
 		}));
 	});
 	const cfgdReporters = cfg.reporter ? (Array.isArray(cfg.reporter) ? cfg.reporter : [cfg.reporter]) : [];
-	const reportingOpts = { outputRoot: opts.outputRoot, supplementalResultsFile: opts.supplementalResultsFile, qualityConfigFile: opts.qualityConfigFile, loadTesting };
+	const reportingOpts = { outputRoot: opts.outputRoot, supplementalResultsFile: opts.supplementalResultsFile, qualityConfigFile: opts.qualityConfigFile, loadTesting, viewportCatalog: opts.viewportCatalog };
 	const reporters = [
 		...cfgdReporters.filter((r) => {
 			const name = Array.isArray(r) ? r[0] : r;
