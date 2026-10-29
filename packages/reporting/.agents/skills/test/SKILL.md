@@ -16,7 +16,7 @@ For requests spanning modes, work in that order. Evaluation uses `ordering` then
 
 ## Test hierarchy
 
-Keep repository tests under `tests/`, grouped by the product area and source route they prove. Treat `tests/suites.json` as the explicit inventory and execution order; add or move every test there and run `pnpm run test:hierarchy`. Use `.test.*` for Node and `.spec.ts` for Playwright. Keep shared support in `tests/scripts/test/support/` and domain-only support beside its owning suite.
+Mirror the current source and route tree so each assertion has one obvious owner. Use the repository's root `.terra-tests.json` as the canonical ordered suite and test-file ownership manifest where supported; do not maintain a competing inventory. See [`test/ordering`](ordering/SKILL.md) for ownership validation and safe consolidation maps, and [`test/writing`](writing/SKILL.md) for assigning assertions to source, route, or domain owners. Keep runner-specific files separate only when the execution boundary requires it.
 
 ## Coverage contract
 
@@ -31,11 +31,11 @@ Exhaustiveness means each material state and risk has an owner at the cheapest r
 
 ## Choose the layer
 
-1. Source/architecture contracts for ownership, inventories, security boundaries, and forbidden legacy paths.
+1. The cheapest reliable layer that proves the contract, from unit or source checks through integration and browser coverage.
 2. Unit/fast integration for transformations, validation, ranking, state changes, and errors.
 3. API/fixture integration for persistence, authorization, and cross-module contracts.
 4. Browser tests for visible behavior, navigation, accessibility, diagnostics, and real integration seams.
-5. Responsive visual runs for composition, geometry, wrapping, overflow, and breakpoint behavior.
+5. Responsive visual runs for composition, geometry, wrapping, overflow, and scenario-relevant breakpoint behavior. Select and declare viewports from measured layout risk, then report selected and configured coverage; see [`test/ordering`](ordering/SKILL.md).
 6. Workbook/PowerPoint evidence for auditability, never as a replacement for assertions.
 
-Avoid duplicating lower-level contracts in expensive browser tests unless they prove an additional user or integration boundary. Assert observable outcomes rather than incidental implementation details.
+Avoid duplicating lower-level contracts in expensive browser tests unless they prove an additional user or integration boundary. Add source-contract tests when they provide the cheapest reliable proof, not as a blanket prerequisite for every change. Assert observable outcomes rather than incidental implementation details.
