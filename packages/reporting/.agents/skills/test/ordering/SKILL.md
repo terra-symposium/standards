@@ -76,6 +76,18 @@ Report unexecuted contexts explicitly. Never summarize a partial matrix as “gr
 
 ## Cross-repository ordering lessons
 
+### Inventory and ownership
+
+Use the repository-root `.terra-tests.json` as the canonical ordered suite manifest. Keep the mapping of suite names, commands, execution contexts, and owned test-file globs there; do not maintain competing suite lists in scripts or documentation. For route- or source-domain organization, mirror the current production source tree so a moved source module has an obvious test owner.
+
+Assign each assertion to one canonical owner: the source module, route, or domain whose contract it proves. Put architecture, integration, visual, and regression assertions with that owner instead of duplicating the same contract across test files. Keep a test in a separate file only when a distinct runner or execution boundary requires it. Validate that every discovered test file belongs to exactly one manifest suite; duplicates and omissions must fail inventory validation, not be silently ignored.
+
+Before consolidating an existing inventory, create a migration map from each old test file or case to its new owner and disposition (move, merge, or retire). For every retired assertion, record the reason and the surviving test or explicit coverage gap. Review the map against source imports and current behavior before deleting old paths, then remove the temporary map after the migration is verified.
+
+### Scenario viewport selection
+
+Choose viewports per scenario from the layout's actual responsive constraints. Record the scenario, relevant breakpoint or content-width threshold, selected viewport names and dimensions, and why each selection can expose the risk. Use the narrowest representative size, the nearest widths on either side of a layout transition, and any required extreme; do not automatically run all six viewports for every scenario. Keep the full configured matrix for broad responsive or release coverage. Declare the selection through the repository's supported `PW_VIEWPORTS` mechanism and preserve the exact selection in the run manifest/report. Report selected and configured viewport inventories so a subset cannot be mistaken for complete coverage.
+
 When a Terra-family repository has a single-page Astro shell with nested panels, mirror the route tree in the test paths rather than preserving historical feature or milestone folders. Use one file per domain inside meaningful route folders where the source tree has those boundaries (`auth/auth.test.ts`, `dashboard/conversation.test.ts`, `dashboard/customers.test.ts`, `admin/admin.test.ts`) and keep only genuine utility boundaries such as helpers, fixtures, and generated results as directories.
 
 Keep the hierarchy inside each file: route boundary first, then page region, data flow, persistence/security contract, and responsive behavior. Historical milestone names belong in nested `describe` labels, not in paths. This keeps ownership obvious when a page or action moves and prevents stale folder names from becoming a compatibility contract.
