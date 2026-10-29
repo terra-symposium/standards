@@ -193,7 +193,9 @@ test('collects only declared viewport scenarios and passes custom dimensions to 
 	assert.match('@viewport:compact', config.projects[0].grep);
 	assert.doesNotMatch('@viewport:expanded', config.projects[0].grep);
 	assert.deepEqual(config.reporter.find((entry) => Array.isArray(entry) && entry[0] === '@terra-symposium/standards-reporting/playwright')[1].viewportCatalog, viewportCatalog);
-	assert.throws(() => withResponsivePlaywright({ projects: [{ name: 'dashboard', grep: /existing/ }] }, { viewportPolicy: 'declared', viewportCatalog }), /already defines grep/);
+	const filtered = withResponsivePlaywright({ projects: [{ name: 'dashboard', grep: /@sanity-studio/u }] }, { viewportPolicy: 'declared', viewportCatalog });
+	assert.match('@sanity-studio @viewport:compact', filtered.projects[0].grep);
+	assert.doesNotMatch('@sanity-studio @viewport:expanded', filtered.projects[0].grep);
 });
 
 /* Persists default Playwright result screenshots across partial runs and rebuilds a deduplicated deck from the folder. */

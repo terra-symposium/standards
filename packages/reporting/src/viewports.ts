@@ -179,11 +179,19 @@ export const withResponsivePlaywright = <T extends PlaywrightTestConfig>(cfg: T,
 	const responsiveProjects = projects.flatMap((p, i) => {
 		const baseName = p.name || `project-${i + 1}`;
 		if (isSetup(p, i) || singleRun.has(baseName)) return [p];
-		if (opts.viewportPolicy === 'declared' && p.grep) throw new Error(`Project ${baseName} already defines grep; move its selector into testMatch before using declared viewports.`);
 		return viewports.map((v) => ({
 			...p,
 			name: visualProjectName(baseName, v, viewports),
-			...(opts.viewportPolicy === 'declared' ? { grep: new RegExp(`(?:^|\\s)@viewport:${v.name.replace(/[^a-z0-9-]/gi, '\\$&')}(?=\\s|$)`) } : {}),
+			...(opts.viewportPolicy === 'declared'
+				? {
+						grep: p.grep
+							? new RegExp(
+									`(?=[\\s\\S]*(?:${p.grep instanceof RegExp ? p.grep.source : p.grep}))(?=[\\s\\S]*@viewport:${v.name.replace(/[^a-z0-9-]/gi, '\\$&')}(?=\\s|$))`,
+									p.grep instanceof RegExp ? p.grep.flags : '',
+								)
+							: new RegExp(`(?:^|\\s)@viewport:${v.name.replace(/[^a-z0-9-]/gi, '\\$&')}(?=\\s|$)`),
+					}
+				: {}),
 			use: { ...(p.use || {}), viewport: { width: v.width, height: v.height }, screenshot: { mode: 'on', fullPage: true, caret: 'initial' } },
 		}));
 	});
