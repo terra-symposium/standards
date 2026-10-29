@@ -276,6 +276,94 @@ test('rebuilds the default screenshot deck from accumulated captures', async () 
 	}
 });
 
+/* Aggregates sequential viewport reporter processes into one logical screenshot run and resumes it after interruption. */
+test('aggregates shared screenshot runs across viewport subprocesses and restarts', async () => {
+	const root = await fs.mkdtemp(path.join(os.tmpdir(), 'terra-reporting-matrix-run-'));
+	const runId = `matrix-${path.basename(root)}`;
+	try {
+		const { default: sharp } = await import('sharp');
+		const screenshot = path.join(root, 'source.png');
+		await sharp({ create: { width: 24, height: 16, channels: 3, background: { r: 60, g: 100, b: 140 } } })
+			.png()
+			.toFile(screenshot);
+		const outputRoot = path.join(root, 'visual');
+		const evidenceDirectory = path.join(outputRoot, 'screenshots');
+		const makeTest = (id, viewport) => ({
+			id,
+			location: { file: path.join(root, 'tests', 'responsive.spec.ts') },
+			title: `renders ${viewport}`,
+			titlePath: () => ['responsive.spec.ts', `renders ${viewport}`],
+			parent: { project: () => ({ name: `browser-${viewport}` }) },
+		});
+		const reporterProgram = `
+			import ProgressReporter from '@terra-symposium/standards-reporting/playwright';
+			const reporter = new ProgressReporter({ outputRoot: process.env.OUTPUT_ROOT, loadTesting: { enabled: false } });
+			const selectedTest = {
+				id: process.env.TEST_ID,
+				location: { file: 'tests/responsive.spec.ts' },
+				title: 'renders ' + process.env.VIEWPORT,
+				titlePath: () => ['responsive.spec.ts', 'renders ' + process.env.VIEWPORT],
+				parent: { project: () => ({ name: 'browser-' + process.env.VIEWPORT }) },
+			};
+			reporter.onBegin({}, { allTests: () => [selectedTest] });
+			if (process.env.COMPLETE_TEST === '1') reporter.onTestEnd(selectedTest, {
+				attachments: [{ name: 'screenshot', contentType: 'image/png', path: process.env.SCREENSHOT }],
+				duration: 5,
+				error: undefined,
+				retry: 0,
+				status: 'passed',
+			});
+			await reporter.onEnd();
+		`;
+		const runProcess = async (selectedTest, { completed = true, finalize = false } = {}) => {
+			await execFileAsync(process.execPath, ['--input-type=module', '-e', reporterProgram], {
+				cwd: process.cwd(),
+				env: {
+					...process.env,
+					TERRA_SCREENSHOT_RUN_ID: runId,
+					TERRA_SCREENSHOT_RUN_FINALIZE: finalize ? '1' : '0',
+					OUTPUT_ROOT: outputRoot,
+					SCREENSHOT: screenshot,
+					TEST_ID: selectedTest.id,
+					VIEWPORT: selectedTest.parent.project().name.slice('browser-'.length),
+					COMPLETE_TEST: completed ? '1' : '0',
+				},
+			});
+		};
+
+		const mobile = makeTest('mobile-test-id', 'mobile');
+		const desktop = makeTest('desktop-test-id', 'xl');
+		await runProcess(mobile);
+		let marker = JSON.parse(await fs.readFile(path.join(evidenceDirectory, '.terra-playwright-run.json'), 'utf8'));
+		assert.deepEqual([marker.expectedTestCount, marker.completedTestCount, marker.collectionFinished], [1, 1, false]);
+
+		// The desktop subprocess starts but is interrupted. It must add its expected ID without replacing the mobile result.
+		await runProcess(desktop, { completed: false });
+		marker = JSON.parse(await fs.readFile(path.join(evidenceDirectory, '.terra-playwright-run.json'), 'utf8'));
+		assert.deepEqual([marker.expectedTestCount, marker.completedTestCount, marker.collectionFinished], [2, 1, false]);
+		assert.deepEqual(marker.expectedTestIds, ['desktop-test-id', 'mobile-test-id']);
+		assert.deepEqual(marker.completedTestIds, ['mobile-test-id']);
+		assert.equal(readScreenshotCapturesFromDirectory(evidenceDirectory).length, 1, 'the partial folder still rebuilds from its completed capture');
+
+		// Restarting the same viewport under the same logical ID completes the matrix without recounting prior tests.
+		await runProcess(desktop, { finalize: true });
+		marker = JSON.parse(await fs.readFile(path.join(evidenceDirectory, '.terra-playwright-run.json'), 'utf8'));
+		assert.deepEqual([marker.expectedTestCount, marker.completedTestCount, marker.collectionFinished], [2, 2, true]);
+		const captures = readScreenshotCapturesFromDirectory(evidenceDirectory);
+		assert.deepEqual(captures.map(({ viewport, runId: captureRunId, historical }) => [viewport, captureRunId, historical]).sort(), [
+			['mobile', runId, false],
+			['xl', runId, false],
+		]);
+
+		// Repeating an already counted subsection is idempotent for expected/executed totals.
+		await runProcess(mobile, { finalize: true });
+		marker = JSON.parse(await fs.readFile(path.join(evidenceDirectory, '.terra-playwright-run.json'), 'utf8'));
+		assert.deepEqual([marker.expectedTestCount, marker.completedTestCount, marker.collectionFinished], [2, 2, true]);
+	} finally {
+		await fs.rm(root, { recursive: true, force: true });
+	}
+});
+
 /* Covers default timing thresholds, grading boundaries, config overrides, and failure-safe measurement. */
 test('loads and grades per-test and operation timing budgets', async () => {
 	assert.deepEqual(DEFAULT_LOAD_BUDGET, { warnMs: 2000, failMs: 5000 });
