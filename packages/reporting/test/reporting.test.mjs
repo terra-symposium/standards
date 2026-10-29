@@ -288,6 +288,13 @@ test('aggregates shared screenshot runs across viewport subprocesses and restart
 			.toFile(screenshot);
 		const outputRoot = path.join(root, 'visual');
 		const evidenceDirectory = path.join(outputRoot, 'screenshots');
+		const latestArtifacts = async () => {
+			const runs = (await fs.readdir(outputRoot, { withFileTypes: true }))
+				.filter((entry) => entry.isDirectory() && entry.name !== 'screenshots')
+				.map((entry) => entry.name)
+				.sort();
+			return fs.readdir(path.join(outputRoot, runs.at(-1)));
+		};
 		const makeTest = (id, viewport) => ({
 			id,
 			location: { file: path.join(root, 'tests', 'responsive.spec.ts') },
@@ -336,6 +343,8 @@ test('aggregates shared screenshot runs across viewport subprocesses and restart
 		await runProcess(mobile);
 		let marker = JSON.parse(await fs.readFile(path.join(evidenceDirectory, '.terra-playwright-run.json'), 'utf8'));
 		assert.deepEqual([marker.expectedTestCount, marker.completedTestCount, marker.collectionFinished], [1, 1, false]);
+		assert.ok((await latestArtifacts()).includes('report.xlsx'));
+		assert.ok(!(await latestArtifacts()).includes('report.pptx'), 'intermediate viewport process does not build a deck');
 
 		// The desktop subprocess starts but is interrupted. It must add its expected ID without replacing the mobile result.
 		await runProcess(desktop, { completed: false });
@@ -349,6 +358,8 @@ test('aggregates shared screenshot runs across viewport subprocesses and restart
 		await runProcess(desktop, { finalize: true });
 		marker = JSON.parse(await fs.readFile(path.join(evidenceDirectory, '.terra-playwright-run.json'), 'utf8'));
 		assert.deepEqual([marker.expectedTestCount, marker.completedTestCount, marker.collectionFinished], [2, 2, true]);
+		assert.ok((await latestArtifacts()).includes('report.xlsx'));
+		assert.ok((await latestArtifacts()).includes('report.pptx'), 'final viewport process builds the accumulated deck');
 		const captures = readScreenshotCapturesFromDirectory(evidenceDirectory);
 		assert.deepEqual(captures.map(({ viewport, runId: captureRunId, historical }) => [viewport, captureRunId, historical]).sort(), [
 			['mobile', runId, false],

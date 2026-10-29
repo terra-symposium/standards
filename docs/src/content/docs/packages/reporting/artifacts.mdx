@@ -5,7 +5,7 @@ description: Write and understand the spreadsheet and slideshow outputs.
 
 ## Outputs from the Playwright reporter
 
-The default reporter creates a timestamped run directory under `test-results/visual`. Each run contains:
+The default reporter creates a timestamped run directory under `test-results/visual`. Each process writes its workbook and screenshots; only the finalizing process in a shared viewport matrix creates the PowerPoint. A standalone process finalizes automatically. The artifacts are:
 
 - `report.xlsx`: a summary, result sheets grouped by test file, project information, diagnostics, and—when enabled—a load-timings sheet.
 - `report.pptx`: screenshot-backed slides grouped by logical test, with responsive previews and diagnostic context. When timing is enabled, it includes a timing summary and paginated timing details.

@@ -837,10 +837,14 @@ export default class ProgressReporter {
 		const spreadsheet = path.join(runDir, this.options.reportFile);
 		const slideshow = path.join(runDir, this.options.slideshowFile);
 		await writeSpreadsheet(spreadsheet, run);
-		if (this.options.screenshotOnlySlideshow) {
-			await writeScreenshotSlideshowFromDirectory(path.resolve(this.options.screenshotsDirectory), slideshow);
-		} else await writeSlideshow(slideshow, this.options.loadTesting.enabled ? results : browserResults, { loadTestingEnabled: this.options.loadTesting.enabled });
-		process.stdout.write(`Test spreadsheet: ${spreadsheet}\nTest slideshow: ${slideshow}\n`);
+		if (this.options.screenshotOnlySlideshow && !this.finalizeScreenshotRun) {
+			process.stdout.write('Screenshot slideshow deferred until the logical run is finalized.\n');
+		} else {
+			if (this.options.screenshotOnlySlideshow) await writeScreenshotSlideshowFromDirectory(path.resolve(this.options.screenshotsDirectory), slideshow);
+			else await writeSlideshow(slideshow, this.options.loadTesting.enabled ? results : browserResults, { loadTestingEnabled: this.options.loadTesting.enabled });
+			process.stdout.write(`Test slideshow: ${slideshow}\n`);
+		}
+		process.stdout.write(`Test spreadsheet: ${spreadsheet}\n`);
 		const measurements = results.flatMap((r) => r.loadMeasurements || []);
 		const loadCounts = loadGradeCounts(measurements);
 		if (this.options.loadTesting.enabled) process.stdout.write(`Load budgets: ${loadCounts.pass} pass, ${loadCounts.warning} warning, ${loadCounts.fail} fail.\n`);
