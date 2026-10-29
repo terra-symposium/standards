@@ -1,5 +1,15 @@
 # @terra-symposium/standards-reporting
 
+## 0.6.0
+
+### Minor Changes
+
+- 3375c1d: Allow Playwright scenarios to declare their selected viewport projects and supply a custom viewport catalog while preserving the existing all-viewport default.
+
+### Patch Changes
+
+- 59196ba: Resolve screenshot sidecar paths relative to the capture directory when regenerating a slideshow.
+
 ## 0.5.0
 
 ### Minor Changes
