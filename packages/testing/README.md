@@ -14,13 +14,13 @@ Add `.terra-tests.json` at the repository root:
       "name": "unit",
       "command": "pnpm",
       "args": ["run", "test:unit"],
-      "owns": ["tests/unit"]
+      "owns": ["tests/unit/**/*.test.ts"]
     }
   ]
 }
 ```
 
-Each suite has one command. `owns` lists repository-relative test paths or suite identifiers and prevents two entries from claiming the same tests. Duplicate command, arguments, and working-directory combinations are rejected when the plan is loaded. The manifest is optional when a repository has no custom suites.
+Each suite has one command. `owns` is required and lists repository-relative file globs for the test files that command executes. The runner expands these globs against files in `test` or `tests` directories and `*.test.*` or `*.spec.*` files, rejecting files claimed by multiple suites or left out of every suite. Duplicate command, arguments, and working-directory combinations are also rejected when the plan is loaded. The manifest is optional when a repository has no custom suites.
 
 After adding the package as a development dependency, run it locally with:
 
