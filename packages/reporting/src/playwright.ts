@@ -10,7 +10,7 @@ IMPORTS
 // API
 import fs from 'node:fs';
 import path from 'node:path';
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { baseVisualProjectName, projectViewportName, viewportSizeLabel } from './viewports.js';
 import { diagnosticCount, normalizeVisualStatus } from './core.js';
 import { gradeLoadMeasurement, loadGradeCounts, loadTestId, readLoadTestingConfig, timeLoadOperation, validateLoadBudgetOverride } from './load-testing.js';
@@ -305,7 +305,7 @@ const persistScreenshotCapture = (directory: string, capture: ScreenshotCapture)
 	if (fs.existsSync(recordFile)) {
 		try {
 			const previous = JSON.parse(fs.readFileSync(recordFile, 'utf8')) as ScreenshotCapture;
-			if ((previous.retry || 0) > (capture.retry || 0)) return { ...previous, screenshot };
+			if (previous.runId === capture.runId && (previous.retry || 0) > (capture.retry || 0)) return { ...previous, screenshot };
 		} catch {
 			// Replace an incomplete record with the next valid result.
 		}
@@ -318,6 +318,48 @@ const persistScreenshotCapture = (directory: string, capture: ScreenshotCapture)
 	fs.writeFileSync(temporaryRecord, JSON.stringify(persisted));
 	fs.renameSync(temporaryRecord, recordFile);
 	return persisted;
+};
+
+const screenshotRunFile = '.terra-playwright-run.json';
+/** Latest reporter collection state persisted beside accumulated screenshots. */
+type ScreenshotRun = {
+	runId: string;
+	startedAt: string;
+	expectedTestCount: number;
+	completedTestCount: number;
+	expectedTestIds?: string[];
+	completedTestIds?: string[];
+	finishedAt?: string;
+	collectionFinished: boolean;
+};
+/** Reads the latest marker while treating malformed or legacy state as absent. */
+const readScreenshotRun = (directory: string): ScreenshotRun | undefined => {
+	try {
+		const run: unknown = JSON.parse(fs.readFileSync(path.join(directory, screenshotRunFile), 'utf8'));
+		if (!run || typeof run !== 'object') return undefined;
+		const value = run as Record<string, unknown>;
+		if (typeof value.runId !== 'string' || typeof value.startedAt !== 'string' || typeof value.expectedTestCount !== 'number' || typeof value.completedTestCount !== 'number') return undefined;
+		return {
+			runId: value.runId,
+			startedAt: value.startedAt,
+			expectedTestCount: value.expectedTestCount,
+			completedTestCount: value.completedTestCount,
+			expectedTestIds: Array.isArray(value.expectedTestIds) ? value.expectedTestIds.filter((id): id is string => typeof id === 'string') : undefined,
+			completedTestIds: Array.isArray(value.completedTestIds) ? value.completedTestIds.filter((id): id is string => typeof id === 'string') : undefined,
+			finishedAt: typeof value.finishedAt === 'string' ? value.finishedAt : undefined,
+			collectionFinished: value.collectionFinished === true,
+		};
+	} catch {
+		return undefined;
+	}
+};
+/** Atomically writes the latest run marker so interrupted captures remain identifiable. */
+const writeScreenshotRun = (directory: string, run: ScreenshotRun): void => {
+	fs.mkdirSync(directory, { recursive: true });
+	const file = path.join(directory, screenshotRunFile);
+	const temporaryFile = `${file}.${process.pid}.tmp`;
+	fs.writeFileSync(temporaryFile, JSON.stringify(run));
+	fs.renameSync(temporaryFile, file);
 };
 
 /** Validates the keyed-capture manifest emitted by the `visualTest` fixture. */
@@ -545,6 +587,9 @@ export default class ProgressReporter {
 	private readonly runDiagnostics: string[] = [];
 	private readonly expectedTests = new Map<string, { location: { file: string }; title: string; titlePath: () => string[]; parent: { project: () => { name: string } | undefined } }>();
 	private readonly completedTests = new Set<string>();
+	private readonly screenshotRunId = process.env.TERRA_SCREENSHOT_RUN_ID?.trim() || randomUUID();
+	private readonly finalizeScreenshotRun = process.env.TERRA_SCREENSHOT_RUN_FINALIZE !== '0';
+	private readonly screenshotRunStartedAt = new Date().toISOString();
 
 	/**
 	 * Creates a reporter that writes application-specific visual test artifacts.
@@ -577,6 +622,22 @@ export default class ProgressReporter {
 		suite: Parameters<NonNullable<import('@playwright/test/reporter').Reporter['onBegin']>>[1],
 	): void {
 		for (const test of suite.allTests()) this.expectedTests.set(test.id, test);
+		if (!process.argv.includes('--list')) {
+			const directory = path.resolve(this.options.screenshotsDirectory);
+			const previous = readScreenshotRun(directory);
+			const sameRun = previous?.runId === this.screenshotRunId ? previous : undefined;
+			const expectedTestIds = [...new Set([...(sameRun?.expectedTestIds || []), ...this.expectedTests.keys()])].sort();
+			const completedTestIds = [...new Set(sameRun?.completedTestIds || [])].sort();
+			writeScreenshotRun(directory, {
+				collectionFinished: false,
+				completedTestCount: Math.max(sameRun?.completedTestCount || 0, completedTestIds.length),
+				completedTestIds,
+				expectedTestCount: Math.max(sameRun?.expectedTestCount || 0, expectedTestIds.length),
+				expectedTestIds,
+				runId: this.screenshotRunId,
+				startedAt: sameRun?.startedAt || this.screenshotRunStartedAt,
+			});
+		}
 		if (!this.options.featureFiles.length || !this.options.projects.length) {
 			const projectFiles = new Map<string, Set<string>>();
 			const files = new Set<string>();
@@ -677,6 +738,8 @@ export default class ProgressReporter {
 					viewportSize: identity.viewportSize,
 					screenshot,
 					retry: result.retry,
+					runId: this.screenshotRunId,
+					capturedAt: new Date().toISOString(),
 				}),
 			);
 		}
@@ -706,6 +769,8 @@ export default class ProgressReporter {
 					viewportSize: identity.viewportSize,
 					screenshot: capturePath,
 					retry: result.retry,
+					runId: this.screenshotRunId,
+					capturedAt: new Date().toISOString(),
 				}),
 			);
 		}
@@ -732,6 +797,23 @@ export default class ProgressReporter {
 				visual: 'No visual surface',
 			});
 		}
+		if (!process.argv.includes('--list')) {
+			const directory = path.resolve(this.options.screenshotsDirectory);
+			const previous = readScreenshotRun(directory);
+			const sameRun = previous?.runId === this.screenshotRunId ? previous : undefined;
+			const expectedTestIds = [...new Set([...(sameRun?.expectedTestIds || []), ...this.expectedTests.keys()])].sort();
+			const completedTestIds = [...new Set([...(sameRun?.completedTestIds || []), ...this.completedTests])].sort();
+			writeScreenshotRun(directory, {
+				collectionFinished: this.finalizeScreenshotRun,
+				completedTestCount: Math.max(sameRun?.completedTestCount || 0, completedTestIds.length),
+				completedTestIds,
+				expectedTestCount: Math.max(sameRun?.expectedTestCount || 0, expectedTestIds.length),
+				expectedTestIds,
+				...(this.finalizeScreenshotRun ? { finishedAt: new Date().toISOString() } : {}),
+				runId: this.screenshotRunId,
+				startedAt: sameRun?.startedAt || this.screenshotRunStartedAt,
+			});
+		}
 		const runDir = path.resolve(this.options.outputRoot, new Date().toISOString().replace(/[:.]/g, '-'));
 		fs.mkdirSync(runDir, { recursive: true });
 		const browserResults = copyScreenshots(this.results, runDir);
@@ -755,10 +837,14 @@ export default class ProgressReporter {
 		const spreadsheet = path.join(runDir, this.options.reportFile);
 		const slideshow = path.join(runDir, this.options.slideshowFile);
 		await writeSpreadsheet(spreadsheet, run);
-		if (this.options.screenshotOnlySlideshow) {
-			await writeScreenshotSlideshowFromDirectory(path.resolve(this.options.screenshotsDirectory), slideshow);
-		} else await writeSlideshow(slideshow, this.options.loadTesting.enabled ? results : browserResults, { loadTestingEnabled: this.options.loadTesting.enabled });
-		process.stdout.write(`Test spreadsheet: ${spreadsheet}\nTest slideshow: ${slideshow}\n`);
+		if (this.options.screenshotOnlySlideshow && !this.finalizeScreenshotRun) {
+			process.stdout.write('Screenshot slideshow deferred until the logical run is finalized.\n');
+		} else {
+			if (this.options.screenshotOnlySlideshow) await writeScreenshotSlideshowFromDirectory(path.resolve(this.options.screenshotsDirectory), slideshow);
+			else await writeSlideshow(slideshow, this.options.loadTesting.enabled ? results : browserResults, { loadTestingEnabled: this.options.loadTesting.enabled });
+			process.stdout.write(`Test slideshow: ${slideshow}\n`);
+		}
+		process.stdout.write(`Test spreadsheet: ${spreadsheet}\n`);
 		const measurements = results.flatMap((r) => r.loadMeasurements || []);
 		const loadCounts = loadGradeCounts(measurements);
 		if (this.options.loadTesting.enabled) process.stdout.write(`Load budgets: ${loadCounts.pass} pass, ${loadCounts.warning} warning, ${loadCounts.fail} fail.\n`);
