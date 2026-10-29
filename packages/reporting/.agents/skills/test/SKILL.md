@@ -14,9 +14,11 @@ Use for work that creates, expands, orders, repairs, evaluates, or represents Te
 
 For requests spanning modes, work in that order. Evaluation uses `ordering` then `represent`; “keep fixing until green” uses `fixing`, then `represent` when visual or browser coverage applies.
 
+This family is the canonical owner of test-policy guidance: this skill routes work, `writing` owns scenario design and evidence selection, and `ordering` owns run selection and execution. Follow [`references/test-structure-and-responsive-evidence.md`](references/test-structure-and-responsive-evidence.md) for ownership, consolidation, retirement, viewport selection, and programmatic evidence.
+
 ## Test hierarchy
 
-Mirror the current source and route tree so each assertion has one obvious owner. Use the repository's root `.terra-tests.json` as the canonical ordered suite and test-file ownership manifest where supported; do not maintain a competing inventory. See [`test/ordering`](ordering/SKILL.md) for ownership validation and safe consolidation maps, and [`test/writing`](writing/SKILL.md) for assigning assertions to source, route, or domain owners. Keep runner-specific files separate only when the execution boundary requires it.
+Mirror the source and route tree beneath the test root, and assign each behavior one authoritative owner. Use the root `.terra-tests.json` as the canonical suite and test-file ownership manifest where supported; do not maintain a competing inventory. Keep runner-specific files separate only when the execution boundary requires it. Follow the linked reference for the migration map and ownership checks.
 
 ## Coverage contract
 
@@ -35,7 +37,7 @@ Exhaustiveness means each material state and risk has an owner at the cheapest r
 2. Unit/fast integration for transformations, validation, ranking, state changes, and errors.
 3. API/fixture integration for persistence, authorization, and cross-module contracts.
 4. Browser tests for visible behavior, navigation, accessibility, diagnostics, and real integration seams.
-5. Responsive visual runs for composition, geometry, wrapping, overflow, and scenario-relevant breakpoint behavior. Select and declare viewports from measured layout risk, then report selected and configured coverage; see [`test/ordering`](ordering/SKILL.md).
+5. Responsive visual runs for composition, geometry, wrapping, overflow, and scenario-relevant breakpoint behavior. Select and declare viewports per scenario from source rules and measured layout risk; see the linked reference.
 6. Workbook/PowerPoint evidence for auditability, never as a replacement for assertions.
 
 Avoid duplicating lower-level contracts in expensive browser tests unless they prove an additional user or integration boundary. Add source-contract tests when they provide the cheapest reliable proof, not as a blanket prerequisite for every change. Assert observable outcomes rather than incidental implementation details.
