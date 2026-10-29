@@ -1,5 +1,14 @@
 # @terra-symposium/standards-reporting
 
+## 0.6.1
+
+### Patch Changes
+
+- 4486044: Aggregate expected and completed screenshot coverage across sequential viewport processes that share one logical run ID.
+- 27167fa: Compose existing Playwright project filters with declared viewport tags so ownership filters and viewport selection can be used together.
+- 7770132: Defer screenshot-only slideshow rebuilds until the final viewport process in a shared matrix run.
+- b369903: Mark screenshots from prior Playwright runs as historical in regenerated slideshow decks.
+
 ## 0.6.0
 
 ### Minor Changes
