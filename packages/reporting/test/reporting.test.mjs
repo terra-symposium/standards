@@ -185,15 +185,17 @@ test('expands regular Playwright projects and preserves single-run setup/capture
 
 test('collects only declared viewport scenarios and passes custom dimensions to reporting', () => {
 	const viewportCatalog = { compact: { width: 767, height: 900 }, expanded: { width: 768, height: 900 } };
-	const config = withResponsivePlaywright(
-		{ projects: [{ name: 'dashboard', testMatch: '**/dashboard.spec.ts' }] },
-		{ viewportPolicy: 'declared', viewportCatalog, loadTesting: { enabled: false } },
+	const config = withResponsivePlaywright({ projects: [{ name: 'dashboard', testMatch: '**/dashboard.spec.ts' }] }, { viewportPolicy: 'declared', viewportCatalog, loadTesting: { enabled: false } });
+	assert.deepEqual(
+		config.projects.map(({ name }) => name),
+		['dashboard-compact', 'dashboard-expanded'],
 	);
-	assert.deepEqual(config.projects.map(({ name }) => name), ['dashboard-compact', 'dashboard-expanded']);
 	assert.match('@viewport:compact', config.projects[0].grep);
 	assert.doesNotMatch('@viewport:expanded', config.projects[0].grep);
 	assert.deepEqual(config.reporter.find((entry) => Array.isArray(entry) && entry[0] === '@terra-symposium/standards-reporting/playwright')[1].viewportCatalog, viewportCatalog);
-	assert.throws(() => withResponsivePlaywright({ projects: [{ name: 'dashboard', grep: /existing/ }] }, { viewportPolicy: 'declared', viewportCatalog }), /already defines grep/);
+	const filtered = withResponsivePlaywright({ projects: [{ name: 'dashboard', grep: /@sanity-studio/u }] }, { viewportPolicy: 'declared', viewportCatalog });
+	assert.match('@sanity-studio @viewport:compact', filtered.projects[0].grep);
+	assert.doesNotMatch('@sanity-studio @viewport:expanded', filtered.projects[0].grep);
 });
 
 /* Persists default Playwright result screenshots across partial runs and rebuilds a deduplicated deck from the folder. */
