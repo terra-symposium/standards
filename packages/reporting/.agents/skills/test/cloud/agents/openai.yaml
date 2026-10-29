@@ -1,0 +1,3 @@
+interface:
+  display_name: "Terra Cloud Playwright"
+  short_description: "Run Playwright suites in verified Terra Cloud tasks"

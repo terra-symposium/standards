@@ -1,0 +1,13 @@
+# Cloud Workflow Evidence
+
+Use this reference only for a multi-domain Cloud repair.
+
+1. Resolve the current ID for the published `terra-symposium-test-fixing` environment through the official environment resolver and verify its repository binding. Stop with an environment-access blocker if the resolver cannot provide a current, verifiable result. Then initialize one committed run-state file with `node scripts/test/cloud-workflow.mjs init --state .agents/test-fixing/runs/<run-id>.json --environment-id <verified-environment-id>` from the verified Terra website checkout. The helper reads `scripts/test/cloud-domains.json`. The state contains the verified Cloud environment ID, task identifiers, commands, SHA, artifacts, and status, never credentials or provider values.
+2. Locate the Cloud checkout under `/workspace` with `scripts/test/cloud-checkout.mjs`; require one verified origin, branch, and SHA before running commands from that directory. Run the `preflight` helper and `node scripts/setup/with-secrets.mjs development -- pnpm run setup:verify` there. Record the real task URL, environment ID, runtime executable paths, command output, test inventory, and artifacts in the state. Do not dispatch workers until preflight is `green`.
+3. Collect each declared Playwright project before execution. Update the manifest/state with actual inventory; unassigned or duplicate ownership stops the run. The foundation owner alone may modify shared runner, reporter, setup, or common fixture infrastructure.
+4. Use one `gpt-6-luna` / `medium` / one-attempt Cloud task per domain and branch `codex/luna-fix-<domain>`. Tasks sharing mutable database, Sanity, session, index, or fixed-record fixtures remain serialized until run-scoped isolation is proved.
+5. Record each task URL, checkout SHA, branch, exact commands, counts, diagnostics, retries, artifacts, cleanup result, and failure ledger before integration. A task without evidence resumes from its recorded task URL; it is never duplicated.
+6. A deterministic setup failure is diagnosed immediately. Retry only after a configuration change or evidence of a transient service failure. Do not increase test timeouts/retries to satisfy a readiness deadline.
+7. Integrate only in `codex/test-fix-all`, preserve ordered commits, rebase onto current `development`, then re-run changed domains, complete collection, and the six viewport matrix. Open one PR only after the combined state validates.
+
+Required viewports: 390x844, 640x800, 768x900, 1024x768, 1280x720, and 1536x864. For changed responsive layouts, inspect breakpoint boundaries and headed Xvfb screenshots after behavioral checks pass.
