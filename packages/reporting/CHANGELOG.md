@@ -1,5 +1,11 @@
 # @terra-symposium/standards-reporting
 
+## 0.6.2
+
+### Patch Changes
+
+- fc41d9a: Persist stable screenshot and run identities across partial viewport processes, label prior captures as historical, and defer screenshot deck generation until the matrix is finalized.
+
 ## 0.6.1
 
 ### Patch Changes
