@@ -289,27 +289,44 @@ test('writes one slide per current capture when a run ID is supplied', async () 
 			.png()
 			.toFile(path.join(evidenceDirectory, 'capture.png'));
 		const runId = 'current-run';
-		for (let index = 0; index < 66; index++) {
+		for (let index = 0; index < 65; index++) {
 			await fs.writeFile(
 				path.join(evidenceDirectory, `capture-${index}.json`),
 				JSON.stringify({
-					group: `case-${index}`,
+					group: `case-${index}\u0000test-result`,
 					key: 'test-result',
 					title: `case ${index}`,
 					viewport: 'xl',
 					viewportSize: '1280×720',
 					screenshot: 'capture.png',
-					runId: index < 65 ? runId : 'historical-run',
+					runId,
 				}),
+			);
+		}
+		for (const [name, capture] of [
+			['retired-run', { group: 'retired-run\u0000test-result', viewport: 'xl', runId: 'historical-run' }],
+			['retired-test', { group: 'retired-test\u0000test-result', viewport: 'xl', runId }],
+			['retired-viewport', { group: 'case-0\u0000test-result', viewport: 'mobile', runId }],
+		]) {
+			await fs.writeFile(
+				path.join(evidenceDirectory, `${name}.json`),
+				JSON.stringify({ key: 'test-result', title: name, viewportSize: capture.viewport === 'mobile' ? '390×844' : '1280×720', screenshot: 'capture.png', ...capture }),
 			);
 		}
 		await fs.writeFile(
 			path.join(evidenceDirectory, '.terra-playwright-run.json'),
-			JSON.stringify({ runId, startedAt: new Date().toISOString(), expectedTestCount: 65, completedTestCount: 65, collectionFinished: true }),
+			JSON.stringify({
+				runId,
+				startedAt: new Date().toISOString(),
+				expectedTestCount: 65,
+				completedTestCount: 65,
+				collectionFinished: true,
+				expectedCaptureGroups: Array.from({ length: 65 }, (_, index) => ({ group: `case-${index}`, viewports: ['xl'] })),
+			}),
 		);
 		const captures = readScreenshotCapturesFromDirectory(evidenceDirectory);
 		assert.equal(captures.filter(({ historical }) => !historical).length, 65);
-		assert.equal(captures.filter(({ historical }) => historical).length, 1);
+		assert.equal(captures.filter(({ historical }) => historical).length, 3);
 		const currentDeck = path.join(root, 'current.pptx');
 		await writeScreenshotSlideshowFromDirectory(evidenceDirectory, currentDeck, { currentRunId: runId });
 		const { stdout: currentArchive } = await execFileAsync('unzip', ['-l', currentDeck]);
@@ -320,7 +337,9 @@ test('writes one slide per current capture when a run ID is supplied', async () 
 		const accumulatedDeck = path.join(root, 'accumulated.pptx');
 		await writeScreenshotSlideshowFromDirectory(evidenceDirectory, accumulatedDeck);
 		const { stdout: accumulatedArchive } = await execFileAsync('unzip', ['-l', accumulatedDeck]);
-		assert.match(accumulatedArchive, /ppt\/slides\/slide66\.xml/);
+		assert.match(accumulatedArchive, /ppt\/slides\/slide68\.xml/);
+		const { stdout: historicalSlide } = await execFileAsync('unzip', ['-p', accumulatedDeck, 'ppt/slides/slide2.xml']);
+		assert.match(historicalSlide, /HISTORICAL CAPTURE/);
 	} finally {
 		await fs.rm(root, { recursive: true, force: true });
 	}

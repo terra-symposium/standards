@@ -321,6 +321,8 @@ const persistScreenshotCapture = (directory: string, capture: ScreenshotCapture)
 };
 
 const screenshotRunFile = '.terra-playwright-run.json';
+/** Expected test identity paired with the viewports discovered across one logical run. */
+type ExpectedScreenshotGroup = { group: string; viewports: string[] };
 /** Latest reporter collection state persisted beside accumulated screenshots. */
 type ScreenshotRun = {
 	runId: string;
@@ -329,6 +331,7 @@ type ScreenshotRun = {
 	completedTestCount: number;
 	expectedTestIds?: string[];
 	completedTestIds?: string[];
+	expectedCaptureGroups?: ExpectedScreenshotGroup[];
 	finishedAt?: string;
 	collectionFinished: boolean;
 };
@@ -346,6 +349,15 @@ const readScreenshotRun = (directory: string): ScreenshotRun | undefined => {
 			completedTestCount: value.completedTestCount,
 			expectedTestIds: Array.isArray(value.expectedTestIds) ? value.expectedTestIds.filter((id): id is string => typeof id === 'string') : undefined,
 			completedTestIds: Array.isArray(value.completedTestIds) ? value.completedTestIds.filter((id): id is string => typeof id === 'string') : undefined,
+			expectedCaptureGroups: Array.isArray(value.expectedCaptureGroups)
+				? value.expectedCaptureGroups.flatMap((item): ExpectedScreenshotGroup[] => {
+						if (!item || typeof item !== 'object') return [];
+						const row = item as Record<string, unknown>;
+						if (typeof row.group !== 'string' || !Array.isArray(row.viewports)) return [];
+						const viewports = row.viewports.filter((viewport): viewport is string => typeof viewport === 'string');
+						return [{ group: row.group, viewports }];
+					})
+				: undefined,
 			finishedAt: typeof value.finishedAt === 'string' ? value.finishedAt : undefined,
 			collectionFinished: value.collectionFinished === true,
 		};
@@ -445,6 +457,12 @@ const testIdentity = (
 		viewport,
 		viewportSize: viewportSizeLabel(viewport, viewportCatalog),
 	};
+};
+
+/** Builds the stable key shared by a test's default and keyed screenshots across viewports. */
+const screenshotTestGroup = (test: { location: { file: string }; title: string; titlePath: () => string[] }, cfgdProject: string, viewportCatalog: ViewportCatalog): string => {
+	const identity = testIdentity(test, cfgdProject, viewportCatalog);
+	return [identity.project, path.relative(process.cwd(), test.location.file), identity.groups, identity.title].join('\u0000');
 };
 
 /** Resolves the title path portion used by the stable test budget key. */
@@ -587,6 +605,7 @@ export default class ProgressReporter {
 	private readonly runDiagnostics: string[] = [];
 	private readonly expectedTests = new Map<string, { location: { file: string }; title: string; titlePath: () => string[]; parent: { project: () => { name: string } | undefined } }>();
 	private readonly completedTests = new Set<string>();
+	private readonly expectedCaptureGroups = new Map<string, Set<string>>();
 	private readonly screenshotRunId = process.env.TERRA_SCREENSHOT_RUN_ID?.trim() || randomUUID();
 	private readonly finalizeScreenshotRun = process.env.TERRA_SCREENSHOT_RUN_FINALIZE !== '0';
 	private readonly screenshotRunStartedAt = new Date().toISOString();
@@ -626,6 +645,14 @@ export default class ProgressReporter {
 			const directory = path.resolve(this.options.screenshotsDirectory);
 			const previous = readScreenshotRun(directory);
 			const sameRun = previous?.runId === this.screenshotRunId ? previous : undefined;
+			for (const { group, viewports } of sameRun?.expectedCaptureGroups || []) this.expectedCaptureGroups.set(group, new Set(viewports));
+			for (const test of suite.allTests()) {
+				const configuredProject = test.parent.project()?.name || test.titlePath().find((v) => v.startsWith('root-')) || 'unknown';
+				const group = screenshotTestGroup(test, configuredProject, this.options.viewportCatalog);
+				const viewports = this.expectedCaptureGroups.get(group) || new Set<string>();
+				viewports.add(projectViewportName(configuredProject, this.options.viewportCatalog));
+				this.expectedCaptureGroups.set(group, viewports);
+			}
 			const expectedTestIds = [...new Set([...(sameRun?.expectedTestIds || []), ...this.expectedTests.keys()])].sort();
 			const completedTestIds = [...new Set(sameRun?.completedTestIds || [])].sort();
 			writeScreenshotRun(directory, {
@@ -634,6 +661,7 @@ export default class ProgressReporter {
 				completedTestIds,
 				expectedTestCount: Math.max(sameRun?.expectedTestCount || 0, expectedTestIds.length),
 				expectedTestIds,
+				expectedCaptureGroups: [...this.expectedCaptureGroups].map(([group, viewports]) => ({ group, viewports: [...viewports] })),
 				runId: this.screenshotRunId,
 				startedAt: sameRun?.startedAt || this.screenshotRunStartedAt,
 			});
@@ -727,7 +755,11 @@ export default class ProgressReporter {
 		};
 		this.results.push(addLoadMeasurements(norm, testId, attachedLoad.measurements, attachedLoad.testBudget, this.options.loadTesting));
 		const identity = testIdentity(test, test.parent.project()?.name || test.titlePath().find((v) => v.startsWith('root-')) || 'unknown', this.options.viewportCatalog);
-		const stableTestGroup = [identity.project, path.relative(process.cwd(), test.location.file), identity.groups, identity.title].join('\u0000');
+		const configuredProject = test.parent.project()?.name || test.titlePath().find((v) => v.startsWith('root-')) || 'unknown';
+		const stableTestGroup = screenshotTestGroup(test, configuredProject, this.options.viewportCatalog);
+		const expectedViewports = this.expectedCaptureGroups.get(stableTestGroup) || new Set<string>();
+		expectedViewports.add(identity.viewport);
+		this.expectedCaptureGroups.set(stableTestGroup, expectedViewports);
 		if (screenshot) {
 			this.screenshotCaptures.push(
 				persistScreenshotCapture(path.resolve(this.options.screenshotsDirectory), {
@@ -809,6 +841,7 @@ export default class ProgressReporter {
 				completedTestIds,
 				expectedTestCount: Math.max(sameRun?.expectedTestCount || 0, expectedTestIds.length),
 				expectedTestIds,
+				expectedCaptureGroups: [...this.expectedCaptureGroups].map(([group, viewports]) => ({ group, viewports: [...viewports] })),
 				...(this.finalizeScreenshotRun ? { finishedAt: new Date().toISOString() } : {}),
 				runId: this.screenshotRunId,
 				startedAt: sameRun?.startedAt || this.screenshotRunStartedAt,

@@ -28,7 +28,7 @@ export default withResponsivePlaywright(
 
 By default, regular projects run at the six shared viewport sizes. Set `PW_VIEWPORTS=mobile,lg` to select a subset. Setup projects and names listed in `singleRunProjects` run once. The helper enables full-page screenshots and the shared reporter.
 
-A timestamped directory under `test-results/visual` contains the workbook, slideshow, and copied screenshots. Each Playwright result screenshot and keyed visual capture is also stored with metadata under `test-results/visual/screenshots`. Repeated test/viewport captures replace their previous file, and each new slideshow is rebuilt from the whole folder, so interrupted and subset runs retain earlier evidence. A run marker identifies the latest collection; captures from older or legacy runs are visibly labeled `HISTORICAL CAPTURE` and never counted as current coverage. The Playwright output directory defaults to `test-results/playwright-output`.
+A timestamped directory under `test-results/visual` contains the workbook, slideshow, and copied screenshots. Each Playwright result screenshot and keyed visual capture is also stored with metadata under `test-results/visual/screenshots`. Repeated test/viewport captures replace their previous file, and each new slideshow is rebuilt from the whole folder, so interrupted and subset runs retain earlier evidence. The run marker records the current test and viewport inventory across processes in the same logical run; captures outside that inventory, from older runs, or from legacy folders are visibly labeled `HISTORICAL CAPTURE` and never counted as current coverage. The Playwright output directory defaults to `test-results/playwright-output`.
 
 ## More capabilities
 

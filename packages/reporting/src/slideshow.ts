@@ -227,6 +227,9 @@ export type ScreenshotCapture = {
 	historical?: boolean;
 };
 
+/** Expected test identities and viewports captured by one logical reporter run. */
+type ScreenshotRunInventory = { runId: string; expectedCaptureGroups?: Array<{ group: string; viewports: string[] }> };
+
 /** Presentation metadata and optional logical-run selection for screenshot-only captures. */
 export type ScreenshotSlideshowOptions = {
 	title?: string;
@@ -240,13 +243,19 @@ export type ScreenshotSlideshowOptions = {
 /** Reads persisted screenshot records and labels captures outside the latest run as historical. */
 export const readScreenshotCapturesFromDirectory = (directory: string, currentRunId?: string): ScreenshotCapture[] => {
 	if (!fs.existsSync(directory)) return [];
-	if (!currentRunId) {
-		try {
-			const run = JSON.parse(fs.readFileSync(path.join(directory, '.terra-playwright-run.json'), 'utf8')) as { runId?: unknown };
-			if (typeof run.runId === 'string') currentRunId = run.runId;
-		} catch {
-			// Legacy folders have no current-run marker; their captures are historical.
+	let currentCaptureGroups: Map<string, Set<string>> | undefined;
+	try {
+		const run = JSON.parse(fs.readFileSync(path.join(directory, '.terra-playwright-run.json'), 'utf8')) as ScreenshotRunInventory;
+		if (!currentRunId) currentRunId = run.runId;
+		if (run.runId === currentRunId && Array.isArray(run.expectedCaptureGroups)) {
+			currentCaptureGroups = new Map(
+				run.expectedCaptureGroups
+					.filter((item) => item && typeof item.group === 'string' && Array.isArray(item.viewports) && item.viewports.every((viewport) => typeof viewport === 'string'))
+					.map(({ group, viewports }) => [group, new Set(viewports)]),
+			);
 		}
+	} catch {
+		// Legacy folders have no current-run marker; their captures are historical.
 	}
 	return fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry): ScreenshotCapture[] => {
 		if (!entry.isFile() || !entry.name.endsWith('.json')) return [];
@@ -263,10 +272,17 @@ export const readScreenshotCapturesFromDirectory = (directory: string, currentRu
 				typeof capture.screenshot !== 'string'
 			)
 				return [];
+			const group = capture.group;
+			const viewport = capture.viewport;
 			const screenshot = path.isAbsolute(capture.screenshot)
 				? capture.screenshot
 				: [path.resolve(directory, capture.screenshot), path.resolve(capture.screenshot)].find((candidate) => fs.existsSync(candidate));
 			if (!screenshot || !fs.existsSync(screenshot)) return [];
+			const currentTest = currentCaptureGroups?.size
+				? [...currentCaptureGroups].some(([expectedGroup, viewports]) => group.startsWith(`${expectedGroup}\u0000`) && viewports.has(viewport))
+				: currentCaptureGroups
+					? false
+					: true;
 			return [
 				{
 					group: capture.group,
@@ -278,7 +294,7 @@ export const readScreenshotCapturesFromDirectory = (directory: string, currentRu
 					retry: typeof capture.retry === 'number' ? capture.retry : 0,
 					runId: typeof capture.runId === 'string' ? capture.runId : undefined,
 					capturedAt: typeof capture.capturedAt === 'string' ? capture.capturedAt : undefined,
-					historical: !currentRunId || capture.runId !== currentRunId,
+					historical: !currentRunId || capture.runId !== currentRunId || !currentTest,
 				},
 			];
 		} catch {
@@ -474,8 +490,6 @@ export const writeScreenshotSlideshow = async (file: string, captures: readonly 
 
 /** Rebuilds a screenshot-only slideshow from the reporter's durable capture directory. */
 export const writeScreenshotSlideshowFromDirectory = async (directory: string, file: string, opts: ScreenshotSlideshowOptions = {}): Promise<void> => {
-	const captures = readScreenshotCapturesFromDirectory(directory, opts.currentRunId).filter(
-		capture => !opts.currentRunId || capture.runId === opts.currentRunId,
-	);
+	const captures = readScreenshotCapturesFromDirectory(directory, opts.currentRunId).filter((capture) => !opts.currentRunId || (capture.runId === opts.currentRunId && !capture.historical));
 	if (captures.length) await writeScreenshotSlideshow(file, captures, opts);
 };
