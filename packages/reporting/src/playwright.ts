@@ -840,7 +840,7 @@ export default class ProgressReporter {
 		if (this.options.screenshotOnlySlideshow && !this.finalizeScreenshotRun) {
 			process.stdout.write('Screenshot slideshow deferred until the logical run is finalized.\n');
 		} else {
-			if (this.options.screenshotOnlySlideshow) await writeScreenshotSlideshowFromDirectory(path.resolve(this.options.screenshotsDirectory), slideshow);
+			if (this.options.screenshotOnlySlideshow) await writeScreenshotSlideshowFromDirectory(path.resolve(this.options.screenshotsDirectory), slideshow, { currentRunId: this.screenshotRunId });
 			else await writeSlideshow(slideshow, this.options.loadTesting.enabled ? results : browserResults, { loadTestingEnabled: this.options.loadTesting.enabled });
 			process.stdout.write(`Test slideshow: ${slideshow}\n`);
 		}

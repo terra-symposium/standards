@@ -227,8 +227,15 @@ export type ScreenshotCapture = {
 	historical?: boolean;
 };
 
-/** Presentation metadata for screenshot-only captures. */
-export type ScreenshotSlideshowOptions = { title?: string; author?: string; company?: string; subject?: string; currentRunId?: string };
+/** Presentation metadata and optional logical-run selection for screenshot-only captures. */
+export type ScreenshotSlideshowOptions = {
+	title?: string;
+	author?: string;
+	company?: string;
+	subject?: string;
+	/** Restrict a directory rebuild to this run; omit it to include historical captures. */
+	currentRunId?: string;
+};
 
 /** Reads persisted screenshot records and labels captures outside the latest run as historical. */
 export const readScreenshotCapturesFromDirectory = (directory: string, currentRunId?: string): ScreenshotCapture[] => {
@@ -467,6 +474,8 @@ export const writeScreenshotSlideshow = async (file: string, captures: readonly 
 
 /** Rebuilds a screenshot-only slideshow from the reporter's durable capture directory. */
 export const writeScreenshotSlideshowFromDirectory = async (directory: string, file: string, opts: ScreenshotSlideshowOptions = {}): Promise<void> => {
-	const captures = readScreenshotCapturesFromDirectory(directory, opts.currentRunId);
+	const captures = readScreenshotCapturesFromDirectory(directory, opts.currentRunId).filter(
+		capture => !opts.currentRunId || capture.runId === opts.currentRunId,
+	);
 	if (captures.length) await writeScreenshotSlideshow(file, captures, opts);
 };

@@ -278,6 +278,54 @@ test('rebuilds the default screenshot deck from accumulated captures', async () 
 	}
 });
 
+/* Keeps automatic screenshot decks bounded while retaining deliberate full-folder recovery. */
+test('writes one slide per current capture when a run ID is supplied', async () => {
+	const root = await fs.mkdtemp(path.join(os.tmpdir(), 'terra-reporting-current-run-'));
+	try {
+		const { default: sharp } = await import('sharp');
+		const evidenceDirectory = path.join(root, 'screenshots');
+		await fs.mkdir(evidenceDirectory, { recursive: true });
+		await sharp({ create: { width: 24, height: 16, channels: 3, background: { r: 60, g: 100, b: 140 } } })
+			.png()
+			.toFile(path.join(evidenceDirectory, 'capture.png'));
+		const runId = 'current-run';
+		for (let index = 0; index < 66; index++) {
+			await fs.writeFile(
+				path.join(evidenceDirectory, `capture-${index}.json`),
+				JSON.stringify({
+					group: `case-${index}`,
+					key: 'test-result',
+					title: `case ${index}`,
+					viewport: 'xl',
+					viewportSize: '1280×720',
+					screenshot: 'capture.png',
+					runId: index < 65 ? runId : 'historical-run',
+				}),
+			);
+		}
+		await fs.writeFile(
+			path.join(evidenceDirectory, '.terra-playwright-run.json'),
+			JSON.stringify({ runId, startedAt: new Date().toISOString(), expectedTestCount: 65, completedTestCount: 65, collectionFinished: true }),
+		);
+		const captures = readScreenshotCapturesFromDirectory(evidenceDirectory);
+		assert.equal(captures.filter(({ historical }) => !historical).length, 65);
+		assert.equal(captures.filter(({ historical }) => historical).length, 1);
+		const currentDeck = path.join(root, 'current.pptx');
+		await writeScreenshotSlideshowFromDirectory(evidenceDirectory, currentDeck, { currentRunId: runId });
+		const { stdout: currentArchive } = await execFileAsync('unzip', ['-l', currentDeck]);
+		assert.match(currentArchive, /ppt\/slides\/slide65\.xml/);
+		assert.doesNotMatch(currentArchive, /ppt\/slides\/slide66\.xml/);
+		const { stdout: currentSlide } = await execFileAsync('unzip', ['-p', currentDeck, 'ppt/slides/slide1.xml']);
+		assert.match(currentSlide, /CURRENT RUN/);
+		const accumulatedDeck = path.join(root, 'accumulated.pptx');
+		await writeScreenshotSlideshowFromDirectory(evidenceDirectory, accumulatedDeck);
+		const { stdout: accumulatedArchive } = await execFileAsync('unzip', ['-l', accumulatedDeck]);
+		assert.match(accumulatedArchive, /ppt\/slides\/slide66\.xml/);
+	} finally {
+		await fs.rm(root, { recursive: true, force: true });
+	}
+});
+
 /* Aggregates sequential viewport reporter processes into one logical screenshot run and resumes it after interruption. */
 test('aggregates shared screenshot runs across viewport subprocesses and restarts', async () => {
 	const root = await fs.mkdtemp(path.join(os.tmpdir(), 'terra-reporting-matrix-run-'));
@@ -324,12 +372,12 @@ test('aggregates shared screenshot runs across viewport subprocesses and restart
 			});
 			await reporter.onEnd();
 		`;
-		const runProcess = async (selectedTest, { completed = true, finalize = false } = {}) => {
+		const runProcess = async (selectedTest, { completed = true, finalize = false, selectedRunId = runId } = {}) => {
 			await execFileAsync(process.execPath, ['--input-type=module', '-e', reporterProgram], {
 				cwd: process.cwd(),
 				env: {
 					...process.env,
-					TERRA_SCREENSHOT_RUN_ID: runId,
+					TERRA_SCREENSHOT_RUN_ID: selectedRunId,
 					TERRA_SCREENSHOT_RUN_FINALIZE: finalize ? '1' : '0',
 					OUTPUT_ROOT: outputRoot,
 					SCREENSHOT: screenshot,
@@ -372,6 +420,29 @@ test('aggregates shared screenshot runs across viewport subprocesses and restart
 		await runProcess(mobile, { finalize: true });
 		marker = JSON.parse(await fs.readFile(path.join(evidenceDirectory, '.terra-playwright-run.json'), 'utf8'));
 		assert.deepEqual([marker.expectedTestCount, marker.completedTestCount, marker.collectionFinished], [2, 2, true]);
+
+		// A later subset run gets a bounded deck while the directory can still rebuild accumulated evidence.
+		const subsetRunId = `subset-${path.basename(root)}`;
+		await runProcess(mobile, { finalize: true, selectedRunId: subsetRunId });
+		const subsetArtifacts = await latestArtifacts();
+		assert.ok(subsetArtifacts.includes('report.pptx'));
+		const runDirectories = (await fs.readdir(outputRoot, { withFileTypes: true }))
+			.filter((entry) => entry.isDirectory() && entry.name !== 'screenshots')
+			.map((entry) => entry.name)
+			.sort();
+		const subsetDeck = path.join(outputRoot, runDirectories.at(-1), 'report.pptx');
+		const { stdout: subsetSlide } = await execFileAsync('unzip', ['-p', subsetDeck, 'ppt/slides/slide1.xml']);
+		assert.equal((subsetSlide.match(/<p:pic>/g) || []).length, 1);
+		assert.match(subsetSlide, /CURRENT RUN/);
+		assert.doesNotMatch(subsetSlide, /HISTORICAL CAPTURE/);
+		const accumulatedDeck = path.join(root, 'accumulated.pptx');
+		await writeScreenshotSlideshowFromDirectory(evidenceDirectory, accumulatedDeck);
+		const { stdout: accumulatedArchive } = await execFileAsync('unzip', ['-l', accumulatedDeck]);
+		assert.match(accumulatedArchive, /ppt\/slides\/slide2\.xml/);
+		const { stdout: accumulatedCurrent } = await execFileAsync('unzip', ['-p', accumulatedDeck, 'ppt/slides/slide1.xml']);
+		const { stdout: accumulatedHistorical } = await execFileAsync('unzip', ['-p', accumulatedDeck, 'ppt/slides/slide2.xml']);
+		assert.match(accumulatedCurrent, /CURRENT RUN/);
+		assert.match(accumulatedHistorical, /HISTORICAL CAPTURE/);
 	} finally {
 		await fs.rm(root, { recursive: true, force: true });
 	}

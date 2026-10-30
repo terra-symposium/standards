@@ -35,7 +35,7 @@ A timestamped directory under `test-results/visual` contains the workbook, slide
 - Import `diagnosticsTest` from `/playwright` to attach browser console, page, and request failures.
 - Import `loadTest` to measure named operations and capture page-navigation timings. It reads `loadTesting` from `quality.json` by default.
 - Import `visualTest` to call `visuals.capture(key)` anywhere inside a Playwright test. Matching keys are grouped across responsive projects. The reporter writes `report.pptx` as screenshot-backed responsive slides by default; set `screenshotOnlySlideshow: false` to use the diagnostic review slideshow instead.
-- Import `writeScreenshotSlideshowFromDirectory` from `/slideshow` to rebuild a screenshot deck from persisted evidence without running Playwright. The latest run marker separates current captures from historical captures; pass `currentRunId` only when intentionally rebuilding against a different run marker.
+- Import `writeScreenshotSlideshowFromDirectory` from `/slideshow` to rebuild a screenshot deck from persisted evidence without running Playwright. Omit `currentRunId` to include historical captures; pass a run ID to write only that run's captures.
 - Use `/spreadsheet` and `/slideshow` to write artifacts from normalized results without using the Playwright reporter.
 - Use `/core`, `/viewports`, and `/load-testing` for shared types and helpers.
 
