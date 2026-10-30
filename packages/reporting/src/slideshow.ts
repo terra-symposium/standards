@@ -444,7 +444,13 @@ export const writeScreenshotSlideshow = async (file: string, captures: readonly 
 		const byViewport = new Map<string, ScreenshotCapture>();
 		for (const capture of group) {
 			const previous = byViewport.get(capture.viewport);
-			if (!previous || (capture.retry || 0) >= (previous.retry || 0)) byViewport.set(capture.viewport, capture);
+			const sameRun = previous && capture.runId === previous.runId;
+			const capturedAt = Date.parse(capture.capturedAt || '') || 0;
+			const previousCapturedAt = Date.parse(previous?.capturedAt || '') || 0;
+			const isNewer = capturedAt >= previousCapturedAt;
+			if (!previous || (sameRun ? (capture.retry || 0) > (previous.retry || 0) || ((capture.retry || 0) === (previous.retry || 0) && isNewer) : isNewer)) {
+				byViewport.set(capture.viewport, capture);
+			}
 		}
 		const ordered = [...byViewport.values()].sort((first, second) => {
 			const firstIndex = knownViewports.indexOf(first.viewport);
@@ -488,8 +494,52 @@ export const writeScreenshotSlideshow = async (file: string, captures: readonly 
 	await neutralizeApplicationMetadata(file);
 };
 
-/** Rebuilds a screenshot-only slideshow from the reporter's durable capture directory. */
+/** Reads current and historical screenshots beneath a folder, with stable source names for multi-repository reports. */
+const readScreenshotCapturesFromDirectoryTree = (root: string, currentRunId?: string): ScreenshotCapture[] => {
+	const visited = new Set<string>();
+	const read = (directory: string, isRoot = false): ScreenshotCapture[] => {
+		let realDirectory: string;
+		try {
+			realDirectory = fs.realpathSync(directory);
+			if (visited.has(realDirectory)) return [];
+			visited.add(realDirectory);
+		} catch {
+			return [];
+		}
+		let entries: fs.Dirent[];
+		try {
+			entries = fs.readdirSync(directory, { withFileTypes: true });
+		} catch {
+			return [];
+		}
+		const sourcePath = path.relative(root, directory);
+		const sourceName = sourcePath ? sourcePath.split(path.sep)[0] : '';
+		const prefix = sourceName ? `${sourceName} · ` : '';
+		const local = readScreenshotCapturesFromDirectory(directory, isRoot ? currentRunId : undefined).map((capture) => ({
+			...capture,
+			group: `${prefix}${capture.group}`,
+			key: sourceName ? `${sourceName}:${capture.key}` : capture.key,
+			title: `${prefix}${capture.title}`,
+		}));
+		const nested = entries
+			.filter((entry) => !['.git', 'node_modules'].includes(entry.name))
+			.filter((entry) => entry.isDirectory() || entry.isSymbolicLink())
+			.sort((first, second) => first.name.localeCompare(second.name))
+			.flatMap((entry) => {
+				const child = path.join(directory, entry.name);
+				try {
+					return fs.statSync(child).isDirectory() ? read(child) : [];
+				} catch {
+					return [];
+				}
+			});
+		return [...local, ...nested];
+	};
+	return read(root);
+};
+
+/** Rebuilds a screenshot-only slideshow from one capture folder or a tree of repository capture folders. */
 export const writeScreenshotSlideshowFromDirectory = async (directory: string, file: string, opts: ScreenshotSlideshowOptions = {}): Promise<void> => {
-	const captures = readScreenshotCapturesFromDirectory(directory, opts.currentRunId).filter((capture) => !opts.currentRunId || (capture.runId === opts.currentRunId && !capture.historical));
+	const captures = readScreenshotCapturesFromDirectoryTree(directory, opts.currentRunId).filter((capture) => !opts.currentRunId || (capture.runId === opts.currentRunId && !capture.historical));
 	if (captures.length) await writeScreenshotSlideshow(file, captures, opts);
 };

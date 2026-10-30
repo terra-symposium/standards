@@ -668,6 +668,71 @@ test('writes responsive screenshot-only slides', async () => {
 	}
 });
 
+/* Rebuilds a multi-repository deck from a partially captured directory tree. */
+test('builds one screenshot deck from nested repository folders and keeps partial and historical captures', async () => {
+	const root = await fs.mkdtemp(path.join(os.tmpdir(), 'terra-screenshot-tree-'));
+	try {
+		const { default: sharp } = await import('sharp');
+		for (const [name, background] of [
+			['website', { r: 40, g: 80, b: 120 }],
+			['docs', { r: 120, g: 80, b: 40 }],
+		]) {
+			const directory = path.join(root, name, 'test-results', 'visual', 'screenshots');
+			await fs.mkdir(directory, { recursive: true });
+			await sharp({ create: { width: 24, height: 16, channels: 3, background } })
+				.png()
+				.toFile(path.join(directory, 'capture.png'));
+			const group = `${name}-responsive`;
+			await fs.writeFile(
+				path.join(directory, `${name}-current.json`),
+				JSON.stringify({
+					group: `${group}\0${name}-test`,
+					key: `${name}-test`,
+					title: `${name} responsive test`,
+					viewport: 'xl',
+					viewportSize: '1280×720',
+					screenshot: 'capture.png',
+					runId: `${name}-current`,
+					capturedAt: '2026-10-31T00:00:00.000Z',
+					retry: 0,
+				}),
+			);
+			if (name === 'docs') {
+				await fs.writeFile(
+					path.join(directory, 'docs-historical.json'),
+					JSON.stringify({
+						group: `${group}\0${name}-test`,
+						key: `${name}-test`,
+						title: `${name} responsive test`,
+						viewport: 'xl',
+						viewportSize: '1280×720',
+						screenshot: 'capture.png',
+						runId: 'docs-earlier-run',
+						capturedAt: '2026-10-30T00:00:00.000Z',
+						retry: 2,
+					}),
+				);
+			}
+			await fs.writeFile(
+				path.join(directory, '.terra-playwright-run.json'),
+				JSON.stringify({ runId: `${name}-current`, expectedCaptureGroups: [{ group, viewports: ['xl', 'mobile'] }], collectionFinished: false }),
+			);
+		}
+		const slideshow = path.join(root, 'all-repositories.pptx');
+		await writeScreenshotSlideshowFromDirectory(root, slideshow);
+		const { stdout: archive } = await execFileAsync('unzip', ['-l', slideshow]);
+		assert.match(archive, /ppt\/slides\/slide3\.xml/);
+		assert.doesNotMatch(archive, /ppt\/slides\/slide4\.xml/);
+		const slides = await Promise.all([1, 2, 3].map(async (index) => (await execFileAsync('unzip', ['-p', slideshow, `ppt/slides/slide${index}.xml`])).stdout));
+		assert.match(slides.join(''), /website · website responsive test/);
+		assert.match(slides.join(''), /docs · docs responsive test/);
+		assert.match(slides.join(''), /HISTORICAL CAPTURE/);
+		assert.match(slides.join(''), /CURRENT RUN/);
+	} finally {
+		await fs.rm(root, { recursive: true, force: true });
+	}
+});
+
 // Covers timing artifacts, supplemental runner rows, reporter enforcement, and the legacy opt-out. */
 test('reports load timing details and fails only when enabled budgets are exceeded', async () => {
 	const root = await fs.mkdtemp(path.join(os.tmpdir(), 'terra-load-report-'));
