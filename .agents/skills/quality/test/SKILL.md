@@ -14,9 +14,11 @@ Use for work that creates, expands, orders, repairs, evaluates, or represents Te
 
 For requests spanning modes, work in that order. Evaluation uses `ordering` then `represent`; “keep fixing until green” uses `fixing`, then `represent` when visual or browser coverage applies.
 
-## Test hierarchy
+## Ownership and selection
 
-Keep repository tests under `tests/`, grouped by the product area and source route they prove. Treat `tests/suites.json` as the explicit inventory and execution order; add or move every test there and run `pnpm run test:hierarchy`. Use `.test.*` for Node and `.spec.ts` for Playwright. Keep shared support in `tests/scripts/test/support/` and domain-only support beside its owning suite.
+Use `.terra-tests.json` as the canonical repository suite plan. Keep framework-specific selectors only where a runner needs them, and ensure aggregate scripts invoke each canonical suite once. Follow the linked [ownership and viewport selection procedure](references/ownership-and-viewport-selection.md) for source ownership, test consolidation, retirement, responsive evidence, screenshots, and completion accounting.
+
+Mirror the source tree beneath each repository's test root, including monorepo package boundaries. Name tests after the owned route or module. Use `.test.*` for Node and `.spec.ts` for Playwright when the runners differ. Keep cross-cutting support in one shared boundary and domain-only support beside its owning tests.
 
 ## Coverage contract
 
@@ -27,7 +29,7 @@ Map each material behavior to an observable assertion or a documented gap. Track
 - proof context: source, unit/integration, public/authenticated browser, mutation fixture, or deployed target;
 - viewport for rendered behavior and fixture owner/isolation/cleanup.
 
-Exhaustiveness means each material state and risk has an owner at the cheapest reliable layer, not merely many assertions.
+Exhaustiveness means each material state and risk has one authoritative owner at the cheapest reliable layer, with consumer tests proving only the integration boundary they add.
 
 ## Choose the layer
 

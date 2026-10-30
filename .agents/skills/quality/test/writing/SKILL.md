@@ -35,7 +35,7 @@ Use table-driven tests for equivalent cases and named tests for distinct journey
 
 ## 4. Maintain and validate
 
-Place tests under `tests/<product-domain>/` to mirror the repository source area. Update `tests/suites.json` whenever a test entry or case module moves, preserve the declared runner context, and run `pnpm run test:hierarchy` before test execution.
+Place tests under the repository's test root, mirroring the source route or module and monorepo package boundary. Update `.terra-tests.json` whenever suite ownership or execution changes. Preserve the declared runner context and ensure no file is owned or executed by more than one canonical suite.
 
 Keep registration-time fixtures before tests and runtime-only helpers after the last test under `/* HELPERS */`. Promote helpers only after real reuse.
 
@@ -49,3 +49,5 @@ Before handoff confirm:
 - fixture data is deterministic, isolated, cleaned, and parallel-safe;
 - no proxy, alias, skip, weakened assertion, or unexplained timeout was introduced;
 - focused and dependent validation commands are recorded.
+
+For cross-repository ownership, journey consolidation, temporary-suite retirement, and measured viewport selection, follow the linked [ownership and viewport selection procedure](references/ownership-and-viewport-selection.md).

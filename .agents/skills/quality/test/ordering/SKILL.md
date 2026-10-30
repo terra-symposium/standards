@@ -45,7 +45,7 @@ The order is a dependency graph, not a way to hide failures. If an earlier gate 
 - Use headless mode for ordinary regression coverage. Use headed mode only for sign-in, visual capture, or a diagnosis that needs a real browser surface.
 - Run only the affected viewport first while fixing, then the adjacent breakpoints, then the declared responsive matrix. A single passing viewport is not responsive coverage.
 
-Use the ordered `tests/suites.json` inventory and the repository's configured scripts rather than inventing alternate runners. Run `pnpm run test:hierarchy` before test execution. Common commands include:
+Use `.terra-tests.json` as the canonical suite plan and the repository's configured commands rather than inventing alternate runners. Confirm that each test file and configured Playwright project is owned exactly once before execution. Common commands include:
 
 ```sh
 pnpm run test:visual
@@ -57,11 +57,11 @@ pnpm --filter terra-symposium-frontend run build
 git diff --check
 ```
 
-Set `PLAYWRIGHT_ASTRO_URL` for an explicit target instead of silently replacing a required context. Set `PW_VIEWPORTS` before `pnpm run test:visual`; record whether the run used `default`, a named subset, or `all`.
+Set `PLAYWRIGHT_ASTRO_URL` for an explicit target instead of silently replacing a required context. For responsive tests, run only the viewports declared for each scenario; record exact dimensions and the reason for every additional viewport.
 
 ## Policy
 
-After a failure, rerun the smallest reproducible test with the same project, fixture, viewport, and target. Then run the nearest adjacent viewport or dependent domain. Only after the focused result is understood should the full matrix run. Preserve the first failure and every later retry in the ledger; retries do not erase flakiness.
+After a failure, rerun the smallest reproducible test with the same project, fixture, viewport, and target. Then run the adjacent viewport combinations selected for that scenario or its dependent domain. Do not expand a failure into a blanket viewport matrix. Preserve the first failure and every later retry in the ledger; retries do not erase flakiness.
 
 ## Completion accounting
 
@@ -90,3 +90,5 @@ Keep cross-cutting test infrastructure intentionally small: one shared test-supp
 Do not discover suites by alphabetically scanning directories. Maintain an explicit ordered suite map in the runner, with architecture/source contracts before page behavior and a named route-level group for each stateful or special execution context. Run independent files together only when their fixtures and services are isolated; split a group-addressable file into its declared groups when shared state requires it.
 
 If browser specs live beside Node tests, configure the browser runner with a root test directory plus an explicit `*.spec.ts` match. That preserves the source hierarchy without accidentally sending source-contract files through Playwright. After a reorganization, verify every moved file's relative imports, runner selector, package script, header, and documentation, then search for old paths before claiming the inventory is complete.
+
+Follow the linked [ownership and viewport selection procedure](references/ownership-and-viewport-selection.md) for inventory reconciliation, per-scenario viewport choices, and expected-versus-executed evidence.
