@@ -501,8 +501,6 @@ export const writeScreenshotSlideshow = async (file: string, captures: readonly 
 
 /** Rebuilds a screenshot-only slideshow from the reporter's durable capture directory. */
 export const writeScreenshotSlideshowFromDirectory = async (directory: string, file: string, opts: ScreenshotSlideshowOptions = {}): Promise<void> => {
-	const captures = readScreenshotCapturesFromDirectory(directory, opts.currentRunId).filter(
-		capture => !opts.currentRunId || capture.runId === opts.currentRunId,
-	);
+	const captures = readScreenshotCapturesFromDirectory(directory, opts.currentRunId).filter((capture) => !opts.currentRunId || capture.runId === opts.currentRunId);
 	if (captures.length) await writeScreenshotSlideshow(file, captures, opts);
 };
