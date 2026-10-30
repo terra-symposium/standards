@@ -251,6 +251,9 @@ export type ScreenshotSlideshowOptions = {
 	currentRunId?: string;
 };
 
+/** One repository's durable screenshot directory and optional exact Playwright run. */
+export type ScreenshotDirectorySource = { label: string; directory: string; runId?: string };
+
 /** Reads persisted screenshot records and labels captures outside the latest run as historical. */
 export const readScreenshotCapturesFromDirectory = (directory: string, currentRunId?: string): ScreenshotCapture[] => {
 	if (!fs.existsSync(directory)) return [];
@@ -503,4 +506,19 @@ export const writeScreenshotSlideshow = async (file: string, captures: readonly 
 export const writeScreenshotSlideshowFromDirectory = async (directory: string, file: string, opts: ScreenshotSlideshowOptions = {}): Promise<void> => {
 	const captures = readScreenshotCapturesFromDirectory(directory, opts.currentRunId).filter((capture) => !opts.currentRunId || capture.runId === opts.currentRunId);
 	if (captures.length) await writeScreenshotSlideshow(file, captures, opts);
+};
+
+/** Builds one screenshot-only deck from any completed or partial set of repository capture folders. */
+export const writeScreenshotSlideshowFromDirectories = async (file: string, sources: readonly ScreenshotDirectorySource[], opts: ScreenshotSlideshowOptions = {}): Promise<void> => {
+	const captures = sources.flatMap(({ label, directory, runId }) =>
+		readScreenshotCapturesFromDirectory(directory, runId)
+			.filter((capture) => !runId || capture.runId === runId)
+			.map((capture) => ({
+				...capture,
+				group: `${label}/${capture.group}`,
+				key: `${label}/${capture.key}`,
+				title: `${label} · ${capture.title}`,
+			})),
+	);
+	await writeScreenshotSlideshow(file, captures, opts);
 };

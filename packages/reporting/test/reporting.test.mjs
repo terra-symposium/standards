@@ -33,8 +33,9 @@ const {
 	readLoadTestingConfig: readLoadTestingCfg,
 	timeLoadOperation: timeLoadOp,
 } = await import('@terra-symposium/standards-reporting/load-testing');
-const { writeSpreadsheet } = await import('@terra-symposium/standards-reporting/spreadsheet');
-const { readScreenshotCapturesFromDirectory, writeScreenshotSlideshow, writeScreenshotSlideshowFromDirectory, writeSlideshow } = await import('@terra-symposium/standards-reporting/slideshow');
+const { mergeSpreadsheets, writeSpreadsheet } = await import('@terra-symposium/standards-reporting/spreadsheet');
+const { readScreenshotCapturesFromDirectory, writeScreenshotSlideshow, writeScreenshotSlideshowFromDirectories, writeScreenshotSlideshowFromDirectory, writeSlideshow } =
+	await import('@terra-symposium/standards-reporting/slideshow');
 
 /*//////////////////////////////////////////////////
 HELPERS
@@ -273,6 +274,74 @@ test('rebuilds the default screenshot deck from accumulated captures', async () 
 		const { stdout: legacySlide } = await execFileAsync('unzip', ['-p', legacyDeck, 'ppt/slides/slide1.xml']);
 		assert.equal((legacySlide.match(/<p:pic>/g) || []).length, 1);
 		assert.match(legacySlide, /HISTORICAL CAPTURE/);
+	} finally {
+		await fs.rm(root, { recursive: true, force: true });
+	}
+});
+
+/* Keeps repository evidence distinct when screenshot folders reuse stable test IDs. */
+test('builds aggregate artifacts from repository screenshot folders and report workbooks', async () => {
+	const root = await fs.mkdtemp(path.join(os.tmpdir(), 'terra-reporting-aggregate-'));
+	try {
+		const { default: sharp } = await import('sharp');
+		const { default: ExcelJS } = await import('exceljs');
+		const screenshot = path.join(root, 'source.png');
+		await sharp({ create: { width: 24, height: 16, channels: 3, background: { r: 60, g: 100, b: 140 } } })
+			.png()
+			.toFile(screenshot);
+		const repositories = ['Website', 'Salesphere'];
+		const screenshotSources = [];
+		const spreadsheetSources = [];
+		for (const repository of repositories) {
+			const directory = path.join(root, repository.toLowerCase(), 'screenshots');
+			await fs.mkdir(directory, { recursive: true });
+			const runId = `${repository.toLowerCase()}-run`;
+			await fs.copyFile(screenshot, path.join(directory, 'capture.png'));
+			await fs.writeFile(
+				path.join(directory, 'capture.json'),
+				JSON.stringify({
+					group: 'shared-scenario',
+					key: 'step-one',
+					title: 'creates a record',
+					viewport: 'xl',
+					viewportSize: '1280×720',
+					screenshot: 'capture.png',
+					runId,
+				}),
+			);
+			await fs.writeFile(path.join(directory, '.terra-playwright-run.json'), JSON.stringify({ runId }));
+			screenshotSources.push({ label: repository, directory, runId });
+			const report = path.join(root, `${repository.toLowerCase()}.xlsx`);
+			await writeSpreadsheet(report, {
+				featureFiles: ['shared.spec.ts'],
+				projects: [{ name: 'root-public', configuredFiles: ['shared.spec.ts'] }],
+				results: [result({ file: 'shared.spec.ts', project: 'root-public', screenshot, title: `${repository} creates a record` })],
+				runDiagnostics: [`${repository} diagnostic`],
+			});
+			spreadsheetSources.push({ label: repository, file: report });
+		}
+
+		const presentation = path.join(root, 'all-repositories.pptx');
+		await writeScreenshotSlideshowFromDirectories(presentation, screenshotSources, { title: 'All repository screenshots' });
+		const { stdout: deckArchive } = await execFileAsync('unzip', ['-l', presentation]);
+		assert.match(deckArchive, /ppt\/slides\/slide2\.xml/);
+		const { stdout: firstSlide } = await execFileAsync('unzip', ['-p', presentation, 'ppt/slides/slide1.xml']);
+		const { stdout: secondSlide } = await execFileAsync('unzip', ['-p', presentation, 'ppt/slides/slide2.xml']);
+		assert.match(`${firstSlide}${secondSlide}`, /Website/);
+		assert.match(`${firstSlide}${secondSlide}`, /Salesphere/);
+
+		const combinedSpreadsheet = path.join(root, 'all-repositories.xlsx');
+		await mergeSpreadsheets(combinedSpreadsheet, spreadsheetSources);
+		const workbook = new ExcelJS.Workbook();
+		await workbook.xlsx.readFile(combinedSpreadsheet);
+		const summary = workbook.getWorksheet('All tests');
+		assert.deepEqual([summary.getCell('A2').value, summary.getCell('B2').value], ['Website', 'shared.spec.ts']);
+		assert.deepEqual([summary.getCell('A3').value, summary.getCell('B3').value], ['Salesphere', 'shared.spec.ts']);
+		assert.equal(summary.getCell('C2').value, 1);
+		assert.equal(summary.getCell('C3').value, 1);
+		assert.ok(workbook.getWorksheet('Website shared.spec.ts'));
+		assert.ok(workbook.getWorksheet('Salesphere shared.spec.ts'));
+		assert.equal(workbook.model.media.length, 2);
 	} finally {
 		await fs.rm(root, { recursive: true, force: true });
 	}
