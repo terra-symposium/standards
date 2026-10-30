@@ -107,12 +107,7 @@ const resultSheetName = (book: ExcelJS.Workbook, src: string): string => {
 };
 /** Returns the populated cell values in worksheet order. */
 const valuesForRow = (row: ExcelJS.Row): (ExcelJS.CellValue | null)[] => Array.from({ length: row.cellCount }, (_, index) => row.getCell(index + 1).value);
-/**
- *
- * @param val
- *
- * @return
- */
+/** Returns the load grade for one test result. */
 const resultLoadGrade = (val: VisualResult): string => {
 	const counts = loadGradeCounts(val.loadMeasurements || []);
 	return counts.fail ? 'fail' : counts.warning ? 'warning' : counts.pass ? 'pass' : '';
