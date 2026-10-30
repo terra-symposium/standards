@@ -1701,7 +1701,7 @@ test('CLI recommendation execution is opt-in per invocation and command failures
 	cfg.recommendationCommands = [{ name: 'fixture-failure', command: failingCmd }];
 	resetExitCode();
 	runQualityCli(cfg, ['quality', '--all']);
-	assert.equal(process.exitCode, 2);
+	assert.equal(process.exitCode, 1, 'quality normalizes any failed recommendation command to a failing exit status');
 	fixtureFile(root, 'recommendations.jsonl', '');
 	resetExitCode();
 	runQualityCli(cfg, ['quality', '--all', '--skip-recommendations']);

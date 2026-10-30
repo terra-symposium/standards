@@ -58,8 +58,17 @@ const S_G_REGEX = () => /\s+/g;
 REGEX
 //////////////////////////////////////////////////*/
 
+/** One repeated static class value and its source locations. */
+export type RepeatedClassFinding = { value: string; count: number; locations: string[] };
+
+/** A configured UI pattern and the file that contains it. */
+export type UiPatternFinding = { file: string; pattern: string };
+
 /** Counts exact edits applied and conservative candidates left for review. */
 export type PatternFixResult = { fixed: number; skipped: number };
+
+/** One repeated regular-expression source and its source locations. */
+export type RegexFinding = { source: string; count: number; locations: string[] };
 
 /** A repeated collection lookup inside another collection callback. */
 export type PerformancePatternFinding = { file: string; line: number; column: number; method: string; receiver: string; recommendation: string };
@@ -156,7 +165,7 @@ HELPERS
  *
  * @return Repeated static class strings that meet the configured minimum count.
  */
-export function repeatedClassFindings(cfg: QualityCfg, analysis?: QualityAnalysis): { value: string; count: number; locations: string[] }[] {
+export function repeatedClassFindings(cfg: QualityCfg, analysis?: QualityAnalysis): RepeatedClassFinding[] {
 	const settings = cfg.repeatedClasses ?? {};
 	const minimum = settings.minimumCount ?? 3;
 	const exts = new Set(settings.extensions ?? ['.astro', '.html', '.js', '.jsx', '.ts', '.tsx']);
@@ -348,7 +357,7 @@ export function fixRepeatedClasses(cfg: QualityCfg, analysis?: QualityAnalysis):
  *
  * @return Matching file/pattern pairs that should use shared UI primitives.
  */
-export function uiPatternFindings(cfg: QualityCfg, analysis?: QualityAnalysis): { file: string; pattern: string }[] {
+export function uiPatternFindings(cfg: QualityCfg, analysis?: QualityAnalysis): UiPatternFinding[] {
 	const settings = cfg.uiPatterns ?? {};
 	const patterns = (settings.forbidden ?? []).map((p) => [p, new RegExp(p, 'm')] as const);
 	const exts = settings.extensions ?? ['.astro', '.html', '.jsx', '.tsx'];
@@ -688,7 +697,7 @@ function regexGroups(cfg: QualityCfg, analysis?: QualityAnalysis): Map<string, R
  *
  * @return Duplicate regular-expression sources and their source locations.
  */
-export function regexFindings(cfg: QualityCfg, analysis?: QualityAnalysis): { source: string; count: number; locations: string[] }[] {
+export function regexFindings(cfg: QualityCfg, analysis?: QualityAnalysis): RegexFinding[] {
 	const minimum = cfg.regexDedup?.minimumCount ?? 2;
 	return [...regexGroups(cfg, analysis)]
 		.filter(([, c]) => c.length >= minimum)

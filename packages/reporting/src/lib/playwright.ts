@@ -1,5 +1,5 @@
 /**
- * packages/reporting/src/lib/playwright.ts
+ * packages/reporting/src/playwright.ts
  * Playwright fixtures and reporter for reusable test evidence.
  */
 
@@ -10,11 +10,12 @@ IMPORTS
 // API
 import fs from 'node:fs';
 import path from 'node:path';
+import { createHash, randomUUID } from 'node:crypto';
 import { baseVisualProjectName, projectViewportName, viewportSizeLabel } from './viewports.js';
 import { diagnosticCount, normalizeVisualStatus } from './core.js';
 import { gradeLoadMeasurement, loadGradeCounts, loadTestId, readLoadTestingConfig, timeLoadOperation, validateLoadBudgetOverride } from './load-testing.js';
 import { test as base } from '@playwright/test';
-import { writeSlideshow } from './slideshow.js';
+import { writeScreenshotSlideshowFromDirectory, writeSlideshow } from './slideshow.js';
 import { writeSpreadsheet } from './spreadsheet.js';
 
 // DATA
@@ -23,6 +24,8 @@ import { VISUAL_VIEWPORTS } from './viewports.js';
 // TYPES
 import type { LoadBudgetOverride, LoadMeasurement, LoadMeasurementInput, LoadTestingConfig, ProjectDefinition, ReportRun, VisualResult } from './core.js';
 import type { ViewportCatalog } from './viewports.js';
+import type { ScreenshotCapture } from './slideshow.js';
+import type { Page } from '@playwright/test';
 
 /*//////////////////////////////////////////////////
 CONFIG
@@ -39,10 +42,6 @@ FIXTURES
 export const diagnosticsTest = base.extend({
 	page: async ({ page, context: ctx }, use, info): Promise<void> => {
 		const diagnostics: BrowserDiagnostic[] = [];
-		/**
-		 *
-		 * @param tgt
-		 */
 		const observe = (tgt: typeof page): void => {
 			tgt.on('console', (m) => {
 				if (!['error', 'warning'].includes(m.type())) return;
@@ -88,10 +87,6 @@ export const loadTest = diagnosticsTest.extend<{ load: LoadTestController }>({
 			const measurements: LoadMeasurementInput[] = [];
 			const pending: Promise<void>[] = [];
 			let testBudget: LoadBudgetOverride | undefined;
-			/**
-			 *
-			 * @param tgt
-			 */
 			const observe = (tgt: typeof page): void => {
 				tgt.on('load', () => {
 					if (!enabled || tgt.url() === 'about:blank') return;
@@ -133,7 +128,10 @@ export const loadTest = diagnosticsTest.extend<{ load: LoadTestController }>({
 				await Promise.all(pending);
 				if (enabled && (measurements.length || testBudget)) {
 					try {
-						await info.attach('load-testing', { body: Buffer.from(JSON.stringify({ measurements, testBudget })), contentType: 'application/json' });
+						await info.attach('load-testing', {
+							body: Buffer.from(JSON.stringify({ measurements, testBudget })),
+							contentType: 'application/json',
+						});
 					} catch {
 						// Preserve the test result if Playwright has already closed its attachment store.
 					}
@@ -144,17 +142,76 @@ export const loadTest = diagnosticsTest.extend<{ load: LoadTestController }>({
 	],
 });
 
+/** Screenshot settings accepted by the reusable visual-capture fixture. */
+export type VisualCaptureOptions = {
+	/** Optional label recorded with the capture; it is not printed on screenshot-only slides. */
+	title?: string;
+	/** Playwright screenshot options, excluding the output path owned by the fixture. */
+	screenshot?: Omit<NonNullable<Parameters<Page['screenshot']>[0]>, 'path'>;
+};
+
+/** Captures keyed screenshots and attaches their metadata for cross-viewport reporting. */
+export type VisualCaptureController = {
+	/** Captures the current page and associates it with a stable key across projects/viewports. */
+	capture: (key: string, options?: VisualCaptureOptions) => Promise<void>;
+};
+
+/**
+ * Playwright fixture for collecting any number of named screenshots from a test.
+ * The shared reporter matches equal keys across responsive projects.
+ */
+export const visualTest = loadTest.extend<{ visuals: VisualCaptureController }>({
+	visuals: async ({ page }, use, info): Promise<void> => {
+		const captures: Array<{ attachmentName: string; contentType: string; key: string; title: string }> = [];
+		const keys = new Set<string>();
+		await use({
+			capture: async (key, options = {}): Promise<void> => {
+				const normalizedKey = key.trim();
+				if (!normalizedKey) throw new Error('A visual capture key is required.');
+				if (keys.has(normalizedKey)) throw new Error(`Duplicate visual capture key: ${normalizedKey}`);
+				keys.add(normalizedKey);
+				const attachmentName = `visual-capture-${String(captures.length + 1).padStart(5, '0')}`;
+				const screenshotOptions: NonNullable<Parameters<Page['screenshot']>[0]> = {
+					type: 'jpeg',
+					quality: 65,
+					fullPage: false,
+					animations: 'disabled' as const,
+					caret: 'hide' as const,
+					...options.screenshot,
+				};
+				const extension = screenshotOptions.type === 'png' ? 'png' : 'jpg';
+				const contentType = screenshotOptions.type === 'png' ? 'image/png' : 'image/jpeg';
+				const screenshotPath = info.outputPath(`${attachmentName}.${extension}`);
+				await fs.promises.writeFile(screenshotPath, await page.screenshot(screenshotOptions));
+				await info.attach(attachmentName, { path: screenshotPath, contentType });
+				captures.push({ attachmentName, contentType, key: normalizedKey, title: options.title?.trim() || normalizedKey });
+			},
+		});
+		if (captures.length) {
+			try {
+				await info.attach('visual-captures', { body: Buffer.from(JSON.stringify(captures)), contentType: 'application/json' });
+			} catch {
+				// Preserve the test result if Playwright has already closed its attachment store.
+			}
+		}
+	},
+});
+
 /** Application-specific paths and catalog settings for the shared reporter. */
 export type ReportingOptions = {
 	featureFiles?: readonly string[];
 	projects?: readonly ProjectDefinition[];
 	viewportCatalog?: ViewportCatalog;
 	outputRoot?: string;
+	/** Folder for durable screenshot captures shared across partial and repeated test runs. */
+	screenshotsDirectory?: string;
 	reportFile?: string;
 	slideshowFile?: string;
 	supplementalResultsFile?: string;
 	qualityConfigFile?: string;
 	loadTesting?: LoadTestingConfig;
+	/** Write report.pptx using only keyed screenshots, with no text or diagnostic slides. */
+	screenshotOnlySlideshow?: boolean;
 };
 
 /** Describes a Playwright attachment passed to the shared reporter. */
@@ -166,20 +223,15 @@ HELPERS
 
 /**
  * Removes terminal color escapes before diagnostics enter an artifact.
- *
- * @param val
  * @param valerminal output that may contain ANSI escape sequences.
- *
- * @return Terminal output with ANSI formatting removed.
+ * @returns Terminal output with ANSI formatting removed.
  */
 export const stripAnsi = (val: string): string => val.replace(new RegExp(`${String.fromCharCode(27)}\\[[0-?]*[ -/]*[@-~]`, 'g'), '');
 
 /**
  * Parses browser diagnostic attachments into readable artifact lines.
- *
  * @param raw JSON attachment text or a plain diagnostic message.
- *
- * @return Normalized diagnostic lines.
+ * @returns Normalized diagnostic lines.
  */
 export const parseDiagnostics = (raw: string): string[] => {
 	if (!raw) return [];
@@ -198,29 +250,22 @@ export const parseDiagnostics = (raw: string): string[] => {
 
 /**
  * Normalizes a terminal output chunk for diagnostic matching and storage.
- *
  * @param chunk Terminal text or bytes emitted by Playwright.
- *
- * @return Trimmed, ANSI-free terminal text.
+ * @returns Trimmed, ANSI-free terminal text.
  */
 const terminalText = (chunk: string | Buffer): string => stripAnsi(chunk.toString('utf8')).trim();
 
 /**
  * Identifies terminal output that should be retained as diagnostic evidence.
- *
- * @param val
  * @param valormalized terminal output.
- *
- * @return Whether the output contains a diagnostic keyword.
+ * @returns Whether the output contains a diagnostic keyword.
  */
 const isTerminalDiagnostic = (val: string): boolean => /\b(?:error|errors|failed|failure|exception|warning|warn|timeout|requestfailed|pageerror)\b/i.test(val);
 
 /**
  * Reads an inline or file-backed Playwright attachment.
- *
  * @param attachment Attachment metadata supplied by Playwright.
- *
- * @return Attachment text, or an empty string when it is unavailable.
+ * @returns Attachment text, or an empty string when it is unavailable.
  */
 const readAttachment = (attachment: ReporterAttachment): string => {
 	if (attachment.body) return attachment.body.toString('utf8');
@@ -230,11 +275,9 @@ const readAttachment = (attachment: ReporterAttachment): string => {
 
 /**
  * Extracts one named JSON diagnostic attachment.
- *
  * @param attachments Attachments emitted for one test result.
  * @param name Diagnostic attachment name to locate.
- *
- * @return Parsed diagnostic lines from the matching attachment.
+ * @returns Parsed diagnostic lines from the matching attachment.
  */
 const diagnosticText = (attachments: readonly ReporterAttachment[], name: string): string[] => {
 	const attachment = attachments.find((v) => v.name === name && v.contentType === 'application/json');
@@ -245,21 +288,99 @@ const diagnosticText = (attachments: readonly ReporterAttachment[], name: string
 
 /**
  * Resolves the path of a captured screenshot attachment.
- *
  * @param attachments Attachments emitted for one test result.
- *
- * @return Screenshot path, or an empty string when no screenshot exists.
+ * @returns Screenshot path, or an empty string when no screenshot exists.
  */
 const screenshotAttachment = (attachments: readonly ReporterAttachment[]): ReporterAttachment | undefined =>
 	attachments.find((v) => ['visual', 'screenshot'].includes(v.name || '') && v.contentType === 'image/png');
 
-/**
- * Reads timing samples and a test override from the fixture attachment.
- *
- * @param attachments
- *
- * @return
- */
+/** Saves one capture under a stable identity so reruns replace it without duplicating the deck. */
+const persistScreenshotCapture = (directory: string, capture: ScreenshotCapture): ScreenshotCapture => {
+	if (!capture.screenshot || !fs.existsSync(capture.screenshot)) return capture;
+	const key = createHash('sha256').update([capture.group, capture.key, capture.viewport].join('\0')).digest('hex');
+	const extension = path.extname(capture.screenshot) || '.png';
+	const screenshot = path.join(directory, `${key}${extension}`);
+	const recordFile = path.join(directory, `${key}.json`);
+	fs.mkdirSync(directory, { recursive: true });
+	if (fs.existsSync(recordFile)) {
+		try {
+			const previous = JSON.parse(fs.readFileSync(recordFile, 'utf8')) as ScreenshotCapture;
+			if (previous.runId === capture.runId && (previous.retry || 0) > (capture.retry || 0)) return { ...previous, screenshot };
+		} catch {
+			// Replace an incomplete record with the next valid result.
+		}
+	}
+	const temporaryImage = `${screenshot}.${process.pid}.tmp`;
+	fs.copyFileSync(capture.screenshot, temporaryImage);
+	fs.renameSync(temporaryImage, screenshot);
+	const persisted = { ...capture, screenshot };
+	const temporaryRecord = `${recordFile}.${process.pid}.tmp`;
+	fs.writeFileSync(temporaryRecord, JSON.stringify(persisted));
+	fs.renameSync(temporaryRecord, recordFile);
+	return persisted;
+};
+
+const screenshotRunFile = '.terra-playwright-run.json';
+/** Latest reporter collection state persisted beside accumulated screenshots. */
+type ScreenshotRun = {
+	runId: string;
+	startedAt: string;
+	expectedTestCount: number;
+	completedTestCount: number;
+	expectedTestIds?: string[];
+	completedTestIds?: string[];
+	finishedAt?: string;
+	collectionFinished: boolean;
+};
+/** Reads the latest marker while treating malformed or legacy state as absent. */
+const readScreenshotRun = (directory: string): ScreenshotRun | undefined => {
+	try {
+		const run: unknown = JSON.parse(fs.readFileSync(path.join(directory, screenshotRunFile), 'utf8'));
+		if (!run || typeof run !== 'object') return undefined;
+		const value = run as Record<string, unknown>;
+		if (typeof value.runId !== 'string' || typeof value.startedAt !== 'string' || typeof value.expectedTestCount !== 'number' || typeof value.completedTestCount !== 'number') return undefined;
+		return {
+			runId: value.runId,
+			startedAt: value.startedAt,
+			expectedTestCount: value.expectedTestCount,
+			completedTestCount: value.completedTestCount,
+			expectedTestIds: Array.isArray(value.expectedTestIds) ? value.expectedTestIds.filter((id): id is string => typeof id === 'string') : undefined,
+			completedTestIds: Array.isArray(value.completedTestIds) ? value.completedTestIds.filter((id): id is string => typeof id === 'string') : undefined,
+			finishedAt: typeof value.finishedAt === 'string' ? value.finishedAt : undefined,
+			collectionFinished: value.collectionFinished === true,
+		};
+	} catch {
+		return undefined;
+	}
+};
+/** Atomically writes the latest run marker so interrupted captures remain identifiable. */
+const writeScreenshotRun = (directory: string, run: ScreenshotRun): void => {
+	fs.mkdirSync(directory, { recursive: true });
+	const file = path.join(directory, screenshotRunFile);
+	const temporaryFile = `${file}.${process.pid}.tmp`;
+	fs.writeFileSync(temporaryFile, JSON.stringify(run));
+	fs.renameSync(temporaryFile, file);
+};
+
+/** Validates the keyed-capture manifest emitted by the `visualTest` fixture. */
+const visualCaptureManifest = (attachments: readonly ReporterAttachment[]): Array<{ attachmentName: string; contentType: string; key: string; title: string }> => {
+	const attachment = attachments.find((item) => item.name === 'visual-captures' && item.contentType === 'application/json');
+	if (!attachment) return [];
+	try {
+		const parsed: unknown = JSON.parse(readAttachment(attachment));
+		if (!Array.isArray(parsed)) return [];
+		return parsed.flatMap((item): Array<{ attachmentName: string; contentType: string; key: string; title: string }> => {
+			if (!item || typeof item !== 'object') return [];
+			const row = item as Record<string, unknown>;
+			if (typeof row.attachmentName !== 'string' || typeof row.contentType !== 'string' || typeof row.key !== 'string' || typeof row.title !== 'string') return [];
+			return [{ attachmentName: row.attachmentName, contentType: row.contentType, key: row.key, title: row.title }];
+		});
+	} catch {
+		return [];
+	}
+};
+
+/** Reads timing samples and a test override from the fixture attachment. */
 const loadAttachment = (attachments: readonly ReporterAttachment[]): { measurements: LoadMeasurementInput[]; testBudget?: LoadBudgetOverride } => {
 	const attachment = attachments.find((v) => v.name === 'load-testing' && v.contentType === 'application/json');
 	if (!attachment) return { measurements: [] };
@@ -283,17 +404,7 @@ const loadAttachment = (attachments: readonly ReporterAttachment[]): { measureme
 	}
 };
 
-/**
- * Grades the test duration and attached page/operation samples for one result.
- *
- * @param result
- * @param id
- * @param inputs
- * @param testBudget
- * @param cfg
- *
- * @return
- */
+/** Grades the test duration and attached page/operation samples for one result. */
 const addLoadMeasurements = (
 	result: VisualResult,
 	id: string,
@@ -311,13 +422,10 @@ const addLoadMeasurements = (
 
 /**
  * Creates the framework-neutral identity fields shared by all result records.
- *
  * @param test Playwright test identity.
- * @param cfgdProject
- * @param viewportCatalog Catalog used to resolve viewport labels and sizes.
  * @param cfgdProjectgured Playwright project name.
- *
- * @return Framework-neutral identity fields for a visual result.
+ * @param viewportCatalog Catalog used to resolve viewport labels and sizes.
+ * @returns Framework-neutral identity fields for a visual result.
  */
 const testIdentity = (
 	test: { location: { file: string }; title: string; titlePath: () => string[] },
@@ -339,13 +447,7 @@ const testIdentity = (
 	};
 };
 
-/**
- * Resolves the title path portion used by the stable test budget key.
- *
- * @param test
- *
- * @return
- */
+/** Resolves the title path portion used by the stable test budget key. */
 const testTitleParts = (test: { location: { file: string }; title: string; titlePath: () => string[] }): string[] => {
 	const file = path.basename(test.location.file);
 	const fullTitlePath = test.titlePath();
@@ -355,12 +457,9 @@ const testTitleParts = (test: { location: { file: string }; title: string; title
 
 /**
  * Generates a stable filename for a copied screenshot.
- *
  * @param result Result whose identity contributes to the filename.
- * @param idx
  * @param idxesult position used to keep duplicate names distinct.
- *
- * @return A filesystem-safe screenshot filename.
+ * @returns A filesystem-safe screenshot filename.
  */
 const screenshotName = (result: VisualResult, idx: number): string => {
 	return `${String(idx + 1).padStart(4, '0')}-${
@@ -373,12 +472,9 @@ const screenshotName = (result: VisualResult, idx: number): string => {
 
 /**
  * Copies captured screenshots into the timestamped run directory.
- *
  * @param results Results whose screenshot paths should be relocated.
- * @param runDir
  * @param runDirtamped output directory for the current run.
- *
- * @return Results with copied screenshot paths.
+ * @returns Results with copied screenshot paths.
  */
 const copyScreenshots = (results: readonly VisualResult[], runDir: string): VisualResult[] => {
 	const imgs = path.join(runDir, 'images');
@@ -391,13 +487,7 @@ const copyScreenshots = (results: readonly VisualResult[], runDir: string): Visu
 	});
 };
 
-/**
- * Redacts personal identifiers and configured secrets from report text.
- *
- * @param val
- *
- * @return
- */
+/** Redacts personal identifiers and configured secrets from report text. */
 const redactEvidence = (val: unknown): string => {
 	let text = Array.from(stripAnsi(String(val ?? '')))
 		.filter((c) => {
@@ -413,13 +503,7 @@ const redactEvidence = (val: unknown): string => {
 	return text.replaceAll(process.cwd(), '[workspace]');
 };
 
-/**
- * Converts untrusted supplemental timing values to supported measurement inputs.
- *
- * @param val
- *
- * @return
- */
+/** Converts untrusted supplemental timing values to supported measurement inputs. */
 const supplementalMeasurements = (val: unknown): LoadMeasurementInput[] => {
 	if (!Array.isArray(val)) return [];
 	return val.flatMap((e): LoadMeasurementInput[] => {
@@ -437,21 +521,8 @@ const supplementalMeasurements = (val: unknown): LoadMeasurementInput[] => {
 	});
 };
 
-/**
- * Converts an optional structured results file into the shared row model.
- *
- * @param file
- * @param loadTesting
- *
- * @return
- */
+/** Converts an optional structured results file into the shared row model. */
 const supplementalResults = (file: string, loadTesting: ReturnType<typeof readLoadTestingConfig>): { results: VisualResult[]; diagnostics: string[] } => {
-	/**
-	 *
-	 * @param err
-	 *
-	 * @return
-	 */
 	const unavailable = (err: string): VisualResult => ({
 		browserErrors: '',
 		duration: 0,
@@ -508,13 +579,17 @@ const supplementalResults = (file: string, loadTesting: ReturnType<typeof readLo
 
 /** Creates the reusable Playwright reporter with application-specific output configuration. */
 export default class ProgressReporter {
-	private readonly options: Required<Pick<ReportingOptions, 'featureFiles' | 'projects' | 'viewportCatalog' | 'outputRoot' | 'reportFile' | 'slideshowFile'>> &
-		Pick<ReportingOptions, 'supplementalResultsFile'> & { loadTesting: ReturnType<typeof readLoadTestingConfig> };
+	private readonly options: Required<Pick<ReportingOptions, 'featureFiles' | 'projects' | 'viewportCatalog' | 'outputRoot' | 'reportFile' | 'slideshowFile' | 'screenshotsDirectory'>> &
+		Pick<ReportingOptions, 'supplementalResultsFile'> & { loadTesting: ReturnType<typeof readLoadTestingConfig>; screenshotOnlySlideshow: boolean };
 	private readonly results: VisualResult[] = [];
+	private readonly screenshotCaptures: ScreenshotCapture[] = [];
 	private readonly terminalDiagnostics = new Map<object, string[]>();
 	private readonly runDiagnostics: string[] = [];
 	private readonly expectedTests = new Map<string, { location: { file: string }; title: string; titlePath: () => string[]; parent: { project: () => { name: string } | undefined } }>();
 	private readonly completedTests = new Set<string>();
+	private readonly screenshotRunId = process.env.TERRA_SCREENSHOT_RUN_ID?.trim() || randomUUID();
+	private readonly finalizeScreenshotRun = process.env.TERRA_SCREENSHOT_RUN_FINALIZE !== '0';
+	private readonly screenshotRunStartedAt = new Date().toISOString();
 
 	/**
 	 * Creates a reporter that writes application-specific visual test artifacts.
@@ -527,26 +602,42 @@ export default class ProgressReporter {
 			projects: opts.projects || [],
 			viewportCatalog: opts.viewportCatalog || VISUAL_VIEWPORTS,
 			outputRoot: opts.outputRoot || 'test-results/visual',
+			screenshotsDirectory: opts.screenshotsDirectory || path.join(opts.outputRoot || 'test-results/visual', 'screenshots'),
 			reportFile: opts.reportFile || 'report.xlsx',
 			slideshowFile: opts.slideshowFile || 'report.pptx',
 			supplementalResultsFile: opts.supplementalResultsFile,
 			loadTesting: readLoadTestingConfig(opts.qualityConfigFile, opts.loadTesting),
+			screenshotOnlySlideshow: opts.screenshotOnlySlideshow ?? process.env.TERRA_SCREENSHOT_ONLY_SLIDESHOW !== '0',
 		};
 	}
 
 	/**
 	 * Records the full expected suite so interrupted tests can be represented.
-	 *
 	 * @param _config Playwright configuration supplied by the reporter lifecycle.
 	 * @param suite Playwright suite containing all discovered tests.
-	 *
-	 * @return Nothing; the expected-test registry is updated in place.
+	 * @returns Nothing; the expected-test registry is updated in place.
 	 */
 	onBegin(
 		_config: Parameters<NonNullable<import('@playwright/test/reporter').Reporter['onBegin']>>[0],
 		suite: Parameters<NonNullable<import('@playwright/test/reporter').Reporter['onBegin']>>[1],
 	): void {
 		for (const test of suite.allTests()) this.expectedTests.set(test.id, test);
+		if (!process.argv.includes('--list')) {
+			const directory = path.resolve(this.options.screenshotsDirectory);
+			const previous = readScreenshotRun(directory);
+			const sameRun = previous?.runId === this.screenshotRunId ? previous : undefined;
+			const expectedTestIds = [...new Set([...(sameRun?.expectedTestIds || []), ...this.expectedTests.keys()])].sort();
+			const completedTestIds = [...new Set(sameRun?.completedTestIds || [])].sort();
+			writeScreenshotRun(directory, {
+				collectionFinished: false,
+				completedTestCount: Math.max(sameRun?.completedTestCount || 0, completedTestIds.length),
+				completedTestIds,
+				expectedTestCount: Math.max(sameRun?.expectedTestCount || 0, expectedTestIds.length),
+				expectedTestIds,
+				runId: this.screenshotRunId,
+				startedAt: sameRun?.startedAt || this.screenshotRunStartedAt,
+			});
+		}
 		if (!this.options.featureFiles.length || !this.options.projects.length) {
 			const projectFiles = new Map<string, Set<string>>();
 			const files = new Set<string>();
@@ -564,12 +655,10 @@ export default class ProgressReporter {
 
 	/**
 	 * Associates stderr with a test result or the run when no test is active.
-	 *
 	 * @param chunk Terminal output emitted by Playwright.
 	 * @param test Active test identity, when available.
 	 * @param result Active test result, when available.
-	 *
-	 * @return Nothing; diagnostic state is updated in place.
+	 * @returns Nothing; diagnostic state is updated in place.
 	 */
 	onStdErr(chunk: string | Buffer, test?: object, result?: object): void {
 		const val = terminalText(chunk);
@@ -583,12 +672,10 @@ export default class ProgressReporter {
 
 	/**
 	 * Retains diagnostic-looking stdout without treating ordinary output as failure evidence.
-	 *
 	 * @param chunk Terminal output emitted by Playwright.
 	 * @param test Active test identity, when available.
 	 * @param result Active test result, when available.
-	 *
-	 * @return Nothing; diagnostic state is updated in place.
+	 * @returns Nothing; diagnostic state is updated in place.
 	 */
 	onStdOut(chunk: string | Buffer, test?: object, result?: object): void {
 		const val = terminalText(chunk);
@@ -602,10 +689,8 @@ export default class ProgressReporter {
 
 	/**
 	 * Retains reporter-level errors in the run diagnostics.
-	 *
 	 * @param err Reporter-level error emitted by Playwright.
-	 *
-	 * @return Nothing; run diagnostics are updated in place.
+	 * @returns Nothing; run diagnostics are updated in place.
 	 */
 	onError(err: { message: string }): void {
 		this.runDiagnostics.push(err.message);
@@ -613,11 +698,9 @@ export default class ProgressReporter {
 
 	/**
 	 * Normalizes a completed Playwright result and associates its evidence.
-	 *
 	 * @param test Completed Playwright test case.
 	 * @param result Completed Playwright test result and attachments.
-	 *
-	 * @return Nothing; the normalized result is appended to the run.
+	 * @returns Nothing; the normalized result is appended to the run.
 	 */
 	onTestEnd(test: import('@playwright/test/reporter').TestCase, result: import('@playwright/test/reporter').TestResult): void {
 		this.completedTests.add(test.id);
@@ -643,13 +726,60 @@ export default class ProgressReporter {
 			visual: screenshot ? 'Embedded' : result.attachments.some((v) => v.name === 'visual-error') ? 'Capture failed' : 'No visual surface',
 		};
 		this.results.push(addLoadMeasurements(norm, testId, attachedLoad.measurements, attachedLoad.testBudget, this.options.loadTesting));
+		const identity = testIdentity(test, test.parent.project()?.name || test.titlePath().find((v) => v.startsWith('root-')) || 'unknown', this.options.viewportCatalog);
+		const stableTestGroup = [identity.project, path.relative(process.cwd(), test.location.file), identity.groups, identity.title].join('\u0000');
+		if (screenshot) {
+			this.screenshotCaptures.push(
+				persistScreenshotCapture(path.resolve(this.options.screenshotsDirectory), {
+					group: `${stableTestGroup}\u0000test-result`,
+					key: 'test-result',
+					title: identity.title,
+					viewport: identity.viewport,
+					viewportSize: identity.viewportSize,
+					screenshot,
+					retry: result.retry,
+					runId: this.screenshotRunId,
+					capturedAt: new Date().toISOString(),
+				}),
+			);
+		}
+		for (const capture of visualCaptureManifest(result.attachments)) {
+			const image = result.attachments.find((item) => item.name === capture.attachmentName && item.contentType === capture.contentType);
+			if (!image) {
+				this.runDiagnostics.push(`Missing screenshot attachment ${capture.attachmentName} for ${capture.key} (${identity.viewport}).`);
+				continue;
+			}
+			let capturePath = image.path || '';
+			if (!capturePath && image.body) {
+				const extension = capture.contentType === 'image/png' ? 'png' : 'jpg';
+				capturePath = path.resolve('test-results/playwright-output', `${test.id.replace(/[^a-z0-9_-]/gi, '-')}-${capture.attachmentName}.${extension}`);
+				fs.mkdirSync(path.dirname(capturePath), { recursive: true });
+				fs.writeFileSync(capturePath, image.body);
+			}
+			if (!capturePath) {
+				this.runDiagnostics.push(`Screenshot data unavailable for ${capture.key} (${identity.viewport}).`);
+				continue;
+			}
+			this.screenshotCaptures.push(
+				persistScreenshotCapture(path.resolve(this.options.screenshotsDirectory), {
+					group: `${stableTestGroup}\u0000${capture.key}`,
+					key: capture.key,
+					title: redactEvidence(capture.title),
+					viewport: identity.viewport,
+					viewportSize: identity.viewportSize,
+					screenshot: capturePath,
+					retry: result.retry,
+					runId: this.screenshotRunId,
+					capturedAt: new Date().toISOString(),
+				}),
+			);
+		}
 		this.terminalDiagnostics.delete(result);
 	}
 
 	/**
 	 * Emits interrupted results and writes the spreadsheet and slideshow artifacts.
-	 *
-	 * @return A promise that resolves after both report artifacts are written.
+	 * @returns A promise that resolves after both report artifacts are written.
 	 */
 	async onEnd(): Promise<'failed' | void> {
 		if (process.argv.includes('--list')) return;
@@ -665,6 +795,23 @@ export default class ProgressReporter {
 				status: 'interrupted',
 				terminalErrors: '',
 				visual: 'No visual surface',
+			});
+		}
+		if (!process.argv.includes('--list')) {
+			const directory = path.resolve(this.options.screenshotsDirectory);
+			const previous = readScreenshotRun(directory);
+			const sameRun = previous?.runId === this.screenshotRunId ? previous : undefined;
+			const expectedTestIds = [...new Set([...(sameRun?.expectedTestIds || []), ...this.expectedTests.keys()])].sort();
+			const completedTestIds = [...new Set([...(sameRun?.completedTestIds || []), ...this.completedTests])].sort();
+			writeScreenshotRun(directory, {
+				collectionFinished: this.finalizeScreenshotRun,
+				completedTestCount: Math.max(sameRun?.completedTestCount || 0, completedTestIds.length),
+				completedTestIds,
+				expectedTestCount: Math.max(sameRun?.expectedTestCount || 0, expectedTestIds.length),
+				expectedTestIds,
+				...(this.finalizeScreenshotRun ? { finishedAt: new Date().toISOString() } : {}),
+				runId: this.screenshotRunId,
+				startedAt: sameRun?.startedAt || this.screenshotRunStartedAt,
 			});
 		}
 		const runDir = path.resolve(this.options.outputRoot, new Date().toISOString().replace(/[:.]/g, '-'));
@@ -690,8 +837,14 @@ export default class ProgressReporter {
 		const spreadsheet = path.join(runDir, this.options.reportFile);
 		const slideshow = path.join(runDir, this.options.slideshowFile);
 		await writeSpreadsheet(spreadsheet, run);
-		await writeSlideshow(slideshow, this.options.loadTesting.enabled ? results : browserResults, { loadTestingEnabled: this.options.loadTesting.enabled });
-		process.stdout.write(`Test spreadsheet: ${spreadsheet}\nTest slideshow: ${slideshow}\n`);
+		if (this.options.screenshotOnlySlideshow && !this.finalizeScreenshotRun) {
+			process.stdout.write('Screenshot slideshow deferred until the logical run is finalized.\n');
+		} else {
+			if (this.options.screenshotOnlySlideshow) await writeScreenshotSlideshowFromDirectory(path.resolve(this.options.screenshotsDirectory), slideshow, { currentRunId: this.screenshotRunId });
+			else await writeSlideshow(slideshow, this.options.loadTesting.enabled ? results : browserResults, { loadTestingEnabled: this.options.loadTesting.enabled });
+			process.stdout.write(`Test slideshow: ${slideshow}\n`);
+		}
+		process.stdout.write(`Test spreadsheet: ${spreadsheet}\n`);
 		const measurements = results.flatMap((r) => r.loadMeasurements || []);
 		const loadCounts = loadGradeCounts(measurements);
 		if (this.options.loadTesting.enabled) process.stdout.write(`Load budgets: ${loadCounts.pass} pass, ${loadCounts.warning} warning, ${loadCounts.fail} fail.\n`);

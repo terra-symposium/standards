@@ -1,0 +1,33 @@
+{
+	"snapshotStatus": "live-labels-captured-with-source-hash-audit",
+	"gemId": "b2b810394d61",
+	"persistentGemKnowledge": [
+		{
+			"label": "003-fast-mode-contract-mtwdj8lj.md",
+			"repositoryPath": null,
+			"sha256": null,
+			"status": "live attachment; local source not found in the checkout"
+		},
+		{
+			"label": "docs-mtwdj8n8.tsx",
+			"repositoryPath": "sanity/schemas/docs.tsx",
+			"sha256": "a412e032aaacac3d5d88c27f3d21709f6ae7c9fd1d2efa0c30af41873eec90d0",
+			"status": "live label matched repository source"
+		}
+	],
+	"historicalKnowledgeLabels": [
+		"002-terra-docs-production-style-context.md",
+		"003-fast-mode-contract.md",
+		"sanity/schemas/docs.tsx"
+	],
+	"conversationUploadsObservedSeparately": [
+		"Week1_Lecture-Chapter1_part1_v8.0.pptx",
+		"Week1-ReviewQuestion.docx",
+		"Week1-ReviewQuestionAnswer.docx",
+		"Week1-TutorialProblem.docx",
+		"Week1-TutorialProblemSolution.docx",
+		"Week1-Lab-Wireshark_Intro_v8.0.pdf",
+		"en-Week1_LectureRecording.txt"
+	],
+	"warning": "Gem knowledge labels are verified live. The contents of the fast-mode attachment were not downloadable from the editor, and its local source was not found."
+}

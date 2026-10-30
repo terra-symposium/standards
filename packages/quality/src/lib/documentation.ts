@@ -66,6 +66,8 @@ type SrcGroup = 'CONFIG' | 'HELPERS';
 export type DocumentationRequirements = { types?: boolean; functions?: boolean; exportedFunctions?: boolean; noInlineFunctions?: boolean };
 /** A repeated named import reported within one source file. */
 export type DuplicateImportFinding = { file: string; line: number; module: string };
+/** A deprecated pnpm directory flag inside a configured documentation command block. */
+export type DocumentedCommandFinding = { file: string; line: number; command: string; recommendation: string };
 const PNPM_FENCE = /^\s*```(?:sh|bash|zsh|shell)\s*$/i;
 const FENCE_CLOSE = /^\s*```\s*$/;
 const PNPM_DIR_FLAG = /^(\s*(?:\$\s*)?pnpm)\s+(?:-C|--prefix)(\s+)("[^"]+"|'[^']+'|\S+)(.*)$/;
@@ -77,7 +79,7 @@ const PNPM_DIR_FLAG = /^(\s*(?:\$\s*)?pnpm)\s+(?:-C|--prefix)(\s+)("[^"]+"|'[^']
  *
  * @return
  */
-export function documentedCommandFindings(cfg: QualityCfg): { file: string; line: number; command: string; recommendation: string }[] {
+export function documentedCommandFindings(cfg: QualityCfg): DocumentedCommandFinding[] {
 	const roots = cfg.documentation?.commandRoots?.map((path) => resolve(cfg.root, path)) ?? [];
 	if (!roots.length) return [];
 	return srcFiles({ ...cfg, sourceRoots: roots, extensions: ['.md', '.mdx'] }).flatMap((file) => {

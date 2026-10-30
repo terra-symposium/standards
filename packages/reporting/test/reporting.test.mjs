@@ -18,12 +18,9 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 
 /*//////////////////////////////////////////////////
-REGEX
+CONFIG
 //////////////////////////////////////////////////*/
 
-const POWERPOINT_EXCEL_TERRA_REGEX = /PowerPoint|Excel|Terra/;
-const TEST_EVIDENCE_REPORTER_REGEX = /Test evidence reporter/;
-const LOAD_TIMING_SUMMARY_REGEX = /Load timing summary/;
 const execFileAsync = promisify(execFile);
 const { diagnosticCount, normalizeVisualStatus: normVisualStatus, orderedFiles, statusCounts } = await import('@terra-symposium/standards-reporting/core');
 const { parseDiagnostics, stripAnsi, default: ProgressReporter } = await import('@terra-symposium/standards-reporting/playwright');
@@ -37,19 +34,13 @@ const {
 	timeLoadOperation: timeLoadOp,
 } = await import('@terra-symposium/standards-reporting/load-testing');
 const { writeSpreadsheet } = await import('@terra-symposium/standards-reporting/spreadsheet');
-const { writeSlideshow } = await import('@terra-symposium/standards-reporting/slideshow');
+const { readScreenshotCapturesFromDirectory, writeScreenshotSlideshow, writeScreenshotSlideshowFromDirectory, writeSlideshow } = await import('@terra-symposium/standards-reporting/slideshow');
 
 /*//////////////////////////////////////////////////
 HELPERS
 //////////////////////////////////////////////////*/
 
 /* Creates the smallest complete normalized result fixture for reporting tests. */
-/**
- *
- * @param overrides
- *
- * @return
- */
 const result = (overrides = {}) => ({
 	browserErrors: '',
 	duration: 10,
@@ -109,11 +100,11 @@ test('captures page navigation for tests that do not destructure the load fixtur
 	const reportFile = path.join(root, 'playwright-report.json');
 	await fs.writeFile(
 		specFile,
-		`import { loadTest as test } from ${JSON.stringify(new URL('../dist/lib/playwright.js', import.meta.url).href)};\ntest('navigates without using load', async ({ page }) => { await page.goto('data:text/html,<title>loaded</title>'); });\n`,
+		`import { visualTest as test } from ${JSON.stringify(new URL('../dist/lib/playwright.js', import.meta.url).href)};\ntest('captures a keyed screenshot', async ({ page, visuals }) => { await page.goto('data:text/html,<title>loaded</title>'); await visuals.capture('/example'); });\n`,
 	);
 	await fs.writeFile(
 		cfgFile,
-		`export default { testDir: ${JSON.stringify(root)}, reporter: [['json', { outputFile: ${JSON.stringify(reportFile)} }]], projects: [{ name: 'chromium', use: { browserName: 'chromium' } }] };\n`,
+		`export default { testDir: ${JSON.stringify(root)}, outputDir: ${JSON.stringify(path.join(root, 'output'))}, reporter: [['json', { outputFile: ${JSON.stringify(reportFile)} }]], projects: [{ name: 'chromium', use: { browserName: 'chromium' } }] };\n`,
 	);
 	try {
 		await execFileAsync('pnpm', ['--filter', '@terra-symposium/standards-reporting', 'exec', 'playwright', 'test', '--config', cfgFile], {
@@ -129,6 +120,14 @@ test('captures page navigation for tests that do not destructure the load fixtur
 			payload.measurements.some((measurement) => measurement.kind === 'page' && measurement.durationMs > 0),
 			JSON.stringify(payload),
 		);
+		const capturesAttachment = results.flatMap((r) => r.attachments).find((e) => e.name === 'visual-captures');
+		assert.ok(capturesAttachment, 'the visual fixture should attach capture metadata');
+		const captures = JSON.parse(Buffer.from(capturesAttachment.body, 'base64').toString('utf8'));
+		assert.equal(captures.length, 1);
+		assert.equal(captures[0].key, '/example');
+		const screenshot = results.flatMap((r) => r.attachments).find((e) => e.name === captures[0].attachmentName);
+		assert.equal(screenshot.contentType, 'image/jpeg');
+		assert.ok((await fs.stat(screenshot.path)).size > 0);
 	} finally {
 		await fs.rm(root, { recursive: true, force: true });
 	}
@@ -166,6 +165,8 @@ test('expands regular Playwright projects and preserves single-run setup/capture
 	assert.deepEqual(cfg.projects.find(({ name: n }) => n === 'app-mobile').dependencies, ['auth-setup']);
 	assert.equal(cfg.projects.find(({ name: n }) => n === 'browser-mobile').use.viewport.width, 390);
 	assert.ok(cfg.reporter.some((r) => Array.isArray(r) && r[0] === '@terra-symposium/standards-reporting/playwright'));
+	const screenshotsOnly = withResponsivePlaywright({ projects: [{ name: 'browser' }] }, { screenshotOnlySlideshow: true });
+	assert.equal(screenshotsOnly.reporter.find((r) => Array.isArray(r) && r[0] === '@terra-symposium/standards-reporting/playwright')[1].screenshotOnlySlideshow, true);
 	process.env.PW_VIEWPORTS = 'md,xl';
 	assert.deepEqual(
 		resolveVisualViewports().map(({ name: n }) => n),
@@ -177,8 +178,274 @@ test('expands regular Playwright projects and preserves single-run setup/capture
 		['browser-md', 'browser-xl'],
 	);
 	assert.equal(focused.metadata.terraLoadTestingEnabled, true);
+	assert.equal(focused.reporter.find((r) => Array.isArray(r) && r[0] === '@terra-symposium/standards-reporting/playwright')[1].screenshotOnlySlideshow, true);
 	if (original === undefined) delete process.env.PW_VIEWPORTS;
 	else process.env.PW_VIEWPORTS = original;
+});
+
+test('collects only declared viewport scenarios and passes custom dimensions to reporting', () => {
+	const viewportCatalog = { compact: { width: 767, height: 900 }, expanded: { width: 768, height: 900 } };
+	const config = withResponsivePlaywright({ projects: [{ name: 'dashboard', testMatch: '**/dashboard.spec.ts' }] }, { viewportPolicy: 'declared', viewportCatalog, loadTesting: { enabled: false } });
+	assert.deepEqual(
+		config.projects.map(({ name }) => name),
+		['dashboard-compact', 'dashboard-expanded'],
+	);
+	assert.match('@viewport:compact', config.projects[0].grep);
+	assert.doesNotMatch('@viewport:expanded', config.projects[0].grep);
+	assert.deepEqual(config.reporter.find((entry) => Array.isArray(entry) && entry[0] === '@terra-symposium/standards-reporting/playwright')[1].viewportCatalog, viewportCatalog);
+	const filtered = withResponsivePlaywright({ projects: [{ name: 'dashboard', grep: /@sanity-studio/u }] }, { viewportPolicy: 'declared', viewportCatalog });
+	assert.match('@sanity-studio @viewport:compact', filtered.projects[0].grep);
+	assert.doesNotMatch('@sanity-studio @viewport:expanded', filtered.projects[0].grep);
+});
+
+/* Persists default Playwright result screenshots across partial runs and rebuilds a deduplicated deck from the folder. */
+test('rebuilds the default screenshot deck from accumulated captures', async () => {
+	const root = await fs.mkdtemp(path.join(os.tmpdir(), 'terra-reporting-capture-folder-'));
+	try {
+		const { default: sharp } = await import('sharp');
+		const screenshot = path.join(root, 'source.png');
+		await sharp({ create: { width: 24, height: 16, channels: 3, background: { r: 60, g: 100, b: 140 } } })
+			.png()
+			.toFile(screenshot);
+		const outputRoot = path.join(root, 'visual');
+		const testCase = {
+			id: 'result-screenshot',
+			location: { file: path.join(root, 'tests', 'responsive.spec.ts') },
+			title: 'renders the page',
+			titlePath: () => ['responsive.spec.ts', 'renders the page'],
+			parent: { project: () => ({ name: 'browser-mobile' }) },
+		};
+		const run = async (projectName, retry = 0) => {
+			const reporter = new ProgressReporter({ outputRoot, loadTesting: { enabled: false } });
+			const selectedTest = { ...testCase, parent: { project: () => ({ name: projectName }) } };
+			reporter.onBegin({}, { allTests: () => [selectedTest] });
+			reporter.onTestEnd(selectedTest, { attachments: [{ name: 'screenshot', contentType: 'image/png', path: screenshot }], duration: 5, error: undefined, retry, status: 'passed' });
+			assert.equal(await reporter.onEnd(), undefined);
+		};
+		await run('browser-mobile', 2);
+		await run('browser-xl');
+		await run('browser-mobile');
+		const evidenceDirectory = path.join(outputRoot, 'screenshots');
+		const entries = await fs.readdir(evidenceDirectory);
+		assert.equal(entries.filter((name) => name.endsWith('.png')).length, 2);
+		assert.equal(entries.filter((name) => name.endsWith('.json') && name !== '.terra-playwright-run.json').length, 2);
+		const persisted = readScreenshotCapturesFromDirectory(evidenceDirectory);
+		const currentRun = JSON.parse(await fs.readFile(path.join(evidenceDirectory, '.terra-playwright-run.json'), 'utf8'));
+		assert.equal(currentRun.collectionFinished, true);
+		assert.equal(currentRun.expectedTestCount, 1);
+		assert.equal(currentRun.completedTestCount, 1);
+		assert.deepEqual(persisted.map(({ viewport, historical }) => [viewport, historical]).sort(), [
+			['mobile', false],
+			['xl', true],
+		]);
+		assert.equal(persisted.find(({ viewport }) => viewport === 'mobile').retry, 0, 'a fresh run replaces a previous run even when its retry number is lower');
+		await fs.writeFile(path.join(evidenceDirectory, 'interrupted-write.json'), '{');
+		const rebuilt = path.join(root, 'rebuilt.pptx');
+		await writeScreenshotSlideshowFromDirectory(evidenceDirectory, rebuilt);
+		const { stdout: archive } = await execFileAsync('unzip', ['-l', rebuilt]);
+		assert.match(archive, /ppt\/slides\/slide2\.xml/);
+		const { stdout: currentSlide } = await execFileAsync('unzip', ['-p', rebuilt, 'ppt/slides/slide1.xml']);
+		const { stdout: historicalSlide } = await execFileAsync('unzip', ['-p', rebuilt, 'ppt/slides/slide2.xml']);
+		assert.equal((currentSlide.match(/<p:pic>/g) || []).length, 1);
+		assert.equal((historicalSlide.match(/<p:pic>/g) || []).length, 1);
+		assert.match(`${currentSlide}${historicalSlide}`, /CURRENT RUN/);
+		assert.match(`${currentSlide}${historicalSlide}`, /HISTORICAL CAPTURE/);
+
+		const interruptedReporter = new ProgressReporter({ outputRoot, loadTesting: { enabled: false } });
+		interruptedReporter.onBegin({}, { allTests: () => [testCase] });
+		const interruptedRun = JSON.parse(await fs.readFile(path.join(evidenceDirectory, '.terra-playwright-run.json'), 'utf8'));
+		assert.equal(interruptedRun.collectionFinished, false);
+		const interruptedDeck = path.join(root, 'interrupted-rebuilt.pptx');
+		await writeScreenshotSlideshowFromDirectory(evidenceDirectory, interruptedDeck);
+		const { stdout: interruptedSlide } = await execFileAsync('unzip', ['-p', interruptedDeck, 'ppt/slides/slide1.xml']);
+		assert.match(interruptedSlide, /HISTORICAL CAPTURE/);
+		assert.doesNotMatch(interruptedSlide, /CURRENT RUN/);
+
+		const legacyDirectory = path.join(root, 'legacy-screenshots');
+		await fs.mkdir(legacyDirectory, { recursive: true });
+		await fs.copyFile(screenshot, path.join(legacyDirectory, 'legacy.png'));
+		await fs.writeFile(
+			path.join(legacyDirectory, 'legacy.json'),
+			JSON.stringify({ group: 'legacy', key: 'test-result', title: 'legacy capture', viewport: 'mobile', viewportSize: '390×844', screenshot: 'legacy.png' }),
+		);
+		const legacyDeck = path.join(root, 'legacy-rebuilt.pptx');
+		await writeScreenshotSlideshowFromDirectory(legacyDirectory, legacyDeck);
+		const { stdout: legacySlide } = await execFileAsync('unzip', ['-p', legacyDeck, 'ppt/slides/slide1.xml']);
+		assert.equal((legacySlide.match(/<p:pic>/g) || []).length, 1);
+		assert.match(legacySlide, /HISTORICAL CAPTURE/);
+	} finally {
+		await fs.rm(root, { recursive: true, force: true });
+	}
+});
+
+/* Keeps automatic screenshot decks bounded while retaining deliberate full-folder recovery. */
+test('writes one slide per current capture when a run ID is supplied', async () => {
+	const root = await fs.mkdtemp(path.join(os.tmpdir(), 'terra-reporting-current-run-'));
+	try {
+		const { default: sharp } = await import('sharp');
+		const evidenceDirectory = path.join(root, 'screenshots');
+		await fs.mkdir(evidenceDirectory, { recursive: true });
+		await sharp({ create: { width: 24, height: 16, channels: 3, background: { r: 60, g: 100, b: 140 } } })
+			.png()
+			.toFile(path.join(evidenceDirectory, 'capture.png'));
+		const runId = 'current-run';
+		for (let index = 0; index < 66; index++) {
+			await fs.writeFile(
+				path.join(evidenceDirectory, `capture-${index}.json`),
+				JSON.stringify({
+					group: `case-${index}`,
+					key: 'test-result',
+					title: `case ${index}`,
+					viewport: 'xl',
+					viewportSize: '1280×720',
+					screenshot: 'capture.png',
+					runId: index < 65 ? runId : 'historical-run',
+				}),
+			);
+		}
+		await fs.writeFile(
+			path.join(evidenceDirectory, '.terra-playwright-run.json'),
+			JSON.stringify({ runId, startedAt: new Date().toISOString(), expectedTestCount: 65, completedTestCount: 65, collectionFinished: true }),
+		);
+		const captures = readScreenshotCapturesFromDirectory(evidenceDirectory);
+		assert.equal(captures.filter(({ historical }) => !historical).length, 65);
+		assert.equal(captures.filter(({ historical }) => historical).length, 1);
+		const currentDeck = path.join(root, 'current.pptx');
+		await writeScreenshotSlideshowFromDirectory(evidenceDirectory, currentDeck, { currentRunId: runId });
+		const { stdout: currentArchive } = await execFileAsync('unzip', ['-l', currentDeck]);
+		assert.match(currentArchive, /ppt\/slides\/slide65\.xml/);
+		assert.doesNotMatch(currentArchive, /ppt\/slides\/slide66\.xml/);
+		const { stdout: currentSlide } = await execFileAsync('unzip', ['-p', currentDeck, 'ppt/slides/slide1.xml']);
+		assert.match(currentSlide, /CURRENT RUN/);
+		const accumulatedDeck = path.join(root, 'accumulated.pptx');
+		await writeScreenshotSlideshowFromDirectory(evidenceDirectory, accumulatedDeck);
+		const { stdout: accumulatedArchive } = await execFileAsync('unzip', ['-l', accumulatedDeck]);
+		assert.match(accumulatedArchive, /ppt\/slides\/slide66\.xml/);
+	} finally {
+		await fs.rm(root, { recursive: true, force: true });
+	}
+});
+
+/* Aggregates sequential viewport reporter processes into one logical screenshot run and resumes it after interruption. */
+test('aggregates shared screenshot runs across viewport subprocesses and restarts', async () => {
+	const root = await fs.mkdtemp(path.join(os.tmpdir(), 'terra-reporting-matrix-run-'));
+	const runId = `matrix-${path.basename(root)}`;
+	try {
+		const { default: sharp } = await import('sharp');
+		const screenshot = path.join(root, 'source.png');
+		await sharp({ create: { width: 24, height: 16, channels: 3, background: { r: 60, g: 100, b: 140 } } })
+			.png()
+			.toFile(screenshot);
+		const outputRoot = path.join(root, 'visual');
+		const evidenceDirectory = path.join(outputRoot, 'screenshots');
+		const latestArtifacts = async () => {
+			const runs = (await fs.readdir(outputRoot, { withFileTypes: true }))
+				.filter((entry) => entry.isDirectory() && entry.name !== 'screenshots')
+				.map((entry) => entry.name)
+				.sort();
+			return fs.readdir(path.join(outputRoot, runs.at(-1)));
+		};
+		const makeTest = (id, viewport) => ({
+			id,
+			location: { file: path.join(root, 'tests', 'responsive.spec.ts') },
+			title: `renders ${viewport}`,
+			titlePath: () => ['responsive.spec.ts', `renders ${viewport}`],
+			parent: { project: () => ({ name: `browser-${viewport}` }) },
+		});
+		const reporterProgram = `
+			import ProgressReporter from '@terra-symposium/standards-reporting/playwright';
+			const reporter = new ProgressReporter({ outputRoot: process.env.OUTPUT_ROOT, loadTesting: { enabled: false } });
+			const selectedTest = {
+				id: process.env.TEST_ID,
+				location: { file: 'tests/responsive.spec.ts' },
+				title: 'renders ' + process.env.VIEWPORT,
+				titlePath: () => ['responsive.spec.ts', 'renders ' + process.env.VIEWPORT],
+				parent: { project: () => ({ name: 'browser-' + process.env.VIEWPORT }) },
+			};
+			reporter.onBegin({}, { allTests: () => [selectedTest] });
+			if (process.env.COMPLETE_TEST === '1') reporter.onTestEnd(selectedTest, {
+				attachments: [{ name: 'screenshot', contentType: 'image/png', path: process.env.SCREENSHOT }],
+				duration: 5,
+				error: undefined,
+				retry: 0,
+				status: 'passed',
+			});
+			await reporter.onEnd();
+		`;
+		const runProcess = async (selectedTest, { completed = true, finalize = false, selectedRunId = runId } = {}) => {
+			await execFileAsync(process.execPath, ['--input-type=module', '-e', reporterProgram], {
+				cwd: process.cwd(),
+				env: {
+					...process.env,
+					TERRA_SCREENSHOT_RUN_ID: selectedRunId,
+					TERRA_SCREENSHOT_RUN_FINALIZE: finalize ? '1' : '0',
+					OUTPUT_ROOT: outputRoot,
+					SCREENSHOT: screenshot,
+					TEST_ID: selectedTest.id,
+					VIEWPORT: selectedTest.parent.project().name.slice('browser-'.length),
+					COMPLETE_TEST: completed ? '1' : '0',
+				},
+			});
+		};
+
+		const mobile = makeTest('mobile-test-id', 'mobile');
+		const desktop = makeTest('desktop-test-id', 'xl');
+		await runProcess(mobile);
+		let marker = JSON.parse(await fs.readFile(path.join(evidenceDirectory, '.terra-playwright-run.json'), 'utf8'));
+		assert.deepEqual([marker.expectedTestCount, marker.completedTestCount, marker.collectionFinished], [1, 1, false]);
+		assert.ok((await latestArtifacts()).includes('report.xlsx'));
+		assert.ok(!(await latestArtifacts()).includes('report.pptx'), 'intermediate viewport process does not build a deck');
+
+		// The desktop subprocess starts but is interrupted. It must add its expected ID without replacing the mobile result.
+		await runProcess(desktop, { completed: false });
+		marker = JSON.parse(await fs.readFile(path.join(evidenceDirectory, '.terra-playwright-run.json'), 'utf8'));
+		assert.deepEqual([marker.expectedTestCount, marker.completedTestCount, marker.collectionFinished], [2, 1, false]);
+		assert.deepEqual(marker.expectedTestIds, ['desktop-test-id', 'mobile-test-id']);
+		assert.deepEqual(marker.completedTestIds, ['mobile-test-id']);
+		assert.equal(readScreenshotCapturesFromDirectory(evidenceDirectory).length, 1, 'the partial folder still rebuilds from its completed capture');
+
+		// Restarting the same viewport under the same logical ID completes the matrix without recounting prior tests.
+		await runProcess(desktop, { finalize: true });
+		marker = JSON.parse(await fs.readFile(path.join(evidenceDirectory, '.terra-playwright-run.json'), 'utf8'));
+		assert.deepEqual([marker.expectedTestCount, marker.completedTestCount, marker.collectionFinished], [2, 2, true]);
+		assert.ok((await latestArtifacts()).includes('report.xlsx'));
+		assert.ok((await latestArtifacts()).includes('report.pptx'), 'final viewport process builds the accumulated deck');
+		const captures = readScreenshotCapturesFromDirectory(evidenceDirectory);
+		assert.deepEqual(captures.map(({ viewport, runId: captureRunId, historical }) => [viewport, captureRunId, historical]).sort(), [
+			['mobile', runId, false],
+			['xl', runId, false],
+		]);
+
+		// Repeating an already counted subsection is idempotent for expected/executed totals.
+		await runProcess(mobile, { finalize: true });
+		marker = JSON.parse(await fs.readFile(path.join(evidenceDirectory, '.terra-playwright-run.json'), 'utf8'));
+		assert.deepEqual([marker.expectedTestCount, marker.completedTestCount, marker.collectionFinished], [2, 2, true]);
+
+		// A later subset run gets a bounded deck while the directory can still rebuild accumulated evidence.
+		const subsetRunId = `subset-${path.basename(root)}`;
+		await runProcess(mobile, { finalize: true, selectedRunId: subsetRunId });
+		const subsetArtifacts = await latestArtifacts();
+		assert.ok(subsetArtifacts.includes('report.pptx'));
+		const runDirectories = (await fs.readdir(outputRoot, { withFileTypes: true }))
+			.filter((entry) => entry.isDirectory() && entry.name !== 'screenshots')
+			.map((entry) => entry.name)
+			.sort();
+		const subsetDeck = path.join(outputRoot, runDirectories.at(-1), 'report.pptx');
+		const { stdout: subsetSlide } = await execFileAsync('unzip', ['-p', subsetDeck, 'ppt/slides/slide1.xml']);
+		assert.equal((subsetSlide.match(/<p:pic>/g) || []).length, 1);
+		assert.match(subsetSlide, /CURRENT RUN/);
+		assert.doesNotMatch(subsetSlide, /HISTORICAL CAPTURE/);
+		const accumulatedDeck = path.join(root, 'accumulated.pptx');
+		await writeScreenshotSlideshowFromDirectory(evidenceDirectory, accumulatedDeck);
+		const { stdout: accumulatedArchive } = await execFileAsync('unzip', ['-l', accumulatedDeck]);
+		assert.match(accumulatedArchive, /ppt\/slides\/slide2\.xml/);
+		const { stdout: accumulatedCurrent } = await execFileAsync('unzip', ['-p', accumulatedDeck, 'ppt/slides/slide1.xml']);
+		const { stdout: accumulatedHistorical } = await execFileAsync('unzip', ['-p', accumulatedDeck, 'ppt/slides/slide2.xml']);
+		assert.match(accumulatedCurrent, /CURRENT RUN/);
+		assert.match(accumulatedHistorical, /HISTORICAL CAPTURE/);
+	} finally {
+		await fs.rm(root, { recursive: true, force: true });
+	}
 });
 
 /* Covers default timing thresholds, grading boundaries, config overrides, and failure-safe measurement. */
@@ -252,12 +519,12 @@ test('writes neutral spreadsheet and slideshow artifacts', async () => {
 	assert.ok((await fs.stat(slideshow)).size > 0);
 	const { stdout: coreProperties } = await execFileAsync('unzip', ['-p', slideshow, 'docProps/core.xml']);
 	assert.match(coreProperties, /Test evidence slideshow/);
-	assert.doesNotMatch(coreProperties, POWERPOINT_EXCEL_TERRA_REGEX);
+	assert.doesNotMatch(coreProperties, /PowerPoint|Excel|Terra/);
 	const { stdout: slideshowProperties } = await execFileAsync('unzip', ['-p', slideshow, 'docProps/app.xml']);
-	assert.match(slideshowProperties, TEST_EVIDENCE_REPORTER_REGEX);
-	assert.doesNotMatch(slideshowProperties, POWERPOINT_EXCEL_TERRA_REGEX);
+	assert.match(slideshowProperties, /Test evidence reporter/);
+	assert.doesNotMatch(slideshowProperties, /PowerPoint|Excel|Terra/);
 	const { stdout: slideText } = await execFileAsync('unzip', ['-p', slideshow, 'ppt/slides/slide1.xml']);
-	assert.doesNotMatch(slideText, POWERPOINT_EXCEL_TERRA_REGEX);
+	assert.doesNotMatch(slideText, /PowerPoint|Excel|Terra/);
 	const { stdout: notes } = await execFileAsync('unzip', ['-p', slideshow, 'ppt/notesSlides/notesSlide1.xml']);
 	assert.match(notes, /full-page screenshot/);
 	const workbook = new ExcelJS.Workbook();
@@ -265,8 +532,8 @@ test('writes neutral spreadsheet and slideshow artifacts', async () => {
 	assert.equal(workbook.creator, 'Test evidence reporter');
 	assert.equal(workbook.title, 'Test evidence spreadsheet');
 	const { stdout: spreadsheetProperties } = await execFileAsync('unzip', ['-p', spreadsheet, 'docProps/app.xml']);
-	assert.match(spreadsheetProperties, TEST_EVIDENCE_REPORTER_REGEX);
-	assert.doesNotMatch(spreadsheetProperties, POWERPOINT_EXCEL_TERRA_REGEX);
+	assert.match(spreadsheetProperties, /Test evidence reporter/);
+	assert.doesNotMatch(spreadsheetProperties, /PowerPoint|Excel|Terra/);
 	assert.deepEqual(
 		workbook.worksheets.map((s) => s.name),
 		['Summary', 'example.spec.ts', 'interrupted.spec.ts', 'Projects', 'Run diagnostics'],
@@ -312,6 +579,74 @@ test('writes neutral spreadsheet and slideshow artifacts', async () => {
 	await writeSlideshow(emptySlideshow, []);
 	const { stdout: emptyNotes } = await execFileAsync('unzip', ['-p', emptySlideshow, 'ppt/slides/slide1.xml']);
 	assert.match(emptyNotes, /No browser test results were collected/);
+});
+
+/* Ensures keyed viewport captures produce screenshot-backed PowerPoint slides. */
+test('writes responsive screenshot-only slides', async () => {
+	const root = await fs.mkdtemp(path.join(os.tmpdir(), 'terra-screenshot-slideshow-'));
+	try {
+		const { default: sharp } = await import('sharp');
+		const screenshot = path.join(root, 'capture.png');
+		await sharp({ create: { width: 32, height: 18, channels: 3, background: { r: 40, g: 80, b: 120 } } })
+			.png()
+			.toFile(screenshot);
+		const viewports = [
+			['mobile', '390×844'],
+			['sm', '640×800'],
+			['md', '768×900'],
+			['lg', '1024×768'],
+			['xl', '1280×720'],
+			['2xl', '1536×864'],
+		];
+		const slideshow = path.join(root, 'screenshots.pptx');
+		await writeScreenshotSlideshow(
+			slideshow,
+			viewports.map(([viewport, viewportSize]) => ({ group: 'example route', key: '/example', title: 'Example route', viewport, viewportSize, screenshot })),
+		);
+		const { stdout: slide } = await execFileAsync('unzip', ['-p', slideshow, 'ppt/slides/slide1.xml']);
+		assert.equal((slide.match(/<p:pic>/g) || []).length, 6);
+		assert.match(slide, /CURRENT RUN/);
+		assert.doesNotMatch(slide, /mobile|desktop|Load timing/);
+		const { stdout: archive } = await execFileAsync('unzip', ['-l', slideshow]);
+		assert.doesNotMatch(archive, /ppt\/slides\/slide2\.xml/);
+		const reporter = new ProgressReporter({ outputRoot: path.join(root, 'reporter'), screenshotOnlySlideshow: true, loadTesting: { enabled: false } });
+		const reporterTests = viewports.map(([viewport]) => ({
+			id: `test-${viewport}`,
+			location: { file: path.join(root, 'routes.spec.ts') },
+			title: 'captures route screenshots',
+			titlePath: () => ['routes.spec.ts', 'captures route screenshots'],
+			parent: { project: () => ({ name: `root-routes-${viewport}` }) },
+		}));
+		reporter.onBegin({}, { allTests: () => reporterTests });
+		for (const [viewport] of viewports) {
+			const captureName = 'visual-capture-00001';
+			reporter.onTestEnd(
+				reporterTests.find(({ id }) => id === `test-${viewport}`),
+				{
+					attachments: [
+						{
+							name: 'visual-captures',
+							contentType: 'application/json',
+							body: Buffer.from(JSON.stringify([{ attachmentName: captureName, contentType: 'image/jpeg', key: '/example', title: 'Example route' }])),
+						},
+						{ name: captureName, contentType: 'image/jpeg', path: screenshot },
+					],
+					duration: 100,
+					error: undefined,
+					retry: 0,
+					status: 'passed',
+				},
+			);
+		}
+		assert.equal(await reporter.onEnd(), undefined);
+		const runDirectory = (await fs.readdir(path.join(root, 'reporter')))[0];
+		const reporterSlides = path.join(root, 'reporter', runDirectory, 'report.pptx');
+		const { stdout: reporterSlide } = await execFileAsync('unzip', ['-p', reporterSlides, 'ppt/slides/slide1.xml']);
+		assert.equal((reporterSlide.match(/<p:pic>/g) || []).length, 6);
+		assert.match(reporterSlide, /CURRENT RUN/);
+	} finally {
+		await fs.rm(root, { recursive: true, force: true });
+	}
 });
 
 // Covers timing artifacts, supplemental runner rows, reporter enforcement, and the legacy opt-out. */
@@ -360,14 +695,14 @@ test('reports load timing details and fails only when enabled budgets are exceed
 	const { stdout: slide1 } = await execFileAsync('unzip', ['-p', slideshow, 'ppt/slides/slide1.xml']);
 	const { stdout: slide2 } = await execFileAsync('unzip', ['-p', slideshow, 'ppt/slides/slide2.xml']);
 	const { stdout: slide4 } = await execFileAsync('unzip', ['-p', slideshow, 'ppt/slides/slide4.xml']);
-	assert.match(slide1, LOAD_TIMING_SUMMARY_REGEX);
+	assert.match(slide1, /Load timing summary/);
 	assert.match(slide1, /2 pass/);
 	assert.match(slide1, /1 warning/);
 	assert.match(slide1, /1 fail/);
 	assert.match(slide2, /Load fail/);
 	assert.match(slide4, /bulk import/);
 	assert.match(slide4, /disk staging/);
-	const reporter = new ProgressReporter({ outputRoot: path.join(root, 'enforced'), loadTesting: { defaultBudget: { warnMs: 1000, failMs: 2000 } } });
+	const reporter = new ProgressReporter({ outputRoot: path.join(root, 'enforced'), loadTesting: { defaultBudget: { warnMs: 1000, failMs: 2000 } }, screenshotOnlySlideshow: false });
 	const testCase = {
 		id: 'slow-test',
 		location: { file: path.join(root, 'tests', 'slow.spec.ts') },
@@ -377,10 +712,10 @@ test('reports load timing details and fails only when enabled budgets are exceed
 	};
 	reporter.onTestEnd(testCase, { attachments: [], duration: 2501, error: undefined, retry: 0, status: 'passed' });
 	assert.equal(await reporter.onEnd(), 'failed');
-	const warningOnly = new ProgressReporter({ outputRoot: path.join(root, 'warning-only'), loadTesting: { defaultBudget: { warnMs: 1000, failMs: 3000 } } });
+	const warningOnly = new ProgressReporter({ outputRoot: path.join(root, 'warning-only'), loadTesting: { defaultBudget: { warnMs: 1000, failMs: 3000 } }, screenshotOnlySlideshow: false });
 	warningOnly.onTestEnd(testCase, { attachments: [], duration: 2501, error: undefined, retry: 0, status: 'passed' });
 	assert.equal(await warningOnly.onEnd(), undefined);
-	const testOverride = new ProgressReporter({ outputRoot: path.join(root, 'test-override'), loadTesting: { defaultBudget: { warnMs: 1000, failMs: 2000 } } });
+	const testOverride = new ProgressReporter({ outputRoot: path.join(root, 'test-override'), loadTesting: { defaultBudget: { warnMs: 1000, failMs: 2000 } }, screenshotOnlySlideshow: false });
 	testOverride.onTestEnd(testCase, {
 		attachments: [{ name: 'load-testing', contentType: 'application/json', body: Buffer.from(JSON.stringify({ testBudget: { failMs: 3000 }, measurements: [] })) }],
 		duration: 2501,
@@ -389,7 +724,7 @@ test('reports load timing details and fails only when enabled budgets are exceed
 		status: 'passed',
 	});
 	assert.equal(await testOverride.onEnd(), undefined);
-	const optedOut = new ProgressReporter({ outputRoot: path.join(root, 'opted-out'), loadTesting: { enabled: false } });
+	const optedOut = new ProgressReporter({ outputRoot: path.join(root, 'opted-out'), loadTesting: { enabled: false }, screenshotOnlySlideshow: false });
 	optedOut.onTestEnd(testCase, { attachments: [], duration: 2501, error: undefined, retry: 0, status: 'passed' });
 	assert.equal(await optedOut.onEnd(), undefined);
 	const legacyWorkbook = new ExcelJS.Workbook();
@@ -401,5 +736,5 @@ test('reports load timing details and fails only when enabled budgets are exceed
 	);
 	const optedOutSlideshow = path.join(root, 'opted-out', optedOutRun, 'report.pptx');
 	const { stdout: legacySlide } = await execFileAsync('unzip', ['-p', optedOutSlideshow, 'ppt/slides/slide1.xml']);
-	assert.doesNotMatch(legacySlide, LOAD_TIMING_SUMMARY_REGEX);
+	assert.doesNotMatch(legacySlide, /Load timing summary/);
 });

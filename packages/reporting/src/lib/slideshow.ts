@@ -14,6 +14,7 @@ import sharp from 'sharp';
 import { createRequire } from 'node:module';
 import { loadGradeCounts } from './load-testing.js';
 import { neutralizeApplicationMetadata } from './metadata.js';
+import { VISUAL_VIEWPORTS } from './viewports.js';
 
 // TYPES
 import type { VisualResult } from './core.js';
@@ -215,6 +216,90 @@ const addResponsiveSlide = async (presentation: Presentation, group: readonly Vi
 };
 /** Optional visible and metadata overrides for a slideshow artifact. */
 export type SlideshowOptions = { title?: string; author?: string; company?: string; subject?: string; loadTestingEnabled?: boolean };
+
+/** A named screenshot collected by the shared Playwright visual-capture fixture. */
+export type ScreenshotCapture = {
+	/** Stable test- and application-scoped group key shared across viewports. */
+	group: string;
+	/** Stable capture key shared across responsive projects. */
+	key: string;
+	/** Human-readable scenario label shown above its screenshot group. */
+	title: string;
+	/** Responsive viewport name. */
+	viewport: string;
+	/** Human-readable viewport dimensions. */
+	viewportSize: string;
+	/** Accessible screenshot file. */
+	screenshot: string;
+	/** Retry number used to select the final capture for each viewport. */
+	retry?: number;
+	/** Run that produced this capture. Missing IDs identify legacy evidence. */
+	runId?: string;
+	/** Time this capture was persisted. */
+	capturedAt?: string;
+	/** True when the capture predates the latest run marker in its directory. */
+	historical?: boolean;
+};
+
+/** Presentation metadata and optional logical-run selection for screenshot-only captures. */
+export type ScreenshotSlideshowOptions = {
+	title?: string;
+	author?: string;
+	company?: string;
+	subject?: string;
+	/** Restrict a directory rebuild to this run; omit it to include historical captures. */
+	currentRunId?: string;
+};
+
+/** Reads persisted screenshot records and labels captures outside the latest run as historical. */
+export const readScreenshotCapturesFromDirectory = (directory: string, currentRunId?: string): ScreenshotCapture[] => {
+	if (!fs.existsSync(directory)) return [];
+	if (!currentRunId) {
+		try {
+			const run = JSON.parse(fs.readFileSync(path.join(directory, '.terra-playwright-run.json'), 'utf8')) as { runId?: unknown };
+			if (typeof run.runId === 'string') currentRunId = run.runId;
+		} catch {
+			// Legacy folders have no current-run marker; their captures are historical.
+		}
+	}
+	return fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry): ScreenshotCapture[] => {
+		if (!entry.isFile() || !entry.name.endsWith('.json')) return [];
+		try {
+			const row: unknown = JSON.parse(fs.readFileSync(path.join(directory, entry.name), 'utf8'));
+			if (!row || typeof row !== 'object') return [];
+			const capture = row as Record<string, unknown>;
+			if (
+				typeof capture.group !== 'string' ||
+				typeof capture.key !== 'string' ||
+				typeof capture.title !== 'string' ||
+				typeof capture.viewport !== 'string' ||
+				typeof capture.viewportSize !== 'string' ||
+				typeof capture.screenshot !== 'string'
+			)
+				return [];
+			const screenshot = path.isAbsolute(capture.screenshot)
+				? capture.screenshot
+				: [path.resolve(directory, capture.screenshot), path.resolve(capture.screenshot)].find((candidate) => fs.existsSync(candidate));
+			if (!screenshot || !fs.existsSync(screenshot)) return [];
+			return [
+				{
+					group: capture.group,
+					key: capture.key,
+					title: capture.title,
+					viewport: capture.viewport,
+					viewportSize: capture.viewportSize,
+					screenshot,
+					retry: typeof capture.retry === 'number' ? capture.retry : 0,
+					runId: typeof capture.runId === 'string' ? capture.runId : undefined,
+					capturedAt: typeof capture.capturedAt === 'string' ? capture.capturedAt : undefined,
+					historical: !currentRunId || capture.runId !== currentRunId,
+				},
+			];
+		} catch {
+			return [];
+		}
+	});
+};
 /** One test result paired with a graded timing measurement for the report. */
 type LoadRow = { result: VisualResult; measurement: NonNullable<VisualResult['loadMeasurements']>[number] };
 /**
@@ -332,4 +417,92 @@ export const writeSlideshow = async (file: string, results: readonly VisualResul
 	if (loadEnabled) addLoadDetailSlides(presentation, results);
 	await presentation.writeFile({ fileName: file });
 	await neutralizeApplicationMetadata(file);
+};
+
+/**
+ * Writes keyed Playwright screenshots as responsive comparison slides with run provenance labels.
+ *
+ * @param file Output path for the slideshow artifact.
+ * @param captures Screenshots collected across test projects and viewports.
+ * @param opts Optional presentation metadata overrides.
+ * @returns A promise that resolves after the screenshot-backed slideshow has been written.
+ */
+export const writeScreenshotSlideshow = async (file: string, captures: readonly ScreenshotCapture[], opts: ScreenshotSlideshowOptions = {}): Promise<void> => {
+	if (!captures.length) throw new Error('No keyed Playwright screenshots were captured for the screenshot slideshow.');
+	const presentation = new /* The runtime package is CommonJS while NodeNext exposes its constructor through a namespace type. */ (
+		createRequire(import.meta.url)('pptxgenjs') as new () => Presentation
+	)();
+	presentation.layout = 'LAYOUT_WIDE';
+	presentation.author = opts.author || 'Test evidence reporter';
+	presentation.company = opts.company || 'Test evidence';
+	presentation.subject = opts.subject || 'Responsive Playwright screenshots';
+	presentation.title = opts.title || 'Playwright screenshots';
+	const groups = new Map<string, ScreenshotCapture[]>();
+	for (const capture of captures) {
+		const groupKey = `${capture.group}\0${capture.historical ? 'historical' : 'current'}`;
+		groups.set(groupKey, [...(groups.get(groupKey) || []), capture]);
+	}
+	const knownViewports = Object.keys(VISUAL_VIEWPORTS);
+	const viewportWidth = (capture: ScreenshotCapture): number => Number.parseInt(capture.viewportSize.split('×')[0] || '', 10) || Number.MAX_SAFE_INTEGER;
+	const orderedGroups = [...groups.entries()].sort(([first], [second]) => first.localeCompare(second));
+	const slideWidth = 13.333;
+	const slideHeight = 7.5;
+	const margin = 0.08;
+	const gap = 0.08;
+	const columns = 3;
+	const cellWidth = (slideWidth - margin * 2 - gap * (columns - 1)) / columns;
+	for (const [, group] of orderedGroups) {
+		const byViewport = new Map<string, ScreenshotCapture>();
+		for (const capture of group) {
+			const previous = byViewport.get(capture.viewport);
+			if (!previous || (capture.retry || 0) >= (previous.retry || 0)) byViewport.set(capture.viewport, capture);
+		}
+		const ordered = [...byViewport.values()].sort((first, second) => {
+			const firstIndex = knownViewports.indexOf(first.viewport);
+			const secondIndex = knownViewports.indexOf(second.viewport);
+			if (firstIndex >= 0 || secondIndex >= 0) return (firstIndex < 0 ? Number.MAX_SAFE_INTEGER : firstIndex) - (secondIndex < 0 ? Number.MAX_SAFE_INTEGER : secondIndex);
+			return viewportWidth(first) - viewportWidth(second);
+		});
+		const rows = Math.ceil(ordered.length / columns);
+		const cellHeight = (slideHeight - margin * 2 - 0.22 - gap * Math.max(0, rows - 1)) / rows;
+		const slide = presentation.addSlide();
+		slide.background = { color: 'FFFFFF' };
+		const historical = group[0]?.historical === true;
+		slide.addText(`${historical ? 'HISTORICAL CAPTURE' : 'CURRENT RUN'} · ${group[0]?.title || 'Playwright capture'}`, {
+			bold: true,
+			color: historical ? '8A5A32' : '315B43',
+			fontFace: 'Aptos',
+			fontSize: 8,
+			fit: 'shrink',
+			margin: 0,
+			x: margin,
+			y: 0.025,
+			w: slideWidth - margin * 2,
+			h: 0.18,
+		});
+		for (const [index, capture] of ordered.entries()) {
+			if (!fs.existsSync(capture.screenshot)) throw new Error(`Screenshot is missing for ${capture.key} (${capture.viewport}): ${capture.screenshot}`);
+			const column = index % columns;
+			const row = Math.floor(index / columns);
+			const x = margin + column * (cellWidth + gap);
+			const y = margin + 0.22 + row * (cellHeight + gap);
+			const { data, info } = await sharp(capture.screenshot)
+				.rotate()
+				.resize({ width: 720, height: 405, fit: 'inside', withoutEnlargement: true })
+				.jpeg({ quality: 62, mozjpeg: true })
+				.toBuffer({ resolveWithObject: true });
+			slide.addImage({ data: `data:image/jpeg;base64,${data.toString('base64')}`, ...fitImg(info.width, info.height, x, y, cellWidth, cellHeight) });
+		}
+	}
+	await fs.promises.mkdir(path.dirname(file), { recursive: true });
+	await presentation.writeFile({ fileName: file });
+	await neutralizeApplicationMetadata(file);
+};
+
+/** Rebuilds a screenshot-only slideshow from the reporter's durable capture directory. */
+export const writeScreenshotSlideshowFromDirectory = async (directory: string, file: string, opts: ScreenshotSlideshowOptions = {}): Promise<void> => {
+	const captures = readScreenshotCapturesFromDirectory(directory, opts.currentRunId).filter(
+		capture => !opts.currentRunId || capture.runId === opts.currentRunId,
+	);
+	if (captures.length) await writeScreenshotSlideshow(file, captures, opts);
 };

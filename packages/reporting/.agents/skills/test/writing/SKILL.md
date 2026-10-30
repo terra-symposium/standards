@@ -9,6 +9,8 @@ Use when adding tests, expanding coverage, changing fixtures, or updating tests 
 
 ## 1. Map the contract
 
+For cross-repository ownership, consolidation, and per-scenario viewport selection, follow [test ownership and viewport selection](../references/ownership-and-viewport-policy.md).
+
 For each behavior, record its owner and identify:
 
 - user/data/security/architecture outcome and lifecycle states;

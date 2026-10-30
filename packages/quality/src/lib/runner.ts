@@ -1046,7 +1046,7 @@ function runQualityPhase(cfg: QualityCfg, phase: QualityPhase, profileChecks: Re
 				if (runTestSuite(cfg, check).status) failures += 1;
 			} catch (error) {
 				failures += 1;
-				recordQualityFailure(check.name, error);
+				recordQualityFailure(`command:${check.name}`, error);
 				printCheckStatus(check.name, 1);
 			}
 		}
@@ -1065,10 +1065,7 @@ function runQualityPhase(cfg: QualityCfg, phase: QualityPhase, profileChecks: Re
 			});
 			status = run(cfg, check.command, args);
 		} catch (error) {
-			const stage = reportStages?.get(`command:${check.name}`);
-			if (stage) stage.status = 'failed';
-			process.exitCode = 1;
-			recordQualityDetail(error instanceof Error ? error.message : String(error));
+			recordQualityFailure(`command:${check.name}`, error);
 		}
 		if (status) {
 			failures += 1;
@@ -1844,7 +1841,7 @@ function runRecommendationCmds(cfg: QualityCfg): void {
 		} catch (err) {
 			recordQualityFailure(`recommendation:${check.name}`, err);
 		}
-		if (status) process.exitCode = status;
+		if (status) process.exitCode = 1;
 		printCheckStatus(`recommendation:${check.name}`, status ? 1 : 0);
 	}
 }

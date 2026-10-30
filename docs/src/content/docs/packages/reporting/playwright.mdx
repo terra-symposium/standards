@@ -65,11 +65,49 @@ test('account page is healthy', async ({ page }) => {
 
 The fixture records browser console errors and warnings, uncaught page errors, and failed requests, then attaches them as JSON to the Playwright test result. The shared reporter combines these attachments with terminal diagnostics and test outcomes.
 
+## Capture screenshots from a test
+
+Import `visualTest` when one test visits multiple routes or states and each view needs its own screenshot:
+
+```ts
+import { visualTest as test } from '@terra-symposium/standards-reporting/playwright';
+
+test('opens every discovered record', async ({ page, visuals }) => {
+	for (const route of await discoverRoutes(page)) {
+		await page.goto(route);
+		await expect(page.getByRole('main')).toBeVisible();
+		await visuals.capture(route, { title: route });
+	}
+});
+```
+
+Use a stable key such as the route so the reporter matches the same capture across responsive projects. The fixture attaches each screenshot and a manifest to the Playwright result. Its default image is a viewport JPEG; pass `screenshot` options to change the capture settings. Keys must be unique within one test result.
+
+The PowerPoint contains responsive screenshot slides by default. `TERRA_SCREENSHOT_ONLY_SLIDESHOW=0` or `screenshotOnlySlideshow: false` opts into the diagnostic review slideshow instead. Every result screenshot and keyed capture is persisted with metadata under `test-results/visual/screenshots`. A finalizing run writes a deck from that run's captures. The persistent screenshot folder retains captures from earlier, interrupted, or viewport-subset runs; rebuild an accumulated deck from the folder without `currentRunId` when needed. Intermediate matrix processes still write their workbook, captures, and run marker but defer the deck until finalization.
+
+An orchestrator that runs viewports in separate Playwright processes can set `TERRA_SCREENSHOT_RUN_ID` to the same value in every process. The reporter then unions expected and completed test IDs in the shared folder marker, so captures from earlier viewport processes stay current within the matrix. Set `TERRA_SCREENSHOT_RUN_FINALIZE=0` for intermediate processes and `1` for the last process; without a shared ID, each reporter process finalizes its own run by default. To resume an interrupted matrix as the same logical run, pass its prior run ID again. Repeated tests are counted once, and only the finalizing process rebuilds the PowerPoint.
+
+You can rebuild the deck later from the evidence folder without running Playwright:
+
+```ts
+import { writeScreenshotSlideshowFromDirectory } from '@terra-symposium/standards-reporting/slideshow';
+
+await writeScreenshotSlideshowFromDirectory('test-results/visual/screenshots', 'test-results/rebuilt-report.pptx');
+```
+
 ## Outputs and options
 
-The reporter writes to a timestamped directory under `test-results/visual` by default. It copies native screenshots into the run directory and creates `report.xlsx` and `report.pptx`. The helper uses `test-results/playwright-output` for Playwright's intermediate output directory.
+The reporter writes each run's workbook and copied screenshots to a timestamped directory under `test-results/visual`. It also saves each test/viewport screenshot with normalized metadata under `test-results/visual/screenshots` and regenerates the screenshot-only `test-results/visual/report.pptx` from that entire folder. Repeated test captures replace the matching test/viewport image, while captures from other viewport subsets remain available. This lets a deck be regenerated after an interrupted or partial run. The helper uses `test-results/playwright-output` for Playwright's intermediate output directory.
 
-`withResponsivePlaywright(config, options)` accepts `singleRunProjects`, `outputDir`, `outputRoot`, `supplementalResultsFile`, `qualityConfigFile`, and explicit `loadTesting` settings. Supplemental results are added to the workbook. With load timing enabled they also appear in slideshow output without screenshot previews; otherwise the slideshow contains browser results only. See [load testing](/packages/reporting/load-testing/) for timing settings and [artifact writers](/packages/reporting/artifacts/) for direct report generation.
+To rebuild the deck later without rerunning Playwright, call the same reporting package API:
+
+```ts
+import { writeSlideshowFromDirectory } from '@terra-symposium/standards-reporting/slideshow';
+
+await writeSlideshowFromDirectory('test-results/visual/screenshots', 'test-results/visual/report.pptx');
+```
+
+`withResponsivePlaywright(config, options)` accepts `singleRunProjects`, `outputDir`, `outputRoot`, `screenshotsDirectory`, `supplementalResultsFile`, `qualityConfigFile`, `screenshotOnlySlideshow`, and explicit `loadTesting` settings. Supplemental results are added to the workbook. See [load testing](/packages/reporting/load-testing/) for timing settings and [artifact writers](/packages/reporting/artifacts/) for direct report generation.
 
 ## Configure the reporter directly
 
@@ -84,6 +122,7 @@ export default {
 				outputRoot: 'test-results/visual',
 				reportFile: 'report.xlsx',
 				slideshowFile: 'report.pptx',
+				screenshotsDirectory: 'test-results/visual/screenshots',
 				qualityConfigFile: 'quality.json',
 			},
 		],
