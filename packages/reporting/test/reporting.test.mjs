@@ -728,6 +728,16 @@ test('builds one screenshot deck from nested repository folders and keeps partia
 		assert.match(slides.join(''), /docs · docs responsive test/);
 		assert.match(slides.join(''), /HISTORICAL CAPTURE/);
 		assert.match(slides.join(''), /CURRENT RUN/);
+		const currentDeck = path.join(root, 'current-repository-runs.pptx');
+		await writeScreenshotSlideshowFromDirectory(root, currentDeck, {
+			currentRunIdsBySource: { website: 'website-current', docs: 'docs-current' },
+		});
+		const { stdout: currentArchive } = await execFileAsync('unzip', ['-l', currentDeck]);
+		assert.match(currentArchive, /ppt\/slides\/slide2\.xml/);
+		assert.doesNotMatch(currentArchive, /ppt\/slides\/slide3\.xml/);
+		const { stdout: currentSlide } = await execFileAsync('unzip', ['-p', currentDeck, 'ppt/slides/slide1.xml']);
+		assert.match(currentSlide, /CURRENT RUN/);
+		assert.doesNotMatch(currentSlide, /HISTORICAL CAPTURE/);
 	} finally {
 		await fs.rm(root, { recursive: true, force: true });
 	}

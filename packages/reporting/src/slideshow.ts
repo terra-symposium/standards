@@ -238,6 +238,8 @@ export type ScreenshotSlideshowOptions = {
 	subject?: string;
 	/** Restrict a directory rebuild to this run; omit it to include historical captures. */
 	currentRunId?: string;
+	/** Restrict a directory-tree rebuild to one run ID per top-level repository folder. */
+	currentRunIdsBySource?: Record<string, string>;
 };
 
 /** Reads persisted screenshot records and labels captures outside the latest run as historical. */
@@ -495,7 +497,7 @@ export const writeScreenshotSlideshow = async (file: string, captures: readonly 
 };
 
 /** Reads current and historical screenshots beneath a folder, with stable source names for multi-repository reports. */
-const readScreenshotCapturesFromDirectoryTree = (root: string, currentRunId?: string): ScreenshotCapture[] => {
+const readScreenshotCapturesFromDirectoryTree = (root: string, opts: ScreenshotSlideshowOptions): ScreenshotCapture[] => {
 	const visited = new Set<string>();
 	const read = (directory: string, isRoot = false): ScreenshotCapture[] => {
 		let realDirectory: string;
@@ -515,7 +517,8 @@ const readScreenshotCapturesFromDirectoryTree = (root: string, currentRunId?: st
 		const sourcePath = path.relative(root, directory);
 		const sourceName = sourcePath ? sourcePath.split(path.sep)[0] : '';
 		const prefix = sourceName ? `${sourceName} · ` : '';
-		const local = readScreenshotCapturesFromDirectory(directory, isRoot ? currentRunId : undefined).map((capture) => ({
+		const currentRunId = isRoot ? opts.currentRunId : opts.currentRunIdsBySource?.[sourceName];
+		const local = readScreenshotCapturesFromDirectory(directory, currentRunId).map((capture) => ({
 			...capture,
 			group: `${prefix}${capture.group}`,
 			key: sourceName ? `${sourceName}:${capture.key}` : capture.key,
@@ -540,6 +543,11 @@ const readScreenshotCapturesFromDirectoryTree = (root: string, currentRunId?: st
 
 /** Rebuilds a screenshot-only slideshow from one capture folder or a tree of repository capture folders. */
 export const writeScreenshotSlideshowFromDirectory = async (directory: string, file: string, opts: ScreenshotSlideshowOptions = {}): Promise<void> => {
-	const captures = readScreenshotCapturesFromDirectoryTree(directory, opts.currentRunId).filter((capture) => !opts.currentRunId || (capture.runId === opts.currentRunId && !capture.historical));
+	const captures = readScreenshotCapturesFromDirectoryTree(directory, opts).filter((capture) => {
+		if (opts.currentRunId) return capture.runId === opts.currentRunId && !capture.historical;
+		const sourceName = capture.group.includes(' · ') ? capture.group.slice(0, capture.group.indexOf(' · ')) : '';
+		const currentRunId = opts.currentRunIdsBySource?.[sourceName];
+		return !currentRunId || (capture.runId === currentRunId && !capture.historical);
+	});
 	if (captures.length) await writeScreenshotSlideshow(file, captures, opts);
 };
