@@ -238,21 +238,24 @@ export type ScreenshotSlideshowOptions = {
 	subject?: string;
 	/** Restrict a directory rebuild to this run; omit it to include historical captures. */
 	currentRunId?: string;
-	/** Restrict a directory-tree rebuild to one run ID per top-level repository folder. */
-	currentRunIdsBySource?: Record<string, string>;
+	/** Restrict a directory-tree rebuild to one or more current run IDs per top-level repository folder. */
+	currentRunIdsBySource?: Record<string, string | string[]>;
 };
 
 /** One repository's durable screenshot directory and optional exact Playwright run. */
 export type ScreenshotDirectorySource = { label: string; directory: string; runId?: string };
 
 /** Reads persisted screenshot records and labels captures outside the latest run as historical. */
-export const readScreenshotCapturesFromDirectory = (directory: string, currentRunId?: string): ScreenshotCapture[] => {
+export const readScreenshotCapturesFromDirectory = (directory: string, currentRunId?: string | readonly string[]): ScreenshotCapture[] => {
 	if (!fs.existsSync(directory)) return [];
+	let markerRunId: string | undefined;
+	const currentRunIds = new Set(typeof currentRunId === 'string' ? [currentRunId] : currentRunId || []);
 	let currentCaptureGroups: Map<string, Set<string>> | undefined;
 	try {
 		const run = JSON.parse(fs.readFileSync(path.join(directory, '.terra-playwright-run.json'), 'utf8')) as ScreenshotRunInventory;
-		if (!currentRunId) currentRunId = run.runId;
-		if (run.runId === currentRunId && Array.isArray(run.expectedCaptureGroups)) {
+		markerRunId = run.runId;
+		if (!currentRunIds.size) currentRunIds.add(run.runId);
+		if (currentRunIds.has(run.runId) && Array.isArray(run.expectedCaptureGroups)) {
 			currentCaptureGroups = new Map(
 				run.expectedCaptureGroups
 					.filter((item) => item && typeof item.group === 'string' && Array.isArray(item.viewports) && item.viewports.every((viewport) => typeof viewport === 'string'))
@@ -283,11 +286,13 @@ export const readScreenshotCapturesFromDirectory = (directory: string, currentRu
 				? capture.screenshot
 				: [path.resolve(directory, capture.screenshot), path.resolve(capture.screenshot)].find((candidate) => fs.existsSync(candidate));
 			if (!screenshot || !fs.existsSync(screenshot)) return [];
-			const currentTest = currentCaptureGroups?.size
-				? [...currentCaptureGroups].some(([expectedGroup, viewports]) => group.startsWith(`${expectedGroup}\u0000`) && viewports.has(viewport))
-				: currentCaptureGroups
-					? false
-					: true;
+			const captureRunId = typeof capture.runId === 'string' ? capture.runId : undefined;
+			const currentTest =
+				currentCaptureGroups?.size && captureRunId === markerRunId
+					? [...currentCaptureGroups].some(([expectedGroup, viewports]) => group.startsWith(`${expectedGroup}\u0000`) && viewports.has(viewport))
+					: currentCaptureGroups && captureRunId === markerRunId
+						? false
+						: true;
 			return [
 				{
 					group: capture.group,
@@ -299,7 +304,7 @@ export const readScreenshotCapturesFromDirectory = (directory: string, currentRu
 					retry: typeof capture.retry === 'number' ? capture.retry : 0,
 					runId: typeof capture.runId === 'string' ? capture.runId : undefined,
 					capturedAt: typeof capture.capturedAt === 'string' ? capture.capturedAt : undefined,
-					historical: !currentRunId || capture.runId !== currentRunId || !currentTest,
+					historical: !captureRunId || !currentRunIds.has(captureRunId) || !currentTest,
 				},
 			];
 		} catch {
@@ -549,8 +554,9 @@ export const writeScreenshotSlideshowFromDirectory = async (directory: string, f
 	const captures = readScreenshotCapturesFromDirectoryTree(directory, opts).filter((capture) => {
 		if (opts.currentRunId) return capture.runId === opts.currentRunId && !capture.historical;
 		const sourceName = capture.group.includes(' · ') ? capture.group.slice(0, capture.group.indexOf(' · ')) : '';
-		const currentRunId = opts.currentRunIdsBySource?.[sourceName];
-		return !currentRunId || (capture.runId === currentRunId && !capture.historical);
+		const currentRunIds = opts.currentRunIdsBySource?.[sourceName];
+		const selectedRunIds = typeof currentRunIds === 'string' ? [currentRunIds] : currentRunIds;
+		return !selectedRunIds?.length || (capture.runId !== undefined && selectedRunIds.includes(capture.runId) && !capture.historical);
 	});
 	if (captures.length) await writeScreenshotSlideshow(file, captures, opts);
 };

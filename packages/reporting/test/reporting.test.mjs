@@ -768,6 +768,20 @@ test('builds one screenshot deck from nested repository folders and keeps partia
 			);
 			if (name === 'docs') {
 				await fs.writeFile(
+					path.join(directory, 'docs-consumer.json'),
+					JSON.stringify({
+						group: `${group}\0docs-consumer-test`,
+						key: 'docs-consumer-test',
+						title: 'docs consumer test',
+						viewport: 'xl',
+						viewportSize: '1280×720',
+						screenshot: 'capture.png',
+						runId: 'docs-consumer-current',
+						capturedAt: '2026-10-31T00:30:00.000Z',
+						retry: 0,
+					}),
+				);
+				await fs.writeFile(
 					path.join(directory, 'docs-historical.json'),
 					JSON.stringify({
 						group: `${group}\0${name}-test`,
@@ -790,23 +804,24 @@ test('builds one screenshot deck from nested repository folders and keeps partia
 		const slideshow = path.join(root, 'all-repositories.pptx');
 		await writeScreenshotSlideshowFromDirectory(root, slideshow);
 		const { stdout: archive } = await execFileAsync('unzip', ['-l', slideshow]);
-		assert.match(archive, /ppt\/slides\/slide3\.xml/);
-		assert.doesNotMatch(archive, /ppt\/slides\/slide4\.xml/);
-		const slides = await Promise.all([1, 2, 3].map(async (index) => (await execFileAsync('unzip', ['-p', slideshow, `ppt/slides/slide${index}.xml`])).stdout));
+		assert.match(archive, /ppt\/slides\/slide4\.xml/);
+		assert.doesNotMatch(archive, /ppt\/slides\/slide5\.xml/);
+		const slides = await Promise.all([1, 2, 3, 4].map(async (index) => (await execFileAsync('unzip', ['-p', slideshow, `ppt/slides/slide${index}.xml`])).stdout));
 		assert.match(slides.join(''), /website · website responsive test/);
 		assert.match(slides.join(''), /docs · docs responsive test/);
 		assert.match(slides.join(''), /HISTORICAL CAPTURE/);
 		assert.match(slides.join(''), /CURRENT RUN/);
 		const currentDeck = path.join(root, 'current-repository-runs.pptx');
 		await writeScreenshotSlideshowFromDirectory(root, currentDeck, {
-			currentRunIdsBySource: { website: 'website-current', docs: 'docs-current' },
+			currentRunIdsBySource: { website: 'website-current', docs: ['docs-current', 'docs-consumer-current'] },
 		});
 		const { stdout: currentArchive } = await execFileAsync('unzip', ['-l', currentDeck]);
-		assert.match(currentArchive, /ppt\/slides\/slide2\.xml/);
-		assert.doesNotMatch(currentArchive, /ppt\/slides\/slide3\.xml/);
-		const { stdout: currentSlide } = await execFileAsync('unzip', ['-p', currentDeck, 'ppt/slides/slide1.xml']);
-		assert.match(currentSlide, /CURRENT RUN/);
-		assert.doesNotMatch(currentSlide, /HISTORICAL CAPTURE/);
+		assert.match(currentArchive, /ppt\/slides\/slide3\.xml/);
+		assert.doesNotMatch(currentArchive, /ppt\/slides\/slide4\.xml/);
+		const currentSlides = await Promise.all([1, 2, 3].map(async (index) => (await execFileAsync('unzip', ['-p', currentDeck, `ppt/slides/slide${index}.xml`])).stdout));
+		assert.match(currentSlides.join(''), /CURRENT RUN/);
+		assert.match(currentSlides.join(''), /docs consumer test/);
+		assert.doesNotMatch(currentSlides.join(''), /HISTORICAL CAPTURE/);
 	} finally {
 		await fs.rm(root, { recursive: true, force: true });
 	}
