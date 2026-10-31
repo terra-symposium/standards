@@ -383,7 +383,8 @@ test('configuration toggles default to enabled and honor explicit category, item
 	assert.equal(qualityCmdEnabled(enabled, 'build'), true);
 	assert.equal(qualityRecommendationEnabled(enabled, 'architecture'), true);
 });
-test('full quality orders phases, groups suites, de-duplicates invocations, and continues after a failing test', () => {
+
+test('full quality orders phases, preserves configured suite order, de-duplicates invocations, and continues after a failing test', () => {
 	const root = fixtureRoot('terra-quality-phase-order-');
 	const marker = join(root, 'runs.txt');
 	const gitMarker = join(root, 'diff-runs.txt');
@@ -479,12 +480,12 @@ test('full quality orders phases, groups suites, de-duplicates invocations, and 
 		'static',
 		'security-check',
 		'static-format-option',
-		'unit',
-		'unit-node',
-		'integration',
 		'browser',
 		'browser',
 		'other',
+		'integration',
+		'unit',
+		'unit-node',
 		'types',
 		'build',
 		'health',
@@ -509,16 +510,18 @@ test('full quality orders phases, groups suites, de-duplicates invocations, and 
 	);
 	const groupOrder = ['Unit Test', 'Unit Node', 'Integration Test', 'Browser E2e', 'Cli Smoke', 'Other Test'].map((group) => text.indexOf(group));
 	assert.ok(groupOrder.every((position) => position >= 0));
+	const suiteStatuses = ['✓ Browser E2e', '✓ Cli Smoke', '✓ Other Test', '✓ Integration Test', '✗ Unit Test', '✓ Unit Node'].map((status) => text.indexOf(status));
+	assert.ok(suiteStatuses.every((position) => position >= 0));
 	assert.deepEqual(
-		groupOrder,
-		[...groupOrder].sort((left, right) => left - right),
+		suiteStatuses,
+		[...suiteStatuses].sort((left, right) => left - right),
 	);
 	assert.match(text, /✗ Unit Test/);
 	assert.doesNotMatch(text, NODE_TESTS_PLAYWRIGHT_TESTS_REGEX, 'the fixture runners do not fabricate child case output');
 	assert.doesNotMatch(progress.join(''), NODE_TESTS_PLAYWRIGHT_TESTS_REGEX);
 	resetExitCode();
 });
-test('full quality prepares safe fixes before dead-code verification and tests', () => {
+test('full quality reports dead-code once under static quality', () => {
 	const root = fixtureRoot('terra-quality-dead-code-output-groups-');
 	const cfg = createQualityCfg({
 		root,
@@ -556,7 +559,7 @@ test('full quality prepares safe fixes before dead-code verification and tests',
 		console.error = originalErr;
 	}
 	const text = output.join('\n');
-	const pos = ['PREPARING SAFE FIXES', 'FORMAT', 'STATIC QUALITY', 'Dead Code', 'TESTS'].map((label) => text.indexOf(label));
+	const pos = ['STATIC QUALITY', '⠋ Dead Code', '✓ Dead Code', 'TESTS'].map((label) => text.indexOf(label));
 	assert.ok(pos.every((position) => position >= 0));
 	assert.deepEqual(
 		pos,
@@ -944,6 +947,7 @@ if (args.includes('--format') && args.includes('json'))
 	assert.doesNotMatch(outputText, FINDINGS_SUMMARY_REGEX);
 	assert.doesNotMatch(outputEvents.join(''), /(?:^|\n)\s*test feedback(?:\n|$)/u);
 	assert.match(outputText, /✓ Contract/);
+	assert.ok(outputEvents.findLastIndex((line) => line.includes('✗ Dead Code')) < outputEvents.findLastIndex((line) => line.includes('✓ Contract')));
 	resetExitCode();
 });
 test('the fixing quality command inlines safe values without broad comment cleanup', () => {
@@ -1701,7 +1705,7 @@ test('CLI recommendation execution is opt-in per invocation and command failures
 	cfg.recommendationCommands = [{ name: 'fixture-failure', command: failingCmd }];
 	resetExitCode();
 	runQualityCli(cfg, ['quality', '--all']);
-	assert.equal(process.exitCode, 2);
+	assert.equal(process.exitCode, 1, 'quality normalizes any failed recommendation command to a failing exit status');
 	fixtureFile(root, 'recommendations.jsonl', '');
 	resetExitCode();
 	runQualityCli(cfg, ['quality', '--all', '--skip-recommendations']);
@@ -1720,15 +1724,26 @@ test('quality CLI checks and autofixes Tailwind canonical-class suggestions', as
 	const root = fixtureRoot('terra-quality-tailwind-cli-');
 	fixtureFile(root, 'package.json', '{"type":"module"}\n');
 	fixtureFile(root, 'styles/tailwind.css', '@import "tailwindcss";\n');
-	fixtureFile(root, 'node_modules/tailwindcss/package.json', JSON.stringify({ name: 'tailwindcss', type: 'module', main: 'index.mjs' }));
+	fixtureFile(root, 'node_modules/@tailwindcss/node/package.json', JSON.stringify({ name: '@tailwindcss/node', type: 'module', main: 'index.mjs' }));
 	fixtureFile(
 		root,
-		'node_modules/tailwindcss/index.mjs',
+		'node_modules/@tailwindcss/node/index.mjs',
 		`export async function __unstable__loadDesignSystem() {
-	return { canonicalizeCandidates(candidates) { return candidates.map((candidate) => candidate === 'border-[var(--sl-color-gray-5)]' ? 'border-(--sl-color-gray-5)' : candidate); } };
+	return {
+		canonicalizeCandidates(candidates) { return candidates.map((candidate) => candidate === 'border-[var(--sl-color-gray-5)]' ? 'border-(--sl-color-gray-5)' : candidate); },
+		resolveThemeValue(key) { return key === '--spacing' ? '0.25rem' : undefined; },
+		candidatesToAst(candidates) {
+			return candidates.map((candidate) => {
+				const match = /^(auto-rows|h)-(?:\\[(\\d+)px\\]|(\\d+))$/.exec(candidate);
+				if (!match) return null;
+				const value = match[2] ? match[2] + 'px' : 'calc(var(--spacing) * ' + match[3] + ')';
+				return [{ kind: 'rule', nodes: [{ kind: 'declaration', property: match[1] === 'h' ? 'height' : 'grid-auto-rows', value, important: false }] }];
+			});
+		},
+	};
 }\n`,
 	);
-	fixtureFile(root, 'src/view.tsx', '<div className="border-[var(--sl-color-gray-5)]" />\n');
+	fixtureFile(root, 'src/view.tsx', '<div className="border-[var(--sl-color-gray-5)] auto-rows-[220px] h-[52px]" />\n');
 	const cfg = createQualityCfg({
 		root,
 		sourceRoots: ['src'],
@@ -1757,17 +1772,17 @@ test('quality CLI checks and autofixes Tailwind canonical-class suggestions', as
 	});
 	resetExitCode();
 	await runQualityCli({ ...cfg, enabledChecks: { ...cfg.enabledChecks, 'tailwind-canonical': false } }, ['tailwind-canonical']);
-	await assert.rejects(runQualityCli({ ...cfg, autofix: { tailwindCanonical: false } }, ['tailwind-canonical']), /failed with 1 suggestion/);
+	await assert.rejects(runQualityCli({ ...cfg, autofix: { tailwindCanonical: false } }, ['tailwind-canonical']), /failed with 3 suggestions/);
 	await runQualityCli(cfg, ['quality', '--all', '--warn', '--skip-commands', '--skip-recommendations', '--report-json', 'quality.json']);
 	assert.equal(process.exitCode, 1, 'full quality records a Tailwind failure and continues instead of rejecting');
 	assert.deepEqual(
 		JSON.parse(fixtureText(root, 'quality.json')).checks.find((check) => check.name === 'tailwind-canonical'),
-		{ name: 'tailwind-canonical', status: 'failed', findings: 1 },
+		{ name: 'tailwind-canonical', status: 'failed', findings: 3 },
 	);
-	assert.equal(fixtureText(root, 'src/view.tsx'), '<div className="border-[var(--sl-color-gray-5)]" />\n');
+	assert.equal(fixtureText(root, 'src/view.tsx'), '<div className="border-[var(--sl-color-gray-5)] auto-rows-[220px] h-[52px]" />\n');
 	resetExitCode();
 	await runQualityCli(cfg, ['quality', '--all', '--skip-commands', '--skip-recommendations']);
-	assert.equal(fixtureText(root, 'src/view.tsx'), '<div className="border-(--sl-color-gray-5)" />\n');
+	assert.equal(fixtureText(root, 'src/view.tsx'), '<div className="border-(--sl-color-gray-5) auto-rows-55 h-13" />\n');
 	await runQualityCli(cfg, ['tailwind-canonical', '--warn', '--report-json', 'quality.json']);
 	assert.deepEqual(
 		JSON.parse(fixtureText(root, 'quality.json')).checks.find((check) => check.name === 'tailwind-canonical'),

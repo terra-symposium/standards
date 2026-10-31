@@ -10,7 +10,7 @@ IMPORTS
 // API
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
@@ -74,17 +74,18 @@ test('missing consumer manifests produce an empty test plan', () => {
 	}
 });
 
-test('manifest validation rejects duplicate commands, overlapping ownership, and paths outside the repository', () => {
+test('manifest validation rejects duplicate commands, overlapping file ownership, omitted tests, and paths outside the repository', () => {
 	const root = fixtureRoot();
 	try {
+		mkdirTest(root, 'tests/unit/one.test.mjs');
 		assert.throws(
 			() =>
 				validateTestPlan(
 					{
 						version: 1,
 						suites: [
-							{ name: 'first', command: 'node', args: ['test.mjs'] },
-							{ name: 'second', command: 'node', args: ['test.mjs'] },
+							{ name: 'first', command: 'node', args: ['test.mjs'], owns: ['tests/*.test.mjs'] },
+							{ name: 'second', command: 'node', args: ['test.mjs'], owns: ['tests/*.test.mjs'] },
 						],
 					},
 					root,
@@ -97,13 +98,17 @@ test('manifest validation rejects duplicate commands, overlapping ownership, and
 					{
 						version: 1,
 						suites: [
-							{ name: 'first', command: 'node', args: ['first.mjs'], owns: ['tests'] },
-							{ name: 'second', command: 'node', args: ['second.mjs'], owns: ['tests/unit'] },
+							{ name: 'first', command: 'node', args: ['first.mjs'], owns: ['tests/**/*.test.mjs'] },
+							{ name: 'second', command: 'node', args: ['second.mjs'], owns: ['tests/unit/*.test.mjs'] },
 						],
 					},
 					root,
 				),
-			/Test ownership overlaps/u,
+			/Test file ownership overlaps/u,
+		);
+		assert.throws(
+			() => validateTestPlan({ version: 1, suites: [{ name: 'first', command: 'node', args: ['test.mjs'], owns: ['tests/unit/*.spec.mjs'] }] }, root),
+			/Test files are not owned/u,
 		);
 		assert.throws(
 			() => validateTestPlan({ version: 1, suites: [{ name: 'first', command: 'node', args: ['test.mjs'], cwd: '../outside' }] }, root),
@@ -113,6 +118,11 @@ test('manifest validation rejects duplicate commands, overlapping ownership, and
 		rmSync(root, { recursive: true, force: true });
 	}
 });
+
+function mkdirTest(root, path) {
+	mkdirSync(join(root, path, '..'), { recursive: true });
+	writeFileSync(join(root, path), '');
+}
 
 test('consumer-defined suites run once each in manifest order and aggregate into one result', () => {
 	const root = fixtureRoot();

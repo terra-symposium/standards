@@ -7,7 +7,7 @@ IMPORTS
 //////////////////////////////////////////////////*/
 
 // API
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { isAbsolute, relative, resolve, sep } from 'node:path';
 import { spawnSync } from 'node:child_process';
 
@@ -20,6 +20,36 @@ const isInside = (root, path) => {
 	const rel = relative(root, path);
 	return rel === '' || (rel !== '..' && !rel.startsWith(`..${sep}`) && !isAbsolute(rel));
 };
+
+function listTestFiles(root) {
+	const files = [];
+	const visit = (directory) => {
+		for (const entry of readdirSync(directory, { withFileTypes: true })) {
+			if (entry.name === 'node_modules' || entry.name === '.git') continue;
+			const path = resolve(directory, entry.name);
+			if (entry.isDirectory()) visit(path);
+			else if (entry.isFile() && ((/(^|\/)(test|tests)\//u.test(relative(root, path).replaceAll('\\', '/')) && /\.[cm]?[jt]sx?$/u.test(entry.name)) || /\.(?:test|spec)\.[cm]?[jt]sx?$/u.test(entry.name))) files.push(relative(root, path).replaceAll('\\', '/'));
+		}
+	};
+	visit(root);
+	return files;
+}
+
+function globRegex(pattern) {
+	let source = '^';
+	for (let i = 0; i < pattern.length; i++) {
+		const char = pattern[i];
+		if (char === '*') {
+			if (pattern[i + 1] === '*') {
+				i++;
+				if (pattern[i + 1] === '/') { i++; source += '(?:.*/)?'; }
+				else source += '.*';
+			} else source += '[^/]*';
+		} else if (char === '?') source += '[^/]';
+		else source += char.replace(/[|\\{}()[\]^$+?.]/gu, '\\$&');
+	}
+	return new RegExp(`${source}$`, 'u');
+}
 
 /*//////////////////////////////////////////////////
 HELPERS
@@ -132,6 +162,8 @@ export function validateTestPlan(value, root) {
 	const names = new Set();
 	const cmds = new Set();
 	const owners = new Map();
+	const ownedFiles = new Map();
+	const testFiles = listTestFiles(resolve(root));
 	for (const [index, raw] of plan.suites.entries()) {
 		if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new Error(`Test suite ${index + 1} must be an object.`);
 		const suite = /** @type {Record<string, unknown>} */ (raw);
@@ -147,16 +179,22 @@ export function validateTestPlan(value, root) {
 		const cmdKey = JSON.stringify([suite.command, args, relative(resolve(root), absoluteCwd)]);
 		if (cmds.has(cmdKey)) throw new Error(`Duplicate test command in suite ${suite.name}; each command must run once.`);
 		cmds.add(cmdKey);
-		if (suite.owns !== undefined && (!Array.isArray(suite.owns) || suite.owns.some((owner) => typeof owner !== 'string' || owner.trim() === '')))
-			throw new Error(`Test suite ${suite.name} owns must be a list of non-empty repository paths or suite identifiers.`);
+		if (!Array.isArray(suite.owns) || suite.owns.some((owner) => typeof owner !== 'string' || owner.trim() === ''))
+			throw new Error(`Test suite ${suite.name} owns must be a list of non-empty repository-relative file globs.`);
 		for (const owner of /** @type {string[]} */ (suite.owns ?? [])) {
 			const norm = owner.replaceAll('\\', '/').replace(/\/+$/u, '');
 			if (!norm || isAbsolute(norm) || norm === '..' || norm.startsWith('../') || norm.split('/').includes('..')) throw new Error(`Test suite ${suite.name} has an invalid owner: ${owner}`);
-			const previous = [...owners.entries()].find(([claimed]) => norm === claimed || norm.startsWith(`${claimed}/`) || claimed.startsWith(`${norm}/`));
-			if (previous) throw new Error(`Test ownership overlaps: ${norm} is claimed by ${previous[1]} and ${suite.name}.`);
+			if (owners.has(norm)) throw new Error(`Test ownership overlaps: ${norm} is claimed by ${owners.get(norm)} and ${suite.name}.`);
 			owners.set(norm, suite.name);
+			for (const file of testFiles.filter((path) => globRegex(norm).test(path))) {
+				const previous = ownedFiles.get(file);
+				if (previous) throw new Error(`Test file ownership overlaps: ${file} is claimed by ${previous} and ${suite.name}.`);
+				ownedFiles.set(file, suite.name);
+			}
 		}
 	}
+	const omitted = testFiles.filter((file) => !ownedFiles.has(file));
+	if (omitted.length) throw new Error(`Test files are not owned by any suite: ${omitted.join(', ')}`);
 }
 
 /**

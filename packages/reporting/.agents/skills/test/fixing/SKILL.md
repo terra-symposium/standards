@@ -47,7 +47,7 @@ Before editing, capture exact test ID, project, viewport, retry, command, output
 
 Repair the current source of truth. Preserve intentional migrations by updating stale test mechanics; repair production only for a demonstrated regression. Do not add proxies, aliases, shims, duplicate routes, compatibility bridges, skipped cases, weakened assertions, broad selectors, swallowed errors, or unexplained timeout/retry increases.
 
-Each worker first collects the suite, then runs source/unit checks, the smallest failing case, its domain, adjacent consumers, and finally responsive verification. Run all six required viewports: 390x844, 640x800, 768x900, 1024x768, 1280x720, and 1536x864. Changed layouts also require adjacent breakpoint and headed Xvfb screenshots. Preserve original failures, browser/server diagnostics, retries, traces, screenshots, workbook/deck reports, and cleanup outcomes.
+Follow [`../references/test-structure-and-responsive-evidence.md`](../references/test-structure-and-responsive-evidence.md) when changing test ownership or selecting responsive coverage. First collect the suite, then run source/unit checks, the smallest failing case, its domain, adjacent consumers, and responsive checks only at the affected scenario's declared sizes. Inspect source media rules, measure the rendered transition, and explain any added viewport run. Preserve original failures, browser/server diagnostics, retries, traces, screenshots, workbook/deck reports, and cleanup outcomes.
 
 ## Cloud Integration And Acceptance
 

@@ -1,0 +1,4 @@
+interface:
+  display_name: 'Dependabot Remediation'
+  short_description: 'Read and fix Dependabot alerts'
+  default_prompt: "Use $dependabot-remediation to read this repository's Dependabot alerts, fix actionable dependency vulnerabilities, and verify the changes."

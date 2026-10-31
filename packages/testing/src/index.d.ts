@@ -3,7 +3,7 @@
  */
 
 /** A named repository-owned command with explicit test-file ownership. */
-export type TestSuite = { name: string; command: string; args?: string[]; cwd?: string; owns?: string[] };
+export type TestSuite = { name: string; command: string; args?: string[]; cwd?: string; owns: string[] };
 /** A versioned list of repository-specific test suites. */
 export type TestPlan = { version: 1; suites: TestSuite[] };
 /** Aggregate result returned after shared and repository-specific checks run. */

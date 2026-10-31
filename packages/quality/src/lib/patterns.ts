@@ -13,7 +13,7 @@ import ts from 'typescript';
 import { createRequire } from 'node:module';
 import { dirname, relative, resolve } from 'node:path';
 import { displayPath, srcFiles } from './files.js';
-import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 
 // TYPES
@@ -232,7 +232,14 @@ function isInsideTemplateLiteral(src: string, offset: number): boolean {
  */
 function insertCfgGroup(src: string, label: string, declarations: string[], file?: string): string {
 	if (!declarations.length) return src;
-	const cfg = /\/\*\/{10,}\r?\n[ \t]*CONFIG[ \t]*\r?\n[ \t]*\/{10,}\*\//.exec(src);
+	const cfgPattern = /\/\*\/{10,}\r?\n[ \t]*CONFIG[ \t]*\r?\n[ \t]*\/{10,}\*\//g;
+	let cfg: RegExpExecArray | null = null;
+	for (let match = cfgPattern.exec(src); match; match = cfgPattern.exec(src)) {
+		if (!isInsideTemplateLiteral(src, match.index)) {
+			cfg = match;
+			break;
+		}
+	}
 	const eol = src.includes('\r\n') ? '\r\n' : '\n';
 	const group = [`/*${'/'.repeat(50)}`, label, `${'/'.repeat(50)}*/`, ...declarations].join(eol);
 	if (cfg) {
@@ -366,66 +373,31 @@ TAILWIND
 //////////////////////////////////////////////////*/
 
 /**
- * Resolves a stylesheet identifier using known package locations and Node's module resolver.
- *
- * @param root Repository root from which package resolution should begin.
- * @param id Stylesheet package identifier or path.
- * @param base Directory used for relative fallback resolution.
- * @param stylesheetDir Directory of the configured stylesheet, used to find workspace dependencies.
- *
- * @return Absolute path to the stylesheet candidate.
- */
-function resolveStylesheet(root: string, id: string, base: string, stylesheetDir: string): string {
-	const require = createRequire(resolve(root, 'package.json'));
-	const known = { tailwindcss: 'tailwindcss/index.css', 'tw-animate-css': 'tw-animate-css/dist/tw-animate.css', 'shadcn/tailwind.css': 'shadcn/dist/tailwind.css' } as Record<string, string>;
-	const candidates = [known[id], id].filter((c): c is string => Boolean(c));
-	for (const candidate of candidates) {
-		for (const packageRoot of [resolve(root, 'node_modules'), resolve(root, 'astro/node_modules'), resolve(stylesheetDir, 'node_modules'), resolve(stylesheetDir, '../node_modules')]) {
-			const directPath = resolve(packageRoot, candidate);
-			if (existsSync(directPath) && statSync(directPath).isFile()) return directPath;
-		}
-		try {
-			return require.resolve(candidate, { paths: [base, stylesheetDir, resolve(stylesheetDir, '..'), root, resolve(root, 'astro')] });
-		} catch {
-			// Try the next package-resolution strategy.
-		}
-	}
-	return resolve(base, id);
-}
-
-/**
- * Loads a stylesheet and records the directory used to resolve its nested imports.
- *
- * @param root Repository root used for package resolution.
- * @param id Stylesheet package identifier or path.
- * @param base Base directory for fallback resolution.
- * @param stylesheetDir Directory of the configured stylesheet, used to find workspace dependencies.
- *
- * @return Loaded stylesheet path, resolution base, and source content.
- */
-async function loadStylesheet(root: string, id: string, base: string, stylesheetDir: string): Promise<{ path: string; base: string; content: string }> {
-	const path = resolveStylesheet(root, id, base, stylesheetDir);
-	if (!existsSync(path) || !statSync(path).isFile()) throw new Error(`Tailwind stylesheet import does not resolve to a file: ${id}`);
-	return { path, base: dirname(path), content: readFileSync(path, 'utf8') };
-}
-
-/**
- * Resolves the consumer repository's Tailwind package entry from its package manifest.
+ * Resolves Tailwind's Node runtime from the consumer's installed integration.
  *
  * @param consumerRequire CommonJS resolver rooted at the consumer package.
  * @param root Repository root whose dependency tree should be searched.
  * @param stylesheetPath Configured stylesheet whose workspace dependencies should also be searched.
  *
- * @return Absolute path to the Tailwind import entry.
+ * @return Absolute path to Tailwind's Node runtime entry.
  */
-function resolveConsumerImport(consumerRequire: NodeRequire, root: string, stylesheetPath: string): string {
+function resolveTailwindNodeImport(consumerRequire: NodeRequire, root: string, stylesheetPath: string): string {
 	const stylesheetDir = dirname(stylesheetPath);
 	const paths = [root, resolve(root, 'astro'), stylesheetDir, resolve(stylesheetDir, '..')];
-	const manifestPath = consumerRequire.resolve('tailwindcss/package.json', { paths });
-	const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as { exports?: { '.': { import?: string } }; module?: string; main?: string };
-	const entry = manifest.exports?.['.']?.import ?? manifest.module ?? manifest.main;
-	if (!entry) throw new Error('Tailwind package does not expose an import entry.');
-	return resolve(dirname(manifestPath), entry);
+	try {
+		return consumerRequire.resolve('@tailwindcss/node', { paths });
+	} catch {
+		// The Node runtime is usually a transitive dependency of the selected v4 integration.
+	}
+	for (const integration of ['@tailwindcss/postcss', '@tailwindcss/vite', '@tailwindcss/cli']) {
+		try {
+			const integrationPath = consumerRequire.resolve(integration, { paths });
+			return createRequire(integrationPath).resolve('@tailwindcss/node');
+		} catch {
+			// Try the next supported Tailwind integration.
+		}
+	}
+	throw new Error('Tailwind v4 Node runtime could not be resolved from the consumer repository.');
 }
 
 /**
@@ -494,14 +466,18 @@ export async function runTailwindCanonical(cfg: QualityCfg, fix = false, output:
 	let tailwind: {
 		__unstable__loadDesignSystem?: (
 			css: string,
-			opts: { from: string; loadStylesheet: (id: string, base: string) => Promise<{ path: string; base: string; content: string }> },
-		) => Promise<{ canonicalizeCandidates: (candidates: string[]) => string[] }>;
+			options: { base: string },
+		) => Promise<{
+			canonicalizeCandidates: (candidates: string[]) => string[];
+			candidatesToAst?: (candidates: string[]) => unknown[];
+			resolveThemeValue?: (key: string, value?: string) => string | undefined;
+		}>;
 	};
 	try {
-		const packagePath = resolveConsumerImport(consumerRequire, cfg.root, stylesheetPath);
+		const packagePath = resolveTailwindNodeImport(consumerRequire, cfg.root, stylesheetPath);
 		tailwind = (await import(pathToFileURL(packagePath).href)) as typeof tailwind;
 	} catch {
-		throw new Error('Tailwind canonical check could not load the consumer repository Tailwind package.');
+		throw new Error('Tailwind canonical check could not load the consumer repository Tailwind v4 Node runtime.');
 	}
 	if (!tailwind.__unstable__loadDesignSystem) {
 		output.onSkip?.();
@@ -509,7 +485,61 @@ export async function runTailwindCanonical(cfg: QualityCfg, fix = false, output:
 		return 0;
 	}
 	const stylesheet = readFileSync(stylesheetPath, 'utf8');
-	const designSystem = await tailwind.__unstable__loadDesignSystem(stylesheet, { from: stylesheetPath, loadStylesheet: (id, base) => loadStylesheet(cfg.root, id, base, dirname(stylesheetPath)) });
+	const designSystem = await tailwind.__unstable__loadDesignSystem(stylesheet, { base: dirname(stylesheetPath) });
+	const lengthInPixels = (value: string): number | undefined => {
+		const match = /^(-?\d+(?:\.\d+)?)(px|rem)$/.exec(value);
+		if (!match) return undefined;
+		const amount = Number(match[1]);
+		return match[2] === 'rem' ? amount * 16 : amount;
+	};
+	const spacing = designSystem.resolveThemeValue?.('--spacing');
+	const spacingInPixels = spacing ? lengthInPixels(spacing) : undefined;
+	const spacingSuggestions = new Map<string, string | undefined>();
+	const spacingSuggestion = (original: string): string | undefined => {
+		if (spacingSuggestions.has(original)) return spacingSuggestions.get(original);
+		const arbitrary = /^(?<utility>.+)-\[(?<value>-?\d+(?:\.\d+)?(?:px|rem))\](?<important>!)?$/.exec(original);
+		const valueInPixels = arbitrary?.groups?.value ? lengthInPixels(arbitrary.groups.value) : undefined;
+		const ratio = valueInPixels !== undefined && spacingInPixels ? valueInPixels / spacingInPixels : undefined;
+		if (!arbitrary?.groups?.utility || valueInPixels === undefined || valueInPixels <= 0 || !spacingInPixels || !ratio || !Number.isInteger(ratio) || !designSystem.candidatesToAst) {
+			spacingSuggestions.set(original, undefined);
+			return undefined;
+		}
+		const proposal = `${arbitrary.groups.utility}-${ratio}${arbitrary.groups.important ?? ''}`;
+		const declarations = (candidate: string): { property: string; value: string; important: boolean }[] => {
+			const found: { property: string; value: string; important: boolean }[] = [];
+			const collect = (node: unknown): void => {
+				if (Array.isArray(node)) {
+					for (const child of node) collect(child);
+					return;
+				}
+				if (!node || typeof node !== 'object') return;
+				const record = node as Record<string, unknown>;
+				if (record.kind === 'declaration' && typeof record.property === 'string' && typeof record.value === 'string') {
+					found.push({ property: record.property, value: record.value, important: record.important === true });
+					return;
+				}
+				if (Array.isArray(record.nodes)) collect(record.nodes);
+			};
+			collect(designSystem.candidatesToAst?.([candidate]));
+			return found;
+		};
+		const before = declarations(original);
+		const after = declarations(proposal);
+		const equivalent =
+			before.length > 0 &&
+			before.length === after.length &&
+			before.every((declaration, index) => {
+				const replacement = after[index];
+				if (!replacement || declaration.property !== replacement.property || declaration.important !== replacement.important) return false;
+				const pixels = lengthInPixels(declaration.value);
+				if (pixels === undefined) return declaration.value === replacement.value;
+				const spacingScale = /^calc\(var\(--spacing\)\s\*\s*(-?\d+(?:\.\d+)?)\)$/.exec(replacement.value);
+				return spacingScale !== null && Math.abs(Number(spacingScale[1]) * spacingInPixels - pixels) < 0.0001;
+			});
+		const suggestion = equivalent ? proposal : undefined;
+		spacingSuggestions.set(original, suggestion);
+		return suggestion;
+	};
 	const scanCfg = cfg.tailwindCanonical.sourceRoots ? { ...cfg, sourceRoots: cfg.tailwindCanonical.sourceRoots.map((r) => resolve(cfg.root, r)) } : cfg;
 	const files = srcFiles(scanCfg).filter((f) => /\.(?:astro|cjs|js|jsx|mjs|ts|tsx)$/.test(f));
 	const findings: { file: string; start: number; end: number; original: string; replacement: string; line: number; column: number }[] = [];
@@ -518,7 +548,8 @@ export async function runTailwindCanonical(cfg: QualityCfg, fix = false, output:
 		for (const val of classVals(source)) {
 			for (const token of val.value.matchAll(/\S+/g)) {
 				const original = token[0]!;
-				const replacement = designSystem.canonicalizeCandidates([original])[0];
+				const canonical = designSystem.canonicalizeCandidates([original])[0];
+				const replacement = canonical && canonical !== original ? canonical : spacingSuggestion(original);
 				if (!replacement || replacement === original || replacement.includes(' ')) continue;
 				const start = val.start + token.index!;
 				findings.push({ file, start, end: start + original.length, original, replacement, ...locationAt(source, start) });

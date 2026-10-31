@@ -89,6 +89,7 @@ Each bullet is one top-level `node:test` case. Nested assertions remain within t
 - shared regex fixer leaves a duplicate group unchanged when any consumer is CommonJS
 - shared regex fixer does not overwrite an unowned registry or partially rewrite consumers
 - Tailwind canonical diagnostics support missing configuration, missing stylesheets, skipped v4 packages, fixes, and nested stylesheet loading
+- Tailwind spacing utilities replace arbitrary lengths only when Tailwind's generated declarations remain equivalent
 - Tailwind canonical diagnostics cleanly skip a package without the unstable v4 API
 
 #### `security.test.mjs` (2)

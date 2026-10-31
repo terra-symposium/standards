@@ -91,7 +91,7 @@ HELPERS
  *
  * @return A supported reporting status, defaulting to `failed` for unknown values.
  */
-export const normalizeVisualStatus = (val: string): VisualStatus => (VISUAL_STATUSES.includes(val as VisualStatus) ? (val as VisualStatus) : 'failed');
+export const normalizeVisualStatus = (value: string): VisualStatus => (VISUAL_STATUSES.includes(value as VisualStatus) ? (value as VisualStatus) : 'failed');
 
 /**
  * Converts internal status casing into the label shown in artifacts.
@@ -110,7 +110,7 @@ export const statusLabel = (status: VisualStatus): string => (status === 'timedO
  *
  * @return The number of non-empty diagnostic lines.
  */
-export const diagnosticCount = (val: string): number => (val ? val.split('\n').filter(Boolean).length : 0);
+export const diagnosticCount = (value: string): number => (value ? value.split('\n').filter(Boolean).length : 0);
 
 /**
  * Returns one count for every supported status, including statuses absent from the run.

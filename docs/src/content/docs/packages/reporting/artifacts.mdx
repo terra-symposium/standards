@@ -5,7 +5,7 @@ description: Write and understand the spreadsheet and slideshow outputs.
 
 ## Outputs from the Playwright reporter
 
-The default reporter creates a timestamped run directory under `test-results/visual`. Each run contains:
+The default reporter creates a timestamped run directory under `test-results/visual`. Each process writes its workbook and screenshots; only the finalizing process in a shared viewport matrix creates the PowerPoint. A standalone process finalizes automatically. The artifacts are:
 
 - `report.xlsx`: a summary, result sheets grouped by test file, project information, diagnostics, and—when enabled—a load-timings sheet.
 - `report.pptx`: screenshot-backed slides grouped by logical test, with responsive previews and diagnostic context. When timing is enabled, it includes a timing summary and paginated timing details.
@@ -33,9 +33,9 @@ await writeSpreadsheet('test-results/report.xlsx', run);
 await writeSlideshow('test-results/report.pptx', run.results);
 ```
 
-A slideshow needs accessible screenshot paths on results to create visual previews; missing captures are labeled in the slide. The workbook can also record results without screenshots.
+A review slideshow needs accessible screenshot paths on results to create visual previews; missing captures are labeled in the slide. The workbook can also record results without screenshots. For route or state sweeps, use `visualTest` to collect keyed captures and enable `screenshotOnlySlideshow` to create a responsive deck made only of those screenshots.
 
-The `writeSpreadsheet(file, run)` function accepts normalized run metadata. `writeSlideshow(file, results, options?)` accepts optional title and document-metadata overrides. When load testing is enabled, set `run.loadTestingEnabled` or `options.loadTestingEnabled` so empty timing sections are still represented.
+The `writeSpreadsheet(file, run)` function accepts normalized run metadata. `writeSlideshow(file, results, options?)` accepts optional title and document-metadata overrides. `writeScreenshotSlideshow(file, captures, options?)` writes screenshot-backed responsive slides from captures. `writeScreenshotSlideshowFromDirectory(directory, file, options?)` reads the reporter's saved capture metadata and regenerates a deck, even when the previous run was interrupted or only some viewports completed. Without `currentRunId`, captures from earlier or legacy runs are placed on separately labeled `HISTORICAL CAPTURE` slides. Pass the current `runId` to generate a bounded deck for only that run; omit it to rebuild the accumulated folder. A repeated test/viewport replaces its older capture, while captures from unrun sections remain available as historical evidence. When load testing is enabled, set `run.loadTestingEnabled` or `options.loadTestingEnabled` so empty timing sections are still represented.
 
 ## Supplemental results
 

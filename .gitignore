@@ -16,3 +16,5 @@ coverage/
 # Local environment credentials
 **/.env
 **/.env.local
+vendor/
+**/vendor/

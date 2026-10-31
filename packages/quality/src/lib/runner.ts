@@ -1046,7 +1046,7 @@ function runQualityPhase(cfg: QualityCfg, phase: QualityPhase, profileChecks: Re
 				if (runTestSuite(cfg, check).status) failures += 1;
 			} catch (error) {
 				failures += 1;
-				recordQualityFailure(check.name, error);
+				recordQualityFailure(`command:${check.name}`, error);
 				printCheckStatus(check.name, 1);
 			}
 		}
@@ -1065,10 +1065,7 @@ function runQualityPhase(cfg: QualityCfg, phase: QualityPhase, profileChecks: Re
 			});
 			status = run(cfg, check.command, args);
 		} catch (error) {
-			const stage = reportStages?.get(`command:${check.name}`);
-			if (stage) stage.status = 'failed';
-			process.exitCode = 1;
-			recordQualityDetail(error instanceof Error ? error.message : String(error));
+			recordQualityFailure(`command:${check.name}`, error);
 		}
 		if (status) {
 			failures += 1;
@@ -1710,7 +1707,8 @@ function parseEslintReports(result: ReturnType<typeof spawnSync>, files: string[
 		if (missing.length) throw new Error(`missing reports for ${missing.join(', ')}`);
 		return reports as EslintReport[];
 	} catch (err) {
-		throw new Error(`ESLint dead-code detector returned invalid JSON or reports for ${files.length} source files: ${err instanceof Error ? err.message : String(err)}`, { cause: err });
+		const detail = err instanceof SyntaxError ? `invalid JSON: ${err.message}` : err instanceof Error ? err.message : String(err);
+		throw new Error(`ESLint dead-code detector could not read reports for ${files.length} source files: ${detail}`, { cause: err });
 	}
 }
 
@@ -1844,7 +1842,7 @@ function runRecommendationCmds(cfg: QualityCfg): void {
 		} catch (err) {
 			recordQualityFailure(`recommendation:${check.name}`, err);
 		}
-		if (status) process.exitCode = status;
+		if (status) process.exitCode = 1;
 		printCheckStatus(`recommendation:${check.name}`, status ? 1 : 0);
 	}
 }

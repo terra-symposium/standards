@@ -3,7 +3,7 @@ title: Terra Quality
 description: Install, configure, and run the Terra Quality source checker and repository CLI.
 ---
 
-`@terra-symposium/standards-quality` coordinates built-in JavaScript and TypeScript checks with tools and commands configured by your repository. It uses `quality.json` for scope and policy and provides the `terra-quality` executable.
+`@terra-symposium/standards-quality` coordinates built-in JavaScript and TypeScript checks with tools and commands configured by your repository. It uses `quality.json` for scope and policy and provides the `terra-quality` and `terra-quality-dev` executables.
 
 Terra Quality does not install project tools or create their native configuration. Install and configure any enabled formatter, linter, reachability checker, type checker, build, or test command in the consuming repository.
 
@@ -39,6 +39,8 @@ The package root re-exports its library API. Explicit subpaths are available for
 | `@terra-symposium/standards-quality/port`              | Helpers for inspecting local TCP listeners and acquiring a port. |
 
 `portOwners(port)` uses `lsof` to find listeners. `acquirePort(port)` sends `SIGTERM` and, if needed, `SIGKILL` to processes using that port before waiting for it to become available. Use it only when the caller owns those processes.
+
+Use `terra-quality-dev --port PORT -- <dev-server> [arguments...]` to acquire a local development port and launch the server with strict port handling. It honors `DOCS_DEV_PORT`, `TERRA_DEV_PORT`, and `PORT` overrides, and forwards termination signals to the server process. Because acquisition terminates listeners on the selected port, reserve this launcher for ports owned by your local development workflow.
 
 ## Checks
 

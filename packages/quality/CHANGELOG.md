@@ -1,5 +1,23 @@
 # @terra-symposium/standards-quality
 
+## 2.1.0
+
+### Minor Changes
+
+- Add the `terra-quality-dev` launcher so repositories share Quality's port acquisition and dev-server startup behavior.
+
+## 2.0.8
+
+### Patch Changes
+
+- Autofix arbitrary length utilities to Tailwind spacing utilities when the generated declarations match.
+
+## 2.0.7
+
+### Patch Changes
+
+- Load Tailwind v4 design systems through Tailwind's Node runtime so canonical checks can read legacy configuration and plugin modules.
+
 ## 2.0.6
 
 ### Patch Changes
