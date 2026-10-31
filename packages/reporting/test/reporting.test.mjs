@@ -254,13 +254,28 @@ test('rebuilds the default screenshot deck from accumulated captures', async () 
 
 		const interruptedReporter = new ProgressReporter({ outputRoot, loadTesting: { enabled: false } });
 		interruptedReporter.onBegin({}, { allTests: () => [testCase] });
+		const interruptedTest = { ...testCase, parent: { project: () => ({ name: 'browser-mobile' }) } };
+		interruptedReporter.onTestEnd(interruptedTest, {
+			attachments: [{ name: 'screenshot', contentType: 'image/png', path: screenshot }],
+			duration: 5,
+			error: undefined,
+			retry: 0,
+			status: 'passed',
+		});
 		const interruptedRun = JSON.parse(await fs.readFile(path.join(evidenceDirectory, '.terra-playwright-run.json'), 'utf8'));
 		assert.equal(interruptedRun.collectionFinished, false);
+		const interruptedCaptures = readScreenshotCapturesFromDirectory(evidenceDirectory);
+		assert.ok(
+			interruptedCaptures.some(({ incomplete }) => incomplete),
+			JSON.stringify(interruptedCaptures.map(({ group, viewport, runId, historical, incomplete }) => ({ group, viewport, runId, historical, incomplete }))),
+		);
 		const interruptedDeck = path.join(root, 'interrupted-rebuilt.pptx');
 		await writeScreenshotSlideshowFromDirectory(evidenceDirectory, interruptedDeck);
-		const { stdout: interruptedSlide } = await execFileAsync('unzip', ['-p', interruptedDeck, 'ppt/slides/slide1.xml']);
-		assert.match(interruptedSlide, /HISTORICAL CAPTURE/);
-		assert.doesNotMatch(interruptedSlide, /CURRENT RUN/);
+		const { stdout: interruptedArchive } = await execFileAsync('unzip', ['-Z1', interruptedDeck]);
+		const interruptedSlidePaths = interruptedArchive.split('\n').filter((file) => /^ppt\/slides\/slide\d+\.xml$/u.test(file));
+		const interruptedSlides = await Promise.all(interruptedSlidePaths.map(async (file) => (await execFileAsync('unzip', ['-p', interruptedDeck, file])).stdout));
+		assert.match(interruptedSlides.join(''), /INCOMPLETE RUN/);
+		assert.doesNotMatch(interruptedSlides.join(''), /CURRENT RUN/);
 
 		const legacyDirectory = path.join(root, 'legacy-screenshots');
 		await fs.mkdir(legacyDirectory, { recursive: true });
@@ -810,7 +825,7 @@ test('builds one screenshot deck from nested repository folders and keeps partia
 		assert.match(slides.join(''), /website · website responsive test/);
 		assert.match(slides.join(''), /docs · docs responsive test/);
 		assert.match(slides.join(''), /HISTORICAL CAPTURE/);
-		assert.match(slides.join(''), /CURRENT RUN/);
+		assert.match(slides.join(''), /INCOMPLETE RUN/);
 		const currentDeck = path.join(root, 'current-repository-runs.pptx');
 		await writeScreenshotSlideshowFromDirectory(root, currentDeck, {
 			currentRunIdsBySource: { website: 'website-current', docs: ['docs-current', 'docs-consumer-current'] },
@@ -819,7 +834,7 @@ test('builds one screenshot deck from nested repository folders and keeps partia
 		assert.match(currentArchive, /ppt\/slides\/slide3\.xml/);
 		assert.doesNotMatch(currentArchive, /ppt\/slides\/slide4\.xml/);
 		const currentSlides = await Promise.all([1, 2, 3].map(async (index) => (await execFileAsync('unzip', ['-p', currentDeck, `ppt/slides/slide${index}.xml`])).stdout));
-		assert.match(currentSlides.join(''), /CURRENT RUN/);
+		assert.match(currentSlides.join(''), /INCOMPLETE RUN/);
 		assert.match(currentSlides.join(''), /docs consumer test/);
 		assert.doesNotMatch(currentSlides.join(''), /HISTORICAL CAPTURE/);
 	} finally {

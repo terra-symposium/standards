@@ -225,10 +225,12 @@ export type ScreenshotCapture = {
 	capturedAt?: string;
 	/** True when the capture predates the latest run marker in its directory. */
 	historical?: boolean;
+	/** True when this capture belongs to the active run and that run has not finalized. */
+	incomplete?: boolean;
 };
 
 /** Expected test identities and viewports captured by one logical reporter run. */
-type ScreenshotRunInventory = { runId: string; expectedCaptureGroups?: Array<{ group: string; viewports: string[] }> };
+type ScreenshotRunInventory = { runId: string; collectionFinished?: boolean; expectedCaptureGroups?: Array<{ group: string; viewports: string[] }> };
 
 /** Presentation metadata and optional logical-run selection for screenshot-only captures. */
 export type ScreenshotSlideshowOptions = {
@@ -249,11 +251,13 @@ export type ScreenshotDirectorySource = { label: string; directory: string; runI
 export const readScreenshotCapturesFromDirectory = (directory: string, currentRunId?: string | readonly string[]): ScreenshotCapture[] => {
 	if (!fs.existsSync(directory)) return [];
 	let markerRunId: string | undefined;
+	let collectionFinished: boolean | undefined;
 	const currentRunIds = new Set(typeof currentRunId === 'string' ? [currentRunId] : currentRunId || []);
 	let currentCaptureGroups: Map<string, Set<string>> | undefined;
 	try {
 		const run = JSON.parse(fs.readFileSync(path.join(directory, '.terra-playwright-run.json'), 'utf8')) as ScreenshotRunInventory;
 		markerRunId = run.runId;
+		collectionFinished = run.collectionFinished;
 		if (!currentRunIds.size) currentRunIds.add(run.runId);
 		if (currentRunIds.has(run.runId) && Array.isArray(run.expectedCaptureGroups)) {
 			currentCaptureGroups = new Map(
@@ -305,6 +309,7 @@ export const readScreenshotCapturesFromDirectory = (directory: string, currentRu
 					runId: typeof capture.runId === 'string' ? capture.runId : undefined,
 					capturedAt: typeof capture.capturedAt === 'string' ? capture.capturedAt : undefined,
 					historical: !captureRunId || !currentRunIds.has(captureRunId) || !currentTest,
+					incomplete: typeof captureRunId === 'string' && captureRunId === markerRunId && currentRunIds.has(captureRunId) && collectionFinished === false && currentTest,
 				},
 			];
 		} catch {
@@ -438,7 +443,8 @@ export const writeScreenshotSlideshow = async (file: string, captures: readonly 
 	presentation.title = opts.title || 'Playwright screenshots';
 	const groups = new Map<string, ScreenshotCapture[]>();
 	for (const capture of captures) {
-		const groupKey = `${capture.group}\0${capture.historical ? 'historical' : 'current'}`;
+		const runState = capture.historical ? 'historical' : capture.incomplete ? 'incomplete' : 'current';
+		const groupKey = `${capture.group}\0${runState}`;
 		groups.set(groupKey, [...(groups.get(groupKey) || []), capture]);
 	}
 	const knownViewports = Object.keys(VISUAL_VIEWPORTS);
@@ -473,9 +479,11 @@ export const writeScreenshotSlideshow = async (file: string, captures: readonly 
 		const slide = presentation.addSlide();
 		slide.background = { color: 'FFFFFF' };
 		const historical = group[0]?.historical === true;
-		slide.addText(`${historical ? 'HISTORICAL CAPTURE' : 'CURRENT RUN'} · ${group[0]?.title || 'Playwright capture'}`, {
+		const incomplete = group[0]?.incomplete === true;
+		const runLabel = historical ? 'HISTORICAL CAPTURE' : incomplete ? 'INCOMPLETE RUN' : 'CURRENT RUN';
+		slide.addText(`${runLabel} · ${group[0]?.title || 'Playwright capture'}`, {
 			bold: true,
-			color: historical ? '8A5A32' : '315B43',
+			color: historical ? '8A5A32' : incomplete ? '9A6A12' : '315B43',
 			fontFace: 'Aptos',
 			fontSize: 8,
 			fit: 'shrink',
