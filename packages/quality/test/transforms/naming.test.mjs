@@ -34,6 +34,10 @@ HELPERS
 function identifiers(src) {
 	const file = ts.createSourceFile('fixture.ts', src, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
 	const nodes = [];
+	/**
+	 *
+	 * @param node
+	 */
 	const visit = (node) => {
 		if (ts.isIdentifier(node)) nodes.push(node);
 		ts.forEachChild(node, visit);
@@ -114,6 +118,12 @@ const expression = function namedExpression() { return true; };
 class WithProperty { constructor(readonly destination: string) {} }
 `;
 	const { file, nodes } = identifiers(src);
+	/**
+	 *
+	 * @param name
+	 *
+	 * @return
+	 */
 	const declaration = (name) => nodes.find((n) => n.text === name && n.parent.name === n);
 	for (const name of ['localValue', 'localFunction', 'LocalClass', 'LocalContract', 'LocalType', 'namedExpression']) assert.equal(isRenamableDeclaration(declaration(name)), true, name);
 	for (const name of ['publicValue', 'publicFunction', 'PublicClass', 'PublicContract', 'PublicType']) assert.equal(isRenamableDeclaration(declaration(name)), false, name);
@@ -136,6 +146,10 @@ void [mapped, rendered, ordinary, handle, view];
 `;
 	const file = ts.createSourceFile('fixture.tsx', src, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
 	const callbacks = [];
+	/**
+	 *
+	 * @param node
+	 */
 	const visit = (node) => {
 		if (ts.isIdentifier(node) && ['block', 'customer', 'index', 'event'].includes(node.text) && ts.isParameter(node.parent)) callbacks.push(node);
 		ts.forEachChild(node, visit);

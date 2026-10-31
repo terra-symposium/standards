@@ -58,9 +58,25 @@ test('collapseInlineIfs preserves the historical nested-if else owner and runtim
 	const root = fixtureRoot('terra-quality-inline-if-else-owner-');
 	const file = fixtureFile(root, 'src/main.ts', 'if (outer) { if (inner) run(); } else stop();\n');
 	const original = fixtureText(root, 'src/main.ts');
+	/**
+	 *
+	 * @param src
+	 * @param outer
+	 * @param inner
+	 *
+	 * @return
+	 */
 	const execute = (src, outer, inner) => {
 		const result = [];
+		/**
+		 *
+		 * @return
+		 */
 		const run = () => result.push('run');
+		/**
+		 *
+		 * @return
+		 */
 		const stop = () => result.push('stop');
 		runInNewContext(`(() => { const outer = ${outer}; const inner = ${inner}; ${src} return result; })()`, { result, run, stop });
 		return result;

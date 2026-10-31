@@ -26,6 +26,10 @@ export function collapseInlineIfs(fileName: string): boolean {
 	const src = readFileSync(fileName, 'utf8');
 	const parsed = ts.createSourceFile(fileName, src, ts.ScriptTarget.Latest, true, fileName.endsWith('x') ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
 	const edits: { start: number; end: number; text: string }[] = [];
+	/**
+	 *
+	 * @param node
+	 */
 	const visit = (node: ts.Node): void => {
 		if (ts.isIfStatement(node) && ts.isBlock(node.thenStatement) && node.thenStatement.statements.length === 1) {
 			const statement = node.thenStatement.statements[0]!;

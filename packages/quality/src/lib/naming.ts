@@ -114,11 +114,20 @@ ALIASES
 
 /** A declaration that only gives a stable local binding a second local name. */
 export type AliasFinding = { file: string; line: number; kind: 'const' | 'type'; name: string; replacement: string };
+/**
+ *
+ * @param n
+ *
+ * @return
+ */
 const aliasTgt = (n: ts.Expression): ts.Identifier | ts.PropertyAccessExpression | ts.ElementAccessExpression | undefined =>
 	ts.isIdentifier(n) || ts.isPropertyAccessExpression(n) || ts.isElementAccessExpression(n) ? n : undefined;
 
-/** Confirms that an identifier keeps the same local binding after its declaration.
+/**
+ * Confirms that an identifier keeps the same local binding after its declaration.
+ *
  * @param symbol Symbol resolved for the identifier.
+ *
  * @return Whether the target remains a stable local binding.
  */
 function isStableLocalBinding(symbol: ts.Symbol): boolean {
@@ -148,6 +157,12 @@ HELPERS
  */
 function replacementMap(groups: readonly [names: string | readonly string[], replacement: string][], pluralReplacements = true): Readonly<Record<string, string>> {
 	const explicit = new Map(groups.flatMap(([n, r]) => (typeof n === 'string' ? [n] : n).map((n) => [n, r] as const)));
+	/**
+	 *
+	 * @param word
+	 *
+	 * @return
+	 */
 	const plural = (word: string): string => {
 		if (/[^aeiou]y$/i.test(word)) return `${word.slice(0, -1)}ies`;
 		if (/(?:s|x|z|ch|sh)$/i.test(word)) return word.length <= 4 ? word : `${word}es`;
@@ -270,6 +285,10 @@ function callbackKind(n: ts.Identifier): RenameKind | undefined {
 	const isInlineCallback = !ts.isFunctionDeclaration(callback) && ts.isCallExpression(callback.parent) && callback.parent.arguments.includes(callback as ts.Expression);
 	let isNamedCallback = false;
 	if (ts.isFunctionDeclaration(callback) && callback.name) {
+		/**
+		 *
+		 * @param n
+		 */
 		const scan = (n: ts.Node): void => {
 			if (isNamedCallback) return;
 			const jsxAttr = ts.isJsxAttribute(n) ? n : undefined;
@@ -281,6 +300,10 @@ function callbackKind(n: ts.Identifier): RenameKind | undefined {
 				!!jsxExpr &&
 				(() => {
 					let refs = false;
+					/**
+					 *
+					 * @param c
+					 */
 					const findRef = (c: ts.Node): void => {
 						if (refs) return;
 						if (ts.isIdentifier(c) && c.text === callback.name?.text) {
@@ -312,6 +335,10 @@ function callbackKind(n: ts.Identifier): RenameKind | undefined {
 	const isJsxCallback = ts.isJsxExpression(callback.parent) && callback.parent.expression === callback && ts.isJsxAttribute(callback.parent.parent);
 	if (!isInlineCallback && !isNamedCallback && !isJsxCallback) return undefined;
 	const declarations: ts.Identifier[] = [];
+	/**
+	 *
+	 * @param name
+	 */
 	const collectBinding = (name: ts.BindingName): void => {
 		if (ts.isIdentifier(name)) declarations.push(name);
 		else for (const element of name.elements) if (ts.isBindingElement(element)) collectBinding(element.name);
@@ -319,6 +346,10 @@ function callbackKind(n: ts.Identifier): RenameKind | undefined {
 	for (const p of callback.parameters) collectBinding(p.name);
 	const declarationNames = new Set(declarations.map((d) => d.text));
 	const reserved = new Set<string>();
+	/**
+	 *
+	 * @param child
+	 */
 	const collect = (child: ts.Node): void => {
 		if (ts.isIdentifier(child) && !declarationNames.has(child.text)) reserved.add(child.text);
 		ts.forEachChild(child, collect);
@@ -482,6 +513,10 @@ export function namingFindings(cfg: QualityCfg, analysis?: QualityAnalysis): Nam
 		);
 		const safetyByScope = new Map<ts.Node, { declared: Set<string>; proposals: Map<string, number> }>();
 		const declaredNames = new Set<string>();
+		/**
+		 *
+		 * @param n
+		 */
 		const collect = (n: ts.Node): void => {
 			if (ts.isIdentifier(n) && isRenamableDeclaration(n)) {
 				const scope = declarationScope(n);
@@ -495,6 +530,10 @@ export function namingFindings(cfg: QualityCfg, analysis?: QualityAnalysis): Nam
 			ts.forEachChild(n, collect);
 		};
 		collect(file);
+		/**
+		 *
+		 * @param n
+		 */
 		const inspect = (n: ts.Node): void => {
 			if (ts.isIdentifier(n) && isRenamableDeclaration(n) && !n.text.startsWith('_') && !protectedNames.has(n.text) && !exportedNames.has(n.text)) {
 				const suggestion = renameDeclaration(n);
@@ -569,6 +608,10 @@ export function aliasFindings(cfg: QualityCfg, analysisOrFix: QualityAnalysis | 
 	for (const src of program.getSourceFiles()) {
 		if (!files.includes(src.fileName)) continue;
 		const aliases: Array<{ statement: ts.Statement; name: ts.Identifier; symbol: ts.Symbol; replacement: string; kind: 'const' | 'type'; targetSymbol?: ts.Symbol; targetName?: string }> = [];
+		/**
+		 *
+		 * @param node
+		 */
 		const inspect = (node: ts.Node): void => {
 			if (
 				ts.isVariableStatement(node) &&
@@ -627,6 +670,10 @@ export function aliasFindings(cfg: QualityCfg, analysisOrFix: QualityAnalysis | 
 				chained.add(tgtAlias);
 			}
 		}
+		/**
+		 *
+		 * @param node
+		 */
 		const visit = (node: ts.Node): void => {
 			if (aliases.some((a) => a.statement === node)) return;
 			if (ts.isIdentifier(node)) {

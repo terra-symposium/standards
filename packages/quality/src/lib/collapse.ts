@@ -11,6 +11,7 @@ IMPORTS
 import ts from 'typescript';
 import { extname } from 'node:path';
 import { readFileSync, writeFileSync } from 'node:fs';
+import { sourceKind } from './source-kind.js';
 
 /*//////////////////////////////////////////////////
 CONFIG
@@ -23,20 +24,6 @@ HELPERS
 //////////////////////////////////////////////////*/
 
 /**
- * Selects the TypeScript parser mode matching a JavaScript or TypeScript filename.
- *
- * @param fileName Source filename whose extension determines the parser mode.
- *
- * @return TypeScript compiler script kind for the filename.
- */
-function scriptKind(fileName: string): ts.ScriptKind {
-	if (/\.[cm]?tsx$/.test(fileName)) return ts.ScriptKind.TSX;
-	if (/\.[cm]?jsx$/.test(fileName)) return ts.ScriptKind.JSX;
-	if (/\.[cm]?js$/.test(fileName)) return ts.ScriptKind.JS;
-	return ts.ScriptKind.TS;
-}
-
-/**
  * Finds the body span of an object, type literal, mapped type, or interface that can be collapsed safely.
  *
  * @param n AST node being considered for whitespace collapsing.
@@ -47,6 +34,10 @@ function scriptKind(fileName: string): ts.ScriptKind {
 function candidateSpan(n: ts.Node, src: string): { start: number; end: number } | undefined {
 	if (ts.isObjectLiteralExpression(n)) {
 		let containsJsx = false;
+		/**
+		 *
+		 * @param c
+		 */
 		const findJsx = (c: ts.Node): void => {
 			if (ts.isJsxElement(c) || ts.isJsxSelfClosingElement(c) || ts.isJsxFragment(c)) {
 				containsJsx = true;
@@ -82,13 +73,25 @@ export function collapseTypesAndObjects(fileName: string): boolean {
 	// ENVIRONMENT
 	if (!SUPPORTED.has(extname(fileName))) return false;
 	const original = readFileSync(fileName, 'utf8');
-	const parsed = ts.createSourceFile(fileName, original, ts.ScriptTarget.Latest, true, scriptKind(fileName));
+	const parsed = ts.createSourceFile(fileName, original, ts.ScriptTarget.Latest, true, sourceKind(fileName));
 	const edits: { start: number; end: number; text: string }[] = [];
 
 	// HELPERS
+	/**
+	 *
+	 * @param n
+	 * @param start
+	 * @param text
+	 *
+	 * @return
+	 */
 	const collapse = (n: ts.Node, start: number, text: string): string | undefined => {
 		if (!/[\r\n]/.test(text)) return undefined;
 		const protectedRanges: { start: number; end: number }[] = [];
+		/**
+		 *
+		 * @param c
+		 */
 		const protectLiterals = (c: ts.Node): void => {
 			if (
 				ts.isStringLiteral(c) ||
@@ -105,6 +108,12 @@ export function collapseTypesAndObjects(fileName: string): boolean {
 			ts.forEachChild(c, protectLiterals);
 		};
 		protectLiterals(n);
+		/**
+		 *
+		 * @param pos
+		 *
+		 * @return
+		 */
 		const isProtected = (pos: number): boolean => protectedRanges.some((r) => pos >= r.start && pos < r.end);
 		const scanner = ts.createScanner(ts.ScriptTarget.Latest, false, parsed.languageVariant, text);
 		let result = '';
@@ -130,6 +139,10 @@ export function collapseTypesAndObjects(fileName: string): boolean {
 	};
 
 	// ANALYSE
+	/**
+	 *
+	 * @param n
+	 */
 	const visit = (n: ts.Node): void => {
 		const span = candidateSpan(n, original);
 		if (span) {

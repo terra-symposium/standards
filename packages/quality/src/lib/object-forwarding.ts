@@ -12,6 +12,7 @@ IMPORTS
 import ts from 'typescript';
 import { displayPath, srcFiles } from './files.js';
 import { readFileSync, writeFileSync } from 'node:fs';
+import { sourceKind } from './source-kind.js';
 
 // TYPES
 import type { QualityAnalysis, QualityCfg } from './runner.js';
@@ -29,20 +30,6 @@ export type ObjectForwardingFixResult = { fixed: number; skipped: number };
 /*//////////////////////////////////////////////////
 HELPERS
 //////////////////////////////////////////////////*/
-
-/**
- * Selects the TypeScript parser mode that matches a source filename.
- *
- * @param fileName Source filename whose extension determines the parser mode.
- *
- * @return TypeScript compiler script kind for the filename.
- */
-function scriptKind(fileName: string): ts.ScriptKind {
-	if (/\.[cm]?tsx$/.test(fileName)) return ts.ScriptKind.TSX;
-	if (/\.[cm]?jsx$/.test(fileName)) return ts.ScriptKind.JSX;
-	if (/\.[cm]?js$/.test(fileName)) return ts.ScriptKind.JS;
-	return ts.ScriptKind.TS;
-}
 
 /**
  * Identifies mutating or collection-building calls where an object literal is a deliberate payload.
@@ -67,8 +54,12 @@ function isIgnoredCallee(expr: ts.Expression): boolean {
  */
 function findingsForFile(cfg: QualityCfg, file: string, analysis?: QualityAnalysis): ObjectForwardingFinding[] {
 	const src = analysis?.texts.get(file) ?? readFileSync(file, 'utf8');
-	const parsed = analysis?.sources.get(file) ?? ts.createSourceFile(file, src, ts.ScriptTarget.Latest, true, scriptKind(file));
+	const parsed = analysis?.sources.get(file) ?? ts.createSourceFile(file, src, ts.ScriptTarget.Latest, true, sourceKind(file));
 	const findings: ObjectForwardingFinding[] = [];
+	/**
+	 *
+	 * @param node
+	 */
 	const visit = (node: ts.Node): void => {
 		if (ts.isCallExpression(node) && !isIgnoredCallee(node.expression)) {
 			for (const argument of node.arguments) {
@@ -139,8 +130,12 @@ export function fixObjectForwarding(cfg: QualityCfg, analysis?: QualityAnalysis)
 	for (const file of analysis?.files ?? srcFiles(cfg)) {
 		if (!/\.[cm]?(?:js|jsx|ts|tsx)$/.test(file)) continue;
 		const src = analysis?.texts.get(file) ?? readFileSync(file, 'utf8');
-		const parsed = analysis?.sources.get(file) ?? ts.createSourceFile(file, src, ts.ScriptTarget.Latest, true, scriptKind(file));
+		const parsed = analysis?.sources.get(file) ?? ts.createSourceFile(file, src, ts.ScriptTarget.Latest, true, sourceKind(file));
 		const edits: Array<{ start: number; end: number }> = [];
+		/**
+		 *
+		 * @param node
+		 */
 		const visit = (node: ts.Node): void => {
 			if (ts.isCallExpression(node) && !isIgnoredCallee(node.expression)) {
 				for (const argument of node.arguments) {
