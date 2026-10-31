@@ -1,6 +1,6 @@
 [build]
   command = "pnpm docs:build"
-  publish = "docs-dist"
+  publish = "dist/docs"
 
 [build.environment]
   NODE_VERSION = "24"
