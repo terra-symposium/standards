@@ -1,5 +1,11 @@
 # @terra-symposium/standards-quality
 
+## 2.1.0
+
+### Minor Changes
+
+- Add the `terra-quality-dev` launcher so repositories share Quality's port acquisition and dev-server startup behavior.
+
 ## 2.0.8
 
 ### Patch Changes
