@@ -199,7 +199,14 @@ function isInsideTemplateLiteral(src: string, offset: number): boolean {
  */
 function insertCfgGroup(src: string, label: string, declarations: string[], file?: string): string {
 	if (!declarations.length) return src;
-	const cfg = /\/\*\/{10,}\r?\n[ \t]*CONFIG[ \t]*\r?\n[ \t]*\/{10,}\*\//.exec(src);
+	const cfgPattern = /\/\*\/{10,}\r?\n[ \t]*CONFIG[ \t]*\r?\n[ \t]*\/{10,}\*\//g;
+	let cfg: RegExpExecArray | null = null;
+	for (let match = cfgPattern.exec(src); match; match = cfgPattern.exec(src)) {
+		if (!isInsideTemplateLiteral(src, match.index)) {
+			cfg = match;
+			break;
+		}
+	}
 	const eol = src.includes('\r\n') ? '\r\n' : '\n';
 	const group = [`/*${'/'.repeat(50)}`, label, `${'/'.repeat(50)}*/`, ...declarations].join(eol);
 	if (cfg) {

@@ -1,0 +1,329 @@
+{
+	"repo": "/Users/kaimacann/Desktop/terra-symposium-website",
+	"refs": ["--glob=refs/remotes/origin/*"],
+	"since": "2026-08-17T13:12:18+1000",
+	"until": "2026-08-24T13:57:15+1000",
+	"timezone": "Australia/Sydney",
+	"brand": "Terra Symposium",
+	"title": "Standup 3",
+	"subtitle": "All organization-branch activity, grouped by Git identity and evidence type.",
+	"randomizePeople": true,
+	"overview": {
+		"title": "The full branch set widened the week’s evidence",
+		"throughline": "Integration, feature, automation, and work-in-progress branches all contributed.\nOnly the retained public routes were verified locally; unmerged work remains Git evidence."
+	},
+	"goals": [
+		{
+			"person": "Miya",
+			"goal": "Make the AI content flow work end to end\nand begin syllabus analysis and sourcing.",
+			"source": "Granola · 1st Standup · 2026-08-17",
+			"status": "Related work appears under an unverified identity"
+		},
+		{
+			"person": "Aashna",
+			"goal": "Bring analytics design mockups to the standup\nand begin an initial implementation.",
+			"source": "Granola · Aashna checkup · 2026-08-13",
+			"status": "No attributed repo activity found"
+		},
+		{
+			"person": "Daniel",
+			"goal": "Assess Stripe-edit consolidation and begin\nthe refactor when it is ready.",
+			"source": "Granola · 1st Standup · 2026-08-17",
+			"status": "Partially evidenced by related runtime and Docs work"
+		},
+		{
+			"person": "Zoe",
+			"goal": "Advance the model-agnostic content pipeline\nand teacher syllabus-upload UI.",
+			"source": "Granola · Zoe checkup · 2026-08-10",
+			"status": "Related work appears under an unverified Git identity"
+		}
+	],
+	"workstreamsTitle": "Four workstreams moved together",
+	"workstreams": [
+		{ "name": "Protected runtime", "summary": "Authenticated local launchers, origin allowlists, and secret cleanup.", "evidence": "663d3b8e1 · 1bb4dd4e5" },
+		{ "name": "Product and UI", "summary": "Profile pictures, organisation checkout, graph editing, and responsive demo surfaces.", "evidence": "10e527df3 · a0b081e78" },
+		{ "name": "Automation and quality", "summary": "Accessibility, compact export, schedule, and dependency maintenance work.", "evidence": "45 automated commits" },
+		{ "name": "Docs and contracts", "summary": "Agent guidance, schema alignment, and durable decision-log rules.", "evidence": "f3282bae6 · 4d69bb54b" }
+	],
+	"contributors": [
+		{
+			"name": "Kai Macann",
+			"commitCount": 140,
+			"plan": {
+				"source": "Google Drive · Kai Macann — 90-Day Action Plan · https://docs.google.com/document/d/1Uye3BWi8y7IXhi6ybpwfB1BzdpY_LUFpPWiJasq7W9I",
+				"start": "2026-08-03",
+				"end": "2026-10-31",
+				"asOf": "2026-08-24",
+				"outcome": "Deliver safe platform foundations and visible product improvements with a clear handover trail.",
+				"previousObjective": "No recorded standup objective is available in the reviewed sources.",
+				"milestones": [
+					{
+						"name": "Map architecture and priorities",
+						"start": "2026-08-03",
+						"end": "2026-09-01",
+						"progress": 75,
+						"evidence": "Weekly review: verified local product/auth surfaces and broad Git activity"
+					},
+					{ "name": "Implement priority changes", "start": "2026-09-02", "end": "2026-10-01", "progress": 0, "evidence": "Scheduled work; no review evidence yet" },
+					{ "name": "Harden and hand over", "start": "2026-10-02", "end": "2026-10-31", "progress": 0, "evidence": "Scheduled work; no review evidence yet" }
+				]
+			},
+			"slides": [
+				{
+					"title": "Kai secured the local development boundary",
+					"lead": "The environment pipeline authenticates\nwith GitHub before returning approved\ndevelopment variables.",
+					"heading": "Observed outcomes in Git",
+					"bullets": [
+						"• Authenticated local launcher path",
+						"• Explicit origin handling and protected runtime",
+						"• Credential normalization and public-mode cleanup",
+						"• Null-safe database operation results"
+					],
+					"code": { "sha": "663d3b8e1", "path": "scripts/setup/runtime.mjs", "start": 57, "end": 72 },
+					"caption": "Full source range shown: local runtime lookup and allowlist checks.",
+					"footer": "Representative commits: 663d3b8e1 · ea56c5a2e · 02fd14937 · 8a59edce1",
+					"sources": ["ea56c5a2e · scripts/setup/runtime.mjs", "8a59edce1 · astro/astro.config.mjs"]
+				},
+				{
+					"title": "Kai advanced product and UI",
+					"lead": "A second lane improved visible\nproduct surfaces and interface\nresponsiveness.",
+					"heading": "Product evidence",
+					"bullets": ["• Profile picture storage, display, and account dialogs", "• Power Source hierarchy graph editing and Arc layouts", "• Responsive demo previews and compact dashboard states"],
+					"screenshot": {
+						"path": "/Users/kaimacann/Desktop/terra-symposium-website/artifacts/weekly-review-2026-08-24/demo-local.png",
+						"route": "http://localhost:4321/demo",
+						"alt": "Local Terra demo showing responsive product interface",
+						"caption": "Local · /demo · public responsive product surface"
+					},
+					"caption": "Observed locally; linked commits include the demo and responsive UI changes.",
+					"footer": "Evidence: 7f4b20e58 · 10e527df3 · 188feadeb · a0b081e78",
+					"sources": ["a314db19c · astro/src/pages/demo.astro", "96b4b83d5 · astro/src/pages/dashboard/classes/_Workshop.tsx"]
+				}
+			]
+		},
+		{
+			"name": "Miya",
+			"commitCount": 4,
+			"plan": {
+				"source": "Google Drive · Development/90 Days.pages · https://drive.google.com/file/d/1ostxdIkqvzP-cwSZXSKPVrSf2W3IsKH9/view",
+				"start": "2026-08-03",
+				"end": "2026-10-31",
+				"asOf": "2026-08-24",
+				"outcome": "Deliver learning, payment, editor, and Bunkers experiences with documentation and error boundaries.",
+				"previousObjective": "Make the AI content flow work end to end and begin syllabus analysis and sourcing.",
+				"milestones": [
+					{ "name": "Logical fallacy & Prisoner's dilemma", "start": "2026-08-03", "end": "2026-08-24", "progress": 0, "evidence": "Drive plan workstream; completion not supplied" },
+					{ "name": "Payment portal", "start": "2026-08-25", "end": "2026-09-15", "progress": 0, "evidence": "Drive plan workstream; completion not supplied" },
+					{ "name": "New problem-editor blocks", "start": "2026-09-16", "end": "2026-10-07", "progress": 0, "evidence": "Drive plan workstream; completion not supplied" },
+					{ "name": "Bunkers", "start": "2026-10-08", "end": "2026-10-31", "progress": 0, "evidence": "Drive plan workstream; completion not supplied" }
+				]
+			},
+			"slides": [
+				{
+					"title": "Miya reduced checkout and startup friction",
+					"lead": "The changes span product access and the\nmacOS local development path.",
+					"heading": "Contribution",
+					"bullets": ["• Added organisation access flow for checkout", "• Fixed macOS local server startup path", "• Removed a conflicting Netlify Dev port"],
+					"screenshot": {
+						"path": "/Users/kaimacann/Desktop/terra-symposium-website/artifacts/weekly-review-2026-08-24/organisation-signup-local.png",
+						"route": "http://localhost:4321/dashboard/organisation/sign-up",
+						"alt": "Local organisation signup form",
+						"caption": "Local · /dashboard/organisation/sign-up · signed-in organisation flow"
+					},
+					"commitTrailTitle": "Commit trail",
+					"commitTrail": ["b4f5e003b  Add organisation access flow", "678634d3f  Support macOS local startup", "2274a9a5d  Use correct dev script path", "aea7c56c3  Remove conflicting Netlify port"],
+					"caption": "Observed locally in the existing signed-in session;\nlauncher changes remain Git evidence.",
+					"footer": "Evidence: b4f5e003b · 678634d3f · 2274a9a5d · aea7c56c3",
+					"sources": ["b4f5e003b · astro/src/pages/dashboard/organisation/_SignUp.tsx"]
+				}
+			]
+		},
+		{
+			"name": "Daniel Gao",
+			"commitCount": 7,
+			"plan": {
+				"source": "Google Drive · Development/90 Days.pages · https://drive.google.com/file/d/1ostxdIkqvzP-cwSZXSKPVrSf2W3IsKH9/view",
+				"start": "2026-08-03",
+				"end": "2026-10-31",
+				"asOf": "2026-08-24",
+				"outcome": "Make authoring, test automation, auth, and Docs quizzes safe to evolve\nwith documentation and error boundaries.",
+				"previousObjective": "Assess Stripe-edit consolidation and begin the refactor when it is ready.",
+				"milestones": [
+					{ "name": "Automated editor test suite", "start": "2026-08-03", "end": "2026-08-20", "progress": 0, "evidence": "Drive plan workstream; completion not supplied" },
+					{ "name": "Consolidate rich-text editors", "start": "2026-08-21", "end": "2026-09-07", "progress": 0, "evidence": "Drive plan workstream; completion not supplied" },
+					{ "name": "Definition hierarchies", "start": "2026-09-08", "end": "2026-09-25", "progress": 0, "evidence": "Drive plan workstream; completion not supplied" },
+					{ "name": "Improve auth", "start": "2026-09-26", "end": "2026-10-13", "progress": 0, "evidence": "Drive plan workstream; completion not supplied" },
+					{ "name": "Docs quiz", "start": "2026-10-14", "end": "2026-10-31", "progress": 0, "evidence": "Drive plan workstream; completion not supplied" }
+				]
+			},
+			"slides": [
+				{
+					"title": "Daniel strengthened authoring and schema alignment",
+					"lead": "The contribution concentrated on\nStudio, Docs authoring, and existing\ndatabase connections.",
+					"heading": "What moved",
+					"bullets": ["• Generated Sanity types aligned with the current model", "• Signed-in users can create Docs sections", "• Studio startup respects an existing connection"],
+					"screenshot": {
+						"path": "/Users/kaimacann/Desktop/terra-symposium-website/artifacts/weekly-review-2026-08-24/docs-local.png",
+						"route": "http://localhost:4321/docs",
+						"alt": "Local Docs workspace",
+						"caption": "Local · /docs · signed-in Docs workspace"
+					},
+					"commitTrailTitle": "Commit trail",
+					"commitTrail": [
+						"cc02e542d  Update generated Sanity types",
+						"5bd76859b  Enable Docs section authoring",
+						"ed2614f28  Apply formatting hygiene",
+						"9ba6d72e8  Respect existing Studio connection"
+					],
+					"caption": "Observed locally in view mode; authoring and Studio\nstartup remain Git evidence.",
+					"footer": "Evidence: cc02e542d · 5bd76859b · ed2614f28 · 9ba6d72e8",
+					"sources": ["cc02e542d · astro/src/lib/sanity.types.ts", "9ba6d72e8 · Studio database startup"]
+				},
+				{
+					"title": "Daniel closed the local public UI launch gap",
+					"lead": "The scoped public launcher keeps\nits narrow environment while\nretaining Node so it can start Astro.",
+					"heading": "New commits after the prior review cut-off",
+					"bullets": ["• Restored Node to the permitted child-process PATH", "• Kept the public launcher’s secret boundary intact", "• Narrowed decision logs to durable operating choices"],
+					"code": { "sha": "f3282bae6", "path": "scripts/dev-public.mjs", "start": 11, "end": 15 },
+					"caption": "Git evidence only; no new local runtime was started for this update.",
+					"footer": "New evidence: f3282bae6 · 4d69bb54b",
+					"sources": ["f3282bae6 · scripts/dev-public.mjs", "4d69bb54b · .agents/decisions/README.md"]
+				}
+			]
+		},
+		{
+			"name": "Zoe",
+			"commitCount": 0,
+			"plan": {
+				"source": "Google Drive · Development/90 Days.pages · https://drive.google.com/file/d/1ostxdIkqvzP-cwSZXSKPVrSf2W3IsKH9/view",
+				"start": "2026-08-03",
+				"end": "2026-10-31",
+				"asOf": "2026-08-24",
+				"outcome": "Replace manual generation with automated content workflows and make syllabus sourcing actionable.",
+				"previousObjective": "Advance the model-agnostic content pipeline and teacher syllabus-upload UI.",
+				"milestones": [
+					{ "name": "Content generation & healing", "start": "2026-08-03", "end": "2026-08-31", "progress": 0, "evidence": "Drive plan workstream; completion not supplied" },
+					{ "name": "Syllabus analysis", "start": "2026-09-01", "end": "2026-09-30", "progress": 0, "evidence": "Drive plan workstream; completion not supplied" },
+					{ "name": "Syllabus fetching", "start": "2026-10-01", "end": "2026-10-31", "progress": 0, "evidence": "Drive plan workstream; completion not supplied" }
+				]
+			},
+			"slides": [
+				{
+					"title": "Zoe’s plan has no verified Git attribution this week",
+					"lead": "The shared action plan is included,\nwhile the separate ZoeZhao-AI identity\nremains unverified.",
+					"heading": "Evidence boundary",
+					"bullets": [
+						"• 90-day action plan created from the Development brief",
+						"• One generation-related branch commit\n  is not attributed to Zoe",
+						"• No confirmed person-level repo\n  activity in this window"
+					],
+					"commitTrailTitle": "Planning and attribution status",
+					"commitTrail": ["Plan source: Development · 90 Days.pages", "Branch evidence: 75f74c81b · ZoeZhao-AI", "Attribution: not verified"],
+					"caption": "Planning context and Git attribution are intentionally kept separate.",
+					"footer": "Plan included · 0 confirmed commits · attribution gap recorded",
+					"sources": ["Google Drive · Zoe — 90-Day Action Plan", "75f74c81b · unverified ZoeZhao-AI identity"]
+				}
+			]
+		},
+		{
+			"name": "Aashna Gaikwad",
+			"commitCount": 0,
+			"plan": {
+				"source": "Google Drive · Development/90 Days.pages · https://drive.google.com/file/d/1ostxdIkqvzP-cwSZXSKPVrSf2W3IsKH9/view",
+				"start": "2026-08-03",
+				"end": "2026-10-31",
+				"asOf": "2026-08-24",
+				"outcome": "Deliver useful dashboards for system health, content analytics, content health, and migrations.",
+				"previousObjective": "Bring analytics design mockups to the standup and begin an initial implementation.",
+				"milestones": [
+					{ "name": "Telemetry", "start": "2026-08-03", "end": "2026-08-24", "progress": 0, "evidence": "Drive plan workstream; completion not supplied" },
+					{ "name": "Content analytics", "start": "2026-08-25", "end": "2026-09-15", "progress": 0, "evidence": "Drive plan workstream; completion not supplied" },
+					{ "name": "Content health", "start": "2026-09-16", "end": "2026-10-07", "progress": 0, "evidence": "Drive plan workstream; completion not supplied" },
+					{ "name": "Migration dashboard", "start": "2026-10-08", "end": "2026-10-31", "progress": 0, "evidence": "Drive plan workstream; completion not supplied" }
+				]
+			},
+			"slides": [
+				{
+					"title": "Aashna established the dashboard planning baseline",
+					"lead": "A detailed 90-day plan and two\ndesign mockups define the early analytics\nwork.",
+					"heading": "Drive evidence",
+					"bullets": [
+						"• Error telemetry and article-usage\n  dashboard design mockups",
+						"• Five dashboard workstreams with a\n  30/60/90 delivery schedule",
+						"• No attributed repo activity\n  in this review window"
+					],
+					"commitTrailTitle": "Planning artefacts",
+					"commitTrail": ["90 day pland and big 5.docx", "01 · Article Usage Dashboard Wireframe.png", "02 · Error Telemetry Dashboard Wireframe.png"],
+					"caption": "Planning evidence only; it does not establish an implemented dashboard.",
+					"footer": "Plan included · 0 confirmed commits · Drive artefacts available",
+					"sources": ["Google Drive · Aashna Gaikwad — 90-Day Action Plan", "Google Drive · Aashna dashboard design mockups"]
+				}
+			]
+		},
+		{
+			"name": "MiyaC · unverified Git identity",
+			"commitCount": 1,
+			"slides": [
+				{
+					"title": "A branch commit overlaps the checkout workstream",
+					"lead": "One checkout commit uses the distinct\nGit identity MiyaC. It is not combined\nwith Miya’s work.",
+					"heading": "Repo evidence",
+					"bullets": ["• Added an organisation checkout-access flow", "• Appears on an origin feature branch", "• Identity relationship is not verifiable from Git"],
+					"commitTrailTitle": "Commit trail",
+					"commitTrail": ["ccf0d0e27  Add organisation access flow for checkout"],
+					"caption": "Git evidence only; identity and merge status remain unverified.",
+					"footer": "Evidence: ccf0d0e27 · origin/miya/checkout-organisation-access",
+					"sources": ["ccf0d0e27 · astro/src/pages/dashboard/organisation/_SignUp.tsx"]
+				}
+			]
+		},
+		{
+			"name": "ZoeZhao-AI · unverified Git identity",
+			"commitCount": 1,
+			"slides": [
+				{
+					"title": "A generation change appears on an origin feature branch",
+					"lead": "One OpenAI-generation commit is\nattributed to ZoeZhao-AI. Git evidence\ndoes not establish person-to-plan match.",
+					"heading": "Repo evidence",
+					"bullets": ["• Extended generation instructions for Arc and Problem", "• Repaired pre-existing Studio and export issues", "• Remains branch-level Git evidence"],
+					"commitTrailTitle": "Commit trail",
+					"commitTrail": ["75f74c81b  Extend generation instructions; fix Studio issues"],
+					"caption": "Git evidence only; the author identity is reported exactly as recorded.",
+					"footer": "Evidence: 75f74c81b · origin/feature/openai-migration",
+					"sources": ["75f74c81b · generation instructions and Studio exports"]
+				}
+			]
+		},
+		{
+			"name": "google-labs-jules[bot] · automated identity",
+			"commitCount": 45,
+			"slides": [
+				{
+					"title": "Automated branch work concentrated on maintenance",
+					"lead": "Forty-five commits use an automated\nGit identity. google-labs-jules[bot]\nis reported separately.",
+					"heading": "Automation summary",
+					"bullets": ["• Accessibility improvements for forms and controls", "• Compact export and schedule lookup refactors", "• Dependency and Knip config maintenance"],
+					"commitTrailTitle": "Representative commits",
+					"commitTrail": [
+						"2d941c8b3  Optimize schedule room lookups",
+						"e4e8f1f53  Enhance form and icon accessibility",
+						"33b92c258  Refactor compact export dialog",
+						"45d5d7598  Clean dependencies and Knip config"
+					],
+					"caption": "Git evidence only; branch integration and runtime impact were not verified.",
+					"footer": "45 commits · automated Git identity · all origin branches",
+					"sources": ["2d941c8b3 · schedule room slots", "e4e8f1f53 · form controls", "33b92c258 · compact export dialog", "45d5d7598 · dependency maintenance"]
+				}
+			]
+		}
+	],
+	"method": {
+		"title": "The evidence boundary is explicit",
+		"columns": [
+			{ "title": "Repo authority", "body": ["All origin branches", "Unique SHA analysis", "Merge commits separated"] },
+			{ "title": "Planning context", "body": ["Granola standup and check-ins", "Wispr Notetaker unavailable", "Drive plans read;\ndates and progress absent"] },
+			{ "title": "Runtime proof", "body": ["Two public local routes captured", "Protected dashboard redirected", "No deploy was triggered"] }
+		],
+		"footer": "A commit proves change; a screenshot proves observed local state; neither proves deployment."
+	}
+}

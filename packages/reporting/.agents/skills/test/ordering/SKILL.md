@@ -7,6 +7,8 @@ description: Plan and run Terra test suites in dependency order with efficient w
 
 Use this skill when deciding what to run, in which order, against which branch or deployment, or when a suite is expensive, stateful, or responsive.
 
+For selective responsive execution and deduplicating suite commands, follow [test ownership and viewport selection](../references/ownership-and-viewport-policy.md). Run only the viewports declared for each scenario; `PW_VIEWPORTS=all` names the available catalog and does not require every test at every width when the suite uses declared selection.
+
 ## Boundary
 
 Read the Playwright config, package scripts, test README, selected test files, fixture setup, and reporter configuration. Record:
