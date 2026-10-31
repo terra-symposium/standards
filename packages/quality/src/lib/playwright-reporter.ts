@@ -35,6 +35,11 @@ type PlaywrightTestCase = {
 	outcome?: () => 'skipped' | 'expected' | 'unexpected' | 'flaky';
 };
 
+export type QualityPlaywrightReporterOptions = {
+	write?: (text: string) => void;
+	writeProgress?: (text: string) => void;
+};
+
 /*//////////////////////////////////////////////////
 HELPERS
 //////////////////////////////////////////////////*/

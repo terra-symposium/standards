@@ -42,6 +42,10 @@ FIXTURES
 export const diagnosticsTest = base.extend({
 	page: async ({ page, context: ctx }, use, info): Promise<void> => {
 		const diagnostics: BrowserDiagnostic[] = [];
+		/**
+		 *
+		 * @param tgt
+		 */
 		const observe = (tgt: typeof page): void => {
 			tgt.on('console', (m) => {
 				if (!['error', 'warning'].includes(m.type())) return;
@@ -87,6 +91,10 @@ export const loadTest = diagnosticsTest.extend<{ load: LoadTestController }>({
 			const measurements: LoadMeasurementInput[] = [];
 			const pending: Promise<void>[] = [];
 			let testBudget: LoadBudgetOverride | undefined;
+			/**
+			 *
+			 * @param tgt
+			 */
 			const observe = (tgt: typeof page): void => {
 				tgt.on('load', () => {
 					if (!enabled || tgt.url() === 'about:blank') return;
@@ -128,10 +136,7 @@ export const loadTest = diagnosticsTest.extend<{ load: LoadTestController }>({
 				await Promise.all(pending);
 				if (enabled && (measurements.length || testBudget)) {
 					try {
-						await info.attach('load-testing', {
-							body: Buffer.from(JSON.stringify({ measurements, testBudget })),
-							contentType: 'application/json',
-						});
+						await info.attach('load-testing', { body: Buffer.from(JSON.stringify({ measurements, testBudget })), contentType: 'application/json' });
 					} catch {
 						// Preserve the test result if Playwright has already closed its attachment store.
 					}
@@ -223,15 +228,20 @@ HELPERS
 
 /**
  * Removes terminal color escapes before diagnostics enter an artifact.
+ *
+ * @param val
  * @param valerminal output that may contain ANSI escape sequences.
- * @returns Terminal output with ANSI formatting removed.
+ *
+ * @return Terminal output with ANSI formatting removed.
  */
 export const stripAnsi = (val: string): string => val.replace(new RegExp(`${String.fromCharCode(27)}\\[[0-?]*[ -/]*[@-~]`, 'g'), '');
 
 /**
  * Parses browser diagnostic attachments into readable artifact lines.
+ *
  * @param raw JSON attachment text or a plain diagnostic message.
- * @returns Normalized diagnostic lines.
+ *
+ * @return Normalized diagnostic lines.
  */
 export const parseDiagnostics = (raw: string): string[] => {
 	if (!raw) return [];
@@ -250,22 +260,29 @@ export const parseDiagnostics = (raw: string): string[] => {
 
 /**
  * Normalizes a terminal output chunk for diagnostic matching and storage.
+ *
  * @param chunk Terminal text or bytes emitted by Playwright.
- * @returns Trimmed, ANSI-free terminal text.
+ *
+ * @return Trimmed, ANSI-free terminal text.
  */
 const terminalText = (chunk: string | Buffer): string => stripAnsi(chunk.toString('utf8')).trim();
 
 /**
  * Identifies terminal output that should be retained as diagnostic evidence.
+ *
+ * @param val
  * @param valormalized terminal output.
- * @returns Whether the output contains a diagnostic keyword.
+ *
+ * @return Whether the output contains a diagnostic keyword.
  */
 const isTerminalDiagnostic = (val: string): boolean => /\b(?:error|errors|failed|failure|exception|warning|warn|timeout|requestfailed|pageerror)\b/i.test(val);
 
 /**
  * Reads an inline or file-backed Playwright attachment.
+ *
  * @param attachment Attachment metadata supplied by Playwright.
- * @returns Attachment text, or an empty string when it is unavailable.
+ *
+ * @return Attachment text, or an empty string when it is unavailable.
  */
 const readAttachment = (attachment: ReporterAttachment): string => {
 	if (attachment.body) return attachment.body.toString('utf8');
@@ -275,9 +292,11 @@ const readAttachment = (attachment: ReporterAttachment): string => {
 
 /**
  * Extracts one named JSON diagnostic attachment.
+ *
  * @param attachments Attachments emitted for one test result.
  * @param name Diagnostic attachment name to locate.
- * @returns Parsed diagnostic lines from the matching attachment.
+ *
+ * @return Parsed diagnostic lines from the matching attachment.
  */
 const diagnosticText = (attachments: readonly ReporterAttachment[], name: string): string[] => {
 	const attachment = attachments.find((v) => v.name === name && v.contentType === 'application/json');
@@ -288,8 +307,10 @@ const diagnosticText = (attachments: readonly ReporterAttachment[], name: string
 
 /**
  * Resolves the path of a captured screenshot attachment.
+ *
  * @param attachments Attachments emitted for one test result.
- * @returns Screenshot path, or an empty string when no screenshot exists.
+ *
+ * @return Screenshot path, or an empty string when no screenshot exists.
  */
 const screenshotAttachment = (attachments: readonly ReporterAttachment[]): ReporterAttachment | undefined =>
 	attachments.find((v) => ['visual', 'screenshot'].includes(v.name || '') && v.contentType === 'image/png');
@@ -416,7 +437,17 @@ const loadAttachment = (attachments: readonly ReporterAttachment[]): { measureme
 	}
 };
 
-/** Grades the test duration and attached page/operation samples for one result. */
+/**
+ * Grades the test duration and attached page/operation samples for one result.
+ *
+ * @param result
+ * @param id
+ * @param inputs
+ * @param testBudget
+ * @param cfg
+ *
+ * @return
+ */
 const addLoadMeasurements = (
 	result: VisualResult,
 	id: string,
@@ -434,10 +465,13 @@ const addLoadMeasurements = (
 
 /**
  * Creates the framework-neutral identity fields shared by all result records.
+ *
  * @param test Playwright test identity.
- * @param cfgdProjectgured Playwright project name.
+ * @param cfgdProject
  * @param viewportCatalog Catalog used to resolve viewport labels and sizes.
- * @returns Framework-neutral identity fields for a visual result.
+ * @param cfgdProjectgured Playwright project name.
+ *
+ * @return Framework-neutral identity fields for a visual result.
  */
 const testIdentity = (
 	test: { location: { file: string }; title: string; titlePath: () => string[] },
@@ -475,9 +509,12 @@ const testTitleParts = (test: { location: { file: string }; title: string; title
 
 /**
  * Generates a stable filename for a copied screenshot.
+ *
  * @param result Result whose identity contributes to the filename.
+ * @param idx
  * @param idxesult position used to keep duplicate names distinct.
- * @returns A filesystem-safe screenshot filename.
+ *
+ * @return A filesystem-safe screenshot filename.
  */
 const screenshotName = (result: VisualResult, idx: number): string => {
 	return `${String(idx + 1).padStart(4, '0')}-${
@@ -490,9 +527,12 @@ const screenshotName = (result: VisualResult, idx: number): string => {
 
 /**
  * Copies captured screenshots into the timestamped run directory.
+ *
  * @param results Results whose screenshot paths should be relocated.
+ * @param runDir
  * @param runDirtamped output directory for the current run.
- * @returns Results with copied screenshot paths.
+ *
+ * @return Results with copied screenshot paths.
  */
 const copyScreenshots = (results: readonly VisualResult[], runDir: string): VisualResult[] => {
 	const imgs = path.join(runDir, 'images');
@@ -505,7 +545,13 @@ const copyScreenshots = (results: readonly VisualResult[], runDir: string): Visu
 	});
 };
 
-/** Redacts personal identifiers and configured secrets from report text. */
+/**
+ * Redacts personal identifiers and configured secrets from report text.
+ *
+ * @param val
+ *
+ * @return
+ */
 const redactEvidence = (val: unknown): string => {
 	let text = Array.from(stripAnsi(String(val ?? '')))
 		.filter((c) => {
@@ -521,7 +567,13 @@ const redactEvidence = (val: unknown): string => {
 	return text.replaceAll(process.cwd(), '[workspace]');
 };
 
-/** Converts untrusted supplemental timing values to supported measurement inputs. */
+/**
+ * Converts untrusted supplemental timing values to supported measurement inputs.
+ *
+ * @param val
+ *
+ * @return
+ */
 const supplementalMeasurements = (val: unknown): LoadMeasurementInput[] => {
 	if (!Array.isArray(val)) return [];
 	return val.flatMap((e): LoadMeasurementInput[] => {
@@ -539,8 +591,21 @@ const supplementalMeasurements = (val: unknown): LoadMeasurementInput[] => {
 	});
 };
 
-/** Converts an optional structured results file into the shared row model. */
+/**
+ * Converts an optional structured results file into the shared row model.
+ *
+ * @param file
+ * @param loadTesting
+ *
+ * @return
+ */
 const supplementalResults = (file: string, loadTesting: ReturnType<typeof readLoadTestingConfig>): { results: VisualResult[]; diagnostics: string[] } => {
+	/**
+	 *
+	 * @param err
+	 *
+	 * @return
+	 */
 	const unavailable = (err: string): VisualResult => ({
 		browserErrors: '',
 		duration: 0,
@@ -632,9 +697,11 @@ export default class ProgressReporter {
 
 	/**
 	 * Records the full expected suite so interrupted tests can be represented.
+	 *
 	 * @param _config Playwright configuration supplied by the reporter lifecycle.
 	 * @param suite Playwright suite containing all discovered tests.
-	 * @returns Nothing; the expected-test registry is updated in place.
+	 *
+	 * @return Nothing; the expected-test registry is updated in place.
 	 */
 	onBegin(
 		_config: Parameters<NonNullable<import('@playwright/test/reporter').Reporter['onBegin']>>[0],
@@ -683,10 +750,12 @@ export default class ProgressReporter {
 
 	/**
 	 * Associates stderr with a test result or the run when no test is active.
+	 *
 	 * @param chunk Terminal output emitted by Playwright.
 	 * @param test Active test identity, when available.
 	 * @param result Active test result, when available.
-	 * @returns Nothing; diagnostic state is updated in place.
+	 *
+	 * @return Nothing; diagnostic state is updated in place.
 	 */
 	onStdErr(chunk: string | Buffer, test?: object, result?: object): void {
 		const val = terminalText(chunk);
@@ -700,10 +769,12 @@ export default class ProgressReporter {
 
 	/**
 	 * Retains diagnostic-looking stdout without treating ordinary output as failure evidence.
+	 *
 	 * @param chunk Terminal output emitted by Playwright.
 	 * @param test Active test identity, when available.
 	 * @param result Active test result, when available.
-	 * @returns Nothing; diagnostic state is updated in place.
+	 *
+	 * @return Nothing; diagnostic state is updated in place.
 	 */
 	onStdOut(chunk: string | Buffer, test?: object, result?: object): void {
 		const val = terminalText(chunk);
@@ -717,8 +788,10 @@ export default class ProgressReporter {
 
 	/**
 	 * Retains reporter-level errors in the run diagnostics.
+	 *
 	 * @param err Reporter-level error emitted by Playwright.
-	 * @returns Nothing; run diagnostics are updated in place.
+	 *
+	 * @return Nothing; run diagnostics are updated in place.
 	 */
 	onError(err: { message: string }): void {
 		this.runDiagnostics.push(err.message);
@@ -726,9 +799,11 @@ export default class ProgressReporter {
 
 	/**
 	 * Normalizes a completed Playwright result and associates its evidence.
+	 *
 	 * @param test Completed Playwright test case.
 	 * @param result Completed Playwright test result and attachments.
-	 * @returns Nothing; the normalized result is appended to the run.
+	 *
+	 * @return Nothing; the normalized result is appended to the run.
 	 */
 	onTestEnd(test: import('@playwright/test/reporter').TestCase, result: import('@playwright/test/reporter').TestResult): void {
 		this.completedTests.add(test.id);
@@ -811,7 +886,8 @@ export default class ProgressReporter {
 
 	/**
 	 * Emits interrupted results and writes the spreadsheet and slideshow artifacts.
-	 * @returns A promise that resolves after both report artifacts are written.
+	 *
+	 * @return A promise that resolves after both report artifacts are written.
 	 */
 	async onEnd(): Promise<'failed' | void> {
 		if (process.argv.includes('--list')) return;

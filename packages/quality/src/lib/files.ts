@@ -15,6 +15,10 @@ import { existsSync, readdirSync, statSync } from 'node:fs';
 // TYPES
 import type { QualityCfg } from './runner.js';
 
+/*//////////////////////////////////////////////////
+CONFIG
+//////////////////////////////////////////////////*/
+
 const SCAN_PRUNED_DIRS = new Set([
 	'.git',
 	'node_modules',
@@ -33,6 +37,7 @@ const SCAN_PRUNED_DIRS = new Set([
 	'.nuxt',
 	'.husky',
 ]);
+
 /*//////////////////////////////////////////////////
 HELPERS
 //////////////////////////////////////////////////*/
@@ -49,7 +54,13 @@ export function srcFiles(cfg: QualityCfg): string[] {
 	const exts = new Set(cfg.extensions);
 	const skippedFiles = new Set((cfg.skippedFiles ?? []).map((file) => resolve(cfg.root, file)));
 	const files: string[] = [];
-	const isSkippedDirectory = (dir: string): boolean => {
+	/**
+	 *
+	 * @param dir
+	 *
+	 * @return
+	 */
+	const isSkippedDir = (dir: string): boolean => {
 		const repoPath = relative(cfg.root, dir);
 		return (cfg.skippedDirectories ?? []).some((skipped) => {
 			const norm = normalize(skipped.replaceAll('\\', '/'));
@@ -59,13 +70,23 @@ export function srcFiles(cfg: QualityCfg): string[] {
 			return dir === skippedPath || dir.startsWith(`${skippedPath}${sep}`) || repoPath === norm;
 		});
 	};
+	/**
+	 *
+	 * @param file
+	 *
+	 * @return
+	 */
 	const isSkippedRootFile = (file: string): boolean => {
 		if (skippedFiles.has(resolve(file))) return true;
 		for (let dir = dirname(resolve(file)); ; dir = dirname(dir)) {
-			if (SCAN_PRUNED_DIRS.has(basename(dir)) || isSkippedDirectory(dir)) return true;
+			if (SCAN_PRUNED_DIRS.has(basename(dir)) || isSkippedDir(dir)) return true;
 			if (dir === cfg.root || dirname(dir) === dir) return false;
 		}
 	};
+	/**
+	 *
+	 * @param dir
+	 */
 	const walk = (dir: string): void => {
 		if (!existsSync(dir)) return;
 		const entry = statSync(dir);
@@ -73,7 +94,7 @@ export function srcFiles(cfg: QualityCfg): string[] {
 			if (!isSkippedRootFile(dir) && exts.has(dir.slice(dir.lastIndexOf('.')))) files.push(dir);
 			return;
 		}
-		if (!entry.isDirectory() || SCAN_PRUNED_DIRS.has(basename(dir)) || isSkippedDirectory(dir)) return;
+		if (!entry.isDirectory() || SCAN_PRUNED_DIRS.has(basename(dir)) || isSkippedDir(dir)) return;
 		for (const e of readdirSync(dir, { withFileTypes: true })) {
 			if (e.isDirectory()) {
 				if (!SCAN_PRUNED_DIRS.has(e.name)) walk(join(dir, e.name));

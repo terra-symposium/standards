@@ -1,6 +1,6 @@
 /**
+ * packages/quality/src/lib/language-profiles.ts
  * Built-in language profiles that connect repository sources to native quality tools.
- *
  * Profiles are data records so future languages can reuse the command runner without
  * adding another parser or rewriting the JavaScript and TypeScript analysis.
  */
@@ -9,17 +9,15 @@
 IMPORTS
 //////////////////////////////////////////////////*/
 
-// NODE
+// API
 import { existsSync } from 'node:fs';
-import { spawnSync } from 'node:child_process';
-import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-
-// PROJECT
+import { resolve } from 'node:path';
+import { spawnSync } from 'node:child_process';
 import { srcFiles } from './files.js';
 
 // TYPES
-import type { QualityAutofixName, QualityCheckName, QualityCfg } from './runner.js';
+import type { QualityAutofixName, QualityCfg, QualityCheckName } from './runner.js';
 
 /*//////////////////////////////////////////////////
 TYPES
@@ -29,12 +27,7 @@ TYPES
 export type LanguageQualityPhase = 'Format' | 'Static quality' | 'Tests' | 'Framework / type checks' | 'Build' | 'Repository health';
 
 /** Tool executable and the minimum version a profile has been checked against. */
-export type LanguageProfileTool = {
-	command: string;
-	versionArgs: string[];
-	minimumVersion: [number, number, number];
-	install: string;
-};
+export type LanguageProfileTool = { command: string; versionArgs: string[]; minimumVersion: [number, number, number]; install: string };
 
 /** One native command supplied by a language profile. */
 export type LanguageProfileCheck = {
@@ -50,32 +43,14 @@ export type LanguageProfileCheck = {
 	requiresCompiledClasses?: boolean;
 };
 
-/** Reusable source, tool, and command defaults for one language. */
-export type LanguageProfile = {
-	id: LanguageProfileId;
-	sourceExtensions: string[];
-	checks: LanguageProfileCheck[];
-};
-
 /** A selected profile command with its file arguments and prerequisite metadata resolved. */
-export type ResolvedLanguageCheck = LanguageProfileCheck & {
-	profileId: string;
-	files: string[];
-};
+export type ResolvedLanguageCheck = LanguageProfileCheck & { profileId: string; files: string[] };
 
 /** A profile check omitted because its source or optional project configuration is absent. */
-export type SkippedLanguageCheck = {
-	name: string;
-	profileId: string;
-	reason: string;
-};
+export type SkippedLanguageCheck = { name: string; profileId: string; reason: string };
 
 /** Resolved native checks and skip explanations for the selected profiles. */
-export type LanguageProfileResolution = {
-	checks: ResolvedLanguageCheck[];
-	skipped: SkippedLanguageCheck[];
-	failed: SkippedLanguageCheck[];
-};
+export type LanguageProfileResolution = { checks: ResolvedLanguageCheck[]; skipped: SkippedLanguageCheck[]; failed: SkippedLanguageCheck[] };
 
 /** Built-in check names that every language must explicitly support or explain as inapplicable. */
 export const QUALITY_CAPABILITY_CHECKS: readonly QualityCheckName[] = [
@@ -123,25 +98,32 @@ export const QUALITY_CAPABILITY_AUTOFIXES: readonly QualityAutofixName[] = [
 	'documentedCommands',
 ];
 
-export type QualityLanguage = 'js-ts' | LanguageProfileId;
+/**
+ *
+ */
 export type LanguageCapability = { status: 'supported' | 'not-applicable'; provider: string; reason?: string };
-export type LanguageCapabilityMap = {
-	checks: Record<QualityCheckName, LanguageCapability>;
-	autofixes: Record<QualityAutofixName, LanguageCapability>;
-};
 
-/** Creates a capability entry implemented by shared runner behavior.
+/**
+ * Creates a capability entry implemented by shared runner behavior.
+ *
  * @param provider Runner feature that supplies the check.
+ *
  * @return A supported capability record.
  */
 const shared = (provider = 'Terra Quality shared runner'): LanguageCapability => ({ status: 'supported', provider });
-/** Creates a capability entry implemented by a language-native tool.
+/**
+ * Creates a capability entry implemented by a language-native tool.
+ *
  * @param provider Native tool or configured command that supplies the check.
+ *
  * @return A supported capability record.
  */
 const native = (provider: string): LanguageCapability => ({ status: 'supported', provider });
-/** Creates an explicit capability entry for a check outside the language's scope.
+/**
+ * Creates an explicit capability entry for a check outside the language's scope.
+ *
  * @param reason Why the check does not apply to this language.
+ *
  * @return A not-applicable capability record.
  */
 const notApplicable = (reason: string): LanguageCapability => ({ status: 'not-applicable', provider: 'none', reason });
@@ -203,7 +185,7 @@ const NATIVE_AUTOFIXES: Record<LanguageProfileId, Partial<Record<QualityAutofixN
 };
 
 /** Full check and autofix disposition for every built-in language. */
-export const LANGUAGE_CAPABILITIES: Record<QualityLanguage, LanguageCapabilityMap> = {
+export const LANGUAGE_CAPABILITIES: Record<'js-ts' | LanguageProfileId, { checks: Record<QualityCheckName, LanguageCapability>; autofixes: Record<QualityAutofixName, LanguageCapability> }> = {
 	'js-ts': {
 		checks: Object.fromEntries(QUALITY_CAPABILITY_CHECKS.map((name) => [name, shared(name === 'document' ? 'Terra Quality JS/TS documentation analyzer' : 'Terra Quality JS/TS analyzer')])) as Record<
 			QualityCheckName,
@@ -274,7 +256,7 @@ export const LANGUAGE_PROFILE_IDS = ['c', 'java', 'python'] as const;
 export type LanguageProfileId = (typeof LANGUAGE_PROFILE_IDS)[number];
 
 /** Opinionated starter checks and install guidance, kept as data for easy extension. */
-export const LANGUAGE_PROFILES: readonly LanguageProfile[] = [
+export const LANGUAGE_PROFILES: readonly { id: LanguageProfileId; sourceExtensions: string[]; checks: LanguageProfileCheck[] }[] = [
 	{
 		id: 'c',
 		sourceExtensions: ['.c', '.h'],
@@ -513,8 +495,8 @@ export function resolveLanguageProfiles(cfg: QualityCfg): LanguageProfileResolut
 	for (const profileId of cfg.languageProfiles ?? []) {
 		const profile = LANGUAGE_PROFILES.find((candidate) => candidate.id === profileId);
 		if (!profile) continue;
-		const skippedDirectories = new Set([...(cfg.skippedDirectories ?? []), '.venv', 'venv', '__pycache__', '.tox', '.ruff_cache', '.pytest_cache', '.gradle', 'target', 'vendor', 'generated', 'out']);
-		const sourceFiles = srcFiles({ ...cfg, extensions: profile.sourceExtensions, skippedDirectories: [...skippedDirectories] });
+		const skippedDirs = new Set([...(cfg.skippedDirectories ?? []), '.venv', 'venv', '__pycache__', '.tox', '.ruff_cache', '.pytest_cache', '.gradle', 'target', 'vendor', 'generated', 'out']);
+		const sourceFiles = srcFiles({ ...cfg, extensions: profile.sourceExtensions, skippedDirectories: [...skippedDirs] });
 		if (!sourceFiles.length) {
 			for (const check of profile.checks) result.skipped.push({ name: check.name, profileId, reason: `no ${profileId} source files were found` });
 			continue;
@@ -554,9 +536,12 @@ export function resolveLanguageProfiles(cfg: QualityCfg): LanguageProfileResolut
 	return result;
 }
 
-/** Applies the runner's opt-in defaults without importing its runtime module.
+/**
+ * Applies the runner's opt-in defaults without importing its runtime module.
+ *
  * @param cfg Normalized project quality configuration.
  * @param check Quality check whose enablement should be evaluated.
+ *
  * @return Whether the profile check should run under the configured toggle.
  */
 function profileQualityCheckEnabled(cfg: QualityCfg, check: QualityCheckName): boolean {
@@ -579,9 +564,7 @@ export function inspectLanguageProfileTool(tool: LanguageProfileTool, cwd: strin
 	const output = `${result.stdout ?? ''}\n${result.stderr ?? ''}`;
 	const detected = parseVersion(output);
 	if (!detected) return { error: `Could not parse the version reported by "${tool.command}". ${tool.install}` };
-	if (compareVersions(detected, tool.minimumVersion) < 0) {
-		return { error: `"${tool.command}" ${detected.join('.')} is below the supported minimum ${tool.minimumVersion.join('.')}. ${tool.install}` };
-	}
+	if (compVersions(detected, tool.minimumVersion) < 0) return { error: `"${tool.command}" ${detected.join('.')} is below the supported minimum ${tool.minimumVersion.join('.')}. ${tool.install}` };
 	return { version: detected.join('.') };
 }
 
@@ -606,7 +589,7 @@ function parseVersion(output: string): [number, number, number] | undefined {
  *
  * @return Negative, zero, or positive according to version ordering.
  */
-function compareVersions(detected: [number, number, number], minimum: [number, number, number]): number {
+function compVersions(detected: [number, number, number], minimum: [number, number, number]): number {
 	for (let index = 0; index < detected.length; index++) {
 		if (detected[index] !== minimum[index]) return detected[index]! - minimum[index]!;
 	}

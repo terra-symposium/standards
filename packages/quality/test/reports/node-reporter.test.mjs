@@ -9,9 +9,18 @@ IMPORTS
 
 // API
 import assert from 'node:assert/strict';
+import defaultQualityNodeReporter, { qualityNodeReporter, qualityNodeReporterOptions } from '../../dist/lib/node-reporter.js';
 import test from 'node:test';
-import defaultQualityNodeReporter from '../../dist/lib/node-reporter.js';
-import { qualityNodeReporter, qualityNodeReporterOptions } from '../../dist/lib/node-reporter.js';
+
+/*//////////////////////////////////////////////////
+REGEX
+//////////////////////////////////////////////////*/
+
+/**
+ *
+ * @return
+ */
+const D_D_GU_REGEX = () => /(\d+\/\d+)/gu;
 
 /*//////////////////////////////////////////////////
 HELPERS
@@ -64,22 +73,19 @@ test('Node reporter reports nested cases once and ignores suite and child output
 		{ type: 'test:pass', data: { name: 'group', nesting: 0, file: 'quality.test.mjs', line: 10, testNumber: 5, details: { type: 'suite' } } },
 		{ type: 'test:complete', data: { name: 'quality.test.mjs', nesting: 0, file: '/repo/test/quality.test.mjs', line: 1, testNumber: 6, details: { type: 'test', passed: true } } },
 	]);
-
 	assert.equal(rendered.output, '  [SKIP] nested skip\n[FAIL] top failure — failure\nNode tests: 2 passed, 1 failed, 1 skipped\n');
 	assert.deepEqual(
-		[...rendered.progress.matchAll(/(\d+\/\d+)/gu)].map(([, count]) => count),
+		[...rendered.progress.matchAll(D_D_GU_REGEX())].map(([, count]) => count),
 		['1/4', '2/4', '3/4', '4/4'],
 	);
 	assert.doesNotMatch(rendered.output, /captured child|group/);
 });
-
 test('Node reporter renders an empty-run bar through the shared progress helper', async () => {
 	const rendered = await render([]);
 	assert.equal(rendered.output, 'Node tests: 0 passed, 0 failed, 0 skipped\n');
 	assert.match(rendered.progress, /0\/0/);
 	assert.match(rendered.progress, /\n$/);
 });
-
 test('Node reporter tracks concurrent, late-discovered cases and file-scoped ids on one bar', async () => {
 	const rendered = await render([
 		{ type: 'test:enqueue', data: { name: 'slow.test.mjs', nesting: 0, file: 'slow.test.mjs', line: 1, type: 'test' } },
@@ -101,10 +107,9 @@ test('Node reporter tracks concurrent, late-discovered cases and file-scoped ids
 		{ type: 'test:complete', data: { name: 'late.test.mjs', nesting: 0, file: 'late.test.mjs', line: 1, testNumber: 2, details: { type: 'test', passed: true } } },
 		{ type: 'test:summary', data: { counts: { tests: 3, passed: 2, failed: 1, skipped: 0, todo: 0, cancelled: 0 } } },
 	]);
-
 	assert.equal(rendered.output, '[FAIL] slow case — failed after running concurrently\nNode tests: 2 passed, 1 failed, 0 skipped\n');
 	assert.deepEqual(
-		[...rendered.progress.matchAll(/(\d+\/\d+)/gu)].map(([, count]) => count),
+		[...rendered.progress.matchAll(D_D_GU_REGEX())].map(([, count]) => count),
 		['1/2', '2/3', '3/3'],
 	);
 	assert.equal((rendered.progress.match(/\n/gu) ?? []).length, 1);
@@ -119,7 +124,6 @@ test('Node reporter options replace inherited reporters and preserve unrelated r
 		'--test-reporter=file:///quality-reporter.js --test-reporter-destination=stdout',
 	);
 });
-
 test('Node reporter ignores reporter API context values that are not progress writers', async () => {
 	const stderr = [];
 	const originalWrite = process.stderr.write;
@@ -134,9 +138,7 @@ test('Node reporter ignores reporter API context values that are not progress wr
 	} finally {
 		process.stderr.write = originalWrite;
 	}
-
 	assert.match(stderr.join(''), /Cases .*0\/0/u);
-
 	const nestedOutput = [];
 	const originalReporterState = process.env.TERRA_QUALITY_NODE_REPORTER_OWNER;
 	process.env.TERRA_QUALITY_NODE_REPORTER_OWNER = '1';

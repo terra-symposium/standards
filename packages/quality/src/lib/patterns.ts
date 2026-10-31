@@ -23,47 +23,69 @@ import type { QualityAnalysis, QualityCfg } from './runner.js';
 REGEX
 //////////////////////////////////////////////////*/
 
+/**
+ *
+ * @return
+ */
 const A_ZA_Z0_9_G_REGEX = () => /[^A-Za-z0-9]+/g;
+/**
+ *
+ * @return
+ */
 const G_REGEX = () => /^_+|_+$/g;
+/**
+ *
+ * @return
+ */
 const G_CLASS_2 = () => /\\/g;
+/**
+ *
+ * @return
+ */
 const EXPORT_CONST_A_ZA_Z_W_B_GM_REGEX = () => /^export const ([A-Za-z_$][\w$]*)\b/gm;
 
 /*//////////////////////////////////////////////////
 REGEX
 //////////////////////////////////////////////////*/
 
+/**
+ *
+ * @return
+ */
 const S_G_REGEX = () => /\s+/g;
 
 /*//////////////////////////////////////////////////
 REGEX
 //////////////////////////////////////////////////*/
 
-/** One repeated static class value and its source locations. */
-export type RepeatedClassFinding = { value: string; count: number; locations: string[] };
-
-/** A configured UI pattern and the file that contains it. */
-export type UiPatternFinding = { file: string; pattern: string };
-
 /** Counts exact edits applied and conservative candidates left for review. */
 export type PatternFixResult = { fixed: number; skipped: number };
 
-/** One repeated regular-expression source and its source locations. */
-export type RegexFinding = { source: string; count: number; locations: string[] };
-
 /** A repeated collection lookup inside another collection callback. */
 export type PerformancePatternFinding = { file: string; line: number; column: number; method: string; receiver: string; recommendation: string };
-
 const COLLECTION_CALLBACKS = new Set(['filter', 'flatMap', 'forEach', 'map', 'reduce', 'some']);
 const REPEATED_LOOKUPS = new Set(['find', 'filter', 'includes', 'indexOf', 'some']);
 
-/** Returns a stable receiver expression suitable for a manual indexing recommendation. */
+/**
+ * Returns a stable receiver expression suitable for a manual indexing recommendation.
+ *
+ * @param node
+ *
+ * @return
+ */
 function stableReceiver(node: ts.Expression): string | undefined {
 	if (ts.isIdentifier(node)) return node.text;
 	if (ts.isPropertyAccessExpression(node) && ts.isIdentifier(node.expression)) return node.getText();
 	return undefined;
 }
 
-/** Finds the nearest enclosing function passed directly to a collection method. */
+/**
+ * Finds the nearest enclosing function passed directly to a collection method.
+ *
+ * @param node
+ *
+ * @return
+ */
 function collectionCallback(node: ts.Node): ts.CallExpression | undefined {
 	for (let current: ts.Node | undefined = node.parent; current; current = current.parent) {
 		if (!ts.isFunctionLike(current)) continue;
@@ -75,13 +97,20 @@ function collectionCallback(node: ts.Node): ts.CallExpression | undefined {
 	return undefined;
 }
 
-/** Reports repeated linear lookups nested in collection callbacks without changing source. */
+/**
+ * Reports repeated linear lookups nested in collection callbacks without changing source.
+ *
+ * @param cfg
+ * @param analysis
+ *
+ * @return
+ */
 export function performancePatternFindings(cfg: QualityCfg, analysis?: QualityAnalysis): PerformancePatternFinding[] {
 	const settings = cfg.performancePatterns;
 	if (!settings) return [];
-	const extensions = new Set(settings.extensions ?? ['.js', '.jsx', '.ts', '.tsx']);
+	const exts = new Set(settings.extensions ?? ['.js', '.jsx', '.ts', '.tsx']);
 	const ignoredFiles = new Set(settings.ignoredFiles ?? []);
-	const files = (analysis?.files ?? srcFiles({ ...cfg, extensions: [...extensions] })).filter((file) => extensions.has(file.slice(file.lastIndexOf('.'))));
+	const files = (analysis?.files ?? srcFiles({ ...cfg, extensions: [...exts] })).filter((file) => exts.has(file.slice(file.lastIndexOf('.'))));
 	const findings: PerformancePatternFinding[] = [];
 	for (const file of files) {
 		const display = displayPath(cfg, file);
@@ -89,6 +118,10 @@ export function performancePatternFindings(cfg: QualityCfg, analysis?: QualityAn
 		const text = analysis?.texts.get(file) ?? readFileSync(file, 'utf8');
 		const source = analysis?.sources.get(file) ?? ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, regexScriptKind(file));
 		if ((source as ts.SourceFile & { parseDiagnostics?: readonly ts.Diagnostic[] }).parseDiagnostics?.length) continue;
+		/**
+		 *
+		 * @param node
+		 */
 		const visit = (node: ts.Node): void => {
 			if (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression) && REPEATED_LOOKUPS.has(node.expression.name.text) && collectionCallback(node)) {
 				const receiver = stableReceiver(node.expression.expression);
@@ -123,7 +156,7 @@ HELPERS
  *
  * @return Repeated static class strings that meet the configured minimum count.
  */
-export function repeatedClassFindings(cfg: QualityCfg, analysis?: QualityAnalysis): RepeatedClassFinding[] {
+export function repeatedClassFindings(cfg: QualityCfg, analysis?: QualityAnalysis): { value: string; count: number; locations: string[] }[] {
 	const settings = cfg.repeatedClasses ?? {};
 	const minimum = settings.minimumCount ?? 3;
 	const exts = new Set(settings.extensions ?? ['.astro', '.html', '.js', '.jsx', '.ts', '.tsx']);
@@ -322,7 +355,7 @@ export function fixRepeatedClasses(cfg: QualityCfg, analysis?: QualityAnalysis):
  *
  * @return Matching file/pattern pairs that should use shared UI primitives.
  */
-export function uiPatternFindings(cfg: QualityCfg, analysis?: QualityAnalysis): UiPatternFinding[] {
+export function uiPatternFindings(cfg: QualityCfg, analysis?: QualityAnalysis): { file: string; pattern: string }[] {
 	const settings = cfg.uiPatterns ?? {};
 	const patterns = (settings.forbidden ?? []).map((p) => [p, new RegExp(p, 'm')] as const);
 	const exts = settings.extensions ?? ['.astro', '.html', '.jsx', '.tsx'];
@@ -421,6 +454,7 @@ function locationAt(src: string, offset: number): { line: number; column: number
  *
  * @param cfg Quality configuration containing the Tailwind stylesheet and source roots.
  * @param fix Whether canonical replacements should be written to source files.
+ * @param output
  *
  * @return Promise resolving to zero after diagnostics or fixes complete.
  */
@@ -546,13 +580,13 @@ const REGEX_REGISTRY_MARKER = '// Generated by @terra-symposium/standards-qualit
 const REGEX_DECLARATION_MARKER = '// Generated by @terra-symposium/standards-quality regex-dedup. Do not edit.';
 /** Parsed regular-expression candidate and the source context needed to rewrite it safely. */
 type RegexCandidate = { file: string; source: string; expression: string; node: ts.Node; ast: ts.SourceFile; rewritable: boolean };
-/** State read from or written to the optional shared regex module and declaration file. */
-type RegexRegistry = { module: string; declaration: string; names: Set<string>; keys: Map<string, string>; owned: boolean };
 
 /**
  * Selects the TypeScript parser mode for the given source extension.
+ *
  * @param file Source filename used to identify JavaScript, JSX, or TypeScript syntax.
- * @returns The matching TypeScript compiler script kind.
+ *
+ * @return The matching TypeScript compiler script kind.
  */
 function regexScriptKind(file: string): ts.ScriptKind {
 	if (/\.tsx$/.test(file)) return ts.ScriptKind.TSX;
@@ -578,6 +612,10 @@ function regexCandidates(cfg: QualityCfg, analysis?: QualityAnalysis): RegexCand
 		const src = analysis?.texts.get(file) ?? readFileSync(file, 'utf8');
 		const ast = analysis?.sources.get(file) ?? ts.createSourceFile(file, src, ts.ScriptTarget.Latest, true, regexScriptKind(file));
 		const shadowedRegExp = hasRegExpBinding(ast);
+		/**
+		 *
+		 * @param node
+		 */
 		const visit = (node: ts.Node): void => {
 			if (ts.isRegularExpressionLiteral(node) && !isGenLocalRegex(node, ast)) {
 				const literal = node.getText(ast);
@@ -599,9 +637,11 @@ function regexCandidates(cfg: QualityCfg, analysis?: QualityAnalysis): RegexCand
 }
 /**
  * Checks whether a regex literal belongs to a generated local `_REGEX` declaration.
+ *
  * @param node Regular-expression literal to classify.
  * @param ast Parsed source file containing the literal.
- * @returns Whether the declaration is in the generated `REGEX` section.
+ *
+ * @return Whether the declaration is in the generated `REGEX` section.
  */
 function isGenLocalRegex(node: ts.RegularExpressionLiteral, ast: ts.SourceFile): boolean {
 	let declaration: ts.VariableDeclaration | undefined;
@@ -618,15 +658,27 @@ function isGenLocalRegex(node: ts.RegularExpressionLiteral, ast: ts.SourceFile):
 }
 /**
  * Detects bindings that shadow the global `RegExp` constructor.
+ *
  * @param ast Parsed source file to inspect.
- * @returns Whether the file declares, imports, or catches a binding named `RegExp`.
+ *
+ * @return Whether the file declares, imports, or catches a binding named `RegExp`.
  */
 function hasRegExpBinding(ast: ts.SourceFile): boolean {
+	/**
+	 *
+	 * @param name
+	 *
+	 * @return
+	 */
 	const bindingHasRegExp = (name: ts.BindingName): boolean => {
 		if (ts.isIdentifier(name)) return name.text === 'RegExp';
 		return name.elements.some((e) => ts.isBindingElement(e) && bindingHasRegExp(e.name));
 	};
 	let found = false;
+	/**
+	 *
+	 * @param node
+	 */
 	const visit = (node: ts.Node): void => {
 		if (found) return;
 		if (
@@ -647,9 +699,11 @@ function hasRegExpBinding(ast: ts.SourceFile): boolean {
 }
 /**
  * Groups parsed regex candidates by their exact source representation.
+ *
  * @param cfg Quality configuration defining source roots and extensions.
  * @param analysis Optional shared analysis context for reusing parsed sources.
- * @returns Candidate groups keyed by regex source and flags.
+ *
+ * @return Candidate groups keyed by regex source and flags.
  */
 function regexGroups(cfg: QualityCfg, analysis?: QualityAnalysis): Map<string, RegexCandidate[]> {
 	const groups = new Map<string, RegexCandidate[]>();
@@ -665,7 +719,7 @@ function regexGroups(cfg: QualityCfg, analysis?: QualityAnalysis): Map<string, R
  *
  * @return Duplicate regular-expression sources and their source locations.
  */
-export function regexFindings(cfg: QualityCfg, analysis?: QualityAnalysis): RegexFinding[] {
+export function regexFindings(cfg: QualityCfg, analysis?: QualityAnalysis): { source: string; count: number; locations: string[] }[] {
 	const minimum = cfg.regexDedup?.minimumCount ?? 2;
 	return [...regexGroups(cfg, analysis)]
 		.filter(([, c]) => c.length >= minimum)
@@ -679,9 +733,11 @@ export function regexFindings(cfg: QualityCfg, analysis?: QualityAnalysis): Rege
 }
 /**
  * Determines whether a consumer file uses ECMAScript module syntax.
+ *
  * @param cfg Quality configuration defining the repository root.
  * @param file Consumer source filename whose nearest package metadata is inspected.
- * @returns Whether the file is an ESM consumer.
+ *
+ * @return Whether the file is an ESM consumer.
  */
 function isEsmConsumer(cfg: QualityCfg, file: string): boolean {
 	if (/\.(?:mjs|mts)$/.test(file)) return true;
@@ -701,9 +757,11 @@ function isEsmConsumer(cfg: QualityCfg, file: string): boolean {
 }
 /**
  * Creates a unique exported constant name from a regex source string.
+ *
  * @param src Regex source used to derive a readable identifier.
  * @param used Identifiers already present in the shared module.
- * @returns The reserved, collision-free export name.
+ *
+ * @return The reserved, collision-free export name.
  */
 function regexExportName(src: string, used: Set<string>): string {
 	const slug = src.replace(A_ZA_Z0_9_G_REGEX(), '_').replace(G_REGEX(), '').slice(0, 60).toUpperCase() || 'PATTERN';
@@ -716,11 +774,13 @@ function regexExportName(src: string, used: Set<string>): string {
 }
 /**
  * Reads the generated shared-regex registry when both files are owned by this tool.
+ *
  * @param modulePath Shared ECMAScript module path.
  * @param declarationPath TypeScript declaration path paired with the module.
- * @returns Parsed registry state, or `null` when an existing file is user-owned.
+ *
+ * @return Parsed registry state, or `null` when an existing file is user-owned.
  */
-function readRegexRegistry(modulePath: string, declarationPath: string): RegexRegistry | null {
+function readRegexRegistry(modulePath: string, declarationPath: string): { module: string; declaration: string; names: Set<string>; keys: Map<string, string>; owned: boolean } | null {
 	const moduleExists = existsSync(modulePath);
 	const declarationExists = existsSync(declarationPath);
 	const module = moduleExists ? readFileSync(modulePath, 'utf8') : `${REGEX_REGISTRY_MARKER}\n`;
@@ -740,8 +800,10 @@ function readRegexRegistry(modulePath: string, declarationPath: string): RegexRe
 }
 /**
  * Builds the declaration file matching the registry's exported regex factories.
+ *
  * @param module Shared module source whose exports determine the declarations.
- * @returns TypeScript declaration source for the exported constants.
+ *
+ * @return TypeScript declaration source for the exported constants.
  */
 function declarationFor(module: string): string {
 	const names = [...new Set([...module.matchAll(EXPORT_CONST_A_ZA_Z_W_B_GM_REGEX())].map((m) => m[1]!))].sort();
@@ -749,9 +811,11 @@ function declarationFor(module: string): string {
 }
 /**
  * Creates the module specifier from a consumer file to the shared registry module.
+ *
  * @param file Consumer source filename.
  * @param modulePath Shared module filename.
- * @returns A normalized relative module specifier.
+ *
+ * @return A normalized relative module specifier.
  */
 function moduleSpecifier(file: string, modulePath: string): string {
 	let specifier = relative(dirname(file), modulePath).replace(G_CLASS_2(), '/');
@@ -760,10 +824,12 @@ function moduleSpecifier(file: string, modulePath: string): string {
 }
 /**
  * Finds an existing namespace import for the shared registry module.
+ *
  * @param ast Parsed consumer source file.
  * @param file Consumer source filename used to resolve import specifiers.
  * @param modulePath Resolved shared module filename.
- * @returns The imported namespace identifier, if the module is already imported.
+ *
+ * @return The imported namespace identifier, if the module is already imported.
  */
 function namespaceImport(ast: ts.SourceFile, file: string, modulePath: string): string | undefined {
 	for (const statement of ast.statements) {
@@ -775,11 +841,13 @@ function namespaceImport(ast: ts.SourceFile, file: string, modulePath: string): 
 }
 /**
  * Adds a namespace import after directives and existing imports.
+ *
  * @param src Consumer source text to update.
  * @param ast Parsed consumer source used to locate the import boundary.
  * @param alias Local name for the shared module namespace.
  * @param specifier Module specifier to import.
- * @returns Source text with the import inserted in the existing import group.
+ *
+ * @return Source text with the import inserted in the existing import group.
  */
 function insertNamespaceImport(src: string, ast: ts.SourceFile, alias: string, specifier: string): string {
 	const line = `import * as ${alias} from '${specifier}';`;
@@ -807,11 +875,17 @@ function insertNamespaceImport(src: string, ast: ts.SourceFile, alias: string, s
 }
 /**
  * Collects every identifier spelling already used in a source file.
+ *
  * @param ast Parsed source file to inspect.
- * @returns Identifier names used for collision checks.
+ *
+ * @return Identifier names used for collision checks.
  */
 function identifierNames(ast: ts.SourceFile): Set<string> {
 	const names = new Set<string>();
+	/**
+	 *
+	 * @param node
+	 */
 	const visit = (node: ts.Node): void => {
 		if (ts.isIdentifier(node)) names.add(node.text);
 		ts.forEachChild(node, visit);
@@ -821,9 +895,11 @@ function identifierNames(ast: ts.SourceFile): Set<string> {
 }
 /**
  * Checks that generated JavaScript or TypeScript source parses successfully.
+ *
  * @param file Output filename used to select the parser mode.
  * @param src Candidate source text to validate.
- * @returns Whether the candidate has no parse diagnostics.
+ *
+ * @return Whether the candidate has no parse diagnostics.
  */
 function validRegexOutput(file: string, src: string): boolean {
 	if (file.endsWith('.d.mts')) {
@@ -889,9 +965,11 @@ export function fixRegexDedup(cfg: QualityCfg, analysis?: QualityAnalysis): Patt
 }
 /**
  * Rewrites eligible duplicate regexes to factories in the configured shared module.
+ *
  * @param cfg Quality configuration containing the shared module and source scope.
  * @param analysis Optional shared analysis context for reusing parsed sources.
- * @returns Counts of shared fixes applied and candidates left for review.
+ *
+ * @return Counts of shared fixes applied and candidates left for review.
  */
 function fixRegexDedupShared(cfg: QualityCfg, analysis?: QualityAnalysis): PatternFixResult {
 	const sharedModule = cfg.regexDedup!.sharedModule!;

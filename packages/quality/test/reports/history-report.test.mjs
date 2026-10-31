@@ -1,11 +1,24 @@
+/**
+ * packages/quality/test/reports/history-report.test.mjs
+ */
+
+/*//////////////////////////////////////////////////
+IMPORTS
+//////////////////////////////////////////////////*/
+
+// API
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync, readFileSync, renameSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 import test from 'node:test';
 import { createHistoryReport, isHistorySourcePath } from '../../dist/lib/history-report.js';
+import { execFileSync } from 'node:child_process';
+import { join } from 'node:path';
+import { mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { runQualityFromCfg } from '../../dist/lib/runner.js';
+import { tmpdir } from 'node:os';
+
+/*//////////////////////////////////////////////////
+HELPERS
+//////////////////////////////////////////////////*/
 
 /**
  * Run a Git fixture command with a stable author and committer date.
@@ -28,6 +41,11 @@ function historyFixture() {
 	git(root, ['init', '-q']);
 	git(root, ['config', 'user.name', 'Terra Test']);
 	git(root, ['config', 'user.email', 'terra@example.test']);
+	/**
+	 *
+	 * @param path
+	 * @param contents
+	 */
 	const write = (path, contents) => {
 		const tgt = join(root, path);
 		mkdirSync(join(tgt, '..'), { recursive: true });
@@ -52,7 +70,6 @@ function historyFixture() {
 	const headSha = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim();
 	return { root, firstSha, secondSha, headSha };
 }
-
 test('full snapshots include dates, source totals, and source-only changes across renames', () => {
 	const { root, firstSha, headSha } = historyFixture();
 	try {
@@ -76,14 +93,12 @@ test('full snapshots include dates, source totals, and source-only changes acros
 		rmSync(root, { recursive: true, force: true });
 	}
 });
-
 test('history scope includes tests and excludes generated, vendor, documentation, dependency, build and configuration files', () => {
 	assert.equal(isHistorySourcePath('src/main.ts'), true);
 	assert.equal(isHistorySourcePath('test/main.test.ts'), true);
 	for (const path of ['node_modules/a.ts', 'vendor/a.py', 'dist/a.js', 'docs/example.ts', 'src/generated/a.ts', 'src/vite.config.ts', 'tsconfig.json'])
 		assert.equal(isHistorySourcePath(path), false, path);
 });
-
 test('push deltas contain commits after the supplied base and the CLI writes schema version 1', () => {
 	const { root, secondSha, headSha } = historyFixture();
 	const oldRepo = process.env.GITHUB_REPOSITORY;
@@ -118,13 +133,17 @@ test('push deltas contain commits after the supplied base and the CLI writes sch
 		rmSync(root, { recursive: true, force: true });
 	}
 });
-
 test('merge commits count source changes against their first parent', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-merge-'));
 	try {
 		git(root, ['init', '-q', '--initial-branch=main']);
 		git(root, ['config', 'user.name', 'Terra Test']);
 		git(root, ['config', 'user.email', 'terra@example.test']);
+		/**
+		 *
+		 * @param path
+		 * @param contents
+		 */
 		const write = (path, contents) => {
 			const tgt = join(root, path);
 			mkdirSync(join(tgt, '..'), { recursive: true });

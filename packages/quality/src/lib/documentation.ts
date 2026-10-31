@@ -20,6 +20,13 @@ import type { QualityAnalysis, QualityCfg } from './runner.js';
 REGEX
 //////////////////////////////////////////////////*/
 
+const N_REGEX = /(?<=\n)/;
+const R_N_END_REGEX = /\r?\n$/;
+
+/*//////////////////////////////////////////////////
+REGEX
+//////////////////////////////////////////////////*/
+
 const TYPE_S_REGEX = /^type\s+/;
 
 /*//////////////////////////////////////////////////
@@ -27,6 +34,10 @@ REGEX
 //////////////////////////////////////////////////*/
 
 const R_N_REGEX = /\r?\n/;
+/**
+ *
+ * @return
+ */
 const S_S_G_REGEX = () => /\/\*\*[\s\S]*?\*\//g;
 
 /*//////////////////////////////////////////////////
@@ -55,23 +66,26 @@ type SrcGroup = 'CONFIG' | 'HELPERS';
 export type DocumentationRequirements = { types?: boolean; functions?: boolean; exportedFunctions?: boolean; noInlineFunctions?: boolean };
 /** A repeated named import reported within one source file. */
 export type DuplicateImportFinding = { file: string; line: number; module: string };
-/** A deprecated pnpm directory flag inside a configured documentation command block. */
-export type DocumentedCommandFinding = { file: string; line: number; command: string; recommendation: string };
-
 const PNPM_FENCE = /^\s*```(?:sh|bash|zsh|shell)\s*$/i;
 const FENCE_CLOSE = /^\s*```\s*$/;
-const PNPM_DIRECTORY_FLAG = /^(\s*(?:\$\s*)?pnpm)\s+(?:-C|--prefix)(\s+)("[^"]+"|'[^']+'|\S+)(.*)$/;
+const PNPM_DIR_FLAG = /^(\s*(?:\$\s*)?pnpm)\s+(?:-C|--prefix)(\s+)("[^"]+"|'[^']+'|\S+)(.*)$/;
 
-/** Finds obsolete pnpm directory flags in configured Markdown shell fences. */
-export function documentedCommandFindings(cfg: QualityCfg): DocumentedCommandFinding[] {
+/**
+ * Finds obsolete pnpm directory flags in configured Markdown shell fences.
+ *
+ * @param cfg
+ *
+ * @return
+ */
+export function documentedCommandFindings(cfg: QualityCfg): { file: string; line: number; command: string; recommendation: string }[] {
 	const roots = cfg.documentation?.commandRoots?.map((path) => resolve(cfg.root, path)) ?? [];
 	if (!roots.length) return [];
 	return srcFiles({ ...cfg, sourceRoots: roots, extensions: ['.md', '.mdx'] }).flatMap((file) => {
 		const source = readFileSync(file, 'utf8');
-		const lines = source.split(/(?<=\n)/);
+		const lines = source.split(N_REGEX);
 		let inShellFence = false;
-		return lines.flatMap((segment, index) => {
-			const line = segment.replace(/\r?\n$/, '');
+		return lines.flatMap((segment, i) => {
+			const line = segment.replace(R_N_END_REGEX, '');
 			if (!inShellFence) {
 				if (PNPM_FENCE.test(line)) inShellFence = true;
 				return [];
@@ -80,13 +94,19 @@ export function documentedCommandFindings(cfg: QualityCfg): DocumentedCommandFin
 				inShellFence = false;
 				return [];
 			}
-			const match = PNPM_DIRECTORY_FLAG.exec(line);
-			return match ? [{ file: displayPath(cfg, file), line: index + 1, command: line.trim(), recommendation: 'replace the pnpm directory flag with --dir' }] : [];
+			const match = PNPM_DIR_FLAG.exec(line);
+			return match ? [{ file: displayPath(cfg, file), line: i + 1, command: line.trim(), recommendation: 'replace the pnpm directory flag with --dir' }] : [];
 		});
 	});
 }
 
-/** Replaces only known deprecated pnpm directory flags in configured Markdown shell fences. */
+/**
+ * Replaces only known deprecated pnpm directory flags in configured Markdown shell fences.
+ *
+ * @param cfg
+ *
+ * @return
+ */
 export function fixDocumentedCommands(cfg: QualityCfg): number {
 	const roots = cfg.documentation?.commandRoots?.map((path) => resolve(cfg.root, path)) ?? [];
 	if (!roots.length) return 0;
@@ -95,9 +115,9 @@ export function fixDocumentedCommands(cfg: QualityCfg): number {
 		const source = readFileSync(file, 'utf8');
 		let inShellFence = false;
 		const updated = source
-			.split(/(?<=\n)/)
+			.split(N_REGEX)
 			.map((segment) => {
-				const line = segment.replace(/\r?\n$/, '');
+				const line = segment.replace(R_N_END_REGEX, '');
 				const lineEnding = segment.slice(line.length);
 				if (!inShellFence) {
 					if (PNPM_FENCE.test(line)) inShellFence = true;
@@ -107,7 +127,7 @@ export function fixDocumentedCommands(cfg: QualityCfg): number {
 					inShellFence = false;
 					return segment;
 				}
-				const match = PNPM_DIRECTORY_FLAG.exec(line);
+				const match = PNPM_DIR_FLAG.exec(line);
 				if (!match) return segment;
 				fixed++;
 				return `${match[1]} --dir${match[2]}${match[3]}${match[4]}${lineEnding}`;
@@ -357,6 +377,14 @@ function groupedImports(parsed: ts.SourceFile, imports: ts.ImportDeclaration[]):
 	/** Information preserved while import declarations are merged and re-emitted. */
 	type MergedImport = { group: ImportGroup; source: string; module: string; typeOnly: boolean; defaultName?: string; namespace?: string; named: Set<string> };
 	const merged = new Map<string, MergedImport>();
+	/**
+	 *
+	 * @param group
+	 * @param n
+	 * @param typeOnly
+	 *
+	 * @return
+	 */
 	const get = (group: ImportGroup, n: ts.ImportDeclaration, typeOnly: boolean) => {
 		const src = importSrc(n);
 		const key = `${group}|${typeOnly ? 'type|' : ''}${src}`;
@@ -441,6 +469,10 @@ function srcSection(label: SrcGroup, statements: string[], eol: string): string 
 function literalSpans(src: string, fileName: string): { start: number; end: number }[] {
 	const parsed = ts.createSourceFile(fileName, src, ts.ScriptTarget.Latest, true, srcKind(fileName));
 	const spans: { start: number; end: number }[] = [];
+	/**
+	 *
+	 * @param n
+	 */
 	const visit = (n: ts.Node): void => {
 		if (ts.isStringLiteral(n) || ts.isRegularExpressionLiteral(n) || ts.isNoSubstitutionTemplateLiteral(n) || ts.isTemplateExpression(n) || ts.isJsxText(n)) {
 			spans.push({ start: n.getStart(parsed), end: n.end });
@@ -471,6 +503,12 @@ function normCommentLayout(src: string, fileName: string, eol: string): string {
 		offset += t.length + nlineSize;
 		return line;
 	});
+	/**
+	 *
+	 * @param line
+	 *
+	 * @return
+	 */
 	const protectedLine = (line: { start: number }): boolean => {
 		let low = 0;
 		let high = spans.length - 1;
@@ -483,8 +521,26 @@ function normCommentLayout(src: string, fileName: string, eol: string): string {
 		}
 		return false;
 	};
+	/**
+	 *
+	 * @param i
+	 *
+	 * @return
+	 */
 	const sectionOpen = (i: number): boolean => !protectedLine(lines[i]) && /^\s*\/\*\/{10,}\s*$/.test(lines[i].text);
+	/**
+	 *
+	 * @param i
+	 *
+	 * @return
+	 */
 	const sectionClose = (i: number): boolean => !protectedLine(lines[i]) && /^\s*\/{10,}\*\/\s*$/.test(lines[i].text);
+	/**
+	 *
+	 * @param i
+	 *
+	 * @return
+	 */
 	const lineGroup = (i: number): boolean => !protectedLine(lines[i]) && /^\s*\/\/ [A-Z][A-Z0-9 _-]*\s*$/.test(lines[i].text);
 
 	// Remove an empty section immediately followed by another section.
@@ -498,6 +554,9 @@ function normCommentLayout(src: string, fileName: string, eol: string): string {
 		}
 	}
 	const out: string[] = [];
+	/**
+	 *
+	 */
 	const pushBlank = (): void => {
 		if (out.length && out.at(-1) !== '') out.push('');
 	};
@@ -528,6 +587,12 @@ function normCommentLayout(src: string, fileName: string, eol: string): string {
 		if (l !== '') return true;
 		const prev = out[i - 1] ?? '';
 		const following = out[i + 1] ?? '';
+		/**
+		 *
+		 * @param textVal
+		 *
+		 * @return
+		 */
 		const comment = (textVal: string): boolean => S_CLASS_2.test(textVal);
 		return comment(prev) || comment(following);
 	});
@@ -545,6 +610,10 @@ function normCommentLayout(src: string, fileName: string, eol: string): string {
 function removeManagedSects(src: string, fileName: string): string {
 	const parsed = ts.createSourceFile(fileName, src, ts.ScriptTarget.Latest, true, srcKind(fileName));
 	const literals: { start: number; end: number }[] = [];
+	/**
+	 *
+	 * @param n
+	 */
 	const visit = (n: ts.Node): void => {
 		if (
 			ts.isStringLiteral(n) ||
@@ -566,21 +635,26 @@ function removeManagedSects(src: string, fileName: string): string {
 	return matches.sort((a, b) => b.index! - a.index!).reduce((t, m) => `${t.slice(0, m.index!)}${t.slice(m.index! + m[0].length)}`, src);
 }
 
-/** Chooses the TSDoc parameter-tag name for a declared parameter.
+/**
+ * Chooses the TSDoc parameter-tag name for a declared parameter.
+ *
  * @param p Parameter declaration whose binding name should be documented.
  * @param i Zero-based parameter position used when the binding has no simple identifier.
- * @returns The identifier name, `props` for object bindings, or a positional fallback.
+ *
+ * @return The identifier name, `props` for object bindings, or a positional fallback.
  */
 function fnParamName(p: ts.ParameterDeclaration, i: number): string {
 	return ts.isIdentifier(p.name) ? p.name.text : ts.isObjectBindingPattern(p.name) ? 'props' : `param${i + 1}`;
 }
 /**
  * Rebuilds a function's TSDoc layout while preserving existing summary and tag prose.
+ *
  * @param n Function declaration whose signature controls required parameter and return tags.
  * @param parsed Source file containing the declaration.
  * @param eol Line-ending sequence to emit.
  * @param existing Existing TSDoc block, when one is present.
- * @returns Normalized TSDoc text; missing prose remains blank for later authoring.
+ *
+ * @return Normalized TSDoc text; missing prose remains blank for later authoring.
  */
 function genFnDoc(n: ts.SignatureDeclaration, parsed: ts.SourceFile, eol: string, existing = ''): string {
 	const params = n.parameters.map(fnParamName);
@@ -640,8 +714,12 @@ function maintainFnDocs(src: string, fileName: string, eol: string): string {
 	const parsed = ts.createSourceFile(fileName, src, ts.ScriptTarget.Latest, true, srcKind(fileName));
 	const updates: { start: number; end: number; text: string }[] = [];
 	const fns: ts.SignatureDeclaration[] = [];
+	/**
+	 *
+	 * @param node
+	 */
 	const visit = (node: ts.Node): void => {
-		if (isNamedDocumentationFunction(node)) fns.push(node);
+		if (isNamedDocumentationFn(node)) fns.push(node);
 		ts.forEachChild(node, visit);
 	};
 	visit(parsed);
@@ -750,7 +828,20 @@ export function maintainSrcFile(root: string, fileName: string): boolean {
 		const first = imports[0];
 		const last = imports.at(-1) as ts.ImportDeclaration;
 		const groups = groupedImports(parsed, imports);
+		/**
+		 *
+		 * @param a
+		 * @param b
+		 *
+		 * @return
+		 */
 		const comp = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
+		/**
+		 *
+		 * @param label
+		 *
+		 * @return
+		 */
 		const render = (label: ImportGroup): string[] => {
 			const entries = groups[label].sort((a, b) => comp(a.text, b.text) || comp(a.source, b.source));
 			const seen = new Set<string>();
@@ -803,6 +894,10 @@ export function removeNonCodeComments(fileName: string): boolean {
 	const removals: { start: number; end: number }[] = [];
 	const nodeStarts: number[] = [];
 	const codeStarts: number[] = [];
+	/**
+	 *
+	 * @param node
+	 */
 	const inspect = (node: ts.Node): void => {
 		codeStarts.push(node.getStart(parsed));
 		if (ts.isVariableStatement(node)) nodeStarts.push(node.getStart(parsed));
@@ -909,9 +1004,12 @@ function documentationSupported(fileName: string): boolean {
 	return /\.(?:c|m)?(?:js|jsx|ts|tsx)$/.test(fileName);
 }
 
-/** Excludes generated and vendored sources from documentation policy checks.
+/**
+ * Excludes generated and vendored sources from documentation policy checks.
+ *
  * @param cfg Quality configuration defining the repository root.
  * @param file Absolute source path to classify.
+ *
  * @return Whether the file is outside generated and vendor directories.
  */
 function documentationSourceIncluded(cfg: QualityCfg, file: string): boolean {
@@ -978,8 +1076,11 @@ function documentationNodeName(node: ts.Node): string {
 	return ts.isIdentifier(candidate) ? candidate.text : ts.isStringLiteral(candidate) || ts.isNumericLiteral(candidate) ? candidate.text : candidate === node ? '<anonymous>' : candidate.getText();
 }
 
-/** Finds the declaration that owns documentation for a named function value.
+/**
+ * Finds the declaration that owns documentation for a named function value.
+ *
  * @param node Function-like declaration or expression to resolve.
+ *
  * @return Variable statement for a named function value, otherwise node itself.
  */
 function documentationTarget(node: ts.Node): ts.Node {
@@ -993,11 +1094,14 @@ function documentationTarget(node: ts.Node): ts.Node {
 	return node;
 }
 
-/** Checks whether a function-like declaration has a stable name and needs its own documentation.
+/**
+ * Checks whether a function-like declaration has a stable name and needs its own documentation.
+ *
  * @param node Syntax node to inspect.
+ *
  * @return Whether node is a named function, method, constructor, or named function value.
  */
-function isNamedDocumentationFunction(node: ts.Node): node is ts.SignatureDeclaration {
+function isNamedDocumentationFn(node: ts.Node): node is ts.SignatureDeclaration {
 	if (!ts.isFunctionLike(node)) return false;
 	if (
 		ts.isFunctionDeclaration(node) ||
@@ -1013,9 +1117,12 @@ function isNamedDocumentationFunction(node: ts.Node): node is ts.SignatureDeclar
 	return false;
 }
 
-/** Tests whether an AST node is nested under a declaration.
+/**
+ * Tests whether an AST node is nested under a declaration.
+ *
  * @param parent Candidate ancestor node.
  * @param target Node whose ancestors should be searched.
+ *
  * @return Whether target is parent or a descendant of parent.
  */
 function containsNode(parent: ts.Node, target: ts.Node): boolean {
@@ -1033,12 +1140,20 @@ function containsNode(parent: ts.Node, target: ts.Node): boolean {
  */
 function tsdocBlocks(src: string, parsed: ts.SourceFile): TSDocBlock[] {
 	const blocks = new Map<number, TSDocBlock>();
+	/**
+	 *
+	 * @param ranges
+	 */
 	const add = (ranges: ts.CommentRange[] | undefined): void => {
 		for (const range of ranges ?? []) {
 			const text = src.slice(range.pos, range.end);
 			if (text.startsWith('/**')) blocks.set(range.pos, { start: range.pos, end: range.end, text });
 		}
 	};
+	/**
+	 *
+	 * @param node
+	 */
 	const visit = (node: ts.Node): void => {
 		add(ts.getLeadingCommentRanges(src, node.getFullStart()));
 		add(ts.getTrailingCommentRanges(src, node.end));
@@ -1138,6 +1253,10 @@ function returnsVal(node: ts.SignatureDeclaration): boolean {
 	if (returnType === 'void' || returnType === 'Promise<void>') return false;
 	if (node.type) return true;
 	let valReturn = false;
+	/**
+	 *
+	 * @param child
+	 */
 	const visit = (child: ts.Node): void => {
 		if (valReturn) return;
 		if (ts.isReturnStatement(child) && child.expression) valReturn = true;
@@ -1179,6 +1298,10 @@ function descriptionFindingsForFile(cfg: QualityCfg, file: string, src: string, 
 	const findings: DocumentationFinding[] = [];
 	const header = fileHeaderBlock(src, blocks);
 	const attached = new Set<number>();
+	/**
+	 *
+	 * @param node
+	 */
 	const markAttached = (node: ts.Node): void => {
 		if (
 			ts.isDeclarationStatement(node) ||
@@ -1273,10 +1396,14 @@ function documentationFindingsForFile(cfg: QualityCfg, file: string, requirement
 	const src = analysis?.texts.get(file) ?? readFileSync(file, 'utf8');
 	const parsed = analysis?.sources.get(file) ?? ts.createSourceFile(file, src, ts.ScriptTarget.Latest, true, documentationScriptKind(file));
 	const findings = descriptionFindingsForFile(cfg, file, src, parsed);
+	/**
+	 *
+	 * @param node
+	 */
 	const visit = (node: ts.Node): void => {
 		const isType = ts.isClassDeclaration(node) || ts.isEnumDeclaration(node) || ts.isInterfaceDeclaration(node) || ts.isTypeAliasDeclaration(node);
 		if (requirements.types && isType && !documented(node, src)) findings.push(documentationReport(file, parsed, node, documentationNodeName(node), 'type', 'add TSDoc for this type', cfg));
-		if (isNamedDocumentationFunction(node)) {
+		if (isNamedDocumentationFn(node)) {
 			const needsDoc = requirements.functions || (requirements.exportedFunctions && exported(node));
 			if (needsDoc) {
 				if (!documented(node, src)) {
@@ -1336,9 +1463,13 @@ export function documentSrcFile(cfg: QualityCfg, file: string): boolean {
 	const src = readFileSync(file, 'utf8');
 	const parsed = ts.createSourceFile(file, src, ts.ScriptTarget.Latest, true, documentationScriptKind(file));
 	const insertions: number[] = [];
+	/**
+	 *
+	 * @param node
+	 */
 	const visit = (node: ts.Node): void => {
 		const isType = ts.isClassDeclaration(node) || ts.isEnumDeclaration(node) || ts.isInterfaceDeclaration(node) || ts.isTypeAliasDeclaration(node);
-		const isFn = isNamedDocumentationFunction(node);
+		const isFn = isNamedDocumentationFn(node);
 		const needsFn = isFn && (requirements.functions || (requirements.exportedFunctions && exported(node)));
 		if (((requirements.types && isType) || needsFn) && !documented(node, src)) insertions.push(documentationTarget(node).getStart(parsed));
 		ts.forEachChild(node, visit);

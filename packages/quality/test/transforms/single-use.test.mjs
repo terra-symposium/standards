@@ -21,7 +21,7 @@ import { fixtureFile, fixtureRoot, fixtureText } from '../../support/fixtures.mj
 REGEX
 //////////////////////////////////////////////////*/
 const EXPORT_TYPE_PAYLOAD_REGEX = /export type Payload/;
-const EXPORT_FUNCTION_PARSEREPORT_REGEX = /export function parseReport/;
+const EXPORT_FN_PARSEREPORT_REGEX = /export function parseReport/;
 
 test('single-use functions with attached prose require review and remain unchanged', () => {
 	const root = fixtureRoot('terra-quality-single-use-comments-');
@@ -428,7 +428,7 @@ test('single-use analysis includes exports unless an external framework consumer
 		[['parseReport', 'REVIEW']],
 	);
 	assert.equal(fixSingleUseDeclarations(cfg), 0);
-	assert.match(fixtureText(root, 'src/main.ts'), EXPORT_FUNCTION_PARSEREPORT_REGEX);
+	assert.match(fixtureText(root, 'src/main.ts'), EXPORT_FN_PARSEREPORT_REGEX);
 });
 test('package entry exports are preserved without exempting private declarations in the same module', () => {
 	const root = fixtureRoot('terra-quality-single-use-package-entry-');
@@ -441,7 +441,7 @@ test('package entry exports are preserved without exempting private declarations
 		['formatInternal'],
 	);
 	assert.equal(fixSingleUseDeclarations(cfg), 0);
-	assert.match(fixtureText(root, 'src/main.ts'), EXPORT_FUNCTION_PARSEREPORT_REGEX);
+	assert.match(fixtureText(root, 'src/main.ts'), EXPORT_FN_PARSEREPORT_REGEX);
 });
 test('single-use fixing never removes a multi-use explicit-any compatibility alias', () => {
 	const root = fixtureRoot('terra-quality-single-use-any-alias-');
@@ -478,12 +478,7 @@ test('single-use directory skips exclude candidates but retain their references'
 	fixtureFile(root, 'src/shared.ts', 'export const sharedValue = 1;\n');
 	fixtureFile(root, 'src/app.ts', "import { sharedValue } from './shared.js';\nvoid sharedValue;\n");
 	fixtureFile(root, 'src/generated/reference.ts', "import { sharedValue } from '../shared.js';\nvoid sharedValue;\n");
-	const cfg = createQualityCfg({
-		root,
-		sourceRoots: ['src'],
-		extensions: ['.ts'],
-		singleUse: { skippedDirectories: ['src/generated'] },
-	});
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], singleUse: { skippedDirectories: ['src/generated'] } });
 	assert.equal(
 		singleUseFindings(cfg).some((finding) => finding.name === 'sharedValue'),
 		false,
