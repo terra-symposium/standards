@@ -1,11 +1,131 @@
 [build]
   command = "pnpm docs:build"
-  publish = "docs/dist"
+  publish = "docs-dist"
 
 [build.environment]
-  NODE_VERSION = "22"
+  NODE_VERSION = "24"
 
 [[headers]]
   for = "/*"
   [headers.values]
     X-Robots-Tag = "noindex, nofollow"
+
+[[redirects]]
+  from = "/getting-started"
+  to = "/packages/quality/setup/"
+  status = 301
+
+[[redirects]]
+  from = "/quality/overview"
+  to = "/packages/quality/"
+  status = 301
+
+[[redirects]]
+  from = "/quality/configuration"
+  to = "/packages/quality/configuration/"
+  status = 301
+
+[[redirects]]
+  from = "/quality/commands"
+  to = "/packages/quality/workflows/"
+  status = 301
+
+[[redirects]]
+  from = "/quality/troubleshooting"
+  to = "/packages/quality/troubleshooting/"
+  status = 301
+
+[[redirects]]
+  from = "/quality/checks"
+  to = "/packages/quality/#checks"
+  status = 301
+
+[[redirects]]
+  from = "/quality/checks/alias"
+  to = "/packages/quality/#alias"
+  status = 301
+
+[[redirects]]
+  from = "/quality/checks/command"
+  to = "/packages/quality/#command"
+  status = 301
+
+[[redirects]]
+  from = "/quality/checks/dead-code"
+  to = "/packages/quality/#dead-code"
+  status = 301
+
+[[redirects]]
+  from = "/quality/checks/diff"
+  to = "/packages/quality/#diff"
+  status = 301
+
+[[redirects]]
+  from = "/quality/checks/document"
+  to = "/packages/quality/#document"
+  status = 301
+
+[[redirects]]
+  from = "/quality/checks/format"
+  to = "/packages/quality/#format"
+  status = 301
+
+[[redirects]]
+  from = "/quality/checks/forward"
+  to = "/packages/quality/#object-forwarding"
+  status = 301
+
+[[redirects]]
+  from = "/quality/checks/import"
+  to = "/packages/quality/#import-validation"
+  status = 301
+
+[[redirects]]
+  from = "/quality/checks/knip"
+  to = "/packages/quality/#knip"
+  status = 301
+
+[[redirects]]
+  from = "/quality/checks/lint"
+  to = "/packages/quality/#lint"
+  status = 301
+
+[[redirects]]
+  from = "/quality/checks/name"
+  to = "/packages/quality/#name"
+  status = 301
+
+[[redirects]]
+  from = "/quality/checks/recommend"
+  to = "/packages/quality/#recommend"
+  status = 301
+
+[[redirects]]
+  from = "/quality/checks/regex-dedup"
+  to = "/packages/quality/#regex-deduplication"
+  status = 301
+
+[[redirects]]
+  from = "/quality/checks/repeated-classes"
+  to = "/packages/quality/#repeated-classes"
+  status = 301
+
+[[redirects]]
+  from = "/quality/checks/security"
+  to = "/packages/quality/#security"
+  status = 301
+
+[[redirects]]
+  from = "/quality/checks/single-use"
+  to = "/packages/quality/#single-use-declarations"
+  status = 301
+
+[[redirects]]
+  from = "/quality/checks/type"
+  to = "/packages/quality/#type"
+  status = 301
+
+[[redirects]]
+  from = "/quality/checks/ui-patterns"
+  to = "/packages/quality/#ui-patterns"
+  status = 301

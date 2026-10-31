@@ -1,22 +1,27 @@
-import { access, mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { access, mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { join, relative, resolve } from 'node:path';
 
 const repositoryRoot = resolve(fileURLToPath(new URL('../..', import.meta.url)));
-const siteRoot = resolve(fileURLToPath(new URL('..', import.meta.url)));
 const sharedSkillsRoot = join(repositoryRoot, '.agents', 'skills');
 const docsSkillsRoot = join(repositoryRoot, 'docs', '.agents', 'skills');
 const packagesRoot = join(repositoryRoot, 'packages');
-const outputDirectory = join(siteRoot, 'src/content/docs/skills');
-const generatedDirectory = join(siteRoot, 'src/generated');
-const indexPath = join(outputDirectory, 'index.mdx');
-const dataPath = join(generatedDirectory, 'skills.json');
+const generatedDirectory = join(repositoryRoot, 'scripts/docs');
+const dataPath = join(generatedDirectory, 'skills.generated.json');
 
 const skillRoots = [];
-if (await access(sharedSkillsRoot).then(() => true).catch(() => false)) {
+if (
+	await access(sharedSkillsRoot)
+		.then(() => true)
+		.catch(() => false)
+) {
 	skillRoots.push({ package: 'shared', path: sharedSkillsRoot });
 }
-if (await access(docsSkillsRoot).then(() => true).catch(() => false)) {
+if (
+	await access(docsSkillsRoot)
+		.then(() => true)
+		.catch(() => false)
+) {
 	skillRoots.push({ package: 'docs', path: docsSkillsRoot });
 }
 const packageEntries = await readdir(packagesRoot, { withFileTypes: true }).catch((error) => {
@@ -26,7 +31,11 @@ const packageEntries = await readdir(packagesRoot, { withFileTypes: true }).catc
 for (const entry of packageEntries) {
 	if (!entry.isDirectory()) continue;
 	const packageSkillsRoot = join(packagesRoot, entry.name, '.agents', 'skills');
-	if (await access(packageSkillsRoot).then(() => true).catch(() => false)) {
+	if (
+		await access(packageSkillsRoot)
+			.then(() => true)
+			.catch(() => false)
+	) {
 		skillRoots.push({ package: entry.name, path: packageSkillsRoot });
 	}
 }
@@ -73,14 +82,5 @@ const skillsByRoot = await Promise.all(
 const skills = skillsByRoot.flat();
 skills.sort((first, second) => `${first.package}/${first.directory}`.localeCompare(`${second.package}/${second.directory}`));
 
-// Keep one documentation route and generate its data from the canonical agent skills.
-await mkdir(outputDirectory, { recursive: true });
-for (const entry of await readdir(outputDirectory, { withFileTypes: true })) {
-	if (entry.name === 'index.mdx') continue;
-	await rm(join(outputDirectory, entry.name), { recursive: true, force: true });
-}
 await mkdir(generatedDirectory, { recursive: true });
 await writeFile(dataPath, `${JSON.stringify(skills, null, '\t')}\n`);
-
-const index = `---\ntitle: Skills\ndescription: Browse shared and package-owned Terra agent skills.\n---\n\nimport SkillsExplorer from '../../../components/SkillsExplorer.tsx';\n\nBrowse shared Terra workflows and package-owned agent skills. Expand a package or group, then select a skill to inspect its Markdown source.\n\n<SkillsExplorer client:load />\n`;
-await writeFile(indexPath, index);

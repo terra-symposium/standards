@@ -2,7 +2,9 @@ node_modules/
 dist/
 coverage/
 **/.astro/
-/docs/src/generated/skills.json
+/docs-dist/
+/.terra-docs/
+/scripts/docs/skills.generated.json
 /.quality-test-tmp/
 /.quality-github-report.json
 .changeset/*.md

@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
-import skills from '../generated/skills.json';
+import skills from './skills.generated.json';
+import './skills-explorer.css';
 
 type Skill = {
 	body: string;
@@ -62,12 +63,7 @@ function SkillTree({ expanded, node, onSelect, onToggle, pathPrefix = '', select
 					<li className="skills-tree__item" key={path}>
 						<div className="skills-tree__row">
 							{hasChildren ? (
-								<button
-									aria-expanded={isExpanded}
-									className="skills-tree__group"
-									onClick={() => onToggle(path)}
-
-								>
+								<button aria-expanded={isExpanded} className="skills-tree__group" onClick={() => onToggle(path)}>
 									<span aria-hidden="true" className="skills-tree__chevron">
 										{isExpanded ? '⌄' : '›'}
 									</span>
@@ -79,7 +75,6 @@ function SkillTree({ expanded, node, onSelect, onToggle, pathPrefix = '', select
 									aria-current={selectedPath === sourcePathForSkill(skill) ? 'true' : undefined}
 									className={`skills-tree__skill ${selectedPath === sourcePathForSkill(skill) ? 'is-selected' : ''}`}
 									onClick={() => onSelect(skill)}
-
 								>
 									{hasChildren ? `Open ${skill.title} skill` : skill.title}
 								</button>
