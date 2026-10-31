@@ -19,7 +19,7 @@ RUNNER
 //////////////////////////////////////////////////*/
 
 /**
- * Runs the three publishable package suites selected by the Standards workspace.
+ * Runs the package and application suites selected by the Standards workspace.
  *
  * @return Nothing; the recursive test command's status becomes this process status.
  */
@@ -29,7 +29,13 @@ function runWorkspaceTests(): void {
 	const env = { ...process.env };
 	env.NODE_OPTIONS = qualityNodeReporterOptions(env.NODE_OPTIONS, reporter);
 	env.TERRA_QUALITY_NODE_REPORTER_OWNER = '1';
-	const suites = ['@terra-symposium/standards-error-boundaries', '@terra-symposium/standards-quality', '@terra-symposium/standards-reporting'];
+	const suites = [
+		'@terra-symposium/standards-error-boundaries',
+		'@terra-symposium/standards-quality',
+		'@terra-symposium/standards-reporting',
+		'@terra-symposium/standards-testing',
+		'@terra-symposium/hygiene-dashboard',
+	];
 	let failed = false;
 
 	console.error('\nTESTS\n  Unit / Contract · Standards workspace');

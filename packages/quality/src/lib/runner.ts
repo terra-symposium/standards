@@ -1016,7 +1016,7 @@ function runQualityPhase(cfg: QualityCfg, phase: QualityPhase, profileChecks: Re
 				if (runTestSuite(cfg, check).status) failures += 1;
 			} catch (error) {
 				failures += 1;
-				recordQualityFailure(check.name, error);
+				recordQualityFailure(`command:${check.name}`, error);
 				printCheckStatus(check.name, 1);
 			}
 		}

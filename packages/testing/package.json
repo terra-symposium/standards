@@ -1,0 +1,38 @@
+{
+	"name": "@terra-symposium/standards-testing",
+	"version": "0.1.0",
+	"description": "Standards-owned shared CI checks and manifest-driven test execution for Terra repositories",
+	"license": "Apache-2.0",
+	"type": "module",
+	"main": "./src/index.mjs",
+	"types": "./src/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./src/index.d.ts",
+			"import": "./src/index.mjs"
+		}
+	},
+	"bin": {
+		"terra-test": "./src/cli.mjs"
+	},
+	"files": [
+		"src",
+		"action.yml",
+		"README.md"
+	],
+	"engines": {
+		"node": ">=20"
+	},
+	"publishConfig": {
+		"registry": "https://registry.npmjs.org",
+		"access": "public"
+	},
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/Terra-Symposium/standards.git"
+	},
+	"scripts": {
+		"build": "node --check src/index.mjs && node --check src/cli.mjs",
+		"test": "node --test test/*.test.mjs"
+	}
+}

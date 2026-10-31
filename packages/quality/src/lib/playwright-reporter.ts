@@ -35,11 +35,6 @@ type PlaywrightTestCase = {
 	outcome?: () => 'skipped' | 'expected' | 'unexpected' | 'flaky';
 };
 
-export type QualityPlaywrightReporterOptions = {
-	write?: (text: string) => void;
-	writeProgress?: (text: string) => void;
-};
-
 /*//////////////////////////////////////////////////
 HELPERS
 //////////////////////////////////////////////////*/
@@ -96,7 +91,7 @@ export default class QualityPlaywrightReporter {
 	 *
 	 * @param opts Optional sinks for output and progress.
 	 */
-	constructor(opts: QualityPlaywrightReporterOptions = {}) {
+	constructor(opts: { write?: (text: string) => void; writeProgress?: (text: string) => void } = {}) {
 		this.write = opts.write ?? ((text) => void process.stdout.write(text));
 		this.writeProgress = opts.writeProgress ?? ((text) => void process.stderr.write(text));
 	}

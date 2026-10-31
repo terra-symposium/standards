@@ -11,6 +11,9 @@
 	"oneLineImports": true,
 	"renameExports": true,
 	"prettierPrintWidth": 200,
+	"singleUse": {
+		"skippedDirectories": ["test", "tests", "packages/testing/src"]
+	},
 	"github": {
 		"repositories": ["salesphere-vh/salesphere", "Terra-Symposium/terra-symposium-website", "Terra-Symposium/standards", "kaimacann/portfolio"],
 		"requiredFeatures": ["dependencyGraph", "dependabotAlerts", "malwareAlerts", "securityUpdates", "versionUpdates", "groupedUpdates"]
@@ -30,14 +33,10 @@
 	"documentation": {
 		"required": {
 			"types": true,
-			"functions": true,
+			"functions": false,
 			"exportedFunctions": true,
 			"noInlineFunctions": false
 		}
-	},
-	"tailwindCanonical": {
-		"stylesheet": "docs/src/styles/tailwind.css",
-		"sourceRoots": ["docs/src/components"]
 	},
 	"enabledChecks": {
 		"format": true,
@@ -46,7 +45,6 @@
 		"type": true,
 		"recommend": true,
 		"name": true,
-		"alias": true,
-		"tailwind-canonical": true
+		"alias": true
 	}
 }

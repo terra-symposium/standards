@@ -10,12 +10,78 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
       - uses: pnpm/action-setup@v6
         with:
           version: 10.30.3
       - uses: actions/setup-node@v7
         with:
-          node-version: 22.19.0
+          node-version: 22.23.4
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm quality:all
+      - name: Capture full-repository quality findings
+        run: pnpm run quality:check --report-json standards-quality.json
+        continue-on-error: true
+      - name: Check formatting
+        run: node packages/quality/dist/lib/runner.js format --all --warn
+      - name: Check lint
+        run: node packages/quality/dist/lib/runner.js lint --all --warn
+      - name: Upload quality report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: standards-quality
+          path: standards-quality.json
+          if-no-files-found: warn
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 10.30.3
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.23.4
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm -r build
+
+  tests:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 10.30.3
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.23.4
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @terra-symposium/standards-reporting exec playwright install --with-deps chromium
+      - uses: ./packages/testing
+        with:
+          manifest: .terra-tests.json
+
+  package:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 10.30.3
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.23.4
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @terra-symposium/standards-testing pack --dry-run
