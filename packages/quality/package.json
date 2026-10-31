@@ -1,6 +1,6 @@
 {
 	"name": "@terra-symposium/standards-quality",
-	"version": "2.0.6",
+	"version": "2.1.0",
 	"description": "Configurable quality checks and maintenance tooling for software repositories",
 	"homepage": "https://standards-docs.netlify.app/",
 	"type": "module",
@@ -10,7 +10,8 @@
 	"main": "./dist/index.js",
 	"types": "./dist/index.d.ts",
 	"bin": {
-		"terra-quality": "dist/lib/runner.js"
+		"terra-quality": "dist/lib/runner.js",
+		"terra-quality-dev": "dist/lib/dev.js"
 	},
 	"publishConfig": {
 		"registry": "https://registry.npmjs.org",

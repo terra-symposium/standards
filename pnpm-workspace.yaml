@@ -2,7 +2,6 @@ packages:
   - packages/*
   - docs
   - apps/*
-  - vendor/braces
 
 allowBuilds:
   esbuild: true
