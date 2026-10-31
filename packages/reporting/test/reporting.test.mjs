@@ -931,3 +931,16 @@ test('reports load timing details and fails only when enabled budgets are exceed
 	const { stdout: legacySlide } = await execFileAsync('unzip', ['-p', optedOutSlideshow, 'ppt/slides/slide1.xml']);
 	assert.doesNotMatch(legacySlide, /Load timing summary/);
 });
+
+test('declared viewport projects collect only their tagged scenarios', () => {
+	const catalog = { mobile: { width: 390, height: 844 }, 'md-before': { width: 767, height: 900 }, md: { width: 768, height: 900 }, xl: { width: 1280, height: 720 } };
+	const cfg = withResponsivePlaywright({ projects: [{ name: 'browser', testMatch: '**/*.spec.ts' }] }, { viewportPolicy: 'declared', viewportCatalog: catalog });
+	assert.deepEqual(cfg.reporter.find(([name]) => name.includes('/playwright'))[1].viewportCatalog, catalog);
+	assert.deepEqual(cfg.projects.map((project) => project.name), ['browser-mobile', 'browser-md-before', 'browser-md', 'browser-xl']);
+	for (const project of cfg.projects) {
+		const viewport = project.name.slice('browser-'.length);
+		assert.equal(project.grep.test(`scenario @viewport:${viewport}`), true);
+		assert.equal(project.grep.test('scenario @viewport:other'), false);
+		assert.deepEqual(project.use.viewport, catalog[viewport]);
+	}
+});

@@ -193,6 +193,7 @@ export const withResponsivePlaywright = <T extends PlaywrightTestConfig>(cfg: T,
 	const responsiveProjects = projects.flatMap((p, i) => {
 		const baseName = p.name || `project-${i + 1}`;
 		if (isSetup(p, i) || singleRun.has(baseName)) return [p];
+		if (opts.viewportPolicy === 'declared' && p.grep) throw new Error(`Project ${baseName} already defines grep; move its selector into testMatch before using declared viewports.`);
 		return viewports.map((v) => ({
 			...p,
 			name: visualProjectName(baseName, v, viewports),
