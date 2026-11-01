@@ -29,7 +29,7 @@ jobs:
         run: node packages/quality/dist/lib/runner.js lint --all --warn
       - name: Upload quality report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: standards-quality
           path: standards-quality.json
