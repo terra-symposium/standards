@@ -2088,10 +2088,7 @@ function collectKnipFindings(cfg: QualityCfg, importedConsumers = importedExport
 		const filePath = assertKnipPath(cfg, issue.file, 'finding source');
 		for (const [kind, val] of Object.entries(issue)) {
 			if (kind === 'file') continue;
-			for (const i of flattenKnipItems(val) as {
-				name: string;
-				line?: number;
-			}[]) {
+			for (const i of flattenKnipItems(val) as { name: string; line?: number }[]) {
 				if (kind === 'exports' && isFrameworkEntryExport(cfg, issue.file, i.name)) continue;
 				const location = kind === 'files' ? i.name : issue.file;
 				const autoFixable = (kind === 'exports' || kind === 'types') && !importedConsumers.get(filePath)?.has(i.name) && knipExportCanBeMadePrivate(filePath, i.name);
