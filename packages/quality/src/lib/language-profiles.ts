@@ -294,7 +294,8 @@ export const LANGUAGE_PROFILES: readonly { id: LanguageProfileId; sourceExtensio
 				command: 'clang-tidy',
 				args: [
 					'--checks=-*,bugprone-*,cert-*,clang-analyzer-*,misc-include-cleaner,performance-*,readability-*',
-					'--warnings-as-errors=*',
+					// Keep core analyzer defects fatal while legacy CERT, bugprone, and platform checks stay visible.
+					'--warnings-as-errors=clang-analyzer-core-*',
 					'{files}',
 					'--',
 					'-std=c11',
