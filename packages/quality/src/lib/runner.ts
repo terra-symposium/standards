@@ -2395,7 +2395,7 @@ function printDeadCodeFindings(findings: DeadCodeFinding[], typeSafetyVerified =
  *
  * @return Remaining findings after any eligible fixes and verification.
  */
-function runDeadCode(cfg: QualityCfg, fix: boolean, all: boolean, verify = true, emit = true): DeadCodeFinding[] {
+function runDeadCode(cfg: QualityCfg, fix: boolean, all: boolean, verify = true, emit = true, includeReviewSingleUse = true): DeadCodeFinding[] {
 	if (emit) qualityHeader('dead-code', `${fix ? 'Fixing safe cases and checking' : 'Read-only check of'} unused files, exports, declarations, and single-use code`);
 	let verificationStarted = false;
 	/**
@@ -2512,7 +2512,12 @@ function runDeadCode(cfg: QualityCfg, fix: boolean, all: boolean, verify = true,
 		findings.push(...unusedDeclarationFindings(cfg, [...eslintReportsByPath.values()]));
 	}
 	const finalSingleUseFindings = fix && !typeRejectedFiles.size ? singleUseVerificationFindings : singleUseFindings(cfg);
-	for (const single of finalSingleUseFindings)
+	let advisorySingleUseCount = 0;
+	for (const single of finalSingleUseFindings) {
+		if (!includeReviewSingleUse && single.decision === 'REVIEW') {
+			advisorySingleUseCount++;
+			continue;
+		}
 		findings.push({
 			rule: 'typescript/single-use',
 			file: single.file,
@@ -2523,6 +2528,8 @@ function runDeadCode(cfg: QualityCfg, fix: boolean, all: boolean, verify = true,
 			reason: single.reason,
 			agentAction: single.agentAction,
 		});
+	}
+	if (emit && advisorySingleUseCount) console.info(`  ${advisorySingleUseCount} single-use bindings remain as review-only suggestions because safe inlining was not proven.`);
 	for (const finding of documentationFindings(scopedCfg(cfg, true)).filter((i) => i.kind === 'orphan'))
 		findings.push({
 			rule: 'tsdoc/detached',
@@ -2558,8 +2565,8 @@ function runDeadCode(cfg: QualityCfg, fix: boolean, all: boolean, verify = true,
  *
  * @return Findings from the non-mutating dead-code scan.
  */
-function runDeadCodeReadOnly(cfg: QualityCfg, all: boolean): DeadCodeFinding[] {
-	return runDeadCode(cfg, false, all);
+function runDeadCodeReadOnly(cfg: QualityCfg, all: boolean, includeReviewSingleUse = true): DeadCodeFinding[] {
+	return runDeadCode(cfg, false, all, true, true, includeReviewSingleUse);
 }
 /**
  * Dispatches the dead-code coordinator in fix or read-only mode.
@@ -2568,8 +2575,8 @@ function runDeadCodeReadOnly(cfg: QualityCfg, all: boolean): DeadCodeFinding[] {
  * @param fix Whether eligible changes may be applied to source files.
  * @param all Whether to inspect all configured source files.
  */
-function runDeadCodeCmd(cfg: QualityCfg, fix: boolean, all: boolean): void {
-	const findings = fix ? runDeadCode(cfg, true, all) : runDeadCodeReadOnly(cfg, all);
+function runDeadCodeCmd(cfg: QualityCfg, fix: boolean, all: boolean, includeReviewSingleUse = true): void {
+	const findings = fix ? runDeadCode(cfg, true, all, true, true, includeReviewSingleUse) : runDeadCodeReadOnly(cfg, all, includeReviewSingleUse);
 	printCheckStatus('dead-code', findings.length);
 }
 
@@ -3430,7 +3437,7 @@ function runFullQuality(cfg: QualityCfg, args: string[], opts: QualityOptions): 
 	 * Runs the remaining dead-code, lint, analysis, and documentation checks.
 	 */
 	const continueStaticAndLater = (): void => {
-		if (qualityCheckEnabled(cfg, 'dead-code')) continueAfterFailure('dead-code', () => runDeadCodeCmd(cfg, qualityAutofixEnabled(cfg, 'dead-code', opts.fix), opts.all));
+		if (qualityCheckEnabled(cfg, 'dead-code')) continueAfterFailure('dead-code', () => runDeadCodeCmd(cfg, qualityAutofixEnabled(cfg, 'dead-code', opts.fix), opts.all, false));
 		if (qualityCheckEnabled(cfg, 'lint')) continueAfterFailure('lint', () => runLint(cfg, { ...opts, fix: false }, true, true));
 		qualityHeader('source-analysis', '');
 		let analysis: QualityAnalysis | undefined;

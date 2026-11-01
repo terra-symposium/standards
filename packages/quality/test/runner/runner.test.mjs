@@ -358,7 +358,7 @@ test('loadQualityCfg resolves a quality file root relative to the configuration 
 	assert.deepEqual(cfg.extensions, ['.ts']);
 	assert.deepEqual(cfg.loadTesting, { enabled: false, defaultBudget: { warnMs: 3000, failMs: 7000 } });
 	assert.equal(cfgDir, join(root, 'config'));
-	const schema = JSON.parse(readFileSync(join(process.cwd(), 'quality.schema.json'), 'utf8'));
+	const schema = JSON.parse(readFileSync(join(process.cwd(), 'packages/quality/quality.schema.json'), 'utf8'));
 	assert.ok(schema.properties.loadTesting);
 	assert.ok(schema.$defs.loadBudget);
 });
@@ -1165,6 +1165,51 @@ test('dead-code CLI fails read-only for safe single-use fixes, then inlines the 
 	}
 	assert.doesNotMatch(readFileSync(src, 'utf8'), /const label/);
 	assert.match(readFileSync(src, 'utf8'), /export const result = \('ready'\)/);
+	resetExitCode();
+});
+test('full quality leaves unproven single-use rewrites advisory while the focused dead-code command reports them', () => {
+	const root = fixtureRoot('terra-quality-single-use-review-gate-');
+	fixtureFile(root, 'src/main.ts', "export async function readValue() { const result = await Promise.resolve('ready'); return result; }\n");
+	const cfg = createQualityCfg({
+		root,
+		sourceRoots: ['src'],
+		extensions: ['.ts'],
+		enabledChecks: {
+			format: false,
+			import: false,
+			name: false,
+			alias: false,
+			forward: false,
+			document: false,
+			lint: false,
+			knip: false,
+			'dead-code': true,
+			type: false,
+			recommend: false,
+			command: false,
+			diff: false,
+			github: false,
+		},
+	});
+	const originalErr = console.error;
+	const originalInfo = console.info;
+	const errors = [];
+	const info = [];
+	console.error = (...parts) => errors.push(parts.join(' '));
+	console.info = (...parts) => info.push(parts.join(' '));
+	try {
+		resetExitCode();
+		runQualityCli(cfg, ['quality', '--all', '--warn', '--skip-commands', '--skip-recommendations']);
+		assert.equal(process.exitCode, 0);
+		assert.match(info.join('\n'), /single-use bindings remain as review-only suggestions/);
+		resetExitCode();
+		runQualityCli(cfg, ['dead-code', '--all', '--warn']);
+		assert.equal(process.exitCode, 1);
+		assert.match(errors.join('\n'), /\[ERROR\] typescript\/single-use: src\/main\.ts/);
+	} finally {
+		console.error = originalErr;
+		console.info = originalInfo;
+	}
 	resetExitCode();
 });
 test('dead-code warn preview copies formatter and browser-test configs before comparing Knip findings', () => {
