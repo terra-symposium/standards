@@ -3049,7 +3049,7 @@ function fixNames(cfg: QualityCfg, all: boolean): void {
 				const replacement = replacements.get(identifierSymbol(n) as ts.Symbol);
 				const astroAttrName = src.fileName.endsWith('.astro') && src.text.slice(n.end, n.end + 2) === '={' && src.text.lastIndexOf('---', n.getStart(src)) >= 0;
 				if (replacement && !astroAttrName) {
-					const shorthandBinding = ts.isBindingElement(n.parent) && n.parent.name === n && !n.parent.propertyName && ts.isObjectBindingPattern(n.parent.parent);
+					const shorthandBinding = ts.isBindingElement(n.parent) && n.parent.name === n && !n.parent.dotDotDotToken && !n.parent.propertyName && ts.isObjectBindingPattern(n.parent.parent);
 					const fileEdits = edits.get(src.fileName) ?? [];
 					fileEdits.push({
 						// Identifier `pos` can include a preceding delimiter (for example the

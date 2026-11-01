@@ -234,8 +234,9 @@ test('renames requested words across casing, separators, compounds, plurals, and
 		organisations: 'orgs',
 	};
 	for (const [name, expected] of Object.entries(cases)) assert.equal(renameId(name), expected, name);
-	for (const name of ['articleDefinition', 'category', 'context', 'event', 'image', 'index', 'request', 'requestId', 'response', 'source', 'target', 'value'])
+	for (const name of ['articleDefinition', 'category', 'context', 'event', 'index', 'request', 'requestId', 'response', 'source', 'target', 'value'])
 		assert.equal(renameId(name), name, `${name} remains a complete domain or API name`);
+	assert.equal(renameId('image'), 'img');
 });
 test('does not rename substrings, protected platform names, or underscore placeholders', () => {
 	for (const name of ['terror', 'deformat', 'repositoryFactory', 'FormData', 'NextResponse', '_']) {
@@ -767,11 +768,11 @@ test('naming supports read-only and automatic-fix modes', () => {
 	runQualityCli(cfg, ['naming', '--all']);
 	assert.equal(readFileSync(file, 'utf8'), 'const org = true;\nconst genPattern = /ok/;\nexport const result = [org, genPattern];\n');
 });
-test('naming preserves complete domain words and applies safe prefix aliases', () => {
-	assert.equal(renameId('image'), 'image');
-	assert.equal(renameId('Image'), 'Image');
-	assert.equal(renameId('heroImage'), 'heroImage');
-	assert.equal(renameId('images'), 'images');
+test('naming coerces image identifiers and applies safe prefix aliases', () => {
+	assert.equal(renameId('image'), 'img');
+	assert.equal(renameId('Image'), 'Img');
+	assert.equal(renameId('heroImage'), 'heroImg');
+	assert.equal(renameId('images'), 'imgs');
 	assert.equal(renameId('activeCard'), 'aCard');
 	assert.equal(renameId('ActiveCard'), 'ACard');
 	assert.equal(renameId('nextCard'), 'nCard');
@@ -874,6 +875,16 @@ test('naming preserves object keys but not positional syntax in destructured map
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
 	runQualityCli(cfg, ['naming', '--all']);
 	assert.equal(readFileSync(file, 'utf8'), 'const first = input.map(({ node }) => node.id);\nconst second = pairs.map(([node, i]) => node[i]);\nvoid [first, second];\n');
+});
+test('naming preserves valid object rest syntax when shortening a map callback binding', () => {
+	const root = mkdtempSync(join(tmpdir(), 'quality-naming-object-rest-'));
+	mkdirSync(join(root, 'src'));
+	const file = join(root, 'src', 'main.ts');
+	writeFileSync(file, 'const result = attachments.map(({ passed, ...item }) => item);\nvoid result;\n');
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
+	runQualityCli(cfg, ['naming', '--all']);
+	assert.equal(readFileSync(file, 'utf8'), 'const result = attachments.map(({ passed, ...i }) => i);\nvoid result;\n');
+	assert.deepEqual(namingFindings(cfg), []);
 });
 test('naming allocates distinct aliases across one destructured callback parameter', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-callback-collisions-'));
