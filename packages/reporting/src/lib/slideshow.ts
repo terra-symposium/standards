@@ -331,10 +331,7 @@ export const readScreenshotCapturesFromDirectory = (dir: string, currentRunId?: 
 		const run = JSON.parse(fs.readFileSync(path.join(dir, '.terra-playwright-run.json'), 'utf8')) as {
 			runId: string;
 			collectionFinished?: boolean;
-			expectedCaptureGroups?: Array<{
-				group: string;
-				viewports: string[];
-			}>;
+			expectedCaptureGroups?: Array<{ group: string; viewports: string[] }>;
 		};
 		markerRunId = run.runId;
 		collectionFinished = run.collectionFinished;

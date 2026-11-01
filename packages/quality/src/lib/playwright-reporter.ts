@@ -106,8 +106,8 @@ export default class QualityPlaywrightReporter {
 		_config: unknown,
 		suite: {
 			/**
-			 *
-			 * @return
+			 * Return every test case discovered under the root suite.
+			 * @returns The test cases used to initialize the progress reporter.
 			 */
 			allTests(): PlaywrightTestCase[];
 		},

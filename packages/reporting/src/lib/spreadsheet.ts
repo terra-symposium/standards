@@ -372,9 +372,9 @@ const copyWorksheet = (source: ExcelJS.Worksheet, target: ExcelJS.Worksheet, sou
 		});
 	});
 	for (const range of source.model.merges || []) target.mergeCells(range);
-	for (const { imageId, range } of source.getImages()) {
-		const image = sourceBook.getImage(Number(imageId));
-		target.addImage(targetBook.addImage(image), structuredClone(range));
+	for (const { imageId: imgId, range } of source.getImages()) {
+		const img = sourceBook.getImage(Number(imgId));
+		target.addImage(targetBook.addImage(img), structuredClone(range));
 	}
 };
 /**

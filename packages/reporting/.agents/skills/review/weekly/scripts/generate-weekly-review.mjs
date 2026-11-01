@@ -319,26 +319,26 @@ function addCode(slide, codeInput, position, colors) {
 /**
  *
  * @param slide
- * @param image
+ * @param img
  * @param position
  * @param colors
  * @param page
  *
  * @return
  */
-async function addScreenshot(slide, image, position, colors, page) {
+async function addScreenshot(slide, img, position, colors, page) {
 	card(slide, position, colors, `screenshot-frame-${page}`, colors.tone);
-	const bytes = await fs.readFile(image.path);
+	const bytes = await fs.readFile(img.path);
 	slide.images.add({
 		blob: bytes,
 		contentType: 'image/png',
-		alt: image.alt,
+		alt: img.alt,
 		fit: 'cover',
 		geometry: 'roundRect',
 		borderRadius: 12,
 		position: { left: position.left + 8, top: position.top + 8, width: position.width - 16, height: position.height - 16 },
 	});
-	return `${image.route} · ${image.path}`;
+	return `${img.route} · ${img.path}`;
 }
 
 /**

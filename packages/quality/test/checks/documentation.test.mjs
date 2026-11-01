@@ -159,6 +159,32 @@ const namedArrow = (flag: boolean) => flag;
 		],
 	);
 });
+test('description audits respect the configured function and exported-function documentation scope', () => {
+	const root = fixtureRoot('terra-quality-documentation-description-scope-');
+	fixtureFile(
+		root,
+		'src/main.ts',
+		`/**
+ * @param value
+ */
+function privateHelper(value: string) { return value; }
+/**
+ * @param value
+ */
+export function publicHelper(value: string) { return value; }
+void [privateHelper, publicHelper];
+`,
+	);
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], documentation: { required: { types: true, functions: false, exportedFunctions: true } } });
+	assert.deepEqual(
+		documentationFindings(cfg).map(({ kind, name }) => [kind, name]),
+		[
+			['summary', '<TSDoc summary>'],
+			['param', '@param value'],
+			['return', '@return'],
+		],
+	);
+});
 test('documentation findings detect missing tags on one-line TSDoc attached to an exported function', () => {
 	const root = fixtureRoot('terra-quality-one-line-function-doc-');
 	fixtureFile(

@@ -98,9 +98,7 @@ export const QUALITY_CAPABILITY_AUTOFIXES: readonly QualityAutofixName[] = [
 	'documentedCommands',
 ];
 
-/**
- *
- */
+/** Support status and explanation for one quality capability in a language profile. */
 export type LanguageCapability = { status: 'supported' | 'not-applicable'; provider: string; reason?: string };
 
 /**

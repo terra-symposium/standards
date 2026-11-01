@@ -342,9 +342,9 @@ const persistScreenshotCapture = (dir: string, capture: ScreenshotCapture): Scre
 			// Replace an incomplete record with the next valid result.
 		}
 	}
-	const temporaryImage = `${screenshot}.${process.pid}.tmp`;
-	fs.copyFileSync(capture.screenshot, temporaryImage);
-	fs.renameSync(temporaryImage, screenshot);
+	const temporaryImg = `${screenshot}.${process.pid}.tmp`;
+	fs.copyFileSync(capture.screenshot, temporaryImg);
+	fs.renameSync(temporaryImg, screenshot);
 	const persisted = { ...capture, screenshot };
 	const temporaryRecord = `${recordFile}.${process.pid}.tmp`;
 	fs.writeFileSync(temporaryRecord, JSON.stringify(persisted));
@@ -897,17 +897,17 @@ export default class ProgressReporter {
 			);
 		// RESOLVE AND PERSIST EACH KEYED SCREENSHOT
 		for (const capture of visualCaptureManifest(result.attachments)) {
-			const image = result.attachments.find((i) => i.name === capture.attachmentName && i.contentType === capture.contentType);
-			if (!image) {
+			const img = result.attachments.find((i) => i.name === capture.attachmentName && i.contentType === capture.contentType);
+			if (!img) {
 				this.runDiagnostics.push(`Missing screenshot attachment ${capture.attachmentName} for ${capture.key} (${identity.viewport}).`);
 				continue;
 			}
-			let capturePath = image.path || '';
-			if (!capturePath && image.body) {
+			let capturePath = img.path || '';
+			if (!capturePath && img.body) {
 				const ext = capture.contentType === 'image/png' ? 'png' : 'jpg';
 				capturePath = path.resolve('test-results/playwright-output', `${test.id.replace(A_Z0_9_GI_REGEX(), '-')}-${capture.attachmentName}.${ext}`);
 				fs.mkdirSync(path.dirname(capturePath), { recursive: true });
-				fs.writeFileSync(capturePath, image.body);
+				fs.writeFileSync(capturePath, img.body);
 			}
 			if (!capturePath) {
 				this.runDiagnostics.push(`Screenshot data unavailable for ${capture.key} (${identity.viewport}).`);

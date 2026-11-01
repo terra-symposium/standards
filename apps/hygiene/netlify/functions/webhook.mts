@@ -82,12 +82,7 @@ export default async function handler(request: Request): Promise<Response> {
 		return new Response('Invalid signature', { status: 401 });
 	const event = JSON.parse(body) as {
 		action?: string;
-		installation?: {
-			id: number;
-			account?: {
-				login?: string;
-			};
-		};
+		installation?: { id: number; account?: { login?: string } };
 		repositories?: GithubRepository[];
 		repositories_added?: GithubRepository[];
 		repositories_removed?: GithubRepository[];

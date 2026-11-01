@@ -168,13 +168,7 @@ function reactRootRenders(source: ts.SourceFile): RenderSite[] {
  *
  * @return Parsed source files with root render sites.
  */
-function sourceInfos(cfg: QualityCfg): {
-	file: string;
-	text: string;
-	source: ts.SourceFile;
-	boundaries: Set<string>;
-	renderSites: RenderSite[];
-}[] {
+function sourceInfos(cfg: QualityCfg): { file: string; text: string; source: ts.SourceFile; boundaries: Set<string>; renderSites: RenderSite[] }[] {
 	return srcFiles(cfg)
 		.filter((file) => SOURCE_EXTS.has(file.slice(file.lastIndexOf('.')).toLowerCase()))
 		.map((file) => {

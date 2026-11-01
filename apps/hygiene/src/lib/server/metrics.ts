@@ -99,13 +99,7 @@ export function parseQualityReport(input: unknown): QualityCounts {
 export function score(
 	tests: TestCounts | null,
 	quality: QualityCounts | null,
-): {
-	tests: TestCounts | null;
-	quality: QualityCounts | null;
-	testRate: number | null;
-	qualityRate: number | null;
-	score: number | null;
-} {
+): { tests: TestCounts | null; quality: QualityCounts | null; testRate: number | null; qualityRate: number | null; score: number | null } {
 	const testTotal = tests ? tests.passed + tests.failed : 0;
 	const testRate = tests && testTotal > 0 ? tests.passed / testTotal : null;
 	const qualityRate = quality && quality.enabled > 0 ? quality.clean / quality.enabled : null;

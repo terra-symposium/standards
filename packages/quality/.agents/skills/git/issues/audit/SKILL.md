@@ -24,7 +24,8 @@ Classify every open issue for the requested repository using current repository 
 6. Update interviewed issues for handoff.
    Add confirmed scope, decisions, criteria, exclusions, and tests.
    Use a concise reply only when editing the description is unsuitable.
-7. Report each issue URL, status, evidence, confidence, blockers, and next action.
+7. For each **Complete** finding, check whether the issue already has current reviewer-ready evidence. If it does not, use the procedure in [Reviewer-ready completion evidence](#reviewer-ready-completion-evidence).
+8. Report each issue URL, status, evidence, confidence, blockers, and next action.
 
 ## Evidence
 
@@ -41,6 +42,14 @@ Keep secrets and credentials out of issue updates.
 
 Update issues only with interview answers and handoff evidence.
 Do not change labels, close issues, or mutate PRs unless asked.
+
+## Reviewer-ready completion evidence
+
+When the user has authorized issue updates, add a concise issue comment for a completed finding if no current evidence comment already includes both a working test/demo link and screenshots of the behavior. Prefer the existing Playwright fixture and a focused browser run. If no suitable demo exists, add one to the repository's Docs instance when applicable, using the fixture the browser tests already cover.
+
+Capture screenshots from the running interface after the relevant action succeeds. Attach them to the issue with short captions or alt text that say what each image demonstrates. Include a direct test link and a brief description of the flow and any limits, such as sample responses when no server key is configured. Reuse existing current evidence instead of posting duplicates. Never claim a mock fixture exercised the external service.
+
+Use a publicly reachable route for the test link; do not post `localhost` URLs. Expose a local preview only when the user has asked for it, and say when that link depends on the local process remaining available. If no safe public test surface or screenshot attachment path is available, report the specific blocker instead of claiming the evidence is attached. Set a project review status only when the user asks; keep the issue open unless they explicitly request closure.
 
 ## Report
 
