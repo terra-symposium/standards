@@ -1,7 +1,24 @@
 #!/usr/bin/env node
+
+/*//////////////////////////////////////////////////
+IMPORTS
+//////////////////////////////////////////////////*/
+
+// API
 import { resolve } from 'node:path';
 import { runTestPlan } from './index.mjs';
 
+/*//////////////////////////////////////////////////
+HELPERS
+//////////////////////////////////////////////////*/
+
+/**
+ * Parses the workspace test-runner command-line options.
+ *
+ * @param args Arguments following the CLI executable name.
+ *
+ * @return The selected root, manifest, suites, and shared-suite mode.
+ */
 function parseArgs(args) {
 	const [cmd, ...rest] = args;
 	if (cmd !== 'run') throw new Error('Usage: terra-test run [--root <path>] [--manifest <path>] [--suites <name,name>] [--shared-only]');
@@ -29,7 +46,6 @@ function parseArgs(args) {
 	}
 	return options;
 }
-
 try {
 	const result = runTestPlan(parseArgs(process.argv.slice(2)));
 	if (result.failed) process.exitCode = 1;

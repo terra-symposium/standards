@@ -7,7 +7,7 @@ IMPORTS
 //////////////////////////////////////////////////*/
 
 // API
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { isAbsolute, relative, resolve, sep } from 'node:path';
 import { spawnSync } from 'node:child_process';
 
@@ -21,20 +21,42 @@ const isInside = (root, path) => {
 	return rel === '' || (rel !== '..' && !rel.startsWith(`..${sep}`) && !isAbsolute(rel));
 };
 
+/*//////////////////////////////////////////////////
+HELPERS
+//////////////////////////////////////////////////*/
+
+/**
+ * Recursively lists source files under test directories and test-named files.
+ *
+ * @param root Directory to search for workspace tests.
+ *
+ * @return Repository-relative, slash-normalized test file paths.
+ */
 function listTestFiles(root) {
 	const files = [];
-	const visit = (directory) => {
-		for (const entry of readdirSync(directory, { withFileTypes: true })) {
+	const visit = (dir) => {
+		for (const entry of readdirSync(dir, { withFileTypes: true })) {
 			if (entry.name === 'node_modules' || entry.name === '.git') continue;
-			const path = resolve(directory, entry.name);
+			const path = resolve(dir, entry.name);
 			if (entry.isDirectory()) visit(path);
-			else if (entry.isFile() && ((/(^|\/)(test|tests)\//u.test(relative(root, path).replaceAll('\\', '/')) && /\.[cm]?[jt]sx?$/u.test(entry.name)) || /\.(?:test|spec)\.[cm]?[jt]sx?$/u.test(entry.name))) files.push(relative(root, path).replaceAll('\\', '/'));
+			else if (
+				entry.isFile() &&
+				((/(^|\/)(test|tests)\//u.test(relative(root, path).replaceAll('\\', '/')) && /\.[cm]?[jt]sx?$/u.test(entry.name)) || /\.(?:test|spec)\.[cm]?[jt]sx?$/u.test(entry.name))
+			)
+				files.push(relative(root, path).replaceAll('\\', '/'));
 		}
 	};
 	visit(root);
 	return files;
 }
 
+/**
+ * Converts the supported glob syntax into a regular expression.
+ *
+ * @param pattern Glob pattern using `*`, `**`, and `?` wildcards.
+ *
+ * @return A regular expression that matches the complete normalized path.
+ */
 function globRegex(pattern) {
 	let source = '^';
 	for (let i = 0; i < pattern.length; i++) {
@@ -42,18 +64,16 @@ function globRegex(pattern) {
 		if (char === '*') {
 			if (pattern[i + 1] === '*') {
 				i++;
-				if (pattern[i + 1] === '/') { i++; source += '(?:.*/)?'; }
-				else source += '.*';
+				if (pattern[i + 1] === '/') {
+					i++;
+					source += '(?:.*/)?';
+				} else source += '.*';
 			} else source += '[^/]*';
 		} else if (char === '?') source += '[^/]';
 		else source += char.replace(/[|\\{}()[\]^$+?.]/gu, '\\$&');
 	}
 	return new RegExp(`${source}$`, 'u');
 }
-
-/*//////////////////////////////////////////////////
-HELPERS
-//////////////////////////////////////////////////*/
 
 /**
  * Checks the current GitHub event range against the shared linear-history policy.

@@ -9,12 +9,12 @@ IMPORTS
 
 // API
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 import test from 'node:test';
+import { execFileSync } from 'node:child_process';
+import { join } from 'node:path';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { readTestPlan, runTestPlan, validateTestPlan } from '../src/index.mjs';
+import { tmpdir } from 'node:os';
 
 /*//////////////////////////////////////////////////
 HELPERS
@@ -23,17 +23,14 @@ HELPERS
 function fixtureRoot() {
 	return mkdtempSync(join(tmpdir(), 'standards-testing-'));
 }
-
 function git(root, ...args) {
 	return execFileSync('git', args, { cwd: root, encoding: 'utf8' }).trim();
 }
-
 function commit(root, message) {
 	git(root, 'add', '.');
 	git(root, '-c', 'user.name=Standards Tests', '-c', 'user.email=standards-tests@example.invalid', 'commit', '-m', message);
 	return git(root, 'rev-parse', 'HEAD');
 }
-
 function withGitHubEvent(root, eventName, event, run) {
 	const eventPath = join(root, 'event.json');
 	writeFileSync(eventPath, JSON.stringify(event));
@@ -50,7 +47,6 @@ function withGitHubEvent(root, eventName, event, run) {
 		else process.env.GITHUB_EVENT_NAME = previousName;
 	}
 }
-
 function initGitFixture() {
 	const root = fixtureRoot();
 	git(root, '-c', 'init.defaultBranch=development', 'init', '-q');
@@ -73,7 +69,6 @@ test('missing consumer manifests produce an empty test plan', () => {
 		rmSync(root, { recursive: true, force: true });
 	}
 });
-
 test('manifest validation rejects duplicate commands, overlapping file ownership, omitted tests, and paths outside the repository', () => {
 	const root = fixtureRoot();
 	try {
@@ -106,10 +101,7 @@ test('manifest validation rejects duplicate commands, overlapping file ownership
 				),
 			/Test file ownership overlaps/u,
 		);
-		assert.throws(
-			() => validateTestPlan({ version: 1, suites: [{ name: 'first', command: 'node', args: ['test.mjs'], owns: ['tests/unit/*.spec.mjs'] }] }, root),
-			/Test files are not owned/u,
-		);
+		assert.throws(() => validateTestPlan({ version: 1, suites: [{ name: 'first', command: 'node', args: ['test.mjs'], owns: ['tests/unit/*.spec.mjs'] }] }, root), /Test files are not owned/u);
 		assert.throws(
 			() => validateTestPlan({ version: 1, suites: [{ name: 'first', command: 'node', args: ['test.mjs'], cwd: '../outside' }] }, root),
 			/working directory must be inside the repository/u,
@@ -118,12 +110,10 @@ test('manifest validation rejects duplicate commands, overlapping file ownership
 		rmSync(root, { recursive: true, force: true });
 	}
 });
-
 function mkdirTest(root, path) {
 	mkdirSync(join(root, path, '..'), { recursive: true });
 	writeFileSync(join(root, path), '');
 }
-
 test('consumer-defined suites run once each in manifest order and aggregate into one result', () => {
 	const root = fixtureRoot();
 	const logPath = join(root, 'runs.log');
@@ -148,7 +138,6 @@ test('consumer-defined suites run once each in manifest order and aggregate into
 		rmSync(root, { recursive: true, force: true });
 	}
 });
-
 test('linear-history accepts an ancestor-only pull-request range', () => {
 	const { root, base } = initGitFixture();
 	try {
@@ -161,7 +150,6 @@ test('linear-history accepts an ancestor-only pull-request range', () => {
 		rmSync(root, { recursive: true, force: true });
 	}
 });
-
 test('linear-history rejects merge commits in a pull-request range', () => {
 	const { root, base } = initGitFixture();
 	try {
