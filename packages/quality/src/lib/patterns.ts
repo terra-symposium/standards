@@ -620,7 +620,7 @@ function regexCandidates(cfg: QualityCfg, analysis?: QualityAnalysis): RegexCand
 	const settings = cfg.regexDedup ?? {};
 	const exts = new Set(settings.extensions ?? ['.js', '.jsx', '.mjs', '.ts', '.tsx', '.mts', '.cts']);
 	const registryPath = settings.sharedModule ? resolve(cfg.root, settings.sharedModule) : '';
-	const skippedDirectories = (settings.skippedDirectories ?? []).map((directory) => resolve(cfg.root, directory));
+	const skippedDirs = (settings.skippedDirectories ?? []).map((directory) => resolve(cfg.root, directory));
 	const candidates: RegexCandidate[] = [];
 	for (const file of analysis?.files ?? srcFiles({ ...cfg, extensions: [...exts] })) {
 		const absoluteFile = resolve(file);
@@ -628,7 +628,7 @@ function regexCandidates(cfg: QualityCfg, analysis?: QualityAnalysis): RegexCand
 			!exts.has(file.slice(file.lastIndexOf('.'))) ||
 			file.endsWith('.d.mts') ||
 			(registryPath && absoluteFile === registryPath) ||
-			skippedDirectories.some((directory) => {
+			skippedDirs.some((directory) => {
 				const relativePath = relative(directory, absoluteFile);
 				return relativePath === '' || (!relativePath.startsWith('..') && !isAbsolute(relativePath));
 			})

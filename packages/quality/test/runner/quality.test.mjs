@@ -760,13 +760,25 @@ test('naming supports read-only and automatic-fix modes', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-'));
 	mkdirSync(join(root, 'src'), { recursive: true });
 	const file = join(root, 'src', 'main.ts');
-	const src = 'const organization = true;\nconst generatedPattern = /ok/;\nexport const result = [organization, generatedPattern];\n';
+	const src = 'const organization = true;\nconst generatedPattern = /ok/;\nconst image = { src: "hero.png" };\nexport const result = [organization, generatedPattern, image];\n';
 	writeFileSync(file, src);
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
 	runQualityCli(cfg, ['naming', '--all', '--warn']);
 	assert.equal(readFileSync(file, 'utf8'), src);
 	runQualityCli(cfg, ['naming', '--all']);
-	assert.equal(readFileSync(file, 'utf8'), 'const org = true;\nconst genPattern = /ok/;\nexport const result = [org, genPattern];\n');
+	assert.equal(readFileSync(file, 'utf8'), 'const org = true;\nconst genPattern = /ok/;\nconst img = { src: "hero.png" };\nexport const result = [org, genPattern, img];\n');
+});
+test('naming does not add imports for unresolved inline import types', () => {
+	const root = mkdtempSync(join(tmpdir(), 'terra-quality-inline-import-type-'));
+	mkdirSync(join(root, 'src/types'), { recursive: true });
+	const types = join(root, 'src/types/docs-page.ts');
+	const file = join(root, 'src/main.ts');
+	const src = "type Cache = import('@lib/types/docs-page').CacheRec;\nexport type Result = Cache;\n";
+	writeFileSync(types, 'export type CacheRec = { value: string };\n');
+	writeFileSync(file, src);
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
+	runQualityCli(cfg, ['naming', '--all']);
+	assert.equal(readFileSync(file, 'utf8'), src);
 });
 test('naming coerces image identifiers and applies safe prefix aliases', () => {
 	assert.equal(renameId('image'), 'img');

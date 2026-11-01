@@ -358,7 +358,7 @@ test('loadQualityCfg resolves a quality file root relative to the configuration 
 	assert.deepEqual(cfg.extensions, ['.ts']);
 	assert.deepEqual(cfg.loadTesting, { enabled: false, defaultBudget: { warnMs: 3000, failMs: 7000 } });
 	assert.equal(cfgDir, join(root, 'config'));
-	const schema = JSON.parse(readFileSync(join(process.cwd(), 'packages/quality/quality.schema.json'), 'utf8'));
+	const schema = JSON.parse(readFileSync(new URL('../../quality.schema.json', import.meta.url), 'utf8'));
 	assert.ok(schema.properties.loadTesting);
 	assert.ok(schema.$defs.loadBudget);
 });

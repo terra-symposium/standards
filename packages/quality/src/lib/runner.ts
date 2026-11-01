@@ -1921,6 +1921,19 @@ function repairMissingImports(cfg: QualityCfg, program: ts.Program, checker: ts.
 		}
 		return false;
 	};
+	/**
+	 * Checks whether a reference is already qualified by a type-only import expression.
+	 * @param n Identifier whose ancestors are inspected.
+	 *
+	 * @return Whether the identifier is part of an `import('module').Type` reference.
+	 */
+	const isImportTypeReference = (n: ts.Identifier): boolean => {
+		for (let parent: ts.Node | undefined = n.parent; parent; parent = parent.parent) {
+			if (ts.isImportTypeNode(parent)) return true;
+			if (ts.isStatement(parent)) return false;
+		}
+		return false;
+	};
 
 	// WALKTHROUGH
 	for (const src of program.getSourceFiles()) {
@@ -1946,6 +1959,7 @@ function repairMissingImports(cfg: QualityCfg, program: ts.Program, checker: ts.
 				ts.isIdentifier(n) &&
 				!intrinsicJsxTag &&
 				!propertyName &&
+				!isImportTypeReference(n) &&
 				!checker.getSymbolAtLocation(n) &&
 				!ts.isPropertyAccessExpression(n.parent) &&
 				!ts.isPropertyAccessChain(n.parent) &&
