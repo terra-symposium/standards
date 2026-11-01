@@ -357,6 +357,12 @@ function callbackKind(n: ts.Identifier): RenameKind | undefined {
 	};
 	collect(callback);
 	for (const declaration of declarations) {
+		if (declaration === n) continue;
+		const declarationParam = ts.findAncestor(declaration, ts.isParameter);
+		const numericIndex = !!declarationParam && callback.parameters.indexOf(declarationParam) === 1 && declaration.text === 'index';
+		if (renameId(declaration.text, { callback: true, numericIndex }) === declaration.text) reserved.add(declaration.text);
+	}
+	for (const declaration of declarations) {
 		if (declaration === n) return { callback: true, numericIndex: callback.parameters.indexOf(param) === 1 && n.text === 'index', reserved: [...reserved] };
 		const declarationParam = ts.findAncestor(declaration, ts.isParameter);
 		reserved.add(

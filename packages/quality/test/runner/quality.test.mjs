@@ -907,6 +907,15 @@ test('naming allocates distinct aliases across one destructured callback paramet
 	runQualityCli(cfg, ['naming', '--all']);
 	assert.equal(readFileSync(file, 'utf8'), 'const output = pairs.map(([i, v]) => v(i));\nvoid output;\n');
 });
+test('naming avoids collisions between callback aliases and existing short parameters', () => {
+	const root = mkdtempSync(join(tmpdir(), 'terra-quality-callback-param-collisions-'));
+	mkdirSync(join(root, 'src'));
+	const file = join(root, 'src', 'main.ts');
+	writeFileSync(file, 'const output = pairs.map((item, index) => item[index]);\nvoid output;\n');
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
+	runQualityCli(cfg, ['naming', '--all']);
+	assert.equal(readFileSync(file, 'utf8'), 'const output = pairs.map((i, v) => i[v]);\nvoid output;\n');
+});
 test('callback renames do not alter unrelated JSDoc parameters with the same name', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-callbacks-'));
 	mkdirSync(join(root, 'src'));
