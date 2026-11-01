@@ -199,7 +199,7 @@ async function main(): Promise<void> {
 		rmSync(temporaryRoot, { recursive: true, force: true });
 	}
 }
-main().catch((error: unknown) => {
-	console.error(error instanceof Error ? error.message : 'Local report import failed.');
+main().catch((err: unknown) => {
+	console.error(err instanceof Error ? err.message : 'Local report import failed.');
 	process.exitCode = 1;
 });

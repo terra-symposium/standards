@@ -51,7 +51,7 @@ test('documented commands diagnose and fix only deprecated pnpm directory flags 
 	);
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], documentation: { commandRoots: ['docs'] } });
 	assert.deepEqual(
-		documentedCommandFindings(cfg).map(({ line, command }) => [line, command]),
+		documentedCommandFindings(cfg).map(({ line, command: cmd }) => [line, cmd]),
 		[
 			[3, 'pnpm -C packages/app test'],
 			[4, 'pnpm --prefix "packages/docs" build -- --watch'],

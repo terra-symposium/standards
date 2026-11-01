@@ -23,9 +23,9 @@ const packagesRoot = join(repoRoot, 'packages');
 const genDir = join(repoRoot, 'scripts/docs');
 const dataPath = join(genDir, 'skills.generated.json');
 const skillRoots = [];
-const packageEntries = await readdir(packagesRoot, { withFileTypes: true }).catch((error) => {
-	if (error.code === 'ENOENT') return [];
-	throw error;
+const packageEntries = await readdir(packagesRoot, { withFileTypes: true }).catch((err) => {
+	if (err.code === 'ENOENT') return [];
+	throw err;
 });
 const skillsByRoot = await Promise.all(
 	skillRoots.map(async ({ package: packageName, path: root }) =>

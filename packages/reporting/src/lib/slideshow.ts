@@ -681,8 +681,8 @@ export const writeScreenshotSlideshowFromDirectory = async (dir: string, file: s
  * @param opts Presentation metadata applied to the aggregate deck.
  */
 export const writeScreenshotSlideshowFromDirectories = async (file: string, sources: readonly ScreenshotDirectorySource[], opts: ScreenshotSlideshowOptions = {}): Promise<void> => {
-	const captures = sources.flatMap(({ label, directory, runId }) =>
-		readScreenshotCapturesFromDirectory(directory, runId)
+	const captures = sources.flatMap(({ label, directory: dir, runId }) =>
+		readScreenshotCapturesFromDirectory(dir, runId)
 			.filter((capture) => !runId || capture.runId === runId)
 			.map((capture) => ({ ...capture, group: `${label}/${capture.group}`, key: `${label}/${capture.key}`, title: `${label} · ${capture.title}` })),
 	);

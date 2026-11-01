@@ -945,6 +945,24 @@ test('naming fix mode leaves protected component paths unchanged', () => {
 	runQualityCli(cfg, ['naming', '--all']);
 	assert.equal(readFileSync(file, 'utf8'), src);
 });
+test('naming coerces configured identifiers in callback parameters', () => {
+	const root = mkdtempSync(join(tmpdir(), 'terra-quality-callback-coercion-'));
+	mkdirSync(join(root, 'src'));
+	const file = join(root, 'src', 'main.ts');
+	writeFileSync(file, 'const output = input.map((image) => image.src);\nvoid output;\n');
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
+	runQualityCli(cfg, ['naming', '--all']);
+	assert.equal(readFileSync(file, 'utf8'), 'const output = input.map((img) => img.src);\nvoid output;\n');
+});
+test('naming preserves callback identifiers when a configured replacement would capture an outer name', () => {
+	const root = mkdtempSync(join(tmpdir(), 'terra-quality-callback-coercion-collision-'));
+	mkdirSync(join(root, 'src'));
+	const file = join(root, 'src', 'main.ts');
+	writeFileSync(file, 'const img = {};\nconst output = input.map((image) => [image, img]);\nvoid output;\n');
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
+	runQualityCli(cfg, ['naming', '--all']);
+	assert.equal(readFileSync(file, 'utf8'), 'const img = {};\nconst output = input.map((image) => [image, img]);\nvoid output;\n');
+});
 test('naming fixes PascalCase declarations, catch variables, and destructuring without changing property keys', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-naming-cases-'));
 	mkdirSync(join(root, 'src'));

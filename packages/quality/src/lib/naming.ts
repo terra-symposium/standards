@@ -248,10 +248,13 @@ export function callbackAlias(name: string, reserved: string[] = []): string {
 export function renameId(name: string, kind: RenameKind = {}): string {
 	if (PROTECTED_IDENTIFIERS.has(name) || name === '_') return name;
 	if (kind.numericIndex && name === 'index') return callbackAlias('item', kind.reserved);
-	if (kind.callback) return callbackAlias(name, kind.reserved);
+	if (kind.callback) {
+		const alias = callbackAlias(name, kind.reserved);
+		if (alias !== name) return alias;
+	}
 	const tokens = identifierTokens(name);
 	if (!tokens.some((t) => Object.hasOwn(IDENTIFIER_REPLACEMENTS, t.toLowerCase()) || Object.hasOwn(PREFIX_REPLACEMENTS, t.toLowerCase()))) return name;
-	return renderIdentifier(
+	const replacement = renderIdentifier(
 		name,
 		tokens.map((t, i) => {
 			const lower = t.toLowerCase();
@@ -262,6 +265,7 @@ export function renameId(name: string, kind: RenameKind = {}): string {
 			return replacement === t ? t : tokenCase(t, replacement);
 		}),
 	);
+	return kind.callback && kind.reserved?.includes(replacement) ? name : replacement;
 }
 
 /**

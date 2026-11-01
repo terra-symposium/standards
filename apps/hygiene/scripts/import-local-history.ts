@@ -109,7 +109,7 @@ async function main(): Promise<void> {
 		rmSync(temporaryRoot, { recursive: true, force: true });
 	}
 }
-main().catch((error: unknown) => {
-	console.error(error instanceof Error ? error.message : 'Local history import failed.');
+main().catch((err: unknown) => {
+	console.error(err instanceof Error ? err.message : 'Local history import failed.');
 	process.exitCode = 1;
 });

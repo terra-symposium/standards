@@ -106,14 +106,14 @@ function run(executable: string, executableArgs: string[]): Promise<void> {
 		const forwardTerminate = () => child.kill('SIGTERM');
 		process.once('SIGINT', forwardInterrupt);
 		process.once('SIGTERM', forwardTerminate);
-		child.once('error', (error) => {
-			console.error('[terra-quality-dev] Could not start the dev server: ' + error.message);
+		child.once('error', (err) => {
+			console.error('[terra-quality-dev] Could not start the dev server: ' + err.message);
 			finish(1, null);
 		});
 		child.once('exit', finish);
 	});
 }
-main().catch((error) => {
-	console.error('[terra-quality-dev] ' + (error instanceof Error ? error.message : String(error)));
+main().catch((err) => {
+	console.error('[terra-quality-dev] ' + (err instanceof Error ? err.message : String(err)));
 	process.exitCode = 1;
 });

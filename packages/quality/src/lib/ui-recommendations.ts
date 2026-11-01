@@ -168,8 +168,8 @@ function isIgnoredFile(file: string, ignoredDirs: string[], ignoredFiles: Set<st
 	return (
 		primitiveDir ||
 		ignoredFiles.has(norm) ||
-		ignoredDirs.some((directory) => {
-			const prefix = directory.replaceAll('\\', '/').replace(/^\/+|\/+$/gu, '');
+		ignoredDirs.some((dir) => {
+			const prefix = dir.replaceAll('\\', '/').replace(/^\/+|\/+$/gu, '');
 			return prefix && (norm === prefix || norm.startsWith(`${prefix}/`));
 		})
 	);

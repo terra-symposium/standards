@@ -1125,7 +1125,7 @@ function reportFailedLangChecks(cfg: QualityCfg, failed: SkippedLanguageCheck[])
  */
 function runLangProfileFixes(cfg: QualityCfg, checks: ResolvedLanguageCheck[], toolResults: Map<string, ReturnType<typeof inspectLanguageProfileTool>>): void {
 	for (const check of checks) {
-		if (!check.autofix || cfg.qualityCommands?.some((command) => command.name === check.name) || !qualityAutofixEnabled(cfg, check.autofix.name) || !qualityCmdEnabled(cfg, check.name)) continue;
+		if (!check.autofix || cfg.qualityCommands?.some((cmd) => cmd.name === check.name) || !qualityAutofixEnabled(cfg, check.autofix.name) || !qualityCmdEnabled(cfg, check.name)) continue;
 		if (check.tool) {
 			const toolKey = JSON.stringify([check.tool.command, check.tool.versionArgs, check.tool.minimumVersion]);
 			let toolResult = toolResults.get(toolKey);
@@ -2819,13 +2819,13 @@ function runTailwindCanonicalCheck(cfg: QualityCfg, fix: boolean): Promise<void>
 		},
 	}).then(
 		() => (skipped ? printSkippedCheckStatus('tailwind-canonical') : printCheckStatus('tailwind-canonical', 0)),
-		(error: unknown) => {
+		(err: unknown) => {
 			const stage = reportStages?.get('tailwind-canonical');
 			if (stage) {
 				stage.status = 'failed';
-				stage.findings = Number(/failed with (\d+) suggestion/.exec(error instanceof Error ? error.message : '')?.[1] ?? 0);
+				stage.findings = Number(/failed with (\d+) suggestion/.exec(err instanceof Error ? err.message : '')?.[1] ?? 0);
 			}
-			throw error;
+			throw err;
 		},
 	);
 }
@@ -3334,9 +3334,9 @@ export function runQualityCli(cfg: QualityCfg, args = process.argv.slice(2)): vo
 			'ui-patterns',
 			'github',
 		];
-		const capabilities = Object.entries(LANGUAGE_CAPABILITIES).flatMap(([language, capability]) => [
-			...Object.entries(capability.checks).map(([name, i]) => ({ language, kind: 'check' as const, name, ...i })),
-			...Object.entries(capability.autofixes).map(([name, i]) => ({ language, kind: 'autofix' as const, name, ...i })),
+		const capabilities = Object.entries(LANGUAGE_CAPABILITIES).flatMap(([lang, capability]) => [
+			...Object.entries(capability.checks).map(([name, i]) => ({ language: lang, kind: 'check' as const, name, ...i })),
+			...Object.entries(capability.autofixes).map(([name, i]) => ({ language: lang, kind: 'autofix' as const, name, ...i })),
 		]);
 		const notApplicableChecks = capabilities
 			.filter((i) => i.kind === 'check' && i.status === 'not-applicable')
@@ -3506,8 +3506,8 @@ function runFullQuality(cfg: QualityCfg, args: string[], opts: QualityOptions): 
 	};
 	if (cfg.tailwindCanonical && qualityCheckEnabled(cfg, 'tailwind-canonical'))
 		return runTailwindCanonicalCheck(cfg, fix('tailwindCanonical'))
-			.catch((error: unknown) => {
-				recordQualityFailure('tailwind-canonical', error);
+			.catch((err: unknown) => {
+				recordQualityFailure('tailwind-canonical', err);
 				printCheckStatus('tailwind-canonical', 1);
 			})
 			.then(continueStaticAndLater);
@@ -3869,9 +3869,9 @@ export function runTypecheck(cfg: QualityCfg, args: string[] = []): void {
 }
 if (process.argv[1] && realpathSync(resolve(process.argv[1])) === realpathSync(fileURLToPath(import.meta.url))) {
 	setQualityProgressSuppressed(true);
-	Promise.resolve(runQualityFromCfg()).catch((error: unknown) => {
+	Promise.resolve(runQualityFromCfg()).catch((err: unknown) => {
 		stopQualitySpinner();
-		console.error(error instanceof Error ? error.message : error);
+		console.error(err instanceof Error ? err.message : err);
 		process.exitCode = 1;
 	});
 }

@@ -1013,7 +1013,7 @@ function documentationSupported(fileName: string): boolean {
 function documentationSourceIncluded(cfg: QualityCfg, file: string): boolean {
 	return !relative(cfg.root, file)
 		.split(sep)
-		.some((directory) => ['generated', 'vendor', 'target', 'out'].includes(directory));
+		.some((dir) => ['generated', 'vendor', 'target', 'out'].includes(dir));
 }
 
 /**

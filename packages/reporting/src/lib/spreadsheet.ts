@@ -350,21 +350,21 @@ const copyWorksheet = (source: ExcelJS.Worksheet, target: ExcelJS.Worksheet, sou
 	target.pageSetup = structuredClone(source.pageSetup);
 	target.headerFooter = structuredClone(source.headerFooter);
 	target.state = source.state;
-	target.columns = source.columns.map((column) => ({
-		width: column.width,
-		hidden: column.hidden,
-		outlineLevel: column.outlineLevel,
-		style: structuredClone(column.style),
-		header: structuredClone(column.header),
-		key: column.key,
+	target.columns = source.columns.map((col) => ({
+		width: col.width,
+		hidden: col.hidden,
+		outlineLevel: col.outlineLevel,
+		style: structuredClone(col.style),
+		header: structuredClone(col.header),
+		key: col.key,
 	}));
 	source.eachRow({ includeEmpty: true }, (row, rowNumber) => {
 		const targetRow = target.getRow(rowNumber);
 		targetRow.height = row.height;
 		targetRow.hidden = row.hidden;
 		targetRow.outlineLevel = row.outlineLevel;
-		row.eachCell({ includeEmpty: true }, (cell, columnNumber) => {
-			const targetCell = targetRow.getCell(columnNumber);
+		row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+			const targetCell = targetRow.getCell(colNumber);
 			targetCell.value = structuredClone(cell.value);
 			targetCell.style = structuredClone(cell.style);
 			if (cell.note) targetCell.note = structuredClone(cell.note);
@@ -412,8 +412,8 @@ export const mergeSpreadsheets = async (file: string, sources: readonly Spreadsh
 			const row = sourceSummary.getRow(rowNumber);
 			if (!row.hasValues) continue;
 			const aggregateRow = summary.addRow([label, ...valuesForRow(row)]);
-			row.eachCell({ includeEmpty: true }, (sourceCell, columnNumber) => {
-				aggregateRow.getCell(columnNumber + 1).style = structuredClone(sourceCell.style);
+			row.eachCell({ includeEmpty: true }, (sourceCell, colNumber) => {
+				aggregateRow.getCell(colNumber + 1).style = structuredClone(sourceCell.style);
 			});
 		}
 		for (const sourceSheet of sourceBook.worksheets) {

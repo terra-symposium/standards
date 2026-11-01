@@ -560,12 +560,12 @@ function addMeetingSlide(deck, section, colors, page, sources) {
 	const slide = deck.slides.add();
 	slide.background.fill = colors.surface;
 	header(slide, meeting.title ?? `${section.name} · meeting notes`, page, colors);
-	meeting.columns.forEach((column, i) => {
+	meeting.columns.forEach((col, i) => {
 		const left = 58 + (i % 2) * 582;
 		const top = 164 + Math.floor(i / 2) * 226;
 		card(slide, { left, top, width: 556, height: 192 }, colors, `meeting-${page}-${i}`, i === 0 ? colors.tone : colors.surface);
-		addText(slide, column.title, { left: left + 24, top: top + 20, width: 500, height: 22 }, { fontSize: 20, color: colors.text, maxChars: 34 }, `meeting-title-${page}-${i}`);
-		addText(slide, column.body.join('\n'), { left: left + 24, top: top + 58, width: 500, height: 112 }, { fontSize: 16, color: colors.muted, maxChars: 58 }, `meeting-body-${page}-${i}`);
+		addText(slide, col.title, { left: left + 24, top: top + 20, width: 500, height: 22 }, { fontSize: 20, color: colors.text, maxChars: 34 }, `meeting-title-${page}-${i}`);
+		addText(slide, col.body.join('\n'), { left: left + 24, top: top + 58, width: 500, height: 112 }, { fontSize: 16, color: colors.muted, maxChars: 58 }, `meeting-body-${page}-${i}`);
 	});
 	footer(slide, meeting.footer ?? 'Meeting notes provide context; GitHub and Git remain the delivery evidence.', page, colors);
 	notes(slide, [...sources, ...(meeting.sources ?? [])]);
@@ -711,11 +711,11 @@ async function main() {
 		const slide = deck.slides.add();
 		slide.background.fill = colors.surface;
 		header(slide, report.access.title, page, colors);
-		report.access.columns.forEach((column, i) => {
+		report.access.columns.forEach((col, i) => {
 			const left = 58 + i * 388;
 			card(slide, { left, top: 168, width: 352, height: 320 }, colors, `access-${i}`, i === 0 ? colors.tone : colors.surface);
-			addText(slide, column.title, { left: left + 26, top: 194, width: 292, height: 24 }, { fontSize: 20, color: colors.text, maxChars: 30 }, `access-title-${i}`);
-			addText(slide, column.body.join('\n'), { left: left + 26, top: 244, width: 292, height: 200 }, { fontSize: 16, color: colors.muted, maxChars: 38 }, `access-body-${i}`);
+			addText(slide, col.title, { left: left + 26, top: 194, width: 292, height: 24 }, { fontSize: 20, color: colors.text, maxChars: 30 }, `access-title-${i}`);
+			addText(slide, col.body.join('\n'), { left: left + 26, top: 244, width: 292, height: 200 }, { fontSize: 16, color: colors.muted, maxChars: 38 }, `access-body-${i}`);
 		});
 		footer(slide, report.access.footer, page, colors);
 		notes(slide, [...sources, ...(report.access.sources ?? [])]);
@@ -899,11 +899,11 @@ async function main() {
 		const slide = deck.slides.add();
 		slide.background.fill = colors.surface;
 		header(slide, report.method.title, page, colors);
-		report.method.columns.forEach((column, i) => {
+		report.method.columns.forEach((col, i) => {
 			const left = 58 + i * 388;
 			card(slide, { left, top: 168, width: 352, height: 280 }, colors, `method-${i}`, i % 2 ? colors.surface : colors.tone);
-			addText(slide, column.title, { left: left + 26, top: 194, width: 292, height: 24 }, { fontSize: 20, color: colors.text, maxChars: 31 }, `method-title-${i}`);
-			addText(slide, column.body.join('\n'), { left: left + 26, top: 244, width: 292, height: 158 }, { fontSize: 16, color: colors.muted, maxChars: 38 }, `method-body-${i}`);
+			addText(slide, col.title, { left: left + 26, top: 194, width: 292, height: 24 }, { fontSize: 20, color: colors.text, maxChars: 31 }, `method-title-${i}`);
+			addText(slide, col.body.join('\n'), { left: left + 26, top: 244, width: 292, height: 158 }, { fontSize: 16, color: colors.muted, maxChars: 38 }, `method-body-${i}`);
 		});
 		footer(slide, report.method.footer, page, colors);
 		notes(slide, sources);
@@ -920,7 +920,7 @@ if (!report.bigFive)
 	throw new Error(
 		'A Big Five progress timeline is required. Assess every objective against the complete Git history on the requested refs through the report end date, then supply deliverable assessments with full commit SHAs.',
 	);
-main().catch((error) => {
-	console.error(error);
+main().catch((err) => {
+	console.error(err);
 	process.exitCode = 1;
 });
