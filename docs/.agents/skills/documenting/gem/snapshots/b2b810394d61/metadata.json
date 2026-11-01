@@ -3,7 +3,7 @@
 	"gem": {
 		"id": "b2b810394d61",
 		"name": "Document",
-		"description": "Write markdown docs for terra docs."
+		"description": "Write markdown docs for docs."
 	},
 	"lastObserved": "2026-10-23",
 	"source": "Live Gemini Gem editor inspected in Dia during this task.",

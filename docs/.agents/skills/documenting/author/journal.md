@@ -1,6 +1,6 @@
 # Prompt journal
 
-Immutable prompt, Gem-update, failure, and validation records for the Terra Docs Document Gem. Records are preserved in numeric order.
+Immutable prompt, Gem-update, failure, and validation records for the Docs Document Gem. Records are preserved in numeric order.
 
 ---
 
@@ -9,7 +9,7 @@ Immutable prompt, Gem-update, failure, and validation records for the Terra Docs
 - Captured: 2026-09-11
 - Gem ID: `b2b810394d61`
 - Name: `Document`
-- Description: `Write markdown docs for terra docs.`
+- Description: `Write markdown docs for docs.`
 - Knowledge before iteration:
   - `docs.tsx`
   - `ns1Jhrj96oySML10X1Y99D.mdx` (Executive / Management / Documentation)
@@ -22,9 +22,9 @@ You are only permitted to return code blocks containing markdown compatible with
 
 ## Journal record: 002-terra-docs-production-style-context.md
 
-# Terra Docs production style context
+# Docs production style context
 
-This file is a read-only reference for agents iterating on Canvas-to-Terra-Docs generation. It was assembled from production leaves read through the Terra Docs MCP on 2026-09-11. The source examples are included to show both the factual density and the canonical Markdown/MDX form expected by the Docs parser.
+This file is a read-only reference for agents iterating on Canvas-to-Terra-Docs generation. It was assembled from production leaves read through the Docs MCP on 2026-09-11. The source examples are included to show both the factual density and the canonical Markdown/MDX form expected by the Docs parser.
 
 ## Observed production conventions
 
@@ -233,7 +233,7 @@ Apply every rule below before responding:
 5. Return raw Markdown/MDX text inside the fence. Never return JSON, an object, an array, a string literal, or fields such as `content`, `markdown`, `source`, `task`, or `errors`.
 6. If you cannot satisfy a formatting preference, preserve the output protocol and source facts first. Never explain the conflict outside the fence.
 
-## Terra Docs form
+## Docs form
 
 Use only the vocabulary supported by the attached `sanity/schemas/docs.tsx` and renderer examples:
 
@@ -261,7 +261,7 @@ Before sending, inspect the complete response silently. Reject and regenerate yo
 
 ## Intended verification
 
-Use a non-headed Chrome/Playwright session with a saved local Canvas capture. Do not call a Sanity mutation. A response is successful only when the raw response satisfies the complete output protocol and the normalised body contains valid Terra Docs blocks.
+Use a non-headed Chrome/Playwright session with a saved local Canvas capture. Do not call a Sanity mutation. A response is successful only when the raw response satisfies the complete output protocol and the normalised body contains valid Docs blocks.
 
 ---
 
@@ -277,7 +277,7 @@ Use a non-headed Chrome/Playwright session with a saved local Canvas capture. Do
 This is the exact instruction saved to the Gem in this iteration:
 
 ```text
-You are the Terra Symposium DOCUMENT Gem. Convert the supplied Canvas page body and attachments into one Terra Docs leaf.
+You are the Terra Symposium DOCUMENT Gem. Convert the supplied Canvas page body and attachments into one Docs leaf.
 
 OUTPUT CONTRACT — obey before all style guidance:
 • Return exactly one fenced Markdown code block and nothing else.
@@ -321,7 +321,7 @@ This iteration makes the local strict generation contract the single source for 
 
 The attached context is deliberately local and includes:
 
-- the production-style Markdown reference assembled from Terra Docs MCP leaves;
+- the production-style Markdown reference assembled from Docs MCP leaves;
 - the Fast-mode contract log;
 - the Docs schema;
 - and the Canvas Playwright scraper.
@@ -344,7 +344,7 @@ The Playwright update test now uses Gemini’s actual populated instruction comp
 
 The exact instruction is the shared `GEMINI_LEAF_PROMPT` in `scripts/generation/_gemini.ts`, logged verbatim in `003-fast-mode-contract.md`. The saved knowledge set is:
 
-- `002-terra-docs-production-style-context.md` — production Terra Docs form/content examples;
+- `002-terra-docs-production-style-context.md` — production Docs form/content examples;
 - `003-fast-mode-contract.md` — output contract and Fast-mode failure guards;
 - `docs.tsx` — schema and schema examples; and
 - `canvas.mts` — the Canvas Playwright capture workflow.

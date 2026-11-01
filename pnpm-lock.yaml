@@ -23,8 +23,8 @@ importers:
         specifier: ^10.0.1
         version: 10.0.1(eslint@10.13.0(jiti@2.7.0))
       '@terra-symposium/docs':
-        specifier: ^0.1.80
-        version: 0.1.80(@astrojs/markdown-satteri@0.4.5)(@types/node@26.6.5)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(xstate@5.33.3)
+        specifier: ^0.1.81
+        version: 0.1.81(@astrojs/markdown-satteri@0.4.5)(@types/node@26.6.5)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(xstate@5.33.3)
       '@types/node':
         specifier: ^26.6.5
         version: 26.6.5
@@ -2136,8 +2136,8 @@ packages:
     peerDependencies:
       tailwindcss: '>=3.0.0 || >=4.0.0 || insiders'
 
-  '@terra-symposium/docs@0.1.80':
-    resolution: {integrity: sha512-nZr1H2VwYdywiyRdwIeonlvBCA1CS2H01VCglaBIJTCq11SlC/83hp2X4/c3VVi/Mu6KakpqJ2gHPcZ6uIlJ+Q==}
+  '@terra-symposium/docs@0.1.81':
+    resolution: {integrity: sha512-lKPygg1ZQjcMJy0+Y2WIqVJKOCNs55oQPh4y2mEHhW8S7kL7cRJLDH1LBC9nt/6X3rrDkt6C9ODpx9zo02BqSg==}
     engines: {node: '>=24.12.0'}
     hasBin: true
 
@@ -6678,7 +6678,7 @@ snapshots:
       postcss-selector-parser: 7.1.6
       tailwindcss: 3.4.19(tsx@4.23.15)(yaml@2.9.1)
 
-  '@terra-symposium/docs@0.1.80(@astrojs/markdown-satteri@0.4.5)(@types/node@26.6.5)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(xstate@5.33.3)':
+  '@terra-symposium/docs@0.1.81(@astrojs/markdown-satteri@0.4.5)(@types/node@26.6.5)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(xstate@5.33.3)':
     dependencies:
       '@astrojs/markdown-remark': 7.3.5
       '@astrojs/mdx': 8.1.2(@astrojs/markdown-remark@7.3.5)(@astrojs/markdown-satteri@0.4.5)(astro@7.4.2(@astrojs/markdown-remark@7.3.5)(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))

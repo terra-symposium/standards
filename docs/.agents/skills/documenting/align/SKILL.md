@@ -5,11 +5,11 @@ description: Iterate Gemini generated content comparing to production Docs refer
 
 # Canvas Docs Generation Iteration
 
-Use only to improve the Canvas source adapter for Terra Docs generation. For general authoring, follow [`author`](../author/SKILL.md); for saved Gem changes, follow [`gem`](../gem/SKILL.md). The goal is production-like structure, information density, and block choice, not merely parseable output.
+Use only to improve the Canvas source adapter for Docs generation. For general authoring, follow [`author`](../author/SKILL.md); for saved Gem changes, follow [`gem`](../gem/SKILL.md). The goal is production-like structure, information density, and block choice, not merely parseable output.
 
 ## Safety and inputs
 
-- Read production examples and target facts through Terra Docs MCP.
+- Read production examples and target facts through Docs MCP.
 - Never call `docs.leaf.generate`, `docs.leaf.write`, or another Sanity mutation. Save artifacts locally, such as in Downloads.
 - Use Playwright Chrome for the explicitly requested Gem edit and generation. Do not use Dia automation or hijack the user's Dia session.
 - Reuse the authenticated Gemini browser profile. Normal iteration is non-headed; headed mode is for explicit sign-in or visual inspection. Stop on authentication failure instead of opening another session.

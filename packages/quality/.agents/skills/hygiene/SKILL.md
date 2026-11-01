@@ -50,7 +50,7 @@ Use comments to expose structure, intent, boundaries, and contracts that are dif
 
 ### Workflow
 
-1. Work in the user-supplied Terra checkout and treat its `.agents` directory as authoritative; ignore stale sibling checkouts. Inspect the repository's quality configuration and representative neighboring files before editing. If the Terra Docs MCP is available, search for the commenting practice leaf under `Development`, read it, and treat it as the project-specific source of truth.
+1. Work in the user-supplied Terra checkout and treat its `.agents` directory as authoritative; ignore stale sibling checkouts. Inspect the repository's quality configuration and representative neighboring files before editing. If the Docs MCP is available, search for the commenting practice leaf under `Development`, read it, and treat it as the project-specific source of truth.
 2. Map the file before changing it: imports, configuration/constants/types, helpers, public components/functions, side effects, and tests. Identify repeated section fences, orphaned labels, duplicated imports, and functions that contain multiple unrelated responsibilities.
 3. Reorganize code into coherent sections without changing behavior. Keep declarations close to the code they explain, preserve dependency order, and update imports/exports and tests when a split or merge changes module boundaries.
 4. Add or repair comments only where they clarify why, contract, lifecycle, data flow, security boundary, or phase. Re-read each comment against the implementation after the edit.

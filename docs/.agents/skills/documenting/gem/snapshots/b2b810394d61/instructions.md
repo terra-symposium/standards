@@ -4,7 +4,7 @@ Snapshot status: this is the repository's local `geminiPrompt()` source, not a v
 
 ```text
 write this leaf
-use the Terra Docs markdown dialect defined by sanity/schemas/docs.tsx
+use the Docs markdown dialect defined by sanity/schemas/docs.tsx
 write only the leaf body
 markdown is not a field
 the response body must be a single fenced markdown code block and nothing else
@@ -16,7 +16,7 @@ if you need a code sample, use the canonical <Code> component syntax exactly as:
 	code here
 	</Code>
 never use bare braces for code samples, and never use triple backticks inside the body
-do not use plain GitHub-flavoured markdown when the schema expects Terra Docs blocks
+do not use plain GitHub-flavoured markdown when the schema expects Docs blocks
 do not invent html or jsx tags such as <AccordionItem>, <TabItem>, <TabsList>, or <CalloutBody>
 do not use triple backticks anywhere outside the outer response fence
 always use <Code> for code samples and examples

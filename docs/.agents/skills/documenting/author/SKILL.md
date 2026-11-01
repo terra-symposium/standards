@@ -3,7 +3,7 @@ name: author
 description: Author, review, preserve, restore, and visually restructure general Terra Symposium Docs leaves with the terra_docs MCP. Use for Terra, executive, development, and university documentation from verified source material or existing Docs leaves.
 ---
 
-# Terra Docs Leaf Authoring
+# Docs Leaf Authoring
 
 Use `terra_docs` MCP to read and write the exact requested leaf. This skill covers general Terra and university content; use the separate Canvas scraping skill to collect Canvas sources. A leaf write replaces the full source, so preserve relevant current facts before changing it.
 
@@ -113,7 +113,7 @@ The repo's `mcp.ts` is the canonical Docs tool implementation. It exposes
 `docs.leaf.read`, `docs.attachment.read`, `docs.leaf.generate`, and `docs.leaf.write`, and shares
 the Sanity serializers, Gemini authentication, coverage audit, and healing workflow. It is
 production-write guarded. `pnpm run docs:mcp` starts this repository-owned integration through
-Infisical's `deploy` environment, so an external Terra Docs MCP connection is not required.
+Infisical's `deploy` environment, so an external Docs MCP connection is not required.
 Check `pnpm run env:doctor` for the configured secret context and complete repository-scoped
 Infisical sign-in in an interactive terminal if prompted. Keep tokens in Infisical and never put
 them in skill files, CLI arguments, browser storage, or logs. Do not build a parallel
