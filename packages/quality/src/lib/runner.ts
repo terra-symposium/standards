@@ -1525,7 +1525,7 @@ type KnipIssue = { file: string; [kind: string]: unknown };
  */
 function flattenKnipItems(value: unknown): unknown[] {
 	if (!Array.isArray(value)) throw new Error('finding kind is not an array');
-	return value.flatMap((item) => (Array.isArray(item) ? flattenKnipItems(item) : [item]));
+	return value.flatMap((i) => (Array.isArray(i) ? flattenKnipItems(i) : [i]));
 }
 
 /**
@@ -2038,14 +2038,10 @@ function readKnipIssues(cfg: QualityCfg): KnipIssue[] {
 				} catch {
 					throw new Error(`invalid ${kind} findings for ${issue.file}`);
 				}
-				for (const item of items) {
-					if (!item || typeof item !== 'object' || Array.isArray(item)) throw new Error(`malformed ${kind} finding for ${issue.file}`);
-					const named = item as { name?: unknown; line?: unknown };
-					if (
-						typeof named.name !== 'string' ||
-						!named.name ||
-						(named.line !== undefined && (typeof named.line !== 'number' || !Number.isInteger(named.line) || named.line < 1))
-					)
+				for (const i of items) {
+					if (!i || typeof i !== 'object' || Array.isArray(i)) throw new Error(`malformed ${kind} finding for ${issue.file}`);
+					const named = i as { name?: unknown; line?: unknown };
+					if (typeof named.name !== 'string' || !named.name || (named.line !== undefined && (typeof named.line !== 'number' || !Number.isInteger(named.line) || named.line < 1)))
 						throw new Error(`malformed ${kind} finding for ${issue.file}`);
 					if (kind === 'files') assertKnipPath(cfg, named.name, 'unreachable file');
 				}
@@ -2093,25 +2089,25 @@ function collectKnipFindings(cfg: QualityCfg, importedConsumers = importedExport
 		const filePath = assertKnipPath(cfg, issue.file, 'finding source');
 		for (const [kind, val] of Object.entries(issue)) {
 			if (kind === 'file') continue;
-			for (const item of flattenKnipItems(val) as KnipItem[]) {
-				if (kind === 'exports' && isFrameworkEntryExport(cfg, issue.file, item.name)) continue;
-				const location = kind === 'files' ? item.name : issue.file;
-				const autoFixable = (kind === 'exports' || kind === 'types') && !importedConsumers.get(filePath)?.has(item.name) && knipExportCanBeMadePrivate(filePath, item.name);
+			for (const i of flattenKnipItems(val) as KnipItem[]) {
+				if (kind === 'exports' && isFrameworkEntryExport(cfg, issue.file, i.name)) continue;
+				const location = kind === 'files' ? i.name : issue.file;
+				const autoFixable = (kind === 'exports' || kind === 'types') && !importedConsumers.get(filePath)?.has(i.name) && knipExportCanBeMadePrivate(filePath, i.name);
 				const reason = autoFixable
 					? 'Knip identifies an unconsumed named export with a direct, unambiguous declaration.'
 					: kind === 'files'
 						? 'Knip considers this file unreachable; file deletion can affect dynamic, generated, or framework references.'
-						: importedConsumers.get(filePath)?.has(item.name)
+						: importedConsumers.get(filePath)?.has(i.name)
 							? 'Knip reports this export as unused, but a configured source consumer was found.'
 							: `Knip reports an unused ${kind} that the safe export rewrite cannot identify unambiguously.`;
 				const agentAction = autoFixable
 					? 'Run the canonical dead-code autofix; it should remove only this export modifier, then verify the declaration and its local uses remain intact.'
 					: kind === 'files'
 						? 'Inspect imports, dynamic loading, framework discovery, generated inventories, and tests. Delete this file only if those checks prove it unreachable; otherwise correct the explicit entry-point or source-discovery model.'
-						: importedConsumers.get(filePath)?.has(item.name)
+						: importedConsumers.get(filePath)?.has(i.name)
 							? 'Reconcile the reported consumer with Knip configuration and module resolution. Preserve the export while it has a real consumer; do not add a broad ignore.'
 							: `Inspect the exact ${kind} and its consumers. Remove it only if it is truly unused; otherwise add the concrete framework/public contract to the explicit entry model.`;
-				findings.push({ rule: `knip/${kind}`, file: location, line: item.line ?? 1, name: item.name, severity: 'error', autofixable: autoFixable, reason, agentAction });
+				findings.push({ rule: `knip/${kind}`, file: location, line: i.line ?? 1, name: i.name, severity: 'error', autofixable: autoFixable, reason, agentAction });
 			}
 		}
 	}
