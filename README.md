@@ -83,6 +83,7 @@ These packages provide reusable primitives. Each consuming repository remains re
 ### `@terra-symposium/standards-quality`
 
 - [`hygiene`](packages/quality/.agents/skills/hygiene/SKILL.md) (`environment-hardening`) — Audit repository health, improve source clarity and documentation, and compact files without changing behavior.
+- [`compact-files`](packages/quality/.agents/skills/compact-files/SKILL.md) (`compact-files`) — Find and remove redundant repository folders and files, consolidate generated output, and preserve authored or required content.
 - [`repo-file-audit`](packages/quality/.agents/skills/repo-file-audit/SKILL.md) — Aggressively prune dead files, enforce canonical source ownership, and collapse redundant configuration.
 - [`git/atomic-commits`](packages/quality/.agents/skills/git/commit/SKILL.md) (`atomic-commits`) — Split a requested working copy into dependency-ordered, reviewable Git commits with conventional imperative titles and factual bodies. Use only when the user explicitly invokes $atomic-commits or attaches this skill and asks to create commits; otherwise plan or report commit groups without committing.
 - [`git/dependabot-remediation`](packages/quality/.agents/skills/git/packages/SKILL.md) (`dependabot-remediation`) — Read a repository's Dependabot security alerts, trace them to affected dependencies, and implement and verify appropriate fixes. Use when asked to review or fix Dependabot alerts; does not publish, push, or dismiss alerts unless separately requested.
@@ -90,8 +91,10 @@ These packages provide reusable primitives. Each consuming repository remains re
 - [`git/issue-completion`](packages/quality/.agents/skills/git/issues/complete/SKILL.md) (`issue-completion`) — Complete clear GitHub issues in isolated, tested pull requests.
 - [`git/issues`](packages/quality/.agents/skills/git/issues/audit/SKILL.md) (`issues`) — Audit open GitHub issues against code, history, and pull requests.
 - [`git/jules`](packages/quality/.agents/skills/git/branches/jules/SKILL.md) (`jules`) — Bundle Jules-created pull requests into a small set of coherent PRs, carry review feedback forward, commit the verified changes, and retire superseded branches.
+- [`git/npm`](packages/quality/.agents/skills/git/npm/SKILL.md) (`npm`) — Handle npm package reads, installs, publishing, and access with one persistent read/write credential instead of repeated per-operation sign-in prompts.
 - [`git/pr-review`](packages/quality/.agents/skills/git/branches/review/SKILL.md) (`pr-review`) — Review and disposition requested Git branches and pull requests, fix actionable defects, and verify integration and cleanup. Report evidence, validation gaps, and retained work.
 - [`git/pruning`](packages/quality/.agents/skills/git/branches/prune/SKILL.md) (`pruning`) — Review and retire requested Git branches and worktrees after confirming their changes are integrated, preserved, superseded, or explicitly abandoned.
+- [`git/prune-device`](packages/quality/.agents/skills/git/branches/prune-device/SKILL.md) (`prune-device`) — Audit Codex storage and consolidate custom skills across repositories when the user asks for device cleanup or skill deduplication.
 - [`git/semver-retcon`](packages/quality/.agents/skills/git/history/SKILL.md) (`semver-retcon`) — Rewrite a repository history into a linear, semantically grouped record while preserving production behaviour, commit authorship, and release traceability.
 - [`standards`](packages/quality/.agents/skills/standards/SKILL.md) (`standards`) — Apply shared Terra coding and review conventions.
 

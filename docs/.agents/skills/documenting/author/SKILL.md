@@ -50,7 +50,7 @@ Write for moderately experienced readers in a helpful mentor voice. Explain inte
 
 ## 4. Canvas source rules
 
-For Canvas collection, first use the [Canvas scraping skill](../canvas-scraping/SKILL.md). Synthesize downloaded source contents; a module title, filename, or link is metadata, not a replacement for document/slide/PDF/transcript/page content. Never turn source material into a resource index.
+For Canvas collection, use the single `canvas-scraping` skill maintained in the Terra Symposium Website repository; it defines the in-app-browser-only, read-only collection boundary. Synthesize downloaded source contents; a module title, filename, or link is metadata, not a replacement for document/slide/PDF/transcript/page content. Never turn source material into a resource index.
 
 - Organize around concepts, relationships, mechanisms, examples, and application. Merge continued concepts when multiple source groups route to one leaf.
 - Keep week labels, source names, and “subject resources” out of the main path unless needed for an actionable link.
@@ -59,7 +59,7 @@ For Canvas collection, first use the [Canvas scraping skill](../canvas-scraping/
 - If an imported document is HTML Canvas preview content, re-download the authenticated `/download` response and do not author from the preview.
 
 Complete Canvas collection, including module attachments and separate recording transcripts,
-with the [Canvas scraping skill](../canvas-scraping/SKILL.md) before authoring.
+with the Website repository’s `canvas-scraping` skill before authoring.
 
 ## 5. Generation contract
 

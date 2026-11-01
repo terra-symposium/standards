@@ -1,4 +1,0 @@
-interface:
-  display_name: 'Sanity Attribute Read Audit'
-  short_description: 'Compare a Sanity inventory tree with application reads.'
-  default_prompt: 'Audit this Sanity attribute inventory against repository code reads.'

@@ -1,4 +1,0 @@
-interface:
-  display_name: 'Commenting'
-  short_description: 'Group code with meaningful comments and strengthen TSDoc'
-  default_prompt: 'Use $commenting to organize code into readable sections, decompose monoliths, and complete missing TSDoc.'

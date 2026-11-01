@@ -20,7 +20,7 @@
 	"repositoryReferences": {
 		"localGenerationPrompt": "scripts/generation/_gemini.ts#geminiPrompt",
 		"generationConfig": "scripts/generation/_config.json",
-		"gemMaintenanceSkill": ".agents/skills/documenting/gem/SKILL.md"
+		"gemMaintenanceSkill": "docs/.agents/skills/documenting/gem/SKILL.md"
 	},
 	"notes": [
 		"The local generation prompt is not evidence of the saved Gem instruction.",

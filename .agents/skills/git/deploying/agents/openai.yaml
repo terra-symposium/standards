@@ -1,3 +1,0 @@
-interface:
-  display_name: 'Terra Deploy'
-  short_description: 'Conserve Netlify deploys and verify Terra releases'

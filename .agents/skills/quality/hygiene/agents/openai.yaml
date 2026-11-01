@@ -1,7 +1,0 @@
-interface:
-  display_name: 'Environment Hardening'
-  short_description: 'Audit builds, deploy logs, and security warnings'
-  default_prompt: 'Use $environment-hardening to audit builds, deployment logs, and GitHub security findings, then fix and verify actionable warnings.'
-
-policy:
-  allow_implicit_invocation: true

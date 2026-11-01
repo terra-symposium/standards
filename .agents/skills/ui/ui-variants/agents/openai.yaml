@@ -1,4 +1,0 @@
-interface:
-  display_name: 'UI Variant Consolidation'
-  short_description: 'Consolidate shared Terra UI variant contracts'
-  default_prompt: 'Audit and consolidate the Terra UI variants while preserving component behavior, local geometry, and caller compatibility.'
