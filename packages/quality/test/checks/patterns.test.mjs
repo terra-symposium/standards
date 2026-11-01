@@ -83,6 +83,20 @@ test('regex deduplication inventories literals and RegExp constructors across co
 	const stricter = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], regexDedup: { minimumCount: 5 } });
 	assert.deepEqual(regexFindings(stricter), [{ source: 'alpha', count: 5, locations: ['src/ignored.ts:1', 'src/one.ts:1', 'src/tests/test.ts:1', 'src/three.ts:1', 'src/two.ts:1'] }]);
 });
+test('shared regex checks can exclude test directories where repeated literals are intentional assertions', () => {
+	const root = fixtureRoot('terra-quality-regex-skipped-directories-');
+	fixtureFile(root, 'src/use.ts', 'export const sourcePattern = /record/g;\n');
+	fixtureFile(root, 'tests/use.test.ts', 'const one = /record/g;\nconst two = /record/g;\n');
+	const cfg = createQualityCfg({
+		root,
+		sourceRoots: ['src', 'tests'],
+		extensions: ['.ts'],
+		regexDedup: { extensions: ['.ts'], sharedModule: 'shared/regex.mjs', skippedDirectories: ['tests'] },
+	});
+	assert.deepEqual(regexFindings(cfg), []);
+	assert.equal(fixRegexDedup(cfg).fixed, 0);
+	assert.match(fixtureText(root, 'tests/use.test.ts'), /const one = \/record\/g;/);
+});
 test('repeated-class fixer creates deterministic file-local CLASSES constants and leaves dynamic/HTML sources alone', () => {
 	const root = fixtureRoot('terra-quality-classes-fix-');
 	fixtureFile(

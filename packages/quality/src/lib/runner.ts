@@ -204,7 +204,7 @@ export type QualityCfg = {
 	tailwindCanonical?: { stylesheet: string; sourceRoots?: string[] };
 	security?: { forbiddenTerms?: string[]; forbiddenImports?: string[]; clientRoots?: string[]; allowProcessEnvRoots?: string[] };
 	repeatedClasses?: { minimumCount?: number; extensions?: string[] };
-	regexDedup?: { extensions?: string[]; minimumCount?: number; sharedModule?: string };
+	regexDedup?: { extensions?: string[]; minimumCount?: number; sharedModule?: string; skippedDirectories?: string[] };
 	uiPatterns?: { forbidden?: string[]; extensions?: string[] };
 	performancePatterns?: { ignoredFiles?: string[]; extensions?: string[] };
 	uiRecommendations?: UiRecommendationSettings;

@@ -11,7 +11,7 @@ IMPORTS
 // API
 import ts from 'typescript';
 import { createRequire } from 'node:module';
-import { dirname, relative, resolve } from 'node:path';
+import { dirname, isAbsolute, relative, resolve } from 'node:path';
 import { displayPath, srcFiles } from './files.js';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
@@ -620,9 +620,20 @@ function regexCandidates(cfg: QualityCfg, analysis?: QualityAnalysis): RegexCand
 	const settings = cfg.regexDedup ?? {};
 	const exts = new Set(settings.extensions ?? ['.js', '.jsx', '.mjs', '.ts', '.tsx', '.mts', '.cts']);
 	const registryPath = settings.sharedModule ? resolve(cfg.root, settings.sharedModule) : '';
+	const skippedDirectories = (settings.skippedDirectories ?? []).map((directory) => resolve(cfg.root, directory));
 	const candidates: RegexCandidate[] = [];
 	for (const file of analysis?.files ?? srcFiles({ ...cfg, extensions: [...exts] })) {
-		if (!exts.has(file.slice(file.lastIndexOf('.'))) || file.endsWith('.d.mts') || (registryPath && resolve(file) === registryPath)) continue;
+		const absoluteFile = resolve(file);
+		if (
+			!exts.has(file.slice(file.lastIndexOf('.'))) ||
+			file.endsWith('.d.mts') ||
+			(registryPath && absoluteFile === registryPath) ||
+			skippedDirectories.some((directory) => {
+				const relativePath = relative(directory, absoluteFile);
+				return relativePath === '' || (!relativePath.startsWith('..') && !isAbsolute(relativePath));
+			})
+		)
+			continue;
 		const src = analysis?.texts.get(file) ?? readFileSync(file, 'utf8');
 		const ast = analysis?.sources.get(file) ?? ts.createSourceFile(file, src, ts.ScriptTarget.Latest, true, regexScriptKind(file));
 		const shadowedRegExp = hasRegExpBinding(ast);

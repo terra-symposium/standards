@@ -83,7 +83,8 @@
 			"properties": {
 				"minimumCount": { "type": "number" },
 				"extensions": { "type": "array", "items": { "type": "string" } },
-				"sharedModule": { "type": "string", "minLength": 1 }
+				"sharedModule": { "type": "string", "minLength": 1 },
+				"skippedDirectories": { "type": "array", "items": { "type": "string" } }
 			},
 			"additionalProperties": false
 		},
