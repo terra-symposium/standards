@@ -39,7 +39,6 @@ test('UI recommendations report native controls and shared text links with sourc
 		].join('\n'),
 	);
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.tsx'] });
-
 	assert.deepEqual(
 		uiComponentRecommendations(cfg).map(({ file, line, element, component, import: importPath, variant }) => ({ file, line, element, component, importPath, variant })),
 		[
@@ -52,7 +51,6 @@ test('UI recommendations report native controls and shared text links with sourc
 		],
 	);
 });
-
 test('UI recommendations scan Astro markup and recognize the docs sidebar ButtonLink opportunity', () => {
 	const root = fixtureRoot('terra-quality-ui-recommendation-astro-');
 	fixtureFile(
@@ -61,13 +59,11 @@ test('UI recommendations scan Astro markup and recognize the docs sidebar Button
 		'<footer>\n\t<a href="/" class="text-xs text-primary no-underline hover:underline hover:decoration-2 hover:underline-offset-[0.2em]">\n\t\tBack to Playlist Atlas\n\t</a>\n</footer>\n',
 	);
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.astro'] });
-
 	assert.deepEqual(
 		uiComponentRecommendations(cfg).map(({ file, line, element, component, variant }) => ({ file, line, element, component, variant })),
 		[{ file: 'src/DocsLayout.astro', line: 2, element: 'a', component: 'ButtonLink', variant: 'primary-link' }],
 	);
 });
-
 test('UI recommendation rules override defaults and honor input types and ignored source paths', () => {
 	const root = fixtureRoot('terra-quality-ui-recommendation-policy-');
 	fixtureFile(root, 'src/view.tsx', '<><button>Use custom action</button><input type="checkbox" /></>\n');
@@ -86,7 +82,6 @@ test('UI recommendation rules override defaults and honor input types and ignore
 			ignoredDirectories: ['src/components/ui'],
 		},
 	});
-
 	assert.deepEqual(
 		uiComponentRecommendations(cfg).map(({ element, component }) => ({ element, component })),
 		[
@@ -95,7 +90,6 @@ test('UI recommendation rules override defaults and honor input types and ignore
 		],
 	);
 });
-
 test('ui-recommendations reports errors and fails when findings remain', async () => {
 	const root = fixtureRoot('terra-quality-ui-recommendation-cli-');
 	fixtureFile(root, 'src/view.tsx', '<><button>Save</button><a href="/" className="text-primary hover:underline">Home</a></>\n');
@@ -111,7 +105,6 @@ test('ui-recommendations reports errors and fails when findings remain', async (
 		console.info = originalInfo;
 		console.error = originalErr;
 	}
-
 	assert.match(output.join('\n'), /\[ERROR\] src\/view\.tsx:1:\d+ <button> should use <Button>/u);
 	assert.match(output.join('\n'), /\[ERROR\] src\/view\.tsx:1:\d+ <a> should use <ButtonLink variant="primary-link">/u);
 	assert.equal(process.exitCode, 1);

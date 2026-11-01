@@ -8,11 +8,11 @@ IMPORTS
 //////////////////////////////////////////////////*/
 
 // API
-import { spawnSync } from 'node:child_process';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { qualityNodeReporterOptions } from '../lib/node-reporter.js';
 import { qualityProgress } from '../lib/progress.js';
+import { spawnSync } from 'node:child_process';
 
 /*//////////////////////////////////////////////////
 RUNNER
@@ -37,7 +37,6 @@ function runWorkspaceTests(): void {
 		'@terra-symposium/hygiene-dashboard',
 	];
 	let failed = false;
-
 	console.error('\nTESTS\n  Unit / Contract · Standards workspace');
 	qualityProgress('Test suites', 0, suites.length);
 	for (const [idx, name] of suites.entries()) {
@@ -53,5 +52,4 @@ function runWorkspaceTests(): void {
 	console.error(`  ${failed ? '✗ failed' : '✓ passed'}`);
 	if (failed) process.exitCode = 1;
 }
-
 runWorkspaceTests();

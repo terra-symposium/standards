@@ -44,6 +44,8 @@ Every quality finding is an error. The runner completes the remaining checks and
 
 This starting configuration uses the built-in checks without requiring external tools. Enable integrations as you install and configure the corresponding repository tools. When lint is enabled, add an ESLint flat config such as `eslint.config.mjs`.
 
+Terra Quality always checks React `createRoot()` and `hydrateRoot()` mounts for a top-level error boundary and installs Astro's hydration fallback in Astro configs. `terra-quality-dev` applies these safe fixes before starting a configured development server. A normal quality check reports missing boundaries; `terra-quality error-boundaries --all` applies them explicitly, while `--warn` inspects without writing. The check cannot be disabled in `quality.json`. React roots import the boundary from `@terra-symposium/standards-error-boundaries/react`.
+
 ## Native language profiles
 
 Terra Quality keeps its built-in syntax analysis scoped to JavaScript and TypeScript. Opt into the full C, Java, or Python check suite with `languageProfiles`; each profile discovers its own file extensions under `sourceRoots`, so native files are not sent through the TypeScript analyzer. Function documentation checks are discovered automatically for all four supported language groups whenever their sources appear under `sourceRoots`. For a repository with no JavaScript or TypeScript sources, leave `extensions` empty:

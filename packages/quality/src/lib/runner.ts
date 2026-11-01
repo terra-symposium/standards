@@ -21,6 +21,7 @@ import { collapseTypesAndObjects } from './collapse.js';
 import { deadCodeEditsIntroduceTypeErrors, deadCodeTypeProgram, fixSingleUseDeclarations, singleUseFindings } from './single-use.js';
 import { displayNameFindings, fixDisplayNames } from './display-name.js';
 import { documentSrcFile, documentationFindings, documentedCommandFindings, duplicateImportFindings, fixDocumentedCommands, maintainSrcFile, protectLongImports } from './documentation.js';
+import { errorBoundaryFindings, fixErrorBoundaries } from './error-boundaries.js';
 import { existsSync, readFileSync, readdirSync, realpathSync, statSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { fixObjectForwarding, objectForwardingFindings } from './object-forwarding.js';
@@ -69,8 +70,8 @@ REGEX
 
 const CJS_JS_JSX_MJS_TS_TSX_REGEX = /\.(?:cjs|js|jsx|mjs|ts|tsx)$/;
 /**
- *
- * @return
+ * Matches hyphens when normalizing source-derived names.
+ * @return A fresh regular expression for matching hyphens.
  */
 const G_REGEX = () => /-/g;
 const C_M_JS_TS_REGEX = /\.(?:c|m)?(?:js|ts)$/;
@@ -92,6 +93,7 @@ const CLI_CMDS = new Set([
 	'regex-dedup',
 	'ui-patterns',
 	'ui-recommendations',
+	'error-boundaries',
 	'imports',
 	'aliases',
 	'forwarding',
@@ -157,6 +159,7 @@ export type QualityCheckName =
 	| 'regex-dedup'
 	| 'ui-patterns'
 	| 'ui-recommendations'
+	| 'error-boundaries'
 	| 'github';
 /** Names accepted in the `autofix` configuration map. */
 export type QualityAutofixName =
@@ -173,7 +176,8 @@ export type QualityAutofixName =
 	| 'regexDedup'
 	| 'accessibility'
 	| 'displayName'
-	| 'documentedCommands';
+	| 'documentedCommands'
+	| 'errorBoundaries';
 /** Normalized repository paths, source scope, policies, and tool settings. */
 export type QualityCfg = {
 	root: string;
@@ -307,6 +311,7 @@ export function createQualityAnalysis(cfg: QualityCfg): QualityAnalysis {
  * @return `true` unless the check is explicitly disabled.
  */
 export function qualityCheckEnabled(cfg: QualityCfg, check: QualityCheckName): boolean {
+	if (check === 'error-boundaries') return true;
 	if (check === 'accessibility' || check === 'display-name' || check === 'documented-commands') return cfg.enabledChecks?.[check] === true;
 	return cfg.enabledChecks?.[check] !== false;
 }
@@ -321,6 +326,7 @@ export function qualityCheckEnabled(cfg: QualityCfg, check: QualityCheckName): b
  * @return `true` when both the invocation and configuration permit autofix.
  */
 export function qualityAutofixEnabled(cfg: QualityCfg, check: QualityAutofixName, cliFix = true): boolean {
+	if (check === 'errorBoundaries') return cliFix;
 	return cliFix && cfg.autofix?.[check] !== false;
 }
 
@@ -433,6 +439,7 @@ function qualityLabel(name: string): string {
 		typecheck: 'Typecheck',
 		'ui-patterns': 'UI Patterns',
 		'ui-recommendations': 'UI Recommendations',
+		'error-boundaries': 'React Error Boundaries',
 	};
 	if (labels[key]) return labels[key];
 	return key
@@ -620,8 +627,8 @@ function workspaceManifests(root: string): WorkspaceManifest[] {
 	if (cached) return cached;
 	const manifests: WorkspaceManifest[] = [];
 	/**
-	 *
-	 * @param dir
+	 * Recursively discovers package manifests while skipping generated directories.
+	 * @param dir Directory whose package manifests are being discovered.
 	 */
 	const visit = (dir: string): void => {
 		let entries: Dirent[];
@@ -847,10 +854,10 @@ function uniqueTestSuites(checks: QualityInvocation[]): QualityInvocation[] {
 		return true;
 	});
 	/**
+	 * Orders test commands so unit and integration checks run before broader suites.
+	 * @param check Quality invocation or check being evaluated.
 	 *
-	 * @param check
-	 *
-	 * @return
+	 * @return Priority rank used to order the selected test commands.
 	 */
 	const rank = (check: QualityInvocation): number => {
 		const name = check.name.toLowerCase();
@@ -1024,8 +1031,8 @@ function qualityInvocations(cfg: QualityCfg, profileChecks: ResolvedLanguageChec
 function runQualityPhase(cfg: QualityCfg, phase: QualityPhase, profileChecks: ResolvedLanguageCheck[], toolResults: Map<string, ReturnType<typeof inspectLanguageProfileTool>>): number {
 	const cmds = qualityInvocations(cfg, profileChecks).filter((check) => qualityCmdEnabled(cfg, check.name) && phaseForInvocation(cfg, check) === phase);
 	/**
-	 *
-	 * @param check
+	 * Checks and caches the required tool for a configured language profile.
+	 * @param check Quality invocation or check being evaluated.
 	 */
 	const requireProfileTool = (check: QualityInvocation): void => {
 		if (!check.profileTool) return;
@@ -1096,8 +1103,8 @@ function reportSkippedLangChecks(cfg: QualityCfg, skipped: SkippedLanguageCheck[
 /**
  * Marks required profile configuration failures without stopping unrelated checks.
  *
- * @param cfg
- * @param failed
+ * @param cfg Quality configuration that defines this check and its repository scope.
+ * @param failed Language-profile checks that could not be configured.
  */
 function reportFailedLangChecks(cfg: QualityCfg, failed: SkippedLanguageCheck[]): void {
 	for (const check of failed) {
@@ -1112,9 +1119,9 @@ function reportFailedLangChecks(cfg: QualityCfg, failed: SkippedLanguageCheck[])
 /**
  * Applies profile-provided safe fixes while preserving the normal read-only check commands.
  *
- * @param cfg
- * @param checks
- * @param toolResults
+ * @param cfg Quality configuration that defines this check and its repository scope.
+ * @param checks Resolved language checks or invocations selected for this phase.
+ * @param toolResults Cache of inspected language-profile tool versions.
  */
 function runLangProfileFixes(cfg: QualityCfg, checks: ResolvedLanguageCheck[], toolResults: Map<string, ReturnType<typeof inspectLanguageProfileTool>>): void {
 	for (const check of checks) {
@@ -1401,8 +1408,8 @@ function fixUnusedDeclarations(cfg: QualityCfg, reports: EslintReport[], changed
 		const starts = new Set(unusedMsgs.map((message) => ast.getPositionOfLineAndCharacter(message.line - 1, message.column - 1)));
 		const edits: Array<{ start: number; end: number; text?: string }> = [];
 		/**
-		 *
-		 * @param node
+		 * Walks the source AST to locate declarations reported as unused.
+		 * @param node Current syntax-tree node being inspected.
 		 */
 		const visit = (node: ts.Node): void => {
 			let declaration: ts.Node | undefined;
@@ -1414,19 +1421,19 @@ function fixUnusedDeclarations(cfg: QualityCfg, reports: EslintReport[], changed
 						: undefined;
 			const externallyConsumed = name ? importedConsumers.get(resolve(report.filePath))?.has(name) : false;
 			/**
+			 * Determines whether a declaration is directly owned by the source file.
+			 * @param candidate Candidate declaration being classified.
 			 *
-			 * @param candidate
-			 *
-			 * @return
+			 * @return Whether the candidate declaration belongs directly to the source file.
 			 */
 			const isTopLevel = (candidate: ts.Node): boolean =>
 				candidate.parent === ast ||
 				(ts.isVariableDeclaration(candidate) && ts.isVariableDeclarationList(candidate.parent) && ts.isVariableStatement(candidate.parent.parent) && candidate.parent.parent.parent === ast);
 			/**
+			 * Checks whether the declaration has an export modifier.
+			 * @param candidate Candidate declaration being classified.
 			 *
-			 * @param candidate
-			 *
-			 * @return
+			 * @return Whether the candidate has an export modifier.
 			 */
 			const isExported = (candidate: ts.Node): boolean => ts.canHaveModifiers(candidate) && Boolean(ts.getModifiers(candidate)?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword));
 			if (ts.isFunctionDeclaration(node) && node.name && starts.has(node.name.getStart(ast)) && isTopLevel(node) && !isExported(node) && !externallyConsumed) declaration = node;
@@ -1740,8 +1747,8 @@ function unusedDeclarationFindings(cfg: QualityCfg, reports: EslintReport[]): De
 			const pos = ast.getPositionOfLineAndCharacter(msg.line - 1, msg.column - 1);
 			let declaration: ts.Node | undefined;
 			/**
-			 *
-			 * @param node
+			 * Locates the unused declaration associated with an ESLint diagnostic.
+			 * @param node Current syntax-tree node being inspected.
 			 */
 			const find = (node: ts.Node): void => {
 				if (
@@ -1901,10 +1908,10 @@ function repairMissingImports(cfg: QualityCfg, program: ts.Program, checker: ts.
 		}
 	}
 	/**
+	 * Determines whether an identifier is used as a type reference.
+	 * @param n Identifier or source value currently being analyzed.
 	 *
-	 * @param n
-	 *
-	 * @return
+	 * @return Whether the identifier appears in a type position.
 	 */
 	const isTypePos = (n: ts.Identifier): boolean => {
 		for (let parent: ts.Node | undefined = n.parent; parent; parent = parent.parent) {
@@ -1928,8 +1935,8 @@ function repairMissingImports(cfg: QualityCfg, program: ts.Program, checker: ts.
 				for (const element of statement.importClause.namedBindings.elements) importedNames.add(element.name.text);
 		}
 		/**
-		 *
-		 * @param n
+		 * Finds identifier references that need a missing-import repair.
+		 * @param n Identifier or source value currently being analyzed.
 		 */
 		const visit = (n: ts.Node): void => {
 			const intrinsicJsxTag = ts.isIdentifier(n) && (ts.isJsxOpeningLikeElement(n.parent) || ts.isJsxClosingElement(n.parent)) && n.parent.tagName === n && /^[a-z]/.test(n.text);
@@ -2240,17 +2247,17 @@ function importedExportConsumers(cfg: QualityCfg): Map<string, Set<string>> {
 		const markup = astro ? raw.slice(astro[0].length) : '';
 		const src = ts.createSourceFile(file, frontmatter, ts.ScriptTarget.Latest, true, file.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
 		/**
+		 * Checks whether an Astro markup section contains the given identifier spelling.
+		 * @param name Name or identifier spelling being checked.
 		 *
-		 * @param name
-		 *
-		 * @return
+		 * @return Whether the markup contains the identifier spelling.
 		 */
 		const markupUses = (name: string): boolean => Boolean(markup) && markup.includes(name);
 		const referencedIdentifiers = new Set<string>();
 		const namespaceProperties = new Map<string, Set<string>>();
 		/**
-		 *
-		 * @param node
+		 * Collects value identifiers and namespace properties referenced by a source file.
+		 * @param node Current syntax-tree node being inspected.
 		 */
 		const collectReferences = (node: ts.Node): void => {
 			if (ts.isImportDeclaration(node)) return;
@@ -2312,11 +2319,11 @@ function acceptTypeSafeEdits(
 	const rejected = new Set<string>();
 	let checks = 0;
 	/**
+	 * Verifies a proposed edit batch and keeps it only when type safety is preserved.
+	 * @param entries Source edits to verify together.
+	 * @param base Accepted edit map used as the starting point for this trial.
 	 *
-	 * @param entries
-	 * @param base
-	 *
-	 * @return
+	 * @return The accepted edits and files rejected by type-safety verification.
 	 */
 	const accept = (entries: [string, string][], base: Map<string, string>): Map<string, string> => {
 		if (!entries.length) return base;
@@ -2392,7 +2399,7 @@ function runDeadCode(cfg: QualityCfg, fix: boolean, all: boolean, verify = true,
 	if (emit) qualityHeader('dead-code', `${fix ? 'Fixing safe cases and checking' : 'Read-only check of'} unused files, exports, declarations, and single-use code`);
 	let verificationStarted = false;
 	/**
-	 *
+	 * Starts the dead-code verification phase once per run.
 	 */
 	const beginVerification = (): void => {
 		if (verificationStarted) return;
@@ -2411,10 +2418,10 @@ function runDeadCode(cfg: QualityCfg, fix: boolean, all: boolean, verify = true,
 	const eslintScannedContents = new Map<string, string>();
 	let importedConsumersForRun: Map<string, Set<string>> | undefined;
 	/**
+	 * Scans selected files with ESLint and stores the source snapshot for later comparison.
+	 * @param selectedFiles Optional file paths to limit the ESLint scan.
 	 *
-	 * @param selectedFiles
-	 *
-	 * @return
+	 * @return ESLint reports for the selected files.
 	 */
 	const scanEslint = (selectedFiles?: string[]): EslintReport[] => {
 		const reports = collectEslintReports(cfg, all, selectedFiles);
@@ -2426,8 +2433,8 @@ function runDeadCode(cfg: QualityCfg, fix: boolean, all: boolean, verify = true,
 		return reports;
 	};
 	/**
-	 *
-	 * @return
+	 * Rescans files changed by the current safe-fix pass.
+	 * @return Reports for files modified since their last ESLint scan.
 	 */
 	const scanDirtyEslintFiles = (): EslintReport[] => {
 		const dirtyFiles = [...eslintScannedContents].filter(([f, content]) => existsSync(f) && readFileSync(f, 'utf8') !== content).map(([f]) => f);
@@ -2549,7 +2556,7 @@ function runDeadCode(cfg: QualityCfg, fix: boolean, all: boolean, verify = true,
  * @param cfg Quality configuration defining source scope and tools.
  * @param all Whether to inspect all configured source files.
  *
- * @return
+ * @return Findings from the non-mutating dead-code scan.
  */
 function runDeadCodeReadOnly(cfg: QualityCfg, all: boolean): DeadCodeFinding[] {
 	return runDeadCode(cfg, false, all);
@@ -2733,6 +2740,7 @@ function runGenericChecks(cfg: QualityCfg, analysis?: QualityAnalysis): void {
 	if (cfg.repeatedClasses && qualityCheckEnabled(cfg, 'repeated-classes')) checks.push(['repeated-classes', () => repeatedClassFindings(cfg, analysis)]);
 	if (cfg.regexDedup && qualityCheckEnabled(cfg, 'regex-dedup')) checks.push(['regex-dedup', () => regexFindings(cfg, analysis)]);
 	if (cfg.uiPatterns && qualityCheckEnabled(cfg, 'ui-patterns')) checks.push(['ui-patterns', () => uiPatternFindings(cfg, analysis)]);
+	checks.push(['error-boundaries', () => errorBoundaryFindings(cfg)]);
 	for (const [name, check] of checks) {
 		qualityHeader(name, `Checking ${name.replace(G_REGEX(), ' ')}`);
 		try {
@@ -2825,52 +2833,52 @@ function fixNames(cfg: QualityCfg, all: boolean): void {
 	});
 	checker = program.getTypeChecker();
 	/**
+	 * Identifies lowercase JSX element names that are intrinsic HTML tags.
+	 * @param n Identifier or source value currently being analyzed.
 	 *
-	 * @param n
-	 *
-	 * @return
+	 * @return Whether the identifier names an intrinsic lowercase JSX tag.
 	 */
 	const isIntrinsicJsxTag = (n: ts.Identifier): boolean => {
 		return (ts.isJsxOpeningLikeElement(n.parent) || ts.isJsxClosingElement(n.parent)) && n.parent.tagName === n && n.text.length > 0 && n.text[0] === n.text[0]!.toLowerCase();
 	};
 	/**
+	 * Resolves an aliased symbol to its underlying declaration symbol.
+	 * @param symbol TypeScript symbol to resolve when checking for aliases.
 	 *
-	 * @param symbol
-	 *
-	 * @return
+	 * @return The underlying symbol, or `undefined` when no symbol was found.
 	 */
 	const canonical = (symbol: ts.Symbol | undefined): ts.Symbol | undefined => (symbol && symbol.flags & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(symbol) : symbol);
 	/**
+	 * Gets the symbol bound to an identifier, including shorthand assignments.
+	 * @param n Identifier or source value currently being analyzed.
 	 *
-	 * @param n
-	 *
-	 * @return
+	 * @return The bound symbol, when TypeScript can resolve one.
 	 */
 	const identifierSymbol = (n: ts.Identifier): ts.Symbol | undefined =>
 		canonical(ts.isShorthandPropertyAssignment(n.parent) ? (checker.getShorthandAssignmentValueSymbol(n.parent) ?? checker.getSymbolAtLocation(n)) : checker.getSymbolAtLocation(n));
 	/**
+	 * Identifies identifiers used as property names rather than references.
+	 * @param n Identifier or source value currently being analyzed.
 	 *
-	 * @param n
-	 *
-	 * @return
+	 * @return Whether the identifier is used as a property key or member name.
 	 */
 	const isPropertyName = (n: ts.Identifier): boolean =>
 		(ts.isPropertyAccessExpression(n.parent) && n.parent.name === n) ||
 		(ts.isQualifiedName(n.parent) && n.parent.right === n) ||
 		((ts.isPropertyAssignment(n.parent) || ts.isMethodDeclaration(n.parent) || ts.isMethodSignature(n.parent)) && n.parent.name === n);
 	/**
+	 * Checks whether the initializer already references this declaration.
+	 * @param n Identifier or source value currently being analyzed.
 	 *
-	 * @param n
-	 *
-	 * @return
+	 * @return Whether the initializer references the declaration being renamed.
 	 */
 	const hasInitShadow = (n: ts.Identifier): boolean => {
 		if (!ts.isVariableDeclaration(n.parent) || !n.parent.initializer) return false;
 		const tgt = checker.getSymbolAtLocation(n);
 		let found = false;
 		/**
-		 *
-		 * @param child
+		 * Collects identifiers and namespace property accesses used by a module.
+		 * @param child Child syntax-tree node within the current initializer.
 		 */
 		const visit = (child: ts.Node): void => {
 			if (found || child === n) return;
@@ -2881,18 +2889,18 @@ function fixNames(cfg: QualityCfg, all: boolean): void {
 		return found;
 	};
 	/**
+	 * Detects same-spelled initializer references that resolve to another declaration.
+	 * @param n Identifier or source value currently being analyzed.
 	 *
-	 * @param n
-	 *
-	 * @return
+	 * @return Whether the initializer has a same-spelled reference to another symbol.
 	 */
 	const hasInitReferenceToOtherSymbol = (n: ts.Identifier): boolean => {
 		if (!ts.isVariableDeclaration(n.parent) || !n.parent.initializer) return false;
 		const tgt = checker.getSymbolAtLocation(n);
 		let found = false;
 		/**
-		 *
-		 * @param child
+		 * Searches an initializer for a reference to the declared identifier.
+		 * @param child Child syntax-tree node within the current initializer.
 		 */
 		const visit = (child: ts.Node): void => {
 			if (found || child === n) return;
@@ -2903,18 +2911,18 @@ function fixNames(cfg: QualityCfg, all: boolean): void {
 		return found;
 	};
 	/**
+	 * Checks whether a proposed name conflicts with an initializer declaration.
+	 * @param n Identifier or source value currently being analyzed.
+	 * @param suggestion Concise identifier spelling proposed by the naming rule.
 	 *
-	 * @param n
-	 * @param suggestion
-	 *
-	 * @return
+	 * @return Whether the initializer contains a declaration that would collide with the suggestion.
 	 */
 	const hasInitRenameCollision = (n: ts.Identifier, suggestion: string): boolean => {
 		if (!ts.isVariableDeclaration(n.parent) || !n.parent.initializer) return false;
 		let found = false;
 		/**
-		 *
-		 * @param child
+		 * Searches an initializer for a reference that resolves to a different symbol.
+		 * @param child Child syntax-tree node within the current initializer.
 		 */
 		const visit = (child: ts.Node): void => {
 			if (found) return;
@@ -2934,11 +2942,11 @@ function fixNames(cfg: QualityCfg, all: boolean): void {
 		return found;
 	};
 	/**
+	 * Checks module consumers for a conflicting initializer binding.
+	 * @param n Identifier or source value currently being analyzed.
+	 * @param suggestion Concise identifier spelling proposed by the naming rule.
 	 *
-	 * @param n
-	 * @param suggestion
-	 *
-	 * @return
+	 * @return Whether a consumer initializer already binds the suggested name to the target.
 	 */
 	const hasInitConsumerCollision = (n: ts.Identifier, suggestion: string): boolean => {
 		const tgt = checker.getSymbolAtLocation(n);
@@ -2948,15 +2956,15 @@ function fixNames(cfg: QualityCfg, all: boolean): void {
 		{
 			let found = false;
 			/**
-			 *
-			 * @param n
+			 * Checks whether an initializer already uses a proposed replacement name.
+			 * @param n Identifier or source value currently being analyzed.
 			 */
 			const visit = (n: ts.Node): void => {
 				if (found) return;
 				if (ts.isVariableDeclaration(n) && ts.isIdentifier(n.name) && n.name.text === suggestion && n.initializer) {
 					/**
-					 *
-					 * @param child
+					 * Searches a candidate initializer for a reference to the target symbol.
+					 * @param child Child syntax-tree node within the current initializer.
 					 */
 					const check = (child: ts.Node): void => {
 						if (found) return;
@@ -2983,8 +2991,8 @@ function fixNames(cfg: QualityCfg, all: boolean): void {
 	for (const src of program.getSourceFiles()) {
 		if (!allowed.has(src.fileName)) continue;
 		/**
-		 *
-		 * @param n
+		 * Collects safe concise-name proposals for declarations in the source file.
+		 * @param n Identifier or source value currently being analyzed.
 		 */
 		const inspect = (n: ts.Node): void => {
 			if (ts.isIdentifier(n) && isRenamableDeclaration(n)) {
@@ -3011,8 +3019,8 @@ function fixNames(cfg: QualityCfg, all: boolean): void {
 	for (const src of program.getSourceFiles()) {
 		if (!allowed.has(src.fileName)) continue;
 		/**
-		 *
-		 * @param n
+		 * Applies eligible symbol renames after checking declaration-scope collisions.
+		 * @param n Identifier or source value currently being analyzed.
 		 */
 		const inspect = (n: ts.Node): void => {
 			if (ts.isIdentifier(n) && isRenamableDeclaration(n) && !n.text.startsWith('_') && !protectedNames.has(n.text) && !hasInitShadow(n) && !hasInitReferenceToOtherSymbol(n)) {
@@ -3033,8 +3041,8 @@ function fixNames(cfg: QualityCfg, all: boolean): void {
 	for (const src of program.getSourceFiles()) {
 		if (!allowed.has(src.fileName)) continue;
 		/**
-		 *
-		 * @param n
+		 * Collects source edits for references bound to renamed symbols.
+		 * @param n Identifier or source value currently being analyzed.
 		 */
 		const inspect = (n: ts.Node): void => {
 			if (ts.isIdentifier(n) && !isIntrinsicJsxTag(n)) {
@@ -3092,8 +3100,8 @@ function fixNames(cfg: QualityCfg, all: boolean): void {
 		if (!allowed.has(src.fileName)) continue;
 		const fileEdits: ts.TextChange[] = [];
 		/**
-		 *
-		 * @param node
+		 * Checks consumers for an existing initializer using the proposed local name.
+		 * @param node Current syntax-tree node being inspected.
 		 */
 		const visit = (node: ts.Node): void => {
 			if (ts.isImportDeclaration(node) && ts.isStringLiteral(node.moduleSpecifier) && node.importClause?.namedBindings && ts.isNamedImports(node.importClause.namedBindings)) {
@@ -3252,7 +3260,7 @@ export function runQualityCli(cfg: QualityCfg, args = process.argv.slice(2)): vo
 	reportStageName = undefined;
 	reportGitHubData = undefined;
 	/**
-	 *
+	 * Writes the collected quality stage results to the requested JSON report.
 	 */
 	const writeReport = (): void => {
 		const executed = [...(reportStages?.values() ?? [])].filter((s) => {
@@ -3335,17 +3343,17 @@ function runFullQuality(cfg: QualityCfg, args: string[], opts: QualityOptions): 
 		reportFailedLangChecks(cfg, profileResolution.failed);
 	}
 	/**
+	 * Runs the configured commands assigned to one quality phase.
+	 * @param phase Quality phase whose configured commands should run.
 	 *
-	 * @param phase
-	 *
-	 * @return
+	 * @return Number of configured command failures in the phase.
 	 */
 	const runConfiguredCmds = (phase: QualityPhase): number => runQualityPhase(cfg, phase, profileResolution.checks, profileToolResults);
 	/**
+	 * Checks whether a configured autofix is enabled for this invocation.
+	 * @param check Quality invocation or check being evaluated.
 	 *
-	 * @param check
-	 *
-	 * @return
+	 * @return Whether the named autofix is enabled for this run.
 	 */
 	const fix = (check: QualityAutofixName): boolean => qualityAutofixEnabled(cfg, check, opts.fix);
 	const scoped = scopedCfg(cfg, opts.all);
@@ -3358,9 +3366,9 @@ function runFullQuality(cfg: QualityCfg, args: string[], opts: QualityOptions): 
 	}
 	let sFixFailed = false;
 	/**
-	 *
-	 * @param name
-	 * @param action
+	 * Runs one safe-fix stage and records if that stage failed.
+	 * @param name Name or identifier spelling being checked.
+	 * @param action Safe-fix action to run under failure handling.
 	 */
 	const sFix = (name: string, action: () => void): void => {
 		if (!continueAfterFailure(name, action)) sFixFailed = true;
@@ -3396,6 +3404,11 @@ function runFullQuality(cfg: QualityCfg, args: string[], opts: QualityOptions): 
 			const documentationIssues = documentationFindings(scopedCfg(cfg, opts.all)).filter((finding) => finding.severity === 'error');
 			if (documentationIssues.length) runDocumentation(cfg, opts, ['document', ...new Set(documentationIssues.map((finding) => resolve(cfg.root, finding.file))), '--quiet'], true);
 		});
+	if (fix('errorBoundaries'))
+		sFix('error-boundaries', () => {
+			const fixed = fixErrorBoundaries(scopedCfg(cfg, opts.all));
+			if (fixed) console.info(`Error-boundary autofix: guarded React roots in ${fixed} file${fixed === 1 ? '' : 's'}.`);
+		});
 	if (opts.fix && qualityCheckEnabled(cfg, 'import') && qualityAutofixEnabled(cfg, 'document', opts.fix))
 		sFix('imports', () => {
 			const repeated = duplicateImportFindings(filesFor(cfg, opts.all));
@@ -3414,7 +3427,7 @@ function runFullQuality(cfg: QualityCfg, args: string[], opts: QualityOptions): 
 	if (!opts.skipCommands) continueAfterFailure('format', () => void runConfiguredCmds('Format'));
 	beginQualityPhase('Static quality');
 	/**
-	 *
+	 * Runs the remaining dead-code, lint, analysis, and documentation checks.
 	 */
 	const continueStaticAndLater = (): void => {
 		if (qualityCheckEnabled(cfg, 'dead-code')) continueAfterFailure('dead-code', () => runDeadCodeCmd(cfg, qualityAutofixEnabled(cfg, 'dead-code', opts.fix), opts.all));
@@ -3477,7 +3490,9 @@ function dispatchQualityCli(cfg: QualityCfg, args: string[]): void | Promise<voi
 	}
 	if (args.includes('--help') || args.includes('-h')) {
 		console.info('Usage: terra-quality <command> [options]');
-		console.info('Commands include quality, history, github, document, format, lint, knip, types, single-use, dead-code, tailwind-canonical, security, ui-recommendations, and domain.');
+		console.info(
+			'Commands include quality, history, github, document, format, lint, knip, types, single-use, dead-code, tailwind-canonical, security, error-boundaries, ui-recommendations, and domain.',
+		);
 		console.info(
 			'Options: --all, --warn, --strict, --skip-commands, --skip-recommendations, --report-json <path>, --repository owner/name; history also accepts --branch <name> and --base-sha <sha>.',
 		);
@@ -3492,10 +3507,10 @@ function dispatchQualityCli(cfg: QualityCfg, args: string[]): void | Promise<voi
 		skipRecommendations: args.includes('--skip-recommendations'),
 	};
 	/**
+	 * Checks whether a configured autofix is enabled for this invocation.
+	 * @param check Quality invocation or check being evaluated.
 	 *
-	 * @param check
-	 *
-	 * @return
+	 * @return Whether the named autofix is enabled for this run.
 	 */
 	const fix = (check: QualityAutofixName): boolean => qualityAutofixEnabled(cfg, check, opts.fix);
 	if (
@@ -3594,6 +3609,17 @@ function dispatchQualityCli(cfg: QualityCfg, args: string[]): void | Promise<voi
 		if (findings.length) process.exitCode = 1;
 		return;
 	}
+	if (cmd === 'error-boundaries') {
+		if (fix('errorBoundaries')) {
+			const fixed = fixErrorBoundaries(scopedCfg(cfg, opts.all));
+			if (fixed) console.info(`Error-boundary autofix: guarded React roots in ${fixed} file${fixed === 1 ? '' : 's'}.`);
+		}
+		const findings = errorBoundaryFindings(scopedCfg(cfg, opts.all));
+		console.error(`React error-boundary findings (${findings.length})`);
+		for (const finding of findings) console.error(`  [ERROR] ${finding.file}:${finding.line}:${finding.column} ${finding.message}`);
+		if (findings.length) process.exitCode = 1;
+		return;
+	}
 	if (cfg.qualityCommands?.some((c) => c.name === cmd)) {
 		runCfgdCmd(cfg, cmd);
 		return;
@@ -3631,7 +3657,7 @@ export function runQualityFromCfg(file?: string, args = process.argv.slice(2)): 
 		return;
 	}
 	const reportIdx = args.indexOf('--report-json');
-	const cmd = args.find((arg, i) => i !== reportIdx + 1 && !arg.startsWith('-')) ?? 'quality';
+	const cmd = args.find((arg, i) => (reportIdx < 0 || i !== reportIdx + 1) && !arg.startsWith('-')) ?? 'quality';
 	if (cmd === 'history') {
 		const reportPath = reportIdx < 0 ? undefined : args[reportIdx + 1];
 		if (!reportPath) throw new Error('terra-quality history requires --report-json <path>.');

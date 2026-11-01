@@ -186,6 +186,7 @@
 		"checkToggles": {
 			"type": "object",
 			"properties": {
+				"error-boundaries": { "type": "boolean", "const": true, "description": "Mandatory check requiring React application render roots to use an error boundary. This check cannot be disabled." },
 				"accessibility": {
 					"type": "boolean",
 					"description": "Opt-in check for source-evident accessible names and decorative inline SVG exposure on native JSX controls and explicit interactive roles."
@@ -199,6 +200,7 @@
 		"autofixToggles": {
 			"type": "object",
 			"properties": {
+				"errorBoundaries": { "type": "boolean", "const": true, "description": "Automatically wraps unguarded React render roots when Terra Quality runs with fixes enabled." },
 				"accessibility": { "type": "boolean", "description": "Copies a literal title into aria-label or hides an unnamed inline SVG inside an already named control." },
 				"displayName": { "type": "boolean", "description": "Adds a conventional displayName to a direct named forwardRef declaration." },
 				"documentedCommands": { "type": "boolean", "description": "Rewrites pnpm -C and --prefix to the repository's canonical --dir flag in configured Markdown shell fences." }

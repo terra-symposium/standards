@@ -123,7 +123,6 @@ test('regex fixer inserts declarations after a real CONFIG section, not one insi
 	const configText = `/*//////////////////////////////////////////////////\nCONFIG\n//////////////////////////////////////////////////*/`;
 	fixtureFile(root, 'src/view.ts', `const generated = \`${configText}\`;\n${configText}\nconst first = /alpha/;\nconst second = /alpha/;\nvoid [generated, first, second];\n`);
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], regexDedup: {} });
-
 	assert.deepEqual(fixRegexDedup(cfg), { fixed: 2, skipped: 0 });
 	const src = fixtureText(root, 'src/view.ts');
 	const genSection = src.indexOf('const generated');

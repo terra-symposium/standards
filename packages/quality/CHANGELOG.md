@@ -1,5 +1,19 @@
 # @terra-symposium/standards-quality
 
+## 2.1.2
+
+### Patch Changes
+
+- Publish the error-boundaries package as a normal semver dependency instead of leaking the workspace protocol into the npm package.
+
+## 2.1.1
+
+### Patch Changes
+
+- Make React application root boundaries mandatory and automatically wrap unguarded JSX and JavaScript roots during Quality fixes.
+- Export the shared React boundary through the Quality package so consumers need only depend on `@terra-symposium/standards-quality`.
+- Run focused commands such as `error-boundaries` without incorrectly applying the full Quality lint-config preflight.
+
 ## 2.1.0
 
 ### Minor Changes

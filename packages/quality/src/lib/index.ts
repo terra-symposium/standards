@@ -20,6 +20,7 @@ export * from './single-use.js';
 export * from './security.js';
 export * from './accessibility.js';
 export * from './display-name.js';
+export * from './error-boundaries.js';
 export * from './patterns.js';
 export * from './ui-recommendations.js';
 export { default as QualityPlaywrightReporter } from './playwright-reporter.js';

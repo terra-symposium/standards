@@ -1,49 +1,52 @@
 {
-	"name": "@terra-symposium/standards-quality",
-	"version": "2.1.0",
-	"description": "Configurable quality checks and maintenance tooling for software repositories",
-	"homepage": "https://standards-docs.netlify.app/",
-	"type": "module",
-	"engines": {
-		"node": ">=18.18"
-	},
-	"main": "./dist/index.js",
-	"types": "./dist/index.d.ts",
-	"bin": {
-		"terra-quality": "dist/lib/runner.js",
-		"terra-quality-dev": "dist/lib/dev.js"
-	},
-	"publishConfig": {
-		"registry": "https://registry.npmjs.org",
-		"access": "public"
-	},
-	"repository": {
-		"type": "git",
-		"url": "git+https://github.com/Terra-Symposium/standards.git"
-	},
-	"exports": {
-		".": "./dist/index.js",
-		"./cli": "./dist/lib/runner.js",
-		"./naming": "./dist/lib/naming.js",
-		"./object-forwarding": "./dist/lib/object-forwarding.js",
-		"./single-use": "./dist/lib/single-use.js",
-		"./port": "./dist/lib/port.js"
-	},
-	"files": [
-		"dist",
-		"quality.schema.json",
-		"quality-configs"
-	],
-	"scripts": {
-		"build": "tsc -p tsconfig.json",
-		"prepare": "npm run build",
-		"pretest": "npm run build",
-		"test": "node --test"
-	},
-	"dependencies": {
-		"typescript": "^5.0.0"
-	},
-	"devDependencies": {
-		"@types/node": "^26.6.5"
-	}
+  "name": "@terra-symposium/standards-quality",
+  "version": "2.1.3",
+  "description": "Configurable quality checks and maintenance tooling for software repositories",
+  "homepage": "https://standards-docs.netlify.app/",
+  "type": "module",
+  "engines": {
+    "node": ">=18.18"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "terra-quality": "dist/lib/runner.js",
+    "terra-quality-dev": "dist/lib/dev.js"
+  },
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org",
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Terra-Symposium/standards.git"
+  },
+  "exports": {
+    ".": "./dist/index.js",
+    "./error-boundaries/react": "./dist/lib/error-boundaries-react.js",
+    "./astro-integration": "./dist/lib/error-boundaries-astro.js",
+    "./cli": "./dist/lib/runner.js",
+    "./naming": "./dist/lib/naming.js",
+    "./object-forwarding": "./dist/lib/object-forwarding.js",
+    "./single-use": "./dist/lib/single-use.js",
+    "./port": "./dist/lib/port.js"
+  },
+  "files": [
+    "dist",
+    "quality.schema.json",
+    "quality-configs"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "prepare": "npm run build",
+    "pretest": "npm run build",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "@terra-symposium/standards-error-boundaries": "^0.1.2",
+    "typescript": "^5.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.5"
+  }
 }

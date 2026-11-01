@@ -19,43 +19,40 @@ import { pathToFileURL } from 'node:url';
 // TYPES
 import type { QualityAnalysis, QualityCfg } from './runner.js';
 
-/*//////////////////////////////////////////////////
-REGEX
-//////////////////////////////////////////////////*/
-
 /**
+ * Matches non-alphanumeric runs when deriving concise identifiers.
  *
- * @return
+ * @return A fresh regular expression for splitting non-alphanumeric runs.
  */
 const A_ZA_Z0_9_G_REGEX = () => /[^A-Za-z0-9]+/g;
 /**
+ * Matches leading and trailing underscores for identifier cleanup.
  *
- * @return
+ * @return A fresh regular expression for trimming underscores.
  */
 const G_REGEX = () => /^_+|_+$/g;
 /**
+ * Matches backslashes when escaping regular-expression text.
  *
- * @return
+ * @return A fresh regular expression for matching backslashes.
  */
 const G_CLASS_2 = () => /\\/g;
 /**
+ * Captures exported constant names when scanning source sections.
  *
- * @return
+ * @return A fresh multiline regular expression for exported constants.
  */
 const EXPORT_CONST_A_ZA_Z_W_B_GM_REGEX = () => /^export const ([A-Za-z_$][\w$]*)\b/gm;
 
-/*//////////////////////////////////////////////////
-REGEX
-//////////////////////////////////////////////////*/
-
 /**
+ * Matches whitespace runs when normalizing source text.
  *
- * @return
+ * @return A fresh regular expression for matching whitespace runs.
  */
 const S_G_REGEX = () => /\s+/g;
 
 /*//////////////////////////////////////////////////
-REGEX
+HELPERS
 //////////////////////////////////////////////////*/
 
 /** Counts exact edits applied and conservative candidates left for review. */
@@ -69,9 +66,9 @@ const REPEATED_LOOKUPS = new Set(['find', 'filter', 'includes', 'indexOf', 'some
 /**
  * Returns a stable receiver expression suitable for a manual indexing recommendation.
  *
- * @param node
+ * @param node Expression whose receiver may be used in a recommendation.
  *
- * @return
+ * @return The receiver text for a simple identifier/property access, otherwise `undefined`.
  */
 function stableReceiver(node: ts.Expression): string | undefined {
 	if (ts.isIdentifier(node)) return node.text;
@@ -82,9 +79,9 @@ function stableReceiver(node: ts.Expression): string | undefined {
 /**
  * Finds the nearest enclosing function passed directly to a collection method.
  *
- * @param node
+ * @param node AST node whose enclosing collection callback is being sought.
  *
- * @return
+ * @return The nearest collection call whose callback contains the node, if any.
  */
 function collectionCallback(node: ts.Node): ts.CallExpression | undefined {
 	for (let current: ts.Node | undefined = node.parent; current; current = current.parent) {
@@ -100,10 +97,10 @@ function collectionCallback(node: ts.Node): ts.CallExpression | undefined {
 /**
  * Reports repeated linear lookups nested in collection callbacks without changing source.
  *
- * @param cfg
- * @param analysis
+ * @param cfg Quality configuration that selects source files and pattern options.
+ * @param analysis Optional shared source analysis to reuse while scanning.
  *
- * @return
+ * @return Repeated linear-lookup findings, with source locations and recommendations.
  */
 export function performancePatternFindings(cfg: QualityCfg, analysis?: QualityAnalysis): PerformancePatternFinding[] {
 	const settings = cfg.performancePatterns;
@@ -119,8 +116,9 @@ export function performancePatternFindings(cfg: QualityCfg, analysis?: QualityAn
 		const source = analysis?.sources.get(file) ?? ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, regexScriptKind(file));
 		if ((source as ts.SourceFile & { parseDiagnostics?: readonly ts.Diagnostic[] }).parseDiagnostics?.length) continue;
 		/**
+		 * Walks the parsed file to find nested linear lookups.
 		 *
-		 * @param node
+		 * @param node Current AST node in the source file.
 		 */
 		const visit = (node: ts.Node): void => {
 			if (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression) && REPEATED_LOOKUPS.has(node.expression.name.text) && collectionCallback(node)) {
@@ -385,6 +383,11 @@ function resolveTailwindNodeImport(consumerRequire: NodeRequire, root: string, s
 	const stylesheetDir = dirname(stylesheetPath);
 	const paths = [root, resolve(root, 'astro'), stylesheetDir, resolve(stylesheetDir, '..')];
 	try {
+		return consumerRequire.resolve('tailwindcss', { paths });
+	} catch {
+		// Try the v4 Node runtime exposed by the installed integration below.
+	}
+	try {
 		return consumerRequire.resolve('@tailwindcss/node', { paths });
 	} catch {
 		// The Node runtime is usually a transitive dependency of the selected v4 integration.
@@ -454,7 +457,7 @@ function locationAt(src: string, offset: number): { line: number; column: number
  *
  * @param cfg Quality configuration containing the Tailwind stylesheet and source roots.
  * @param fix Whether canonical replacements should be written to source files.
- * @param output
+ * @param output Optional callbacks and quiet-mode control for diagnostic reporting.
  *
  * @return Promise resolving to zero after diagnostics or fixes complete.
  */
@@ -466,7 +469,7 @@ export async function runTailwindCanonical(cfg: QualityCfg, fix = false, output:
 	let tailwind: {
 		__unstable__loadDesignSystem?: (
 			css: string,
-			options: { base: string },
+			options: { base: string; from: string; loadStylesheet: (id: string, base: string) => Promise<{ base: string; content: string; path: string }> },
 		) => Promise<{
 			canonicalizeCandidates: (candidates: string[]) => string[];
 			candidatesToAst?: (candidates: string[]) => unknown[];
@@ -485,7 +488,18 @@ export async function runTailwindCanonical(cfg: QualityCfg, fix = false, output:
 		return 0;
 	}
 	const stylesheet = readFileSync(stylesheetPath, 'utf8');
-	const designSystem = await tailwind.__unstable__loadDesignSystem(stylesheet, { base: dirname(stylesheetPath) });
+	const loadStylesheet = async (id: string, base: string): Promise<{ base: string; content: string; path: string }> => {
+		let importedPath = resolve(base, id);
+		if (!existsSync(importedPath)) {
+			try {
+				importedPath = consumerRequire.resolve(id, { paths: [base, cfg.root, resolve(cfg.root, 'astro'), dirname(stylesheetPath), resolve(dirname(stylesheetPath), '..')] });
+			} catch {
+				throw new Error(`Tailwind stylesheet import not found: ${id}`);
+			}
+		}
+		return { base: dirname(importedPath), content: readFileSync(importedPath, 'utf8'), path: importedPath };
+	};
+	const designSystem = await tailwind.__unstable__loadDesignSystem(stylesheet, { base: dirname(stylesheetPath), from: stylesheetPath, loadStylesheet });
 	const lengthInPixels = (value: string): number | undefined => {
 		const match = /^(-?\d+(?:\.\d+)?)(px|rem)$/.exec(value);
 		if (!match) return undefined;
@@ -528,8 +542,8 @@ export async function runTailwindCanonical(cfg: QualityCfg, fix = false, output:
 		const equivalent =
 			before.length > 0 &&
 			before.length === after.length &&
-			before.every((declaration, index) => {
-				const replacement = after[index];
+			before.every((declaration, i) => {
+				const replacement = after[i];
 				if (!replacement || declaration.property !== replacement.property || declaration.important !== replacement.important) return false;
 				const pixels = lengthInPixels(declaration.value);
 				if (pixels === undefined) return declaration.value === replacement.value;
@@ -613,8 +627,9 @@ function regexCandidates(cfg: QualityCfg, analysis?: QualityAnalysis): RegexCand
 		const ast = analysis?.sources.get(file) ?? ts.createSourceFile(file, src, ts.ScriptTarget.Latest, true, regexScriptKind(file));
 		const shadowedRegExp = hasRegExpBinding(ast);
 		/**
+		 * Collects regex literals and supported `RegExp` constructions from the file.
 		 *
-		 * @param node
+		 * @param node Current AST node being inspected.
 		 */
 		const visit = (node: ts.Node): void => {
 			if (ts.isRegularExpressionLiteral(node) && !isGenLocalRegex(node, ast)) {
@@ -665,10 +680,11 @@ function isGenLocalRegex(node: ts.RegularExpressionLiteral, ast: ts.SourceFile):
  */
 function hasRegExpBinding(ast: ts.SourceFile): boolean {
 	/**
+	 * Checks whether a binding pattern contains a `RegExp` name.
 	 *
-	 * @param name
+	 * @param name Binding name, including nested destructuring patterns.
 	 *
-	 * @return
+	 * @return Whether any bound identifier is named `RegExp`.
 	 */
 	const bindingHasRegExp = (name: ts.BindingName): boolean => {
 		if (ts.isIdentifier(name)) return name.text === 'RegExp';
@@ -676,8 +692,9 @@ function hasRegExpBinding(ast: ts.SourceFile): boolean {
 	};
 	let found = false;
 	/**
+	 * Searches declarations and imports for a binding that shadows global `RegExp`.
 	 *
-	 * @param node
+	 * @param node Current AST node being inspected.
 	 */
 	const visit = (node: ts.Node): void => {
 		if (found) return;
@@ -883,8 +900,9 @@ function insertNamespaceImport(src: string, ast: ts.SourceFile, alias: string, s
 function identifierNames(ast: ts.SourceFile): Set<string> {
 	const names = new Set<string>();
 	/**
+	 * Adds each identifier spelling found in the source tree.
 	 *
-	 * @param node
+	 * @param node Current AST node being inspected.
 	 */
 	const visit = (node: ts.Node): void => {
 		if (ts.isIdentifier(node)) names.add(node.text);

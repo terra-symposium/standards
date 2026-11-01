@@ -34,8 +34,9 @@ REGEX
 
 const UNKNOWN_QUALITY_CLI_ARGUMENT_REGEX = /Unknown quality CLI argument/;
 /**
+ * Matches the import declaration used by the naming repair fixture.
  *
- * @return
+ * @return A fresh global regular expression for finding that declaration.
  */
 const IMPORT_TYPE_RECORDDATA_FROM_TYPES_G_REGEX = () => /import type \{ RecordData \} from '\.\/types';/g;
 const REPORTER_PLAYWRIGHT_REPORTER_JS_U_REGEX = /^--reporter=.*playwright-reporter\.js$/u;
@@ -270,11 +271,12 @@ test('full quality continues after failed scripts and prints their details under
 	const root = fixtureRoot('terra-quality-cli-continue-failures-');
 	const marker = join(root, 'ran.txt');
 	/**
+	 * Builds a configured command that writes a marker and exits with the requested status.
 	 *
-	 * @param message
-	 * @param exitCode
+	 * @param message Text written to the shared marker and standard error.
+	 * @param exitCode Exit status returned by the command.
 	 *
-	 * @return
+	 * @return Command configuration accepted by the quality runner.
 	 */
 	const cmd = (message, exitCode = 1) => ({
 		command: process.execPath,
@@ -383,7 +385,6 @@ test('configuration toggles default to enabled and honor explicit category, item
 	assert.equal(qualityCmdEnabled(enabled, 'build'), true);
 	assert.equal(qualityRecommendationEnabled(enabled, 'architecture'), true);
 });
-
 test('full quality orders phases, preserves configured suite order, de-duplicates invocations, and continues after a failing test', () => {
 	const root = fixtureRoot('terra-quality-phase-order-');
 	const marker = join(root, 'runs.txt');
@@ -399,11 +400,12 @@ test('full quality orders phases, preserves configured suite order, de-duplicate
 	);
 	fixtureFile(root, 'bin/node', `#!/bin/sh\nprintf '%s\\n' "$@" > ${JSON.stringify(nodeArgsMarker)}\nprintf 'unit-node\\n' >> ${JSON.stringify(marker)}\n`, 0o755);
 	/**
+	 * Builds a command fixture that records its label and can report failure.
 	 *
-	 * @param label
-	 * @param failure
+	 * @param label Text appended to the shared invocation marker.
+	 * @param failure Whether the command should exit with a failure status.
 	 *
-	 * @return
+	 * @return Command configuration accepted by the quality runner.
 	 */
 	const recorded = (label, failure = false) => ({
 		command: process.execPath,
@@ -480,12 +482,12 @@ test('full quality orders phases, preserves configured suite order, de-duplicate
 		'static',
 		'security-check',
 		'static-format-option',
+		'unit',
+		'unit-node',
+		'integration',
 		'browser',
 		'browser',
 		'other',
-		'integration',
-		'unit',
-		'unit-node',
 		'types',
 		'build',
 		'health',
@@ -510,7 +512,7 @@ test('full quality orders phases, preserves configured suite order, de-duplicate
 	);
 	const groupOrder = ['Unit Test', 'Unit Node', 'Integration Test', 'Browser E2e', 'Cli Smoke', 'Other Test'].map((group) => text.indexOf(group));
 	assert.ok(groupOrder.every((position) => position >= 0));
-	const suiteStatuses = ['✓ Browser E2e', '✓ Cli Smoke', '✓ Other Test', '✓ Integration Test', '✗ Unit Test', '✓ Unit Node'].map((status) => text.indexOf(status));
+	const suiteStatuses = ['✗ Unit Test', '✓ Unit Node', '✓ Integration Test', '✓ Browser E2e', '✓ Cli Smoke', '✓ Other Test'].map((status) => text.indexOf(status));
 	assert.ok(suiteStatuses.every((position) => position >= 0));
 	assert.deepEqual(
 		suiteStatuses,
@@ -840,10 +842,11 @@ export type Result = RecordData;
 		`import { runQualityFromCfg } from ${JSON.stringify(runnerUrl)};\nawait runQualityFromCfg(new URL('./quality.json', import.meta.url).pathname, process.argv.slice(2));\n`,
 	);
 	/**
+	 * Runs the generated quality wrapper with the supplied CLI arguments.
 	 *
-	 * @param args
+	 * @param args Arguments passed through to the quality CLI.
 	 *
-	 * @return
+	 * @return Spawn result containing the wrapper's status and captured output.
 	 */
 	const runQuality = (...args) => spawnSync(process.execPath, [script, ...args], { cwd: root, encoding: 'utf8' });
 	const original = readFileSync(src, 'utf8');
