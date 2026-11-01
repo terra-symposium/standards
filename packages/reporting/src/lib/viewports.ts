@@ -17,8 +17,9 @@ import type { LoadTestingConfig } from './core.js';
 import type { PlaywrightTestConfig } from '@playwright/test';
 
 /*//////////////////////////////////////////////////
-CONFIG
+REGEX
 //////////////////////////////////////////////////*/
+const A_Z0_9_GI_REGEX = () => /[^a-z0-9-]/gi;
 
 /** The default responsive viewport catalog used by the shared reporter. */
 export const VISUAL_VIEWPORTS = {
@@ -179,6 +180,7 @@ export const withResponsivePlaywright = <T extends PlaywrightTestConfig>(cfg: T,
 	const singleRun = new Set(opts.singleRunProjects || []);
 	/**
 	 * Identifies projects that should run once instead of expanding across viewports.
+	 *
 	 * @param project Playwright project whose dependencies and test pattern are inspected.
 	 * @param idx Project index used to create a stable fallback name.
 	 *
@@ -193,7 +195,6 @@ export const withResponsivePlaywright = <T extends PlaywrightTestConfig>(cfg: T,
 	const responsiveProjects = projects.flatMap((p, i) => {
 		const baseName = p.name || `project-${i + 1}`;
 		if (isSetup(p, i) || singleRun.has(baseName)) return [p];
-		if (opts.viewportPolicy === 'declared' && p.grep) throw new Error(`Project ${baseName} already defines grep; move its selector into testMatch before using declared viewports.`);
 		return viewports.map((v) => ({
 			...p,
 			name: visualProjectName(baseName, v, viewports),
@@ -201,10 +202,10 @@ export const withResponsivePlaywright = <T extends PlaywrightTestConfig>(cfg: T,
 				? {
 						grep: p.grep
 							? new RegExp(
-									`(?=[\\s\\S]*(?:${p.grep instanceof RegExp ? p.grep.source : p.grep}))(?=[\\s\\S]*@viewport:${v.name.replace(/[^a-z0-9-]/gi, '\\$&')}(?=\\s|$))`,
+									`(?=[\\s\\S]*(?:${p.grep instanceof RegExp ? p.grep.source : p.grep}))(?=[\\s\\S]*@viewport:${v.name.replace(A_Z0_9_GI_REGEX(), '\\$&')}(?=\\s|$))`,
 									p.grep instanceof RegExp ? p.grep.flags : '',
 								)
-							: new RegExp(`(?:^|\\s)@viewport:${v.name.replace(/[^a-z0-9-]/gi, '\\$&')}(?=\\s|$)`),
+							: new RegExp(`(?:^|\\s)@viewport:${v.name.replace(A_Z0_9_GI_REGEX(), '\\$&')}(?=\\s|$)`),
 					}
 				: {}),
 			use: { ...(p.use || {}), viewport: { width: v.width, height: v.height }, screenshot: { mode: 'on', fullPage: true, caret: 'initial' } },

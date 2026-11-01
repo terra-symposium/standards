@@ -15,11 +15,21 @@ Before migration, build a case-level map: existing file/case, source owner, obse
 
 Use the repository's canonical test manifest (for Terra repositories, `.terra-tests.json`) for suite commands and file ownership. Do not keep duplicate registries in scripts or prose. Expand ownership patterns during validation and require every discovered test file to be owned exactly once. Aggregate scripts and CI should invoke each canonical suite once. Share startup and authentication where isolation permits, parallelize independent work, and serialize only proven shared mutable resources. Run readiness assertions instead of sleeps or network-idle waits; choose operation-specific timeouts.
 
+## Terra source ownership
+
+- Docs owns document workspace, editor, rich-block behavior, and simulated CRUD journeys. Consumer repositories test only the integration boundary they add.
+- Website owns host authorization, Sanity operations, migrations, and website-specific adapters. Remove feature tests whose behavior is owned by Docs.
+- Styling owns reusable components, variants, and responsive primitives. Applications own their composition, product workflows, and integration boundaries.
+- Standards owns quality, reporting, test-runner, and public composite-action implementation. Public consumers call Standards directly instead of recreating a distribution mirror.
+- Portfolio tests only behavior unique to its demos and host composition. Shared component behavior belongs to Styling.
+
+Treat labels such as architecture, integration, visual, and regression as proof descriptions, not separate product domains. Move overlapping tests beside their source owner. Retain a consumer test only when the source package cannot prove the additional boundary.
+
 ## Choose viewports for each scenario
 
 For each browser scenario, inspect the component's source media/container queries and measure the rendered UI in a real browser. Identify the failure mode a size can expose: wrapping, overflow, hidden controls, navigation changes, placement, keyboard reachability, or altered interaction. Record the relevant source rule or measured transition, the selected viewport names and dimensions, and why each size adds coverage.
 
-Declare only the scenario's meaningful viewport combinations using native Playwright tags and a `viewport-reason` annotation. Selection must happen during collection, with no runtime skips. If a transition changes behavior, cover the affected interaction immediately below, at, and above the measured threshold; add narrow or wide extremes only when they expose another risk. Run layout-independent logic once at the canonical desktop size. Do not multiply every test by a standard viewport catalog or require six breakpoints without scenario evidence. Explain any extra viewport run.
+Declare only the scenario's meaningful viewport combinations using native Playwright tags and a `viewport-reason` annotation. After all scenarios in a suite are annotated, set the shared Reporting helper to `viewportPolicy: 'declared'`; selection must happen during collection, with no runtime skips. Do not combine this policy with project-level `grep`. If a transition changes behavior, cover the affected interaction immediately below, at, and above the measured threshold; add narrow or wide extremes only when they expose another risk. Run layout-independent logic once at the canonical desktop size. Do not multiply every test by a standard viewport catalog or require six breakpoints without scenario evidence. Explain any extra viewport run.
 
 The reporting helper may retain a legacy default for unmigrated consumers. Migrated suites declare their own selections through the supported catalog/configuration, and the runner must execute exactly those declared combinations. Report expected and executed test/viewport combinations so omissions are visible.
 

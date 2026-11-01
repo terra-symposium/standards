@@ -86,7 +86,6 @@ HELPERS
 /**
  * Converts an external status into the normalized reporting status set.
  *
- * @param val
  * @param value External status value.
  *
  * @return A supported reporting status, defaulting to `failed` for unknown values.
@@ -105,7 +104,6 @@ export const statusLabel = (status: VisualStatus): string => (status === 'timedO
 /**
  * Counts newline-delimited diagnostic messages while treating an empty value as zero.
  *
- * @param val
  * @param value Newline-delimited diagnostic text.
  *
  * @return The number of non-empty diagnostic lines.

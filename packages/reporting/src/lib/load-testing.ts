@@ -24,6 +24,11 @@ CONFIG
 
 /** Default warning and failure thresholds used when a repo does not override them. */
 export const DEFAULT_LOAD_BUDGET: LoadBudget = { warnMs: 2000, failMs: 5000 };
+
+/*//////////////////////////////////////////////////
+TYPES
+//////////////////////////////////////////////////*/
+
 /** Fully normalized load testing settings. */
 export type NormalizedLoadTestingConfig = {
 	enabled: boolean;
@@ -34,8 +39,15 @@ export type NormalizedLoadTestingConfig = {
 };
 /** Optional inputs that have higher precedence than quality.json values. */
 export type LoadTestingOverrides = LoadTestingConfig;
+
+/*//////////////////////////////////////////////////
+HELPERS
+//////////////////////////////////////////////////*/
+
+// BUDGET VALIDATION
 /**
  * Checks whether a parsed configuration value is a non-array record.
+ *
  * @param value Candidate value read from repository or test configuration.
  *
  * @return `true` when the value is a non-array object.
@@ -96,6 +108,8 @@ const completeBudget = (value: LoadBudget, label: string): LoadBudget => {
 	if (value.failMs <= value.warnMs) throw new Error(`${label}.failMs must be greater than warnMs.`);
 	return value;
 };
+
+// CONFIGURATION NORMALIZATION
 /**
  * Normalizes raw settings and applies explicit options over quality.json settings.
  *
@@ -113,6 +127,7 @@ export const normalizeLoadTestingConfig = (raw: LoadTestingConfig = {}, override
 	);
 	/**
 	 * Merges one named budget map over another while retaining unmentioned entries.
+	 *
 	 * @param base Existing named budgets that retain lower precedence.
 	 * @param additional Named budgets that override matching base entries.
 	 *
@@ -131,6 +146,8 @@ export const normalizeLoadTestingConfig = (raw: LoadTestingConfig = {}, override
 	if (typeof enabled !== 'boolean') throw new Error('loadTesting.enabled must be a boolean.');
 	return { enabled, defaultBudget, testBudgets, operationBudgets: opBudgets };
 };
+
+// REPOSITORY CONFIGURATION FILE
 /**
  * Reads load settings from a repository's quality.json and applies explicit overrides.
  * Missing quality.json files preserve the shared 2s/5s defaults.
@@ -157,6 +174,8 @@ export const readLoadTestingConfig = (file = path.resolve(process.cwd(), 'qualit
 	if (raw.enabled !== undefined && typeof raw.enabled !== 'boolean') throw new Error(`loadTesting.enabled in ${cfgFile} must be a boolean.`);
 	return { ...normalizeLoadTestingConfig(raw, overrides), root };
 };
+
+// MEASUREMENT IDENTITY AND GRADING
 /**
  * Creates a stable test-budget key from a repository-relative file and full title path.
  *
@@ -215,6 +234,8 @@ export const loadGradeCounts = (measurements: readonly Pick<LoadMeasurement, 'gr
 	for (const item of measurements) counts[item.grade] += 1;
 	return counts;
 };
+
+// OPERATION TIMING
 /**
  * Times an operation, records its duration even when it throws, and preserves its value/error.
  *

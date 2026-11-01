@@ -26,6 +26,7 @@ import type { ReportRun, VisualResult } from './core.js';
 CONFIG
 //////////////////////////////////////////////////*/
 
+// STATUS AND TIMING STYLES
 const STATUS_STYLES: Record<string, { fill: string; font: string }> = {
 	passed: { fill: 'FFDCEFE0', font: 'FF166534' },
 	failed: { fill: 'FFFEE2E2', font: 'FF991B1B' },
@@ -38,6 +39,12 @@ const LOAD_STYLES: Record<string, { fill: string; font: string }> = {
 	warning: { fill: 'FFFEF3C7', font: 'FF92400E' },
 	fail: { fill: 'FFFEE2E2', font: 'FF991B1B' },
 };
+
+/*//////////////////////////////////////////////////
+HELPERS
+//////////////////////////////////////////////////*/
+
+// CELL FORMATTING
 /**
  * Applies the shared header layout to a worksheet.
  *
@@ -77,8 +84,8 @@ const styleStatus = (cell: ExcelJS.Cell, status: string): void => {
 /**
  * Applies a timing grade and its semantic color treatment to a cell.
  *
- * @param cell
- * @param grade
+ * @param cell Cell that will display the timing grade.
+ * @param grade Grade key used to select the timing color treatment.
  */
 const styleLoadGrade = (cell: ExcelJS.Cell, grade: string): void => {
 	const style = LOAD_STYLES[grade] || LOAD_STYLES.fail;
@@ -88,14 +95,12 @@ const styleLoadGrade = (cell: ExcelJS.Cell, grade: string): void => {
 	cell.alignment = { horizontal: 'center', vertical: 'middle' };
 };
 /**
- * Adds one feature-file result sheet, including available screenshot evidence.
+ * Produces a worksheet-safe name unique within the workbook for a feature file.
  *
- * @param book Workbook receiving the sheet.
- * @param src
- * @param name Feature-file name used as the worksheet name.
- * @param vals Results belonging to the feature file.
+ * @param book Workbook whose existing worksheet names must be avoided.
+ * @param src Feature-file path or label to convert into a worksheet name.
  *
- * @return Nothing; the workbook is mutated in place.
+ * @return A sanitized name of at most 31 characters, with a numeric suffix when needed to avoid collisions.
  */
 const resultSheetName = (book: ExcelJS.Workbook, src: string): string => {
 	const base =
@@ -114,19 +119,34 @@ const resultSheetName = (book: ExcelJS.Workbook, src: string): string => {
 	}
 	return name;
 };
-/** Returns the populated cell values in worksheet order. */
-const valuesForRow = (row: ExcelJS.Row): (ExcelJS.CellValue | null)[] => Array.from({ length: row.cellCount }, (_, index) => row.getCell(index + 1).value);
-/** Returns the load grade for one test result. */
+/**
+ * Reads the populated cell values in worksheet order, including empty positions within the row.
+ *
+ * @param row Worksheet row whose values are copied into the aggregate summary.
+ *
+ * @return Cell values from the first column through the row's last populated cell.
+ */
+const valuesForRow = (row: ExcelJS.Row): (ExcelJS.CellValue | null)[] => Array.from({ length: row.cellCount }, (_, i) => row.getCell(i + 1).value);
+/**
+ * Chooses the worst timing grade recorded for one test result.
+ *
+ * @param val Result whose timing measurements contribute to the displayed grade.
+ *
+ * @return `fail`, `warning`, `pass`, or an empty string when the result has no timing samples.
+ */
 const resultLoadGrade = (val: VisualResult): string => {
 	const counts = loadGradeCounts(val.loadMeasurements || []);
 	return counts.fail ? 'fail' : counts.warning ? 'warning' : counts.pass ? 'pass' : '';
 };
+
+// RESULT WORKSHEETS
 /**
+ * Adds a feature-file worksheet with result rows and any available screenshot evidence.
  *
- * @param book
- * @param name
- * @param vals
- * @param loadEnabled
+ * @param book Workbook receiving the worksheet and embedded images.
+ * @param name Feature-file label used to derive the worksheet name.
+ * @param vals Normalized results belonging to that feature file.
+ * @param loadEnabled Whether the result rows include load-grade values.
  */
 const addResultSheet = (book: ExcelJS.Workbook, name: string, vals: readonly VisualResult[], loadEnabled: boolean): void => {
 	const sheet = book.addWorksheet(resultSheetName(book, name));
@@ -202,7 +222,7 @@ const addResultSheet = (book: ExcelJS.Workbook, name: string, vals: readonly Vis
  *
  * @param book Workbook receiving the summary sheet.
  * @param run Normalized report run to summarize.
- * @param loadEnabled
+ * @param loadEnabled Whether load-grade totals are included in the summary columns.
  *
  * @return Nothing; the workbook is mutated in place.
  */
@@ -221,8 +241,8 @@ const addSummary = (book: ExcelJS.Workbook, run: ReportRun, loadEnabled: boolean
 /**
  * Adds a row for every timed test, page navigation, and named operation.
  *
- * @param book
- * @param results
+ * @param book Workbook receiving the timing sheet.
+ * @param results Results whose attached measurements are listed as rows.
  */
 const addLoadTimings = (book: ExcelJS.Workbook, results: readonly VisualResult[]): void => {
 	const sheet = book.addWorksheet('Load timings');
@@ -312,11 +332,18 @@ export const writeSpreadsheet = async (file: string, run: ReportRun): Promise<vo
 	await book.xlsx.writeFile(file);
 	await neutralizeApplicationMetadata(file);
 };
-
 /** A report workbook and its repository label for an aggregate evidence workbook. */
 export type SpreadsheetSource = { label: string; file: string };
 
-/** Copies tabular content, cell styling, merges, and embedded images into one named worksheet. */
+// AGGREGATE WORKBOOK
+/**
+ * Copies tabular content, cell styling, merges, and embedded images into one named worksheet.
+ *
+ * @param source Worksheet whose cells, formatting, merges, and images are copied.
+ * @param target Empty destination worksheet receiving the copied content.
+ * @param sourceBook Workbook that owns image references in the source worksheet.
+ * @param targetBook Workbook that receives cloned image references.
+ */
 const copyWorksheet = (source: ExcelJS.Worksheet, target: ExcelJS.Worksheet, sourceBook: ExcelJS.Workbook, targetBook: ExcelJS.Workbook): void => {
 	target.properties = structuredClone(source.properties);
 	target.views = structuredClone(source.views);
@@ -350,7 +377,6 @@ const copyWorksheet = (source: ExcelJS.Worksheet, target: ExcelJS.Worksheet, sou
 		target.addImage(targetBook.addImage(image), structuredClone(range));
 	}
 };
-
 /**
  * Combines per-repository Reporting workbooks into an all-tests workbook.
  *
@@ -379,7 +405,7 @@ export const mergeSpreadsheets = async (file: string, sources: readonly Spreadsh
 		if (!summaryHeader) {
 			summaryHeader = ['Repository', ...header];
 			summary.addRow(summaryHeader);
-		} else if (header.length !== summaryHeader.length - 1 || header.some((value, index) => value !== summaryHeader?.[index + 1])) {
+		} else if (header.length !== summaryHeader.length - 1 || header.some((value, i) => value !== summaryHeader?.[i + 1])) {
 			throw new Error(`Reporting workbook Summary columns do not match the aggregate contract: ${sourceFile}`);
 		}
 		for (let rowNumber = 2; rowNumber <= sourceSummary.rowCount; rowNumber++) {

@@ -7,11 +7,9 @@ description: Design and maintain exhaustive Terra tests, fixtures, contracts, an
 
 Use when adding tests, expanding coverage, changing fixtures, or updating tests for an intentional migration.
 
-Follow [`../references/test-structure-and-responsive-evidence.md`](../references/test-structure-and-responsive-evidence.md) for canonical ownership, consolidation, retirement, viewport rationale, tags, annotations, and evidence collection.
-
 ## 1. Map the contract
 
-For cross-repository ownership, consolidation, and per-scenario viewport selection, follow [test ownership and viewport selection](../references/ownership-and-viewport-policy.md).
+For canonical ownership, consolidation, retirement, viewport selection, and evidence collection, follow [`../references/test-structure-and-responsive-evidence.md`](../references/test-structure-and-responsive-evidence.md).
 
 For each behavior, record its owner and identify:
 
