@@ -1169,7 +1169,7 @@ test('dead-code CLI fails read-only for safe single-use fixes, then inlines the 
 });
 test('full quality leaves unproven single-use rewrites advisory while the focused dead-code command reports them', () => {
 	const root = fixtureRoot('terra-quality-single-use-review-gate-');
-	fixtureFile(root, 'src/main.ts', "export async function readValue() { const result = await Promise.resolve('ready'); return result; }\n");
+	fixtureFile(root, 'src/main.ts', "export async function readValue() { const result = await Promise.resolve('ready'); const label = 'ready'; return { result, label }; }\n");
 	const cfg = createQualityCfg({
 		root,
 		sourceRoots: ['src'],
@@ -1193,19 +1193,19 @@ test('full quality leaves unproven single-use rewrites advisory while the focuse
 	});
 	const originalErr = console.error;
 	const originalInfo = console.info;
-	const errors = [];
+	const errs = [];
 	const info = [];
-	console.error = (...parts) => errors.push(parts.join(' '));
+	console.error = (...parts) => errs.push(parts.join(' '));
 	console.info = (...parts) => info.push(parts.join(' '));
 	try {
 		resetExitCode();
 		runQualityCli(cfg, ['quality', '--all', '--warn', '--skip-commands', '--skip-recommendations']);
 		assert.equal(process.exitCode, 0);
-		assert.match(info.join('\n'), /single-use bindings remain as review-only suggestions/);
+		assert.match(info.join('\n'), /single-use findings remain as non-blocking inlining suggestions/);
 		resetExitCode();
 		runQualityCli(cfg, ['dead-code', '--all', '--warn']);
 		assert.equal(process.exitCode, 1);
-		assert.match(errors.join('\n'), /\[ERROR\] typescript\/single-use: src\/main\.ts/);
+		assert.match(errs.join('\n'), /\[ERROR\] typescript\/single-use: src\/main\.ts/);
 	} finally {
 		console.error = originalErr;
 		console.info = originalInfo;

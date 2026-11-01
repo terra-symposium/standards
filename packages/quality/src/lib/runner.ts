@@ -2514,7 +2514,7 @@ function runDeadCode(cfg: QualityCfg, fix: boolean, all: boolean, verify = true,
 	const finalSingleUseFindings = fix && !typeRejectedFiles.size ? singleUseVerificationFindings : singleUseFindings(cfg);
 	let advisorySingleUseCount = 0;
 	for (const single of finalSingleUseFindings) {
-		if (!includeReviewSingleUse && single.decision === 'REVIEW') {
+		if (!includeReviewSingleUse) {
 			advisorySingleUseCount++;
 			continue;
 		}
@@ -2529,7 +2529,7 @@ function runDeadCode(cfg: QualityCfg, fix: boolean, all: boolean, verify = true,
 			agentAction: single.agentAction,
 		});
 	}
-	if (emit && advisorySingleUseCount) console.info(`  ${advisorySingleUseCount} single-use bindings remain as review-only suggestions because safe inlining was not proven.`);
+	if (emit && advisorySingleUseCount) console.info(`  ${advisorySingleUseCount} single-use findings remain as non-blocking inlining suggestions.`);
 	for (const finding of documentationFindings(scopedCfg(cfg, true)).filter((i) => i.kind === 'orphan'))
 		findings.push({
 			rule: 'tsdoc/detached',
