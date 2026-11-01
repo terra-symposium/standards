@@ -1513,7 +1513,20 @@ type DeadCodeFinding = { rule: string; file: string; line: number; name: string;
 /** One named item reported by Knip, with an optional source line. */
 type KnipItem = { name: string; line?: number };
 /** One source-file record in Knip's machine-readable issue inventory. */
-type KnipIssue = { file: string; [kind: string]: string | KnipItem[] };
+type KnipIssue = { file: string; [kind: string]: unknown };
+
+/**
+ * Flattens Knip issue groups while preserving the named findings in each group.
+ * Knip reports duplicate exports as arrays of arrays; other finding kinds are flat.
+ *
+ * @param value Knip's finding value for one issue kind.
+ *
+ * @return The named finding records contained in the value.
+ */
+function flattenKnipItems(value: unknown): unknown[] {
+	if (!Array.isArray(value)) throw new Error('finding kind is not an array');
+	return value.flatMap((item) => (Array.isArray(item) ? flattenKnipItems(item) : [item]));
+}
 
 /**
  * Uses the repository's resolved unused-variable rule without evaluating its unrelated lint rules.
@@ -2019,11 +2032,22 @@ function readKnipIssues(cfg: QualityCfg): KnipIssue[] {
 			assertKnipPath(cfg, issue.file, 'finding source');
 			for (const [kind, val] of Object.entries(issue)) {
 				if (kind === 'file') continue;
-				if (!Array.isArray(val)) throw new Error(`invalid ${kind} findings for ${issue.file}`);
-				for (const item of val) {
-					if (!item || typeof item.name !== 'string' || !item.name || (item.line !== undefined && (!Number.isInteger(item.line) || item.line < 1)))
+				let items: unknown[];
+				try {
+					items = flattenKnipItems(val);
+				} catch {
+					throw new Error(`invalid ${kind} findings for ${issue.file}`);
+				}
+				for (const item of items) {
+					if (!item || typeof item !== 'object' || Array.isArray(item)) throw new Error(`malformed ${kind} finding for ${issue.file}`);
+					const named = item as { name?: unknown; line?: unknown };
+					if (
+						typeof named.name !== 'string' ||
+						!named.name ||
+						(named.line !== undefined && (typeof named.line !== 'number' || !Number.isInteger(named.line) || named.line < 1))
+					)
 						throw new Error(`malformed ${kind} finding for ${issue.file}`);
-					if (kind === 'files') assertKnipPath(cfg, item.name, 'unreachable file');
+					if (kind === 'files') assertKnipPath(cfg, named.name, 'unreachable file');
 				}
 			}
 		}
@@ -2069,7 +2093,7 @@ function collectKnipFindings(cfg: QualityCfg, importedConsumers = importedExport
 		const filePath = assertKnipPath(cfg, issue.file, 'finding source');
 		for (const [kind, val] of Object.entries(issue)) {
 			if (kind === 'file') continue;
-			for (const item of val as KnipItem[]) {
+			for (const item of flattenKnipItems(val) as KnipItem[]) {
 				if (kind === 'exports' && isFrameworkEntryExport(cfg, issue.file, item.name)) continue;
 				const location = kind === 'files' ? item.name : issue.file;
 				const autoFixable = (kind === 'exports' || kind === 'types') && !importedConsumers.get(filePath)?.has(item.name) && knipExportCanBeMadePrivate(filePath, item.name);

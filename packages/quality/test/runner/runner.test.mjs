@@ -1706,6 +1706,21 @@ test('dead-code fails closed when Knip exits unsuccessfully with an empty invent
 	assert.throws(() => runQualityCli(cfg, ['dead-code', '--warn']), /failure without findings/);
 	assert.equal(fixtureText(root, 'src/main.ts'), 'export const value = 1;\n');
 });
+test('dead-code accepts Knip duplicate findings grouped as nested arrays', () => {
+	const root = fixtureRoot('terra-quality-knip-duplicates-');
+	fixtureFile(root, 'src/runtime.ts', 'export const warn = 1;\nexport const error = 2;\n');
+	const knip = fixtureFile(
+		root,
+		'bin/knip.mjs',
+		`#!/usr/bin/env node\nprocess.stdout.write(JSON.stringify({ issues: [{ file: 'src/runtime.ts', duplicates: [[{ name: 'warn', line: 1 }, { name: 'error', line: 2 }]] }] }));\nprocess.exitCode = 1;\n`,
+		0o755,
+	);
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], tools: { knip }, enabledChecks: { lint: false } });
+	resetExitCode();
+	runQualityCli(cfg, ['dead-code', '--warn']);
+	assert.equal(process.exitCode, 1, 'duplicate exports remain actionable quality findings');
+	resetExitCode();
+});
 test('dead-code validates the full Knip inventory before changing any export', () => {
 	const root = fixtureRoot('terra-quality-knip-incomplete-inventory-');
 	const src = fixtureFile(root, 'src/main.ts', 'export const unused = 1;\n');
