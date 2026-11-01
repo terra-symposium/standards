@@ -157,6 +157,7 @@ test('shared regex registry rewrites TypeScript and MJS literals and constructor
 	assert.match(mjsSrc, /TerraQualityRegex\.REGEX_CONSTRUCTOR_GY_REGEX\(\)/);
 	const registrySrc = fixtureText(root, 'shared/regex.mjs');
 	const registryTypes = fixtureText(root, 'shared/regex.d.mts');
+	assert.match(registrySrc, /\/\/ @terra-quality-regex-key "alpha\/g"\n\/\*\*\n \* Creates a fresh regular expression instance for the shared pattern\./);
 	assert.match(registrySrc, /export const REGEX_ALPHA_G_REGEX = \(\) => \(/);
 	assert.match(registrySrc, /new RegExp\('constructor', 'gy'\)/);
 	assert.match(registryTypes, /export declare const REGEX_ALPHA_G_REGEX: \(\) => RegExp;/);
@@ -170,7 +171,7 @@ test('shared regex registry rewrites TypeScript and MJS literals and constructor
 	});
 	assert.deepEqual(ts.getPreEmitDiagnostics(program), []);
 	const registry = await import(`${pathToFileURL(resolve(root, 'shared/regex.mjs')).href}?fresh=1`);
-	const alphaFactoryName = registrySrc.match(/\/\/ @terra-quality-regex-key "alpha\/g"\nexport const (\w+)/)?.[1];
+	const alphaFactoryName = registrySrc.match(/\/\/ @terra-quality-regex-key "alpha\/g"\n(?:\/\*\*[\s\S]*?\*\/\n)?export const (\w+)/)?.[1];
 	assert.ok(alphaFactoryName);
 	const alphaFactory = registry[alphaFactoryName];
 	const first = alphaFactory();

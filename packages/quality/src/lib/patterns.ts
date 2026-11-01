@@ -806,7 +806,7 @@ function readRegexRegistry(modulePath: string, declarationPath: string): { modul
 	if ((moduleExists || declarationExists) && !owned) return null;
 	const names = new Set([...module.matchAll(EXPORT_CONST_A_ZA_Z_W_B_GM_REGEX())].map((m) => m[1]!));
 	const keys = new Map<string, string>();
-	for (const match of module.matchAll(/^\/\/ @terra-quality-regex-key (.+)\r?\nexport const ([A-Za-z_$][\w$]*)\b/gm)) {
+	for (const match of module.matchAll(/^\/\/ @terra-quality-regex-key (.+)\r?\n(?:\/\*\*[\s\S]*?\*\/\r?\n)?export const ([A-Za-z_$][\w$]*)\b/gm)) {
 		try {
 			keys.set(JSON.parse(match[1]!) as string, match[2]!);
 		} catch {
@@ -1021,7 +1021,7 @@ function fixRegexDedupShared(cfg: QualityCfg, analysis?: QualityAnalysis): Patte
 	const moduleAdditions = newEntries
 		.map(
 			({ key: k, name: n, expression: e }) =>
-				`// @terra-quality-regex-key ${JSON.stringify(k)}\nexport const ${n} = () => (\n${e
+				`// @terra-quality-regex-key ${JSON.stringify(k)}\n/**\n * Creates a fresh regular expression instance for the shared pattern.\n *\n * @returns A new RegExp instance.\n */\nexport const ${n} = () => (\n${e
 					.split('\n')
 					.map((l) => `\t${l}`)
 					.join('\n')}\n);`,
