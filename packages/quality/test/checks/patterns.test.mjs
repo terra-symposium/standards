@@ -87,12 +87,7 @@ test('shared regex checks can exclude test directories where repeated literals a
 	const root = fixtureRoot('terra-quality-regex-skipped-directories-');
 	fixtureFile(root, 'src/use.ts', 'export const sourcePattern = /record/g;\n');
 	fixtureFile(root, 'tests/use.test.ts', 'const one = /record/g;\nconst two = /record/g;\n');
-	const cfg = createQualityCfg({
-		root,
-		sourceRoots: ['src', 'tests'],
-		extensions: ['.ts'],
-		regexDedup: { extensions: ['.ts'], sharedModule: 'shared/regex.mjs', skippedDirectories: ['tests'] },
-	});
+	const cfg = createQualityCfg({ root, sourceRoots: ['src', 'tests'], extensions: ['.ts'], regexDedup: { extensions: ['.ts'], sharedModule: 'shared/regex.mjs', skippedDirectories: ['tests'] } });
 	assert.deepEqual(regexFindings(cfg), []);
 	assert.equal(fixRegexDedup(cfg).fixed, 0);
 	assert.match(fixtureText(root, 'tests/use.test.ts'), /const one = \/record\/g;/);
