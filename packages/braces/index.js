@@ -1,5 +1,8 @@
-'use strict';
+/**
+ * packages/braces/index.js
+ */
 
+'use strict';
 const stringify = require('./lib/stringify');
 const compile = require('./lib/compile');
 const expand = require('./lib/expand');
@@ -13,15 +16,17 @@ const parse = require('./lib/parse');
  * console.log(braces('{a,b,c}', { compile: true })); //=> ['(a|b|c)']
  * console.log(braces('{a,b,c}')); //=> ['a', 'b', 'c']
  * ```
- * @param {String} `str`
- * @param {Object} `options`
- * @return {String}
+ *
+ * @param input - Brace pattern or array of patterns to process.
+ * @param options - Options controlling expansion, compilation, and duplicate removal.
+ *
+ * @returns An array of expanded patterns or compiled pattern strings.
+ *
  * @api public
  */
 
 const braces = (input, options = {}) => {
 	let output = [];
-
 	if (Array.isArray(input)) {
 		for (const pattern of input) {
 			const result = braces.create(pattern, options);
@@ -34,14 +39,11 @@ const braces = (input, options = {}) => {
 	} else {
 		output = [].concat(braces.create(input, options));
 	}
-
-	if (options && options.expand === true && options.nodupes === true) {
-		output = [...new Set(output)];
-	}
+	if (options && options.expand === true && options.nodupes === true) output = [...new Set(output)];
 	return output;
 };
 
-/**
+/*
  * Parse the given `str` with the given `options`.
  *
  * ```js
@@ -57,7 +59,7 @@ const braces = (input, options = {}) => {
 
 braces.parse = (input, options = {}) => parse(input, options);
 
-/**
+/*
  * Creates a braces string from an AST, or an AST node.
  *
  * ```js
@@ -72,13 +74,11 @@ braces.parse = (input, options = {}) => parse(input, options);
  */
 
 braces.stringify = (input, options = {}) => {
-	if (typeof input === 'string') {
-		return stringify(braces.parse(input, options), options);
-	}
+	if (typeof input === 'string') return stringify(braces.parse(input, options), options);
 	return stringify(input, options);
 };
 
-/**
+/*
  * Compiles a brace pattern into a regex-compatible, optimized string.
  * This method is called by the main [braces](#braces) function by default.
  *
@@ -94,13 +94,11 @@ braces.stringify = (input, options = {}) => {
  */
 
 braces.compile = (input, options = {}) => {
-	if (typeof input === 'string') {
-		input = braces.parse(input, options);
-	}
+	if (typeof input === 'string') input = braces.parse(input, options);
 	return compile(input, options);
 };
 
-/**
+/*
  * Expands a brace pattern into an array. This method is called by the
  * main [braces](#braces) function when `options.expand` is true. Before
  * using this method it's recommended that you read the [performance notes](#performance))
@@ -118,26 +116,18 @@ braces.compile = (input, options = {}) => {
  */
 
 braces.expand = (input, options = {}) => {
-	if (typeof input === 'string') {
-		input = braces.parse(input, options);
-	}
-
+	if (typeof input === 'string') input = braces.parse(input, options);
 	let result = expand(input, options);
 
 	// filter out empty strings if specified
-	if (options.noempty === true) {
-		result = result.filter(Boolean);
-	}
+	if (options.noempty === true) result = result.filter(Boolean);
 
 	// filter out duplicates if specified
-	if (options.nodupes === true) {
-		result = [...new Set(result)];
-	}
-
+	if (options.nodupes === true) result = [...new Set(result)];
 	return result;
 };
 
-/**
+/*
  * Processes a brace pattern and returns either an expanded array
  * (if `options.expand` is true), a highly optimized regex-compatible string.
  * This method is called by the main [braces](#braces) function.
@@ -154,14 +144,11 @@ braces.expand = (input, options = {}) => {
  */
 
 braces.create = (input, options = {}) => {
-	if (input === '' || input.length < 3) {
-		return [input];
-	}
-
+	if (input === '' || input.length < 3) return [input];
 	return options.expand !== true ? braces.compile(input, options) : braces.expand(input, options);
 };
 
-/**
+/*
  * Expose "braces"
  */
 

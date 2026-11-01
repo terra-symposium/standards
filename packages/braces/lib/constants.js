@@ -1,5 +1,8 @@
-'use strict';
+/**
+ * packages/braces/lib/constants.js
+ */
 
+'use strict';
 module.exports = {
 	MAX_DEPTH: 100,
 	MAX_LENGTH: 10000,
@@ -13,10 +16,8 @@ module.exports = {
 	CHAR_LOWERCASE_A: 'a' /* a */,
 	CHAR_UPPERCASE_Z: 'Z' /* Z */,
 	CHAR_LOWERCASE_Z: 'z' /* z */,
-
 	CHAR_LEFT_PARENTHESES: '(' /* ( */,
 	CHAR_RIGHT_PARENTHESES: ')' /* ) */,
-
 	CHAR_ASTERISK: '*' /* * */,
 
 	// Non-alphabetic chars.
