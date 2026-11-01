@@ -1,7 +1,7 @@
 {
 	"$schema": "./packages/quality/quality.schema.json",
 	"root": ".",
-	"sourceRoots": ["packages", "scripts"],
+	"sourceRoots": ["packages", "apps", "scripts"],
 	"extensions": [".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx", ".mts", ".cts"],
 	"tools": {
 		"eslint": "eslint",
