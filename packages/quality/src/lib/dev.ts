@@ -19,7 +19,10 @@ import { spawn, spawnSync } from 'node:child_process';
 HELPERS
 //////////////////////////////////////////////////*/
 
-/** Starts a configured development server after applying boundaries and reserving its port. */
+/**
+ * Starts a configured development server after applying boundaries and reserving its port.
+ *
+ */
 async function main(): Promise<void> {
 	const args = process.argv.slice(2);
 	const separator = args.indexOf('--');
@@ -46,7 +49,7 @@ async function main(): Promise<void> {
  *
  */
 function applyErrBoundaries(): void {
-	if (!existsSync('quality.json')) return;
+	if (!existsSync('quality.json') && !existsSync('config/quality.json')) return;
 	const runner = fileURLToPath(new URL('./runner.js', import.meta.url));
 	const result = spawnSync(process.execPath, [runner, 'error-boundaries', '--all'], { cwd: process.cwd(), env: process.env, stdio: 'inherit' });
 	if (result.status !== 0) throw new Error('Could not apply the configured application error boundaries.');
