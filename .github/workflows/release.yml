@@ -26,9 +26,7 @@ jobs:
       - run: pnpm --filter @terra-symposium/standards-quality test
       - uses: changesets/action@v2
         with:
-          publish: pnpm release
-          branch: development
-          title: 'chore: release shared packages'
-          summary: Version and publish shared package changes.
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          publish-script: pnpm release
+          pr-base-branch: development
+          pr-title: 'chore: release shared packages'
