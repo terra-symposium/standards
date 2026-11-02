@@ -1,1 +1,18 @@
-config/pnpm-workspace.yaml
+packages:
+  - config
+  - packages/*
+  - apps/*
+
+lockfileDir: config
+virtualStoreDir: node_modules/.pnpm
+
+allowBuilds:
+  esbuild: true
+
+overrides:
+  brace-expansion@5: 5.0.12
+  http-cache-semantics: 4.3.0
+  image-size: 2.0.4
+  postcss-selector-parser: 7.1.6
+  smol-toml: 1.9.1
+  uuid: 11.1.1

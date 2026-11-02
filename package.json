@@ -1,1 +1,12 @@
-config/package.json
+{
+  "name": "standards-workspace-adapter",
+  "private": true,
+  "packageManager": "pnpm@10.30.3",
+  "scripts": {
+    "build": "pnpm --dir config run build",
+    "test": "pnpm --dir config run test",
+    "quality": "pnpm --dir config run quality",
+    "docs": "pnpm --dir config run docs",
+    "prepare": "pnpm --dir config run prepare"
+  }
+}
