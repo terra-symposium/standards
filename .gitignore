@@ -3,7 +3,7 @@ dist/
 coverage/
 tests/results/
 **/.astro/
-/.terra-docs/
+dist/.terra-docs/
 /scripts/docs/skills.generated.json
 /.quality-test-tmp/
 /.quality-github-report.json
