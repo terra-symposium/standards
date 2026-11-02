@@ -149,16 +149,19 @@ export const normalizeLoadTestingConfig = (raw: LoadTestingConfig = {}, override
 
 // REPOSITORY CONFIGURATION FILE
 /**
- * Reads load settings from a repository's quality.json and applies explicit overrides.
- * Missing quality.json files preserve the shared 2s/5s defaults.
+ * Reads load settings from a repository's root or config/quality.json and applies explicit overrides.
+ * Missing quality configuration preserves the shared 2s/5s defaults.
  *
- * @param file Optional quality.json path; defaults to the current repository root.
+ * @param file Optional quality.json path; defaults to the root file, then config/quality.json.
  * @param overrides Explicit settings with higher precedence than the file.
  *
  * @return Validated and normalized settings.
  */
-export const readLoadTestingConfig = (file = path.resolve(process.cwd(), 'quality.json'), overrides: LoadTestingOverrides = {}): NormalizedLoadTestingConfig => {
-	const cfgFile = path.resolve(file);
+export const readLoadTestingConfig = (file: string | undefined = undefined, overrides: LoadTestingOverrides = {}): NormalizedLoadTestingConfig => {
+	const rootConfig = path.resolve(process.cwd(), 'quality.json');
+	const configFile = path.resolve(process.cwd(), 'config/quality.json');
+	const defaultFile = fs.existsSync(rootConfig) ? rootConfig : configFile;
+	const cfgFile = path.resolve(file ?? defaultFile);
 	if (!fs.existsSync(cfgFile)) return { ...normalizeLoadTestingConfig({}, overrides), root: process.cwd() };
 	let parsed: unknown;
 	try {

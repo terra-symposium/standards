@@ -564,6 +564,16 @@ test('loads and grades per-test and operation timing budgets', async () => {
 	await fs.writeFile(cfgFile, JSON.stringify({ loadTesting: { enabled: false, defaultBudget: { warnMs: 3000, failMs: 7000 } } }));
 	assert.equal(readLoadTestingCfg(cfgFile).enabled, false);
 	assert.deepEqual(readLoadTestingCfg(cfgFile, { enabled: true }).defaultBudget, { warnMs: 3000, failMs: 7000 });
+	const configDir = path.join(root, 'config');
+	await fs.mkdir(configDir);
+	await fs.writeFile(path.join(configDir, 'quality.json'), JSON.stringify({ loadTesting: { enabled: false } }));
+	const previousCwd = process.cwd();
+	process.chdir(root);
+	try {
+		assert.equal(readLoadTestingCfg().enabled, false);
+	} finally {
+		process.chdir(previousCwd);
+	}
 	assert.equal(withResponsivePlaywright({ projects: [{ name: 'browser' }] }, { qualityConfigFile: cfgFile }).metadata.terraLoadTestingEnabled, false);
 	const recorded = [];
 	assert.equal(
