@@ -67,7 +67,7 @@ jobs:
       - run: pnpm --filter @terra-symposium/standards-reporting exec playwright install --with-deps chromium
       - uses: ./packages/testing
         with:
-          manifest: tests/terra-tests.json
+          manifest: config/terra-tests.json
 
   package:
     if: github.event_name == 'pull_request'

@@ -2,7 +2,7 @@ name: Terra test plan
 description: Run a repository test plan once with shared suite validation and reporting.
 inputs:
   manifest:
-    description: Repository-relative JSON test-plan path. Defaults to tests/terra-tests.json, then the legacy root path.
+    description: Repository-relative JSON test-plan path. Defaults to config/terra-tests.json, then tests/terra-tests.json, then the legacy root path.
     required: false
     default: ''
   suites:

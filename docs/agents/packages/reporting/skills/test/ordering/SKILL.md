@@ -47,7 +47,7 @@ The order is a dependency graph, not a way to hide failures. If an earlier gate 
 - Use headless mode for ordinary regression coverage. Use headed mode only for sign-in, visual capture, or a diagnosis that needs a real browser surface.
 - Run the affected viewport first while fixing, then nearby widths that exercise the same source breakpoint or measured transition. Do not expand to a blanket matrix; a single passing viewport proves only that selected scenario and size.
 
-Use the repository's canonical manifest (`tests/terra-tests.json` in current Terra repositories) and configured scripts rather than inventing alternate runners. Validate file ownership before execution. Common commands include:
+Use the repository's canonical manifest (`config/terra-tests.json` in current Terra repositories) and configured scripts rather than inventing alternate runners. Validate file ownership before execution. Common commands include:
 
 ```sh
 pnpm run test:visual

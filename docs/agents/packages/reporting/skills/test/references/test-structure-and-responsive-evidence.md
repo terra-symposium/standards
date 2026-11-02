@@ -13,7 +13,7 @@ Use this reference when reorganizing a repository's test inventory or selecting 
 
 Before migration, build a case-level map: existing file/case, source owner, observable assertion, execution layer, dependencies, duration, destination scenario, and disposition. Every assertion must map to a retained scenario or an explicit deletion reason. Retire an assertion only when its proof is redundant, temporary, or obsolete; document the reason and the surviving proof or accepted coverage gap.
 
-Use the repository's canonical test manifest (`tests/terra-tests.json` for current Terra repositories) for suite commands and file ownership. Do not keep duplicate registries in scripts or prose. Expand ownership patterns during validation and require every discovered test file to be owned exactly once. Aggregate scripts and CI should invoke each canonical suite once. Share startup and authentication where isolation permits, parallelize independent work, and serialize only proven shared mutable resources. Run readiness assertions instead of sleeps or network-idle waits; choose operation-specific timeouts.
+Use the repository's canonical test manifest (`config/terra-tests.json` for current Terra repositories) for suite commands and file ownership. Do not keep duplicate registries in scripts or prose. Expand ownership patterns during validation and require every discovered test file to be owned exactly once. Aggregate scripts and CI should invoke each canonical suite once. Share startup and authentication where isolation permits, parallelize independent work, and serialize only proven shared mutable resources. Run readiness assertions instead of sleeps or network-idle waits; choose operation-specific timeouts.
 
 ## Terra source ownership
 

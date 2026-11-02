@@ -69,6 +69,23 @@ test('missing consumer manifests produce an empty test plan', () => {
 		rmSync(root, { recursive: true, force: true });
 	}
 });
+test('default discovery prefers config/terra-tests.json and preserves explicit manifest selection', () => {
+	const root = fixtureRoot();
+	try {
+		const configPlan = { version: 1, suites: [{ name: 'config-plan', command: 'node', args: [], owns: ['tests/plan.test.mjs'] }] };
+		const testsPlan = { version: 1, suites: [{ name: 'tests-plan', command: 'node', args: [], owns: ['tests/plan.test.mjs'] }] };
+		mkdirTest(root, 'tests/plan.test.mjs');
+		mkdirSync(join(root, 'config'), { recursive: true });
+		mkdirSync(join(root, 'tests'), { recursive: true });
+		writeFileSync(join(root, 'config/terra-tests.json'), JSON.stringify(configPlan));
+		writeFileSync(join(root, 'tests/terra-tests.json'), JSON.stringify(testsPlan));
+
+		assert.deepEqual(readTestPlan(root), configPlan);
+		assert.deepEqual(readTestPlan(root, 'tests/terra-tests.json'), testsPlan);
+	} finally {
+		rmSync(root, { recursive: true, force: true });
+	}
+});
 test('manifest validation rejects duplicate commands, overlapping file ownership, omitted tests, and paths outside the repository', () => {
 	const root = fixtureRoot();
 	try {

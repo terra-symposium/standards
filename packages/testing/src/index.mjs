@@ -168,12 +168,13 @@ export function readTestPlan(root, manifestPath = defaultManifestPath(root)) {
 }
 
 /**
- * Prefer the organized tests location while retaining compatibility with existing consumers.
+ * Prefer the centralized config location while retaining compatibility with existing consumers.
  * @param {string} root Repository root.
  * @return {string} Repository-relative manifest path.
  */
 function defaultManifestPath(root) {
 	const absoluteRoot = resolve(root);
+	if (existsSync(resolve(absoluteRoot, 'config/terra-tests.json'))) return 'config/terra-tests.json';
 	if (existsSync(resolve(absoluteRoot, 'tests/terra-tests.json'))) return 'tests/terra-tests.json';
 	return '.terra-tests.json';
 }

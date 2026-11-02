@@ -20,7 +20,7 @@ This family is the canonical owner of test-policy guidance: this skill routes wo
 
 ## Test hierarchy
 
-Mirror the source and route tree beneath the test root, and assign each behavior one authoritative owner. Use `tests/terra-tests.json` as the canonical suite and test-file ownership manifest where supported; do not maintain a competing inventory. Keep runner-specific files separate only when the execution boundary requires it. Follow the linked reference for the migration map and ownership checks.
+Mirror the source and route tree beneath the test root, and assign each behavior one authoritative owner. Use `config/terra-tests.json` as the canonical suite and test-file ownership manifest where supported; do not maintain a competing inventory. Keep runner-specific files separate only when the execution boundary requires it. Follow the linked reference for the migration map and ownership checks.
 
 ## Coverage contract
 

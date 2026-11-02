@@ -12,7 +12,7 @@
   },
   "scripts": {
 		"build": "pnpm --filter @terra-symposium/standards-quality build && pnpm --filter @terra-symposium/standards-error-boundaries build && node packages/quality/dist/lib/runner.js error-boundaries --all && pnpm -r build",
-    "test": "pnpm --filter './packages/**' -r build && node packages/testing/src/cli.mjs run --manifest tests/terra-tests.json",
+    "test": "pnpm --filter './packages/**' -r build && node packages/testing/src/cli.mjs run --manifest config/terra-tests.json",
     "quality": "pnpm --filter @terra-symposium/standards-quality build && node scripts/quality.mjs quality --skip-commands --skip-recommendations",
     "docs": "docs dev",
     "prepare": "husky"

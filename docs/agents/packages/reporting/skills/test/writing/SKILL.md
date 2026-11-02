@@ -20,7 +20,7 @@ For each behavior, record its owner and identify:
 
 Assign each material case a new test, an existing test ID, or an intentional gap. Do not add duplicates to increase counts.
 
-Resolve each assertion to one canonical source, route, or domain owner and keep its proof with that owner. Use `tests/terra-tests.json` as the canonical ordered suite manifest for file ownership and execution. Before reorganizing, map every old file/case to a destination and disposition; document why an assertion is retired and identify surviving proof or an explicit coverage gap. Apply the linked reference's ownership checks.
+Resolve each assertion to one canonical source, route, or domain owner and keep its proof with that owner. Use `config/terra-tests.json` as the canonical ordered suite manifest for file ownership and execution. Before reorganizing, map every old file/case to a destination and disposition; document why an assertion is retired and identify surviving proof or an explicit coverage gap. Apply the linked reference's ownership checks.
 
 ## 2. Choose scope and fixture
 
