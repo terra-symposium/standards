@@ -10,10 +10,20 @@ Use only to improve the Canvas source adapter for Terra Docs generation. For gen
 ## Safety and inputs
 
 - Read production examples and target facts through Terra Docs MCP.
-- Never call `docs.leaf.generate`, `docs.leaf.write`, or another Sanity mutation. Save artifacts locally, such as in Downloads.
-- Use Playwright Chrome for the explicitly requested Gem edit and generation. Do not use Dia automation or hijack the user's Dia session.
-- Reuse the authenticated Gemini browser profile. Normal iteration is non-headed; headed mode is for explicit sign-in or visual inspection. Stop on authentication failure instead of opening another session.
-- Never expose credentials, cookies, storage state, or environment values. Do not commit unless explicitly asked.
+
+Never call `docs.leaf.generate`, `docs.leaf.write`, or another Sanity mutation. Save artifacts
+locally, such as in Downloads.
+
+Use Playwright Chrome for the explicitly requested Gem edit and generation. Do not use Dia
+automation or hijack the user's Dia session.
+
+Reuse the authenticated Gemini browser profile. Normal iteration is non-headed; headed mode is for
+explicit sign-in or visual inspection. Stop on authentication failure instead of opening another
+session.
+
+Never expose credentials, cookies, storage state, or environment values. Do not commit unless
+explicitly asked.
+
 
 Before a prompt change, provide the Gem with:
 
@@ -39,12 +49,21 @@ Production examples teach form, never source facts.
 Put the output contract before style guidance. Require:
 
 - one fenced Markdown artifact and no wrapper, labels, prose, or JSON outside it;
-- native HTML tables for schedules, comparisons, requirements, inventories, staff, assessments, and repeated fields;
+
+native HTML tables for schedules, comparisons, requirements, inventories, staff, assessments, and
+repeated fields;
+
 - canonical `<Code language="...">{` ... `}</Code>` with no nested fence;
 - permitted Docs blocks only; no invented components;
-- concise headings and one idea per bullet, with natural prose and lines under 140 characters where practical;
+
+concise headings and one idea per bullet, with natural prose and lines under 140 characters where
+practical;
+
 - inline `<code>` for technical tokens and `$...$` for symbolic relationships;
-- tables for repeated/comparison data, concise asides for salient constraints, `<Nodes>` for real sequences, accordions for secondary detail, and numbered lists only for ordered procedures;
+
+tables for repeated/comparison data, concise asides for salient constraints, `<Nodes>` for real
+sequences, accordions for secondary detail, and numbered lists only for ordered procedures;
+
 - a silent structural self-check and a complete corrected artifact when the driver reports an error.
 
 Keep style guidance generic; do not turn one source example into a universal rule. Test the output contract, not whether the model explains its repair.

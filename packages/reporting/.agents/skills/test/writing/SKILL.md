@@ -20,12 +20,23 @@ Assign each material case a new test, an existing test ID, or an intentional gap
 
 ## 2. Choose scope and fixture
 
-- Use pure tests for transformations, source-contract tests for ownership/migrations, API tests for persistence/authorization, and browser tests for real user interaction/accessibility/integration.
-- Add screenshots only when geometry/composition is part of the contract; use assertions for functional truth.
-- Prefer named, small, run-scoped fixtures. Generate unique IDs, clean up in `finally`, and verify removal.
-- Create fixture data at the boundary that owns it. Keep tests parallel-safe unless a documented shared resource requires serial execution.
-- Keep time, randomness, network, and external providers deterministic or injectable where practical.
-- Use accessible roles, labels, names, and stable contract attributes. Avoid positional selectors, incidental classes, and selectors broadened to hide failures.
+Use pure tests for transformations, source-contract tests for ownership/migrations, API tests for
+persistence/authorization, and browser tests for real user interaction/accessibility/integration.
+
+Add screenshots only when geometry/composition is part of the contract; use assertions for
+functional truth.
+
+Prefer named, small, run-scoped fixtures. Generate unique IDs, clean up in `finally`, and verify
+removal.
+
+Create fixture data at the boundary that owns it. Keep tests parallel-safe unless a documented
+shared resource requires serial execution.
+
+Keep time, randomness, network, and external providers deterministic or injectable where practical.
+
+Use accessible roles, labels, names, and stable contract attributes. Avoid positional selectors,
+incidental classes, and selectors broadened to hide failures.
+
 
 ## 3. Assert completely
 

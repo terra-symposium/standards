@@ -28,9 +28,17 @@ Use `docs.leaf.generate` to read/process the target; do not read the target or i
 The following repository references own generation and rendering behavior. Read the latest numbered [prompt journal](./journal.md) record before changing prompts; older entries are historical evidence.
 
 - [Gem maintenance](../gem/SKILL.md) owns Gem changes and provider selection.
-- The website checkout's `scripts/generation/_gemini.ts` builds the local `geminiPrompt()` composer prompt; it is not proof of the saved Gem instruction.
-- The local harness in the website checkout is `scripts/export/canvas.mts`. Gem metadata/instruction updates are documented in the [Gem skill](../gem/SKILL.md); the currently configured Gem updater target is missing.
-- The website checkout's `sanity/schemas/docs.tsx` schema and `astro/src/pages/docs/_blocks.tsx` renderer define valid blocks and constraints.
+
+The website checkout's `scripts/generation/_gemini.ts` builds the local `geminiPrompt()` composer
+prompt; it is not proof of the saved Gem instruction.
+
+The local harness in the website checkout is `scripts/export/canvas.mts`. Gem metadata/instruction
+updates are documented in the [Gem skill](../gem/SKILL.md); the currently configured Gem updater
+target is missing.
+
+The website checkout's `sanity/schemas/docs.tsx` schema and `astro/src/pages/docs/_blocks.tsx`
+renderer define valid blocks and constraints.
+
 
 Use only canonical Docs blocks: native `<table>`, `<Code>`, `:::kind[title]` callouts, `|||[title]` tabs, `===[title]` accordions, `<Nodes>`, `<DocsMath>`/dollar delimiters, and `<Embed>`. Do not create a parallel renderer or invented component.
 
@@ -40,23 +48,47 @@ Write for moderately experienced readers in a helpful mentor voice. Explain inte
 
 - Start with a concise overview and the most important action/deadline.
 - Use clear H2/H3 hierarchy and a short introduction under each heading.
-- Keep one concise idea per bullet. Split compound actions and qualifications into sub-bullets or separate paragraphs.
+
+Keep one concise idea per bullet. Split compound actions and qualifications into sub-bullets or
+separate paragraphs.
+
 - Keep ordinary lines and bullets under 140 characters; break at natural boundaries.
-- Use numbered lists only for sequences. Use tables for repeated/multidimensional facts, callouts for bounded important guidance, tabs for mutually exclusive references, accordions for secondary/long detail, and `<Nodes>` for genuine sequences or branches.
-- Keep the primary path focused. Put optional, low-salience, or lengthy collections in titled accordions.
-- For university notes, keep concepts atomic and retrieval-oriented, connect related ideas, preserve explicit lists, and end substantial notes with practical implications.
-- For Terra organizational, executive, and development leaves, prioritize decisions, ownership, rationale, and next steps.
-- Escape schema-sensitive characters in prose as required by `docs.tsx` (for example, `&#58;` for literal colons). Keep raw HTML inside canonical Code blocks when needed.
+
+Use numbered lists only for sequences. Use tables for repeated/multidimensional facts, callouts for
+bounded important guidance, tabs for mutually exclusive references, accordions for secondary/long
+detail, and `<Nodes>` for genuine sequences or branches.
+
+Keep the primary path focused. Put optional, low-salience, or lengthy collections in titled
+accordions.
+
+For university notes, keep concepts atomic and retrieval-oriented, connect related ideas, preserve
+explicit lists, and end substantial notes with practical implications.
+
+For Terra organizational, executive, and development leaves, prioritize decisions, ownership,
+rationale, and next steps.
+
+Escape schema-sensitive characters in prose as required by `docs.tsx` (for example, `&#58;` for
+literal colons). Keep raw HTML inside canonical Code blocks when needed.
+
 
 ## 4. Canvas source rules
 
 For Canvas collection, first use the [Canvas scraping skill](../canvas-scraping/SKILL.md). Synthesize downloaded source contents; a module title, filename, or link is metadata, not a replacement for document/slide/PDF/transcript/page content. Never turn source material into a resource index.
 
-- Organize around concepts, relationships, mechanisms, examples, and application. Merge continued concepts when multiple source groups route to one leaf.
-- Keep week labels, source names, and “subject resources” out of the main path unless needed for an actionable link.
-- Use the Canvas registry's stable `inputSources` URL for routing. Renamed leaves remain mapped; multiple URLs may route to one leaf.
+Organize around concepts, relationships, mechanisms, examples, and application. Merge continued
+concepts when multiple source groups route to one leaf.
+
+Keep week labels, source names, and “subject resources” out of the main path unless needed for an
+actionable link.
+
+Use the Canvas registry's stable `inputSources` URL for routing. Renamed leaves remain mapped;
+multiple URLs may route to one leaf.
+
 - Generate once per unique leaf, attaching/refreshing every source first.
-- If an imported document is HTML Canvas preview content, re-download the authenticated `/download` response and do not author from the preview.
+
+If an imported document is HTML Canvas preview content, re-download the authenticated `/download`
+response and do not author from the preview.
+
 
 Complete Canvas collection, including module attachments and separate recording transcripts,
 with the [Canvas scraping skill](../canvas-scraping/SKILL.md) before authoring.
@@ -67,10 +99,19 @@ Generation is agentic: the model interprets material, selects structure, and res
 
 ### Retry and authentication
 
-- Use shared `HealWorkflow` from `scripts/generation/_heal.ts` with explicit `maxRetries: 3` (initial attempt plus three retries).
-- Return exact syntax, schema, extraction, or response-shape failures to the next prompt; log each retry and preserve raw responses.
-- Never coerce an invalid response into success. After exhaustion, preserve diagnostics and fail without a write.
-- Reuse the one authenticated Gemini browser profile/session. Normal generation is non-headed. Headed mode is for explicit sign-in or visual inspection. On reuse failure, stop with an authentication error; do not launch another context/window/session.
+Use shared `HealWorkflow` from `scripts/generation/_heal.ts` with explicit `maxRetries: 3` (initial
+attempt plus three retries).
+
+Return exact syntax, schema, extraction, or response-shape failures to the next prompt; log each
+retry and preserve raw responses.
+
+Never coerce an invalid response into success. After exhaustion, preserve diagnostics and fail
+without a write.
+
+Reuse the one authenticated Gemini browser profile/session. Normal generation is non-headed. Headed
+mode is for explicit sign-in or visual inspection. On reuse failure, stop with an authentication
+error; do not launch another context/window/session.
+
 
 ### Attachment completeness gate
 
@@ -78,13 +119,27 @@ After parsing and before any Sanity mutation, expose a source manifest and run `
 
 Record as typed quality evidence: readable source characters; total/usable attachments; generated characters; Docs block count; deterministic findings; semantic audit status; covered/missing attachment IDs; missing topics; and retries.
 
-- Enforce generated content of at least `max(800, 8% of readable source characters)`; reject empty/suspiciously short output.
+Enforce generated content of at least `max(800, 8% of readable source characters)`; reject
+empty/suspiciously short output.
+
 - Require at least three meaningful Docs blocks for a substantial corpus.
-- Use tolerant anchors from headings, URLs, filenames, distinctive terms, and code identifiers. Name attachments with no detectable representation.
-- Run Gemini's strict JSON coverage audit after deterministic validation. Account for every usable attachment and return corrective instructions on failure.
-- Send exact deterministic/semantic failure and requested correction into the next healing attempt. Preserve raw responses and audit results. After the fourth total failed attempt, stop without writing.
-- Keep audit metadata out of stored Markdown/MDX. Use the same validator/retry behavior in MCP generation, local Fast-mode harness, and Playwright batch driver.
-- Successful MCP generation returns quality evidence. Post-write verification checks the evidence and re-reads the stored leaf, not merely `content.length > 0`.
+
+Use tolerant anchors from headings, URLs, filenames, distinctive terms, and code identifiers. Name
+attachments with no detectable representation.
+
+Run Gemini's strict JSON coverage audit after deterministic validation. Account for every usable
+attachment and return corrective instructions on failure.
+
+Send exact deterministic/semantic failure and requested correction into the next healing attempt.
+Preserve raw responses and audit results. After the fourth total failed attempt, stop without
+writing.
+
+Keep audit metadata out of stored Markdown/MDX. Use the same validator/retry behavior in MCP
+generation, local Fast-mode harness, and Playwright batch driver.
+
+Successful MCP generation returns quality evidence. Post-write verification checks the evidence and
+re-reads the stored leaf, not merely `content.length > 0`.
+
 
 Direct `docs.leaf.write` remains available for intentionally small pages without attachments; never use it to bypass a failed generation gate.
 

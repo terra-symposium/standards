@@ -1,40 +1,29 @@
-# @terra-symposium/standards-reporting
+# Reporting
 
-Reusable responsive Playwright diagnostics and evidence reports for Terra Symposium repositories.
+Reusable Playwright evidence reporting: normalizes test results, viewport data, and load grades, then writes spreadsheet and slideshow artifacts.
 
-## Install
+## Getting started
 
-```sh
-pnpm add -D @terra-symposium/standards-reporting @playwright/test
-```
+### Commands
 
-The package requires Node.js `>=18.18` and has an `@playwright/test >=1.52.0 <2` peer dependency. Spreadsheet, slideshow, and image-processing dependencies are installed with the package.
+From `standards/main/`, run `pnpm install`, then `pnpm --filter @terra-symposium/standards-reporting test` to validate the reporting package.
 
-## Configure responsive projects
+## Security and Limitations
 
-```ts
-import { defineConfig } from '@playwright/test';
-import { withResponsivePlaywright } from '@terra-symposium/standards-reporting/viewports';
+Reports and generated spreadsheets can contain test evidence. Use synthetic fixtures and exclude credentials, personal data, and private customer content.
 
-export default withResponsivePlaywright(
-	defineConfig({
-		projects: [{ name: 'web', testMatch: '**/*.spec.ts' }],
-	}),
-	{
-		singleRunProjects: ['manual-browser-capture'],
-	},
-);
-```
+## Structure
 
-By default, regular projects run at the six shared viewport sizes. Set `PW_VIEWPORTS=mobile,lg` to select a subset. Setup projects and names listed in `singleRunProjects` run once. The helper enables full-page screenshots and the shared reporter.
+`src/` exports reporting helpers; `test/` covers the API; `.agents/skills/` contains maintainer guidance. The package depends on Playwright and Office artifact libraries.
 
-A timestamped directory under `test-results/visual` contains the workbook, slideshow, and copied screenshots. The Playwright output directory defaults to `test-results/playwright-output`.
+## References
 
-## More capabilities
+See the [public exports](src/index.ts), [package manifest](package.json), and [tests](test/).
 
-- Import `diagnosticsTest` from `/playwright` to attach browser console, page, and request failures.
-- Import `loadTest` to measure named operations and capture page-navigation timings. It reads `loadTesting` from `quality.json` by default.
-- Use `/spreadsheet` and `/slideshow` to write artifacts from normalized results without using the Playwright reporter.
-- Use `/core`, `/viewports`, and `/load-testing` for shared types and helpers.
+## Contributing
 
-The repository remains responsible for test scenarios, authentication, browser setup, CI uploads, and retention. See the [reporting guide](https://standards-docs.netlify.app/packages/reporting/) for complete options and output details.
+Add tests for reporting changes and document user-facing changes in [CHANGELOG.md](CHANGELOG.md).
+
+## Credits and license
+
+The package manifest does not declare a license and the repository has no root license; ask maintainers before reuse.

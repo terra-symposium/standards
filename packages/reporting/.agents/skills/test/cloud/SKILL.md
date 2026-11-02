@@ -59,9 +59,27 @@ Use these repository-specific steps when the task is attached to the published `
 
 ### Terra evidence and cleanup
 
-- Include the live environment revision in local suite evidence; do not substitute a stale configured label. Preserve inherited proxy and CA trust.
-- The wrapper reloads Development credentials for each invocation. Both Studio keys are test-only deliveries; no static `PLAYWRIGHT_*_AUTH_STATE` is used. Identity mismatch, denied project access, or missing credentials are blockers, never passing skips.
-- Missing-token partial coverage is opt-in only: `TERRA_CLOUD_ALLOW_MISSING_STUDIO=1 pnpm run test:cloud:disposable`. It excludes the Studio and generation projects, lists their blocked counts, and returns failure for incomplete coverage. It accepts no extra filters and still runs the app projects at all six viewports. Use this only when explicitly requested; smoke requires both Studio keys.
-- The manifest records selected inventory, executed/passed/failed/skipped/blocked counts, project and viewport evidence, coverage mode, and cleanup. `filtered` describes a selected scope; it is not full-suite evidence. The full-suite prerequisite metadata is advisory and does not schedule a rerun.
-- Distinguish assertion failures from infrastructure blockers. For example, denied Sanity CDN assets or blocked SMTP are policy/dependency failures; preserve the failed HTTP assertion and report the dependency cause rather than bypassing policy or weakening TLS.
-- Verify owned services stopped, task-created fixtures removed, generated session files and `.terra-cloud-auth-fixture.json` absent, and loopback ports closed. PGlite stops on wrapper exit. Keep test reports, credentials, sessions, and `work/` scratch out of commits.
+Include the live environment revision in local suite evidence; do not substitute a stale configured
+label. Preserve inherited proxy and CA trust.
+
+The wrapper reloads Development credentials for each invocation. Both Studio keys are test-only
+deliveries; no static `PLAYWRIGHT_*_AUTH_STATE` is used. Identity mismatch, denied project access,
+or missing credentials are blockers, never passing skips.
+
+Missing-token partial coverage is opt-in only: `TERRA_CLOUD_ALLOW_MISSING_STUDIO=1 pnpm run
+test:cloud:disposable`. It excludes the Studio and generation projects, lists their blocked counts,
+and returns failure for incomplete coverage. It accepts no extra filters and still runs the app
+projects at all six viewports. Use this only when explicitly requested; smoke requires both Studio
+keys.
+
+The manifest records selected inventory, executed/passed/failed/skipped/blocked counts, project and
+viewport evidence, coverage mode, and cleanup. `filtered` describes a selected scope; it is not
+full-suite evidence. The full-suite prerequisite metadata is advisory and does not schedule a rerun.
+
+Distinguish assertion failures from infrastructure blockers. For example, denied Sanity CDN assets
+or blocked SMTP are policy/dependency failures; preserve the failed HTTP assertion and report the
+dependency cause rather than bypassing policy or weakening TLS.
+
+Verify owned services stopped, task-created fixtures removed, generated session files and
+`.terra-cloud-auth-fixture.json` absent, and loopback ports closed. PGlite stops on wrapper exit.
+Keep test reports, credentials, sessions, and `work/` scratch out of commits.

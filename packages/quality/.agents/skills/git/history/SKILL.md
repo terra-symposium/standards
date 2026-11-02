@@ -9,10 +9,18 @@ Use when reconstructing development history from a production baseline or extend
 
 ## Invariants
 
-- Record production `main`, source development ref, their SHAs, and the target branch before rewriting.
-- Produce linear history without merge commits. Map every source commit to one replacement or an explicit no-op.
-- Preserve each replacement's primary author name, email, and author timestamp. Use the operator as committer and retain verified co-authors as trailers.
-- Never group across primary-author boundaries. Group only contiguous, same-author commits with one coherent observable topic. Prefer atomicity; split heterogeneous work even when files overlap.
+Record production `main`, source development ref, their SHAs, and the target branch before
+rewriting.
+
+Produce linear history without merge commits. Map every source commit to one replacement or an
+explicit no-op.
+
+Preserve each replacement's primary author name, email, and author timestamp. Use the operator as
+committer and retain verified co-authors as trailers.
+
+Never group across primary-author boundaries. Group only contiguous, same-author commits with one
+coherent observable topic. Prefer atomicity; split heterogeneous work even when files overlap.
+
 - Do not infer authorship from the operator, branch owner, or blame. Verify final author metadata.
 - Preserve the resulting tree exactly unless the task includes source changes.
 
@@ -32,10 +40,18 @@ Reasoning:
 - <evidence-based purpose or grouping rationale>
 ```
 
-- Assign a unique, monotonically increasing plain SemVer to every commit, including development and audit commits.
-- Use major for breaking integration changes; minor for additive capability/API/schema; patch for fixes, maintenance, docs, tests, refactors, styling, CI, and non-additive work. Reset lower components normally.
+Assign a unique, monotonically increasing plain SemVer to every commit, including development and
+audit commits.
+
+Use major for breaking integration changes; minor for additive capability/API/schema; patch for
+fixes, maintenance, docs, tests, refactors, styling, CI, and non-additive work. Reset lower
+components normally.
+
 - Record evidence for major boundaries. Do not inflate a version to hide unrelated work.
-- Describe all contributing commits' observable outcomes in `Features`; describe intent, compatibility, attribution, or grouping in `Reasoning`. Do not invent motivation.
+
+Describe all contributing commits' observable outcomes in `Features`; describe intent,
+compatibility, attribution, or grouping in `Reasoning`. Do not invent motivation.
+
 
 ## Workflow
 

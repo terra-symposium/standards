@@ -39,11 +39,22 @@ The order is a dependency graph, not a way to hide failures. If an earlier gate 
 
 - Use the narrowest command that answers the current question.
 - Run independent source and unit suites in parallel when they do not share mutable services.
-- Keep the repository's configured worker limits. Reduce workers only after a focused run demonstrates a shared service or fixture limit, and record the reason.
-- Keep stateful Sanity, database, auth, and mutation projects isolated. Use serial execution only for a documented shared resource.
-- Reuse one prepared authenticated state only when the owning fixture guarantees isolation and expiry handling.
-- Use headless mode for ordinary regression coverage. Use headed mode only for sign-in, visual capture, or a diagnosis that needs a real browser surface.
-- Run only the affected viewport first while fixing, then the adjacent breakpoints, then the declared responsive matrix. A single passing viewport is not responsive coverage.
+
+Keep the repository's configured worker limits. Reduce workers only after a focused run demonstrates
+a shared service or fixture limit, and record the reason.
+
+Keep stateful Sanity, database, auth, and mutation projects isolated. Use serial execution only for
+a documented shared resource.
+
+Reuse one prepared authenticated state only when the owning fixture guarantees isolation and expiry
+handling.
+
+Use headless mode for ordinary regression coverage. Use headed mode only for sign-in, visual
+capture, or a diagnosis that needs a real browser surface.
+
+Run only the affected viewport first while fixing, then the adjacent breakpoints, then the declared
+responsive matrix. A single passing viewport is not responsive coverage.
+
 
 Use the ordered `tests/suites.json` inventory and the repository's configured scripts rather than inventing alternate runners. Run `pnpm run test:hierarchy` before test execution. Common commands include:
 

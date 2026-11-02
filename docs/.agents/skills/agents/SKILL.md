@@ -31,12 +31,35 @@ The index also mentions `.agents/debt/`, but that directory is not currently pre
 
 ## Choose the right resource
 
-- Put repository-wide agent rules and navigation in `.agents/index.md`; keep it aligned with current paths and commands.
-- Put architecture maps in `.agents/architecture/`. Put a consequential, lasting decision in `docs/decisions/` using the format in `.agents/decisions/README.md`. Keep ordinary fixes in their issue or pull request.
-- Put active agent work plans in `.agents/plans/`. Put durable implementation plans and technical findings in the matching `docs/implementation-plans/` or `docs/` section.
-- Add a persona only for a distinct recurring role or scheduled workflow. Follow `.agents/personas/README.md`, use an existing persona as the shape, keep shared schedule rules there, and put only role-specific instructions and critical journal lessons in the persona file. Add or update its role profile in the README. New persona prompts should link to the existing `.agents/personas/README.md`, not a missing `.jules/README.md`.
-- Keep documentation and content workflows in `docs/.agents/skills/<skill>/`, repository quality workflows in `packages/quality/.agents/skills/<skill>/`, and test, review, and standup workflows in `packages/reporting/.agents/skills/<skill>/`. UI workflows belong in Terra Styling at `.agents/skills/ui/`; website-specific Sanity workflows belong in the website repository at `.agents/skills/sanity/`. The root `.agents/skills/` directory contains the Standards catalog only. Before adding a skill, check whether its workflow belongs in an existing one. Follow the `skill-creator` skill, add only needed support files, update the owning repository's catalog, and regenerate the Standards browser only for skills owned by this repository.
-- Choose Markdown documentation in the repository when it is the maintained source. If the requested content belongs in Terra Docs or tsdocs, follow the relevant shared authoring workflow instead of creating a competing copy.
+Put repository-wide agent rules and navigation in `.agents/index.md`; keep it aligned with current
+paths and commands.
+
+Put architecture maps in `.agents/architecture/`. Put a consequential, lasting decision in
+`docs/decisions/` using the format in `.agents/decisions/README.md`. Keep ordinary fixes in their
+issue or pull request.
+
+Put active agent work plans in `.agents/plans/`. Put durable implementation plans and technical
+findings in the matching `docs/implementation-plans/` or `docs/` section.
+
+Add a persona only for a distinct recurring role or scheduled workflow. Follow
+`.agents/personas/README.md`, use an existing persona as the shape, keep shared schedule rules
+there, and put only role-specific instructions and critical journal lessons in the persona file. Add
+or update its role profile in the README. New persona prompts should link to the existing
+`.agents/personas/README.md`, not a missing `.jules/README.md`.
+
+Keep documentation and content workflows in `docs/.agents/skills/<skill>/`, repository quality
+workflows in `packages/quality/.agents/skills/<skill>/`, and test, review, and standup workflows in
+`packages/reporting/.agents/skills/<skill>/`. UI workflows belong in Terra Styling at
+`.agents/skills/ui/`; website-specific Sanity workflows belong in the website repository at
+`.agents/skills/sanity/`. The root `.agents/skills/` directory contains the Standards catalog only.
+Before adding a skill, check whether its workflow belongs in an existing one. Follow the
+`skill-creator` skill, add only needed support files, update the owning repository's catalog, and
+regenerate the Standards browser only for skills owned by this repository.
+
+Choose Markdown documentation in the repository when it is the maintained source. If the requested
+content belongs in Terra Docs or tsdocs, follow the relevant shared authoring workflow instead of
+creating a competing copy.
+
 
 ## Initialize or refresh agent context
 
