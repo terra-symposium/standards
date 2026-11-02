@@ -749,7 +749,7 @@ test('builds one screenshot deck from nested repository folders and keeps partia
 			['website', { r: 40, g: 80, b: 120 }],
 			['docs', { r: 120, g: 80, b: 40 }],
 		]) {
-			const dir = path.join(root, name, 'test-results', 'visual', 'screenshots');
+			const dir = path.join(root, name, 'tests', 'results', 'visual', 'screenshots');
 			await fs.mkdir(dir, { recursive: true });
 			await sharp({ create: { width: 24, height: 16, channels: 3, background } })
 				.png()
