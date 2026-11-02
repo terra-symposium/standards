@@ -20,11 +20,11 @@ You are only permitted to return code blocks containing markdown compatible with
 
 ---
 
-## Journal record: 002-terra-docs-production-style-context.md
+## Journal record: 002-docs-production-style-context.md
 
 # Docs production style context
 
-This file is a read-only reference for agents iterating on Canvas-to-Terra-Docs generation. It was assembled from production leaves read through the Docs MCP on 2026-09-11. The source examples are included to show both the factual density and the canonical Markdown/MDX form expected by the Docs parser.
+This file is a read-only reference for agents iterating on Canvas-to-Docs generation. It was assembled from production leaves read through the Docs MCP on 2026-09-11. The source examples are included to show both the factual density and the canonical Markdown/MDX form expected by the Docs parser.
 
 ## Observed production conventions
 
@@ -205,12 +205,12 @@ The examples above are style and parser references only. When generating a Canva
 - Gem ID: `b2b810394d61`
 - Gem: `Document`
 - Requested mode: `fast` / Gemini Flash
-- Context attachments: `002-terra-docs-production-style-context.md`, `sanity/schemas/docs.tsx`, `astro/src/pages/docs/_blocks.tsx`, `scripts/export/canvas.mts`
+- Context attachments: `002-docs-production-style-context.md`, `sanity/schemas/docs.tsx`, `astro/src/pages/docs/_blocks.tsx`, `scripts/export/canvas.mts`
 - Status before live verification: proposed local/Gem prompt
 
 ## Exact prompt
 
-# Canvas-to-Terra-Docs generation contract
+# Canvas-to-Docs generation contract
 
 You are generating one Terra Symposium Docs leaf from a Canvas page capture and its attachments. Treat this as a deterministic document-conversion task, not a chat reply. The attached production-reference Markdown teaches style and block form only; it is not a source of facts. The supplied Canvas page body and attachments are the only factual authority.
 
@@ -287,7 +287,7 @@ OUTPUT CONTRACT — obey before all style guidance:
 • The first non-blank line inside the fence must begin with ## . Return the leaf body as raw Markdown/MDX, never a wrapper field such as content, markdown, source, task, or errors.
 • Put no triple-backtick fence inside the body. Use the canonical Code component for code.
 
-TERRA DOCS FORM:
+DOCS FORM:
 • Follow the attached docs schema and renderer examples exactly. Use H2–H6 headings, short orienting paragraphs, bullets, and numbered lists.
 • Repeated or multidimensional source data — schedules, comparisons, requirements, assessments, inventories, options, definitions, or repeated fields — must be a native HTML table with thead, tbody, tr, th, and td. Never use pipe tables.
 • Use only supported blocks: :::note[Title], :::tip[Title], :::example[Title], :::warning[Title], :::caution[Title], ===[Title] accordions, |||[Title] tabs, <Nodes>, <Embed>, <Code>, and native HTML tables. Close every block. Do not invent JSX wrappers.
@@ -300,7 +300,7 @@ CONTENT RULES:
 • Use tables, callouts, tabs, accordions, or Nodes only when the source makes them useful. Finish substantial university notes with a source-grounded practical implication.
 
 SILENT CHECK BEFORE RESPONDING:
-Verify the raw response starts exactly with the markdown fence, has one outer pair, ends exactly with the fence, has an ## body heading, no inner triple backticks, valid Terra blocks, canonical Code syntax, complete HTML tables where repeated data exists, and only source-grounded claims. If any check fails, correct it silently and then return only the single fenced block.
+Verify the raw response starts exactly with the markdown fence, has one outer pair, ends exactly with the fence, has an ## body heading, no inner triple backticks, valid Blocks, canonical Code syntax, complete HTML tables where repeated data exists, and only source-grounded claims. If any check fails, correct it silently and then return only the single fenced block.
 ```
 
 The longer local driver prompt is retained separately in `003-fast-mode-contract.md`; it is intentionally more explicit than the Gem copy until a real Fast-mode response can be inspected.
@@ -344,7 +344,7 @@ The Playwright update test now uses Gemini’s actual populated instruction comp
 
 The exact instruction is the shared `GEMINI_LEAF_PROMPT` in `scripts/generation/_gemini.ts`, logged verbatim in `003-fast-mode-contract.md`. The saved knowledge set is:
 
-- `002-terra-docs-production-style-context.md` — production Docs form/content examples;
+- `002-docs-production-style-context.md` — production Docs form/content examples;
 - `003-fast-mode-contract.md` — output contract and Fast-mode failure guards;
 - `docs.tsx` — schema and schema examples; and
 - `canvas.mts` — the Canvas Playwright capture workflow.
@@ -637,7 +637,7 @@ Canvas source routes are matched through a normalised source identity rather tha
 - Gem: `Document` (`b2b810394d61`)
 - Mode: Gemini Fast fallback
 - Prompt source: `scripts/generation/_gemini.ts` (`GEMINI_LEAF_PROMPT`)
-- Knowledge files: `002-terra-docs-production-style-context.md`, `003-fast-mode-contract.md`, `sanity/schemas/docs.tsx`
+- Knowledge files: `002-docs-production-style-context.md`, `003-fast-mode-contract.md`, `sanity/schemas/docs.tsx`
 - Baseline output: `/Users/kaimacann/Downloads/canvas-gem-fast-iteration-018`
 - Status: baseline captured before alignment revision
 
@@ -655,7 +655,7 @@ The exact baseline instruction remains in `GEMINI_LEAF_PROMPT` at the revision r
 - Gem: `Document` (`b2b810394d61`)
 - Mode: Gemini Fast fallback
 - Prompt source: `scripts/generation/_gemini.ts` (`GEMINI_LEAF_PROMPT`)
-- Context files: `002-terra-docs-production-style-context.md`, `003-fast-mode-contract.md`, `sanity/schemas/docs.tsx`
+- Context files: `002-docs-production-style-context.md`, `003-fast-mode-contract.md`, `sanity/schemas/docs.tsx`
 - Local source fixture: `/Users/kaimacann/Downloads/network-fundamentals-canvas-fixed-3/course-40934/week7`
 - Local output: `/Users/kaimacann/Downloads/canvas-gem-fast-iteration-020-week7`
 - Status: prompt revision ready for Gem update; local baseline was generated before the Gem save

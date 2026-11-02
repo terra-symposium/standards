@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "packageManager": "pnpm@10.30.3",
   "type": "module",
-  "terraDocs": {
+  "docs": {
     "title": "Standards",
     "description": "Documentation for shared Terra Symposium packages and tools.",
     "site": "https://standards-docs.netlify.app",
@@ -14,7 +14,7 @@
 		"build": "pnpm --filter @terra-symposium/standards-quality build && pnpm --filter @terra-symposium/standards-error-boundaries build && node packages/quality/dist/lib/runner.js error-boundaries --all && pnpm -r build",
     "test": "pnpm --filter './packages/**' -r build && node packages/testing/src/cli.mjs run --manifest .terra-tests.json",
     "quality": "pnpm --filter @terra-symposium/standards-quality build && node packages/quality/dist/lib/runner.js quality --skip-commands --skip-recommendations",
-    "docs": "terra-docs dev",
+    "docs": "docs dev",
     "prepare": "husky"
   },
   "devDependencies": {

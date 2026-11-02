@@ -3,7 +3,7 @@ dist/
 coverage/
 tests/results/
 **/.astro/
-dist/.terra-docs/
+dist/.docs/
 /.quality-test-tmp/
 /.quality-github-report.json
 .changeset/*.md

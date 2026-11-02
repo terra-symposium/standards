@@ -1,11 +1,11 @@
 ---
 name: author
-description: Author, review, preserve, restore, and visually restructure general Terra Symposium Docs leaves with the terra_docs MCP. Use for Terra, executive, development, and university documentation from verified source material or existing Docs leaves.
+description: Author, review, preserve, restore, and visually restructure general Terra Symposium Docs leaves with the docs MCP. Use for Terra, executive, development, and university documentation from verified source material or existing Docs leaves.
 ---
 
 # Docs Leaf Authoring
 
-Use `terra_docs` MCP to read and write the exact requested leaf. This skill covers general Terra and university content; use the separate Canvas scraping skill to collect Canvas sources. A leaf write replaces the full source, so preserve relevant current facts before changing it.
+Use `docs` MCP to read and write the exact requested leaf. This skill covers general Terra and university content; use the separate Canvas scraping skill to collect Canvas sources. A leaf write replaces the full source, so preserve relevant current facts before changing it.
 
 For direct authoring, use the read-before-write workflow below.
 

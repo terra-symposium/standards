@@ -16,7 +16,7 @@
 		}
 	],
 	"historicalKnowledgeLabels": [
-		"002-terra-docs-production-style-context.md",
+		"002-docs-production-style-context.md",
 		"003-fast-mode-contract.md",
 		"sanity/schemas/docs.tsx"
 	],

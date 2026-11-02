@@ -1,6 +1,6 @@
 # Terra-derived commenting conventions
 
-These notes were gathered from the local `standards` quality package and the `terra-symposium-website` repository. They are evidence for the skill, not a replacement for checking the current repository or the live `terra_docs` Development leaf.
+These notes were gathered from the local `standards` quality package and the `terra-symposium-website` repository. They are evidence for the skill, not a replacement for checking the current repository or the live `docs` Development leaf.
 
 ## Standards quality package
 
@@ -28,4 +28,4 @@ These notes were gathered from the local `standards` quality package and the `te
 
 ## MCP lookup
 
-When the `terra_docs` MCP is connected, use its read-only search/tree tools to locate the commenting-practices leaf under the Development section, then read that exact leaf before applying local conventions. If the MCP is unavailable, say so internally and rely on repository evidence without fabricating leaf-specific rules.
+When the `docs` MCP is connected, use its read-only search/tree tools to locate the commenting-practices leaf under the Development section, then read that exact leaf before applying local conventions. If the MCP is unavailable, say so internally and rely on repository evidence without fabricating leaf-specific rules.

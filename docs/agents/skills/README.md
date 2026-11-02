@@ -25,7 +25,7 @@ production Docs references, to improve the generation's adherence to strict guid
 local-only headless Chrome checks.
 
 [`author`](../skills/documenting/author/SKILL.md) — Author, review, preserve, restore, and visually
-restructure general Terra Symposium Docs leaves with the terra_docs MCP. Use for Terra, executive,
+restructure general Terra Symposium Docs leaves with the docs MCP. Use for Terra, executive,
 development, and university documentation from verified source material or existing Docs leaves.
 
 [`gem`](../skills/documenting/gem/SKILL.md) — Capture, update, and verify Terra's Gemini Document
