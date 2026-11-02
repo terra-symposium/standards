@@ -1,6 +1,6 @@
 [build]
 command = "pnpm --filter @terra-symposium/hygiene-dashboard db:migrate && pnpm --filter @terra-symposium/hygiene-dashboard build"
-publish = "apps/hygiene/dist"
+publish = "dist/apps/hygiene"
 
 [functions]
 directory = "/apps/hygiene/netlify/functions"

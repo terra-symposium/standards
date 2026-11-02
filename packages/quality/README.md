@@ -14,6 +14,16 @@ pnpm add -D @terra-symposium/standards-quality
 
 In an npm-managed repository, use `npm install --save-dev @terra-symposium/standards-quality` instead.
 
+## Shared development-server port acquisition
+
+Use the package's `terra-quality-dev` launcher before starting a local server so repositories share the same port cleanup behavior:
+
+```sh
+terra-quality-dev --port 4311 -- astro dev --host 127.0.0.1
+```
+
+The launcher calls the exported `acquirePort()` helper, then starts the requested command with `--port` and `--strictPort` when those options are missing. `DOCS_DEV_PORT`, `TERRA_DEV_PORT`, or `PORT` can override the configured port. Since acquisition terminates existing listeners, use it only for ports owned by the local development workflow.
+
 Create `quality.json` in the repository root:
 
 ```json
@@ -33,6 +43,8 @@ Create `quality.json` in the repository root:
 Every quality finding is an error. The runner completes the remaining checks and configured commands before returning failure; there is no warning or non-blocking finding policy.
 
 This starting configuration uses the built-in checks without requiring external tools. Enable integrations as you install and configure the corresponding repository tools. When lint is enabled, add an ESLint flat config such as `eslint.config.mjs`.
+
+Terra Quality always checks React `createRoot()` and `hydrateRoot()` mounts for a top-level error boundary and installs Astro's hydration fallback in Astro configs. `terra-quality-dev` applies these safe fixes before starting a configured development server. A normal quality check reports missing boundaries; `terra-quality error-boundaries --all` applies them explicitly, while `--warn` inspects without writing. The check cannot be disabled in `quality.json`. React roots import the boundary from `@terra-symposium/standards-error-boundaries/react`.
 
 ## Native language profiles
 

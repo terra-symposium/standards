@@ -26,6 +26,7 @@ export const IDENTIFIER_REPLACEMENTS = replacementMap([
 	[['administrator', 'administration'], 'admin'],
 	['attribute', 'attr'],
 	['intelligence', 'intel'],
+	['image', 'img'],
 	['command', 'cmd'],
 	['column', 'col'],
 	[['compare', 'comp'], 'comp'],
@@ -247,10 +248,13 @@ export function callbackAlias(name: string, reserved: string[] = []): string {
 export function renameId(name: string, kind: RenameKind = {}): string {
 	if (PROTECTED_IDENTIFIERS.has(name) || name === '_') return name;
 	if (kind.numericIndex && name === 'index') return callbackAlias('item', kind.reserved);
-	if (kind.callback) return callbackAlias(name, kind.reserved);
+	if (kind.callback) {
+		const alias = callbackAlias(name, kind.reserved);
+		if (alias !== name) return alias;
+	}
 	const tokens = identifierTokens(name);
 	if (!tokens.some((t) => Object.hasOwn(IDENTIFIER_REPLACEMENTS, t.toLowerCase()) || Object.hasOwn(PREFIX_REPLACEMENTS, t.toLowerCase()))) return name;
-	return renderIdentifier(
+	const replacement = renderIdentifier(
 		name,
 		tokens.map((t, i) => {
 			const lower = t.toLowerCase();
@@ -261,6 +265,7 @@ export function renameId(name: string, kind: RenameKind = {}): string {
 			return replacement === t ? t : tokenCase(t, replacement);
 		}),
 	);
+	return kind.callback && kind.reserved?.includes(replacement) ? name : replacement;
 }
 
 /**
@@ -355,6 +360,12 @@ function callbackKind(n: ts.Identifier): RenameKind | undefined {
 		ts.forEachChild(child, collect);
 	};
 	collect(callback);
+	for (const declaration of declarations) {
+		if (declaration === n) continue;
+		const declarationParam = ts.findAncestor(declaration, ts.isParameter);
+		const numericIndex = !!declarationParam && callback.parameters.indexOf(declarationParam) === 1 && declaration.text === 'index';
+		if (renameId(declaration.text, { callback: true, numericIndex }) === declaration.text) reserved.add(declaration.text);
+	}
 	for (const declaration of declarations) {
 		if (declaration === n) return { callback: true, numericIndex: callback.parameters.indexOf(param) === 1 && n.text === 'index', reserved: [...reserved] };
 		const declarationParam = ts.findAncestor(declaration, ts.isParameter);

@@ -29,26 +29,16 @@ TYPES
 /** A source location whose interactive JSX element has no known accessible name. */
 export type AccessibilityFinding = { file: string; line: number; column: number; element: string; message: string; fixable: boolean };
 
-/**
- *
- */
+/** Classification used while resolving an element's computed accessible name. */
 type NameState = 'named' | 'empty' | 'unknown';
-/**
- *
- */
+/** Static value discovered for an accessible-name source, or its resolution state. */
 type StaticValue = { state: 'static'; value: string; source: string } | { state: 'empty' } | { state: 'unknown' };
 
-/**
- *
- */
+/** JSX element shapes supported by the accessibility source analysis. */
 type ElementRef = ts.JsxElement | ts.JsxSelfClosingElement;
-/**
- *
- */
+/** Candidate title value and source attribute used to name an interactive element. */
 type NameCandidate = { parsed: ts.SourceFile; opening: ts.JsxOpeningLikeElement; title: Extract<StaticValue, { state: 'static' }>; emptyAriaLabel?: ts.JsxAttribute };
-/**
- *
- */
+/** JSX icon candidate whose decorative status can be inferred from its attributes. */
 type DecorativeIconCandidate = { parsed: ts.SourceFile; opening: ts.JsxOpeningLikeElement };
 
 /*//////////////////////////////////////////////////

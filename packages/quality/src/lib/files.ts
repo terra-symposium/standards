@@ -26,6 +26,7 @@ const SCAN_PRUNED_DIRS = new Set([
 	'build',
 	'.build',
 	'coverage',
+	'results',
 	'test-results',
 	'.next',
 	'.astro',

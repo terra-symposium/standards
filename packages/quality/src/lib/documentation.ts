@@ -73,9 +73,8 @@ const PNPM_DIR_FLAG = /^(\s*(?:\$\s*)?pnpm)\s+(?:-C|--prefix)(\s+)("[^"]+"|'[^']
 /**
  * Finds obsolete pnpm directory flags in configured Markdown shell fences.
  *
- * @param cfg
- *
- * @return
+ * @param cfg Quality configuration containing documentation command roots.
+ * @returns Deprecated pnpm directory commands found in configured Markdown.
  */
 export function documentedCommandFindings(cfg: QualityCfg): { file: string; line: number; command: string; recommendation: string }[] {
 	const roots = cfg.documentation?.commandRoots?.map((path) => resolve(cfg.root, path)) ?? [];
@@ -103,9 +102,8 @@ export function documentedCommandFindings(cfg: QualityCfg): { file: string; line
 /**
  * Replaces only known deprecated pnpm directory flags in configured Markdown shell fences.
  *
- * @param cfg
- *
- * @return
+ * @param cfg Quality configuration containing documentation command roots.
+ * @returns Number of deprecated commands replaced.
  */
 export function fixDocumentedCommands(cfg: QualityCfg): number {
 	const roots = cfg.documentation?.commandRoots?.map((path) => resolve(cfg.root, path)) ?? [];
@@ -1015,7 +1013,7 @@ function documentationSupported(fileName: string): boolean {
 function documentationSourceIncluded(cfg: QualityCfg, file: string): boolean {
 	return !relative(cfg.root, file)
 		.split(sep)
-		.some((directory) => ['generated', 'vendor', 'target', 'out'].includes(directory));
+		.some((dir) => ['generated', 'vendor', 'target', 'out'].includes(dir));
 }
 
 /**
@@ -1055,7 +1053,8 @@ function documented(node: ts.Node, src: string): boolean {
  * @return `true` when the node is explicitly exported.
  */
 function exported(node: ts.Node): boolean {
-	return !!(ts.canHaveModifiers(node) && ts.getModifiers(node)?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword));
+	const target = documentationTarget(node);
+	return !!(ts.canHaveModifiers(target) && ts.getModifiers(target)?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword));
 }
 
 /**
@@ -1298,11 +1297,18 @@ function descriptionFindingsForFile(cfg: QualityCfg, file: string, src: string, 
 	const findings: DocumentationFinding[] = [];
 	const header = fileHeaderBlock(src, blocks);
 	const attached = new Set<number>();
+	const requiredAttached = new Set<number>();
+	const requirements = { functions: true, ...cfg.documentation?.required };
 	/**
 	 *
 	 * @param node
 	 */
 	const markAttached = (node: ts.Node): void => {
+		const requiresDocumentation =
+			((ts.isClassDeclaration(node) || ts.isEnumDeclaration(node) || ts.isInterfaceDeclaration(node) || ts.isTypeAliasDeclaration(node)) && requirements.types) ||
+			(isNamedDocumentationFn(node) && (requirements.functions || (requirements.exportedFunctions && exported(node)))) ||
+			((ts.isPropertySignature(node) || ts.isMethodSignature(node) || ts.isCallSignatureDeclaration(node) || ts.isConstructSignatureDeclaration(node) || ts.isIndexSignatureDeclaration(node)) &&
+				requirements.types);
 		if (
 			ts.isDeclarationStatement(node) ||
 			ts.isFunctionLike(node) ||
@@ -1317,7 +1323,10 @@ function descriptionFindingsForFile(cfg: QualityCfg, file: string, src: string, 
 			ts.isVariableStatement(node)
 		)
 			for (const range of ts.getLeadingCommentRanges(src, node.getFullStart()) ?? [])
-				if (src.slice(range.pos, range.end).startsWith('/**') && S_REGEX.test(src.slice(range.end, node.getStart(parsed)))) attached.add(range.pos);
+				if (src.slice(range.pos, range.end).startsWith('/**') && S_REGEX.test(src.slice(range.end, node.getStart(parsed)))) {
+					attached.add(range.pos);
+					if (requiresDocumentation) requiredAttached.add(range.pos);
+				}
 		ts.forEachChild(node, markAttached);
 	};
 	markAttached(parsed);
@@ -1328,6 +1337,7 @@ function descriptionFindingsForFile(cfg: QualityCfg, file: string, src: string, 
 			findings.push(finding);
 			continue;
 		}
+		if (!requiredAttached.has(block.start)) continue;
 		const lines = tsdocLines(block);
 		const firstTag = lines.findIndex((l) => l.text.startsWith('@'));
 		const summary = lines

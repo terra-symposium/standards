@@ -26,6 +26,7 @@ import type { ReportRun, VisualResult } from './core.js';
 CONFIG
 //////////////////////////////////////////////////*/
 
+// STATUS AND TIMING STYLES
 const STATUS_STYLES: Record<string, { fill: string; font: string }> = {
 	passed: { fill: 'FFDCEFE0', font: 'FF166534' },
 	failed: { fill: 'FFFEE2E2', font: 'FF991B1B' },
@@ -38,6 +39,12 @@ const LOAD_STYLES: Record<string, { fill: string; font: string }> = {
 	warning: { fill: 'FFFEF3C7', font: 'FF92400E' },
 	fail: { fill: 'FFFEE2E2', font: 'FF991B1B' },
 };
+
+/*//////////////////////////////////////////////////
+HELPERS
+//////////////////////////////////////////////////*/
+
+// CELL FORMATTING
 /**
  * Applies the shared header layout to a worksheet.
  *
@@ -77,8 +84,8 @@ const styleStatus = (cell: ExcelJS.Cell, status: string): void => {
 /**
  * Applies a timing grade and its semantic color treatment to a cell.
  *
- * @param cell
- * @param grade
+ * @param cell Cell that will display the timing grade.
+ * @param grade Grade key used to select the timing color treatment.
  */
 const styleLoadGrade = (cell: ExcelJS.Cell, grade: string): void => {
 	const style = LOAD_STYLES[grade] || LOAD_STYLES.fail;
@@ -88,14 +95,12 @@ const styleLoadGrade = (cell: ExcelJS.Cell, grade: string): void => {
 	cell.alignment = { horizontal: 'center', vertical: 'middle' };
 };
 /**
- * Adds one feature-file result sheet, including available screenshot evidence.
+ * Produces a worksheet-safe name unique within the workbook for a feature file.
  *
- * @param book Workbook receiving the sheet.
- * @param src
- * @param name Feature-file name used as the worksheet name.
- * @param vals Results belonging to the feature file.
+ * @param book Workbook whose existing worksheet names must be avoided.
+ * @param src Feature-file path or label to convert into a worksheet name.
  *
- * @return Nothing; the workbook is mutated in place.
+ * @return A sanitized name of at most 31 characters, with a numeric suffix when needed to avoid collisions.
  */
 const resultSheetName = (book: ExcelJS.Workbook, src: string): string => {
 	const base =
@@ -115,21 +120,33 @@ const resultSheetName = (book: ExcelJS.Workbook, src: string): string => {
 	return name;
 };
 /**
+ * Reads the populated cell values in worksheet order, including empty positions within the row.
  *
- * @param val
+ * @param row Worksheet row whose values are copied into the aggregate summary.
  *
- * @return
+ * @return Cell values from the first column through the row's last populated cell.
+ */
+const valuesForRow = (row: ExcelJS.Row): (ExcelJS.CellValue | null)[] => Array.from({ length: row.cellCount }, (_, i) => row.getCell(i + 1).value);
+/**
+ * Chooses the worst timing grade recorded for one test result.
+ *
+ * @param val Result whose timing measurements contribute to the displayed grade.
+ *
+ * @return `fail`, `warning`, `pass`, or an empty string when the result has no timing samples.
  */
 const resultLoadGrade = (val: VisualResult): string => {
 	const counts = loadGradeCounts(val.loadMeasurements || []);
 	return counts.fail ? 'fail' : counts.warning ? 'warning' : counts.pass ? 'pass' : '';
 };
+
+// RESULT WORKSHEETS
 /**
+ * Adds a feature-file worksheet with result rows and any available screenshot evidence.
  *
- * @param book
- * @param name
- * @param vals
- * @param loadEnabled
+ * @param book Workbook receiving the worksheet and embedded images.
+ * @param name Feature-file label used to derive the worksheet name.
+ * @param vals Normalized results belonging to that feature file.
+ * @param loadEnabled Whether the result rows include load-grade values.
  */
 const addResultSheet = (book: ExcelJS.Workbook, name: string, vals: readonly VisualResult[], loadEnabled: boolean): void => {
 	const sheet = book.addWorksheet(resultSheetName(book, name));
@@ -205,7 +222,7 @@ const addResultSheet = (book: ExcelJS.Workbook, name: string, vals: readonly Vis
  *
  * @param book Workbook receiving the summary sheet.
  * @param run Normalized report run to summarize.
- * @param loadEnabled
+ * @param loadEnabled Whether load-grade totals are included in the summary columns.
  *
  * @return Nothing; the workbook is mutated in place.
  */
@@ -224,8 +241,8 @@ const addSummary = (book: ExcelJS.Workbook, run: ReportRun, loadEnabled: boolean
 /**
  * Adds a row for every timed test, page navigation, and named operation.
  *
- * @param book
- * @param results
+ * @param book Workbook receiving the timing sheet.
+ * @param results Results whose attached measurements are listed as rows.
  */
 const addLoadTimings = (book: ExcelJS.Workbook, results: readonly VisualResult[]): void => {
 	const sheet = book.addWorksheet('Load timings');
@@ -313,5 +330,116 @@ export const writeSpreadsheet = async (file: string, run: ReportRun): Promise<vo
 	addDiagnostics(book, run);
 	book.views = [{ x: 0, y: 0, width: 19200, height: 10800, visibility: 'visible', activeTab: 0, firstSheet: 0 }];
 	await book.xlsx.writeFile(file);
+	await neutralizeApplicationMetadata(file);
+};
+/** A report workbook and its repository label for an aggregate evidence workbook. */
+export type SpreadsheetSource = { label: string; file: string };
+
+// AGGREGATE WORKBOOK
+/**
+ * Copies tabular content, cell styling, merges, and embedded images into one named worksheet.
+ *
+ * @param source Worksheet whose cells, formatting, merges, and images are copied.
+ * @param target Empty destination worksheet receiving the copied content.
+ * @param sourceBook Workbook that owns image references in the source worksheet.
+ * @param targetBook Workbook that receives cloned image references.
+ */
+const copyWorksheet = (source: ExcelJS.Worksheet, target: ExcelJS.Worksheet, sourceBook: ExcelJS.Workbook, targetBook: ExcelJS.Workbook): void => {
+	target.properties = structuredClone(source.properties);
+	target.views = structuredClone(source.views);
+	target.pageSetup = structuredClone(source.pageSetup);
+	target.headerFooter = structuredClone(source.headerFooter);
+	target.state = source.state;
+	target.columns = source.columns.map((col) => ({
+		width: col.width,
+		hidden: col.hidden,
+		outlineLevel: col.outlineLevel,
+		style: structuredClone(col.style),
+		header: structuredClone(col.header),
+		key: col.key,
+	}));
+	source.eachRow({ includeEmpty: true }, (row, rowNumber) => {
+		const targetRow = target.getRow(rowNumber);
+		targetRow.height = row.height;
+		targetRow.hidden = row.hidden;
+		targetRow.outlineLevel = row.outlineLevel;
+		row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+			const targetCell = targetRow.getCell(colNumber);
+			targetCell.value = structuredClone(cell.value);
+			targetCell.style = structuredClone(cell.style);
+			if (cell.note) targetCell.note = structuredClone(cell.note);
+			if (cell.dataValidation) targetCell.dataValidation = structuredClone(cell.dataValidation);
+		});
+	});
+	for (const range of source.model.merges || []) target.mergeCells(range);
+	for (const { imageId: imgId, range } of source.getImages()) {
+		const img = sourceBook.getImage(Number(imgId));
+		target.addImage(targetBook.addImage(img), structuredClone(range));
+	}
+};
+/**
+ * Combines per-repository Reporting workbooks into an all-tests workbook.
+ *
+ * @param file Output path for the aggregate workbook.
+ * @param sources Repository labels and source report.xlsx paths.
+ *
+ * @return A promise that resolves after summaries, detailed rows, and screenshot images are copied.
+ */
+export const mergeSpreadsheets = async (file: string, sources: readonly SpreadsheetSource[]): Promise<void> => {
+	if (!sources.length) throw new Error('At least one Reporting workbook is required to create an aggregate spreadsheet.');
+	const aggregate = new ExcelJS.Workbook();
+	aggregate.creator = 'Test evidence reporter';
+	aggregate.lastModifiedBy = 'Test evidence reporter';
+	aggregate.title = 'Aggregate test evidence spreadsheet';
+	aggregate.subject = 'Cross-repository Playwright results and screenshots';
+	aggregate.description = 'Programmatically combined repository test evidence.';
+	const summary = aggregate.addWorksheet('All tests');
+	let summaryHeader: ExcelJS.CellValue[] | undefined;
+	const usedSheetNames = new Set(['all tests']);
+	for (const { label, file: sourceFile } of sources) {
+		const sourceBook = new ExcelJS.Workbook();
+		await sourceBook.xlsx.readFile(sourceFile);
+		const sourceSummary = sourceBook.getWorksheet('Summary');
+		if (!sourceSummary) throw new Error(`Reporting workbook has no Summary worksheet: ${sourceFile}`);
+		const header = valuesForRow(sourceSummary.getRow(1)) as ExcelJS.CellValue[];
+		if (!summaryHeader) {
+			summaryHeader = ['Repository', ...header];
+			summary.addRow(summaryHeader);
+		} else if (header.length !== summaryHeader.length - 1 || header.some((value, i) => value !== summaryHeader?.[i + 1])) {
+			throw new Error(`Reporting workbook Summary columns do not match the aggregate contract: ${sourceFile}`);
+		}
+		for (let rowNumber = 2; rowNumber <= sourceSummary.rowCount; rowNumber++) {
+			const row = sourceSummary.getRow(rowNumber);
+			if (!row.hasValues) continue;
+			const aggregateRow = summary.addRow([label, ...valuesForRow(row)]);
+			row.eachCell({ includeEmpty: true }, (sourceCell, colNumber) => {
+				aggregateRow.getCell(colNumber + 1).style = structuredClone(sourceCell.style);
+			});
+		}
+		for (const sourceSheet of sourceBook.worksheets) {
+			if (sourceSheet.name === 'Summary') continue;
+			const base =
+				`${label} ${sourceSheet.name}`
+					.replace(/[\\/*?:[\]]/gu, '_')
+					.replace(/^'+|'+$/gu, '')
+					.slice(0, 31) || 'Results';
+			let sheetName = base;
+			let suffix = 2;
+			while (usedSheetNames.has(sheetName.toLowerCase())) {
+				const postfix = ` (${suffix++})`;
+				sheetName = `${base.slice(0, 31 - postfix.length)}${postfix}`;
+			}
+			usedSheetNames.add(sheetName.toLowerCase());
+			copyWorksheet(sourceSheet, aggregate.addWorksheet(sheetName), sourceBook, aggregate);
+		}
+	}
+	if (!summaryHeader) throw new Error('No summary rows were available in the Reporting workbooks.');
+	summary.columns = [{ width: 18 }, ...summaryHeader.slice(1).map(() => ({ width: 18 }))];
+	summary.views = [{ showGridLines: false, state: 'frozen', ySplit: 1 }];
+	summary.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
+	summary.getRow(1).fill = { fgColor: { argb: 'FF1F4E78' }, pattern: 'solid', type: 'pattern' };
+	for (const row of summary.getRows(2, summary.rowCount) || []) row.alignment = { vertical: 'top', wrapText: true };
+	aggregate.views = [{ x: 0, y: 0, width: 19200, height: 10800, visibility: 'visible', activeTab: 0, firstSheet: 0 }];
+	await aggregate.xlsx.writeFile(file);
 	await neutralizeApplicationMetadata(file);
 };

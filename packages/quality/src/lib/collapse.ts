@@ -11,6 +11,7 @@ IMPORTS
 import ts from 'typescript';
 import { extname } from 'node:path';
 import { readFileSync, writeFileSync } from 'node:fs';
+import { sourceKind } from './source-kind.js';
 
 /*//////////////////////////////////////////////////
 CONFIG
@@ -21,20 +22,6 @@ const SUPPORTED = new Set(['.cjs', '.cts', '.js', '.jsx', '.mjs', '.mts', '.ts',
 /*//////////////////////////////////////////////////
 HELPERS
 //////////////////////////////////////////////////*/
-
-/**
- * Selects the TypeScript parser mode matching a JavaScript or TypeScript filename.
- *
- * @param fileName Source filename whose extension determines the parser mode.
- *
- * @return TypeScript compiler script kind for the filename.
- */
-function scriptKind(fileName: string): ts.ScriptKind {
-	if (/\.[cm]?tsx$/.test(fileName)) return ts.ScriptKind.TSX;
-	if (/\.[cm]?jsx$/.test(fileName)) return ts.ScriptKind.JSX;
-	if (/\.[cm]?js$/.test(fileName)) return ts.ScriptKind.JS;
-	return ts.ScriptKind.TS;
-}
 
 /**
  * Finds the body span of an object, type literal, mapped type, or interface that can be collapsed safely.
@@ -86,7 +73,7 @@ export function collapseTypesAndObjects(fileName: string): boolean {
 	// ENVIRONMENT
 	if (!SUPPORTED.has(extname(fileName))) return false;
 	const original = readFileSync(fileName, 'utf8');
-	const parsed = ts.createSourceFile(fileName, original, ts.ScriptTarget.Latest, true, scriptKind(fileName));
+	const parsed = ts.createSourceFile(fileName, original, ts.ScriptTarget.Latest, true, sourceKind(fileName));
 	const edits: { start: number; end: number; text: string }[] = [];
 
 	// HELPERS

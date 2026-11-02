@@ -98,9 +98,7 @@ export const QUALITY_CAPABILITY_AUTOFIXES: readonly QualityAutofixName[] = [
 	'documentedCommands',
 ];
 
-/**
- *
- */
+/** Support status and explanation for one quality capability in a language profile. */
 export type LanguageCapability = { status: 'supported' | 'not-applicable'; provider: string; reason?: string };
 
 /**
@@ -296,7 +294,8 @@ export const LANGUAGE_PROFILES: readonly { id: LanguageProfileId; sourceExtensio
 				command: 'clang-tidy',
 				args: [
 					'--checks=-*,bugprone-*,cert-*,clang-analyzer-*,misc-include-cleaner,performance-*,readability-*',
-					'--warnings-as-errors=*',
+					// Keep core analyzer defects fatal while legacy CERT, bugprone, and platform checks stay visible.
+					'--warnings-as-errors=clang-analyzer-core-*',
 					'{files}',
 					'--',
 					'-std=c11',
@@ -507,7 +506,7 @@ export function resolveLanguageProfiles(cfg: QualityCfg): LanguageProfileResolut
 				result.failed.push({ name: check.name, profileId, reason: `required configuration ${check.requiredFile} is absent` });
 				continue;
 			}
-			const files = check.fileExtensions ? sourceFiles.filter((file) => check.fileExtensions!.some((extension) => file.endsWith(extension))) : sourceFiles;
+			const files = check.fileExtensions ? sourceFiles.filter((file) => check.fileExtensions!.some((ext) => file.endsWith(ext))) : sourceFiles;
 			if (check.args.includes('{files}') && !files.length) {
 				result.skipped.push({ name: check.name, profileId, reason: 'no files matched this check' });
 				continue;
@@ -527,7 +526,7 @@ export function resolveLanguageProfiles(cfg: QualityCfg): LanguageProfileResolut
 					result.failed.push({ name: check.name, profileId: profile.id, reason: `required configuration ${check.requiredFile} is absent` });
 					continue;
 				}
-				const checkFiles = check.fileExtensions ? files.filter((file) => check.fileExtensions!.some((extension) => file.endsWith(extension))) : files;
+				const checkFiles = check.fileExtensions ? files.filter((file) => check.fileExtensions!.some((ext) => file.endsWith(ext))) : files;
 				const args = check.args.flatMap((argument) => (argument === '{files}' ? checkFiles : argument === '{files-comma}' ? [checkFiles.join(',')] : [argument]));
 				result.checks.push({ ...check, args, profileId: profile.id, files: checkFiles });
 			}

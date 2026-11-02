@@ -13,17 +13,8 @@ IMPORTS
 // API
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {
-	createQualityCfg,
-	documentSrcFile,
-	documentationFindings,
-	documentedCommandFindings,
-	duplicateImportFindings,
-	fixDocumentedCommands,
-	maintainSrcFile,
-	protectLongImports,
-	removeNonCodeComments,
-} from '../../dist/index.js';
+// prettier-ignore
+import { createQualityCfg, documentSrcFile, documentationFindings, documentedCommandFindings, duplicateImportFindings, fixDocumentedCommands, maintainSrcFile, protectLongImports, removeNonCodeComments } from '../../dist/index.js';
 import { fixtureFile, fixtureRoot, fixtureText } from '../../support/fixtures.mjs';
 
 /*//////////////////////////////////////////////////
@@ -41,7 +32,6 @@ test('documentation policy excludes generated and vendor source trees', () => {
 		['documentedScope'],
 	);
 });
-
 test('documented commands diagnose and fix only deprecated pnpm directory flags in configured shell fences', () => {
 	const root = fixtureRoot('terra-quality-documented-commands-');
 	fixtureFile(
@@ -61,7 +51,7 @@ test('documented commands diagnose and fix only deprecated pnpm directory flags 
 	);
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], documentation: { commandRoots: ['docs'] } });
 	assert.deepEqual(
-		documentedCommandFindings(cfg).map(({ line, command }) => [line, command]),
+		documentedCommandFindings(cfg).map(({ line, command: cmd }) => [line, cmd]),
 		[
 			[3, 'pnpm -C packages/app test'],
 			[4, 'pnpm --prefix "packages/docs" build -- --watch'],
@@ -85,7 +75,6 @@ test('documented commands diagnose and fix only deprecated pnpm directory flags 
 	assert.equal(fixDocumentedCommands(cfg), 0, 'the transformation is idempotent');
 	assert.deepEqual(documentedCommandFindings(cfg), []);
 });
-
 test('documented command check is disabled without explicit roots and preserves CRLF', () => {
 	const root = fixtureRoot('terra-quality-document-command-disabled-');
 	fixtureFile(root, 'docs/commands.md', '```bash\r\npnpm -C packages/app test\r\n```\r\n');
@@ -95,7 +84,6 @@ test('documented command check is disabled without explicit roots and preserves 
 	assert.equal(fixDocumentedCommands(cfg), 1);
 	assert.equal(fixtureText(root, 'docs/commands.md'), '```bash\r\npnpm --dir packages/app test\r\n```\r\n');
 });
-
 test('documented command autofix preserves mixed line endings', () => {
 	const root = fixtureRoot('terra-quality-document-command-mixed-lines-');
 	fixtureFile(root, 'docs/commands.md', '```sh\r\npnpm -C packages/app test\r\npnpm --prefix packages/docs build\n```\n');
@@ -103,7 +91,6 @@ test('documented command autofix preserves mixed line endings', () => {
 	assert.equal(fixDocumentedCommands(cfg), 2);
 	assert.equal(fixtureText(root, 'docs/commands.md'), '```sh\r\npnpm --dir packages/app test\r\npnpm --dir packages/docs build\n```\n');
 });
-
 test('documentation policy independently reports types, exported functions, and inline functions', () => {
 	const root = fixtureRoot('terra-quality-documentation-policy-');
 	fixtureFile(
@@ -142,7 +129,6 @@ void [privateHelper, publicHelper, arrowHelper, expressionHelper, documented];
 		],
 	);
 });
-
 test('default function policy requires docs for private methods, constructors, and named function values but ignores callbacks', () => {
 	const root = fixtureRoot('terra-quality-document-all-named-functions-');
 	fixtureFile(
@@ -170,6 +156,32 @@ const namedArrow = (flag: boolean) => flag;
 			['function', 'close'],
 			['function', 'helper'],
 			['function', 'namedArrow'],
+		],
+	);
+});
+test('description audits respect the configured function and exported-function documentation scope', () => {
+	const root = fixtureRoot('terra-quality-documentation-description-scope-');
+	fixtureFile(
+		root,
+		'src/main.ts',
+		`/**
+ * @param value
+ */
+function privateHelper(value: string) { return value; }
+/**
+ * @param value
+ */
+export function publicHelper(value: string) { return value; }
+void [privateHelper, publicHelper];
+`,
+	);
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], documentation: { required: { types: true, functions: false, exportedFunctions: true } } });
+	assert.deepEqual(
+		documentationFindings(cfg).map(({ kind, name }) => [kind, name]),
+		[
+			['summary', '<TSDoc summary>'],
+			['param', '@param value'],
+			['return', '@return'],
 		],
 	);
 });

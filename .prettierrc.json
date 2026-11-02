@@ -1,5 +1,1 @@
-{
-	"printWidth": 200,
-	"singleQuote": true,
-	"useTabs": true
-}
+config/.prettierrc.json

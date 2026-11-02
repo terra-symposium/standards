@@ -1,11 +1,19 @@
 {
-	"version": 1,
-	"suites": [
-		{
-			"name": "standards-workspace",
-			"command": "node",
-			"args": ["packages/quality/dist/app/workspace-test-runner.js"],
-			"owns": ["packages/error-boundaries/test", "packages/quality/test", "packages/reporting/test", "packages/testing/test", "apps/hygiene/test"]
-		}
-	]
+  "version": 1,
+  "suites": [
+    {
+      "name": "standards-workspace",
+      "command": "node",
+      "args": [
+        "packages/quality/dist/app/workspace-test-runner.js"
+      ],
+      "owns": [
+        "packages/error-boundaries/test/**/*",
+        "packages/quality/test/**/*",
+        "packages/reporting/test/**/*",
+        "packages/testing/test/**/*",
+        "apps/hygiene/test/**/*"
+      ]
+    }
+  ]
 }

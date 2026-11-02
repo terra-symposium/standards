@@ -1,47 +1,49 @@
 {
-	"name": "@terra-symposium/standards",
-	"private": true,
-	"version": "0.1.0",
-	"packageManager": "pnpm@10.30.3",
-	"type": "module",
-	"scripts": {
-		"build": "pnpm -r build",
-		"pretest": "pnpm --filter './packages/**' -r build",
-		"test": "node packages/testing/src/cli.mjs run --manifest .terra-tests.json",
-		"prepare": "husky",
-		"prequality": "pnpm --filter @terra-symposium/standards-quality build",
-		"quality": "node packages/quality/dist/lib/runner.js quality --skip-commands --skip-recommendations",
-		"prequality:all": "pnpm --filter @terra-symposium/standards-quality build && pnpm --filter @terra-symposium/standards-error-boundaries build",
-		"quality:all": "node packages/quality/dist/lib/runner.js quality --all --skip-commands --skip-recommendations",
-		"prequality:check": "pnpm --filter @terra-symposium/standards-quality build && pnpm --filter @terra-symposium/standards-error-boundaries build",
-		"quality:check": "node packages/quality/dist/lib/runner.js quality --all --warn --skip-commands --skip-recommendations",
-		"prequality:github": "pnpm --filter @terra-symposium/standards-quality build",
-		"quality:github": "node packages/quality/dist/lib/runner.js github --report-json .quality-github-report.json",
-		"docs:dev": "pnpm --filter @terra-symposium/standards-docs dev",
-		"docs:build": "pnpm --filter @terra-symposium/standards-docs build",
-		"docs:preview": "pnpm --filter @terra-symposium/standards-docs build && pnpm --filter @terra-symposium/standards-docs preview",
-		"release": "changeset publish"
-	},
-	"devDependencies": {
-		"@changesets/cli": "^3.0.3",
-		"@eslint/js": "^10.0.1",
-		"@types/node": "^26.6.5",
-		"eslint": "^10.13.0",
-		"globals": "^17.13.0",
-		"husky": "^9.1.7",
-		"knip": "^6.41.0",
-		"prettier": "^3.9.10",
-		"typescript": "^6.0.3",
-		"typescript-eslint": "^8.71.2"
-	},
-	"pnpm": {
-		"overrides": {
-			"brace-expansion@5": "5.0.12",
-			"http-cache-semantics": "4.3.0",
-			"image-size": "2.0.4",
-			"postcss-selector-parser": "7.1.6",
-			"smol-toml": "1.9.1",
-			"uuid": "11.1.1"
-		}
-	}
+  "name": "@terra-symposium/standards",
+  "private": true,
+  "version": "0.1.0",
+  "packageManager": "pnpm@10.30.3",
+  "type": "module",
+  "scripts": {
+    "build": "pnpm -r build",
+    "prebuild": "pnpm --filter @terra-symposium/standards-quality build && node packages/quality/dist/lib/runner.js error-boundaries --all",
+    "pretest": "pnpm --filter './packages/**' -r build",
+    "test": "node packages/testing/src/cli.mjs run --manifest .terra-tests.json",
+    "prepare": "husky",
+    "prequality": "pnpm --filter @terra-symposium/standards-quality build",
+    "quality": "node packages/quality/dist/lib/runner.js quality --skip-commands --skip-recommendations",
+    "prequality:all": "pnpm --filter @terra-symposium/standards-quality build && pnpm --filter @terra-symposium/standards-error-boundaries build",
+    "quality:all": "node packages/quality/dist/lib/runner.js quality --all --skip-commands --skip-recommendations",
+    "prequality:check": "pnpm --filter @terra-symposium/standards-quality build && pnpm --filter @terra-symposium/standards-error-boundaries build",
+    "quality:check": "node packages/quality/dist/lib/runner.js quality --all --warn --skip-commands --skip-recommendations",
+    "prequality:github": "pnpm --filter @terra-symposium/standards-quality build",
+    "quality:github": "node packages/quality/dist/lib/runner.js github --report-json .quality-github-report.json",
+    "docs:dev": "terra-docs dev --title Standards --description 'Documentation for shared Terra Symposium packages and tools.'",
+    "docs:build": "terra-docs build --title Standards --description 'Documentation for shared Terra Symposium packages and tools.' --site https://standards-docs.netlify.app --out dist/docs",
+    "docs:preview": "terra-docs preview --title Standards --description 'Documentation for shared Terra Symposium packages and tools.' --site https://standards-docs.netlify.app --out dist/docs",
+    "release": "changeset publish"
+  },
+  "devDependencies": {
+    "@changesets/cli": "^3.0.3",
+    "@eslint/js": "^10.0.1",
+    "@terra-symposium/docs": "^0.2.1",
+    "@types/node": "^26.6.5",
+    "eslint": "^10.13.0",
+    "globals": "^17.13.0",
+    "husky": "^9.1.7",
+    "knip": "^6.41.0",
+    "prettier": "^3.9.10",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.71.2"
+  },
+  "pnpm": {
+    "overrides": {
+      "brace-expansion@5": "5.0.12",
+      "http-cache-semantics": "4.3.0",
+      "image-size": "2.0.4",
+      "postcss-selector-parser": "7.1.6",
+      "smol-toml": "1.9.1",
+      "uuid": "11.1.1"
+    }
+  }
 }

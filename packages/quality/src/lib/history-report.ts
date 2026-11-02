@@ -1,9 +1,20 @@
+/**
+ * packages/quality/src/lib/history-report.ts
+ */
+
+/*//////////////////////////////////////////////////
+IMPORTS
+//////////////////////////////////////////////////*/
+
+// API
 import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+
 /*//////////////////////////////////////////////////
 REGEX
 //////////////////////////////////////////////////*/
+
 const S_REGEX = /\s+/;
 const GIT_I_REGEX = /\.git$/i;
 const A_F_D_40_I_REGEX = /^[a-f\d]{40}$/i;
@@ -22,10 +33,9 @@ export type HistoryReport = {
 	generatedAt: string;
 	commits: HistoryCommitReport[];
 };
-
 const SRC_EXT = /\.(?:astro|c|cc|cpp|cs|css|go|html|java|js|jsx|jsonl|kt|less|m|mdx|php|py|rb|rs|scss|sh|sql|svelte|swift|ts|tsx|vue)$/i;
 const EXCLUDED_DIR =
-	/^(?:\.git|\.github|\.next|\.nuxt|\.output|\.turbo|\.vercel|\.netlify|\.astro|\.cache|build|coverage|dist|docs?|documentation|generated|vendor|node_modules|bower_components|target|out|public|static|storybook-static|test-results)$/i;
+	/^(?:\.git|\.github|\.next|\.nuxt|\.output|\.turbo|\.vercel|\.netlify|\.astro|\.cache|build|coverage|dist|docs?|documentation|generated|vendor|node_modules|bower_components|target|out|public|static|storybook-static|test-results|results)$/i;
 const EXCLUDED_FILE =
 	/^(?:package(?:-lock)?\.json|pnpm-lock\.yaml|yarn\.lock|tsconfig(?:\.[^.]+)?\.json|(?:astro|eslint|prettier|vite|vitest|webpack|rollup|tailwind|postcss|jest|playwright|babel|next|netlify)\.config\.[^.]+|Dockerfile|Makefile)$/i;
 const HISTORY_BATCH_SIZE = 50;
@@ -36,6 +46,7 @@ const GIT_OUTPUT_LIMIT = 128 * 1024 * 1024;
  * Return whether a tracked path belongs to the dashboard's source and test scope.
  *
  * @param path Repository-relative tracked file path.
+ *
  * @return Whether the path contributes to history metrics.
  */
 export function isHistorySourcePath(path: string): boolean {
@@ -52,6 +63,7 @@ export function isHistorySourcePath(path: string): boolean {
  * @param root Git checkout path.
  * @param args Git command arguments.
  * @param input Optional standard input for the command.
+ *
  * @return The command's UTF-8 output.
  */
 function git(root: string, args: string[], input?: string): string {
@@ -64,6 +76,7 @@ function git(root: string, args: string[], input?: string): string {
  * @param root Git checkout path.
  * @param args Git command arguments.
  * @param input Standard input for the command.
+ *
  * @return The command's binary output.
  */
 function gitBuffer(root: string, args: string[], input: string): Buffer {
@@ -74,6 +87,7 @@ function gitBuffer(root: string, args: string[], input: string): Buffer {
  * Resolve the GitHub repository name from Actions metadata or the origin remote.
  *
  * @param root Git checkout path.
+ *
  * @return The owner/repository name.
  */
 function repoName(root: string): string {
@@ -134,6 +148,7 @@ function srcChanges(root: string, head: string, parents: string[], stats: Map<st
  * @param root Git checkout path.
  * @param range Git revision range to inspect.
  * @param stats Per-commit source line totals to update.
+ *
  * @return Merge commit SHAs requiring first-parent stats.
  */
 function readNumstatLog(root: string, range: string, stats: Map<string, { additions: number; deletions: number }>): Set<string> {
@@ -171,6 +186,7 @@ function readNumstatLog(root: string, range: string, stats: Map<string, { additi
  *
  * @param root Git checkout path.
  * @param sha Commit SHA to inspect.
+ *
  * @return Eligible blob IDs in the commit tree.
  */
 function parseTree(root: string, sha: string): string[] {
@@ -190,6 +206,7 @@ function parseTree(root: string, sha: string): string[] {
  * Count newline-terminated and final unterminated source lines.
  *
  * @param content Source blob bytes.
+ *
  * @return The number of source lines.
  */
 function lineCount(content: Uint8Array): number {
@@ -231,6 +248,7 @@ function blobLineCounts(root: string, blobs: string[], cache: Map<string, number
  *
  * @param root Git checkout path.
  * @param range Git revision range to inspect.
+ *
  * @return Commit SHAs, author dates, and parent SHAs.
  */
 function commitMetadata(root: string, range: string): { sha: string; authorDate: string; parents: string[] }[] {
@@ -251,6 +269,7 @@ function commitMetadata(root: string, range: string): { sha: string; authorDate:
  * @param root Git checkout path.
  * @param base Push base SHA.
  * @param head Checked-out head SHA.
+ *
  * @return Whether base is an ancestor of head.
  */
 function isAncestor(root: string, base: string, head: string): boolean {
@@ -267,6 +286,7 @@ function isAncestor(root: string, base: string, head: string): boolean {
  *
  * @param root Path to the full Git checkout.
  * @param opts Optional repository, branch, or push-base overrides.
+ *
  * @return A versioned history report with normalized commit counts.
  */
 export function createHistoryReport(root: string, opts: { repository?: string; branch?: string; baseSha?: string | null } = {}): HistoryReport {
@@ -280,7 +300,6 @@ export function createHistoryReport(root: string, opts: { repository?: string; b
 	const changes = new Map<string, { additions: number; deletions: number }>();
 	const merges = readNumstatLog(root, range, changes);
 	for (const commit of commits) if (merges.has(commit.sha)) srcChanges(root, commit.sha, commit.parents, changes);
-
 	const lineCounts = new Map<string, number>();
 	const reportCommits: HistoryCommitReport[] = [];
 	for (let start = 0; start < commits.length; start += HISTORY_BATCH_SIZE) {
@@ -301,7 +320,6 @@ export function createHistoryReport(root: string, opts: { repository?: string; b
 			});
 		}
 	}
-
 	return {
 		schemaVersion: 1,
 		mode: delta ? 'delta' : 'snapshot',
@@ -320,6 +338,7 @@ export function createHistoryReport(root: string, opts: { repository?: string; b
  * @param root Path to the full Git checkout.
  * @param path Output path relative to the checkout.
  * @param opts Optional repository, branch, or push-base overrides.
+ *
  * @return The generated history report.
  */
 export function writeHistoryReport(root: string, path: string, opts?: { repository?: string; branch?: string; baseSha?: string | null }): HistoryReport {

@@ -1,8 +1,9 @@
 node_modules/
 dist/
 coverage/
+tests/results/
 **/.astro/
-/docs/src/generated/skills.json
+dist/.terra-docs/
 /.quality-test-tmp/
 /.quality-github-report.json
 .changeset/*.md
@@ -16,3 +17,5 @@ coverage/
 # Local environment credentials
 **/.env
 **/.env.local
+vendor/
+**/vendor/

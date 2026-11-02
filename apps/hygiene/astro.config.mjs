@@ -1,4 +1,7 @@
-import { defineConfig } from 'astro/config';
-import react from '@astrojs/react';
+import { terraErrorBoundaryIntegration as __terraErrorBoundaryIntegration } from '@terra-symposium/standards-quality/astro-integration';
+import config from './config/astro.config.mjs';
 
-export default defineConfig({ integrations: [react()] });
+export default {
+	...config,
+	integrations: [__terraErrorBoundaryIntegration(), ...(config.integrations ?? [])],
+};

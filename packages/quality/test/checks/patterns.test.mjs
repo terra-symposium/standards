@@ -83,6 +83,15 @@ test('regex deduplication inventories literals and RegExp constructors across co
 	const stricter = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], regexDedup: { minimumCount: 5 } });
 	assert.deepEqual(regexFindings(stricter), [{ source: 'alpha', count: 5, locations: ['src/ignored.ts:1', 'src/one.ts:1', 'src/tests/test.ts:1', 'src/three.ts:1', 'src/two.ts:1'] }]);
 });
+test('shared regex checks can exclude test directories where repeated literals are intentional assertions', () => {
+	const root = fixtureRoot('terra-quality-regex-skipped-directories-');
+	fixtureFile(root, 'src/use.ts', 'export const sourcePattern = /record/g;\n');
+	fixtureFile(root, 'tests/use.test.ts', 'const one = /record/g;\nconst two = /record/g;\n');
+	const cfg = createQualityCfg({ root, sourceRoots: ['src', 'tests'], extensions: ['.ts'], regexDedup: { extensions: ['.ts'], sharedModule: 'shared/regex.mjs', skippedDirectories: ['tests'] } });
+	assert.deepEqual(regexFindings(cfg), []);
+	assert.equal(fixRegexDedup(cfg).fixed, 0);
+	assert.match(fixtureText(root, 'tests/use.test.ts'), /const one = \/record\/g;/);
+});
 test('repeated-class fixer creates deterministic file-local CLASSES constants and leaves dynamic/HTML sources alone', () => {
 	const root = fixtureRoot('terra-quality-classes-fix-');
 	fixtureFile(
@@ -118,6 +127,21 @@ test('regex fixer deduplicates stateless literals and preserves fresh stateful i
 	assert.equal((src.match(/BETA_G_REGEX\(\)/g) ?? []).length, 2);
 	assert.deepEqual(regexFindings(cfg), []);
 });
+test('regex fixer inserts declarations after a real CONFIG section, not one inside a template literal', () => {
+	const root = fixtureRoot('terra-quality-regex-template-config-');
+	const configText = `/*//////////////////////////////////////////////////\nCONFIG\n//////////////////////////////////////////////////*/`;
+	fixtureFile(root, 'src/view.ts', `const generated = \`${configText}\`;\n${configText}\nconst first = /alpha/;\nconst second = /alpha/;\nvoid [generated, first, second];\n`);
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], regexDedup: {} });
+	assert.deepEqual(fixRegexDedup(cfg), { fixed: 2, skipped: 0 });
+	const src = fixtureText(root, 'src/view.ts');
+	const genSection = src.indexOf('const generated');
+	const cfgSection = src.indexOf(configText, genSection + 1);
+	const regexSection = src.indexOf('REGEX', cfgSection);
+	const firstUse = src.indexOf('const first');
+	assert.ok(genSection < cfgSection && cfgSection < regexSection && regexSection < firstUse);
+	assert.match(src, /const first = ALPHA_REGEX;/);
+	assert.match(src, /const second = ALPHA_REGEX;/);
+});
 test('shared regex registry rewrites TypeScript and MJS literals and constructors with relative namespace imports', async () => {
 	const root = fixtureRoot('terra-quality-regex-shared-');
 	fixtureFile(root, 'package.json', '{"type":"module"}\n');
@@ -142,6 +166,7 @@ test('shared regex registry rewrites TypeScript and MJS literals and constructor
 	assert.match(mjsSrc, /TerraQualityRegex\.REGEX_CONSTRUCTOR_GY_REGEX\(\)/);
 	const registrySrc = fixtureText(root, 'shared/regex.mjs');
 	const registryTypes = fixtureText(root, 'shared/regex.d.mts');
+	assert.match(registrySrc, /\/\/ @terra-quality-regex-key "alpha\/g"\n\/\*\*\n \* Creates a fresh regular expression instance for the shared pattern\./);
 	assert.match(registrySrc, /export const REGEX_ALPHA_G_REGEX = \(\) => \(/);
 	assert.match(registrySrc, /new RegExp\('constructor', 'gy'\)/);
 	assert.match(registryTypes, /export declare const REGEX_ALPHA_G_REGEX: \(\) => RegExp;/);
@@ -155,7 +180,7 @@ test('shared regex registry rewrites TypeScript and MJS literals and constructor
 	});
 	assert.deepEqual(ts.getPreEmitDiagnostics(program), []);
 	const registry = await import(`${pathToFileURL(resolve(root, 'shared/regex.mjs')).href}?fresh=1`);
-	const alphaFactoryName = registrySrc.match(/\/\/ @terra-quality-regex-key "alpha\/g"\nexport const (\w+)/)?.[1];
+	const alphaFactoryName = registrySrc.match(/\/\/ @terra-quality-regex-key "alpha\/g"\n(?:\/\*\*[\s\S]*?\*\/\n)?export const (\w+)/)?.[1];
 	assert.ok(alphaFactoryName);
 	const alphaFactory = registry[alphaFactoryName];
 	const first = alphaFactory();

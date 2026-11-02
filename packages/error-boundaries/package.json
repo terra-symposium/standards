@@ -1,6 +1,6 @@
 {
 	"name": "@terra-symposium/standards-error-boundaries",
-	"version": "0.1.1",
+	"version": "0.1.2",
 	"description": "Framework-neutral React error boundaries for Terra Symposium applications",
 	"type": "module",
 	"main": "./dist/index.js",
@@ -17,13 +17,15 @@
 		".": "./dist/index.js",
 		"./react": "./dist/components/react.js",
 		"./astro": "./dist/lib/astro.js",
+		"./astro-integration": "./dist/lib/astro-integration.js",
+		"./astro-boundary": "./dist/components/AstroErrorBoundary.astro",
 		"./next": "./dist/lib/next.js"
 	},
 	"files": [
 		"dist"
 	],
 	"scripts": {
-		"build": "tsc -p tsconfig.json",
+		"build": "tsc -p tsconfig.json && mkdir -p dist/components && cp src/components/AstroErrorBoundary.astro dist/components/AstroErrorBoundary.astro",
 		"prepare": "npm run build",
 		"pretest": "npm run build",
 		"test": "node --test test/*.test.mjs"

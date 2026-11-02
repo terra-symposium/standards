@@ -17,8 +17,9 @@ import type { LoadTestingConfig } from './core.js';
 import type { PlaywrightTestConfig } from '@playwright/test';
 
 /*//////////////////////////////////////////////////
-CONFIG
+REGEX
 //////////////////////////////////////////////////*/
+const A_Z0_9_GI_REGEX = () => /[^a-z0-9-]/gi;
 
 /** The default responsive viewport catalog used by the shared reporter. */
 export const VISUAL_VIEWPORTS = {
@@ -50,7 +51,7 @@ HELPERS
 /**
  * Resolves an environment selection or alias list against an application catalog.
  *
- * @param raw - or whitespace-separated viewport names, aliases, or `all`.
+ * @param raw Optional comma- or whitespace-separated viewport names, aliases, or `all`; defaults to `PW_VIEWPORTS`.
  * @param catalog Viewport catalog against which names are validated.
  *
  * @return The selected viewport definitions in request order.
@@ -128,18 +129,26 @@ export const viewportSizeLabel = (viewport: string, catalog: ViewportCatalog = V
 
 /** Options for the shared responsive Playwright configuration helper. */
 export type ResponsivePlaywrightOptions = {
+	/** Run scenarios only in projects named by native @viewport:<name> tags. */
+	viewportPolicy?: 'all' | 'declared';
+	/** Viewports available to this suite; defaults to the shared catalog. */
+	viewportCatalog?: ViewportCatalog;
 	/** Project names that represent manual, single-run browser captures. */
 	singleRunProjects?: readonly string[];
 	/** Disposable Playwright output directory, separate from timestamped reports. */
 	outputDir?: string;
 	/** Parent directory for timestamped reports and their shared images folder. */
 	outputRoot?: string;
+	/** Persistent directory used to accumulate screenshot and metadata pairs across runs. */
+	screenshotsDirectory?: string;
 	/** Optional structured results file to add to the workbook exactly once. */
 	supplementalResultsFile?: string;
 	/** Optional path to the repository's quality.json; defaults to the current directory. */
 	qualityConfigFile?: string;
 	/** Explicit timing settings that override matching quality.json values. */
 	loadTesting?: LoadTestingConfig;
+	/** Write the shared PowerPoint from keyed screenshots only, with no text slides. */
+	screenshotOnlySlideshow?: boolean;
 };
 
 /**
@@ -150,14 +159,13 @@ export type ResponsivePlaywrightOptions = {
  * `singleRunProjects`. The helper adds full-page automatic screenshots and the shared
  * evidence reporter while preserving any other configured reporters.
  *
- * @param cfg
+ * @param cfg Existing Playwright configuration to extend.
  * @param opts Shared matrix and reporting options.
- * @param config Existing Playwright configuration.
  *
  * @return Configuration with responsive projects, native screenshots, and reporting.
  */
 export const withResponsivePlaywright = <T extends PlaywrightTestConfig>(cfg: T, opts: ResponsivePlaywrightOptions = {}): T => {
-	const viewports = resolveVisualViewports();
+	const viewports = resolveVisualViewports(process.env.PW_VIEWPORTS, opts.viewportCatalog);
 	const loadTesting = readLoadTestingConfig(opts.qualityConfigFile, opts.loadTesting);
 	const sharedDistCandidates = [
 		path.resolve(process.cwd(), 'node_modules/@terra-symposium/standards-reporting/dist'),
@@ -167,15 +175,16 @@ export const withResponsivePlaywright = <T extends PlaywrightTestConfig>(cfg: T,
 	const sharedDist = sharedDistCandidates.find((c) => fs.existsSync(c)) || sharedDistCandidates[0];
 	const resolvedSharedDist = fs.existsSync(sharedDist) ? fs.realpathSync(sharedDist) : sharedDist;
 	const external = [...(cfg.build?.external || []), path.join(resolvedSharedDist, '**')];
-	const projects = (cfg.projects || []) as Array<{ dependencies?: readonly string[]; name?: string; testMatch?: unknown; use?: Record<string, unknown> }>;
+	const projects = (cfg.projects || []) as Array<{ dependencies?: readonly string[]; name?: string; testMatch?: unknown; grep?: unknown; use?: Record<string, unknown> }>;
 	const dependencyProjects = new Set(projects.flatMap((p) => p.dependencies || []));
 	const singleRun = new Set(opts.singleRunProjects || []);
 	/**
+	 * Identifies projects that should run once instead of expanding across viewports.
 	 *
-	 * @param project
-	 * @param idx
+	 * @param project Playwright project whose dependencies and test pattern are inspected.
+	 * @param idx Project index used to create a stable fallback name.
 	 *
-	 * @return
+	 * @return `true` when the project is setup-only and should not expand across viewports.
 	 */
 	const isSetup = (project: (typeof projects)[number], idx: number): boolean => {
 		const name = project.name || `project-${idx + 1}`;
@@ -189,11 +198,29 @@ export const withResponsivePlaywright = <T extends PlaywrightTestConfig>(cfg: T,
 		return viewports.map((v) => ({
 			...p,
 			name: visualProjectName(baseName, v, viewports),
+			...(opts.viewportPolicy === 'declared'
+				? {
+						grep: p.grep
+							? new RegExp(
+									`(?=[\\s\\S]*(?:${p.grep instanceof RegExp ? p.grep.source : p.grep}))(?=[\\s\\S]*@viewport:${v.name.replace(A_Z0_9_GI_REGEX(), '\\$&')}(?=\\s|$))`,
+									p.grep instanceof RegExp ? p.grep.flags : '',
+								)
+							: new RegExp(`(?:^|\\s)@viewport:${v.name.replace(A_Z0_9_GI_REGEX(), '\\$&')}(?=\\s|$)`),
+					}
+				: {}),
 			use: { ...(p.use || {}), viewport: { width: v.width, height: v.height }, screenshot: { mode: 'on', fullPage: true, caret: 'initial' } },
 		}));
 	});
 	const cfgdReporters = cfg.reporter ? (Array.isArray(cfg.reporter) ? cfg.reporter : [cfg.reporter]) : [];
-	const reportingOpts = { outputRoot: opts.outputRoot, supplementalResultsFile: opts.supplementalResultsFile, qualityConfigFile: opts.qualityConfigFile, loadTesting };
+	const reportingOpts = {
+		viewportCatalog: opts.viewportCatalog,
+		outputRoot: opts.outputRoot,
+		screenshotsDirectory: opts.screenshotsDirectory,
+		supplementalResultsFile: opts.supplementalResultsFile,
+		qualityConfigFile: opts.qualityConfigFile,
+		loadTesting,
+		screenshotOnlySlideshow: opts.screenshotOnlySlideshow ?? process.env.TERRA_SCREENSHOT_ONLY_SLIDESHOW !== '0',
+	};
 	const reporters = [
 		...cfgdReporters.filter((r) => {
 			const name = Array.isArray(r) ? r[0] : r;
@@ -205,7 +232,7 @@ export const withResponsivePlaywright = <T extends PlaywrightTestConfig>(cfg: T,
 		...cfg,
 		metadata: { ...(cfg.metadata || {}), terraLoadTestingEnabled: loadTesting.enabled },
 		build: { ...(cfg.build || {}), external },
-		outputDir: opts.outputDir || 'test-results/playwright-output',
+		outputDir: opts.outputDir || 'tests/results/playwright-output',
 		projects: responsiveProjects,
 		reporter: reporters,
 		use: { ...(cfg.use || {}), screenshot: { mode: 'on', fullPage: true, caret: 'initial' } },
