@@ -36,7 +36,7 @@ The Website Docs routes share the Astro server on port 2010. Portfolio is curren
 
 ## Port acquisition
 
-Prefer the shared `terra-quality-dev` launcher when the repository provides it. It accepts an explicit `--port`, adds strict-port handling, and calls the shared Quality `acquirePort()` helper before launch. Host Docs apps may set `DOCS_DEV_PORT` in their `docs dev` script; Astro apps should use their fixed configured port and strict handling where supported.
+Prefer the shared `terra-quality-dev` launcher when the repository provides it. It accepts an explicit `--port`, adds strict-port handling, and calls the shared Quality `acquirePort()` helper before launch. Host Docs apps should pass `--port PORT` to `docs dev`; the Docs CLI reads that flag or `docs.port` from the host package manifest. `DOCS_DEV_PORT` is honored by `terra-quality-dev`, not by the `docs` CLI. Astro apps should use their fixed configured port and strict handling where supported.
 
 `acquirePort(port)` terminates processes listening on that port, then waits until it can bind. Use it only for ports owned by the local development workflow. Never use port `0` as a fixed assignment: it requests an OS-selected ephemeral port. Validate that configured ports are integers from 1 through 65535 and keep assignments unique across concurrently used services. Ports below 1024 may require elevated privileges on Unix-like systems; confirm the local runtime can bind Salesphere’s assigned port 1000.
 

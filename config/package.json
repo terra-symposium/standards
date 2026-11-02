@@ -14,7 +14,7 @@
     "build": "cd .. && pnpm --filter @terra-symposium/standards-quality build && pnpm --filter @terra-symposium/standards-error-boundaries build && node packages/quality/dist/lib/runner.js error-boundaries --all && pnpm -r build",
     "test": "cd .. && pnpm --filter './packages/**' -r build && node packages/testing/src/cli.mjs run --manifest config/terra-tests.json",
     "quality": "cd .. && pnpm --filter @terra-symposium/standards-quality build && node scripts/quality.mjs quality --skip-commands --skip-recommendations",
-    "docs": "cd .. && DOCS_DEV_PORT=2050 docs dev",
+    "docs": "cd .. && docs dev --port 2050",
     "prepare": "cd .. && husky config/husky"
   },
   "devDependencies": {
