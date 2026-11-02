@@ -768,6 +768,18 @@ test('naming supports read-only and automatic-fix modes', () => {
 	runQualityCli(cfg, ['naming', '--all']);
 	assert.equal(readFileSync(file, 'utf8'), 'const org = true;\nconst genPattern = /ok/;\nconst img = { src: "hero.png" };\nexport const result = [org, genPattern, img];\n');
 });
+test('naming autofix preserves object-rest bindings', () => {
+	const root = mkdtempSync(join(tmpdir(), 'terra-quality-object-rest-'));
+	mkdirSync(join(root, 'src'), { recursive: true });
+	const file = join(root, 'src', 'main.ts');
+	const source = 'const results = records.map(({ ...item }) => item);\nvoid results;\n';
+	writeFileSync(file, source);
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
+	runQualityCli(cfg, ['naming', '--all']);
+	const output = readFileSync(file, 'utf8');
+	assert.equal(output, 'const results = records.map(({ ...i }) => i);\nvoid results;\n');
+	assert.doesNotMatch(output, /\.\.\.item\s*:/u);
+});
 test('naming does not add imports for unresolved inline import types', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-inline-import-type-'));
 	mkdirSync(join(root, 'src/types'), { recursive: true });
