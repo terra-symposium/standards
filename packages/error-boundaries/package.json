@@ -25,10 +25,9 @@
 		"dist"
 	],
 	"scripts": {
-		"build": "tsc -p tsconfig.json && mkdir -p dist/components && cp src/components/AstroErrorBoundary.astro dist/components/AstroErrorBoundary.astro",
-		"prepare": "npm run build",
-		"pretest": "npm run build",
-		"test": "node --test test/*.test.mjs"
+		"build": "tsc -p config/tsconfig.json && mkdir -p dist/components && cp src/components/AstroErrorBoundary.astro dist/components/AstroErrorBoundary.astro",
+		"test": "npm run build && node --test test/*.test.mjs",
+		"prepare": "npm run build"
 	},
 	"peerDependencies": {
 		"react": ">=18",

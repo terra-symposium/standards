@@ -1,3 +1,4 @@
+import { terraErrorBoundaryIntegration as __terraErrorBoundaryIntegration } from '@terra-symposium/standards-error-boundaries/astro-integration';
 /**
  * apps/hygiene/astro.config.mjs
  */
@@ -17,5 +18,5 @@ CONFIG
 
 export default defineConfig({
 	outDir: fileURLToPath(new URL('../../../dist/apps/hygiene/', import.meta.url)),
-	integrations: [react()],
+	integrations: [__terraErrorBoundaryIntegration(), react()],
 });

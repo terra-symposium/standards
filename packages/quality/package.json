@@ -37,10 +37,9 @@
     "quality-configs"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.json",
-    "prepare": "npm run build",
-    "pretest": "npm run build",
-    "test": "node --test"
+    "build": "tsc -p config/tsconfig.json",
+    "test": "npm run build && node --test",
+    "prepare": "npm run build"
   },
   "dependencies": {
     "@terra-symposium/standards-error-boundaries": "^0.1.2",

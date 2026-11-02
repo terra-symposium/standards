@@ -23,7 +23,7 @@ jobs:
       - name: Enable npm trusted publishing
         run: npm install --global npm@11.5.1
       - run: pnpm install --frozen-lockfile
-      - run: pnpm quality:all
+      - run: pnpm run quality -- --all
       - uses: changesets/action@v2
         with:
           publish: pnpm release

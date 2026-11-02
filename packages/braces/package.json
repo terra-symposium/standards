@@ -51,5 +51,8 @@
 		"ranges",
 		"sh"
 	],
+	"scripts": {
+		"build": "node scripts/build.mjs"
+	},
 	"private": true
 }

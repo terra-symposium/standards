@@ -1,1 +1,1 @@
-pnpm quality:check
+pnpm run quality -- --warn

@@ -1,5 +1,5 @@
 [build]
-  command = "pnpm docs:build"
+  command = "pnpm exec terra-docs build"
   publish = "dist/docs"
 
 [build.environment]

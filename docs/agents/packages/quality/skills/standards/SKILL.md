@@ -41,7 +41,7 @@ When working in `terra-symposium-website`, read the root `README.md` and `docs/a
 
 ### Local quality and code conventions
 
-- Use `pnpm run quality` for the working changes or `pnpm run quality:all` for the configured source tree. Choose a focused quality command when the task needs one.
+- Use `pnpm run quality` for the working changes or `pnpm run quality -- --all` for the configured source tree. Choose a focused quality command when the task needs one.
 - Run `pnpm run maintain` after adding or renaming supported source files, or when headers and fences may drift.
 - Use the Standards CLI workflow for finding triage, autofix review, complete-diff review, and reporting. Keep website-specific configuration in `quality.json`.
 - When a rule should apply across Terra repositories, implement it in the shared `@terra-symposium/standards-quality` package; keep one-off website rules in this repository's configuration.
@@ -58,7 +58,7 @@ When working in `terra-symposium-website`, read the root `README.md` and `docs/a
 
 ### Local runtime boundaries
 
-- Use `pnpm run dev` or `pnpm run astro:dev` for Astro. Do not use Netlify Dev or local `.env` files.
+- Use `pnpm run dev` or `cd astro && pnpm run dev` for Astro. Do not use Netlify Dev or local `.env` files.
 - Use `pnpm run dev` in `sanity/` or the backend workspace for Studio.
 - Do not run local `drizzle-kit studio`; database operations run only on trusted deployments.
 

@@ -19,7 +19,7 @@ jobs:
           node-version: 22.23.4
           registry-url: https://registry.npmjs.org
       - run: pnpm install --frozen-lockfile
-      - run: pnpm build
+      - run: pnpm run build
       - name: Publish quality when missing
         working-directory: packages/quality
         run: |
