@@ -2,7 +2,7 @@
 
 `@terra-symposium/standards-testing` always runs Standards-owned shared checks first, then runs any repository-specific suites. The shared checks include linear-history validation. Repositories keep only their custom test files and commands; shared test logic and duplicate-suite validation stay in Standards.
 
-## Test plan
+## What it does
 
 Add `config/terra-tests.json` as the canonical ordered test plan. The runner also discovers `tests/terra-tests.json` and the legacy `.terra-tests.json` root path for existing consumers when the config path is absent:
 
@@ -13,7 +13,7 @@ Add `config/terra-tests.json` as the canonical ordered test plan. The runner als
     {
       "name": "unit",
       "command": "pnpm",
-      "args": ["run", "test:unit"],
+      "args": ["run", "test"],
       "owns": ["tests/unit/**/*.test.ts"]
     }
   ]
@@ -43,3 +43,23 @@ For responsive Playwright coverage, declare `PW_VIEWPORTS` from the layout risk 
 Standards remains the source of truth for changes under `packages/testing`; update the public mirror when publishing an implementation change.
 
 The Action executes one plan in one job, so repositories can expose one test check even when the plan has several suites.
+
+## Deployment and operations
+
+Not applicable.
+
+## Data, privacy, and limitations
+
+Not applicable.
+
+## References
+
+Not applicable.
+
+## Contributing
+
+Not applicable.
+
+## Credits and license
+
+Not applicable.

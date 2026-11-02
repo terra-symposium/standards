@@ -2,19 +2,37 @@
 
 The suite exercises the public package boundary from `dist/index.js` with isolated temporary repositories. It does not depend on the Standards checkout, installed application dependencies, or the current Git worktree. Command checks use executable fixtures that record arguments, so behavior can be tested without running each real formatter, linter, compiler, or repository build.
 
-## One discovery path
+## What it does
 
-`pnpm test` runs `node --test`. Node discovers the test files recursively under this directory exactly once. The folders below separate checks, transforms, runner behavior, and reports; shared fixture helpers live outside discovery in `support/fixtures.mjs`.
+Not applicable.
+
+## Prerequisites
+
+Not applicable.
+
+## Get started
+
+Not applicable.
+
+## Usage
+
+### One discovery path
+`pnpm run test` runs `node --test`. Node discovers the test files recursively under this directory exactly once. The folders below separate checks, transforms, runner behavior, and reports; shared fixture helpers live outside discovery in `support/fixtures.mjs`.
 
 Tests selected by a repository's `quality:all` command are grouped in this order: **Unit / Contract → Integration → Browser / Cloud → Other tests**. Each selected command gets a suite bar. Node and Playwright also report individual cases through the shared 24-cell progress display. Node keeps a single live line open while test files are still being discovered, then finalizes with the runner's exact summary count when available. Unknown runners show only suite progress, with no guessed case total.
 
-## Dead-code output contract
-
+### Dead-code output contract
 Dead-code is one static-quality group with two explicit stages:
 
-- **Safe fixes:** Knip import consumers; ESLint unused declarations; single-use declaration/reference scans and candidate classification; apply only proven rewrites.
-- **Verification:** Knip unused-file/export/dependency reachability; final ESLint and single-use findings; TypeScript safety checks for proposed edits.
-- **Manual findings:** stable file/line/rule/name order; all findings are errors. Continue every configured check before returning failure.
+**Safe fixes:** Knip import consumers; ESLint unused declarations; single-use declaration/reference
+scans and candidate classification; apply only proven rewrites.
+
+**Verification:** Knip unused-file/export/dependency reachability; final ESLint and single-use
+findings; TypeScript safety checks for proposed edits.
+
+**Manual findings:** stable file/line/rule/name order; all findings are errors. Continue every
+configured check before returning failure.
+
 
 ```text
 Before                         After
@@ -30,33 +48,31 @@ Before                         After
                                     Cases [████████████████████████] 5/5 ✓ passed
 ```
 
-## Coverage areas
-
-| Folder       | Area                                                                                                            |
-| ------------ | --------------------------------------------------------------------------------------------------------------- |
-| `checks`     | Source discovery, imports, patterns, security, and documentation requirements/maintenance.                      |
-| `transforms` | Type/object and conditional collapsing, naming/aliases, object forwarding, and single-use analysis/fixes.       |
-| `runner`     | Configuration, CLI/phase dispatch, dead-code coordination, progress, formatter/typecheck boundaries, and ports. |
-| `reports`    | Node/Playwright test progress, GitHub analytics, and history reports.                                           |
-
-## Complete subtest inventory
-
+### Complete subtest inventory
 Each bullet is one top-level `node:test` case. Nested assertions remain within their owning contract case. The inventory contains **217 cases**.
 
-### Checks (36)
+#### Checks (36)
 
-#### `documentation.test.mjs` (17)
+##### `documentation.test.mjs` (17)
 
 - documentation policy independently reports types, exported functions, and inline functions
 - documentation findings detect missing tags on one-line TSDoc attached to an exported function
 - documentation findings warn for detached TSDoc and accept declaration and file-header comments
 - documentation description audit accepts TSDoc attached to a type member
 - documentation findings recognize the props scaffold for destructured parameters
-- documentation description audits report missing prose while accepting documented tags and optional tags
-- documentation description audit continues after nested template expressions and ignores comment-shaped string content
+
+documentation description audits report missing prose while accepting documented tags and optional
+tags
+
+documentation description audit continues after nested template expressions and ignores
+comment-shaped string content
+
 - documentation audits recognize a BOM and shebang before a generated file header
 - documentSrcFile inserts empty scaffolds only for missing required declarations and is idempotent
-- maintainSrcFile leaves unsupported files untouched and protectLongImports is selective and idempotent
+
+maintainSrcFile leaves unsupported files untouched and protectLongImports is selective and
+idempotent
+
 - maintainSrcFile keeps the path and human description in one valid header block
 - maintainSrcFile prefixes a prose-only leading header with the canonical path
 - final comment cleanup removes detached TSDoc and generated grouping comments only
@@ -65,80 +81,118 @@ Each bullet is one top-level `node:test` case. Nested assertions remain within t
 - duplicate import audit reports repeated type bindings with their later source location
 - maintainSrcFile heals orphaned duplicate header fragments and merges adjacent descriptions
 
-#### `files.test.mjs` (4)
+##### `files.test.mjs` (4)
 
 - source discovery handles nested roots, include roots, direct files, and files created during a run
 - Test and spec files are included in quality source discovery when their extensions are configured
 - working-tree discovery includes modified and untracked sources but excludes ignored files
-- path utilities distinguish files, directories, missing paths, and repository-relative display names
 
-#### `imports.test.mjs` (2)
+path utilities distinguish files, directories, missing paths, and repository-relative display names
+
+
+##### `imports.test.mjs` (2)
 
 - import validation resolves relative, aliased, index, asset, export, dynamic, and require imports
-- import validation respects external prefixes, explicit unsupported extensions, and missing index targets
 
-#### `patterns.test.mjs` (11)
+import validation respects external prefixes, explicit unsupported extensions, and missing index
+targets
+
+
+##### `patterns.test.mjs` (11)
 
 - repeated-class detection normalizes whitespace and ignores dynamic and one-word values
 - UI pattern detection applies configured extensions to all matching files
 - regex deduplication inventories literals and RegExp constructors across configured source files
-- repeated-class fixer creates deterministic file-local CLASSES constants and leaves dynamic/HTML sources alone
-- regex fixer deduplicates stateless literals and preserves fresh stateful instances through factories
-- shared regex registry rewrites TypeScript and MJS literals and constructors with relative namespace imports
+
+repeated-class fixer creates deterministic file-local CLASSES constants and leaves dynamic/HTML
+sources alone
+
+regex fixer deduplicates stateless literals and preserves fresh stateful instances through factories
+
+shared regex registry rewrites TypeScript and MJS literals and constructors with relative namespace
+imports
+
 - shared regex export allocation avoids names already owned by the registry
 - shared regex fixer leaves a duplicate group unchanged when any consumer is CommonJS
 - shared regex fixer does not overwrite an unowned registry or partially rewrite consumers
-- Tailwind canonical diagnostics support missing configuration, missing stylesheets, skipped v4 packages, fixes, and nested stylesheet loading
-- Tailwind spacing utilities replace arbitrary lengths only when Tailwind's generated declarations remain equivalent
+
+Tailwind canonical diagnostics support missing configuration, missing stylesheets, skipped v4
+packages, fixes, and nested stylesheet loading
+
+Tailwind spacing utilities replace arbitrary lengths only when Tailwind's generated declarations
+remain equivalent
+
 - Tailwind canonical diagnostics cleanly skip a package without the unstable v4 API
 
-#### `security.test.mjs` (2)
+##### `security.test.mjs` (2)
 
-- security checks detect environment files, forbidden terms/imports, client secrets, dotenv, and process-boundary violations
+security checks detect environment files, forbidden terms/imports, client secrets, dotenv, and
+process-boundary violations
+
 - security checks honor tracked visibility and runtime-root exceptions in a Git worktree
 
-### Transforms (49)
+#### Transforms (49)
 
-#### `collapse.test.mjs` (1)
+##### `collapse.test.mjs` (1)
 
-- collapseTypesAndObjects preserves JSX-bearing objects and unsupported files while handling JavaScript-family extensions
+collapseTypesAndObjects preserves JSX-bearing objects and unsupported files while handling
+JavaScript-family extensions
 
-#### `inline-if.test.mjs` (2)
 
-- collapseInlineIfs collapses eligible one-statement blocks, preserves indentation and else syntax, and is idempotent
+##### `inline-if.test.mjs` (2)
+
+collapseInlineIfs collapses eligible one-statement blocks, preserves indentation and else syntax,
+and is idempotent
+
 - collapseInlineIfs preserves the historical nested-if else owner and runtime behavior
 
-#### `naming.test.mjs` (13)
+##### `naming.test.mjs` (13)
 
 - naming maps are immutable and identifier tokenisation preserves separators, acronyms, and numbers
 - callback aliases shorten only configured idioms and choose deterministic fallbacks on collision
 - renameId shortens category, intelligence, and other configured words without touching substrings
-- protected path and filename predicates handle generated folders, declaration files, route conventions, and Windows separators
-- declaration predicates distinguish repository-owned declarations, public contracts, parameter properties, and owning scopes
+
+protected path and filename predicates handle generated folders, declaration files, route
+conventions, and Windows separators
+
+declaration predicates distinguish repository-owned declarations, public contracts, parameter
+properties, and owning scopes
+
 - callback declaration APIs classify inline helper, collection, and event-handler callbacks
 - alias analysis keeps only stable local identifier and type aliases
-- alias autofix replaces references and shorthand properties, supports the shared analysis overload, and is idempotent
+
+alias autofix replaces references and shorthand properties, supports the shared analysis overload,
+and is idempotent
+
 - alias analysis preserves property snapshots and mutable roots
 - alias autofix skips bindings shadowed at any replacement reference
 - alias analysis preserves transitive value chains and still removes independent aliases
 - alias analysis preserves chains whose target is shadowed, including type aliases
-- naming findings use shared analysis, report severity by replacement kind, and preserve protected declarations
 
-#### `object-forwarding.test.mjs` (3)
+naming findings use shared analysis, report severity by replacement kind, and preserve protected
+declarations
+
+
+##### `object-forwarding.test.mjs` (3)
 
 - object forwarding does not promote shape-changing whole-object rewrites
 - object forwarding accepts a shared analysis cache without reporting ambiguous projections
 - object forwarding fixer removes only exact properties already covered by a preceding spread
 
-#### `single-use.test.mjs` (30)
+##### `single-use.test.mjs` (30)
 
 - single-use functions with attached prose require review and remain unchanged
 - inlining keeps attached comments for constants and types
 - single-use analysis blocks function inlining and preserves attached TSDoc
 - single-use analysis blocks hook calls and other effectful initializers
 - single-use agent actions name the actual unsafe boundary without irrelevant React guidance
-- single-use analysis classifies pure data, runtime boundaries, callable declarations, large values, and type consumers
-- single-use analysis counts cross-file consumers but ignores import syntax itself and honors include roots
+
+single-use analysis classifies pure data, runtime boundaries, callable declarations, large values,
+and type consumers
+
+single-use analysis counts cross-file consumers but ignores import syntax itself and honors include
+roots
+
 - single-use type fixing inlines exported aliases and interfaces with one consumer
 - single-use type fixing preserves grouped imports when several bindings are inlined
 - single-use type analysis distinguishes same-named declarations by resolved symbol
@@ -163,18 +217,18 @@ Each bullet is one top-level `node:test` case. Nested assertions remain within t
 - single-use fixing retains object values referenced through typeof
 - single-use fixer reports functions in call, JSX, and type-query positions for review
 
-### Runner and progress (125)
+#### Runner and progress (125)
 
-#### `port.test.mjs` (2)
+##### `port.test.mjs` (2)
 
 - portOwners rejects non-integer and out-of-range ports before invoking lsof
 - acquirePort terminates an existing listener and releases the port
 
-#### `progress.test.mjs` (1)
+##### `progress.test.mjs` (1)
 
 - progress updates always include a bar and rewrite one line even without a TTY
 
-#### `language-profiles.test.mjs` (7)
+##### `language-profiles.test.mjs` (7)
 
 - language profiles resolve only matching source files and optional project checks
 - selected profiles with no matching sources are reported as skipped
@@ -184,7 +238,7 @@ Each bullet is one top-level `node:test` case. Nested assertions remain within t
 - C, Java, and Python profiles invoke their native checks in phase order
 - profile defaults can be overridden while arbitrary language commands remain available
 
-#### `quality.test.mjs` (61)
+##### `quality.test.mjs` (61)
 
 - consolidated quality modules expose their behavior from the public package entrypoint
 - the published runtime dependency stays within the supported TypeScript API major
@@ -212,7 +266,9 @@ Each bullet is one top-level `node:test` case. Nested assertions remain within t
 - maintenance adds missing tags to existing one-line TSDoc without imports or across custom sections
 - maintenance preserves existing TSDoc prose and tag descriptions while adding missing tags
 - maintenance preserves managed-looking sections in files without imports
-- maintenance normalizes section, group, and line-comment whitespace without duplicate empty sections
+
+maintenance normalizes section, group, and line-comment whitespace without duplicate empty sections
+
 - maintenance does not normalize section-shaped text inside templates
 - format applies maintenance before Prettier and is idempotent
 - protects long one-line imports from Prettier wrapping
@@ -234,7 +290,10 @@ Each bullet is one top-level `node:test` case. Nested assertions remain within t
 - callback renames do not alter unrelated JSDoc parameters with the same name
 - naming leaves node unchanged outside configured map callbacks
 - naming fix mode leaves protected component paths unchanged
-- naming fixes PascalCase declarations, catch variables, and destructuring without changing property keys
+
+naming fixes PascalCase declarations, catch variables, and destructuring without changing property
+keys
+
 - naming preserves exported contracts and configurable protected identifiers
 - naming updates JSDoc parameter tags with parameter declarations
 - naming preserves explicitly unused underscore parameters
@@ -248,7 +307,7 @@ Each bullet is one top-level `node:test` case. Nested assertions remain within t
 - naming preserves intrinsic JSX tags when component symbols are unresolved
 - naming ignores declarations exported through an export list
 
-#### `runner.test.mjs` (54)
+##### `runner.test.mjs` (54)
 
 - createQualityCfg applies defaults and resolves every repository-relative path exactly once
 - CLI help exits before default quality dispatch or any configured autofix can run
@@ -259,16 +318,29 @@ Each bullet is one top-level `node:test` case. Nested assertions remain within t
 - the executable handles help without a config and rejects unknown commands before config loading
 - the executable rejects linting without an ESLint flat config before running quality
 - loadQualityCfg resolves a quality file root relative to the configuration file
-- configuration toggles default to enabled and honor explicit category, item, CLI, and recommendation disables
-- full quality orders phases, groups suites, de-duplicates invocations, and continues after a failing test
+
+configuration toggles default to enabled and honor explicit category, item, CLI, and recommendation
+disables
+
+full quality orders phases, groups suites, de-duplicates invocations, and continues after a failing
+test
+
 - full quality nests dead-code safe fixes and verification under static quality
 - full quality keeps the supplemental TypeScript project check when extensions have no roots
-- createQualityAnalysis caches all selected source text and only creates AST entries for JavaScript/TypeScript files
-- runFormatter supports legacy and typed invocation forms, ignores Astro targets, and batches large scopes
+
+createQualityAnalysis caches all selected source text and only creates AST entries for
+JavaScript/TypeScript files
+
+runFormatter supports legacy and typed invocation forms, ignores Astro targets, and batches large
+scopes
+
 - runFormatter divides large source arguments into bounded subprocess batches
 - runTypecheck honors custom command ownership and does not invoke it for a scoped file-only request
 - CLI domain dispatch runs enabled commands, skips disabled commands, and rejects unknown domains
-- runQualityFromCfg loads JSON and reaches the same explicit domain boundary as an in-memory configuration
+
+runQualityFromCfg loads JSON and reaches the same explicit domain boundary as an in-memory
+configuration
+
 - runQuality honors disabled findings categories without leaking a failure status
 - quality autofix fills missing TSDoc tags then reports blank prose for agent assistance
 - CLI lint applies its autofix policy while the Knip audit remains read-only
@@ -277,7 +349,9 @@ Each bullet is one top-level `node:test` case. Nested assertions remain within t
 - full quality routes unused-variable findings through dead-code once and treats findings as errors
 - the fixing quality command inlines safe values without broad comment cleanup
 - dead-code reports private unused functions and removes only the proven declaration
-- dead-code scans the full scope once and applies same-file fixes before rescanning only changed files
+
+dead-code scans the full scope once and applies same-file fixes before rescanning only changed files
+
 - dead-code runs only the configured unused-variable rule through the local flat-config API
 - dead-code CLI fails read-only for safe single-use fixes, then inlines the primitive value
 - dead-code warn preview copies formatter and browser-test configs before comparing Knip findings
@@ -305,22 +379,25 @@ Each bullet is one top-level `node:test` case. Nested assertions remain within t
 - CLI UI-pattern dispatch reports findings through the process exit status
 - quality CLI checks and autofixes Tailwind canonical-class suggestions
 
-### Reports (14)
+#### Reports (14)
 
-#### `github-report.test.mjs` (3)
+##### `github-report.test.mjs` (3)
 
 - GitHub report classifies open issues and security alerts without exposing secret values
 - GitHub report keeps unavailable alert counts unknown instead of reporting zero
 - github CLI writes the analytics stage and agent instructions to the quality JSON report
 
-#### `history-report.test.mjs` (4)
+##### `history-report.test.mjs` (4)
 
 - full snapshots include dates, source totals, and source-only changes across renames
-- history scope includes tests and excludes generated, vendor, documentation, dependency, build and configuration files
+
+history scope includes tests and excludes generated, vendor, documentation, dependency, build and
+configuration files
+
 - push deltas contain commits after the supplied base and the CLI writes schema version 1
 - merge commits count source changes against their first parent
 
-#### `node-reporter.test.mjs` (5)
+##### `node-reporter.test.mjs` (5)
 
 - Node reporter reports nested cases once and ignores suite and child output events
 - Node reporter renders an empty-run bar through the shared progress helper
@@ -328,7 +405,45 @@ Each bullet is one top-level `node:test` case. Nested assertions remain within t
 - Node reporter options replace inherited reporters and preserve unrelated runtime flags
 - Node reporter ignores reporter API context values that are not progress writers
 
-#### `playwright-reporter.test.mjs` (2)
+##### `playwright-reporter.test.mjs` (2)
 
 - Playwright reporter counts retries once and writes terminal results in discovery order
 - Playwright reporter handles an empty discovery set
+
+## Configuration and security
+
+Not applicable.
+
+## Development and structure
+
+Not applicable.
+
+## Validation
+
+### Coverage areas
+| Folder       | Area                                                                                                            |
+| ------------ | --------------------------------------------------------------------------------------------------------------- |
+| `checks`     | Source discovery, imports, patterns, security, and documentation requirements/maintenance.                      |
+| `transforms` | Type/object and conditional collapsing, naming/aliases, object forwarding, and single-use analysis/fixes.       |
+| `runner`     | Configuration, CLI/phase dispatch, dead-code coordination, progress, formatter/typecheck boundaries, and ports. |
+| `reports`    | Node/Playwright test progress, GitHub analytics, and history reports.                                           |
+
+## Deployment and operations
+
+Not applicable.
+
+## Data, privacy, and limitations
+
+Not applicable.
+
+## References
+
+Not applicable.
+
+## Contributing
+
+Not applicable.
+
+## Credits and license
+
+Not applicable.
