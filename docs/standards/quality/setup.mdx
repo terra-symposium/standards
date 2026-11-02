@@ -35,7 +35,7 @@ export default {
 };
 ```
 
-Install ESLint, Knip, and TypeScript only when you enable their corresponding checks, and keep their project-specific rules in each tool's native configuration. Linting requires an ESLint flat config such as `eslint.config.mjs`.
+Install ESLint, Knip, and TypeScript only when you enable their corresponding checks, and keep their project-specific rules in each tool's native configuration. Linting requires an ESLint flat config such as `eslint.config.mjs` at the repository root or under `configRoot`.
 
 Create `quality.json` at the repository root. This example enables built-in checks without requiring external tool installations:
 
@@ -53,7 +53,7 @@ Create `quality.json` at the repository root. This example enables built-in chec
 }
 ```
 
-Add the tools you want and configure their native files before enabling those checks. For example, lint integration requires an ESLint flat config such as `eslint.config.mjs`; formatting uses Prettier's repository configuration when present.
+Add the tools you want and configure their native files before enabling those checks. For example, lint integration requires an ESLint flat config such as `eslint.config.mjs`; formatting uses Prettier's configuration discovered at the repository root or under `configRoot`.
 
 ## Run it
 

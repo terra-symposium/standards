@@ -477,7 +477,7 @@ function isPackageEntryExport(cfg: QualityCfg, candidate: Candidate, checker: ts
 			for (const tgt of tgts) {
 				const norm = tgt.replace(/^\.\//, '').replace(/\.(?:m|c)?(?:js|jsx|ts|tsx|d\.ts)$/, '');
 				if (norm === relFile.replace(C_M_JS_JSX_TS_TSX_REGEX, '')) return true;
-				const tsconfigPath = [join(dir, 'tsconfig.json'), join(dir, 'config/tsconfig.json')].find((path) => statSync(path, { throwIfNoEntry: false })?.isFile());
+				const tsconfigPath = [join(dir, 'tsconfig.json'), join(dir, 'config/tsconfig.json'), join(cfg.configRoot ?? join(cfg.root, 'config'), 'tsconfig.json')].find((path) => statSync(path, { throwIfNoEntry: false })?.isFile());
 				if (!tsconfigPath) continue;
 				const parsed = ts.readConfigFile(tsconfigPath, ts.sys.readFile);
 				if (parsed.error) continue;

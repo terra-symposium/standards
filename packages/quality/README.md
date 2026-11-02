@@ -137,7 +137,7 @@ The installed `quality.schema.json` provides editor validation. The [test README
 
 ## Configuration and security
 
-Terra Quality loads `quality.json` from the repository root, or falls back to `config/quality.json`. For its default TypeScript project check, it prefers root `tsconfig.json` and falls back to `config/tsconfig.json`; an explicit `tsconfig` path in `quality.json` takes precedence. Package-specific `tsconfig.json` files remain preferred when checking package entry-point reachability.
+Terra Quality loads `quality.json` from the repository root, or falls back to `config/quality.json`. `root` identifies the repository root, while `configRoot` identifies the centralized tool-config directory; both accept paths relative to the inferred project root or `root`, respectively. ESLint, Prettier, Knip, and the default TypeScript project are searched at the repository root first, then in `configRoot`. Package-specific `tsconfig.json` files remain preferred when checking package entry-point reachability.
 
 ## Development and structure
 
@@ -168,7 +168,7 @@ Create `quality.json` in the repository root:
 
 Every quality finding is an error. The runner completes the remaining checks and configured commands before returning failure; there is no warning or non-blocking finding policy.
 
-This starting configuration uses the built-in checks without requiring external tools. Enable integrations as you install and configure the corresponding repository tools. When lint is enabled, add an ESLint flat config such as `eslint.config.mjs`.
+This starting configuration uses the built-in checks without requiring external tools. Enable integrations as you install and configure the corresponding repository tools. When lint is enabled, add an ESLint flat config such as `eslint.config.mjs` at the repository root or under `configRoot`.
 
 Terra Quality always checks React `createRoot()` and `hydrateRoot()` mounts for a top-level error boundary and installs Astro's hydration fallback in Astro configs. `terra-quality-dev` applies these safe fixes before starting a configured development server. A normal quality check reports missing boundaries; `terra-quality error-boundaries --all` applies them explicitly, while `--warn` inspects without writing. The check cannot be disabled in `quality.json`. React roots import the boundary from `@terra-symposium/standards-error-boundaries/react`.
 

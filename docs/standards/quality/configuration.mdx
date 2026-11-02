@@ -23,15 +23,16 @@ This example uses built-in checks without enabling external tools:
 }
 ```
 
-Install and configure a tool before enabling the check that invokes it. For example, linting requires an ESLint flat config in the configured root. Build, test, and other repository commands are opt-in through `qualityCommands`.
+Install and configure a tool before enabling the check that invokes it. For example, linting requires an ESLint flat config at `root` or under `configRoot`. Build, test, and other repository commands are opt-in through `qualityCommands`.
 
 ## Paths and source discovery
 
-Runtime paths resolve from `root`. By default, `root` is the directory containing `quality.json`; an explicit relative `root` is resolved from the config file. The editor-only `$schema` value is a path to the installed JSON Schema and is not read by the runner.
+Source and project paths resolve from `root`. By default, a `config/quality.json` file uses its parent as the repository root; a root-level `quality.json` uses its containing directory. A relative `root` is resolved from that inferred project root. Tool configs are searched at the repository root first and then under `configRoot`. By default, `configRoot` is the directory containing `quality.json` when the file is in a config directory, otherwise `<root>/config`. An explicit relative `configRoot` is resolved from `root`. The editor-only `$schema` value is a path to the installed JSON Schema and is not read by the runner.
 
 | Field                   | Purpose                                                                                                                                             |
 | ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `root`                  | Repository root used for source discovery and child-process working directories. Relative to the config file; defaults to its containing directory. |
+| `root`                  | Repository root used for source discovery and child-process working directories. Relative to the inferred project root. |
+| `configRoot`            | Central tool-config directory searched after root-level config files for ESLint, Prettier, Knip, and the default TypeScript project. Relative to `root`; defaults based on the `quality.json` location. |
 | `sourceRoots`           | Required source roots scanned by regular checks.                                                                                                    |
 | `includeRoots`          | Additional source roots appended to `sourceRoots` during discovery.                                                                                 |
 | `skippedDirectories`    | Directory names or repository-relative directory paths omitted from source discovery. A directory name such as `.build` is skipped at every depth.  |
@@ -183,7 +184,7 @@ The maintenance command may create structural TSDoc scaffolding. Replace it with
 | `oneLineImports`      | Enables the source-maintenance protection for configured long one-line imports.         |
 | `prettierPrintWidth`  | Print width used by the one-line import protection.                                     |
 | `lintRoots`           | Additional ESLint roots; when omitted, the selected source files define the lint scope. |
-| `tsconfig`            | TypeScript project configuration path; defaults to `tsconfig.json` at `root`.           |
+| `tsconfig`            | TypeScript project configuration path relative to `root`; defaults to root `tsconfig.json`, then `configRoot/tsconfig.json`. |
 | `typecheckRoots`      | Restricts selected-file type checking to these roots.                                   |
 | `typecheckExtensions` | Extensions included in selected-file type checks.                                       |
 | `typecheckCommand`    | Repository-owned typecheck executable and optional string-array arguments.              |
@@ -274,4 +275,4 @@ Budget values are milliseconds; `failMs` must be greater than `warnMs`. Test bud
 
 ## This repository's configuration
 
-The root [`quality.json`](https://github.com/Terra-Symposium/standards/blob/main/quality.json) scans `packages` and `scripts`, enables several project-specific checks, preserves long one-line imports, and declares build and test commands. It excludes single-use analysis from `packages/quality`, where reusable declarations and package APIs are intentionally concentrated. Use it as a reference, then choose scope and rules that fit your repository.
+The root [`quality.json`](https://github.com/Terra-Symposium/standards/blob/main/quality.json) scans `packages` and `scripts`, enables several project-specific checks, preserves long one-line imports, and declares build and test commands. It excludes single-use analysis from `packages/quality`, where reusable declarations and package APIs are intentionally concentrated. Use it as a reference, then choose scope and rules that fit your repository. Repositories may instead keep the quality file and related tool configs together under `config/`; Terra Quality infers the repository root and discovers the tool configs there.

@@ -307,7 +307,7 @@ keys
 - naming preserves intrinsic JSX tags when component symbols are unresolved
 - naming ignores declarations exported through an export list
 
-##### `runner.test.mjs` (54)
+##### `runner.test.mjs` (67)
 
 - createQualityCfg applies defaults and resolves every repository-relative path exactly once
 - CLI help exits before default quality dispatch or any configured autofix can run
@@ -317,7 +317,9 @@ keys
 - naming autofix never text-rewrites Astro properties or string literals
 - the executable handles help without a config and rejects unknown commands before config loading
 - the executable rejects linting without an ESLint flat config before running quality
+- the executable loads ESLint flat config from configured `configRoot`
 - loadQualityCfg resolves a quality file root relative to the configuration file
+- loadQualityCfg resolves repository root and custom `configRoot` independently
 
 configuration toggles default to enabled and honor explicit category, item, CLI, and recommendation
 disables
@@ -334,8 +336,11 @@ JavaScript/TypeScript files
 runFormatter supports legacy and typed invocation forms, ignores Astro targets, and batches large
 scopes
 
+- runFormatter discovers Prettier config and ignore files from configured `configRoot`
+
 - runFormatter divides large source arguments into bounded subprocess batches
 - runTypecheck honors custom command ownership and does not invoke it for a scoped file-only request
+- runTypecheck discovers the default tsconfig under configured `configRoot`
 - CLI domain dispatch runs enabled commands, skips disabled commands, and rejects unknown domains
 
 runQualityFromCfg loads JSON and reaches the same explicit domain boundary as an in-memory

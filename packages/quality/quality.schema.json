@@ -6,7 +6,8 @@
 	"required": ["sourceRoots", "extensions"],
 	"properties": {
 		"$schema": { "type": "string" },
-		"root": { "type": "string" },
+		"root": { "type": "string", "description": "Repository root used for source paths and subprocess working directories. Relative to the inferred project root." },
+		"configRoot": { "type": "string", "description": "Directory searched for centralized tool configs such as ESLint, Prettier, Knip, and tsconfig.json. Relative to root; defaults to the quality.json directory when it is a config folder, otherwise root/config." },
 		"sourceRoots": { "type": "array", "items": { "type": "string" } },
 		"includeRoots": { "type": "array", "items": { "type": "string" } },
 		"skippedDirectories": { "type": "array", "items": { "type": "string" }, "description": "Directory names or repository-relative directory paths excluded from source discovery." },

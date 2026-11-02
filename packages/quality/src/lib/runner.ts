@@ -111,18 +111,19 @@ const ESLINT_CONFIG_NAMES = ['eslint.config.js', 'eslint.config.mjs', 'eslint.co
 /**
  * Finds the repository ESLint config, preferring the conventional root location.
  *
- * @param root Repository root to search.
+ * @param root Repository root to search first.
+ * @param configRoot Directory containing centralized tool configuration.
  *
  * @return Absolute config path or undefined when no flat config exists.
  */
-function findEslintConfig(root: string): string | undefined {
+function findEslintConfig(root: string, configRoot = resolve(root, 'config')): string | undefined {
 	const rootConfigs = ESLINT_CONFIG_NAMES.map((name) => resolve(root, name));
-	const configDirectoryConfigs = ESLINT_CONFIG_NAMES.map((name) => resolve(root, 'config', name));
+	const configDirectoryConfigs = ESLINT_CONFIG_NAMES.map((name) => resolve(configRoot, name));
 	return [...rootConfigs, ...configDirectoryConfigs].find((path) => existsSync(path));
 }
 
 /**
- * Resolves the configured TypeScript project, defaulting to `config/tsconfig.json` when no root config exists.
+ * Resolves the configured TypeScript project, defaulting to `configRoot/tsconfig.json` when no root config exists.
  *
  * @param cfg Quality configuration containing repository paths.
  *
@@ -130,7 +131,7 @@ function findEslintConfig(root: string): string | undefined {
  */
 function projectTsconfig(cfg: QualityCfg): string {
 	if (cfg.tsconfig) return resolve(cfg.root, cfg.tsconfig);
-	const candidates = [resolve(cfg.root, 'tsconfig.json'), resolve(cfg.root, 'config/tsconfig.json')];
+	const candidates = [resolve(cfg.root, 'tsconfig.json'), resolve(cfg.configRoot ?? resolve(cfg.root, 'config'), 'tsconfig.json')];
 	return candidates.find((path) => existsSync(path)) ?? candidates[0]!;
 }
 const ESLINT_API_FALLBACK = 78;
@@ -209,6 +210,7 @@ export type QualityAutofixName =
 /** Normalized repository paths, source scope, policies, and tool settings. */
 export type QualityCfg = {
 	root: string;
+	configRoot?: string;
 	sourceRoots: string[];
 	includeRoots?: string[];
 	skippedDirectories?: string[];
@@ -392,10 +394,13 @@ export function qualityRecommendationEnabled(cfg: QualityCfg, name: string): boo
 export function loadQualityCfg(file?: string): QualityCfg {
 	const defaultConfig = resolve(process.cwd(), 'quality.json');
 	const path = resolve(file ?? (existsSync(defaultConfig) ? defaultConfig : resolve(process.cwd(), 'config/quality.json')));
-	const raw = JSON.parse(readFileSync(path, 'utf8')) as Omit<QualityCfg, 'root'> & { root?: string };
+	const raw = JSON.parse(readFileSync(path, 'utf8')) as Omit<QualityCfg, 'root' | 'configRoot'> & { root?: string; configRoot?: string };
 	const configDir = dirname(path);
 	const implicitConfigRoot = basename(configDir) === 'config' ? dirname(configDir) : configDir;
-	return createQualityCfg({ ...raw, root: raw.root ? resolve(implicitConfigRoot, raw.root) : implicitConfigRoot });
+	const root = raw.root ? resolve(implicitConfigRoot, raw.root) : implicitConfigRoot;
+	const defaultConfigRoot = configDir === implicitConfigRoot ? resolve(root, 'config') : configDir;
+	const configRoot = raw.configRoot ? resolve(root, raw.configRoot) : defaultConfigRoot;
+	return createQualityCfg({ ...raw, root, configRoot });
 }
 
 /**
@@ -406,6 +411,8 @@ export function loadQualityCfg(file?: string): QualityCfg {
  * @return Configuration ready for quality checks and subprocess execution.
  */
 export function createQualityCfg(cfg: QualityCfg): QualityCfg {
+	const root = resolve(cfg.root);
+	const configRoot = resolve(root, cfg.configRoot ?? 'config');
 	const langProfiles = cfg.languageProfiles ?? [];
 	if (!Array.isArray(langProfiles)) throw new Error('languageProfiles must be an array of profile names.');
 	for (const profile of langProfiles) {
@@ -416,16 +423,17 @@ export function createQualityCfg(cfg: QualityCfg): QualityCfg {
 		...cfg,
 		languageProfiles: langProfiles,
 		renameExports: cfg.renameExports ?? false,
-		root: resolve(cfg.root),
-		sourceRoots: cfg.sourceRoots.map((p) => resolve(cfg.root, p)),
-		includeRoots: (cfg.includeRoots ?? []).map((p) => resolve(cfg.root, p)),
+		root,
+		configRoot,
+		sourceRoots: cfg.sourceRoots.map((p) => resolve(root, p)),
+		includeRoots: (cfg.includeRoots ?? []).map((p) => resolve(root, p)),
 		skippedDirectories: cfg.skippedDirectories ?? [],
-		skippedFiles: (cfg.skippedFiles ?? []).map((p) => resolve(cfg.root, p)),
+		skippedFiles: (cfg.skippedFiles ?? []).map((p) => resolve(root, p)),
 		singleUse: cfg.singleUse ? { ...cfg.singleUse, skippedDirectories: cfg.singleUse.skippedDirectories ?? [] } : undefined,
 		aliases: cfg.aliases ?? {},
 		protectedIdentifiers: cfg.protectedIdentifiers ?? [],
-		lintRoots: (cfg.lintRoots ?? []).map((p) => resolve(cfg.root, p)),
-		typecheckRoots: (cfg.typecheckRoots ?? []).map((p) => resolve(cfg.root, p)),
+		lintRoots: (cfg.lintRoots ?? []).map((p) => resolve(root, p)),
+		typecheckRoots: (cfg.typecheckRoots ?? []).map((p) => resolve(root, p)),
 		typecheckCommand: cfg.typecheckCommand,
 	};
 }
@@ -1296,7 +1304,7 @@ function scopedCfg(cfg: QualityCfg, all: boolean): QualityCfg {
  * @return ESM source for the ESLint API child process.
  */
 function eslintApiSource(cfg: QualityCfg, files: string[], opts: QualityOptions, exhaustive: boolean, deadCodeCoordinated: boolean): string {
-	const payload = JSON.stringify({ root: cfg.root, files, fix: opts.fix, exhaustive, deadCodeCoordinated, eslintConfig: findEslintConfig(cfg.root) });
+	const payload = JSON.stringify({ root: cfg.root, files, fix: opts.fix, exhaustive, deadCodeCoordinated, eslintConfig: findEslintConfig(cfg.root, cfg.configRoot) });
 	const progressUrl = new URL('./progress.js', import.meta.url).href;
 	return `
 import { createRequire } from 'node:module';
@@ -1397,7 +1405,7 @@ function runLint(cfg: QualityCfg, opts: QualityOptions, exhaustive = false, dead
 		}
 	}
 	if (apiUnavailable) {
-		const eslintConfig = findEslintConfig(cfg.root);
+		const eslintConfig = findEslintConfig(cfg.root, cfg.configRoot);
 		for (const filesBatch of argumentBatches(files)) {
 			const status = run(cfg, toolPath(cfg, cfg.tools?.eslint, 'eslint'), [...flags, ...(eslintConfig ? ['--config', eslintConfig] : []), ...filesBatch], { quietSuccess: opts.fix });
 			completed += filesBatch.length;
@@ -1700,7 +1708,7 @@ function runFocusedEslint(cfg: QualityCfg, flatCfg: string, files: string[]): Re
 function collectEslintReports(cfg: QualityCfg, all: boolean, selectedFiles?: string[]): EslintReport[] {
 	const files = (selectedFiles ?? filesFor(cfg, all)).filter((f) => CJS_JS_JSX_MJS_TS_TSX_REGEX.test(f));
 	const reports: EslintReport[] = [];
-	const flatCfg = findEslintConfig(cfg.root);
+	const flatCfg = findEslintConfig(cfg.root, cfg.configRoot);
 	const eslintPath = toolPath(cfg, cfg.tools?.eslint, 'eslint');
 	const focusedEslint = canUseFocusedEslint(cfg, flatCfg);
 	let completed = 0;
@@ -2060,7 +2068,7 @@ function repairMissingImports(cfg: QualityCfg, program: ts.Program, checker: ts.
  */
 function readKnipIssues(cfg: QualityCfg): KnipIssue[] {
 	const knip = toolPath(cfg, cfg.tools?.knip, 'knip');
-	const knipConfig = [resolve(cfg.root, 'knip.json'), resolve(cfg.root, 'config/knip.json')].find((path) => existsSync(path));
+	const knipConfig = [resolve(cfg.root, 'knip.json'), resolve(cfg.configRoot ?? resolve(cfg.root, 'config'), 'knip.json')].find((path) => existsSync(path));
 	const result = spawnSync(knip, [...(knipConfig ? ['--config', knipConfig] : []), '--reporter', 'json', '--no-config-hints'], {
 		cwd: cfg.root,
 		encoding: 'utf8',
@@ -3788,10 +3796,10 @@ export function runQualityFromCfg(file?: string, args = process.argv.slice(2)): 
 	const cfg = loadQualityCfg(file);
 	const lintCmds = new Set(['quality', 'quality:all', 'quality:baseline', 'document', 'maintain', 'dead-code', 'knip', 'lint', 'naming', 'single-use']);
 	if (lintCmds.has(cmd) && qualityCheckEnabled(cfg, 'lint')) {
-		const flatCfg = findEslintConfig(cfg.root);
+		const flatCfg = findEslintConfig(cfg.root, cfg.configRoot);
 		if (!flatCfg)
 			throw new Error(
-				`ESLint flat config is required for ${cmd}. Add eslint.config.js, eslint.config.mjs, or eslint.config.ts at ${cfg.root} or ${resolve(cfg.root, 'config')} before running Terra Quality.`,
+				`ESLint flat config is required for ${cmd}. Add eslint.config.js, eslint.config.mjs, or eslint.config.ts at ${cfg.root} or ${cfg.configRoot ?? resolve(cfg.root, 'config')} before running Terra Quality.`,
 			);
 	}
 	return runQualityCli(cfg, args);
@@ -3896,9 +3904,9 @@ export function runFormatter(cfg: QualityCfg, optsOrArgs: QualityOptions | strin
 		'prettier.config.mjs',
 		'prettier.config.cjs',
 	]
-		.flatMap((name) => [resolve(cfg.root, name), resolve(cfg.root, 'config', name)])
+		.flatMap((name) => [resolve(cfg.root, name), resolve(cfg.configRoot ?? resolve(cfg.root, 'config'), name)])
 		.find((path) => existsSync(path));
-	const prettierIgnore = [resolve(cfg.root, '.prettierignore'), resolve(cfg.root, 'config/.prettierignore')].find((path) => existsSync(path));
+	const prettierIgnore = [resolve(cfg.root, '.prettierignore'), resolve(cfg.configRoot ?? resolve(cfg.root, 'config'), '.prettierignore')].find((path) => existsSync(path));
 	const explicitConfig = flags.some((flag) => flag === '--config' || flag.startsWith('--config='));
 	const explicitIgnore = flags.some((flag) => flag === '--ignore-path' || flag.startsWith('--ignore-path='));
 	const configArgs = [...(!explicitConfig && prettierConfig ? ['--config', prettierConfig] : []), ...(!explicitIgnore && prettierIgnore ? ['--ignore-path', prettierIgnore] : [])];

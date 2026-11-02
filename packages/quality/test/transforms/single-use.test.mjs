@@ -444,6 +444,15 @@ test('package entry exports are preserved without exempting private declarations
 	assert.equal(fixSingleUseDeclarations(cfg), 0);
 	assert.match(fixtureText(root, 'src/main.ts'), EXPORT_FN_PARSEREPORT_REGEX);
 });
+test('package-local tsconfig remains preferred over the shared configRoot tsconfig', () => {
+	const root = fixtureRoot('terra-quality-single-use-package-config-root-');
+	fixtureFile(root, 'packages/widget/src/main.ts', `export function parseReport() { return { ok: true }; }\nfunction formatInternal() { return 'ready'; }\nwrite(parseReport(), formatInternal());\n`);
+	fixtureFile(root, 'packages/widget/package.json', JSON.stringify({ exports: { '.': './dist/main.js' } }));
+	fixtureFile(root, 'packages/widget/config/tsconfig.json', JSON.stringify({ compilerOptions: { rootDir: '../src', outDir: '../dist' }, include: ['../src'] }));
+	fixtureFile(root, 'tooling/tsconfig.json', JSON.stringify({ compilerOptions: { rootDir: '../packages/widget/src', outDir: '../packages/widget/lib' }, include: ['../packages/widget/src'] }));
+	const cfg = createQualityCfg({ root, configRoot: 'tooling', sourceRoots: ['packages/widget/src'], extensions: ['.ts'] });
+	assert.deepEqual(singleUseFindings(cfg).map(({ name }) => name), ['formatInternal']);
+});
 test('single-use fixing never removes a multi-use explicit-any compatibility alias', () => {
 	const root = fixtureRoot('terra-quality-single-use-any-alias-');
 	fixtureFile(
