@@ -12,7 +12,7 @@ import assert from 'node:assert/strict';
 import test, { afterEach } from 'node:test';
 // prettier-ignore
 import { aliasFindings, checkImports, collapseInlineIfs, collapseTypesAndObjects, createQualityAnalysis, createQualityCfg, documentationFindings, maintainSrcFile, namingFindings, objectForwardingFindings, protectLongImports, qualityNodeReporter, regexFindings, renameId, runQuality, runQualityCli, runTailwindCanonical, srcFiles } from '../../dist/index.js';
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
@@ -347,7 +347,10 @@ writeFileSync(${JSON.stringify(marker)}, 'ok');
 	runQualityCli(cfg, ['format', '--all']);
 	assert.equal(readFileSync(marker, 'utf8'), 'ok');
 });
-test('Prettier keeps short objects and types inline while wrapping constructs over print width', () => {
+test(
+	'Prettier keeps short objects and types inline while wrapping constructs over print width',
+	{ skip: !existsSync(fileURLToPath(new URL('../../../../node_modules/.bin/prettier', import.meta.url))) },
+	() => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-prettier-wrap-'));
 	mkdirSync(join(root, 'src'));
 	const file = join(root, 'src', 'main.ts');
@@ -376,7 +379,8 @@ void [short, long];
 	assert.match(result, /const short = \{ alpha: true, beta: false,? \};/);
 	assert.match(result, /type Short = \{ alpha: boolean; beta: boolean,? \};/);
 	assert.match(result, /const long = \{\n/);
-});
+	},
+);
 test('maintenance adds headers and grouped sorted imports', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-'));
 	mkdirSync(join(root, 'src'), { recursive: true });

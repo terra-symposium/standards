@@ -27,6 +27,8 @@ REGEX
 
 const FINDINGS_SUMMARY_REGEX = /FINDINGS SUMMARY/;
 const ERR_KNIP_EXPORTS_SRC_MAIN_TS_1_CLIENT_REGEX = /\[ERROR\] knip\/exports: src\/main\.ts:1 Client/;
+const ESLINT_BIN = fileURLToPath(new URL('../../../../node_modules/.bin/eslint', import.meta.url));
+const ESLINT_AVAILABLE = existsSync(ESLINT_BIN);
 
 /*//////////////////////////////////////////////////
 REGEX
@@ -344,7 +346,7 @@ test('the executable rejects linting without an ESLint flat config before runnin
 	assert.match(result.stderr, /ESLint flat config is required for quality/);
 	assert.doesNotMatch(result.stderr, /couldn't find an eslint\.config/);
 });
-test('the executable loads ESLint flat config from config/', () => {
+test('the executable loads ESLint flat config from config/', { skip: !ESLINT_AVAILABLE }, () => {
 	const root = fixtureRoot('terra-quality-eslint-config-directory-');
 	const workspaceRoot = fileURLToPath(new URL('../../../../', import.meta.url));
 	fixtureFile(root, 'package.json', '{}\n');
@@ -357,7 +359,7 @@ test('the executable loads ESLint flat config from config/', () => {
 	assert.equal(result.status, 0, result.stderr);
 	assert.doesNotMatch(result.stderr, /Could not find config file/);
 });
-test('the executable loads ESLint flat config from configured configRoot', () => {
+test('the executable loads ESLint flat config from configured configRoot', { skip: !ESLINT_AVAILABLE }, () => {
 	const root = fixtureRoot('terra-quality-eslint-config-root-');
 	const workspaceRoot = fileURLToPath(new URL('../../../../', import.meta.url));
 	fixtureFile(root, 'package.json', '{}\n');
@@ -370,7 +372,7 @@ test('the executable loads ESLint flat config from configured configRoot', () =>
 	assert.equal(result.status, 0, result.stderr);
 	assert.doesNotMatch(result.stderr, /Could not find config file/);
 });
-test('the executable prefers every root ESLint config over configs under config/', () => {
+test('the executable prefers centralized ESLint config over the root compatibility fallback', { skip: !ESLINT_AVAILABLE }, () => {
 	const root = fixtureRoot('terra-quality-eslint-config-precedence-');
 	const workspaceRoot = fileURLToPath(new URL('../../../../', import.meta.url));
 	fixtureFile(root, 'package.json', '{"type":"module"}\n');
@@ -381,8 +383,8 @@ test('the executable prefers every root ESLint config over configs under config/
 	fixtureFile(root, 'src/main.js', 'console.log(true);\n');
 	const runner = fileURLToPath(new URL('../../dist/lib/runner.js', import.meta.url));
 	const result = spawnSync(process.execPath, [runner, 'lint', '--all'], { cwd: root, encoding: 'utf8' });
-	assert.notEqual(result.status, 0, `${result.stdout}\n${result.stderr}`);
-	assert.match(`${result.stdout}\n${result.stderr}`, /no-console/u);
+	assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+	assert.doesNotMatch(`${result.stdout}\n${result.stderr}`, /no-console/u);
 });
 test('loadQualityCfg infers the project root from an explicit config/quality.json path', () => {
 	const root = fixtureRoot('terra-quality-load-config-');
@@ -726,6 +728,8 @@ test('runFormatter discovers Prettier config and ignore files under config/', ()
 	const root = fixtureRoot('terra-quality-formatter-config-directory-');
 	const cmd = recordingCmd(root);
 	fixtureFile(root, 'src/main.ts', 'const value = true;\n');
+	fixtureFile(root, '.prettierrc.mjs', 'export default { singleQuote: false };\n');
+	fixtureFile(root, '.prettierignore', 'src/\n');
 	fixtureFile(root, 'config/.prettierrc.mjs', 'export default {};\n');
 	fixtureFile(root, 'config/.prettierignore', 'dist/\n');
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], tools: { prettier: cmd } });
@@ -735,6 +739,8 @@ test('runFormatter discovers Prettier config and ignore files under config/', ()
 	assert.ok(args.includes(join(root, 'config/.prettierrc.mjs')));
 	assert.ok(args.includes('--ignore-path'));
 	assert.ok(args.includes(join(root, 'config/.prettierignore')));
+	assert.equal(args.includes(join(root, '.prettierrc.mjs')), false);
+	assert.equal(args.includes(join(root, '.prettierignore')), false);
 });
 test('runFormatter discovers Prettier config and ignore files from configured configRoot', () => {
 	const root = fixtureRoot('terra-quality-formatter-config-root-');
@@ -761,6 +767,7 @@ test('runTypecheck honors custom command ownership and does not invoke it for a 
 test('runTypecheck discovers the default tsconfig under configured configRoot', () => {
 	const root = fixtureRoot('terra-quality-typecheck-config-root-');
 	const cmd = recordingCmd(root, 'tsc-args.jsonl', 'bin/record-tsc.mjs');
+	fixtureFile(root, 'tsconfig.json', '{"extends":"./legacy.json"}\n');
 	fixtureFile(root, 'tooling/tsconfig.json', '{}\n');
 	const cfg = createQualityCfg({ root, configRoot: 'tooling', sourceRoots: ['src'], extensions: ['.ts'], tools: { tsc: cmd } });
 	runTypecheck(cfg);
@@ -872,6 +879,7 @@ test('CLI lint applies its autofix policy while the Knip audit remains read-only
 		0o755,
 	);
 	fixtureFile(root, 'src/main.ts', 'const value = true;\nvoid value;\n');
+	fixtureFile(root, 'knip.json', '{"entry": ["legacy.ts"]}\n');
 	fixtureFile(root, 'tooling/knip.json', '{}\n');
 	const cfg = createQualityCfg({ root, configRoot: 'tooling', sourceRoots: ['src'], extensions: ['.ts'], tools: { eslint, knip } });
 	runQualityCli(cfg, ['lint', '--all', '--warn']);

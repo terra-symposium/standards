@@ -137,7 +137,7 @@ The installed `quality.schema.json` provides editor validation. The [test README
 
 ## Configuration and security
 
-Terra Quality loads `quality.json` from the repository root, or falls back to `config/quality.json`. `root` identifies the repository root, while `configRoot` identifies the centralized tool-config directory; both accept paths relative to the inferred project root or `root`, respectively. ESLint, Prettier, Knip, and the default TypeScript project are searched at the repository root first, then in `configRoot`. Package-specific `tsconfig.json` files remain preferred when checking package entry-point reachability.
+Terra Quality loads `quality.json` from the repository root, or falls back to `config/quality.json`. `root` identifies the repository root, while `configRoot` identifies the centralized tool-config directory; both accept paths relative to the inferred project root or `root`, respectively. ESLint, Prettier, Knip, and the default TypeScript project are searched in `configRoot` first, with conventional root filenames as compatibility fallbacks. Package-specific `tsconfig.json` files remain preferred when checking package entry-point reachability.
 
 ## Development and structure
 

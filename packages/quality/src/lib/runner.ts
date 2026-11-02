@@ -109,7 +109,7 @@ const TOOL_OUTPUT_MAX_BUFFER = 64 * 1024 * 1024;
 const ESLINT_CONFIG_NAMES = ['eslint.config.js', 'eslint.config.mjs', 'eslint.config.cjs', 'eslint.config.ts', 'eslint.config.mts', 'eslint.config.cts'];
 
 /**
- * Finds the repository ESLint config, preferring the conventional root location.
+ * Finds the repository ESLint config, preferring the centralized config directory.
  *
  * @param root Repository root to search first.
  * @param configRoot Directory containing centralized tool configuration.
@@ -117,13 +117,13 @@ const ESLINT_CONFIG_NAMES = ['eslint.config.js', 'eslint.config.mjs', 'eslint.co
  * @return Absolute config path or undefined when no flat config exists.
  */
 function findEslintConfig(root: string, configRoot = resolve(root, 'config')): string | undefined {
-	const rootConfigs = ESLINT_CONFIG_NAMES.map((name) => resolve(root, name));
 	const configDirectoryConfigs = ESLINT_CONFIG_NAMES.map((name) => resolve(configRoot, name));
-	return [...rootConfigs, ...configDirectoryConfigs].find((path) => existsSync(path));
+	const rootConfigs = ESLINT_CONFIG_NAMES.map((name) => resolve(root, name));
+	return [...configDirectoryConfigs, ...rootConfigs].find((path) => existsSync(path));
 }
 
 /**
- * Resolves the configured TypeScript project, defaulting to `configRoot/tsconfig.json` when no root config exists.
+ * Resolves the configured TypeScript project, preferring `configRoot/tsconfig.json` over the root fallback.
  *
  * @param cfg Quality configuration containing repository paths.
  *
@@ -131,7 +131,7 @@ function findEslintConfig(root: string, configRoot = resolve(root, 'config')): s
  */
 function projectTsconfig(cfg: QualityCfg): string {
 	if (cfg.tsconfig) return resolve(cfg.root, cfg.tsconfig);
-	const candidates = [resolve(cfg.root, 'tsconfig.json'), resolve(cfg.configRoot ?? resolve(cfg.root, 'config'), 'tsconfig.json')];
+	const candidates = [resolve(cfg.configRoot ?? resolve(cfg.root, 'config'), 'tsconfig.json'), resolve(cfg.root, 'tsconfig.json')];
 	return candidates.find((path) => existsSync(path)) ?? candidates[0]!;
 }
 const ESLINT_API_FALLBACK = 78;
@@ -2068,7 +2068,7 @@ function repairMissingImports(cfg: QualityCfg, program: ts.Program, checker: ts.
  */
 function readKnipIssues(cfg: QualityCfg): KnipIssue[] {
 	const knip = toolPath(cfg, cfg.tools?.knip, 'knip');
-	const knipConfig = [resolve(cfg.root, 'knip.json'), resolve(cfg.configRoot ?? resolve(cfg.root, 'config'), 'knip.json')].find((path) => existsSync(path));
+	const knipConfig = [resolve(cfg.configRoot ?? resolve(cfg.root, 'config'), 'knip.json'), resolve(cfg.root, 'knip.json')].find((path) => existsSync(path));
 	const result = spawnSync(knip, [...(knipConfig ? ['--config', knipConfig] : []), '--reporter', 'json', '--no-config-hints'], {
 		cwd: cfg.root,
 		encoding: 'utf8',
@@ -3904,9 +3904,9 @@ export function runFormatter(cfg: QualityCfg, optsOrArgs: QualityOptions | strin
 		'prettier.config.mjs',
 		'prettier.config.cjs',
 	]
-		.flatMap((name) => [resolve(cfg.root, name), resolve(cfg.configRoot ?? resolve(cfg.root, 'config'), name)])
+		.flatMap((name) => [resolve(cfg.configRoot ?? resolve(cfg.root, 'config'), name), resolve(cfg.root, name)])
 		.find((path) => existsSync(path));
-	const prettierIgnore = [resolve(cfg.root, '.prettierignore'), resolve(cfg.configRoot ?? resolve(cfg.root, 'config'), '.prettierignore')].find((path) => existsSync(path));
+	const prettierIgnore = [resolve(cfg.configRoot ?? resolve(cfg.root, 'config'), '.prettierignore'), resolve(cfg.root, '.prettierignore')].find((path) => existsSync(path));
 	const explicitConfig = flags.some((flag) => flag === '--config' || flag.startsWith('--config='));
 	const explicitIgnore = flags.some((flag) => flag === '--ignore-path' || flag.startsWith('--ignore-path='));
 	const configArgs = [...(!explicitConfig && prettierConfig ? ['--config', prettierConfig] : []), ...(!explicitIgnore && prettierIgnore ? ['--ignore-path', prettierIgnore] : [])];
