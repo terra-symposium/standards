@@ -357,13 +357,13 @@ test('the executable loads ESLint flat config from config/', () => {
 	assert.equal(result.status, 0, result.stderr);
 	assert.doesNotMatch(result.stderr, /Could not find config file/);
 });
-test('loadQualityCfg resolves a quality file root relative to the configuration file', () => {
+test('loadQualityCfg infers the project root from an explicit config/quality.json path', () => {
 	const root = fixtureRoot('terra-quality-load-config-');
 	const cfgDir = join(root, 'config');
 	const cfgPath = fixtureFile(
 		root,
 		'config/quality.json',
-		JSON.stringify({ root: '..', sourceRoots: ['src'], extensions: ['.ts'], loadTesting: { enabled: false, defaultBudget: { warnMs: 3000, failMs: 7000 } } }),
+		JSON.stringify({ root: '.', sourceRoots: ['src'], extensions: ['.ts'], loadTesting: { enabled: false, defaultBudget: { warnMs: 3000, failMs: 7000 } } }),
 	);
 	const cfg = loadQualityCfg(cfgPath);
 	assert.equal(cfg.root, root);
@@ -374,6 +374,14 @@ test('loadQualityCfg resolves a quality file root relative to the configuration 
 	const schema = JSON.parse(readFileSync(new URL('../../quality.schema.json', import.meta.url), 'utf8'));
 	assert.ok(schema.properties.loadTesting);
 	assert.ok(schema.$defs.loadBudget);
+});
+test('loadQualityCfg keeps explicit root overrides relative to the inferred project root for nested apps', () => {
+	const root = fixtureRoot('terra-quality-load-nested-config-');
+	const appRoot = join(root, 'projects/app');
+	const cfgPath = fixtureFile(appRoot, 'config/quality.json', JSON.stringify({ root: 'workspace', sourceRoots: ['src'], extensions: ['.ts'] }));
+	const cfg = loadQualityCfg(cfgPath);
+	assert.equal(cfg.root, join(appRoot, 'workspace'));
+	assert.deepEqual(cfg.sourceRoots, [join(appRoot, 'workspace/src')]);
 });
 test('loadQualityCfg discovers config/quality.json when the root adapter is absent', () => {
 	const root = fixtureRoot('terra-quality-default-config-directory-');

@@ -368,7 +368,7 @@ export function qualityRecommendationEnabled(cfg: QualityCfg, name: string): boo
 }
 
 /**
- * Loads and normalizes a quality configuration file relative to that file's directory.
+ * Loads and normalizes a quality configuration file relative to its project root.
  *
  * @param file Configuration path; defaults to `quality.json` in the current directory.
  *
@@ -378,7 +378,8 @@ export function loadQualityCfg(file?: string): QualityCfg {
 	const defaultConfig = resolve(process.cwd(), 'quality.json');
 	const path = resolve(file ?? (existsSync(defaultConfig) ? defaultConfig : resolve(process.cwd(), 'config/quality.json')));
 	const raw = JSON.parse(readFileSync(path, 'utf8')) as Omit<QualityCfg, 'root'> & { root?: string };
-	const implicitConfigRoot = file === undefined && dirname(path) === resolve(process.cwd(), 'config') ? process.cwd() : dirname(path);
+	const configDir = dirname(path);
+	const implicitConfigRoot = basename(configDir) === 'config' ? dirname(configDir) : configDir;
 	return createQualityCfg({ ...raw, root: raw.root ? resolve(implicitConfigRoot, raw.root) : implicitConfigRoot });
 }
 
