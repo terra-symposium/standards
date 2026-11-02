@@ -61,9 +61,9 @@ Apply this source tree as a rule, not a suggestion. Every source file must have 
 
 ### Configuration minimum
 
-- Keep at most one committed `.env.example` at the repository root when manual environment setup needs a template. In a monorepo, group variables by app in that one file. Keep zero templates when a repository has no manual environment inputs or a managed provider is already the canonical setup.
-- Move existing app-level examples to the root, merge their variable names and non-secret placeholders, then update every setup guide and script. Never copy real secret values into the template.
-- Configure ignore rules to allow only the root `.env.example`; remove nested example exceptions after consolidation.
+- Keep at most one committed `config/.env.example` when manual environment setup needs a template. In a monorepo, group variables by app in that one file. Keep zero templates when a repository has no manual environment inputs or a managed provider is already the canonical setup.
+- Move existing app-level examples into `config/.env.example`, merge their variable names and non-secret placeholders, then update every setup guide and script. Never copy real secret values into the template.
+- Configure ignore rules to allow only `config/.env.example`; remove other example exceptions after consolidation.
 - Never read, print, or delete ignored private `.env*` files, browser storage, or credentials. Inspect only paths and, when necessary, variable names. Preserve them as local user state.
 - Keep provider project locators, deployment manifests, schemas, and tool configs separate when they have distinct readers. Do not combine different responsibilities just to lower the file count.
 - For each tool and scope, retain one active configuration. Prove which duplicate is loaded from tool behavior, manifests, or direct references; update references and delete the obsolete file. Keep multiple lockfiles only for genuinely independent package roots with their own manifests.

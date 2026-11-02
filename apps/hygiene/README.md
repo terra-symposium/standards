@@ -6,7 +6,7 @@ Separate Astro/React dashboard for admins of repositories that install the Terra
 
 1. Connect a dedicated Neon database to this Netlify site or set `DATABASE_URL`. The app also reads `NETLIFY_DATABASE_URL` from Netlify's Neon integration. The build applies the idempotent SQL migrations before compiling.
 2. Create a GitHub App with callback URL `https://<site>/api/callback`, webhook URL `https://<site>/api/webhook`, and read-only repository permissions. Subscribe to Installation and Installation repositories events. Enable user authorization and set the webhook secret.
-3. Create a Netlify site for this repository with the repository root as its base directory and `apps/hygiene` as its package directory. Set the variables in the repository-root `.env.example` for the production Functions context.
+3. Create a Netlify site for this repository with the repository root as its base directory and `apps/hygiene` as its package directory. Set the variables in `config/.env.example` for the production Functions context.
 4. Install the GitHub App on selected repositories. Signed-in users see a repository only when GitHub confirms their current admin permission.
 
 ## Collect reports
@@ -30,7 +30,7 @@ The dashboard checks the signed-in GitHub user's current admin permission for ev
 
 ## Local development
 
-Use the Netlify CLI's local emulator to run the dashboard and its Functions together. In this linked project the CLI can load database and GitHub credentials from the production environment; no deployment is needed. Override `APP_ORIGIN` to `http://127.0.0.1:8888`, and add `http://127.0.0.1/api/callback` as an additional callback URL in the GitHub App settings. Loopback HTTP cookies are allowed only for `127.0.0.1`; hosted origins continue to require secure cookies. If you run without the linked site's environment, copy the repository-root `.env.example` to `apps/hygiene/.env` and fill in those values locally.
+Use the Netlify CLI's local emulator to run the dashboard and its Functions together. In this linked project the CLI can load database and GitHub credentials from the production environment; no deployment is needed. Override `APP_ORIGIN` to `http://127.0.0.1:8888`, and add `http://127.0.0.1/api/callback` as an additional callback URL in the GitHub App settings. Loopback HTTP cookies are allowed only for `127.0.0.1`; hosted origins continue to require secure cookies. If you run without the linked site's environment, copy `config/.env.example` to `apps/hygiene/.env` and fill in those values locally.
 
 Run database migrations once with `pnpm --filter @terra-symposium/hygiene-dashboard db:migrate`. The migration runner reads `process.env` and does not load `.env` files, so expose one of its supported database URL variables in your shell before running it; Netlify Dev loading `apps/hygiene/.env` does not apply to this command. Then from `apps/hygiene` start the local server with `APP_ORIGIN=http://127.0.0.1:8888 pnpm exec netlify dev --context production --command 'pnpm exec astro dev --host 127.0.0.1 --port 4321' --functions netlify/functions --port 8888 --target-port 4321`. Netlify Dev proxies the Astro dev server and exposes the Functions at the same `/api/*` paths used by the hosted app. Open `http://127.0.0.1:8888`. This does not deploy the site.
 
@@ -49,6 +49,6 @@ For the Terra Symposium website, import test and quality metrics from a clean ch
 pnpm --filter @terra-symposium/hygiene-dashboard reports:import -- --repository Terra-Symposium/terra-symposium-website --checkout /path/to/terra-symposium-website --branch development
 ```
 
-Use `--branch main` for the main branch. The importer runs the repository's JUnit suite and `@terra-symposium/standards-quality@0.5.0`, then discards the raw files. Its current test command is specific to the Terra Symposium website; another repository needs its JUnit test command configured before local test metrics can be imported. If a branch has no `quality.json`, the importer uses `origin/development:quality.json` and records that policy branch beside the local report.
+Use `--branch main` for the main branch. The importer runs the repository's JUnit suite and `@terra-symposium/standards-quality@0.5.0`, then discards the raw files. Its current test command is specific to the Terra Symposium website; another repository needs its JUnit test command configured before local test metrics can be imported. If a branch has no `quality.json`, the importer uses `origin/development:config/quality.json` and records that policy branch beside the local report.
 
 For UI-only work, `pnpm --filter @terra-symposium/hygiene-dashboard dev` starts Astro without Netlify Functions. Run `pnpm --filter @terra-symposium/hygiene-dashboard test` for parser, authorization, score, and report policy tests.
