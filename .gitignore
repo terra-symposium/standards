@@ -1,21 +1,32 @@
+# Dependencies
 node_modules/
+
+# Build and generated output
 dist/
+dist/.docs/
+**/.astro/
+
+# Test artifacts
 coverage/
 tests/results/
-**/.astro/
-dist/.docs/
+
+# Local environment and credentials
+**/.env
+**/.env.local
+
+# Quality runner artifacts
 /.quality-test-tmp/
 /.quality-github-report.json
+
+# Changesets
 .changeset/*.md
 !.changeset/README.md
 !.changeset/tidy-repos-report.md
 !.changeset/github-analytics-report.md
 
-# Local Netlify folder
+# Local deployment state
 .netlify
 
-# Local environment credentials
-**/.env
-**/.env.local
+# Vendored dependencies
 vendor/
 **/vendor/
