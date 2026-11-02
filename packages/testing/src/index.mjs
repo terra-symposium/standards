@@ -156,7 +156,7 @@ function runLinearHistory(root) {
  *
  * @return {{version: 1, suites: Array<{name: string, command: string, args: string[], cwd?: string, owns?: string[]}>}}
  */
-export function readTestPlan(root, manifestPath = '.terra-tests.json') {
+export function readTestPlan(root, manifestPath = defaultManifestPath(root)) {
 	const absoluteRoot = resolve(root);
 	if (!manifestPath) return emptyTestPlan;
 	if (isAbsolute(manifestPath) || !isInside(absoluteRoot, resolve(absoluteRoot, manifestPath))) throw new Error(`Test manifest must be inside the repository: ${manifestPath}`);
@@ -165,6 +165,17 @@ export function readTestPlan(root, manifestPath = '.terra-tests.json') {
 	const plan = JSON.parse(readFileSync(absoluteManifest, 'utf8'));
 	validateTestPlan(plan, absoluteRoot);
 	return plan;
+}
+
+/**
+ * Prefer the organized tests location while retaining compatibility with existing consumers.
+ * @param {string} root Repository root.
+ * @return {string} Repository-relative manifest path.
+ */
+function defaultManifestPath(root) {
+	const absoluteRoot = resolve(root);
+	if (existsSync(resolve(absoluteRoot, 'tests/terra-tests.json'))) return 'tests/terra-tests.json';
+	return '.terra-tests.json';
 }
 
 /**
@@ -234,7 +245,7 @@ export function validateTestPlan(value, root) {
  *
  * @return {{passed: number, failed: number, selected: string[]}}
  */
-export function runTestPlan({ root, manifest = '.terra-tests.json', suites: requested = [], sharedOnly = false }) {
+export function runTestPlan({ root, manifest, suites: requested = [], sharedOnly = false }) {
 	const absoluteRoot = resolve(root);
 	const plan = sharedOnly ? emptyTestPlan : readTestPlan(absoluteRoot, manifest);
 	const allSuites = /** @type {Array<{name: string, command: string, args?: string[], cwd?: string}>} */ (plan.suites);

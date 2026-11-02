@@ -4,7 +4,7 @@
 
 ## Test plan
 
-Add `.terra-tests.json` at the repository root:
+Add `tests/terra-tests.json` as the canonical ordered test plan. The runner still discovers `.terra-tests.json` at the root for older consumers when the new path is absent:
 
 ```json
 {
@@ -27,7 +27,7 @@ Keep this root manifest as the canonical ordered mapping of suite commands and f
 After adding the package as a development dependency, run it locally with:
 
 ```sh
-pnpm exec terra-test run --manifest .terra-tests.json
+pnpm exec terra-test run --manifest tests/terra-tests.json
 ```
 
 Select custom suites with `--suites unit,contracts`; shared checks still run. Use `--shared-only` for workflows that should run the Standards checks without local suites. The GitHub Action is published as a public distribution mirror so public repositories can consume the Standards-owned implementation:
@@ -35,7 +35,7 @@ Select custom suites with `--suites unit,contracts`; shared checks still run. Us
 ```yaml
 - uses: Terra-Symposium/standards/packages/testing@3f9b31323d3617d6b565770880865ec7cf1a9704
   with:
-    manifest: .terra-tests.json
+    manifest: tests/terra-tests.json
 ```
 
 For responsive Playwright coverage, declare `PW_VIEWPORTS` from the layout risk in each scenario and record the selected names and dimensions in the report. Include widths around relevant breakpoints; use all configured viewports for broad responsive coverage. Reports should distinguish the selected inventory from the full configured inventory.

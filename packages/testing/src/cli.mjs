@@ -22,7 +22,7 @@ HELPERS
 function parseArgs(args) {
 	const [cmd, ...rest] = args;
 	if (cmd !== 'run') throw new Error('Usage: terra-test run [--root <path>] [--manifest <path>] [--suites <name,name>] [--shared-only]');
-	const options = { root: process.cwd(), manifest: '.terra-tests.json', suites: [], sharedOnly: false };
+	const options = { root: process.cwd(), manifest: undefined, suites: [], sharedOnly: false };
 	for (let index = 0; index < rest.length; index++) {
 		const flag = rest[index];
 		const value = rest[index + 1];

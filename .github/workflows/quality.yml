@@ -21,7 +21,7 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - name: Capture full-repository quality findings
-        run: pnpm run quality -- --report-json standards-quality.json
+        run: pnpm run quality --report-json standards-quality.json
         continue-on-error: true
       - name: Check formatting
         run: node packages/quality/dist/lib/runner.js format --all --warn
@@ -67,7 +67,7 @@ jobs:
       - run: pnpm --filter @terra-symposium/standards-reporting exec playwright install --with-deps chromium
       - uses: ./packages/testing
         with:
-          manifest: .terra-tests.json
+          manifest: tests/terra-tests.json
 
   package:
     if: github.event_name == 'pull_request'

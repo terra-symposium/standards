@@ -14,7 +14,7 @@ overrides:
 
 importers:
 
-  .:
+  ..:
     devDependencies:
       '@changesets/cli':
         specifier: ^3.0.3
@@ -53,7 +53,7 @@ importers:
         specifier: ^8.71.2
         version: 8.72.0(eslint@10.13.0(jiti@2.7.0))(typescript@6.0.3)
 
-  apps/hygiene:
+  ../apps/hygiene:
     dependencies:
       '@astrojs/react':
         specifier: ^7.1.0
@@ -96,13 +96,13 @@ importers:
         specifier: ^6.0.3
         version: 6.0.3
 
-  packages/braces:
+  ../packages/braces:
     dependencies:
       fill-range:
         specifier: ^7.1.1
         version: 7.1.1
 
-  packages/error-boundaries:
+  ../packages/error-boundaries:
     devDependencies:
       '@types/react':
         specifier: ^19.3.0
@@ -120,7 +120,7 @@ importers:
         specifier: ^6.0.3
         version: 6.0.3
 
-  packages/quality:
+  ../packages/quality:
     dependencies:
       '@terra-symposium/standards-error-boundaries':
         specifier: ^0.1.2
@@ -133,7 +133,7 @@ importers:
         specifier: ^26.6.5
         version: 26.6.5
 
-  packages/reporting:
+  ../packages/reporting:
     dependencies:
       '@terra-symposium/styling':
         specifier: ^0.1.34
@@ -161,8 +161,7 @@ importers:
         specifier: ^6.0.3
         version: 6.0.3
 
-  packages/testing: {}
-
+  ../packages/testing: {}
 packages:
 
   '@alloc/quick-lru@5.3.0':

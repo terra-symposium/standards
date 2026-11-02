@@ -2,6 +2,9 @@ packages:
   - packages/*
   - apps/*
 
+lockfileDir: config
+virtualStoreDir: ../node_modules/.pnpm
+
 allowBuilds:
   esbuild: true
 

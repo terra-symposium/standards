@@ -118,7 +118,8 @@ test('consumer-defined suites run once each in manifest order and aggregate into
 	const root = fixtureRoot();
 	const logPath = join(root, 'runs.log');
 	const scriptPath = join(root, 'record.mjs');
-	const manifestPath = join(root, '.terra-tests.json');
+	const manifestPath = join(root, 'tests/terra-tests.json');
+	mkdirSync(join(root, 'tests'), { recursive: true });
 	writeFileSync(scriptPath, `import { appendFileSync } from 'node:fs';\nappendFileSync(${JSON.stringify(logPath)}, process.argv[2] + '\\n');\n`);
 	const names = ['contracts', 'unit', 'custom'];
 	writeFileSync(manifestPath, JSON.stringify({ version: 1, suites: names.map((name) => ({ name, command: process.execPath, args: [scriptPath, name], owns: [`tests/${name}`] })) }));
