@@ -1,6 +1,7 @@
 node_modules/
 dist/
 coverage/
+tests/results/
 **/.astro/
 /.terra-docs/
 /scripts/docs/skills.generated.json

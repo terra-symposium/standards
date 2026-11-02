@@ -14,9 +14,9 @@ Use when a run must produce, inspect, or hand off workbook and PowerPoint eviden
 3. Preserve the timestamped output:
 
 ```text
-test-results/visual/<timestamp>/report.xlsx
-test-results/visual/<timestamp>/report.pptx
-test-results/visual/<timestamp>/images/
+tests/results/visual/<timestamp>/report.xlsx
+tests/results/visual/<timestamp>/report.pptx
+tests/results/visual/<timestamp>/images/
 ```
 
 4. Record ref, target URL, command, projects, viewport names/dimensions, test count, retries, skips, and exact artifact paths.

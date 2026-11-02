@@ -49,13 +49,13 @@ Use these repository-specific steps when the task is attached to the published `
 5. When a fast verdict is explicitly requested, run `pnpm run test:cloud:smoke`. This delegates to the disposable wrapper with `PW_VIEWPORTS=desktop`, one Chromium project (`cloud-smoke`), one worker, and four checks: fresh loopback database/schema readiness, public landing route, authenticated application session route, and matching Sanity user identity with project access. It does not exercise the Studio UI, Docs editing, generation, or the complete responsive inventory. A passing smoke never replaces full coverage. The equivalent supported filter command is:
 
    ```sh
-   PW_VIEWPORTS=desktop PW_WORKERS=1 TERRA_CLOUD_RESULT_DIR=test-results/cloud-smoke \
+   PW_VIEWPORTS=desktop PW_WORKERS=1 TERRA_CLOUD_RESULT_DIR=tests/results/cloud-smoke \
      pnpm run test:cloud:disposable -- \
      --config=scripts/test/playwright.cloud-smoke.config.ts \
      --project=cloud-smoke --grep=cloud.smoke. --workers=1
    ```
 
-6. Review `test-results/cloud/manifest.json` for full runs or `test-results/cloud-smoke/manifest.json` for smoke runs. Add selected project counts and viewport evidence to the report.
+6. Review `tests/results/cloud/manifest.json` for full runs or `tests/results/cloud-smoke/manifest.json` for smoke runs. Add selected project counts and viewport evidence to the report.
 
 ### Terra evidence and cleanup
 

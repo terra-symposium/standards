@@ -729,8 +729,8 @@ export default class ProgressReporter {
 			featureFiles: opts.featureFiles || [],
 			projects: opts.projects || [],
 			viewportCatalog: opts.viewportCatalog || VISUAL_VIEWPORTS,
-			outputRoot: opts.outputRoot || 'test-results/visual',
-			screenshotsDirectory: opts.screenshotsDirectory || path.join(opts.outputRoot || 'test-results/visual', 'screenshots'),
+			outputRoot: opts.outputRoot || 'tests/results/visual',
+			screenshotsDirectory: opts.screenshotsDirectory || path.join(opts.outputRoot || 'tests/results/visual', 'screenshots'),
 			reportFile: opts.reportFile || 'report.xlsx',
 			slideshowFile: opts.slideshowFile || 'report.pptx',
 			supplementalResultsFile: opts.supplementalResultsFile,
@@ -855,7 +855,7 @@ export default class ProgressReporter {
 		const attachment = screenshotAttachment(result.attachments);
 		let screenshot = attachment?.path || '';
 		if (!screenshot && attachment?.body) {
-			screenshot = path.resolve(`test-results/playwright-output/${test.id.replace(A_Z0_9_GI_REGEX(), '-')}-screenshot.png`);
+			screenshot = path.resolve(`tests/results/playwright-output/${test.id.replace(A_Z0_9_GI_REGEX(), '-')}-screenshot.png`);
 			fs.mkdirSync(path.dirname(screenshot), { recursive: true });
 			fs.writeFileSync(screenshot, attachment.body);
 		}
@@ -905,7 +905,7 @@ export default class ProgressReporter {
 			let capturePath = img.path || '';
 			if (!capturePath && img.body) {
 				const ext = capture.contentType === 'image/png' ? 'png' : 'jpg';
-				capturePath = path.resolve('test-results/playwright-output', `${test.id.replace(A_Z0_9_GI_REGEX(), '-')}-${capture.attachmentName}.${ext}`);
+				capturePath = path.resolve('tests/results/playwright-output', `${test.id.replace(A_Z0_9_GI_REGEX(), '-')}-${capture.attachmentName}.${ext}`);
 				fs.mkdirSync(path.dirname(capturePath), { recursive: true });
 				fs.writeFileSync(capturePath, img.body);
 			}

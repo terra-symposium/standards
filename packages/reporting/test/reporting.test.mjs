@@ -182,7 +182,7 @@ test('expands regular Playwright projects and preserves single-run setup/capture
 		cfg.projects.map(({ name: n }) => n),
 		['browser-mobile', 'browser-sm', 'browser-md', 'browser-lg', 'browser-xl', 'browser-2xl', 'auth-setup', 'app-mobile', 'app-sm', 'app-md', 'app-lg', 'app-xl', 'app-2xl', 'manual-capture'],
 	);
-	assert.equal(cfg.outputDir, 'test-results/playwright-output');
+	assert.equal(cfg.outputDir, 'tests/results/playwright-output');
 	assert.deepEqual(cfg.use.screenshot, { mode: 'on', fullPage: true, caret: 'initial' });
 	assert.deepEqual(cfg.projects.find(({ name: n }) => n === 'app-mobile').dependencies, ['auth-setup']);
 	assert.equal(cfg.projects.find(({ name: n }) => n === 'browser-mobile').use.viewport.width, 390);
