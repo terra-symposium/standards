@@ -116,7 +116,9 @@ const ESLINT_CONFIG_NAMES = ['eslint.config.js', 'eslint.config.mjs', 'eslint.co
  * @return Absolute config path or undefined when no flat config exists.
  */
 function findEslintConfig(root: string): string | undefined {
-	return ESLINT_CONFIG_NAMES.flatMap((name) => [resolve(root, name), resolve(root, 'config', name)]).find((path) => existsSync(path));
+	const rootConfigs = ESLINT_CONFIG_NAMES.map((name) => resolve(root, name));
+	const configDirectoryConfigs = ESLINT_CONFIG_NAMES.map((name) => resolve(root, 'config', name));
+	return [...rootConfigs, ...configDirectoryConfigs].find((path) => existsSync(path));
 }
 const ESLINT_API_FALLBACK = 78;
 const ESLINT_ARGUMENT_BUDGET = 64 * 1024;

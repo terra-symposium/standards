@@ -357,6 +357,20 @@ test('the executable loads ESLint flat config from config/', () => {
 	assert.equal(result.status, 0, result.stderr);
 	assert.doesNotMatch(result.stderr, /Could not find config file/);
 });
+test('the executable prefers every root ESLint config over configs under config/', () => {
+	const root = fixtureRoot('terra-quality-eslint-config-precedence-');
+	const workspaceRoot = fileURLToPath(new URL('../../../../', import.meta.url));
+	fixtureFile(root, 'package.json', '{"type":"module"}\n');
+	symlinkSync(resolve(workspaceRoot, 'node_modules'), join(root, 'node_modules'), 'dir');
+	fixtureFile(root, 'quality.json', JSON.stringify({ sourceRoots: ['src'], extensions: ['.js'] }));
+	fixtureFile(root, 'eslint.config.cjs', "module.exports = [{ files: ['**/*.js'], rules: { 'no-console': 'error' } }];\n");
+	fixtureFile(root, 'config/eslint.config.js', "export default [{ files: ['**/*.js'], rules: { 'no-console': 'off' } }];\n");
+	fixtureFile(root, 'src/main.js', 'console.log(true);\n');
+	const runner = fileURLToPath(new URL('../../dist/lib/runner.js', import.meta.url));
+	const result = spawnSync(process.execPath, [runner, 'lint', '--all'], { cwd: root, encoding: 'utf8' });
+	assert.notEqual(result.status, 0, `${result.stdout}\n${result.stderr}`);
+	assert.match(`${result.stdout}\n${result.stderr}`, /no-console/u);
+});
 test('loadQualityCfg infers the project root from an explicit config/quality.json path', () => {
 	const root = fixtureRoot('terra-quality-load-config-');
 	const cfgDir = join(root, 'config');
