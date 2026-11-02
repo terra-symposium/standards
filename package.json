@@ -18,8 +18,8 @@
     "quality:check": "node packages/quality/dist/lib/runner.js quality --all --warn --skip-commands --skip-recommendations",
     "prequality:github": "pnpm --filter @terra-symposium/standards-quality build",
     "quality:github": "node packages/quality/dist/lib/runner.js github --report-json .quality-github-report.json",
-    "docs:dev": "node scripts/docs/generate-skills.mjs && terra-docs dev --title Standards --description 'Documentation for shared Terra Symposium packages and tools.'",
-    "docs:build": "node scripts/docs/generate-skills.mjs && terra-docs build --title Standards --description 'Documentation for shared Terra Symposium packages and tools.' --site https://standards-docs.netlify.app --out dist/docs",
+    "docs:dev": "terra-docs dev --title Standards --description 'Documentation for shared Terra Symposium packages and tools.'",
+    "docs:build": "terra-docs build --title Standards --description 'Documentation for shared Terra Symposium packages and tools.' --site https://standards-docs.netlify.app --out dist/docs",
     "docs:preview": "terra-docs preview --title Standards --description 'Documentation for shared Terra Symposium packages and tools.' --site https://standards-docs.netlify.app --out dist/docs",
     "release": "changeset publish"
   },
