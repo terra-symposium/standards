@@ -5,7 +5,7 @@ description: Iterate Gemini generated content comparing to production Docs refer
 
 # Canvas Docs Generation Iteration
 
-Use only to improve the Canvas source adapter for Docs generation. For general authoring, follow [`author`](../author/SKILL.md); for saved Gem changes, follow [`gem`](../gem/SKILL.md). The goal is production-like structure, information density, and block choice, not merely parseable output.
+Use only to improve the Canvas source adapter for Docs generation. For general authoring, follow the [Docs composition guide](https://github.com/Terra-Symposium/docs/blob/main/docs/authoring/composing/index.md); for saved Gem changes, follow [`gem`](../gem/SKILL.md). The goal is production-like structure, information density, and block choice, not merely parseable output.
 
 ## Safety and inputs
 
@@ -30,8 +30,8 @@ Production examples teach form, never source facts.
 3. Update Gem context through isolated Playwright Chrome; reload and verify saved instructions and file labels. Uploads may persist even when the save button is disabled.
 4. Keep the local Playwright driver prompt synchronized with the Gem output contract.
 5. Generate non-headed from a local Canvas fixture or saved scrape. Never patch Sanity or reuse Dia.
-6. Inspect the raw response before normalization. Require exactly one outer `markdown` fence, no outside text, an H2 as the first body line, no inner triple-backtick fences, canonical `<Code>` syntax, HTML tables for repeated data, and only schema-supported blocks. Confirm source facts are retained without invention.
-7. Run the shared `HealWorkflow` and `_coverage.ts` validator described in [`author`](../author/SKILL.md). Preserve raw/audit output; the initial attempt plus three retries is the maximum. Pass exact failures and requested corrections into the next attempt. Exhaustion is failure, not partial success.
+6. Inspect the raw response before normalization. Require exactly one outer four-backtick `markdown` fence, no outside text, an H2 as the first body line, fenced code, supported tables, and only schema-supported blocks. Confirm source facts are retained without invention.
+7. Run the shared `HealWorkflow` and `_coverage.ts` validator described in [`gem`](../gem/SKILL.md). Preserve raw/audit output; the initial attempt plus three retries is the maximum. Pass exact failures and requested corrections into the next attempt. Exhaustion is failure, not partial success.
 8. Revise only to address a recorded failure. Repeat until structure, block distribution, and attachment coverage meet the contract.
 
 ## Prompt design
@@ -40,7 +40,7 @@ Put the output contract before style guidance. Require:
 
 - one fenced Markdown artifact and no wrapper, labels, prose, or JSON outside it;
 - native HTML tables for schedules, comparisons, requirements, inventories, staff, assessments, and repeated fields;
-- canonical `<Code language="...">{` ... `}</Code>` with no nested fence;
+- fenced code blocks with a language label;
 - permitted Docs blocks only; no invented components;
 - concise headings and one idea per bullet, with natural prose and lines under 140 characters where practical;
 - inline `<code>` for technical tokens and `$...$` for symbolic relationships;

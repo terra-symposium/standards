@@ -24,7 +24,7 @@ context, documentation, personas, plans, and shared skills.
 production Docs references, to improve the generation's adherence to strict guidelines via
 local-only headless Chrome checks.
 
-[`author`](../skills/documenting/author/SKILL.md) — Author, review, preserve, restore, and visually
+[`Docs authoring`](https://github.com/Terra-Symposium/docs/tree/main/docs/authoring) — Author, review, preserve, restore, and visually
 restructure general Terra Symposium Docs leaves with the docs MCP. Use for Terra, executive,
 development, and university documentation from verified source material or existing Docs leaves.
 

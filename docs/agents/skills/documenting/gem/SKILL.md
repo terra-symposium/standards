@@ -23,11 +23,11 @@ Use when changing the saved Terra Document Gem, its knowledge, or its browser-ba
 - Never create a second anonymous context, duplicate headed window, or parallel Gemini session for one leaf. Stop on auth failure; do not open a fallback session.
 - Keep credentials out of prompts, source, logs, and artifacts. Do not call any Docs/Sanity mutation during local iteration.
 - Never commit unless separately authorized.
-- Use the shared bounded `HealWorkflow` and attachment validator in [`author`](../author/SKILL.md). Preserve raw responses and audit diagnostics; no more than three retries after the initial attempt, and no write after failed validation.
+- Use the shared bounded `HealWorkflow` and attachment validator. Preserve raw responses and audit diagnostics; no more than three retries after the initial attempt, and no write after failed validation.
 
 ## Update procedure
 
-1. Read [`author`](../author/SKILL.md), the latest numbered [`prompt journal`](../author/journal.md) entry, current prompt source, schema, and [provider modes](references/provider-modes.md).
+1. Read the [Docs blocks](https://github.com/Terra-Symposium/docs/blob/main/docs/authoring/blocks/index.md) and [composition guide](https://github.com/Terra-Symposium/docs/blob/main/docs/authoring/composing/index.md), the latest numbered [`prompt journal`](../author/journal.md) entry, current prompt source, schema, and [provider modes](references/provider-modes.md).
 2. In the authenticated Gemini UI, inspect the intended Gem and capture its ID, name, description, exact instructions, citation setting, and every knowledge attachment label before making changes. Save the exact values and attachment manifest in a new snapshot folder under `snapshots/`; never copy authentication state.
 3. Separate the work into two reviewable parts: Gem content (instructions and knowledge files) and Gem metadata (name, description, citation setting, and target Gem identity). Preserve any field not explicitly being changed. Record repository paths and hashes for local knowledge files.
 4. Edit the repository prompt/context. The current checkout has no `CONTEXT_FILES` list or working Gem update implementation. `package.json` invokes a missing root `playwright.gem.config.ts`; the available config at `tests/scripts/generation/playwright.gem.config.ts` points to a missing `scripts/generation/document-gem.spec.ts`. Do not rely on the update command until both paths are repaired and the updater saves/reload-verifies the intended fields.
@@ -58,8 +58,8 @@ The configured updater command is currently broken and is shown only to identify
 
    It stores raw and normalized responses in Downloads and does not mutate Sanity.
 
-10. Inspect raw output before normalization: one `markdown` fence, first body line H2, no inner triple-backtick fence, canonical `<Code>`, HTML tables for repeated data, no unsupported blocks or citation markers. Preserve raw and normalized artifacts together.
+10. Inspect raw output before normalization: one outer four-backtick `markdown` fence, first body line H2, supported fenced code and tables, no unsupported blocks or citation markers. Preserve raw and normalized artifacts together.
 11. On a syntax/schema/coverage failure, pass the exact failure to the bounded healer and make the smallest prompt/driver correction. After retries are exhausted, stop and report the final error and diagnostic path.
 12. Journal every prompt revision with exact prompt/source link, Gem ID, mode, context files, output directory, and raw/normalized validation. Log transport/extraction fixes separately from prompt revisions.
 
-The shared contract also requires source-weighted length, meaningful Docs blocks, deterministic attachment anchors, strict semantic audit, and verified post-write quality evidence for production generation. Follow [`author`](../author/SKILL.md) for its thresholds and workflow; never copy audit metadata into stored Markdown/MDX.
+The shared contract also requires source-weighted length, meaningful Docs blocks, deterministic attachment anchors, strict semantic audit, and verified post-write quality evidence for production generation. Run `scripts/generation/_coverage.ts` before any write: require at least `max(800, 8% of readable source characters)` and three meaningful blocks for substantial material; account for every usable attachment with deterministic anchors and the strict semantic audit. Re-read the stored leaf after a successful write. Never copy audit metadata into stored Markdown/MDX.
