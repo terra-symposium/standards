@@ -137,10 +137,11 @@ async function main(): Promise<void> {
 			if (!existsSync(dependencyPath)) throw new Error(`Install dependencies before importing reports; missing ${dir}.`);
 			symlinkSync(dependencyPath, join(worktree, dir), 'dir');
 		}
-		const qualityConfigPath = join(worktree, 'quality.json');
+		const qualityConfigPath = join(worktree, 'config/quality.json');
 		const qualityPolicyBranch = existsSync(qualityConfigPath) ? branch : 'development';
 		if (!existsSync(qualityConfigPath)) {
-			const sharedPolicy = git(checkout, ['show', 'origin/development:quality.json']);
+			const sharedPolicy = git(checkout, ['show', 'origin/development:config/quality.json']);
+			mkdirSync(join(worktree, 'config'), { recursive: true });
 			writeFileSync(qualityConfigPath, `${sharedPolicy}\n`);
 		}
 		const testStatus = run(
@@ -187,7 +188,7 @@ async function main(): Promise<void> {
 			? `${report.quality.clean}/${report.quality.enabled} clean checks, ${report.quality.findings} findings, ${report.quality.total} total checks`
 			: 'Terra Quality report missing';
 		console.info(`Imported local report for ${repo} (${branch}) at ${headSha.slice(0, 9)}.`);
-		console.info(`Terra Quality policy: ${qualityPolicyBranch} branch configuration${qualityPolicyBranch === branch ? '' : ' (main has no quality.json)'}.`);
+		console.info(`Terra Quality policy: ${qualityPolicyBranch} branch configuration${qualityPolicyBranch === branch ? '' : ' (the target branch has no config/quality.json)'}.`);
 		console.info(`Tests: ${testCounts}; command exit ${testStatus}.`);
 		console.info(`Quality: ${qualityCounts}; command exit ${qualityStatus}.`);
 	} finally {
