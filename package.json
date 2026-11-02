@@ -20,7 +20,7 @@
   "devDependencies": {
     "@changesets/cli": "^3.0.3",
     "@eslint/js": "^10.0.1",
-    "@terra-symposium/docs": "^0.4.2",
+    "@terra-symposium/docs": "^0.4.3",
     "@types/node": "^26.6.5",
     "astro": "7.4.4",
     "eslint": "^10.13.0",
