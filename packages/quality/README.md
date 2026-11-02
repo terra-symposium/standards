@@ -137,7 +137,7 @@ The installed `quality.schema.json` provides editor validation. The [test README
 
 ## Configuration and security
 
-Not applicable.
+Terra Quality loads `quality.json` from the repository root, or falls back to `config/quality.json`. For its default TypeScript project check, it prefers root `tsconfig.json` and falls back to `config/tsconfig.json`; an explicit `tsconfig` path in `quality.json` takes precedence. Package-specific `tsconfig.json` files remain preferred when checking package entry-point reachability.
 
 ## Development and structure
 

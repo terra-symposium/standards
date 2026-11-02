@@ -120,6 +120,19 @@ function findEslintConfig(root: string): string | undefined {
 	const configDirectoryConfigs = ESLINT_CONFIG_NAMES.map((name) => resolve(root, 'config', name));
 	return [...rootConfigs, ...configDirectoryConfigs].find((path) => existsSync(path));
 }
+
+/**
+ * Resolves the configured TypeScript project, defaulting to `config/tsconfig.json` when no root config exists.
+ *
+ * @param cfg Quality configuration containing repository paths.
+ *
+ * @return Absolute TypeScript configuration path.
+ */
+function projectTsconfig(cfg: QualityCfg): string {
+	if (cfg.tsconfig) return resolve(cfg.root, cfg.tsconfig);
+	const candidates = [resolve(cfg.root, 'tsconfig.json'), resolve(cfg.root, 'config/tsconfig.json')];
+	return candidates.find((path) => existsSync(path)) ?? candidates[0]!;
+}
 const ESLINT_API_FALLBACK = 78;
 const ESLINT_ARGUMENT_BUDGET = 64 * 1024;
 const FOCUSED_ESLINT_FALLBACK = 'TERRA_QUALITY_FOCUSED_ESLINT_UNAVAILABLE';
@@ -1901,7 +1914,7 @@ function runRecommendationCmds(cfg: QualityCfg): void {
 function runProjectTypecheck(cfg: QualityCfg): void {
 	qualityHeader('typecheck', 'Checking the configured project type boundary');
 	if (!cfg.typecheckCommand) {
-		const status = run(cfg, toolPath(cfg, cfg.tools?.tsc, 'tsc'), ['--noEmit', '-p', cfg.tsconfig ?? 'tsconfig.json']);
+		const status = run(cfg, toolPath(cfg, cfg.tools?.tsc, 'tsc'), ['--noEmit', '-p', projectTsconfig(cfg)]);
 		if (status) process.exitCode = status;
 		printCheckStatus('typecheck', status ? 1 : 0);
 		return;
@@ -3933,7 +3946,7 @@ export function runTypecheck(cfg: QualityCfg, args: string[] = []): void {
         'ESNext', '--allowImportingTsExtensions',
         ...(args.length ? suppliedFiles : typecheckFiles),
 			]
-		: ['--noEmit', '-p', cfg.tsconfig ?? 'tsconfig.json', ...suppliedFiles];
+		: ['--noEmit', '-p', projectTsconfig(cfg), ...suppliedFiles];
 	qualityHeader('typecheck', `Checking ${args.length ? 'the selected source files' : 'the configured TypeScript project'}`);
 	const result = spawnSync(toolPath(cfg, tsc, 'tsc'), compilerArgs, { cwd: cfg.root, stdio: ['inherit', 'pipe', 'pipe'], maxBuffer: TOOL_OUTPUT_MAX_BUFFER });
 	const status = result.status ?? 1;
