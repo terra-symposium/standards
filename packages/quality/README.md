@@ -34,7 +34,7 @@ In an npm-managed repository, use `npm install --save-dev @terra-symposium/stand
 - Does not install or configure language toolchains, formatters, linters, or repository commands.
 
 ### Native language profiles
-Terra Quality keeps its built-in syntax analysis scoped to JavaScript and TypeScript. Opt into the full C, Java, or Python check suite with `languageProfiles`; each profile discovers its own file extensions under `sourceRoots`, so native files are not sent through the TypeScript analyzer. Function documentation checks are discovered automatically for all four supported language groups whenever their sources appear under `sourceRoots`. For a repository with no JavaScript or TypeScript sources, leave `extensions` empty:
+Terra Quality keeps its built-in syntax analysis scoped to JavaScript and TypeScript. Opt into the full C, Java, or Python check suite with `languageProfiles`; each profile discovers its own file extensions under `sourceRoots`, so native files are not sent through the TypeScript analyzer. Function documentation checks are discovered automatically for all four supported language groups whenever their sources appear under `sourceRoots`. C and header declarations use Doxygen blocks. Set `documentation.cAuthors` to map repository-relative C source directory prefixes to required `@author` names; the longest matching prefix takes precedence. C checks report missing summaries, parameter descriptions and order, return descriptions, and authors without generating prose. For a repository with no JavaScript or TypeScript sources, leave `extensions` empty:
 
 ```json
 {
@@ -49,19 +49,19 @@ Selected profiles run only when matching source exists. Checks skip when their l
 
 | Profile  | Default checks                                                                                                 | Native prerequisites                                                                                 |
 | -------- | -------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| `c`      | clang-format; clang-tidy and Clang Static Analyzer; strict Doxygen documentation coverage                      | LLVM/Clang 14+; Doxygen 1.9+ and a root `Doxyfile`                                                   |
+| `c`      | clang-format; Clang AST function documentation; clang-tidy and Clang Static Analyzer                        | LLVM/Clang 14+                                                                                      |
 | `java`   | google-java-format; Checkstyle with all-access Javadocs; PMD source rules; SpotBugs on compiled classes        | google-java-format 1.14+; Checkstyle 10+; PMD 7+; SpotBugs 4.8+; compatible JDK and compiled classes |
 | `python` | Ruff format/lint; mypy; Bandit; Vulture; interrogate and pydoclint documentation coverage for `.py` and `.pyi` | Ruff 0.1+; mypy 1+; Bandit 1.7+; Vulture 2+; interrogate 1.7+; pydoclint 0.11+                       |
 
 For example, on macOS install the native tools with Homebrew and add Ruff to a Python project with uv:
 
 ```sh
-brew install llvm doxygen google-java-format checkstyle pmd spotbugs
+brew install llvm google-java-format checkstyle pmd spotbugs
 export PATH="$(brew --prefix llvm)/bin:$PATH"
 uv add --dev ruff mypy bandit vulture interrogate pydoclint
 ```
 
-On Debian or Ubuntu, install the C tools with `sudo apt-get install clang clang-format clang-tidy doxygen`; install the Java and Python tools with the package manager or project wrappers used by that repository. The profile check prints its tested minimum if the installed version is too old.
+On Debian or Ubuntu, install the C tools with `sudo apt-get install clang clang-format clang-tidy`; install the Java and Python tools with the package manager or project wrappers used by that repository. The profile check prints its tested minimum if the installed version is too old.
 
 Build and test commands remain repository-owned. Add them to `qualityCommands` using the project’s existing Make, Maven, Gradle, Python, or other wrapper. A configured command whose name matches a profile check replaces that default; other commands run alongside the profiles. SpotBugs runs in repository health after build commands and accepts Maven `target/classes` or Gradle `build/classes/java/main`; override `java-spotbugs` for a different build layout. For example:
 

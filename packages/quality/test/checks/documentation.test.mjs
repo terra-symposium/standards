@@ -21,6 +21,93 @@ import { fixtureFile, fixtureRoot, fixtureText } from '../../support/fixtures.mj
 TESTS
 //////////////////////////////////////////////////*/
 
+test('C documentation checks static definitions and header declarations with ownership, pointer parameters, and locations', () => {
+	const root = fixtureRoot('terra-quality-c-documentation-');
+	fixtureFile(root, 'src/c/compression/api.h', `/**
+ * @brief Copies bytes into the output buffer.
+ * @param input source bytes
+ * @param output destination buffer
+ * @param size number of bytes
+ * @return number copied
+ * @author kai
+ */
+size_t copy_bytes(const char *input, char *output, size_t size);
+`);
+	fixtureFile(root, 'src/c/compression/api.c', `#define FAKE_CALL(x) x(1)
+/**
+ * Copies bytes into the output buffer.
+ * @param input source bytes
+ * @param output destination buffer
+ * @param size number of bytes
+ * @return number copied
+ * @author kai
+ */
+size_t copy_bytes(const char *input, char *output, size_t size) { return size; }
+/** Clears the output buffer.
+ * @author kai
+ */
+static void clear_buffer(void) { const char *text = "fake_call()"; (void)text; }
+`);
+	const cfg = createQualityCfg({ root, sourceRoots: ['src/c'], extensions: [], documentation: { cAuthors: { 'src/c': 'haadi', 'src/c/compression': 'kai' } } });
+	assert.deepEqual(documentationFindings(cfg).map(({ name, file, line }) => [name, file, line]), []);
+});
+test('C documentation treats matching header prototypes and source definitions as one documentation contract', () => {
+	const root = fixtureRoot('terra-quality-c-documentation-dedup-');
+	fixtureFile(root, 'src/c/module/api.h', 'int transform(int value);\n');
+	fixtureFile(root, 'src/c/module/impl.c', 'int transform(int value) { return value; }\n');
+	const cfg = createQualityCfg({ root, sourceRoots: ['src/c'], extensions: [] });
+	const findings = documentationFindings(cfg).filter(({ kind, name }) => kind === 'function' && name === 'transform');
+	assert.equal(findings.length, 1);
+	fixtureFile(root, 'src/c/other/api.h', `/** Transforms a value.\n * @param value input value\n * @return transformed value\n * @author haadi\n */\nint transform_value(int value);\n`);
+	fixtureFile(root, 'src/c/other/impl.c', 'int transform_value(int value) { return value; }\n');
+	assert.deepEqual(documentationFindings(cfg).filter(({ kind, name }) => kind === 'function' && name === 'transform_value'), []);
+});
+test('C documentation reports missing, stale, ordered, undescribed, return, summary, and author fields', () => {
+	const root = fixtureRoot('terra-quality-c-documentation-errors-');
+	fixtureFile(root, 'src/c/encryption/crypto.c', `/**
+ *
+ * @param extra unused
+ * @param output
+ * @param input source
+ * @author kai
+ */
+int transform(const char *input, char *output) { return 1; }
+int undocumented(void);
+/** Returns an empty result.
+ * @return
+ * @author marceline
+ */
+int empty_result(void);
+`);
+	fixtureFile(root, 'src/c/login/session.c', `/** Starts a login session.\n * @author kai\n */\nvoid login_session(void);\n`);
+	const cfg = createQualityCfg({ root, sourceRoots: ['src/c'], extensions: [], documentation: { cAuthors: { 'src/c/encryption': 'marceline', 'src/c/login': 'marceline' } } });
+	const findings = documentationFindings(cfg);
+	assert.ok(findings.some(({ name, reason }) => name === '<summary>' && reason.includes('summary')));
+	assert.ok(findings.some(({ name, reason }) => name === '@param order' && reason.includes('order')));
+	assert.ok(findings.some(({ name, reason }) => name === '@param output' && reason.includes('description')));
+	assert.ok(findings.some(({ name, reason }) => name === '@param extra' && reason.includes('stale')));
+	assert.ok(findings.some(({ name }) => name === '@return'));
+	assert.ok(findings.some(({ name }) => name === '@author marceline'));
+	assert.ok(findings.some(({ file, name }) => file.endsWith('session.c') && name === '@author marceline'));
+	assert.ok(findings.some(({ name, reason }) => name === '@return' && reason.includes('description')));
+	assert.ok(findings.some(({ file, line, name }) => file.endsWith('crypto.c') && line === 9 && name === 'undocumented'));
+});
+test('C documentation ignores comments, literals, macro bodies, controls, and pointer declarations', () => {
+	const root = fixtureRoot('terra-quality-c-documentation-mask-');
+	fixtureFile(root, 'src/c/main.c', `#define HIDDEN() fake(1)
+const char *text = "fake_call()";
+/* fake_comment() */
+void (*callback)(int value);
+/** Runs the callback.
+ * @param callback callback function
+ * @param value callback argument
+ * @author haadi
+ */
+void invoke(void (*callback)(int), int value) { if (value) callback(value); }
+`);
+	const cfg = createQualityCfg({ root, sourceRoots: ['src/c'], extensions: [], documentation: { cAuthors: { 'src/c': 'haadi' } } });
+	assert.deepEqual(documentationFindings(cfg).map(({ name }) => name), []);
+});
 test('documentation policy excludes generated and vendor source trees', () => {
 	const root = fixtureRoot('terra-quality-documentation-pruned-');
 	fixtureFile(root, 'src/main.ts', 'function documentedScope() { return true; }\n');

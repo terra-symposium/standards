@@ -35,6 +35,7 @@
 			"type": "object",
 			"properties": {
 				"commandRoots": { "type": "array", "items": { "type": "string" }, "description": "Markdown roots where fenced pnpm commands are checked for deprecated directory flags." },
+				"cAuthors": { "type": "object", "additionalProperties": { "type": "string" }, "description": "Repository-relative C source directory prefixes mapped to required @author names." },
 				"required": {
 					"type": "object",
 					"properties": {

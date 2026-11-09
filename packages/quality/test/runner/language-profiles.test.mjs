@@ -11,7 +11,7 @@ IMPORTS
 // API
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { createQualityCfg, inspectLanguageProfileTool, resolveLanguageProfiles, runQualityCli } from '../../dist/index.js';
+import { createQualityCfg, documentationFindings, inspectLanguageProfileTool, resolveLanguageProfiles, runQualityCli } from '../../dist/index.js';
 import { delimiter, dirname, join } from 'node:path';
 import { fixtureFile, fixtureRoot, fixtureText, resetExitCode } from '../../support/fixtures.mjs';
 import { readFileSync } from 'node:fs';
@@ -64,7 +64,7 @@ function fakeProfileTool(root, name, version) {
 	return fixtureFile(
 		root,
 		`bin/${name}`,
-		`#!/usr/bin/env node\nimport { appendFileSync } from 'node:fs';\nif (process.argv[2] === '--version' || process.argv[2] === '-version') console.log(${JSON.stringify(`${name} ${version}`)});\nelse appendFileSync(process.env.TERRA_QUALITY_PROFILE_MARKER, JSON.stringify({ name: ${JSON.stringify(name)}, args: process.argv.slice(2) }) + '\\n');\n`,
+		`#!/usr/bin/env node\nimport { appendFileSync } from 'node:fs';\nif (process.argv[2] === '--version' || process.argv[2] === '-version') console.log(${JSON.stringify(`${name} ${version}`)});\nelse if (process.argv.includes('-ast-dump=json')) console.log(JSON.stringify({ kind: 'TranslationUnitDecl', inner: [] }));\nelse appendFileSync(process.env.TERRA_QUALITY_PROFILE_MARKER, JSON.stringify({ name: ${JSON.stringify(name)}, args: process.argv.slice(2) }) + '\\n');\n`,
 		0o755,
 	);
 }
@@ -81,7 +81,6 @@ test('language profiles resolve only matching source files and optional project 
 	fixtureFile(root, 'src/Second.java', 'class Second {}\n');
 	fixtureFile(root, 'src/worker.py', 'pass\n');
 	fixtureFile(root, 'src/types.pyi', 'def work() -> None: ...\n');
-	fixtureFile(root, 'Doxyfile', 'INPUT = src\n');
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], languageProfiles: ['c', 'java', 'python'] });
 	const resolved = resolveLanguageProfiles(cfg);
 	assert.deepEqual(
@@ -90,7 +89,6 @@ test('language profiles resolve only matching source files and optional project 
 			'c-format',
 			'c-static-analysis',
 			'c-clang-tidy',
-			'c-documentation',
 			'java-format',
 			'java-checkstyle',
 			'java-pmd',
@@ -169,26 +167,13 @@ test('documentation commands resolve automatically for detected source even when
 		['python-docstring-coverage', 'python-docstring-signatures'],
 	);
 });
-test('missing required documentation configuration fails and JSON reports explicit N/A capabilities', () => {
+test('C documentation is a built-in source check and does not require a Doxyfile', () => {
 	const root = fixtureRoot('terra-quality-documentation-prerequisite-');
 	fixtureFile(root, 'src/main.c', 'static int helper(void) { return 1; }\n');
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: [], enabledChecks: { ...DISABLED_SOURCE_CHECKS, document: true } });
 	const resolved = resolveLanguageProfiles(cfg);
-	assert.deepEqual(resolved.failed, [{ name: 'c-documentation', profileId: 'c', reason: 'required configuration Doxyfile is absent' }]);
-	const previousErr = console.error;
-	console.error = () => {};
-	try {
-		runQualityCli(cfg, ['quality', '--all', '--warn', '--report-json', 'report.json']);
-		const report = JSON.parse(fixtureText(root, 'report.json'));
-		assert.equal(report.checks.find(({ name }) => name === 'command:c-documentation')?.status, 'failed');
-		assert.match(report.checks.find(({ name }) => name === 'command:c-documentation')?.reason ?? '', /Doxyfile is absent/);
-		const inaccessible = report.checks.find(({ name }) => name === 'c:accessibility');
-		assert.equal(inaccessible?.status, 'not-applicable');
-		assert.match(inaccessible?.reason ?? '', /JSX\/TSX/);
-	} finally {
-		console.error = previousErr;
-		resetExitCode();
-	}
+	assert.deepEqual(resolved.failed, []);
+	assert.ok(documentationFindings(cfg).some(({ name, reason }) => name === 'helper' && reason.includes('missing documentation block')));
 });
 test('profile tool checks enforce their minimum version and include installation guidance', () => {
 	const root = fixtureRoot('terra-quality-language-tool-version-');
@@ -229,12 +214,10 @@ test('C, Java, and Python profiles invoke their native checks in phase order', (
 	fixtureFile(root, 'src/App.java', 'class App {}\n');
 	fixtureFile(root, 'src/worker.py', 'pass\n');
 	fixtureFile(root, 'src/types.pyi', 'def work() -> None: ...\n');
-	fixtureFile(root, 'Doxyfile', 'INPUT = src\n');
 	for (const [name, version] of [
 		['clang-format', '18.0.0'],
 		['clang', '18.0.0'],
 		['clang-tidy', '18.0.0'],
-		['doxygen', '1.9.8'],
 		['google-java-format', '1.36.0'],
 		['checkstyle', '14.0.0'],
 		['pmd', '7.13.0'],
@@ -262,7 +245,7 @@ test('C, Java, and Python profiles invoke their native checks in phase order', (
 			.map((line) => JSON.parse(line));
 		assert.deepEqual(
 			calls.map(({ name }) => name),
-			['clang-format', 'google-java-format', 'ruff', 'clang', 'clang-tidy', 'doxygen', 'checkstyle', 'pmd', 'ruff', 'bandit', 'vulture', 'interrogate', 'pydoclint', 'mypy', 'spotbugs'],
+			['clang-format', 'google-java-format', 'ruff', 'clang', 'clang-tidy', 'checkstyle', 'pmd', 'ruff', 'bandit', 'vulture', 'interrogate', 'pydoclint', 'mypy', 'spotbugs'],
 		);
 		resetExitCode();
 	} finally {

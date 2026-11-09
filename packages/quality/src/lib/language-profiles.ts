@@ -143,7 +143,7 @@ const CHECKSTYLE_CONFIG = fileURLToPath(new URL('../../quality-configs/checkstyl
 const PMD_CONFIG = fileURLToPath(new URL('../../quality-configs/pmd-rules.xml', import.meta.url));
 const NATIVE_CHECKS: Record<LanguageProfileId, Partial<Record<QualityCheckName, string>>> = {
 	c: {
-		document: 'Doxygen',
+		document: 'Clang AST comment analysis',
 		format: 'clang-format',
 		import: 'clang-tidy misc-include-cleaner',
 		name: 'clang-tidy readability checks',
@@ -310,21 +310,6 @@ export const LANGUAGE_PROFILES: readonly { id: LanguageProfileId; sourceExtensio
 					versionArgs: ['--version'],
 					minimumVersion: [14, 0, 0],
 					install: 'Install LLVM/Clang with your system package manager (for example, `brew install llvm` or `sudo apt-get install clang-tidy`).',
-				},
-			},
-			{
-				name: 'c-documentation',
-				phase: 'Static quality',
-				command: 'doxygen',
-				args: ['Doxyfile'],
-				qualityChecks: ['document'],
-				requiredFile: 'Doxyfile',
-				tool: {
-					command: 'doxygen',
-					versionArgs: ['--version'],
-					minimumVersion: [1, 9, 0],
-					install:
-						'Install Doxygen with your system package manager (for example, `brew install doxygen` or `sudo apt-get install doxygen`). Set `WARN_AS_ERROR = FAIL_ON_WARNINGS` in Doxyfile to fail on documentation warnings.',
 				},
 			},
 		],

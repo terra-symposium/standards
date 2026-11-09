@@ -227,7 +227,7 @@ export type QualityCfg = {
 	excludeTests?: boolean;
 	enabledChecks?: Partial<Record<QualityCheckName, boolean>>;
 	autofix?: Partial<Record<QualityAutofixName, boolean>>;
-	documentation?: { required?: DocumentationRequirements; commandRoots?: string[] };
+	documentation?: { required?: DocumentationRequirements; commandRoots?: string[]; cAuthors?: Record<string, string> };
 	enabledCommands?: Record<string, boolean>;
 	recommendationCommands?: { name: string; command: string; args?: string[] }[];
 	enabledRecommendations?: Record<string, boolean>;

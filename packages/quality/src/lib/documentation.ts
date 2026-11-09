@@ -12,6 +12,7 @@ import ts from 'typescript';
 import { displayPath, srcFiles } from './files.js';
 import { extname, relative, resolve, sep } from 'node:path';
 import { readFileSync, renameSync, unlinkSync, writeFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 
 // TYPES
 import type { QualityAnalysis, QualityCfg } from './runner.js';
@@ -1016,6 +1017,109 @@ function documentationSourceIncluded(cfg: QualityCfg, file: string): boolean {
 		.some((dir) => ['generated', 'vendor', 'target', 'out'].includes(dir));
 }
 
+/** Returns source offsets for C comments while blanking literals and macro lines. */
+function cCode(source: string): string {
+	let code = source.replace(/\/\*[\s\S]*?\*\/|\/\/[^\n]*|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'/g, (part) => part.replace(/[^\n]/g, ' '));
+	code = code.replace(/^[ \t]*#.*(?:\\\r?\n[ \t]*#?.*)*/gm, (part) => part.replace(/[^\n]/g, ' '));
+	return code;
+}
+
+function cPair(text: string, start: number, open: string, close: string): number {
+	let depth = 0;
+	for (let index = start; index < text.length; index += 1) {
+		if (text[index] === open) depth += 1;
+		else if (text[index] === close && --depth === 0) return index;
+	}
+	return -1;
+}
+
+function cParameters(text: string): string[] {
+	if (!text.trim() || text.trim() === 'void') return [];
+	const names: string[] = [];
+	let start = 0;
+	let round = 0;
+	let square = 0;
+	for (let index = 0; index <= text.length; index += 1) {
+		const char = text[index];
+		if (char === '(') round += 1;
+		if (char === ')') round -= 1;
+		if (char === '[') square += 1;
+		if (char === ']') square -= 1;
+		if ((char === ',' && round === 0 && square === 0) || index === text.length) {
+			const part = text.slice(start, index).trim();
+			const pointerName = part.match(/\(\s*\*\s*(\w+)/)?.[1];
+			const identifiers = [...part.replace(/\[[^\]]*\]/g, '').matchAll(/[A-Za-z_]\w*/g)].map(([name]) => name);
+			const name = pointerName ?? identifiers.at(-1);
+			if (name && name !== 'void' && part !== '...') names.push(name);
+			start = index + 1;
+		}
+	}
+	return names;
+}
+
+/** Audits Doxygen blocks on C prototypes and definitions using Clang's declaration AST. */
+function cDocumentationFindings(cfg: QualityCfg, file: string, source: string, documentedSignatures = new Set<string>(), missingTargets = new Map<string, string>()): DocumentationFinding[] {
+	const parsed = spawnSync('clang', ['-x', 'c', '-std=c11', '-fsyntax-only', '-Wno-everything', '-Wno-unknown-pragmas', '-Wno-ignored-attributes', '-Xclang', '-ast-dump=json', file], { cwd: cfg.root, encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 });
+	if (parsed.error || !parsed.stdout) return [{ file: displayPath(cfg, file), line: 1, column: 1, name: 'clang', kind: 'function', reason: `Clang is required to inspect C documentation: ${parsed.error?.message ?? (parsed.stderr.trim() || 'no AST output')}`, severity: 'error' }];
+	const ast = JSON.parse(parsed.stdout) as CNode;
+	const declarations: { name: string; signature: string; line: number; params: string[]; returnsValue: boolean; comment?: CNode }[] = [];
+	const walk = (node: CNode): void => {
+		if (node.kind === 'FunctionDecl' && node.name && node.loc?.offset !== undefined && !node.loc.includedFrom && (!node.loc.file || resolve(node.loc.file) === resolve(file))) {
+			const children = node.inner ?? [];
+			declarations.push({ name: node.name, signature: `${node.name}|${node.type?.qualType ?? ''}`, line: node.loc.line ?? source.slice(0, node.loc.offset).split('\n').length, params: children.filter((child) => child.kind === 'ParmVarDecl').map((child) => child.name ?? '<unnamed>'), returnsValue: !/^void\s*\(/.test(node.type?.qualType ?? ''), comment: children.find((child) => child.kind === 'FullComment') });
+		}
+		for (const child of node.inner ?? []) walk(child);
+	};
+	walk(ast);
+	const rel = relative(cfg.root, file).split(sep).join('/');
+	const author = Object.entries(cfg.documentation?.cAuthors ?? {})
+		.filter(([prefix]) => rel.startsWith(prefix.replace(/\/$/, '') + '/'))
+		.sort(([left], [right]) => right.length - left.length)[0]?.[1];
+	const findings: DocumentationFinding[] = [];
+	const deduplicated = new Map<string, (typeof declarations)[number]>();
+	for (const declaration of declarations) {
+		const previous = deduplicated.get(declaration.signature);
+		if (!previous || (!previous.comment && declaration.comment)) deduplicated.set(declaration.signature, declaration);
+	}
+	for (const declaration of deduplicated.values()) {
+		const comment = declaration.comment ? parseCComment(declaration.comment) : undefined;
+		const report = (name: string, kind: DocumentationFinding['kind'], reason: string): void => { findings.push({ file: displayPath(cfg, file), line: declaration.line, column: 1, name, kind, reason, severity: 'error' }); };
+		if (!comment) {
+			missingTargets.set(`${displayPath(cfg, file)}|${declaration.line}|${declaration.name}`, declaration.signature);
+			report(declaration.name, 'function', `missing documentation block for ${declaration.name}`);
+			continue;
+		}
+		documentedSignatures.add(declaration.signature);
+		if (!comment.summary.trim()) report('<summary>', 'summary', 'add a meaningful documentation summary');
+		const documented = comment.params.map(({ name }) => name);
+		for (const name of declaration.params) if (!documented.includes(name)) report(`@param ${name}`, 'param', `missing @param ${name}`);
+		for (const name of new Set(documented.filter((name) => !declaration.params.includes(name)))) report(`@param ${name}`, 'param', `stale @param ${name}`);
+		if (declaration.params.some((name, index) => documented[index] !== name)) report('@param order', 'param', `@param tags must follow signature order: ${declaration.params.join(', ')}`);
+		for (const { name, description } of comment.params) if (declaration.params.includes(name) && !description.trim()) report(`@param ${name}`, 'param', `missing description for @param ${name}`);
+		if (declaration.returnsValue && !comment.returns?.trim()) report('@return', 'return', 'missing @return description');
+		if (author && !comment.authors.includes(author)) report(`@author ${author}`, 'tag', `missing or incorrect @author ${author}`);
+	}
+	return findings;
+}
+
+type CNode = { kind?: string; name?: string; text?: string; param?: string; loc?: { offset?: number; line?: number; file?: string; includedFrom?: { file?: string } }; type?: { qualType?: string }; inner?: CNode[] };
+function parseCComment(node: CNode): { summary: string; params: { name: string; description: string }[]; returns?: string; authors: string[] } {
+	const result = { summary: '', params: [] as { name: string; description: string }[], authors: [] as string[], returns: undefined as string | undefined };
+	const text = (current: CNode): string => (current.text ?? '') + (current.inner ?? []).map(text).join('');
+	for (const child of node.inner ?? []) {
+		if (child.kind === 'ParagraphComment') result.summary += text(child);
+		if (child.kind === 'ParamCommandComment') result.params.push({ name: child.param ?? '', description: text(child).trim() });
+		if (child.kind === 'BlockCommandComment') {
+			const value = text(child).trim();
+			if (/^brief$/i.test(child.name ?? '')) result.summary += value;
+			if (/^returns?$/i.test(child.name ?? '')) result.returns = value;
+			if (/^author$/i.test(child.name ?? '')) result.authors.push(value);
+		}
+	}
+	return result;
+}
+
+
 /**
  * Checks whether a node has a JSDoc or TSDoc block in its leading trivia.
  *
@@ -1451,11 +1555,22 @@ function documentationFindingsForFile(cfg: QualityCfg, file: string, requirement
  */
 export function documentationFindings(cfg: QualityCfg, analysis?: QualityAnalysis): DocumentationFinding[] {
 	const requirements = { functions: true, ...cfg.documentation?.required };
-	return analysis?.files
-		? analysis.files.filter((file) => documentationSourceIncluded(cfg, file)).flatMap((f) => documentationFindingsForFile(cfg, f, requirements, analysis))
-		: srcFiles(cfg)
-				.filter((file) => documentationSourceIncluded(cfg, file))
-				.flatMap((f) => documentationFindingsForFile(cfg, f, requirements));
+	const cFiles = srcFiles({ ...cfg, extensions: ['.c', '.h'] }).filter((file) => documentationSourceIncluded(cfg, file));
+	const documentedSignatures = new Set<string>();
+	const missingTargets = new Map<string, string>();
+	const cFindings = cFiles.flatMap((file) => cDocumentationFindings(cfg, file, readFileSync(file, 'utf8'), documentedSignatures, missingTargets));
+	const otherFiles = analysis?.files
+		? analysis.files.filter((file) => documentationSourceIncluded(cfg, file) && documentationSupported(file))
+		: srcFiles(cfg).filter((file) => documentationSourceIncluded(cfg, file) && documentationSupported(file));
+	const otherFindings = otherFiles.flatMap((file) => documentationFindingsForFile(cfg, file, requirements, analysis));
+	const primaryMissing = new Map<string, string>();
+	for (const [target, signature] of missingTargets) if (!primaryMissing.has(signature)) primaryMissing.set(signature, target);
+	return [...cFindings, ...otherFindings].filter((finding) => {
+		if (finding.kind !== 'function' || !finding.reason.startsWith('missing documentation block')) return true;
+		const target = `${finding.file}|${finding.line}|${finding.name}`;
+		const signature = missingTargets.get(target);
+		return !signature || (!documentedSignatures.has(signature) && primaryMissing.get(signature) === target);
+	});
 }
 
 /**
