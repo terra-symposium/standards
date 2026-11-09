@@ -59,23 +59,26 @@ test('collapseInlineIfs preserves the historical nested-if else owner and runtim
 	const file = fixtureFile(root, 'src/main.ts', 'if (outer) { if (inner) run(); } else stop();\n');
 	const original = fixtureText(root, 'src/main.ts');
 	/**
+	 * Evaluates conditional source with recording branch functions.
 	 *
-	 * @param src
-	 * @param outer
-	 * @param inner
+	 * @param src Conditional statement to evaluate.
+	 * @param outer Value used for the outer condition.
+	 * @param inner Value used for the inner condition.
 	 *
-	 * @return
+	 * @return Branch names recorded in execution order.
 	 */
 	const execute = (src, outer, inner) => {
 		const result = [];
 		/**
+		 * Records that the conditional source called its `run` branch.
 		 *
-		 * @return
+		 * @return The number of recorded branch calls.
 		 */
 		const run = () => result.push('run');
 		/**
+		 * Records that the conditional source called its `stop` branch.
 		 *
-		 * @return
+		 * @return The number of recorded branch calls.
 		 */
 		const stop = () => result.push('stop');
 		runInNewContext(`(() => { const outer = ${outer}; const inner = ${inner}; ${src} return result; })()`, { result, run, stop });

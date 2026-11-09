@@ -50,7 +50,7 @@ HELPERS
 /**
  * Resolves an environment selection or alias list against an application catalog.
  *
- * @param raw - or whitespace-separated viewport names, aliases, or `all`.
+ * @param raw Comma- or whitespace-separated viewport names, aliases, or `all`.
  * @param catalog Viewport catalog against which names are validated.
  *
  * @return The selected viewport definitions in request order.
@@ -141,6 +141,8 @@ export type ResponsivePlaywrightOptions = {
 	/** Explicit timing settings that override matching quality.json values. */
 	loadTesting?: LoadTestingConfig;
 };
+/** Project fields needed to expand and classify a Playwright project. */
+type ResponsiveProjectConfig = { dependencies?: readonly string[]; name?: string; testMatch?: unknown; use?: Record<string, unknown> };
 
 /**
  * Expands every regular Playwright project across Terra's shared responsive viewport set.
@@ -150,9 +152,8 @@ export type ResponsivePlaywrightOptions = {
  * `singleRunProjects`. The helper adds full-page automatic screenshots and the shared
  * evidence reporter while preserving any other configured reporters.
  *
- * @param cfg
+ * @param cfg Existing Playwright configuration to extend.
  * @param opts Shared matrix and reporting options.
- * @param config Existing Playwright configuration.
  *
  * @return Configuration with responsive projects, native screenshots, and reporting.
  */
@@ -165,49 +166,59 @@ export const withResponsivePlaywright = <T extends PlaywrightTestConfig>(cfg: T,
 		path.resolve(process.cwd(), 'packages/reporting/dist'),
 	];
 	const sharedDist = sharedDistCandidates.find((c) => fs.existsSync(c)) || sharedDistCandidates[0];
-	const resolvedSharedDist = fs.existsSync(sharedDist) ? fs.realpathSync(sharedDist) : sharedDist;
-	const external = [...(cfg.build?.external || []), path.join(resolvedSharedDist, '**')];
-	const projects = (cfg.projects || []) as Array<{ dependencies?: readonly string[]; name?: string; testMatch?: unknown; use?: Record<string, unknown> }>;
-	const dependencyProjects = new Set(projects.flatMap((p) => p.dependencies || []));
-	const singleRun = new Set(opts.singleRunProjects || []);
-	/**
-	 *
-	 * @param project
-	 * @param idx
-	 *
-	 * @return
-	 */
-	const isSetup = (project: (typeof projects)[number], idx: number): boolean => {
-		const name = project.name || `project-${idx + 1}`;
-		const match = Array.isArray(project.testMatch) ? project.testMatch : [project.testMatch];
-		const matchText = match.map((e) => (e instanceof RegExp ? e.source : String(e || ''))).join(' ');
-		return dependencyProjects.has(name) || /setup/i.test(name) || /\.setup\.[cm]?[jt]sx?/i.test(matchText);
-	};
-	const responsiveProjects = projects.flatMap((p, i) => {
-		const baseName = p.name || `project-${i + 1}`;
-		if (isSetup(p, i) || singleRun.has(baseName)) return [p];
-		return viewports.map((v) => ({
-			...p,
-			name: visualProjectName(baseName, v, viewports),
-			use: { ...(p.use || {}), viewport: { width: v.width, height: v.height }, screenshot: { mode: 'on', fullPage: true, caret: 'initial' } },
-		}));
-	});
-	const cfgdReporters = cfg.reporter ? (Array.isArray(cfg.reporter) ? cfg.reporter : [cfg.reporter]) : [];
-	const reportingOpts = { outputRoot: opts.outputRoot, supplementalResultsFile: opts.supplementalResultsFile, qualityConfigFile: opts.qualityConfigFile, loadTesting };
-	const reporters = [
-		...cfgdReporters.filter((r) => {
-			const name = Array.isArray(r) ? r[0] : r;
-			return !(typeof name === 'string' && name.includes('@terra-symposium/standards-reporting/playwright'));
-		}),
-		['@terra-symposium/standards-reporting/playwright', reportingOpts],
-	];
-	return {
-		...cfg,
-		metadata: { ...(cfg.metadata || {}), terraLoadTestingEnabled: loadTesting.enabled },
-		build: { ...(cfg.build || {}), external },
-		outputDir: opts.outputDir || 'test-results/playwright-output',
-		projects: responsiveProjects,
-		reporter: reporters,
-		use: { ...(cfg.use || {}), screenshot: { mode: 'on', fullPage: true, caret: 'initial' } },
-	} as T;
+	// Thread configuration snapshots through parameters to retain their evaluation order.
+	return ((resolvedSharedDist: string, getProjects: () => ResponsiveProjectConfig[]) =>
+		((external: string[], projects: ResponsiveProjectConfig[]) =>
+			((dependencyProjects: Set<string>, singleRun: Set<string>) =>
+				((responsiveProjects: unknown[]) =>
+					((
+						cfgdReporters: unknown[],
+						reportingOpts: {
+							outputRoot: ResponsivePlaywrightOptions['outputRoot'];
+							supplementalResultsFile: ResponsivePlaywrightOptions['supplementalResultsFile'];
+							qualityConfigFile: ResponsivePlaywrightOptions['qualityConfigFile'];
+							loadTesting: LoadTestingConfig;
+						},
+					) =>
+						((reporters: unknown[]) =>
+							({
+								...cfg,
+								metadata: { ...(cfg.metadata || {}), terraLoadTestingEnabled: loadTesting.enabled },
+								build: { ...(cfg.build || {}), external },
+								outputDir: opts.outputDir || 'test-results/playwright-output',
+								projects: responsiveProjects,
+								reporter: reporters,
+								use: { ...(cfg.use || {}), screenshot: { mode: 'on', fullPage: true, caret: 'initial' } },
+							}) as T)([
+							...cfgdReporters.filter((r) => {
+								const name = Array.isArray(r) ? r[0] : r;
+								return !(typeof name === 'string' && name.includes('@terra-symposium/standards-reporting/playwright'));
+							}),
+							['@terra-symposium/standards-reporting/playwright', reportingOpts],
+						]))(cfg.reporter ? (Array.isArray(cfg.reporter) ? cfg.reporter : [cfg.reporter]) : [], {
+						outputRoot: opts.outputRoot,
+						supplementalResultsFile: opts.supplementalResultsFile,
+						qualityConfigFile: opts.qualityConfigFile,
+						loadTesting,
+					}))(
+					projects.flatMap((p, i) => {
+						const baseName = p.name || `project-${i + 1}`;
+						const name = p.name || `project-${i + 1}`;
+						if (
+							((matchText: string) => dependencyProjects.has(name) || /setup/i.test(name) || /\.setup\.[cm]?[jt]sx?/i.test(matchText))(
+								(Array.isArray(p.testMatch) ? p.testMatch : [p.testMatch]).map((e) => (e instanceof RegExp ? e.source : String(e || ''))).join(' '),
+							) ||
+							singleRun.has(baseName)
+						)
+							return [p];
+						return viewports.map((v) => ({
+							...p,
+							name: visualProjectName(baseName, v, viewports),
+							use: { ...(p.use || {}), viewport: { width: v.width, height: v.height }, screenshot: { mode: 'on', fullPage: true, caret: 'initial' } },
+						}));
+					}),
+				))(new Set(projects.flatMap((p) => p.dependencies || [])), new Set(opts.singleRunProjects || [])))([...(cfg.build?.external || []), path.join(resolvedSharedDist, '**')], getProjects()))(
+		fs.existsSync(sharedDist) ? fs.realpathSync(sharedDist) : sharedDist,
+		() => (cfg.projects || []) as ResponsiveProjectConfig[],
+	);
 };

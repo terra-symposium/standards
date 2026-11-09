@@ -20,9 +20,9 @@ HELPERS
 /**
  * Creates a quality config scoped to one JSX fixture.
  *
- * @param source
+ * @param source JSX source written to the fixture file.
  *
- * @return
+ * @return Fixture root and its quality configuration.
  */
 function fixtureConfig(source) {
 	const root = fixtureRoot('terra-quality-accessibility-');

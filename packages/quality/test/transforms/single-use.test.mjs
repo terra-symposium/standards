@@ -17,12 +17,13 @@ import test from 'node:test';
 import ts from 'typescript';
 import { createQualityCfg, fixSingleUseDeclarations, fixSingleUseTypes, singleUseFindings } from '../../dist/index.js';
 import { fixtureFile, fixtureRoot, fixtureText } from '../../support/fixtures.mjs';
+
 /*//////////////////////////////////////////////////
 REGEX
 //////////////////////////////////////////////////*/
+
 const EXPORT_TYPE_PAYLOAD_REGEX = /export type Payload/;
 const EXPORT_FN_PARSEREPORT_REGEX = /export function parseReport/;
-
 test('single-use functions with attached prose require review and remain unchanged', () => {
 	const root = fixtureRoot('terra-quality-single-use-comments-');
 	fixtureFile(
@@ -51,6 +52,20 @@ describe('fixture', () => {
 	assert.match(result, /function walk\(dir: string\)/);
 	assert.equal((result.match(/Walks configured source roots/g) ?? []).length, 1);
 	assert.equal(ts.createSourceFile('main.ts', result, ts.ScriptTarget.Latest, true).parseDiagnostics.length, 0);
+});
+test('self-recursive declarations count their recursive references', () => {
+	const root = fixtureRoot('terra-quality-single-use-recursive-');
+	fixtureFile(
+		root,
+		'src/main.ts',
+		`function countDown(value: number): number { return value === 0 ? 0 : countDown(value - 1); }
+const visit = (value: number): number => value === 0 ? 0 : visit(value - 1);
+void countDown(2);
+void visit(2);
+`,
+	);
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
+	assert.deepEqual(singleUseFindings(cfg), []);
 });
 test('inlining keeps attached comments for constants and types', () => {
 	const root = fixtureRoot('terra-quality-single-use-comment-kinds-');
@@ -208,6 +223,20 @@ test('single-use analysis counts cross-file consumers but ignores import syntax 
 		false,
 	);
 });
+test('single-use analysis preserves declarations re-exported through a barrel', () => {
+	const root = fixtureRoot('terra-quality-single-use-barrel-exports-');
+	fixtureFile(root, 'src/types.ts', `export type Payload = { value: string };\nexport const status = 'ready';\n`);
+	fixtureFile(root, 'src/index.ts', `export type { Payload } from './types';\nexport { status } from './types';\n`);
+	fixtureFile(root, 'src/consumer.ts', `import type { Payload } from './index';\nimport { status } from './index';\nconst payload: Payload = { value: status };\nvoid payload;\n`);
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
+	assert.equal(
+		singleUseFindings(cfg).some(({ name }) => ['Payload', 'status'].includes(name)),
+		false,
+	);
+	assert.equal(fixSingleUseDeclarations(cfg), 0);
+	assert.match(fixtureText(root, 'src/types.ts'), /export type Payload/);
+	assert.match(fixtureText(root, 'src/types.ts'), /export const status/);
+});
 test('single-use type fixing inlines exported aliases and interfaces with one consumer', () => {
 	const root = fixtureRoot('terra-quality-single-use-fix-');
 	fixtureFile(root, 'src/types.ts', `export type Payload = { value: string };\nexport interface Result { ok: boolean; }\n`);
@@ -322,6 +351,26 @@ void { sharedItem, nested: { ...sharedItem } };
 	assert.equal(singleUseFindings(cfg).find((finding) => finding.name === 'pureArray')?.decision, 'REVIEW');
 	assert.equal(fixSingleUseTypes(cfg), 0);
 	assert.equal(file.endsWith('src/main.ts'), true);
+});
+test('single-use fixing inlines constant-only expressions but preserves effectful initializers', () => {
+	const root = fixtureRoot('terra-quality-single-use-constant-expression-');
+	fixtureFile(
+		root,
+		'src/main.ts',
+		`declare function readValue(): number;
+const computed = (2 + 3) * 4;
+const effectful = readValue();
+consume(computed);
+consume(effectful);
+function consume(value: number): void { void value; }
+`,
+	);
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
+	assert.equal(fixSingleUseDeclarations(cfg), 1);
+	const source = fixtureText(root, 'src/main.ts');
+	assert.doesNotMatch(source, /const computed/);
+	assert.match(source, /consume\(\(\(2 \+ 3\) \* 4\)\)/);
+	assert.match(source, /const effectful = readValue\(\)/);
 });
 test('single-use fixing leaves typed variables that depend on imported types intact', () => {
 	const root = fixtureRoot('terra-quality-single-use-imported-type-');

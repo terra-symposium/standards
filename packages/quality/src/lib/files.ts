@@ -50,61 +50,53 @@ HELPERS
  * @return Sorted absolute paths for files that belong to the configured source scope.
  */
 export function srcFiles(cfg: QualityCfg): string[] {
-	const roots = [...cfg.sourceRoots, ...(cfg.includeRoots ?? [])];
 	const exts = new Set(cfg.extensions);
 	const skippedFiles = new Set((cfg.skippedFiles ?? []).map((file) => resolve(cfg.root, file)));
 	const files: string[] = [];
 	/**
+	 * Determines whether a source directory is excluded by configuration.
+	 * @param dir Absolute directory path to check.
 	 *
-	 * @param dir
-	 *
-	 * @return
+	 * @return `true` when the directory matches a skipped directory entry.
 	 */
 	const isSkippedDir = (dir: string): boolean => {
-		const repoPath = relative(cfg.root, dir);
 		return (cfg.skippedDirectories ?? []).some((skipped) => {
 			const norm = normalize(skipped.replaceAll('\\', '/'));
 			if (!norm || norm === '.') return false;
 			if (!norm.includes(sep)) return basename(dir) === norm;
 			const skippedPath = resolve(cfg.root, norm);
-			return dir === skippedPath || dir.startsWith(`${skippedPath}${sep}`) || repoPath === norm;
+			return dir === skippedPath || dir.startsWith(`${skippedPath}${sep}`) || relative(cfg.root, dir) === norm;
 		});
 	};
-	/**
-	 *
-	 * @param file
-	 *
-	 * @return
-	 */
-	const isSkippedRootFile = (file: string): boolean => {
-		if (skippedFiles.has(resolve(file))) return true;
-		for (let dir = dirname(resolve(file)); ; dir = dirname(dir)) {
-			if (SCAN_PRUNED_DIRS.has(basename(dir)) || isSkippedDir(dir)) return true;
-			if (dir === cfg.root || dirname(dir) === dir) return false;
-		}
-	};
-	/**
-	 *
-	 * @param dir
-	 */
-	const walk = (dir: string): void => {
-		if (!existsSync(dir)) return;
-		const entry = statSync(dir);
-		if (entry.isFile()) {
-			if (!isSkippedRootFile(dir) && exts.has(dir.slice(dir.lastIndexOf('.')))) files.push(dir);
-			return;
-		}
-		if (!entry.isDirectory() || SCAN_PRUNED_DIRS.has(basename(dir)) || isSkippedDir(dir)) return;
-		for (const e of readdirSync(dir, { withFileTypes: true })) {
-			if (e.isDirectory()) {
-				if (!SCAN_PRUNED_DIRS.has(e.name)) walk(join(dir, e.name));
+	for (const root of [...cfg.sourceRoots, ...(cfg.includeRoots ?? [])]) {
+		const pending = [root];
+		while (pending.length) {
+			const dir = pending.pop()!;
+			if (!existsSync(dir)) continue;
+			const entry = statSync(dir);
+			if (entry.isFile()) {
+				if (!skippedFiles.has(resolve(dir)) && exts.has(dir.slice(dir.lastIndexOf('.')))) {
+					for (let parent = dirname(resolve(dir)); ; parent = dirname(parent)) {
+						if (SCAN_PRUNED_DIRS.has(basename(parent)) || isSkippedDir(parent)) break;
+						if (parent === cfg.root || dirname(parent) === parent) {
+							files.push(dir);
+							break;
+						}
+					}
+				}
 				continue;
 			}
-			const path = join(dir, e.name);
-			if (!skippedFiles.has(resolve(path)) && exts.has(e.name.slice(e.name.lastIndexOf('.')))) files.push(path);
+			if (!entry.isDirectory() || SCAN_PRUNED_DIRS.has(basename(dir)) || isSkippedDir(dir)) continue;
+			for (const entry of readdirSync(dir, { withFileTypes: true })) {
+				if (entry.isDirectory()) {
+					if (!SCAN_PRUNED_DIRS.has(entry.name)) pending.push(join(dir, entry.name));
+					continue;
+				}
+				const path = join(dir, entry.name);
+				if (!skippedFiles.has(resolve(path)) && exts.has(entry.name.slice(entry.name.lastIndexOf('.')))) files.push(path);
+			}
 		}
-	};
-	for (const root of roots) walk(root);
+	}
 	return files.sort((a, b) => a.localeCompare(b));
 }
 
@@ -116,14 +108,15 @@ export function srcFiles(cfg: QualityCfg): string[] {
  * @return Sorted configured source files that are changed or untracked in the working tree.
  */
 export function workingSrcFiles(cfg: QualityCfg): string[] {
-	const changed = new Set(
-		execFileSync('git', ['diff', '--name-only', '--diff-filter=ACMR'], { cwd: cfg.root, encoding: 'utf8' })
-			.concat(execFileSync('git', ['ls-files', '--others', '--exclude-standard'], { cwd: cfg.root, encoding: 'utf8' }))
-			.split('\n')
-			.filter(Boolean)
-			.map((p) => join(cfg.root, p)),
+	return ((changed: Set<string>) => srcFiles(cfg).filter((file) => changed.has(file)))(
+		new Set(
+			execFileSync('git', ['diff', '--name-only', '--diff-filter=ACMR'], { cwd: cfg.root, encoding: 'utf8' })
+				.concat(execFileSync('git', ['ls-files', '--others', '--exclude-standard'], { cwd: cfg.root, encoding: 'utf8' }))
+				.split('\n')
+				.filter(Boolean)
+				.map((path) => join(cfg.root, path)),
+		),
 	);
-	return srcFiles(cfg).filter((f) => changed.has(f));
 }
 
 /**

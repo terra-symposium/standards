@@ -52,65 +52,7 @@ function scriptKind(fileName: string): ts.ScriptKind {
  * @return `true` when the callee name indicates a payload boundary that should be ignored.
  */
 function isIgnoredCallee(expr: ts.Expression): boolean {
-	const text = expr.getText();
-	return /\.(?:insert|upsert|update|set|push|add|append|assign)$/.test(text);
-}
-
-/**
- * Finds repeated property forwarding in call-site object literals within one source file.
- *
- * @param cfg Quality configuration used to render diagnostic paths.
- * @param file Absolute path to the source file being inspected.
- * @param analysis Optional shared parse context for avoiding repeated reads and AST construction.
- *
- * @return Object-forwarding findings discovered in the file.
- */
-function findingsForFile(cfg: QualityCfg, file: string, analysis?: QualityAnalysis): ObjectForwardingFinding[] {
-	const src = analysis?.texts.get(file) ?? readFileSync(file, 'utf8');
-	const parsed = analysis?.sources.get(file) ?? ts.createSourceFile(file, src, ts.ScriptTarget.Latest, true, scriptKind(file));
-	const findings: ObjectForwardingFinding[] = [];
-	/**
-	 *
-	 * @param node
-	 */
-	const visit = (node: ts.Node): void => {
-		if (ts.isCallExpression(node) && !isIgnoredCallee(node.expression)) {
-			for (const argument of node.arguments) {
-				if (!ts.isObjectLiteralExpression(argument)) continue;
-				const spreads = new Map<string, number>();
-				for (let idx = 0; idx < argument.properties.length; idx++) {
-					const property = argument.properties[idx]!;
-					if (ts.isSpreadAssignment(property) && ts.isIdentifier(property.expression)) spreads.set(property.expression.text, idx);
-				}
-				const bySrc = new Map<string, string[]>();
-				for (let idx = 0; idx < argument.properties.length; idx++) {
-					const property = argument.properties[idx]!;
-					if (!ts.isPropertyAssignment(property) || !ts.isIdentifier(property.name)) continue;
-					if (!ts.isPropertyAccessExpression(property.initializer) || !ts.isIdentifier(property.initializer.expression)) continue;
-					if (property.initializer.name.text !== property.name.text) continue;
-					if ((spreads.get(property.initializer.expression.text) ?? idx) >= idx) continue;
-					bySrc.set(property.initializer.expression.text, [...(bySrc.get(property.initializer.expression.text) ?? []), property.name.text]);
-				}
-				for (const [srcName, properties] of bySrc) {
-					if (!properties.length) continue;
-					const pos = parsed.getLineAndCharacterOfPosition(argument.getStart(parsed));
-					const callee = node.expression.getText(parsed);
-					findings.push({
-						file: displayPath(cfg, file),
-						line: pos.line + 1,
-						column: pos.character + 1,
-						callee,
-						source: srcName,
-						properties,
-						recommendation: `remove exact properties already supplied by ...${srcName}`,
-					});
-				}
-			}
-		}
-		ts.forEachChild(node, visit);
-	};
-	visit(parsed);
-	return findings;
+	return /\.(?:insert|upsert|update|set|push|add|append|assign)$/.test(expr.getText());
 }
 
 /**
@@ -125,7 +67,52 @@ function findingsForFile(cfg: QualityCfg, file: string, analysis?: QualityAnalys
  * @return Object-forwarding errors.
  */
 export function objectForwardingFindings(cfg: QualityCfg, analysis?: QualityAnalysis): ObjectForwardingFinding[] {
-	return (analysis?.files ?? srcFiles(cfg)).flatMap((f) => findingsForFile(cfg, f, analysis));
+	return (analysis?.files ?? srcFiles(cfg)).flatMap((file) => {
+		const parsed = analysis?.sources.get(file) ?? ts.createSourceFile(file, analysis?.texts.get(file) ?? readFileSync(file, 'utf8'), ts.ScriptTarget.Latest, true, scriptKind(file));
+		const findings: ObjectForwardingFinding[] = [];
+		const pending: ts.Node[] = [parsed];
+		while (pending.length) {
+			const currentNode = pending.pop()!;
+			if (ts.isCallExpression(currentNode) && !isIgnoredCallee(currentNode.expression)) {
+				for (const argument of currentNode.arguments) {
+					if (!ts.isObjectLiteralExpression(argument)) continue;
+					const spreads = new Map<string, number>();
+					for (let idx = 0; idx < argument.properties.length; idx++) {
+						const property = argument.properties[idx]!;
+						if (ts.isSpreadAssignment(property) && ts.isIdentifier(property.expression)) spreads.set(property.expression.text, idx);
+					}
+					const bySrc = new Map<string, string[]>();
+					for (let idx = 0; idx < argument.properties.length; idx++) {
+						const property = argument.properties[idx]!;
+						if (!ts.isPropertyAssignment(property) || !ts.isIdentifier(property.name)) continue;
+						if (!ts.isPropertyAccessExpression(property.initializer) || !ts.isIdentifier(property.initializer.expression)) continue;
+						if (property.initializer.name.text !== property.name.text) continue;
+						if ((spreads.get(property.initializer.expression.text) ?? idx) >= idx) continue;
+						bySrc.set(property.initializer.expression.text, [...(bySrc.get(property.initializer.expression.text) ?? []), property.name.text]);
+					}
+					for (const [srcName, properties] of bySrc) {
+						if (!properties.length) continue;
+						const pos = parsed.getLineAndCharacterOfPosition(argument.getStart(parsed));
+						findings.push({
+							file: displayPath(cfg, file),
+							line: pos.line + 1,
+							column: pos.character + 1,
+							callee: currentNode.expression.getText(parsed),
+							source: srcName,
+							properties,
+							recommendation: `remove exact properties already supplied by ...${srcName}`,
+						});
+					}
+				}
+			}
+			const descendants: ts.Node[] = [];
+			ts.forEachChild(currentNode, (child) => {
+				descendants.push(child);
+			});
+			for (let index = descendants.length - 1; index >= 0; index--) pending.push(descendants[index]!);
+		}
+		return findings;
+	});
 }
 
 /**
@@ -143,15 +130,12 @@ export function fixObjectForwarding(cfg: QualityCfg, analysis?: QualityAnalysis)
 	for (const file of analysis?.files ?? srcFiles(cfg)) {
 		if (!/\.[cm]?(?:js|jsx|ts|tsx)$/.test(file)) continue;
 		const src = analysis?.texts.get(file) ?? readFileSync(file, 'utf8');
-		const parsed = analysis?.sources.get(file) ?? ts.createSourceFile(file, src, ts.ScriptTarget.Latest, true, scriptKind(file));
 		const edits: Array<{ start: number; end: number }> = [];
-		/**
-		 *
-		 * @param node
-		 */
-		const visit = (node: ts.Node): void => {
-			if (ts.isCallExpression(node) && !isIgnoredCallee(node.expression)) {
-				for (const argument of node.arguments) {
+		const pending: ts.Node[] = [analysis?.sources.get(file) ?? ts.createSourceFile(file, src, ts.ScriptTarget.Latest, true, scriptKind(file))];
+		while (pending.length) {
+			const currentNode = pending.pop()!;
+			if (ts.isCallExpression(currentNode) && !isIgnoredCallee(currentNode.expression)) {
+				for (const argument of currentNode.arguments) {
 					if (!ts.isObjectLiteralExpression(argument)) continue;
 					const spreads = new Map<string, number>();
 					for (let i = 0; i < argument.properties.length; i++) {
@@ -172,9 +156,12 @@ export function fixObjectForwarding(cfg: QualityCfg, analysis?: QualityAnalysis)
 					}
 				}
 			}
-			ts.forEachChild(node, visit);
-		};
-		visit(parsed);
+			const descendants: ts.Node[] = [];
+			ts.forEachChild(currentNode, (child) => {
+				descendants.push(child);
+			});
+			for (let index = descendants.length - 1; index >= 0; index--) pending.push(descendants[index]!);
+		}
 		if (!edits.length) continue;
 		let updated = src;
 		for (const edit of edits.sort((a, b) => b.start - a.start)) updated = `${updated.slice(0, edit.start)}${updated.slice(edit.end)}`;

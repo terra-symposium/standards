@@ -23,24 +23,33 @@ import type { QualityAnalysis, QualityCfg } from './runner.js';
 REGEX
 //////////////////////////////////////////////////*/
 
+const D_U_REGEX = /_(\d+)$/u;
+const T_R_N_ESLINT_DISABLE_NEXT_LINE_TS_IGNORE_TS_EXPECT_ERR_R_N_GM_REGEX = () => /^[ \t]*\/\/[^\r\n]*(?:eslint-disable-next-line|@ts-ignore|@ts-expect-error)[^\r\n]*/gm;
+/** Creates a regular expression that extracts non-whitespace class tokens. */
+const NONSPACE_G_REGEX = () => /\S+/g;
+
+/*//////////////////////////////////////////////////
+REGEX
+//////////////////////////////////////////////////*/
+
 /**
- *
- * @return
+ * Creates a regular expression that removes non-alphanumeric runs from identifier text.
+ * @return A fresh global regular expression.
  */
 const A_ZA_Z0_9_G_REGEX = () => /[^A-Za-z0-9]+/g;
 /**
- *
- * @return
+ * Creates a regular expression that trims underscores from identifier boundaries.
+ * @return A fresh global regular expression.
  */
 const G_REGEX = () => /^_+|_+$/g;
 /**
- *
- * @return
+ * Creates a regular expression that matches backslashes in source text.
+ * @return A fresh global regular expression.
  */
 const G_CLASS_2 = () => /\\/g;
 /**
- *
- * @return
+ * Creates a regular expression that finds exported constant declarations.
+ * @return A fresh multiline global regular expression.
  */
 const EXPORT_CONST_A_ZA_Z_W_B_GM_REGEX = () => /^export const ([A-Za-z_$][\w$]*)\b/gm;
 
@@ -49,8 +58,8 @@ REGEX
 //////////////////////////////////////////////////*/
 
 /**
- *
- * @return
+ * Creates a regular expression that matches whitespace runs.
+ * @return A fresh global regular expression.
  */
 const S_G_REGEX = () => /\s+/g;
 
@@ -63,83 +72,67 @@ export type PatternFixResult = { fixed: number; skipped: number };
 
 /** A repeated collection lookup inside another collection callback. */
 export type PerformancePatternFinding = { file: string; line: number; column: number; method: string; receiver: string; recommendation: string };
-const COLLECTION_CALLBACKS = new Set(['filter', 'flatMap', 'forEach', 'map', 'reduce', 'some']);
-const REPEATED_LOOKUPS = new Set(['find', 'filter', 'includes', 'indexOf', 'some']);
-
-/**
- * Returns a stable receiver expression suitable for a manual indexing recommendation.
- *
- * @param node
- *
- * @return
- */
-function stableReceiver(node: ts.Expression): string | undefined {
-	if (ts.isIdentifier(node)) return node.text;
-	if (ts.isPropertyAccessExpression(node) && ts.isIdentifier(node.expression)) return node.getText();
-	return undefined;
-}
-
-/**
- * Finds the nearest enclosing function passed directly to a collection method.
- *
- * @param node
- *
- * @return
- */
-function collectionCallback(node: ts.Node): ts.CallExpression | undefined {
-	for (let current: ts.Node | undefined = node.parent; current; current = current.parent) {
-		if (!ts.isFunctionLike(current)) continue;
-		const call = current.parent;
-		if (!ts.isCallExpression(call) || !call.arguments.includes(current as ts.Expression)) continue;
-		const callee = call.expression;
-		if (ts.isPropertyAccessExpression(callee) && COLLECTION_CALLBACKS.has(callee.name.text)) return call;
-	}
-	return undefined;
-}
-
 /**
  * Reports repeated linear lookups nested in collection callbacks without changing source.
  *
- * @param cfg
- * @param analysis
+ * @param cfg Quality configuration defining pattern rules and source roots.
+ * @param analysis Optional shared analysis context for reusing source text and ASTs.
  *
- * @return
+ * @return Repeated collection lookups that occur inside collection callbacks.
  */
 export function performancePatternFindings(cfg: QualityCfg, analysis?: QualityAnalysis): PerformancePatternFinding[] {
 	const settings = cfg.performancePatterns;
 	if (!settings) return [];
 	const exts = new Set(settings.extensions ?? ['.js', '.jsx', '.ts', '.tsx']);
-	const ignoredFiles = new Set(settings.ignoredFiles ?? []);
-	const files = (analysis?.files ?? srcFiles({ ...cfg, extensions: [...exts] })).filter((file) => exts.has(file.slice(file.lastIndexOf('.'))));
 	const findings: PerformancePatternFinding[] = [];
-	for (const file of files) {
+	for (const file of analysis?.files ?? srcFiles({ ...cfg, extensions: [...exts] })) {
+		if (!exts.has(file.slice(file.lastIndexOf('.')))) continue;
 		const display = displayPath(cfg, file);
-		if (ignoredFiles.has(display)) continue;
-		const text = analysis?.texts.get(file) ?? readFileSync(file, 'utf8');
-		const source = analysis?.sources.get(file) ?? ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, regexScriptKind(file));
+		if ((settings.ignoredFiles ?? []).includes(display)) continue;
+		const source = analysis?.sources.get(file) ?? ts.createSourceFile(file, analysis?.texts.get(file) ?? readFileSync(file, 'utf8'), ts.ScriptTarget.Latest, true, regexScriptKind(file));
 		if ((source as ts.SourceFile & { parseDiagnostics?: readonly ts.Diagnostic[] }).parseDiagnostics?.length) continue;
-		/**
-		 *
-		 * @param node
-		 */
-		const visit = (node: ts.Node): void => {
-			if (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression) && REPEATED_LOOKUPS.has(node.expression.name.text) && collectionCallback(node)) {
-				const receiver = stableReceiver(node.expression.expression);
-				if (receiver) {
-					const position = source.getLineAndCharacterOfPosition(node.getStart(source));
-					findings.push({
-						file: display,
-						line: position.line + 1,
-						column: position.character + 1,
-						method: node.expression.name.text,
-						receiver,
-						recommendation: `Consider precomputing a Map or Set for ${receiver} before this collection callback; measure the representative path before changing it.`,
-					});
+		const stack: ts.Node[] = [source];
+		while (stack.length) {
+			const node = stack.pop()!;
+			if (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression)) {
+				const method = node.expression.name.text;
+				if (method === 'find' || method === 'filter' || method === 'includes' || method === 'indexOf' || method === 'some') {
+					for (let current: ts.Node | undefined = node.parent; current; current = current.parent) {
+						if (!ts.isFunctionLike(current)) continue;
+						const call = current.parent;
+						if (!ts.isCallExpression(call) || !call.arguments.includes(current as ts.Expression)) continue;
+						if (
+							!ts.isPropertyAccessExpression(call.expression) ||
+							(call.expression.name.text !== 'filter' &&
+								call.expression.name.text !== 'flatMap' &&
+								call.expression.name.text !== 'forEach' &&
+								call.expression.name.text !== 'map' &&
+								call.expression.name.text !== 'reduce' &&
+								call.expression.name.text !== 'some')
+						)
+							continue;
+						const expr = node.expression.expression;
+						const receiver = ts.isIdentifier(expr) ? expr.text : ts.isPropertyAccessExpression(expr) && ts.isIdentifier(expr.expression) ? expr.getText() : undefined;
+						if (receiver) {
+							findings.push({
+								file: display,
+								line: source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1,
+								column: source.getLineAndCharacterOfPosition(node.getStart(source)).character + 1,
+								method,
+								receiver,
+								recommendation: `Consider precomputing a Map or Set for ${receiver} before this collection callback; measure the representative path before changing it.`,
+							});
+						}
+						break;
+					}
 				}
 			}
-			ts.forEachChild(node, visit);
-		};
-		visit(source);
+			const children: ts.Node[] = [];
+			ts.forEachChild(node, (child) => {
+				children.push(child);
+			});
+			for (let i = children.length - 1; i >= 0; i--) stack.push(children[i]!);
+		}
 	}
 	return findings;
 }
@@ -158,7 +151,6 @@ HELPERS
  */
 export function repeatedClassFindings(cfg: QualityCfg, analysis?: QualityAnalysis): { value: string; count: number; locations: string[] }[] {
 	const settings = cfg.repeatedClasses ?? {};
-	const minimum = settings.minimumCount ?? 3;
 	const exts = new Set(settings.extensions ?? ['.astro', '.html', '.js', '.jsx', '.ts', '.tsx']);
 	const vals = new Map<string, string[]>();
 	for (const file of (analysis?.files ?? srcFiles({ ...cfg, extensions: [...exts] })).filter((f) => exts.has(f.slice(f.lastIndexOf('.'))))) {
@@ -169,11 +161,12 @@ export function repeatedClassFindings(cfg: QualityCfg, analysis?: QualityAnalysi
 		for (const match of src.matchAll(/\b(?:class|className)\s*=\s*(['"])([^'"\n]+)\1/g)) {
 			const val = match[2].replace(S_G_REGEX(), ' ').trim();
 			if (val.includes('{') || val.split(' ').length < 2) continue;
-			const location = `${displayPath(cfg, file)}:${src.slice(0, match.index ?? 0).split('\n').length}`;
-			vals.set(val, [...(vals.get(val) ?? []), location]);
+			vals.set(val, [...(vals.get(val) ?? []), `${displayPath(cfg, file)}:${src.slice(0, match.index ?? 0).split('\n').length}`]);
 		}
 	}
-	return [...vals.entries()].filter(([, l]) => l.length >= minimum).map(([v, l]) => ({ value: v, count: l.length, locations: l.sort((l, r) => l.localeCompare(r, undefined, { numeric: true })) }));
+	return [...vals.entries()]
+		.filter(([, l]) => l.length >= (settings.minimumCount ?? 3))
+		.map(([v, l]) => ({ value: v, count: l.length, locations: l.sort((l, r) => l.localeCompare(r, undefined, { numeric: true })) }));
 }
 
 /**
@@ -185,39 +178,21 @@ export function repeatedClassFindings(cfg: QualityCfg, analysis?: QualityAnalysi
  * @return Upper-case identifier suitable for a generated class constant.
  */
 function classConstName(val: string, used: Set<string>): string {
-	const words = val
-		.split(/\s+/)
-		.map((t) => t.replace(A_ZA_Z0_9_G_REGEX(), '_').replace(G_REGEX(), ''))
-		.filter(Boolean);
-	let name = `${words.join('_') || 'SHARED'}_CLASS`.toUpperCase();
+	let name = `${
+		val
+			.split(/\s+/)
+			.map((t) => t.replace(A_ZA_Z0_9_G_REGEX(), '_').replace(G_REGEX(), ''))
+			.filter(Boolean)
+			.join('_') || 'SHARED'
+	}_CLASS`.toUpperCase();
 	if (/^\d/.test(name)) name = `CLASS_${name}`;
 	if (name.length > 80)
 		name = `${name.slice(0, 70)}_${Math.abs([...val].reduce((n, c) => (n * 31 + c.charCodeAt(0)) | 0, 0))
 			.toString(36)
 			.toUpperCase()}`;
-	let suffix = 2;
-	while (used.has(name)) name = `${name}_${suffix++}`;
+	while (used.has(name)) name = `${name.replace(/_\d+$/u, '')}_${Number(name.match(D_U_REGEX)?.[1] ?? 1) + 1}`;
 	used.add(name);
 	return name;
-}
-
-/**
- * Determines whether a source offset is inside a JavaScript template literal.
- * Template-generated markup is data, so replacing its class text with a source
- * identifier would change the generated markup rather than reference a value.
- *
- * @param src Source text containing the candidate match.
- * @param offset Candidate offset in the source text.
- *
- * @return Whether the offset is enclosed by an unescaped backtick.
- */
-function isInsideTemplateLiteral(src: string, offset: number): boolean {
-	let open = false;
-	for (let i = 0; i < offset; i++) {
-		if (src[i] !== '`' || (i > 0 && src[i - 1] === '\\')) continue;
-		open = !open;
-	}
-	return open;
 }
 
 /**
@@ -250,9 +225,8 @@ function insertCfgGroup(src: string, label: string, declarations: string[], file
 		}
 		return `---${eol}${group}${eol}---${eol}${src}`;
 	}
-	const ast = ts.createSourceFile(file, src, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
 	let at = 0;
-	for (const statement of ast.statements) {
+	for (const statement of ts.createSourceFile(file, src, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX).statements) {
 		if (ts.isImportDeclaration(statement) || (ts.isExpressionStatement(statement) && ts.isStringLiteral(statement.expression))) at = statement.end;
 		else break;
 	}
@@ -288,7 +262,6 @@ function writePatternSrc(file: string, src: string): boolean {
  */
 export function fixRepeatedClasses(cfg: QualityCfg, analysis?: QualityAnalysis): PatternFixResult {
 	const settings = cfg.repeatedClasses ?? {};
-	const minimum = settings.minimumCount ?? 3;
 	const exts = new Set(settings.extensions ?? ['.astro', '.html', '.js', '.jsx', '.ts', '.tsx']);
 	let fixed = 0;
 	let skipped = 0;
@@ -304,16 +277,13 @@ export function fixRepeatedClasses(cfg: QualityCfg, analysis?: QualityAnalysis):
 			skipped += 1;
 			continue;
 		}
-		const matches = [...src.matchAll(/\b(class|className)(\s*=\s*)(['"])([^'"\n]+)\3/g)]
-			.filter((m) => !isInsideTemplateLiteral(src, m.index ?? 0))
-			.map((m) => ({ match: m, value: m[4]!.replace(S_G_REGEX(), ' ').trim() }));
+		const matches = [...src.matchAll(/\b(class|className)(\s*=\s*)(['"])([^'"\n]+)\3/g)].map((m) => ({ match: m, value: m[4]!.replace(S_G_REGEX(), ' ').trim() }));
 		const groups = new Map<string, typeof matches>();
 		for (const entry of matches) if (!entry.value.includes('{') && entry.value.split(' ').length >= 2) groups.set(entry.value, [...(groups.get(entry.value) ?? []), entry]);
-		const candidates = [...groups.entries()].filter(([, e]) => e.length >= minimum);
+		const candidates = [...groups.entries()].filter(([, e]) => e.length >= (settings.minimumCount ?? 3));
 		if (!candidates.length) continue;
 		const used = new Set<string>();
-		const parsed = analysis?.sources.get(file) ?? ts.createSourceFile(file, src, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
-		parsed.forEachChild((n) => {
+		(analysis?.sources.get(file) ?? ts.createSourceFile(file, src, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)).forEachChild((n) => {
 			if (!ts.isVariableStatement(n)) return;
 			for (const declaration of n.declarationList.declarations) if (ts.isIdentifier(declaration.name)) used.add(declaration.name.text);
 		});
@@ -350,119 +320,20 @@ export function fixRepeatedClasses(cfg: QualityCfg, analysis?: QualityAnalysis):
  */
 export function uiPatternFindings(cfg: QualityCfg, analysis?: QualityAnalysis): { file: string; pattern: string }[] {
 	const settings = cfg.uiPatterns ?? {};
-	const patterns = (settings.forbidden ?? []).map((p) => [p, new RegExp(p, 'm')] as const);
-	const exts = settings.extensions ?? ['.astro', '.html', '.jsx', '.tsx'];
-	return (analysis?.files ?? srcFiles({ ...cfg, extensions: exts }))
-		.filter((f) => exts.includes(f.slice(f.lastIndexOf('.'))))
-		.flatMap((f) => {
-			const name = displayPath(cfg, f);
-			const src = analysis?.texts.get(f) ?? readFileSync(f, 'utf8');
-			return patterns.filter(([, p]) => p.test(src)).map(([p]) => ({ file: name, pattern: p }));
-		});
+	return ((patterns) => {
+		if (!patterns.length) return [];
+		const exts = settings.extensions ?? ['.astro', '.html', '.jsx', '.tsx'];
+		return (analysis?.files ?? srcFiles({ ...cfg, extensions: exts }))
+			.filter((file) => exts.includes(file.slice(file.lastIndexOf('.'))))
+			.flatMap((file) => {
+				return patterns.filter(([, expression]) => expression.test(analysis?.texts.get(file) ?? readFileSync(file, 'utf8'))).map(([pattern]) => ({ file: displayPath(cfg, file), pattern }));
+			});
+	})((settings.forbidden ?? []).map((pattern) => [pattern, new RegExp(pattern, 'm')] as const));
 }
 
 /*//////////////////////////////////////////////////
 TAILWIND
 //////////////////////////////////////////////////*/
-
-/**
- * Resolves a stylesheet identifier using known package locations and Node's module resolver.
- *
- * @param root Repository root from which package resolution should begin.
- * @param id Stylesheet package identifier or path.
- * @param base Directory used for relative fallback resolution.
- * @param stylesheetDir Directory of the configured stylesheet, used to find workspace dependencies.
- *
- * @return Absolute path to the stylesheet candidate.
- */
-function resolveStylesheet(root: string, id: string, base: string, stylesheetDir: string): string {
-	const require = createRequire(resolve(root, 'package.json'));
-	const known = { tailwindcss: 'tailwindcss/index.css', 'tw-animate-css': 'tw-animate-css/dist/tw-animate.css', 'shadcn/tailwind.css': 'shadcn/dist/tailwind.css' } as Record<string, string>;
-	const candidates = [known[id], id].filter((c): c is string => Boolean(c));
-	for (const candidate of candidates) {
-		for (const packageRoot of [resolve(root, 'node_modules'), resolve(root, 'astro/node_modules'), resolve(stylesheetDir, 'node_modules'), resolve(stylesheetDir, '../node_modules')]) {
-			const directPath = resolve(packageRoot, candidate);
-			if (existsSync(directPath) && statSync(directPath).isFile()) return directPath;
-		}
-		try {
-			return require.resolve(candidate, { paths: [base, stylesheetDir, resolve(stylesheetDir, '..'), root, resolve(root, 'astro')] });
-		} catch {
-			// Try the next package-resolution strategy.
-		}
-	}
-	return resolve(base, id);
-}
-
-/**
- * Loads a stylesheet and records the directory used to resolve its nested imports.
- *
- * @param root Repository root used for package resolution.
- * @param id Stylesheet package identifier or path.
- * @param base Base directory for fallback resolution.
- * @param stylesheetDir Directory of the configured stylesheet, used to find workspace dependencies.
- *
- * @return Loaded stylesheet path, resolution base, and source content.
- */
-async function loadStylesheet(root: string, id: string, base: string, stylesheetDir: string): Promise<{ path: string; base: string; content: string }> {
-	const path = resolveStylesheet(root, id, base, stylesheetDir);
-	if (!existsSync(path) || !statSync(path).isFile()) throw new Error(`Tailwind stylesheet import does not resolve to a file: ${id}`);
-	return { path, base: dirname(path), content: readFileSync(path, 'utf8') };
-}
-
-/**
- * Resolves the consumer repository's Tailwind package entry from its package manifest.
- *
- * @param consumerRequire CommonJS resolver rooted at the consumer package.
- * @param root Repository root whose dependency tree should be searched.
- * @param stylesheetPath Configured stylesheet whose workspace dependencies should also be searched.
- *
- * @return Absolute path to the Tailwind import entry.
- */
-function resolveConsumerImport(consumerRequire: NodeRequire, root: string, stylesheetPath: string): string {
-	const stylesheetDir = dirname(stylesheetPath);
-	const paths = [root, resolve(root, 'astro'), stylesheetDir, resolve(stylesheetDir, '..')];
-	const manifestPath = consumerRequire.resolve('tailwindcss/package.json', { paths });
-	const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as { exports?: { '.': { import?: string } }; module?: string; main?: string };
-	const entry = manifest.exports?.['.']?.import ?? manifest.module ?? manifest.main;
-	if (!entry) throw new Error('Tailwind package does not expose an import entry.');
-	return resolve(dirname(manifestPath), entry);
-}
-
-/**
- * Extracts static class-string segments from class attributes and common class-composition calls.
- *
- * @param src Source text to scan.
- *
- * @return Class segments and their offsets in the source text.
- */
-function classVals(src: string): Array<{ start: number; value: string }> {
-	const vals: Array<{ start: number; value: string }> = [];
-	const attrPattern = /\b(?:class|className)\s*=\s*(?:(['"])([\s\S]*?)\1|\{\s*`([\s\S]*?)`\s*\})/g;
-	for (const match of src.matchAll(attrPattern)) {
-		const value = match[2] ?? match[3] ?? '';
-		const valStart = match.index! + match[0].indexOf(value);
-		let segmentStart = 0;
-		for (const interpolation of value.matchAll(/\$\{[\s\S]*?\}/g)) {
-			if (interpolation.index! > segmentStart) vals.push({ start: valStart + segmentStart, value: value.slice(segmentStart, interpolation.index) });
-			segmentStart = interpolation.index! + interpolation[0].length;
-		}
-		if (segmentStart < value.length) vals.push({ start: valStart + segmentStart, value: value.slice(segmentStart) });
-	}
-	const callPattern = /\b(?:cn|clsx|classnames|cva)\s*\(/g;
-	for (const call of src.matchAll(callPattern)) {
-		let depth = 1;
-		let cursor = call.index! + call[0].length;
-		while (cursor < src.length && depth > 0) {
-			if (src[cursor] === '(') depth += 1;
-			if (src[cursor] === ')') depth -= 1;
-			cursor += 1;
-		}
-		const bodyStart = call.index! + call[0].length;
-		const body = src.slice(bodyStart, cursor - 1);
-		for (const value of body.matchAll(/(['"`])([\s\S]*?)\1/g)) if (!value[2]!.includes('${')) vals.push({ start: bodyStart + value.index! + 1, value: value[2]! });
-	}
-	return vals;
-}
 
 /**
  * Converts a source offset into the one-based line and column used by diagnostics.
@@ -472,17 +343,12 @@ function classVals(src: string): Array<{ start: number; value: string }> {
  *
  * @return One-based source location.
  */
-function locationAt(src: string, offset: number): { line: number; column: number } {
-	const before = src.slice(0, offset);
-	return { line: before.split('\n').length, column: offset - before.lastIndexOf('\n') };
-}
-
 /**
  * Runs the Tailwind v4 canonical-class diagnostic used by the quality CLI.
  *
  * @param cfg Quality configuration containing the Tailwind stylesheet and source roots.
  * @param fix Whether canonical replacements should be written to source files.
- * @param output
+ * @param output Optional callbacks and output controls for reporting findings.
  *
  * @return Promise resolving to zero after diagnostics or fixes complete.
  */
@@ -490,7 +356,6 @@ export async function runTailwindCanonical(cfg: QualityCfg, fix = false, output:
 	if (!cfg.tailwindCanonical) return 0;
 	const stylesheetPath = resolve(cfg.root, cfg.tailwindCanonical.stylesheet);
 	if (!existsSync(stylesheetPath)) throw new Error(`Tailwind stylesheet not found: ${stylesheetPath}`);
-	const consumerRequire = createRequire(resolve(cfg.root, 'package.json'));
 	let tailwind: {
 		__unstable__loadDesignSystem?: (
 			css: string,
@@ -498,8 +363,13 @@ export async function runTailwindCanonical(cfg: QualityCfg, fix = false, output:
 		) => Promise<{ canonicalizeCandidates: (candidates: string[]) => string[] }>;
 	};
 	try {
-		const packagePath = resolveConsumerImport(consumerRequire, cfg.root, stylesheetPath);
-		tailwind = (await import(pathToFileURL(packagePath).href)) as typeof tailwind;
+		const manifestPath = createRequire(resolve(cfg.root, 'package.json')).resolve('tailwindcss/package.json', {
+			paths: [cfg.root, resolve(cfg.root, 'astro'), dirname(stylesheetPath), resolve(dirname(stylesheetPath), '..')],
+		});
+		const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as { exports?: { '.': { import?: string } }; module?: string; main?: string };
+		const entry = manifest.exports?.['.']?.import ?? manifest.module ?? manifest.main;
+		if (!entry) throw new Error('Tailwind package does not expose an import entry.');
+		tailwind = (await import(pathToFileURL(resolve(dirname(manifestPath), entry)).href)) as typeof tailwind;
 	} catch {
 		throw new Error('Tailwind canonical check could not load the consumer repository Tailwind package.');
 	}
@@ -508,20 +378,105 @@ export async function runTailwindCanonical(cfg: QualityCfg, fix = false, output:
 		if (!output.quiet) console.info('Tailwind canonical check skipped: installed Tailwind does not expose v4 canonical-class diagnostics.');
 		return 0;
 	}
-	const stylesheet = readFileSync(stylesheetPath, 'utf8');
-	const designSystem = await tailwind.__unstable__loadDesignSystem(stylesheet, { from: stylesheetPath, loadStylesheet: (id, base) => loadStylesheet(cfg.root, id, base, dirname(stylesheetPath)) });
-	const scanCfg = cfg.tailwindCanonical.sourceRoots ? { ...cfg, sourceRoots: cfg.tailwindCanonical.sourceRoots.map((r) => resolve(cfg.root, r)) } : cfg;
-	const files = srcFiles(scanCfg).filter((f) => /\.(?:astro|cjs|js|jsx|mjs|ts|tsx)$/.test(f));
+	const designSystem = await tailwind.__unstable__loadDesignSystem(readFileSync(stylesheetPath, 'utf8'), {
+		from: stylesheetPath,
+		loadStylesheet: async (id, base) => {
+			const stylesheetDir = dirname(stylesheetPath);
+			const path = (() => {
+				for (const candidate of [
+					({ tailwindcss: 'tailwindcss/index.css', 'tw-animate-css': 'tw-animate-css/dist/tw-animate.css', 'shadcn/tailwind.css': 'shadcn/dist/tailwind.css' } as Record<string, string>)[id],
+					id,
+				].filter((candidate): candidate is string => Boolean(candidate))) {
+					for (const directPath of [resolve(cfg.root, 'node_modules'), resolve(cfg.root, 'astro/node_modules'), resolve(stylesheetDir, 'node_modules'), resolve(stylesheetDir, '../node_modules')].map(
+						(packageRoot) => resolve(packageRoot, candidate),
+					))
+						if (existsSync(directPath) && statSync(directPath).isFile()) return directPath;
+					try {
+						return createRequire(resolve(cfg.root, 'package.json')).resolve(candidate, { paths: [base, stylesheetDir, resolve(stylesheetDir, '..'), cfg.root, resolve(cfg.root, 'astro')] });
+					} catch {
+						// Try the next package-resolution strategy.
+					}
+				}
+				return resolve(base, id);
+			})();
+			if (!existsSync(path) || !statSync(path).isFile()) throw new Error(`Tailwind stylesheet import does not resolve to a file: ${id}`);
+			return { path, base: dirname(path), content: readFileSync(path, 'utf8') };
+		},
+	});
+	const files = srcFiles(cfg.tailwindCanonical.sourceRoots ? { ...cfg, sourceRoots: cfg.tailwindCanonical.sourceRoots.map((r) => resolve(cfg.root, r)) } : cfg).filter((f) =>
+		/\.(?:astro|cjs|js|jsx|mjs|ts|tsx)$/.test(f),
+	);
 	const findings: { file: string; start: number; end: number; original: string; replacement: string; line: number; column: number }[] = [];
 	for (const file of files) {
 		const source = readFileSync(file, 'utf8');
-		for (const val of classVals(source)) {
-			for (const token of val.value.matchAll(/\S+/g)) {
-				const original = token[0]!;
-				const replacement = designSystem.canonicalizeCandidates([original])[0];
-				if (!replacement || replacement === original || replacement.includes(' ')) continue;
-				const start = val.start + token.index!;
-				findings.push({ file, start, end: start + original.length, original, replacement, ...locationAt(source, start) });
+		for (const match of source.matchAll(/\b(?:class|className)\s*=\s*(?:(['"])([\s\S]*?)\1|\{\s*`([\s\S]*?)`\s*\})/g)) {
+			const value = match[2] ?? match[3] ?? '';
+			const start = match.index! + match[0].indexOf(value);
+			let segmentStart = 0;
+			for (const interpolation of value.matchAll(/\$\{[\s\S]*?\}/g)) {
+				if (interpolation.index! > segmentStart)
+					for (const token of value.slice(segmentStart, interpolation.index).matchAll(NONSPACE_G_REGEX())) {
+						const original = token[0]!;
+						const replacement = designSystem.canonicalizeCandidates([original])[0];
+						if (!replacement || replacement === original || replacement.includes(' ')) continue;
+						const candidateStart = start + segmentStart + token.index!;
+						const before = source.slice(0, candidateStart);
+						findings.push({
+							file,
+							start: candidateStart,
+							end: candidateStart + original.length,
+							original,
+							replacement,
+							line: before.split('\n').length,
+							column: candidateStart - before.lastIndexOf('\n'),
+						});
+					}
+				segmentStart = interpolation.index! + interpolation[0].length;
+			}
+			if (segmentStart < value.length)
+				for (const token of value.slice(segmentStart).matchAll(NONSPACE_G_REGEX())) {
+					const original = token[0]!;
+					const replacement = designSystem.canonicalizeCandidates([original])[0];
+					if (!replacement || replacement === original || replacement.includes(' ')) continue;
+					const candidateStart = start + segmentStart + token.index!;
+					const before = source.slice(0, candidateStart);
+					findings.push({
+						file,
+						start: candidateStart,
+						end: candidateStart + original.length,
+						original,
+						replacement,
+						line: before.split('\n').length,
+						column: candidateStart - before.lastIndexOf('\n'),
+					});
+				}
+		}
+		for (const call of source.matchAll(/\b(?:cn|clsx|classnames|cva)\s*\(/g)) {
+			let depth = 1;
+			let cursor = call.index! + call[0].length;
+			while (cursor < source.length && depth > 0) {
+				if (source[cursor] === '(') depth += 1;
+				if (source[cursor] === ')') depth -= 1;
+				cursor += 1;
+			}
+			for (const value of source.slice(call.index! + call[0].length, cursor - 1).matchAll(/(['"`])([\s\S]*?)\1/g)) {
+				if (value[2]!.includes('${')) continue;
+				for (const token of value[2]!.matchAll(NONSPACE_G_REGEX())) {
+					const original = token[0]!;
+					const replacement = designSystem.canonicalizeCandidates([original])[0];
+					if (!replacement || replacement === original || replacement.includes(' ')) continue;
+					const candidateStart = call.index! + call[0].length + value.index! + 1 + token.index!;
+					const before = source.slice(0, candidateStart);
+					findings.push({
+						file,
+						start: candidateStart,
+						end: candidateStart + original.length,
+						original,
+						replacement,
+						line: before.split('\n').length,
+						column: candidateStart - before.lastIndexOf('\n'),
+					});
+				}
 			}
 		}
 	}
@@ -578,105 +533,89 @@ function regexCandidates(cfg: QualityCfg, analysis?: QualityAnalysis): RegexCand
 	const candidates: RegexCandidate[] = [];
 	for (const file of analysis?.files ?? srcFiles({ ...cfg, extensions: [...exts] })) {
 		if (!exts.has(file.slice(file.lastIndexOf('.'))) || file.endsWith('.d.mts') || (registryPath && resolve(file) === registryPath)) continue;
-		const src = analysis?.texts.get(file) ?? readFileSync(file, 'utf8');
-		const ast = analysis?.sources.get(file) ?? ts.createSourceFile(file, src, ts.ScriptTarget.Latest, true, regexScriptKind(file));
-		const shadowedRegExp = hasRegExpBinding(ast);
-		/**
-		 *
-		 * @param node
-		 */
-		const visit = (node: ts.Node): void => {
-			if (ts.isRegularExpressionLiteral(node) && !isGenLocalRegex(node, ast)) {
-				const literal = node.getText(ast);
-				const end = literal.lastIndexOf('/');
-				const pattern = literal.slice(1, end);
-				const flags = literal.slice(end + 1);
-				candidates.push({ file, source: flags ? `${pattern}/${flags}` : pattern, expression: literal, node, ast, rewritable: true });
+		const ast = analysis?.sources.get(file) ?? ts.createSourceFile(file, analysis?.texts.get(file) ?? readFileSync(file, 'utf8'), ts.ScriptTarget.Latest, true, regexScriptKind(file));
+		const stack: ts.Node[] = [ast];
+		while (stack.length) {
+			const node = stack.pop()!;
+			if (ts.isRegularExpressionLiteral(node)) {
+				let declaration: ts.VariableDeclaration | undefined;
+				for (let current: ts.Node | undefined = node; current && !ts.isSourceFile(current); current = current.parent) {
+					if (ts.isVariableDeclaration(current)) {
+						declaration = current;
+						break;
+					}
+				}
+				if (
+					!declaration ||
+					!ts.isIdentifier(declaration.name) ||
+					!declaration.name.text.endsWith('_REGEX') ||
+					[...ast.text.slice(0, declaration.getStart(ast)).matchAll(/\/\*\/{10,}\r?\n[ \t]*([A-Z][A-Z _-]*)[ \t]*\r?\n[ \t]*\/{10,}\*\//g)].at(-1)?.[1] !== 'REGEX'
+				) {
+					const literal = node.getText(ast);
+					const end = literal.lastIndexOf('/');
+					const pattern = literal.slice(1, end);
+					const flags = literal.slice(end + 1);
+					candidates.push({ file, source: flags ? `${pattern}/${flags}` : pattern, expression: literal, node, ast, rewritable: true });
+				}
 			} else if (ts.isNewExpression(node) && ts.isIdentifier(node.expression) && node.expression.text === 'RegExp' && !node.typeArguments?.length) {
 				const [pattern, flags, ...rest] = node.arguments ?? [];
 				if (!rest.length && (ts.isStringLiteral(pattern) || ts.isNoSubstitutionTemplateLiteral(pattern)) && (!flags || ts.isStringLiteral(flags))) {
-					candidates.push({ file, source: flags ? `${pattern.getText(ast)}, ${flags.getText(ast)}` : pattern.getText(ast), expression: node.getText(ast), node, ast, rewritable: !shadowedRegExp });
+					candidates.push({ file, source: flags ? `${pattern.getText(ast)}, ${flags.getText(ast)}` : pattern.getText(ast), expression: node.getText(ast), node, ast, rewritable: false });
 				}
 			}
-			ts.forEachChild(node, visit);
+			const children: ts.Node[] = [];
+			ts.forEachChild(node, (child) => {
+				children.push(child);
+			});
+			for (let index = children.length - 1; index >= 0; index--) stack.push(children[index]!);
+		}
+		const bindingHasRegExp = (name: ts.BindingName): boolean => {
+			if (ts.isIdentifier(name)) return name.text === 'RegExp';
+			return name.elements.some((element) => ts.isBindingElement(element) && bindingHasRegExp(element.name));
 		};
-		visit(ast);
+		let found = false;
+		const bindingStack: ts.Node[] = [ast];
+		while (bindingStack.length && !found) {
+			const node = bindingStack.pop()!;
+			if (
+				(ts.isVariableDeclaration(node) || ts.isParameter(node) || ts.isFunctionDeclaration(node) || ts.isClassDeclaration(node) || ts.isEnumDeclaration(node)) &&
+				node.name &&
+				bindingHasRegExp(node.name as ts.BindingName)
+			) {
+				found = true;
+				continue;
+			}
+			if ((ts.isImportClause(node) && node.name?.text === 'RegExp') || (ts.isImportSpecifier(node) && node.name.text === 'RegExp')) {
+				found = true;
+				continue;
+			}
+			if (ts.isCatchClause(node) && node.variableDeclaration && bindingHasRegExp(node.variableDeclaration.name)) {
+				found = true;
+				continue;
+			}
+			const children: ts.Node[] = [];
+			ts.forEachChild(node, (child) => {
+				children.push(child);
+			});
+			for (let index = children.length - 1; index >= 0; index--) bindingStack.push(children[index]!);
+		}
+		for (const candidate of candidates) if (candidate.ast === ast && ts.isNewExpression(candidate.node)) candidate.rewritable = !found;
 	}
 	return candidates;
-}
-/**
- * Checks whether a regex literal belongs to a generated local `_REGEX` declaration.
- *
- * @param node Regular-expression literal to classify.
- * @param ast Parsed source file containing the literal.
- *
- * @return Whether the declaration is in the generated `REGEX` section.
- */
-function isGenLocalRegex(node: ts.RegularExpressionLiteral, ast: ts.SourceFile): boolean {
-	let declaration: ts.VariableDeclaration | undefined;
-	for (let curr: ts.Node | undefined = node; curr && !ts.isSourceFile(curr); curr = curr.parent) {
-		if (ts.isVariableDeclaration(curr)) {
-			declaration = curr;
-			break;
-		}
-	}
-	if (!declaration || !ts.isIdentifier(declaration.name) || !declaration.name.text.endsWith('_REGEX')) return false;
-	const before = ast.text.slice(0, declaration.getStart(ast));
-	const sections = [...before.matchAll(/\/\*\/{10,}\r?\n[ \t]*([A-Z][A-Z _-]*)[ \t]*\r?\n[ \t]*\/{10,}\*\//g)];
-	return sections.at(-1)?.[1] === 'REGEX';
-}
-/**
- * Detects bindings that shadow the global `RegExp` constructor.
- *
- * @param ast Parsed source file to inspect.
- *
- * @return Whether the file declares, imports, or catches a binding named `RegExp`.
- */
-function hasRegExpBinding(ast: ts.SourceFile): boolean {
-	/**
-	 *
-	 * @param name
-	 *
-	 * @return
-	 */
-	const bindingHasRegExp = (name: ts.BindingName): boolean => {
-		if (ts.isIdentifier(name)) return name.text === 'RegExp';
-		return name.elements.some((e) => ts.isBindingElement(e) && bindingHasRegExp(e.name));
-	};
-	let found = false;
-	/**
-	 *
-	 * @param node
-	 */
-	const visit = (node: ts.Node): void => {
-		if (found) return;
-		if (
-			(ts.isVariableDeclaration(node) || ts.isParameter(node) || ts.isFunctionDeclaration(node) || ts.isClassDeclaration(node) || ts.isEnumDeclaration(node)) &&
-			node.name &&
-			bindingHasRegExp(node.name as ts.BindingName)
-		) {
-			found = true;
-			return;
-		}
-		if (ts.isImportClause(node) && node.name?.text === 'RegExp') found = true;
-		if (ts.isImportSpecifier(node) && node.name.text === 'RegExp') found = true;
-		if (ts.isCatchClause(node) && node.variableDeclaration && bindingHasRegExp(node.variableDeclaration.name)) found = true;
-		ts.forEachChild(node, visit);
-	};
-	visit(ast);
-	return found;
 }
 /**
  * Groups parsed regex candidates by their exact source representation.
  *
  * @param cfg Quality configuration defining source roots and extensions.
  * @param analysis Optional shared analysis context for reusing parsed sources.
+ * @param candidates Parsed regular-expression candidates to group.
  *
  * @return Candidate groups keyed by regex source and flags.
  */
-function regexGroups(cfg: QualityCfg, analysis?: QualityAnalysis): Map<string, RegexCandidate[]> {
+function regexGroups(cfg: QualityCfg, analysis?: QualityAnalysis, candidates = regexCandidates(cfg, analysis)): Map<string, RegexCandidate[]> {
+	if (!candidates.length) return new Map();
 	const groups = new Map<string, RegexCandidate[]>();
-	for (const candidate of regexCandidates(cfg, analysis)) groups.set(candidate.source, [...(groups.get(candidate.source) ?? []), candidate]);
+	for (const candidate of candidates) groups.set(candidate.source, [...(groups.get(candidate.source) ?? []), candidate]);
 	return groups;
 }
 
@@ -689,9 +628,8 @@ function regexGroups(cfg: QualityCfg, analysis?: QualityAnalysis): Map<string, R
  * @return Duplicate regular-expression sources and their source locations.
  */
 export function regexFindings(cfg: QualityCfg, analysis?: QualityAnalysis): { source: string; count: number; locations: string[] }[] {
-	const minimum = cfg.regexDedup?.minimumCount ?? 2;
 	return [...regexGroups(cfg, analysis)]
-		.filter(([, c]) => c.length >= minimum)
+		.filter(([, c]) => c.length >= (cfg.regexDedup?.minimumCount ?? 2))
 		.map(([s, c]) => ({
 			source: s,
 			count: c.length,
@@ -725,73 +663,6 @@ function isEsmConsumer(cfg: QualityCfg, file: string): boolean {
 	return false;
 }
 /**
- * Creates a unique exported constant name from a regex source string.
- *
- * @param src Regex source used to derive a readable identifier.
- * @param used Identifiers already present in the shared module.
- *
- * @return The reserved, collision-free export name.
- */
-function regexExportName(src: string, used: Set<string>): string {
-	const slug = src.replace(A_ZA_Z0_9_G_REGEX(), '_').replace(G_REGEX(), '').slice(0, 60).toUpperCase() || 'PATTERN';
-	const base = `REGEX_${slug}_REGEX`;
-	let name = base;
-	let suffix = 2;
-	while (used.has(name)) name = `${base}_${suffix++}`;
-	used.add(name);
-	return name;
-}
-/**
- * Reads the generated shared-regex registry when both files are owned by this tool.
- *
- * @param modulePath Shared ECMAScript module path.
- * @param declarationPath TypeScript declaration path paired with the module.
- *
- * @return Parsed registry state, or `null` when an existing file is user-owned.
- */
-function readRegexRegistry(modulePath: string, declarationPath: string): { module: string; declaration: string; names: Set<string>; keys: Map<string, string>; owned: boolean } | null {
-	const moduleExists = existsSync(modulePath);
-	const declarationExists = existsSync(declarationPath);
-	const module = moduleExists ? readFileSync(modulePath, 'utf8') : `${REGEX_REGISTRY_MARKER}\n`;
-	const declaration = declarationExists ? readFileSync(declarationPath, 'utf8') : `${REGEX_DECLARATION_MARKER}\n`;
-	const owned = module.startsWith(REGEX_REGISTRY_MARKER) && declaration.startsWith(REGEX_DECLARATION_MARKER);
-	if ((moduleExists || declarationExists) && !owned) return null;
-	const names = new Set([...module.matchAll(EXPORT_CONST_A_ZA_Z_W_B_GM_REGEX())].map((m) => m[1]!));
-	const keys = new Map<string, string>();
-	for (const match of module.matchAll(/^\/\/ @terra-quality-regex-key (.+)\r?\nexport const ([A-Za-z_$][\w$]*)\b/gm)) {
-		try {
-			keys.set(JSON.parse(match[1]!) as string, match[2]!);
-		} catch {
-			// An invalid generated annotation is not used as a key; the export remains collision-protected.
-		}
-	}
-	return { module, declaration, names, keys, owned };
-}
-/**
- * Builds the declaration file matching the registry's exported regex factories.
- *
- * @param module Shared module source whose exports determine the declarations.
- *
- * @return TypeScript declaration source for the exported constants.
- */
-function declarationFor(module: string): string {
-	const names = [...new Set([...module.matchAll(EXPORT_CONST_A_ZA_Z_W_B_GM_REGEX())].map((m) => m[1]!))].sort();
-	return `${REGEX_DECLARATION_MARKER}\n${names.map((n) => `export declare const ${n}: () => RegExp;`).join('\n')}${names.length ? '\n' : ''}`;
-}
-/**
- * Creates the module specifier from a consumer file to the shared registry module.
- *
- * @param file Consumer source filename.
- * @param modulePath Shared module filename.
- *
- * @return A normalized relative module specifier.
- */
-function moduleSpecifier(file: string, modulePath: string): string {
-	let specifier = relative(dirname(file), modulePath).replace(G_CLASS_2(), '/');
-	if (!specifier.startsWith('.')) specifier = `./${specifier}`;
-	return specifier;
-}
-/**
  * Finds an existing namespace import for the shared registry module.
  *
  * @param ast Parsed consumer source file.
@@ -809,40 +680,6 @@ function namespaceImport(ast: ts.SourceFile, file: string, modulePath: string): 
 	}
 }
 /**
- * Adds a namespace import after directives and existing imports.
- *
- * @param src Consumer source text to update.
- * @param ast Parsed consumer source used to locate the import boundary.
- * @param alias Local name for the shared module namespace.
- * @param specifier Module specifier to import.
- *
- * @return Source text with the import inserted in the existing import group.
- */
-function insertNamespaceImport(src: string, ast: ts.SourceFile, alias: string, specifier: string): string {
-	const line = `import * as ${alias} from '${specifier}';`;
-	const eol = src.includes('\r\n') ? '\r\n' : '\n';
-	let at = 0;
-	for (const statement of ast.statements) {
-		const directive = ts.isExpressionStatement(statement) && ts.isStringLiteral(statement.expression);
-		if (ts.isImportDeclaration(statement) || directive) at = statement.end;
-		else break;
-	}
-	if (!at && ast.statements.length) {
-		const first = ast.statements[0]!;
-		at = first.getStart(ast);
-		const leading = src.slice(first.getFullStart(), first.getStart(ast));
-		const directive = [...leading.matchAll(/^[ \t]*\/\/[^\r\n]*(?:eslint-disable-next-line|@ts-ignore|@ts-expect-error)[^\r\n]*/gm)].at(-1);
-		if (directive?.index !== undefined) at = first.getFullStart() + directive.index;
-	}
-	if (!at && src.startsWith('#!')) {
-		const shebangEnd = src.indexOf('\n');
-		at = shebangEnd < 0 ? src.length : shebangEnd + 1;
-	}
-	const before = src.slice(0, at);
-	const after = src.slice(at);
-	return `${before}${at && !before.endsWith('\n') ? eol : ''}${line}${after.startsWith('\n') || after.startsWith('\r\n') ? '' : eol}${after}`;
-}
-/**
  * Collects every identifier spelling already used in a source file.
  *
  * @param ast Parsed source file to inspect.
@@ -851,15 +688,16 @@ function insertNamespaceImport(src: string, ast: ts.SourceFile, alias: string, s
  */
 function identifierNames(ast: ts.SourceFile): Set<string> {
 	const names = new Set<string>();
-	/**
-	 *
-	 * @param node
-	 */
-	const visit = (node: ts.Node): void => {
+	const stack: ts.Node[] = [ast];
+	while (stack.length) {
+		const node = stack.pop()!;
 		if (ts.isIdentifier(node)) names.add(node.text);
-		ts.forEachChild(node, visit);
-	};
-	visit(ast);
+		const children: ts.Node[] = [];
+		ts.forEachChild(node, (child) => {
+			children.push(child);
+		});
+		for (let index = children.length - 1; index >= 0; index--) stack.push(children[index]!);
+	}
 	return names;
 }
 /**
@@ -871,10 +709,8 @@ function identifierNames(ast: ts.SourceFile): Set<string> {
  * @return Whether the candidate has no parse diagnostics.
  */
 function validRegexOutput(file: string, src: string): boolean {
-	if (file.endsWith('.d.mts')) {
-		const parsed = ts.createSourceFile(file, src, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS) as ts.SourceFile & { parseDiagnostics: readonly ts.Diagnostic[] };
-		return parsed.parseDiagnostics.length === 0;
-	}
+	if (file.endsWith('.d.mts'))
+		return (ts.createSourceFile(file, src, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS) as ts.SourceFile & { parseDiagnostics: readonly ts.Diagnostic[] }).parseDiagnostics.length === 0;
 	if (
 		ts.transpileModule(src, { fileName: file, reportDiagnostics: true, compilerOptions: { allowJs: true, jsx: ts.JsxEmit.Preserve, target: ts.ScriptTarget.ESNext, module: ts.ModuleKind.ESNext } })
 			.diagnostics?.length
@@ -893,27 +729,163 @@ function validRegexOutput(file: string, src: string): boolean {
  * @return Counts of regex expressions replaced and candidates left unchanged for safety.
  */
 export function fixRegexDedup(cfg: QualityCfg, analysis?: QualityAnalysis): PatternFixResult {
-	if (cfg.regexDedup?.sharedModule) return fixRegexDedupShared(cfg, analysis);
-	const settings = cfg.regexDedup ?? {};
-	const minimum = settings.minimumCount ?? 2;
-	const groups = regexGroups(cfg, analysis);
+	if (cfg.regexDedup?.sharedModule) {
+		const sharedModule = cfg.regexDedup!.sharedModule!;
+		if (!sharedModule.endsWith('.mjs')) throw new Error('regexDedup.sharedModule must name an ESM .mjs file.');
+		const modulePath = resolve(cfg.root, sharedModule);
+		const moduleRelative = relative(cfg.root, modulePath);
+		if (moduleRelative === '..' || moduleRelative.startsWith(`..${process.platform === 'win32' ? '\\' : '/'}`)) throw new Error('regexDedup.sharedModule must stay inside the repository root.');
+		const declarationPath = modulePath.replace(/\.mjs$/, '.d.mts');
+		const groups = [...regexGroups(cfg, analysis)].filter(([, c]) => c.length >= (cfg.regexDedup?.minimumCount ?? 2));
+		if (!groups.length) return { fixed: 0, skipped: 0 };
+		const registry = (() => {
+			const moduleExists = existsSync(modulePath);
+			const declarationExists = existsSync(declarationPath);
+			const module = moduleExists ? readFileSync(modulePath, 'utf8') : `${REGEX_REGISTRY_MARKER}\n`;
+			const declaration = declarationExists ? readFileSync(declarationPath, 'utf8') : `${REGEX_DECLARATION_MARKER}\n`;
+			const owned = module.startsWith(REGEX_REGISTRY_MARKER) && declaration.startsWith(REGEX_DECLARATION_MARKER);
+			if ((moduleExists || declarationExists) && !owned) return null;
+			return {
+				module,
+				declaration,
+				names: new Set([...module.matchAll(EXPORT_CONST_A_ZA_Z_W_B_GM_REGEX())].map((match) => match[1]!)),
+				keys: new Map<string, string>(
+					[...module.matchAll(/^\/\/ @terra-quality-regex-key (.+)\r?\nexport const ([A-Za-z_$][\w$]*)\b/gm)].flatMap((match) => {
+						try {
+							return [[JSON.parse(match[1]!) as string, match[2]!]];
+						} catch {
+							// An invalid generated annotation is not used as a key; the export remains collision-protected.
+							return [];
+						}
+					}),
+				),
+				owned,
+			};
+		})();
+		if (!registry) return { fixed: 0, skipped: groups.reduce((c, [, v]) => c + v.length, 0) };
+		const rewritable = groups.filter(([, c]) => c.every((c) => c.rewritable && isEsmConsumer(cfg, c.file)));
+		let skipped = groups.filter(([, c]) => !c.every((c) => c.rewritable && isEsmConsumer(cfg, c.file))).reduce((c, [, v]) => c + v.length, 0);
+		if (!rewritable.length) return { fixed: 0, skipped };
+		const usedExports = new Set(registry.names);
+		const namesByKey = new Map(registry.keys);
+		const newEntries: Array<{ key: string; name: string; expression: string }> = [];
+		const groupNames = new Map<string, string>();
+		for (const [key, candidates] of rewritable.sort(([l], [r]) => l.localeCompare(r))) {
+			let name = namesByKey.get(key);
+			if (!name) {
+				const base = `REGEX_${key.replace(A_ZA_Z0_9_G_REGEX(), '_').replace(G_REGEX(), '').slice(0, 60).toUpperCase() || 'PATTERN'}_REGEX`;
+				name = base;
+				while (usedExports.has(name)) name = `${base}_${Number(name.match(D_U_REGEX)?.[1] ?? 1) + 1}`;
+				usedExports.add(name);
+				namesByKey.set(key, name);
+				newEntries.push({ key, name, expression: candidates[0]!.expression });
+			}
+			groupNames.set(key, name);
+		}
+		const eol = '\n';
+		const moduleAdditions = newEntries
+			.map(
+				({ key: k, name: n, expression: e }) =>
+					`// @terra-quality-regex-key ${JSON.stringify(k)}\nexport const ${n} = () => (\n${e
+						.split('\n')
+						.map((l) => `\t${l}`)
+						.join('\n')}\n);`,
+			)
+			.join(`${eol}${eol}`);
+		const moduleSrc = `${registry.module.replace(/\s*$/, '')}${moduleAdditions ? `${eol}${eol}${moduleAdditions}${eol}` : `${eol}`}`;
+		const declarationSrc = `${REGEX_DECLARATION_MARKER}\n${[...new Set([...moduleSrc.matchAll(EXPORT_CONST_A_ZA_Z_W_B_GM_REGEX())].map((match) => match[1]!))]
+			.sort()
+			.map((name) => `export declare const ${name}: () => RegExp;`)
+			.join('\n')}${[...moduleSrc.matchAll(EXPORT_CONST_A_ZA_Z_W_B_GM_REGEX())].length ? '\n' : ''}`;
+		const srcEdits = new Map<string, { source: string; ast: ts.SourceFile; edits: Array<{ start: number; end: number; replacement: string }>; alias: string; specifier: string }>();
+		let fixed = 0;
+		for (const [key, candidates] of rewritable) {
+			for (const candidate of candidates) {
+				let fileEdits = srcEdits.get(candidate.file);
+				if (!fileEdits) {
+					const existingAlias = namespaceImport(candidate.ast, candidate.file, modulePath);
+					let alias = existingAlias ?? 'TerraQualityRegex';
+					while (!existingAlias && identifierNames(candidate.ast).has(alias)) alias = `TerraQualityRegex${alias === 'TerraQualityRegex' ? 2 : Number(alias.slice('TerraQualityRegex'.length)) + 1}`;
+					fileEdits = {
+						source: analysis?.texts.get(candidate.file) ?? readFileSync(candidate.file, 'utf8'),
+						ast: candidate.ast,
+						edits: [],
+						alias,
+						specifier: relative(dirname(candidate.file), modulePath)
+							.replace(G_CLASS_2(), '/')
+							.replace(/^(?!\.)/, './'),
+					};
+					srcEdits.set(candidate.file, fileEdits);
+				}
+				fileEdits.edits.push({ start: candidate.node.getStart(candidate.ast), end: candidate.node.end, replacement: `${fileEdits.alias}.${groupNames.get(key)!}()` });
+				fixed++;
+			}
+		}
+		const updatedSrcs = new Map<string, string>();
+		for (const [file, fileEdits] of srcEdits) {
+			let updated = fileEdits.source;
+			for (const edit of fileEdits.edits.sort((l, r) => r.start - l.start)) updated = `${updated.slice(0, edit.start)}${edit.replacement}${updated.slice(edit.end)}`;
+			if (!namespaceImport(fileEdits.ast, file, modulePath)) {
+				const eol = updated.includes('\r\n') ? '\r\n' : '\n';
+				let at = 0;
+				let first: ts.Statement | undefined;
+				for (const statement of ts.createSourceFile(file, updated, ts.ScriptTarget.Latest, true, regexScriptKind(file)).statements) {
+					first ??= statement;
+					if (ts.isImportDeclaration(statement) || (ts.isExpressionStatement(statement) && ts.isStringLiteral(statement.expression))) at = statement.end;
+					else break;
+				}
+				if (!at && first) {
+					at = first.getStart();
+					if ([...updated.slice(first.getFullStart(), first.getStart()).matchAll(T_R_N_ESLINT_DISABLE_NEXT_LINE_TS_IGNORE_TS_EXPECT_ERR_R_N_GM_REGEX())].at(-1)?.index !== undefined)
+						at = first.getFullStart() + [...updated.slice(first.getFullStart(), first.getStart()).matchAll(T_R_N_ESLINT_DISABLE_NEXT_LINE_TS_IGNORE_TS_EXPECT_ERR_R_N_GM_REGEX())].at(-1)!.index!;
+				}
+				if (!at && updated.startsWith('#!')) {
+					const shebangEnd = updated.indexOf('\n');
+					at = shebangEnd < 0 ? updated.length : shebangEnd + 1;
+				}
+				updated = `${updated.slice(0, at)}${at && !updated.slice(0, at).endsWith('\n') ? eol : ''}import * as ${fileEdits.alias} from '${fileEdits.specifier}';${updated.slice(at).startsWith('\n') || updated.slice(at).startsWith('\r\n') ? '' : eol}${updated.slice(at)}`;
+			}
+			if (!validRegexOutput(file, updated)) {
+				skipped += fileEdits.edits.length;
+				fixed -= fileEdits.edits.length;
+				continue;
+			}
+			updatedSrcs.set(file, updated);
+		}
+		if ([...updatedSrcs].length !== srcEdits.size || !validRegexOutput(modulePath, moduleSrc) || !validRegexOutput(declarationPath, declarationSrc))
+			return { fixed: 0, skipped: groups.filter(([, c]) => c.every((c) => c.rewritable && isEsmConsumer(cfg, c.file))).reduce((c, [, v]) => c + v.length, 0) + skipped };
+		mkdirSync(dirname(modulePath), { recursive: true });
+		writeFileSync(modulePath, moduleSrc);
+		writeFileSync(declarationPath, declarationSrc);
+		for (const [file, source] of updatedSrcs) writeFileSync(file, source);
+		return { fixed, skipped };
+	}
 	let fixed = 0;
 	let skipped = 0;
 	const files = new Map<string, RegexCandidate[]>();
-	for (const candidate of [...groups.values()].flat()) {
+	for (const candidate of [...regexGroups(cfg, analysis, regexCandidates(cfg, analysis)).values()].flat()) {
 		if (!ts.isRegularExpressionLiteral(candidate.node)) continue;
 		files.set(candidate.file, [...(files.get(candidate.file) ?? []), candidate]);
 	}
 	for (const [file, candidates] of files) {
-		const src = analysis?.texts.get(file) ?? readFileSync(file, 'utf8');
 		const localGroups = new Map<string, RegexCandidate[]>();
 		for (const candidate of candidates) localGroups.set(candidate.source, [...(localGroups.get(candidate.source) ?? []), candidate]);
-		const matches = [...localGroups].filter(([, n]) => n.length >= minimum);
-		const used = identifierNames(candidates[0]!.ast);
+		const matches = [...localGroups].filter(([, n]) => n.length >= (cfg.regexDedup?.minimumCount ?? 2));
 		const declarations: string[] = [];
 		const edits: Array<{ start: number; end: number; replacement: string }> = [];
 		for (const [, nodes] of matches) {
-			const name = classConstName(nodes[0]!.expression.replace(/\W+/g, '_'), used).replace(/_CLASS$/, '_REGEX');
+			const name = classConstName(
+				nodes[0]!.expression.replace(/\W+/g, '_'),
+				new Set([
+					...identifierNames(candidates[0]!.ast),
+					...declarations
+						.join('\n')
+						.replace(/^const /gmu, '')
+						.replace(/ =.*$/gmu, '')
+						.split('\n')
+						.filter(Boolean),
+				]),
+			).replace(/_CLASS$/, '_REGEX');
 			const flags = nodes[0]!.expression.slice(nodes[0]!.expression.lastIndexOf('/') + 1);
 			const stateful = flags.includes('g') || flags.includes('y');
 			declarations.push(`const ${name} = ${stateful ? `() => ${nodes[0]!.expression}` : nodes[0]!.expression};`);
@@ -922,7 +894,7 @@ export function fixRegexDedup(cfg: QualityCfg, analysis?: QualityAnalysis): Patt
 		}
 		const matchingCount = matches.reduce((c, [, n]) => c + n.length, 0);
 		if (!edits.length) continue;
-		let updated = src;
+		let updated = analysis?.texts.get(file) ?? readFileSync(file, 'utf8');
 		for (const edit of edits.sort((l, r) => r.start - l.start)) updated = `${updated.slice(0, edit.start)}${edit.replacement}${updated.slice(edit.end)}`;
 		const withGroup = insertCfgGroup(updated, 'REGEX', declarations, file);
 		if (withGroup === updated || !writePatternSrc(file, withGroup)) {
@@ -930,96 +902,5 @@ export function fixRegexDedup(cfg: QualityCfg, analysis?: QualityAnalysis): Patt
 			skipped += matchingCount;
 		}
 	}
-	return { fixed, skipped };
-}
-/**
- * Rewrites eligible duplicate regexes to factories in the configured shared module.
- *
- * @param cfg Quality configuration containing the shared module and source scope.
- * @param analysis Optional shared analysis context for reusing parsed sources.
- *
- * @return Counts of shared fixes applied and candidates left for review.
- */
-function fixRegexDedupShared(cfg: QualityCfg, analysis?: QualityAnalysis): PatternFixResult {
-	const sharedModule = cfg.regexDedup!.sharedModule!;
-	if (!sharedModule.endsWith('.mjs')) throw new Error('regexDedup.sharedModule must name an ESM .mjs file.');
-	const modulePath = resolve(cfg.root, sharedModule);
-	const moduleRelative = relative(cfg.root, modulePath);
-	if (moduleRelative === '..' || moduleRelative.startsWith(`..${process.platform === 'win32' ? '\\' : '/'}`)) throw new Error('regexDedup.sharedModule must stay inside the repository root.');
-	const declarationPath = modulePath.replace(/\.mjs$/, '.d.mts');
-	const minimum = cfg.regexDedup?.minimumCount ?? 2;
-	const groups = [...regexGroups(cfg, analysis)].filter(([, c]) => c.length >= minimum);
-	if (!groups.length) return { fixed: 0, skipped: 0 };
-	const registry = readRegexRegistry(modulePath, declarationPath);
-	if (!registry) return { fixed: 0, skipped: groups.reduce((c, [, v]) => c + v.length, 0) };
-	const rewritable = groups.filter(([, c]) => c.every((c) => c.rewritable && isEsmConsumer(cfg, c.file)));
-	let skipped = groups.filter(([, c]) => !c.every((c) => c.rewritable && isEsmConsumer(cfg, c.file))).reduce((c, [, v]) => c + v.length, 0);
-	if (!rewritable.length) return { fixed: 0, skipped };
-	const usedExports = new Set(registry.names);
-	const namesByKey = new Map(registry.keys);
-	const newEntries: Array<{ key: string; name: string; expression: string }> = [];
-	const groupNames = new Map<string, string>();
-	for (const [key, candidates] of rewritable.sort(([l], [r]) => l.localeCompare(r))) {
-		let name = namesByKey.get(key);
-		if (!name) {
-			name = regexExportName(key, usedExports);
-			namesByKey.set(key, name);
-			newEntries.push({ key, name, expression: candidates[0]!.expression });
-		}
-		groupNames.set(key, name);
-	}
-	const eol = '\n';
-	const moduleAdditions = newEntries
-		.map(
-			({ key: k, name: n, expression: e }) =>
-				`// @terra-quality-regex-key ${JSON.stringify(k)}\nexport const ${n} = () => (\n${e
-					.split('\n')
-					.map((l) => `\t${l}`)
-					.join('\n')}\n);`,
-		)
-		.join(`${eol}${eol}`);
-	const moduleSrc = `${registry.module.replace(/\s*$/, '')}${moduleAdditions ? `${eol}${eol}${moduleAdditions}${eol}` : `${eol}`}`;
-	const declarationSrc = declarationFor(moduleSrc);
-	const srcEdits = new Map<string, { source: string; ast: ts.SourceFile; edits: Array<{ start: number; end: number; replacement: string }>; alias: string; specifier: string }>();
-	let fixed = 0;
-	for (const [key, candidates] of rewritable) {
-		const name = groupNames.get(key)!;
-		for (const candidate of candidates) {
-			let fileEdits = srcEdits.get(candidate.file);
-			if (!fileEdits) {
-				const source = analysis?.texts.get(candidate.file) ?? readFileSync(candidate.file, 'utf8');
-				const existingAlias = namespaceImport(candidate.ast, candidate.file, modulePath);
-				const names = identifierNames(candidate.ast);
-				let alias = existingAlias ?? 'TerraQualityRegex';
-				let suffix = 2;
-				while (!existingAlias && names.has(alias)) alias = `TerraQualityRegex${suffix++}`;
-				fileEdits = { source, ast: candidate.ast, edits: [], alias, specifier: moduleSpecifier(candidate.file, modulePath) };
-				srcEdits.set(candidate.file, fileEdits);
-			}
-			fileEdits.edits.push({ start: candidate.node.getStart(candidate.ast), end: candidate.node.end, replacement: `${fileEdits.alias}.${name}()` });
-			fixed++;
-		}
-	}
-	const updatedSrcs = new Map<string, string>();
-	for (const [file, fileEdits] of srcEdits) {
-		let updated = fileEdits.source;
-		for (const edit of fileEdits.edits.sort((l, r) => r.start - l.start)) updated = `${updated.slice(0, edit.start)}${edit.replacement}${updated.slice(edit.end)}`;
-		if (!namespaceImport(fileEdits.ast, file, modulePath)) {
-			const updatedAst = ts.createSourceFile(file, updated, ts.ScriptTarget.Latest, true, regexScriptKind(file));
-			updated = insertNamespaceImport(updated, updatedAst, fileEdits.alias, fileEdits.specifier);
-		}
-		if (!validRegexOutput(file, updated)) {
-			skipped += fileEdits.edits.length;
-			fixed -= fileEdits.edits.length;
-			continue;
-		}
-		updatedSrcs.set(file, updated);
-	}
-	if ([...updatedSrcs].length !== srcEdits.size || !validRegexOutput(modulePath, moduleSrc) || !validRegexOutput(declarationPath, declarationSrc))
-		return { fixed: 0, skipped: groups.filter(([, c]) => c.every((c) => c.rewritable && isEsmConsumer(cfg, c.file))).reduce((c, [, v]) => c + v.length, 0) + skipped };
-	mkdirSync(dirname(modulePath), { recursive: true });
-	writeFileSync(modulePath, moduleSrc);
-	writeFileSync(declarationPath, declarationSrc);
-	for (const [file, source] of updatedSrcs) writeFileSync(file, source);
 	return { fixed, skipped };
 }

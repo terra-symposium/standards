@@ -35,18 +35,18 @@ export type NormalizedLoadTestingConfig = {
 /** Optional inputs that have higher precedence than quality.json values. */
 export type LoadTestingOverrides = LoadTestingConfig;
 /**
+ * Checks whether a value is a non-null, non-array object.
  *
- * @param val
+ * @param val Value to inspect.
  *
- * @return
+ * @return Whether the value can be read as a string-keyed record.
  */
 const isRec = (val: unknown): val is Record<string, unknown> => !!val && typeof val === 'object' && !Array.isArray(val);
 /**
  * Validates one partial budget and returns a fresh object.
  *
- * @param val
+ * @param val Value to validate as a partial timing budget.
  * @param label Location used in configuration errors.
- * @param valandidate budget from quality.json or test code.
  *
  * @return A validated partial budget.
  */
@@ -63,8 +63,7 @@ const budgetOverride = (val: unknown, label: string): LoadBudgetOverride => {
 /**
  * Validates and copies a partial budget supplied by a test helper.
  *
- * @param val
- * @param valandidate partial threshold override.
+ * @param val Partial warning and failure thresholds supplied by a test helper.
  *
  * @return A validated partial budget.
  */
@@ -76,9 +75,8 @@ export const validateLoadBudgetOverride = (val: LoadBudgetOverride): LoadBudgetO
 /**
  * Validates a named budget map.
  *
- * @param val
+ * @param val Value to validate as a map of named timing budgets.
  * @param label Location used in configuration errors.
- * @param valandidate map from configuration.
  *
  * @return A validated map keyed by test identity or measurement name.
  */
@@ -90,9 +88,8 @@ const budgetMap = (val: unknown, label: string): Record<string, LoadBudgetOverri
 /**
  * Checks that a complete budget has an ordered warning/failure boundary.
  *
- * @param val
+ * @param val Complete warning and failure thresholds to check.
  * @param label Location used in configuration errors.
- * @param valudget to validate.
  *
  * @return The validated budget.
  */
@@ -116,11 +113,12 @@ export const normalizeLoadTestingConfig = (raw: LoadTestingConfig = {}, override
 		'loadTesting.defaultBudget',
 	);
 	/**
+	 * Merges named budgets, with additional values taking precedence.
 	 *
-	 * @param base
-	 * @param additional
+	 * @param base Budgets from repository configuration.
+	 * @param additional Budgets that override repository configuration.
 	 *
-	 * @return
+	 * @return A new map containing the merged budgets.
 	 */
 	const mergeMaps = (base: Record<string, LoadBudgetOverride>, additional: Record<string, LoadBudgetOverride>): Record<string, LoadBudgetOverride> => {
 		const merged: Record<string, LoadBudgetOverride> = { ...base };
@@ -190,10 +188,9 @@ export const gradeLoad = (durationMs: number, budget: LoadBudget): LoadGrade => 
  * Resolves and grades one measurement using test/helper overrides, named config, and defaults.
  *
  * @param input Raw timing measurement.
- * @param cfg
+ * @param cfg Normalized repository timing settings.
  * @param testId Stable test key for per-test budgets.
  * @param testOverride Optional budget set directly by the test fixture.
- * @param cfgrmalized repository timing settings.
  *
  * @return A normalized measurement ready for artifacts.
  */
@@ -224,21 +221,20 @@ export const loadGradeCounts = (measurements: readonly Pick<LoadMeasurement, 'gr
  * Times an operation, records its duration even when it throws, and preserves its value/error.
  *
  * @param name Stable human-readable operation name.
- * @param op
- * @param rec
+ * @param op Operation to time.
+ * @param rec Callback that receives the elapsed measurement.
  * @param budget Optional helper-level budget override.
- * @param opo time.
- * @param recllback receiving the elapsed measurement.
  *
  * @return The operation result.
  */
 export const timeLoadOperation = async <T>(name: string, op: () => T | Promise<T>, rec: (measurement: LoadMeasurementInput) => void, budget?: LoadBudgetOverride): Promise<T> => {
 	if (!name.trim()) throw new Error('A named load measurement is required.');
 	const valid = budget ? validateLoadBudgetOverride(budget) : undefined;
-	const start = performance.now();
-	try {
-		return await op();
-	} finally {
-		rec({ name, kind: 'operation', durationMs: performance.now() - start, ...(valid ? { budget: valid } : {}) });
-	}
+	return (async (start) => {
+		try {
+			return await op();
+		} finally {
+			rec({ name, kind: 'operation', durationMs: performance.now() - start, ...(valid ? { budget: valid } : {}) });
+		}
+	})(performance.now());
 };

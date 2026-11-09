@@ -19,6 +19,12 @@ import type { QualityAnalysis, QualityCfg } from './runner.js';
 REGEX
 //////////////////////////////////////////////////*/
 
+const ON_A_Z_REGEX = /^on[A-Z]/;
+
+/*//////////////////////////////////////////////////
+REGEX
+//////////////////////////////////////////////////*/
+
 const A_Z_REGEX = /^[A-Z]/;
 /** Context used when shortening an identifier without changing its meaning. */
 type RenameKind = { numericIndex?: boolean; callback?: boolean; reserved?: string[] };
@@ -114,34 +120,6 @@ ALIASES
 
 /** A declaration that only gives a stable local binding a second local name. */
 export type AliasFinding = { file: string; line: number; kind: 'const' | 'type'; name: string; replacement: string };
-/**
- *
- * @param n
- *
- * @return
- */
-const aliasTgt = (n: ts.Expression): ts.Identifier | ts.PropertyAccessExpression | ts.ElementAccessExpression | undefined =>
-	ts.isIdentifier(n) || ts.isPropertyAccessExpression(n) || ts.isElementAccessExpression(n) ? n : undefined;
-
-/**
- * Confirms that an identifier keeps the same local binding after its declaration.
- *
- * @param symbol Symbol resolved for the identifier.
- *
- * @return Whether the target remains a stable local binding.
- */
-function isStableLocalBinding(symbol: ts.Symbol): boolean {
-	if (symbol.flags & ts.SymbolFlags.Alias) return false;
-	const declaration = symbol.valueDeclaration;
-	const variable =
-		declaration && ts.isVariableDeclaration(declaration)
-			? declaration
-			: declaration && ts.isBindingElement(declaration) && ts.isVariableDeclaration(declaration.parent.parent)
-				? declaration.parent.parent
-				: undefined;
-	const list = variable?.parent;
-	return Boolean(list && ts.isVariableDeclarationList(list) && (list.flags & ts.NodeFlags.Const) !== 0);
-}
 
 /*//////////////////////////////////////////////////
 HELPERS
@@ -158,10 +136,10 @@ HELPERS
 function replacementMap(groups: readonly [names: string | readonly string[], replacement: string][], pluralReplacements = true): Readonly<Record<string, string>> {
 	const explicit = new Map(groups.flatMap(([n, r]) => (typeof n === 'string' ? [n] : n).map((n) => [n, r] as const)));
 	/**
+	 * Pluralizes one supported identifier word before applying its replacement.
+	 * @param word Singular or already plural identifier word.
 	 *
-	 * @param word
-	 *
-	 * @return
+	 * @return The plural form used as a replacement-map key.
 	 */
 	const plural = (word: string): string => {
 		if (/[^aeiou]y$/i.test(word)) return `${word.slice(0, -1)}ies`;
@@ -188,36 +166,6 @@ export function identifierTokens(name: string): string[] {
 		.split(/[_-]/)
 		.flatMap((p) => p.match(/[A-Z]+(?=[A-Z][a-z]|\d|$)|[A-Z]?[a-z]+|\d+/g) ?? [p])
 		.filter(Boolean);
-}
-
-/**
- * Reassembles replacement tokens using the original identifier's casing and separators.
- *
- * @param original Identifier whose formatting should be preserved.
- * @param tokens Replacement tokens to render.
- *
- * @return The replacement identifier in the original naming style.
- */
-function renderIdentifier(original: string, tokens: string[]): string {
-	if (/^[A-Z][A-Z0-9_]*$/.test(original)) return tokens.join(original.includes('_') ? '_' : '').toUpperCase();
-	if (original.includes('_')) return tokens.join('_');
-	if (original.includes('-')) return tokens.join('-');
-	if (A_Z_REGEX.test(original)) return tokens.map((t) => t.charAt(0).toUpperCase() + t.slice(1)).join('');
-	return tokens.map((t, i) => (i === 0 ? t.toLowerCase() : t.charAt(0).toUpperCase() + t.slice(1))).join('');
-}
-
-/**
- * Applies the original token's uppercase, PascalCase, or lowercase style to a replacement word.
- *
- * @param original Original identifier token.
- * @param replacement Concise replacement token.
- *
- * @return Replacement token with casing matching the original.
- */
-function tokenCase(original: string, replacement: string): string {
-	if (original === original.toUpperCase()) return replacement.toUpperCase();
-	if (original.charAt(0) === original.charAt(0).toUpperCase()) return replacement.charAt(0).toUpperCase() + replacement.slice(1);
-	return replacement;
 }
 
 /**
@@ -250,17 +198,22 @@ export function renameId(name: string, kind: RenameKind = {}): string {
 	if (kind.callback) return callbackAlias(name, kind.reserved);
 	const tokens = identifierTokens(name);
 	if (!tokens.some((t) => Object.hasOwn(IDENTIFIER_REPLACEMENTS, t.toLowerCase()) || Object.hasOwn(PREFIX_REPLACEMENTS, t.toLowerCase()))) return name;
-	return renderIdentifier(
-		name,
-		tokens.map((t, i) => {
+	return tokens
+		.map((t, i) => {
 			const lower = t.toLowerCase();
 			const replacement =
 				i === 0 && Object.hasOwn(PREFIX_REPLACEMENTS, lower)
 					? PREFIX_REPLACEMENTS[lower as keyof typeof PREFIX_REPLACEMENTS]
 					: (IDENTIFIER_REPLACEMENTS[lower as keyof typeof IDENTIFIER_REPLACEMENTS] ?? t);
-			return replacement === t ? t : tokenCase(t, replacement);
-		}),
-	);
+			if (/^[A-Z][A-Z0-9_]*$/.test(name)) return replacement.toUpperCase();
+			if (name.includes('_') || name.includes('-')) {
+				if (replacement === t) return t;
+				return t === t.toUpperCase() ? replacement.toUpperCase() : t.charAt(0) === t.charAt(0).toUpperCase() ? replacement.charAt(0).toUpperCase() + replacement.slice(1) : replacement;
+			}
+			if (A_Z_REGEX.test(name)) return replacement.charAt(0).toUpperCase() + replacement.slice(1);
+			return i === 0 ? replacement.toLowerCase() : replacement.charAt(0).toUpperCase() + replacement.slice(1);
+		})
+		.join(name.includes('_') ? '_' : name.includes('-') ? '-' : '');
 }
 
 /**
@@ -282,39 +235,29 @@ function callbackKind(n: ts.Identifier): RenameKind | undefined {
 		(n): n is ts.ArrowFunction | ts.FunctionExpression | ts.FunctionDeclaration => ts.isArrowFunction(n) || ts.isFunctionExpression(n) || ts.isFunctionDeclaration(n),
 	);
 	if (!callback) return undefined;
-	const isInlineCallback = !ts.isFunctionDeclaration(callback) && ts.isCallExpression(callback.parent) && callback.parent.arguments.includes(callback as ts.Expression);
 	let isNamedCallback = false;
 	if (ts.isFunctionDeclaration(callback) && callback.name) {
-		/**
-		 *
-		 * @param n
-		 */
-		const scan = (n: ts.Node): void => {
-			if (isNamedCallback) return;
+		const pending: ts.Node[] = [callback.parent];
+		while (pending.length && !isNamedCallback) {
+			const n = pending.pop()!;
 			const jsxAttr = ts.isJsxAttribute(n) ? n : undefined;
 			const jsxExpr = jsxAttr?.initializer && ts.isJsxExpression(jsxAttr.initializer) ? jsxAttr.initializer.expression : undefined;
-			const isJsxHandler =
-				!!jsxAttr &&
-				ts.isIdentifier(jsxAttr.name) &&
-				/^on[A-Z]/.test(jsxAttr.name.text) &&
-				!!jsxExpr &&
-				(() => {
-					let refs = false;
-					/**
-					 *
-					 * @param c
-					 */
-					const findRef = (c: ts.Node): void => {
-						if (refs) return;
-						if (ts.isIdentifier(c) && c.text === callback.name?.text) {
-							refs = true;
-							return;
-						}
-						ts.forEachChild(c, findRef);
-					};
-					findRef(jsxExpr);
-					return refs;
-				})();
+			let refs = false;
+			if (jsxAttr && ts.isIdentifier(jsxAttr.name) && ON_A_Z_REGEX.test(jsxAttr.name.text) && jsxExpr) {
+				const pendingExpr: ts.Node[] = [jsxExpr];
+				while (pendingExpr.length && !refs) {
+					const child = pendingExpr.pop()!;
+					if (ts.isIdentifier(child) && child.text === callback.name.text) {
+						refs = true;
+						break;
+					}
+					const children: ts.Node[] = [];
+					ts.forEachChild(child, (descendant) => {
+						children.push(descendant);
+					});
+					for (let i = children.length - 1; i >= 0; i--) pendingExpr.push(children[i]!);
+				}
+			}
 			if (
 				ts.isCallExpression(n) &&
 				ts.isPropertyAccessExpression(n.expression) &&
@@ -322,39 +265,49 @@ function callbackKind(n: ts.Identifier): RenameKind | undefined {
 				n.arguments.some((a) => ts.isIdentifier(a) && a.text === callback.name?.text)
 			) {
 				isNamedCallback = true;
-				return;
+				break;
 			}
-			if (isJsxHandler) {
+			if (jsxAttr && ts.isIdentifier(jsxAttr.name) && ON_A_Z_REGEX.test(jsxAttr.name.text) && jsxExpr && refs) {
 				isNamedCallback = true;
-				return;
+				continue;
 			}
-			ts.forEachChild(n, scan);
-		};
-		scan(callback.parent);
+			const children: ts.Node[] = [];
+			ts.forEachChild(n, (child) => {
+				children.push(child);
+			});
+			for (let i = children.length - 1; i >= 0; i--) pending.push(children[i]!);
+		}
 	}
-	const isJsxCallback = ts.isJsxExpression(callback.parent) && callback.parent.expression === callback && ts.isJsxAttribute(callback.parent.parent);
-	if (!isInlineCallback && !isNamedCallback && !isJsxCallback) return undefined;
+	if (
+		!(!ts.isFunctionDeclaration(callback) && ts.isCallExpression(callback.parent) && callback.parent.arguments.includes(callback as ts.Expression)) &&
+		!isNamedCallback &&
+		!(ts.isJsxExpression(callback.parent) && callback.parent.expression === callback && ts.isJsxAttribute(callback.parent.parent))
+	)
+		return undefined;
 	const declarations: ts.Identifier[] = [];
-	/**
-	 *
-	 * @param name
-	 */
-	const collectBinding = (name: ts.BindingName): void => {
-		if (ts.isIdentifier(name)) declarations.push(name);
-		else for (const element of name.elements) if (ts.isBindingElement(element)) collectBinding(element.name);
-	};
-	for (const p of callback.parameters) collectBinding(p.name);
-	const declarationNames = new Set(declarations.map((d) => d.text));
+	for (const p of callback.parameters) {
+		const pending = [p.name];
+		while (pending.length) {
+			const name = pending.pop()!;
+			if (ts.isIdentifier(name)) declarations.push(name);
+			else
+				for (let i = name.elements.length - 1; i >= 0; i--) {
+					const element = name.elements[i];
+					if (ts.isBindingElement(element)) pending.push(element.name);
+				}
+		}
+	}
 	const reserved = new Set<string>();
-	/**
-	 *
-	 * @param child
-	 */
-	const collect = (child: ts.Node): void => {
-		if (ts.isIdentifier(child) && !declarationNames.has(child.text)) reserved.add(child.text);
-		ts.forEachChild(child, collect);
-	};
-	collect(callback);
+	const pending: ts.Node[] = [callback];
+	while (pending.length) {
+		const child = pending.pop()!;
+		if (ts.isIdentifier(child) && !declarations.some((declaration) => declaration.text === child.text)) reserved.add(child.text);
+		const children: ts.Node[] = [];
+		ts.forEachChild(child, (descendant) => {
+			children.push(descendant);
+		});
+		for (let i = children.length - 1; i >= 0; i--) pending.push(children[i]!);
+	}
 	for (const declaration of declarations) {
 		if (declaration === n) return { callback: true, numericIndex: callback.parameters.indexOf(param) === 1 && n.text === 'index', reserved: [...reserved] };
 		const declarationParam = ts.findAncestor(declaration, ts.isParameter);
@@ -475,9 +428,10 @@ export function isRenamableDeclaration(n: ts.Identifier): boolean {
  * @return The nearest function-like scope, or the source file when no function owns it.
  */
 export function declarationScope(n: ts.Identifier): ts.Node {
-	const isOuterDeclarationName =
-		(ts.isFunctionDeclaration(n.parent) || ts.isClassDeclaration(n.parent) || ts.isInterfaceDeclaration(n.parent) || ts.isTypeAliasDeclaration(n.parent)) && n.parent.name === n;
-	let scope: ts.Node = isOuterDeclarationName ? n.parent.parent : n.parent;
+	let scope: ts.Node =
+		(ts.isFunctionDeclaration(n.parent) || ts.isClassDeclaration(n.parent) || ts.isInterfaceDeclaration(n.parent) || ts.isTypeAliasDeclaration(n.parent)) && n.parent.name === n
+			? n.parent.parent
+			: n.parent;
 	while (!ts.isSourceFile(scope)) {
 		if (
 			ts.isArrowFunction(scope) ||
@@ -503,21 +457,15 @@ export function declarationScope(n: ts.Identifier): ts.Node {
  * @return Concise-name findings for declarations that can be renamed safely.
  */
 export function namingFindings(cfg: QualityCfg, analysis?: QualityAnalysis): NamingFinding[] {
-	const protectedNames = new Set([...PROTECTED_IDENTIFIERS, ...(cfg.protectedIdentifiers ?? [])]);
 	const findings: NamingFinding[] = [];
 	for (const f of analysis?.files ?? srcFiles(cfg)) {
 		if (isProtectedPath(displayPath(cfg, f))) continue;
 		const file = analysis?.sources.get(f) ?? ts.createSourceFile(f, readFileSync(f, 'utf8'), ts.ScriptTarget.Latest, true, f.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
-		const exportedNames = new Set(
-			file.statements.flatMap((s) => (ts.isExportDeclaration(s) && s.exportClause && ts.isNamedExports(s.exportClause) ? s.exportClause.elements.map((e) => (e.propertyName ?? e.name).text) : [])),
-		);
 		const safetyByScope = new Map<ts.Node, { declared: Set<string>; proposals: Map<string, number> }>();
 		const declaredNames = new Set<string>();
-		/**
-		 *
-		 * @param n
-		 */
-		const collect = (n: ts.Node): void => {
+		const pending: ts.Node[] = [file];
+		while (pending.length) {
+			const n = pending.pop()!;
 			if (ts.isIdentifier(n) && isRenamableDeclaration(n)) {
 				const scope = declarationScope(n);
 				const safety = safetyByScope.get(scope) ?? { declared: new Set<string>(), proposals: new Map<string, number>() };
@@ -527,41 +475,38 @@ export function namingFindings(cfg: QualityCfg, analysis?: QualityAnalysis): Nam
 				if (!n.text.startsWith('_') && suggestion !== n.text && !isCallbackDeclaration(n)) safety.proposals.set(suggestion, (safety.proposals.get(suggestion) ?? 0) + 1);
 				safetyByScope.set(scope, safety);
 			}
-			ts.forEachChild(n, collect);
-		};
-		collect(file);
-		/**
-		 *
-		 * @param n
-		 */
-		const inspect = (n: ts.Node): void => {
-			if (ts.isIdentifier(n) && isRenamableDeclaration(n) && !n.text.startsWith('_') && !protectedNames.has(n.text) && !exportedNames.has(n.text)) {
+			const children: ts.Node[] = [];
+			ts.forEachChild(n, (child) => {
+				children.push(child);
+			});
+			for (let i = children.length - 1; i >= 0; i--) pending.push(children[i]!);
+		}
+		pending.push(file);
+		while (pending.length) {
+			const n = pending.pop()!;
+			if (
+				ts.isIdentifier(n) &&
+				isRenamableDeclaration(n) &&
+				!n.text.startsWith('_') &&
+				!PROTECTED_IDENTIFIERS.has(n.text) &&
+				!cfg.protectedIdentifiers?.includes(n.text) &&
+				!file.statements.some(
+					(s) => ts.isExportDeclaration(s) && s.exportClause && ts.isNamedExports(s.exportClause) && s.exportClause.elements.some((e) => (e.propertyName ?? e.name).text === n.text),
+				)
+			) {
 				const suggestion = renameDeclaration(n);
 				const safety = safetyByScope.get(declarationScope(n));
-				if (!isCallbackDeclaration(n) && (safety?.declared.has(suggestion) || declaredNames.has(suggestion) || (safety?.proposals.get(suggestion) ?? 0) > 1)) return;
+				if (!isCallbackDeclaration(n) && (safety?.declared.has(suggestion) || declaredNames.has(suggestion) || (safety?.proposals.get(suggestion) ?? 0) > 1)) continue;
 				if (suggestion !== n.text) findings.push({ file: displayPath(cfg, f), name: n.text, suggestion, severity: 'error', start: n.getStart(file) });
 			}
-			ts.forEachChild(n, inspect);
-		};
-		inspect(file);
+			const children: ts.Node[] = [];
+			ts.forEachChild(n, (child) => {
+				children.push(child);
+			});
+			for (let i = children.length - 1; i >= 0; i--) pending.push(children[i]!);
+		}
 	}
 	return findings;
-}
-
-/**
- * Checks whether a symbol name appears in another source file's text.
- *
- * @param files Source files to scan.
- * @param srcTexts Cached source text keyed by absolute path.
- * @param src File being excluded from the search.
- * @param name Symbol name to search for as a complete word.
- *
- * @return `true` when another file references the name textually.
- */
-function externallyReferenced(files: string[], srcTexts: Map<string, string>, src: string, name: string): boolean {
-	const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-	const pattern = new RegExp(`\\b${escaped}\\b`);
-	return files.some((f) => f !== src && pattern.test(srcTexts.get(f) ?? ''));
 }
 
 /**
@@ -575,9 +520,7 @@ function externallyReferenced(files: string[], srcTexts: Map<string, string>, sr
  */
 export function aliasFindings(cfg: QualityCfg, analysisOrFix: QualityAnalysis | boolean = false, legacyFix = false): AliasFinding[] {
 	const analysis = typeof analysisOrFix === 'object' ? analysisOrFix : undefined;
-	const fix = typeof analysisOrFix === 'boolean' ? analysisOrFix : legacyFix;
 	const files = (analysis?.files ?? srcFiles(cfg)).filter((f) => /\.(?:c|m)?(?:js|ts)x?$/.test(f));
-	const srcTexts = analysis?.texts ?? new Map(files.map((f) => [f, readFileSync(f, 'utf8')]));
 	const program =
 		analysis?.program ??
 		ts.createProgram(files, {
@@ -608,11 +551,9 @@ export function aliasFindings(cfg: QualityCfg, analysisOrFix: QualityAnalysis | 
 	for (const src of program.getSourceFiles()) {
 		if (!files.includes(src.fileName)) continue;
 		const aliases: Array<{ statement: ts.Statement; name: ts.Identifier; symbol: ts.Symbol; replacement: string; kind: 'const' | 'type'; targetSymbol?: ts.Symbol; targetName?: string }> = [];
-		/**
-		 *
-		 * @param node
-		 */
-		const inspect = (node: ts.Node): void => {
+		const pending: ts.Node[] = [src];
+		while (pending.length) {
+			const node = pending.pop()!;
 			if (
 				ts.isVariableStatement(node) &&
 				(node.declarationList.flags & ts.NodeFlags.Const) !== 0 &&
@@ -621,7 +562,8 @@ export function aliasFindings(cfg: QualityCfg, analysisOrFix: QualityAnalysis | 
 			) {
 				const declaration = node.declarationList.declarations[0];
 				const name = declaration.name as ts.Identifier;
-				const tgt = declaration.initializer && aliasTgt(declaration.initializer);
+				const init = declaration.initializer;
+				const tgt = init && (ts.isIdentifier(init) || ts.isPropertyAccessExpression(init) || ts.isElementAccessExpression(init)) ? init : undefined;
 				const symbol = tgt && checker.getSymbolAtLocation(name);
 				const targetSymbol = tgt
 					? (checker.getSymbolAtLocation(tgt) ??
@@ -635,7 +577,17 @@ export function aliasFindings(cfg: QualityCfg, analysisOrFix: QualityAnalysis | 
 					symbol &&
 					targetSymbol &&
 					symbol !== targetSymbol &&
-					isStableLocalBinding(targetSymbol) &&
+					!(targetSymbol.flags & ts.SymbolFlags.Alias) &&
+					(() => {
+						const declaration = targetSymbol.valueDeclaration;
+						const list =
+							declaration && ts.isVariableDeclaration(declaration)
+								? declaration.parent
+								: declaration && ts.isBindingElement(declaration) && ts.isVariableDeclaration(declaration.parent.parent)
+									? declaration.parent.parent.parent
+									: undefined;
+						return Boolean(list && ts.isVariableDeclarationList(list) && (list.flags & ts.NodeFlags.Const) !== 0);
+					})() &&
 					!exportedSymbols.has(symbol) &&
 					!exportedNames.has(name.text) &&
 					!node.modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword)
@@ -651,13 +603,19 @@ export function aliasFindings(cfg: QualityCfg, analysisOrFix: QualityAnalysis | 
 					symbol !== targetSymbol &&
 					!exportedSymbols.has(symbol) &&
 					!exportedNames.has(node.name.text) &&
-					!externallyReferenced(files, srcTexts, src.fileName, node.name.text)
+					!files.some((f) => {
+						if (f === src.fileName) return false;
+						return new RegExp(`\\b${node.name.text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`).test(analysis?.texts.get(f) ?? program.getSourceFile(f)?.text ?? '');
+					})
 				)
 					aliases.push({ statement: node, name: node.name, symbol, replacement: node.type.getText(src), kind: 'type', targetSymbol, targetName: node.type.typeName.getText(src) });
 			}
-			ts.forEachChild(node, inspect);
-		};
-		inspect(src);
+			const children: ts.Node[] = [];
+			ts.forEachChild(node, (child) => {
+				children.push(child);
+			});
+			for (let i = children.length - 1; i >= 0; i--) pending.push(children[i]!);
+		}
 		if (!aliases.length) continue;
 		const edits: Array<{ start: number; end: number; text: string; alias: (typeof aliases)[number] }> = [];
 		const symbols = new Map(aliases.map((a) => [a.symbol, a]));
@@ -670,23 +628,20 @@ export function aliasFindings(cfg: QualityCfg, analysisOrFix: QualityAnalysis | 
 				chained.add(tgtAlias);
 			}
 		}
-		/**
-		 *
-		 * @param node
-		 */
-		const visit = (node: ts.Node): void => {
-			if (aliases.some((a) => a.statement === node)) return;
+		const pendingReferences: ts.Node[] = [src];
+		while (pendingReferences.length) {
+			const node = pendingReferences.pop()!;
+			if (aliases.some((a) => a.statement === node)) continue;
 			if (ts.isIdentifier(node)) {
-				const symbol =
-					ts.isShorthandPropertyAssignment(node.parent) && node.parent.name === node
+				const alias = symbols.get(
+					(ts.isShorthandPropertyAssignment(node.parent) && node.parent.name === node
 						? (checker.getShorthandAssignmentValueSymbol(node.parent) ?? checker.getSymbolAtLocation(node))
-						: checker.getSymbolAtLocation(node);
-				const alias = symbols.get(symbol as ts.Symbol);
+						: checker.getSymbolAtLocation(node)) as ts.Symbol,
+				);
 				if (alias && node !== alias.name) {
-					const visibleTgt = checker.getSymbolsInScope(node, ts.SymbolFlags.Type | ts.SymbolFlags.Value).find((c) => c.name === alias.targetName);
-					if (alias.targetSymbol && visibleTgt !== alias.targetSymbol) {
+					if (alias.targetSymbol && checker.getSymbolsInScope(node, ts.SymbolFlags.Type | ts.SymbolFlags.Value).find((c) => c.name === alias.targetName) !== alias.targetSymbol) {
 						shadowed.add(alias);
-						return;
+						continue;
 					}
 					edits.push({
 						start: node.getStart(src),
@@ -696,14 +651,15 @@ export function aliasFindings(cfg: QualityCfg, analysisOrFix: QualityAnalysis | 
 					});
 				}
 			}
-			ts.forEachChild(node, visit);
-		};
-		visit(src);
+			const children: ts.Node[] = [];
+			ts.forEachChild(node, (child) => {
+				children.push(child);
+			});
+			for (let i = children.length - 1; i >= 0; i--) pendingReferences.push(children[i]!);
+		}
 		const sAliases = aliases.filter((alias) => !shadowed.has(alias) && !chained.has(alias));
 		if (!sAliases.length) continue;
-		const sAliasSet = new Set(sAliases);
-		const sEdits = edits.filter((edit) => sAliasSet.has(edit.alias));
-		edits.splice(0, edits.length, ...sEdits);
+		edits.splice(0, edits.length, ...edits.filter((edit) => sAliases.includes(edit.alias)));
 		for (const alias of sAliases) {
 			findings.push({
 				file: displayPath(cfg, src.fileName),
@@ -714,7 +670,7 @@ export function aliasFindings(cfg: QualityCfg, analysisOrFix: QualityAnalysis | 
 			});
 			edits.push({ start: alias.statement.getFullStart(), end: alias.statement.end, text: '', alias });
 		}
-		if (fix) {
+		if (typeof analysisOrFix === 'boolean' ? analysisOrFix : legacyFix) {
 			const original = readFileSync(src.fileName, 'utf8');
 			const updated = edits.sort((a, b) => b.start - a.start).reduce((t, e) => `${t.slice(0, e.start)}${e.text}${t.slice(e.end)}`, original);
 			if (updated !== original) writeFileSync(src.fileName, updated);

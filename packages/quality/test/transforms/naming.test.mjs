@@ -35,8 +35,9 @@ function identifiers(src) {
 	const file = ts.createSourceFile('fixture.ts', src, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
 	const nodes = [];
 	/**
+	 * Collects identifier nodes while traversing the source tree.
 	 *
-	 * @param node
+	 * @param node Current TypeScript syntax node.
 	 */
 	const visit = (node) => {
 		if (ts.isIdentifier(node)) nodes.push(node);
@@ -119,10 +120,11 @@ class WithProperty { constructor(readonly destination: string) {} }
 `;
 	const { file, nodes } = identifiers(src);
 	/**
+	 * Finds the identifier node that names a declaration.
 	 *
-	 * @param name
+	 * @param name Declaration name to locate.
 	 *
-	 * @return
+	 * @return The matching identifier node, if found.
 	 */
 	const declaration = (name) => nodes.find((n) => n.text === name && n.parent.name === n);
 	for (const name of ['localValue', 'localFunction', 'LocalClass', 'LocalContract', 'LocalType', 'namedExpression']) assert.equal(isRenamableDeclaration(declaration(name)), true, name);
@@ -147,8 +149,9 @@ void [mapped, rendered, ordinary, handle, view];
 	const file = ts.createSourceFile('fixture.tsx', src, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
 	const callbacks = [];
 	/**
+	 * Collects callback parameter identifiers from the source tree.
 	 *
-	 * @param node
+	 * @param node Current TypeScript syntax node.
 	 */
 	const visit = (node) => {
 		if (ts.isIdentifier(node) && ['block', 'customer', 'index', 'event'].includes(node.text) && ts.isParameter(node.parent)) callbacks.push(node);

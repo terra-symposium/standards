@@ -10,7 +10,7 @@ IMPORTS
 // API
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { qualityProgress, setQualityProgressSuppressed } from '../../dist/lib/progress.js';
+import { qualityProgress, qualityProgressState } from '../../dist/lib/progress.js';
 
 /*//////////////////////////////////////////////////
 TESTS
@@ -19,10 +19,11 @@ TESTS
 test('progress updates always include a bar and rewrite one line even without a TTY', () => {
 	const writes = [];
 	/**
+	 * Stores one rendered progress chunk for later assertions.
 	 *
-	 * @param chunk
+	 * @param chunk Progress text written by the renderer.
 	 *
-	 * @return
+	 * @return The number of captured chunks after appending this one.
 	 */
 	const capture = (chunk) => writes.push(chunk);
 	const stderr = process.stderr;
@@ -69,11 +70,11 @@ test('progress updates always include a bar and rewrite one line even without a 
 });
 test('quiet output suppresses progress writes', () => {
 	const writes = [];
-	setQualityProgressSuppressed(true);
+	qualityProgressState.suppressed = true;
 	try {
 		qualityProgress('Quiet scan', 1, 2, (chunk) => writes.push(chunk));
 	} finally {
-		setQualityProgressSuppressed(false);
+		qualityProgressState.suppressed = false;
 	}
 	assert.deepEqual(writes, []);
 });

@@ -34,7 +34,7 @@ function git(root, args, date) {
 /**
  * Create a temporary repository with source, tests, exclusions, renames, and dated commits.
  *
- * @return A temporary Git repository and cleanup helper.
+ * @return Temporary repository root and the first, second, and HEAD commit SHAs.
  */
 function historyFixture() {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-history-'));
@@ -42,9 +42,10 @@ function historyFixture() {
 	git(root, ['config', 'user.name', 'Terra Test']);
 	git(root, ['config', 'user.email', 'terra@example.test']);
 	/**
+	 * Writes fixture contents beneath the temporary repository root.
 	 *
-	 * @param path
-	 * @param contents
+	 * @param path Repository-relative file path.
+	 * @param contents Text to write to the fixture file.
 	 */
 	const write = (path, contents) => {
 		const tgt = join(root, path);
@@ -140,9 +141,10 @@ test('merge commits count source changes against their first parent', () => {
 		git(root, ['config', 'user.name', 'Terra Test']);
 		git(root, ['config', 'user.email', 'terra@example.test']);
 		/**
+		 * Writes fixture contents beneath the temporary repository root.
 		 *
-		 * @param path
-		 * @param contents
+		 * @param path Repository-relative file path.
+		 * @param contents Text to write to the fixture file.
 		 */
 		const write = (path, contents) => {
 			const tgt = join(root, path);

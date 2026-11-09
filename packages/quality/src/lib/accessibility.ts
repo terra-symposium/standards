@@ -29,56 +29,22 @@ TYPES
 /** A source location whose interactive JSX element has no known accessible name. */
 export type AccessibilityFinding = { file: string; line: number; column: number; element: string; message: string; fixable: boolean };
 
-/**
- *
- */
+/** Describes whether source evidence proves content is named, empty, or uncertain. */
 type NameState = 'named' | 'empty' | 'unknown';
-/**
- *
- */
+/** Represents a statically read attribute value or an unavailable value. */
 type StaticValue = { state: 'static'; value: string; source: string } | { state: 'empty' } | { state: 'unknown' };
 
-/**
- *
- */
+/** Represents a JSX element with either paired or self-closing syntax. */
 type ElementRef = ts.JsxElement | ts.JsxSelfClosingElement;
-/**
- *
- */
+/** Stores a named-control element and the literal title used for a safe label fix. */
 type NameCandidate = { parsed: ts.SourceFile; opening: ts.JsxOpeningLikeElement; title: Extract<StaticValue, { state: 'static' }>; emptyAriaLabel?: ts.JsxAttribute };
-/**
- *
- */
+/** Stores an SVG that can safely be marked as decorative. */
 type DecorativeIconCandidate = { parsed: ts.SourceFile; opening: ts.JsxOpeningLikeElement };
 
 /*//////////////////////////////////////////////////
 CONSTANTS
 //////////////////////////////////////////////////*/
 
-const JSX_EXTS = /\.(?:jsx|tsx|js|ts)$/i;
-const NATIVE_LABELABLE = new Set(['button', 'input', 'select', 'textarea']);
-const INPUT_BUTTON_TYPES = new Set(['button', 'submit', 'reset']);
-const INTERACTIVE_ROLES = new Set([
-	'button',
-	'checkbox',
-	'combobox',
-	'gridcell',
-	'link',
-	'listbox',
-	'menuitem',
-	'menuitemcheckbox',
-	'menuitemradio',
-	'option',
-	'radio',
-	'searchbox',
-	'slider',
-	'spinbutton',
-	'progressbar',
-	'switch',
-	'tab',
-	'textbox',
-	'treeitem',
-]);
 const INTERACTIVE_NATIVE = new Set(['button', 'input', 'select', 'textarea', 'summary']);
 
 /*//////////////////////////////////////////////////
@@ -86,23 +52,11 @@ HELPERS
 //////////////////////////////////////////////////*/
 
 /**
- * Selects a TypeScript parser mode for a JSX-capable source path.
- *
- * @param fileName
- *
- * @return
- */
-function scriptKind(fileName: string): ts.ScriptKind {
-	if (/\.tsx?$/i.test(fileName)) return ts.ScriptKind.TSX;
-	return ts.ScriptKind.JSX;
-}
-
-/**
  * Returns JSX attributes from either an element or self-closing element.
  *
- * @param element
+ * @param element JSX element whose attributes are returned.
  *
- * @return
+ * @returns The opening element's JSX attributes.
  */
 function attrsOf(element: ElementRef): ts.JsxAttributes {
 	return ts.isJsxElement(element) ? element.openingElement.attributes : element.attributes;
@@ -111,9 +65,9 @@ function attrsOf(element: ElementRef): ts.JsxAttributes {
 /**
  * Returns JSX child nodes from either an element or self-closing element.
  *
- * @param element
+ * @param element JSX element whose children are returned.
  *
- * @return
+ * @returns The element's children, or an empty array for a self-closing element.
  */
 function childrenOf(element: ElementRef): readonly ts.JsxChild[] {
 	return ts.isJsxElement(element) ? element.children : [];
@@ -122,9 +76,9 @@ function childrenOf(element: ElementRef): readonly ts.JsxChild[] {
 /**
  * Returns the JSX tag name as written in source.
  *
- * @param element
+ * @param element JSX element whose tag name is read.
  *
- * @return
+ * @returns The source text of the tag name.
  */
 function tagOf(element: ElementRef): string {
 	return ts.isJsxElement(element) ? element.openingElement.tagName.getText() : element.tagName.getText();
@@ -133,10 +87,10 @@ function tagOf(element: ElementRef): string {
 /**
  * Finds a named JSX attribute without interpreting spreads.
  *
- * @param element
- * @param name
+ * @param element JSX element to search.
+ * @param name Attribute name to find.
  *
- * @return
+ * @returns The matching JSX attribute, if present.
  */
 function attrOf(element: ElementRef, name: string): ts.JsxAttribute | undefined {
 	return attrsOf(element).properties.find((property): property is ts.JsxAttribute => ts.isJsxAttribute(property) && ts.isIdentifier(property.name) && property.name.text === name);
@@ -145,9 +99,9 @@ function attrOf(element: ElementRef, name: string): ts.JsxAttribute | undefined 
 /**
  * Reads a statically available string-like JSX attribute and preserves its expression source for safe copying.
  *
- * @param attr
+ * @param attr JSX attribute to inspect, if present.
  *
- * @return
+ * @returns Its static string-like value, an empty state, or an unknown state.
  */
 function staticAttr(attr: ts.JsxAttribute | undefined): StaticValue {
 	if (!attr?.initializer) return { state: 'empty' };
@@ -169,9 +123,9 @@ function staticAttr(attr: ts.JsxAttribute | undefined): StaticValue {
 /**
  * Reads a title only when its source is a string literal or a template literal without substitutions.
  *
- * @param attr
+ * @param attr JSX title attribute to inspect, if present.
  *
- * @return
+ * @returns The literal title value, an empty state, or an unknown state.
  */
 function literalTitle(attr: ts.JsxAttribute | undefined): StaticValue {
 	if (!attr?.initializer) return { state: 'empty' };
@@ -188,43 +142,35 @@ function literalTitle(attr: ts.JsxAttribute | undefined): StaticValue {
 /**
  * Checks for meaningful text after trimming whitespace and zero-width padding.
  *
- * @param value
+ * @param value Text to check for non-whitespace content.
  *
- * @return
+ * @returns Whether the text contains meaningful characters.
  */
 function meaningful(value: string): boolean {
 	return value.replace(/[\s\u00a0\u200b\ufeff]/g, '').replace(/&(?:nbsp|#0*160|#x0*a0);/gi, '').length > 0;
 }
 
 /**
- * Returns whether the HTML hidden attribute is present, false, or uncertain.
- *
- * @param element
- *
- * @return
- */
-function hiddenAttrState(element: ElementRef): NameState {
-	const attr = attrOf(element, 'hidden');
-	if (!attr) return 'empty';
-	if (!attr.initializer) return 'named';
-	if (ts.isStringLiteral(attr.initializer)) return 'named';
-	if (!ts.isJsxExpression(attr.initializer) || !attr.initializer.expression) return 'unknown';
-	const expr = attr.initializer.expression;
-	if (expr.kind === ts.SyntaxKind.TrueKeyword) return 'named';
-	if (expr.kind === ts.SyntaxKind.FalseKeyword || expr.kind === ts.SyntaxKind.NullKeyword) return 'empty';
-	if (ts.isNumericLiteral(expr)) return Number(expr.text) === 0 ? 'empty' : 'named';
-	return 'unknown';
-}
-
-/**
  * Determines whether an element or an ancestor is hidden from the accessibility tree.
  *
- * @param element
+ * @param element JSX element to check for hidden attributes.
  *
- * @return
+ * @returns `named` when hidden, `empty` when visible, or `unknown` when dynamic.
  */
 function hiddenState(element: ElementRef): NameState {
-	const hidden = hiddenAttrState(element);
+	const attr = attrOf(element, 'hidden');
+	let hidden: NameState = 'empty';
+	if (attr) {
+		if (!attr.initializer || ts.isStringLiteral(attr.initializer)) hidden = 'named';
+		else if (!ts.isJsxExpression(attr.initializer) || !attr.initializer.expression) hidden = 'unknown';
+		else {
+			const expr = attr.initializer.expression;
+			if (expr.kind === ts.SyntaxKind.TrueKeyword) hidden = 'named';
+			else if (expr.kind === ts.SyntaxKind.FalseKeyword || expr.kind === ts.SyntaxKind.NullKeyword) hidden = 'empty';
+			else if (ts.isNumericLiteral(expr)) hidden = Number(expr.text) === 0 ? 'empty' : 'named';
+			else hidden = 'unknown';
+		}
+	}
 	const ariaHiddenAttr = attrOf(element, 'aria-hidden');
 	const ariaHidden = ariaHiddenAttr && !ariaHiddenAttr.initializer ? { state: 'static' as const, value: 'true', source: 'true' } : staticAttr(ariaHiddenAttr);
 	if (hidden === 'named' || (ariaHidden.state === 'static' && ariaHidden.value.toLowerCase() === 'true')) return 'named';
@@ -235,9 +181,9 @@ function hiddenState(element: ElementRef): NameState {
 /**
  * Reads the static value of an input type, using HTML's default text type.
  *
- * @param element
+ * @param element Input element whose type is read.
  *
- * @return
+ * @returns The input type value, defaulting to the HTML `text` type.
  */
 function inputType(element: ElementRef): StaticValue {
 	const type = attrOf(element, 'type');
@@ -245,34 +191,11 @@ function inputType(element: ElementRef): StaticValue {
 }
 
 /**
- * Identifies JSX elements that are native controls or explicitly assigned an interactive ARIA role.
- *
- * @param element
- *
- * @return
- */
-function targetKind(element: ElementRef): { element: string; labelable: boolean } | undefined {
-	const tag = tagOf(element);
-	if (A_Z_A_Z_D_REGEX.test(tag) && (INTERACTIVE_NATIVE.has(tag) || tag === 'progress')) {
-		if (tag === 'input') {
-			const type = inputType(element);
-			if (type.state === 'unknown' || (type.state === 'static' && type.value.toLowerCase() === 'hidden')) return undefined;
-		}
-		return { element: `<${tag}>`, labelable: NATIVE_LABELABLE.has(tag) };
-	}
-	if (A_Z_A_Z_D_REGEX.test(tag) && tag === 'a' && attrOf(element, 'href')) return { element: '<a>', labelable: false };
-	if (A_Z_A_Z_D_REGEX.test(tag) && tag === 'area' && attrOf(element, 'href')) return { element: '<area>', labelable: false };
-	const role = staticAttr(attrOf(element, 'role'));
-	if (role.state === 'static' && INTERACTIVE_ROLES.has(role.value.toLowerCase())) return { element: `<${tag}>[role="${role.value}"]`, labelable: false };
-	return undefined;
-}
-
-/**
  * Combines child text evidence; a definite name takes precedence over uncertain extra children.
  *
- * @param states
+ * @param states Evidence states collected from child content.
  *
- * @return
+ * @returns `named` if any child is named, otherwise `unknown` if any is uncertain, or `empty`.
  */
 function combine(states: NameState[]): NameState {
 	if (states.includes('named')) return 'named';
@@ -283,10 +206,10 @@ function combine(states: NameState[]): NameState {
 /**
  * Determines whether a JSX element has static text or image alternative text in its children.
  *
- * @param element
- * @param forLabel
+ * @param element JSX element whose child content is checked.
+ * @param forLabel Whether interactive descendants are being evaluated as label text.
  *
- * @return
+ * @returns The combined accessible-name evidence from the children.
  */
 function contentState(element: ElementRef, forLabel = false): NameState {
 	const children = childrenOf(element);
@@ -297,10 +220,10 @@ function contentState(element: ElementRef, forLabel = false): NameState {
 /**
  * Examines one JSX child for visible static text without guessing about component output.
  *
- * @param child
- * @param forLabel
+ * @param child JSX child node to inspect.
+ * @param forLabel Whether interactive descendants are being evaluated as label text.
  *
- * @return
+ * @returns Whether the child provides named, empty, or uncertain text evidence.
  */
 function childContentState(child: ts.JsxChild, forLabel: boolean): NameState {
 	if (ts.isJsxText(child)) return meaningful(child.text) ? 'named' : 'empty';
@@ -320,10 +243,10 @@ function childContentState(child: ts.JsxChild, forLabel: boolean): NameState {
 /**
  * Examines a nested element, honoring hidden content, image alt, SVG names, and custom components.
  *
- * @param element
- * @param forLabel
+ * @param element Nested JSX element to inspect.
+ * @param forLabel Whether interactive descendants are being evaluated as label text.
  *
- * @return
+ * @returns Whether the element provides named, empty, or uncertain text evidence.
  */
 function elementContentState(element: ElementRef, forLabel: boolean): NameState {
 	const hidden = hiddenState(element);
@@ -350,9 +273,9 @@ function elementContentState(element: ElementRef, forLabel: boolean): NameState 
 /**
  * Determines whether a source element supplies a usable name through ARIA attributes.
  *
- * @param element
+ * @param element JSX element whose ARIA naming attributes are checked.
  *
- * @return
+ * @returns Whether a static ARIA name is present, absent, or uncertain.
  */
 function ariaNameState(element: ElementRef): NameState {
 	const label = staticAttr(attrOf(element, 'aria-label'));
@@ -361,293 +284,253 @@ function ariaNameState(element: ElementRef): NameState {
 }
 
 /**
- * Extracts text from an aria-labelledby target, even when the target itself is hidden.
+ * Collects findings and candidate source edits for one parsed source file.
  *
- * @param element
+ * @param cfg Quality configuration used to format finding paths.
+ * @param file Source file path being inspected.
+ * @param parsed Parsed TypeScript source file.
  *
- * @return
+ * @returns Accessible-name findings and source locations eligible for safe fixes.
  */
-function referencedContentState(element: ElementRef): NameState {
-	const tag = tagOf(element);
-	if (!A_Z_A_Z_D_REGEX.test(tag) || tag.includes('-')) return 'unknown';
-	const label = staticAttr(attrOf(element, 'aria-label'));
-	if (label.state === 'static') return 'named';
-	if (label.state === 'unknown') return 'unknown';
-	if (tag === 'img') {
-		const alt = staticAttr(attrOf(element, 'alt'));
-		return alt.state === 'static' ? 'named' : alt.state === 'unknown' ? 'unknown' : 'empty';
+function inspectFile(cfg: QualityCfg, file: string, parsed: ts.SourceFile): { findings: AccessibilityFinding[]; candidates: NameCandidate[]; decorativeCandidates: DecorativeIconCandidate[] } {
+	if ((parsed as ts.SourceFile & { parseDiagnostics?: readonly ts.Diagnostic[] }).parseDiagnostics?.length) return { findings: [], candidates: [], decorativeCandidates: [] };
+	const labels = new Map<string, NameState>();
+	const labelPending: { node: ts.Node; hidden: boolean }[] = [{ node: parsed, hidden: false }];
+	while (labelPending.length) {
+		const { node, hidden } = labelPending.pop()!;
+		const isElement = ts.isJsxElement(node) || ts.isJsxSelfClosingElement(node);
+		const descendants: ts.Node[] = [];
+		ts.forEachChild(node, (child) => {
+			descendants.push(child);
+		});
+		if (hidden || (isElement && hiddenState(node) !== 'empty')) {
+			for (let index = descendants.length - 1; index >= 0; index--) labelPending.push({ node: descendants[index]!, hidden: true });
+			continue;
+		}
+		if (isElement && tagOf(node) === 'label') {
+			const target = staticAttr(attrOf(node, 'htmlFor') ?? attrOf(node, 'for'));
+			if (target.state === 'static') {
+				const content = contentState(node, true);
+				const previous = labels.get(target.value);
+				labels.set(target.value, previous === 'named' || content === 'named' ? 'named' : previous === 'unknown' || content === 'unknown' ? 'unknown' : 'empty');
+			}
+		}
+		for (let index = descendants.length - 1; index >= 0; index--) labelPending.push({ node: descendants[index]!, hidden: false });
 	}
-	const labelledBy = staticAttr(attrOf(element, 'aria-labelledby'));
-	if (labelledBy.state !== 'empty') return 'unknown';
-	return combine(childrenOf(element).map((child) => childContentState(child, false)));
-}
-
-/**
- * Builds conservative source evidence for literal JSX ids and their referenced text.
- *
- * @param source
- *
- * @return
- */
-function idContentStates(source: ts.SourceFile): Map<string, NameState> {
 	const ids = new Map<string, NameState>();
-	const duplicates = new Set<string>();
-	/**
-	 *
-	 * @param node
-	 */
-	const visit = (node: ts.Node): void => {
+	const duplicateIds = new Set<string>();
+	const idPending: ts.Node[] = [parsed];
+	while (idPending.length) {
+		const node = idPending.pop()!;
 		if (ts.isJsxElement(node) || ts.isJsxSelfClosingElement(node)) {
 			const id = staticAttr(attrOf(node, 'id'));
 			if (id.state === 'static') {
-				if (ids.has(id.value)) duplicates.add(id.value);
-				else ids.set(id.value, referencedContentState(node));
-			}
-		}
-		ts.forEachChild(node, visit);
-	};
-	visit(source);
-	for (const id of duplicates) ids.set(id, 'unknown');
-	return ids;
-}
-
-/**
- * Resolves a literal aria-labelledby value only when its source references establish a name.
- *
- * @param element
- * @param ids
- *
- * @return
- */
-function labelledByState(element: ElementRef, ids: Map<string, NameState>): NameState {
-	const value = staticAttr(attrOf(element, 'aria-labelledby'));
-	if (value.state !== 'static') return value.state;
-	const references = value.value.trim().split(/\s+/).filter(Boolean);
-	if (!references.length) return 'empty';
-	return combine(references.map((id) => ids.get(id) ?? 'empty'));
-}
-
-/**
- * Finds labels associated by a literal id and records whether each label has meaningful text.
- *
- * @param source
- *
- * @return
- */
-function associatedLabels(source: ts.SourceFile): Map<string, NameState> {
-	const labels = new Map<string, NameState>();
-	/**
-	 *
-	 * @param node
-	 * @param hidden
-	 */
-	const visit = (node: ts.Node, hidden: boolean): void => {
-		if (ts.isJsxElement(node) || ts.isJsxSelfClosingElement(node)) {
-			const state = hiddenState(node);
-			const isHidden = hidden || state === 'named' || state === 'unknown';
-			if (!isHidden && tagOf(node) === 'label') {
-				const target = staticAttr(attrOf(node, 'htmlFor') ?? attrOf(node, 'for'));
-				if (target.state === 'static') {
-					const content = contentState(node, true);
-					const previous = labels.get(target.value);
-					labels.set(target.value, previous === 'named' || content === 'named' ? 'named' : previous === 'unknown' || content === 'unknown' ? 'unknown' : 'empty');
+				if (ids.has(id.value)) duplicateIds.add(id.value);
+				else {
+					const tag = tagOf(node);
+					let state: NameState;
+					if (!A_Z_A_Z_D_REGEX.test(tag) || tag.includes('-')) state = 'unknown';
+					else {
+						const label = staticAttr(attrOf(node, 'aria-label'));
+						if (label.state !== 'empty') state = label.state === 'static' ? 'named' : 'unknown';
+						else if (tag === 'img') {
+							const alt = staticAttr(attrOf(node, 'alt'));
+							state = alt.state === 'static' ? 'named' : alt.state === 'unknown' ? 'unknown' : 'empty';
+						} else if (staticAttr(attrOf(node, 'aria-labelledby')).state !== 'empty') state = 'unknown';
+						else state = combine(childrenOf(node).map((child) => childContentState(child, false)));
+					}
+					ids.set(id.value, state);
 				}
 			}
 		}
-		const currentHidden = hidden || ((ts.isJsxElement(node) || ts.isJsxSelfClosingElement(node)) && hiddenState(node) !== 'empty');
-		ts.forEachChild(node, (child) => visit(child, currentHidden));
-	};
-	visit(source, false);
-	return labels;
-}
-
-/**
- * Returns accessible-name evidence for one control, including nested and id-associated labels.
- *
- * @param element
- * @param kind
- * @param labels
- * @param nestedLabel
- *
- * @return
- */
-function elementNameState(
-	element: ElementRef,
-	kind: { element: string; labelable: boolean },
-	labels: Map<string, NameState>,
-	nestedLabel: NameState,
-): { state: NameState; title?: StaticValue; emptyAriaLabel?: ts.JsxAttribute; iconOnly: boolean } {
-	const aria = ariaNameState(element);
-	if (aria !== 'empty') return { state: aria, iconOnly: false };
-	const id = kind.labelable ? staticAttr(attrOf(element, 'id')) : { state: 'empty' as const };
-	if (id.state === 'static') {
-		const label = labels.get(id.value) ?? 'empty';
-		if (label !== 'empty') return { state: label, iconOnly: false };
-	} else if (id.state === 'unknown') return { state: 'unknown', iconOnly: false };
-	if (kind.labelable && nestedLabel !== 'empty') return { state: nestedLabel, iconOnly: false };
-	const tag = tagOf(element);
-	if (tag === 'input') {
-		const type = inputType(element);
-		if (type.state === 'unknown') return { state: 'unknown', iconOnly: false };
-		const inputTypeValue = type.state === 'static' ? type.value.toLowerCase() : 'text';
-		if (inputTypeValue === 'image') {
-			const alt = staticAttr(attrOf(element, 'alt'));
-			if (alt.state === 'static') return { state: 'named', iconOnly: false };
-			if (alt.state === 'unknown') return { state: 'unknown', iconOnly: false };
-		} else if (INPUT_BUTTON_TYPES.has(inputTypeValue)) {
-			const value = staticAttr(attrOf(element, 'value'));
-			if (value.state === 'static') return { state: 'named', iconOnly: false };
-			if (value.state === 'unknown') return { state: 'unknown', iconOnly: false };
-			if ((inputTypeValue === 'submit' || inputTypeValue === 'reset') && !attrOf(element, 'value')) return { state: 'named', iconOnly: false };
-		}
+		const descendants: ts.Node[] = [];
+		ts.forEachChild(node, (child) => {
+			descendants.push(child);
+		});
+		for (let index = descendants.length - 1; index >= 0; index--) idPending.push(descendants[index]!);
 	}
-	if (tag === 'area') {
-		const alt = staticAttr(attrOf(element, 'alt'));
-		if (alt.state === 'static') return { state: 'named', iconOnly: false };
-		if (alt.state === 'unknown') return { state: 'unknown', iconOnly: false };
-	}
-	const role = staticAttr(attrOf(element, 'role'));
-	const nameFromContent = tag !== 'progress' && !(role.state === 'static' && role.value.toLowerCase() === 'progressbar');
-	const childState = nameFromContent ? contentState(element) : 'empty';
-	if (childState === 'named' || childState === 'unknown') return { state: childState, iconOnly: false };
-	const spreads = attrsOf(element).properties.some(ts.isJsxSpreadAttribute);
-	if (spreads) return { state: 'unknown', iconOnly: false };
-	const title = literalTitle(attrOf(element, 'title'));
-	if (title.state === 'unknown') return { state: 'unknown', title, iconOnly: false };
-	const emptyAriaLabel = attrOf(element, 'aria-label');
-	return { state: 'empty', title, emptyAriaLabel, iconOnly: true };
-}
-
-/**
- * Finds unnamed, non-focusable inline SVG images inside a named native control.
- *
- * @param element
- *
- * @return
- */
-function decorativeIcons(element: ElementRef): ElementRef[] {
-	const icons: ElementRef[] = [];
-	/**
-	 *
-	 * @param node
-	 */
-	const visit = (node: ts.Node): void => {
-		if (!ts.isJsxElement(node) && !ts.isJsxSelfClosingElement(node)) {
-			ts.forEachChild(node, visit);
-			return;
-		}
-		const tag = tagOf(node);
-		if (tag === 'svg') {
-			const role = staticAttr(attrOf(node, 'role'));
-			const ownName = ariaNameState(node);
-			const title = literalTitle(attrOf(node, 'title'));
-			const hidden = hiddenState(node);
-			const hasUncertainAttrs = attrsOf(node).properties.some(ts.isJsxSpreadAttribute) || ['focusable', 'tabIndex'].some((name) => attrOf(node, name));
-			if (role.state === 'empty' && ownName === 'empty' && title.state === 'empty' && contentState(node) === 'empty' && hidden === 'empty' && !hasUncertainAttrs) icons.push(node);
-			return;
-		}
-		if (!A_Z_A_Z_D_REGEX.test(tag) || hiddenState(node) !== 'empty') return;
-		if (ts.isJsxElement(node)) node.children.forEach(visit);
-	};
-	childrenOf(element).forEach(visit);
-	return icons;
-}
-
-/**
- * Collects findings and candidate source edits for one parsed source file.
- *
- * @param cfg
- * @param file
- * @param parsed
- *
- * @return
- */
-function inspectFile(cfg: QualityCfg, file: string, parsed: ts.SourceFile): { findings: AccessibilityFinding[]; candidates: NameCandidate[]; decorativeCandidates: DecorativeIconCandidate[] } {
-	const parseDiagnostics = (parsed as ts.SourceFile & { parseDiagnostics?: readonly ts.Diagnostic[] }).parseDiagnostics;
-	if (parseDiagnostics?.length) return { findings: [], candidates: [], decorativeCandidates: [] };
-	const labels = associatedLabels(parsed);
-	const ids = idContentStates(parsed);
+	for (const id of duplicateIds) ids.set(id, 'unknown');
 	const findings: AccessibilityFinding[] = [];
 	const candidates: NameCandidate[] = [];
 	const decorativeCandidates: DecorativeIconCandidate[] = [];
-	/**
-	 *
-	 * @param node
-	 * @param hidden
-	 * @param nestedLabel
-	 */
-	const visit = (node: ts.Node, hidden: boolean, nestedLabel: NameState): void => {
+	const pending: { node: ts.Node; hidden: boolean; nestedLabel: NameState }[] = [{ node: parsed, hidden: false, nestedLabel: 'empty' }];
+	while (pending.length) {
+		const { node, hidden, nestedLabel } = pending.pop()!;
 		if (ts.isJsxElement(node) || ts.isJsxSelfClosingElement(node)) {
-			const elementHidden = hiddenState(node);
-			const currentHidden = hidden || elementHidden !== 'empty';
 			const tag = tagOf(node);
-			let childLabel = nestedLabel;
-			if (tag === 'label') childLabel = contentState(node, true);
-			const kind = targetKind(node);
-			if (!currentHidden && kind) {
-				const ariaLabel = ariaNameState(node);
-				const ariaName = ariaLabel === 'empty' ? labelledByState(node, ids) : ariaLabel;
-				const name = ariaName === 'empty' ? elementNameState(node, kind, labels, nestedLabel) : { state: ariaName, iconOnly: false };
-				if (name.state === 'empty') {
-					const titleCanFix = name.title?.state === 'static' && name.iconOnly;
-					const position = parsed.getLineAndCharacterOfPosition(node.getStart(parsed));
-					const message = titleCanFix
-						? `${kind.element} has no accessible name; copy its non-empty title into aria-label.`
-						: `${kind.element} has no accessible name; add static text, an ARIA name, or an associated label.`;
-					findings.push({ file: displayPath(cfg, file), line: position.line + 1, column: position.character + 1, element: kind.element, message, fixable: titleCanFix });
-					if (name.title?.state === 'static') {
-						const opening = ts.isJsxElement(node) ? node.openingElement : node;
-						candidates.push({ parsed, opening, title: name.title, emptyAriaLabel: name.emptyAriaLabel });
+			const role = staticAttr(attrOf(node, 'role'));
+			const normRole = role.state === 'static' ? role.value.toLowerCase() : '';
+			let kind: { element: string; labelable: boolean } | undefined;
+			if (A_Z_A_Z_D_REGEX.test(tag) && (INTERACTIVE_NATIVE.has(tag) || tag === 'progress')) {
+				if (tag !== 'input') kind = { element: `<${tag}>`, labelable: tag === 'button' || tag === 'select' || tag === 'textarea' };
+				else {
+					const type = inputType(node);
+					if (type.state !== 'unknown' && !(type.state === 'static' && type.value.toLowerCase() === 'hidden')) kind = { element: '<input>', labelable: true };
+				}
+			} else if (A_Z_A_Z_D_REGEX.test(tag) && (tag === 'a' || tag === 'area') && attrOf(node, 'href')) kind = { element: `<${tag}>`, labelable: false };
+			else if (
+				role.state === 'static' &&
+				(normRole === 'button' ||
+					normRole === 'checkbox' ||
+					normRole === 'combobox' ||
+					normRole === 'gridcell' ||
+					normRole === 'link' ||
+					normRole === 'listbox' ||
+					normRole === 'menuitem' ||
+					normRole === 'menuitemcheckbox' ||
+					normRole === 'menuitemradio' ||
+					normRole === 'option' ||
+					normRole === 'radio' ||
+					normRole === 'searchbox' ||
+					normRole === 'slider' ||
+					normRole === 'spinbutton' ||
+					normRole === 'progressbar' ||
+					normRole === 'switch' ||
+					normRole === 'tab' ||
+					normRole === 'textbox' ||
+					normRole === 'treeitem')
+			)
+				kind = { element: `<${tag}>[role="${role.value}"]`, labelable: false };
+			if (!(hidden || hiddenState(node) !== 'empty') && kind) {
+				let ariaName = ariaNameState(node);
+				if (ariaName === 'empty') {
+					const labelledBy = staticAttr(attrOf(node, 'aria-labelledby'));
+					if (labelledBy.state === 'static') {
+						const references = labelledBy.value.trim().split(/\s+/).filter(Boolean);
+						ariaName = references.length ? combine(references.map((id) => ids.get(id) ?? 'empty')) : 'empty';
+					} else ariaName = labelledBy.state;
+				}
+				let nameState: NameState = ariaName;
+				let title: StaticValue | undefined;
+				if (nameState === 'empty') {
+					const id = kind.labelable ? staticAttr(attrOf(node, 'id')) : { state: 'empty' as const };
+					if (id.state === 'static' && (labels.get(id.value) ?? 'empty') !== 'empty') nameState = labels.get(id.value)!;
+					else if (id.state === 'unknown') nameState = 'unknown';
+					else if (kind.labelable && nestedLabel !== 'empty') nameState = nestedLabel;
+					if (nameState === 'empty' && tag === 'input') {
+						const input = inputType(node);
+						if (input.state === 'unknown') nameState = 'unknown';
+						else if ((input.state === 'static' ? input.value.toLowerCase() : 'text') === 'image') {
+							const alt = staticAttr(attrOf(node, 'alt'));
+							if (alt.state !== 'empty') nameState = alt.state === 'static' ? 'named' : 'unknown';
+						} else if (input.state === 'static' && (input.value.toLowerCase() === 'button' || input.value.toLowerCase() === 'submit' || input.value.toLowerCase() === 'reset')) {
+							const value = staticAttr(attrOf(node, 'value'));
+							if (value.state !== 'empty') nameState = value.state === 'static' ? 'named' : 'unknown';
+							else if ((input.value.toLowerCase() === 'submit' || input.value.toLowerCase() === 'reset') && !attrOf(node, 'value')) nameState = 'named';
+						}
 					}
-				} else if (name.state === 'named') {
-					for (const icon of decorativeIcons(node)) {
-						const opening = ts.isJsxElement(icon) ? icon.openingElement : icon;
-						const position = parsed.getLineAndCharacterOfPosition(icon.getStart(parsed));
-						findings.push({
-							file: displayPath(cfg, file),
-							line: position.line + 1,
-							column: position.character + 1,
-							element: '<svg>',
-							message: 'Decorative SVG inside an already named control is exposed to assistive technology; add aria-hidden="true".',
-							fixable: true,
+					if (nameState === 'empty' && tag === 'area') {
+						const alt = staticAttr(attrOf(node, 'alt'));
+						if (alt.state !== 'empty') nameState = alt.state === 'static' ? 'named' : 'unknown';
+					}
+					if (nameState === 'empty') {
+						const childState = tag !== 'progress' && normRole !== 'progressbar' ? contentState(node) : 'empty';
+						if (childState !== 'empty') nameState = childState;
+					}
+					if (nameState === 'empty' && attrsOf(node).properties.some(ts.isJsxSpreadAttribute)) nameState = 'unknown';
+					if (nameState === 'empty') {
+						title = literalTitle(attrOf(node, 'title'));
+						if (title.state === 'unknown') nameState = 'unknown';
+					}
+				}
+				if (nameState === 'empty') {
+					const titleCanFix = title?.state === 'static';
+					const position = parsed.getLineAndCharacterOfPosition(node.getStart(parsed));
+					findings.push({
+						file: displayPath(cfg, file),
+						line: position.line + 1,
+						column: position.character + 1,
+						element: kind.element,
+						message: titleCanFix
+							? `${kind.element} has no accessible name; copy its non-empty title into aria-label.`
+							: `${kind.element} has no accessible name; add static text, an ARIA name, or an associated label.`,
+						fixable: titleCanFix,
+					});
+					if (title?.state === 'static') candidates.push({ parsed, opening: ts.isJsxElement(node) ? node.openingElement : node, title, emptyAriaLabel: attrOf(node, 'aria-label') });
+				} else if (nameState === 'named') {
+					const iconPending: ts.Node[] = [...childrenOf(node)].reverse();
+					while (iconPending.length) {
+						const icon = iconPending.pop()!;
+						if (!ts.isJsxElement(icon) && !ts.isJsxSelfClosingElement(icon)) {
+							const descendants: ts.Node[] = [];
+							ts.forEachChild(icon, (child) => {
+								descendants.push(child);
+							});
+							for (let index = descendants.length - 1; index >= 0; index--) iconPending.push(descendants[index]!);
+							continue;
+						}
+						if (tagOf(icon) === 'svg') {
+							if (
+								staticAttr(attrOf(icon, 'role')).state === 'empty' &&
+								ariaNameState(icon) === 'empty' &&
+								literalTitle(attrOf(icon, 'title')).state === 'empty' &&
+								contentState(icon) === 'empty' &&
+								hiddenState(icon) === 'empty' &&
+								!attrsOf(icon).properties.some(ts.isJsxSpreadAttribute) &&
+								!attrOf(icon, 'focusable') &&
+								!attrOf(icon, 'tabIndex')
+							) {
+								const position = parsed.getLineAndCharacterOfPosition(icon.getStart(parsed));
+								findings.push({
+									file: displayPath(cfg, file),
+									line: position.line + 1,
+									column: position.character + 1,
+									element: '<svg>',
+									message: 'Decorative SVG inside an already named control is exposed to assistive technology; add aria-hidden="true".',
+									fixable: true,
+								});
+								decorativeCandidates.push({ parsed, opening: ts.isJsxElement(icon) ? icon.openingElement : icon });
+							}
+							continue;
+						}
+						if (!A_Z_A_Z_D_REGEX.test(tagOf(icon)) || hiddenState(icon) !== 'empty' || ts.isJsxSelfClosingElement(icon)) continue;
+						const descendants: ts.Node[] = [];
+						icon.children.forEach((child) => {
+							descendants.push(child);
 						});
-						decorativeCandidates.push({ parsed, opening });
+						for (let index = descendants.length - 1; index >= 0; index--) iconPending.push(descendants[index]!);
 					}
 				}
 			}
-			ts.forEachChild(node, (child) => visit(child, currentHidden, childLabel));
-			return;
 		}
-		ts.forEachChild(node, (child) => visit(child, hidden, nestedLabel));
-	};
-	visit(parsed, false, 'empty');
+		const descendants: ts.Node[] = [];
+		ts.forEachChild(node, (child) => {
+			descendants.push(child);
+		});
+		for (let index = descendants.length - 1; index >= 0; index--) {
+			pending.push({
+				node: descendants[index]!,
+				hidden: ts.isJsxElement(node) || ts.isJsxSelfClosingElement(node) ? hidden || hiddenState(node) !== 'empty' : hidden,
+				nestedLabel: (ts.isJsxElement(node) || ts.isJsxSelfClosingElement(node)) && tagOf(node) === 'label' ? contentState(node, true) : nestedLabel,
+			});
+		}
+	}
 	return { findings, candidates, decorativeCandidates };
 }
 
 /**
  * Returns configured files that contain JSX syntax supported by this check.
  *
- * @param cfg
- * @param analysis
+ * @param cfg Quality configuration that supplies source roots.
+ * @param analysis Optional shared analysis containing the files to inspect.
  *
- * @return
+ * @returns Source paths with JavaScript or TypeScript extensions supported by this check.
  */
 function sourceFiles(cfg: QualityCfg, analysis?: QualityAnalysis): string[] {
-	return (analysis?.files ?? srcFiles(cfg)).filter((file) => JSX_EXTS.test(file));
+	return (analysis?.files ?? srcFiles(cfg)).filter((file) => /\.(?:jsx|tsx|js|ts)$/i.test(file));
 }
 
 /**
  * Loads the source and parsed AST from the shared analysis cache when available.
  *
- * @param file
- * @param analysis
+ * @param file Source file path to load.
+ * @param analysis Optional shared analysis containing cached text and parsed sources.
  *
- * @return
+ * @returns The source text and its parsed TypeScript source file.
  */
 function sourceFor(file: string, analysis?: QualityAnalysis): { text: string; parsed: ts.SourceFile } {
 	const text = analysis?.texts.get(file) ?? readFileSync(file, 'utf8');
-	const parsed = analysis?.sources.get(file) ?? ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, scriptKind(file));
-	return { text, parsed };
+	return { text, parsed: analysis?.sources.get(file) ?? ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, /\.tsx?$/i.test(file) ? ts.ScriptKind.TSX : ts.ScriptKind.JSX) };
 }
 
 /*//////////////////////////////////////////////////
@@ -698,12 +581,8 @@ export function fixAccessibleNames(cfg: QualityCfg): { fixed: number } {
 		}
 		let updated = text;
 		for (const edit of edits.sort((a, b) => b.start - a.start)) updated = `${updated.slice(0, edit.start)}${edit.text}${updated.slice(edit.end)}`;
-		const diagnostics = ts.transpileModule(updated, {
-			fileName: file,
-			reportDiagnostics: true,
-			compilerOptions: { allowJs: true, jsx: ts.JsxEmit.Preserve, target: ts.ScriptTarget.ESNext },
-		}).diagnostics;
-		if (diagnostics?.length) continue;
+		if (ts.transpileModule(updated, { fileName: file, reportDiagnostics: true, compilerOptions: { allowJs: true, jsx: ts.JsxEmit.Preserve, target: ts.ScriptTarget.ESNext } }).diagnostics?.length)
+			continue;
 		writeFileSync(file, updated);
 		fixed += edits.length;
 	}

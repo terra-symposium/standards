@@ -1,6 +1,7 @@
 {
 	"$schema": "https://unpkg.com/knip@6/schema.json",
 	"ignoreDependencies": ["pptxgenjs", "prettier"],
+	"ignoreBinaries": ["codex"],
 	"ignoreFiles": ["packages/*/dist/**"],
 	"ignoreIssues": { "vendor/braces/lib/utils.js": ["exports"] },
 	"workspaces": {
@@ -10,8 +11,19 @@
 			"ignoreDependencies": ["@types/react-dom", "react-dom"]
 		},
 		"packages/reporting": {
-			"entry": ["src/core.ts", "src/playwright.ts", "src/viewports.ts", "src/load-testing.ts", "src/spreadsheet.ts", "src/slideshow.ts", "src/metadata.ts", "test/*.test.mjs"],
-			"project": ["src/**/*.ts", "test/**/*.mjs"]
+			"entry": [
+				"src/core.ts",
+				"src/playwright.ts",
+				"src/viewports.ts",
+				"src/load-testing.ts",
+				"src/spreadsheet.ts",
+				"src/slideshow.ts",
+				"src/metadata.ts",
+				".agents/skills/review/weekly/scripts/generate-weekly-review.mjs",
+				"test/*.test.mjs"
+			],
+			"project": ["src/**/*.ts", ".agents/skills/review/weekly/scripts/**/*.mjs", "test/**/*.mjs"],
+			"ignoreDependencies": ["@oai/artifact-tool", "colorjs.io"]
 		},
 		"packages/testing": {
 			"entry": ["src/index.mjs", "src/cli.mjs"],

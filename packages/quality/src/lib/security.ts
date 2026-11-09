@@ -41,8 +41,7 @@ export function securityFindings(cfg: QualityCfg): SecurityFinding[] {
 	const findings: SecurityFinding[] = [];
 	const visible = (() => {
 		try {
-			const repoRoot = execFileSync('git', ['rev-parse', '--show-toplevel'], { cwd: cfg.root, encoding: 'utf8' }).trim();
-			if (realpathSync(repoRoot) !== realpathSync(cfg.root)) return undefined;
+			if (realpathSync(execFileSync('git', ['rev-parse', '--show-toplevel'], { cwd: cfg.root, encoding: 'utf8' }).trim()) !== realpathSync(cfg.root)) return undefined;
 			return new Set(
 				execFileSync('git', ['ls-files', '--cached', '--others', '--exclude-standard'], { cwd: cfg.root, encoding: 'utf8' })
 					.split('\n')
@@ -54,26 +53,26 @@ export function securityFindings(cfg: QualityCfg): SecurityFinding[] {
 		}
 	})();
 	const files = srcFiles(cfg).filter((f) => !visible || visible.has(f));
-	const allNames = files.map((f) => displayPath(cfg, f));
 
 	// WALKTHROUGH
-	for (const file of allNames) if (ENV_REGEX.test(file)) findings.push({ file, message: 'environment files must not be committed' });
+	for (const file of files.map((f) => displayPath(cfg, f))) if (ENV_REGEX.test(file)) findings.push({ file, message: 'environment files must not be committed' });
 	for (const entry of readdirSync(cfg.root, { withFileTypes: true }))
 		if (entry.isFile() && ENV_REGEX.test(entry.name) && (!visible || visible.has(join(cfg.root, entry.name)))) findings.push({ file: entry.name, message: 'environment files must not be committed' });
-	const forbiddenTerms = (settings.forbiddenTerms ?? []).map((t) => new RegExp(t, 'i'));
-	const forbiddenImports = settings.forbiddenImports ?? [];
-	const clientRoots = (settings.clientRoots ?? []).map((r) => join(cfg.root, r));
-	const envAllowedRoots = (settings.allowProcessEnvRoots ?? []).map((r) => join(cfg.root, r));
 	for (const file of files) {
 		const name = displayPath(cfg, file);
 		const src = readFileSync(file, 'utf8');
-		for (const pattern of forbiddenTerms) if (pattern.test(src)) findings.push({ file: name, message: `forbidden term matches ${pattern}` });
-		for (const specifier of forbiddenImports)
+		for (const pattern of (settings.forbiddenTerms ?? []).map((t) => new RegExp(t, 'i'))) if (pattern.test(src)) findings.push({ file: name, message: `forbidden term matches ${pattern}` });
+		for (const specifier of settings.forbiddenImports ?? [])
 			if (new RegExp(`(?:from|import)\\s*(?:\\(\\s*)?['"]${specifier.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&')}['"]`).test(src)) findings.push({ file: name, message: `forbidden import ${specifier}` });
-		if (clientRoots.some((r) => file.startsWith(`${r}/`)) && /(?:SECRET|TOKEN|PASSWORD|PRIVATE_KEY|DATABASE_URL)/.test(src) && /import\.meta\.env|process\.env/.test(src))
+		if (
+			(settings.clientRoots ?? []).some((r) => file.startsWith(`${join(cfg.root, r)}/`)) &&
+			/(?:SECRET|TOKEN|PASSWORD|PRIVATE_KEY|DATABASE_URL)/.test(src) &&
+			/import\.meta\.env|process\.env/.test(src)
+		)
 			findings.push({ file: name, message: 'client source references a secret-shaped environment value' });
 		if (/dotenv(?:\.config|\/config)/.test(src)) findings.push({ file: name, message: 'environment-file loading is forbidden' });
-		if (/process\.env(?:\.|\[)/.test(src) && !envAllowedRoots.some((r) => file.startsWith(`${r}/`))) findings.push({ file: name, message: 'process.env access is outside an allowed runtime root' });
+		if (/process\.env(?:\.|\[)/.test(src) && !(settings.allowProcessEnvRoots ?? []).some((r) => file.startsWith(`${join(cfg.root, r)}/`)))
+			findings.push({ file: name, message: 'process.env access is outside an allowed runtime root' });
 	}
 	return findings;
 }

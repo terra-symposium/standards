@@ -50,45 +50,11 @@ function scriptKind(fileName: string): ts.ScriptKind {
 }
 
 /**
- * Checks for a direct React forwardRef call without unwrapping casts or other wrappers.
- *
- * @param init Variable initializer to inspect.
- *
- * @return `true` when the initializer is `forwardRef(...)` or `React.forwardRef(...)`.
- */
-function isForwardRef(init: ts.Expression | undefined): init is ts.CallExpression {
-	if (!init || !ts.isCallExpression(init) || init.questionDotToken) return false;
-	const callee = init.expression;
-	if (ts.isIdentifier(callee)) return callee.text === 'forwardRef';
-	return ts.isPropertyAccessExpression(callee) && !callee.questionDotToken && ts.isIdentifier(callee.expression) && callee.expression.text === 'React' && callee.name.text === 'forwardRef';
-}
-
-/**
- * Returns the component name targeted by a displayName assignment expression.
- *
- * @param left Assignment target to inspect.
- *
- * @return Component identifier when the target is its displayName property.
- */
-function assignedComponent(left: ts.Expression): string | undefined {
-	if (ts.isPropertyAccessExpression(left) && !left.questionDotToken && left.name.text === 'displayName' && ts.isIdentifier(left.expression)) return left.expression.text;
-	if (
-		ts.isElementAccessExpression(left) &&
-		ts.isIdentifier(left.expression) &&
-		left.argumentExpression &&
-		ts.isStringLiteralLike(left.argumentExpression) &&
-		left.argumentExpression.text === 'displayName'
-	)
-		return left.expression.text;
-	return undefined;
-}
-
-/**
  * Returns whether a node introduces a lexical or function-scoped binding boundary.
  *
- * @param node
+ * @param node Syntax node to check for a binding-scope boundary.
  *
- * @return
+ * @return `true` when the node begins a scope used to resolve candidate declarations.
  */
 function isBindingScope(node: ts.Node): boolean {
 	return (
@@ -105,45 +71,6 @@ function isBindingScope(node: ts.Node): boolean {
 }
 
 /**
- * Finds the scope that owns a variable declaration, accounting for `var` hoisting.
- *
- * @param declaration
- *
- * @return
- */
-function declarationScope(declaration: ts.VariableDeclaration): ts.Node {
-	const list = declaration.parent;
-	const blockScoped = (list.flags & (ts.NodeFlags.Let | ts.NodeFlags.Const)) !== 0;
-	for (let current: ts.Node | undefined = list.parent; current; current = current.parent) {
-		if (!isBindingScope(current)) continue;
-		if (ts.isSourceFile(current)) return current;
-		if (blockScoped && !ts.isFunctionLike(current)) return current;
-		if (!blockScoped && ts.isFunctionLike(current)) return current;
-	}
-	return declaration.getSourceFile();
-}
-
-/**
- * Resolves a component property assignment to the nearest same-named candidate binding.
- *
- * @param node
- * @param name
- * @param byName
- *
- * @return
- */
-function candidatesForAssignment(node: ts.Node, name: string, byName: Map<string, Candidate[]>): Candidate[] {
-	const candidates = byName.get(name);
-	if (!candidates) return [];
-	for (let current: ts.Node | undefined = node.parent; current; current = current.parent) {
-		if (!isBindingScope(current)) continue;
-		const matches = candidates.filter((candidate) => candidate.scope === current);
-		if (matches.length) return matches;
-	}
-	return [];
-}
-
-/**
  * Collects direct forwardRef variable declarations and classifies explicit displayName writes.
  *
  * @param file Absolute source filename to inspect.
@@ -153,72 +80,75 @@ function candidatesForAssignment(node: ts.Node, name: string, byName: Map<string
  * @return Eligible named declarations, including whether an existing assignment is matching or conflicting.
  */
 function candidatesForFile(file: string, analysis?: QualityAnalysis): Candidate[] {
-	const src = analysis?.texts.get(file) ?? readFileSync(file, 'utf8');
-	const parsed = analysis?.sources.get(file) ?? ts.createSourceFile(file, src, ts.ScriptTarget.Latest, true, scriptKind(file));
+	// Read source text eagerly even when the parse cache has a hit.
+	const parsed = ((src: string) => analysis?.sources.get(file) ?? ts.createSourceFile(file, src, ts.ScriptTarget.Latest, true, scriptKind(file)))(
+		analysis?.texts.get(file) ?? readFileSync(file, 'utf8'),
+	);
 	if ((parsed as ts.SourceFile & { parseDiagnostics?: readonly ts.Diagnostic[] }).parseDiagnostics?.length) return [];
 	const candidates: Candidate[] = [];
 	const byName = new Map<string, Candidate[]>();
-	/**
-	 *
-	 * @param node
-	 */
-	const collect = (node: ts.Node): void => {
+	const assignments: ts.BinaryExpression[] = [];
+	const pending: ts.Node[] = [parsed];
+	while (pending.length) {
+		const node = pending.pop()!;
 		if (ts.isVariableStatement(node)) {
 			for (const declaration of node.declarationList.declarations) {
-				if (!ts.isIdentifier(declaration.name) || !isForwardRef(declaration.initializer)) continue;
-				const candidate: Candidate = { name: declaration.name.text, declaration, statement: node, scope: declarationScope(declaration), assignment: 'missing' };
+				const init = declaration.initializer;
+				if (!ts.isIdentifier(declaration.name) || !init || !ts.isCallExpression(init) || init.questionDotToken) continue;
+				const callee = init.expression;
+				if (
+					!(ts.isIdentifier(callee)
+						? callee.text === 'forwardRef'
+						: ts.isPropertyAccessExpression(callee) && !callee.questionDotToken && ts.isIdentifier(callee.expression) && callee.expression.text === 'React' && callee.name.text === 'forwardRef')
+				)
+					continue;
+				const list = declaration.parent;
+				const blockScoped = (list.flags & (ts.NodeFlags.Let | ts.NodeFlags.Const)) !== 0;
+				let scope: ts.Node = declaration.getSourceFile();
+				for (let current: ts.Node | undefined = list.parent; current; current = current.parent) {
+					if (!isBindingScope(current)) continue;
+					if (ts.isSourceFile(current) || (blockScoped && !ts.isFunctionLike(current)) || (!blockScoped && ts.isFunctionLike(current))) {
+						scope = current;
+						break;
+					}
+				}
+				const candidate: Candidate = { name: declaration.name.text, declaration, statement: node, scope, assignment: 'missing' };
 				candidates.push(candidate);
 				byName.set(candidate.name, [...(byName.get(candidate.name) ?? []), candidate]);
 			}
 		}
-		ts.forEachChild(node, collect);
-	};
-	collect(parsed);
-	/**
-	 *
-	 * @param node
-	 */
-	const inspectAssignments = (node: ts.Node): void => {
-		if (ts.isBinaryExpression(node) && node.operatorToken.kind >= ts.SyntaxKind.FirstAssignment && node.operatorToken.kind <= ts.SyntaxKind.LastAssignment) {
-			const name = assignedComponent(node.left);
-			const targets = name ? candidatesForAssignment(node, name, byName) : undefined;
-			if (targets) {
-				const exact = node.operatorToken.kind === ts.SyntaxKind.EqualsToken && ts.isStringLiteralLike(node.right) && node.right.text === name;
-				for (const target of targets) {
-					if (target.assignment === 'missing' || !exact) target.assignment = exact ? 'matching' : 'conflicting';
-				}
-			}
-		}
-		ts.forEachChild(node, inspectAssignments);
-	};
-	inspectAssignments(parsed);
-	return candidates;
-}
-
-/**
- * Finds missing or conflicting displayName assignments in one file.
- *
- * @param cfg Quality configuration used to render diagnostic paths.
- * @param file Absolute filename to inspect.
- * @param analysis Optional shared analysis context.
- *
- * @return Findings for declarations without an exact conventional displayName assignment.
- */
-function findingsForFile(cfg: QualityCfg, file: string, analysis?: QualityAnalysis): DisplayNameFinding[] {
-	const findings: DisplayNameFinding[] = [];
-	for (const candidate of candidatesForFile(file, analysis)) {
-		if (candidate.assignment === 'matching') continue;
-		const source = candidate.declaration.getSourceFile();
-		const pos = source.getLineAndCharacterOfPosition(candidate.declaration.name.getStart(source));
-		findings.push({
-			file: displayPath(cfg, file),
-			line: pos.line + 1,
-			column: pos.character + 1,
-			component: candidate.name,
-			recommendation: candidate.assignment === 'conflicting' ? `review existing ${candidate.name}.displayName assignment` : `add ${candidate.name}.displayName = '${candidate.name}'`,
+		if (ts.isBinaryExpression(node) && node.operatorToken.kind >= ts.SyntaxKind.FirstAssignment && node.operatorToken.kind <= ts.SyntaxKind.LastAssignment) assignments.push(node);
+		const children: ts.Node[] = [];
+		ts.forEachChild(node, (child) => {
+			children.push(child);
 		});
+		for (let i = children.length - 1; i >= 0; i--) pending.push(children[i]);
 	}
-	return findings;
+	for (const node of assignments) {
+		let name: string | undefined;
+		if (ts.isPropertyAccessExpression(node.left) && !node.left.questionDotToken && node.left.name.text === 'displayName' && ts.isIdentifier(node.left.expression)) name = node.left.expression.text;
+		else if (
+			ts.isElementAccessExpression(node.left) &&
+			ts.isIdentifier(node.left.expression) &&
+			node.left.argumentExpression &&
+			ts.isStringLiteralLike(node.left.argumentExpression) &&
+			node.left.argumentExpression.text === 'displayName'
+		)
+			name = node.left.expression.text;
+		const matches = name ? byName.get(name) : undefined;
+		if (!name || !matches) continue;
+		for (let current: ts.Node | undefined = node.parent; current; current = current.parent) {
+			if (!isBindingScope(current)) continue;
+			const targets = matches.filter((candidate) => candidate.scope === current);
+			if (!targets.length) continue;
+			const exact = node.operatorToken.kind === ts.SyntaxKind.EqualsToken && ts.isStringLiteralLike(node.right) && node.right.text === name;
+			for (const target of targets) {
+				if (target.assignment === 'missing' || !exact) target.assignment = exact ? 'matching' : 'conflicting';
+			}
+			break;
+		}
+	}
+	return candidates;
 }
 
 /**
@@ -234,7 +164,22 @@ function findingsForFile(cfg: QualityCfg, file: string, analysis?: QualityAnalys
  * @return Missing or conflicting displayName recommendations.
  */
 export function displayNameFindings(cfg: QualityCfg, analysis?: QualityAnalysis): DisplayNameFinding[] {
-	return (analysis?.files ?? srcFiles(cfg)).flatMap((file) => findingsForFile(cfg, file, analysis));
+	return (analysis?.files ?? srcFiles(cfg)).flatMap((file) => {
+		const findings: DisplayNameFinding[] = [];
+		for (const candidate of candidatesForFile(file, analysis)) {
+			if (candidate.assignment === 'matching') continue;
+			const source = candidate.declaration.getSourceFile();
+			const pos = source.getLineAndCharacterOfPosition(candidate.declaration.name.getStart(source));
+			findings.push({
+				file: displayPath(cfg, file),
+				line: pos.line + 1,
+				column: pos.character + 1,
+				component: candidate.name,
+				recommendation: candidate.assignment === 'conflicting' ? `review existing ${candidate.name}.displayName assignment` : `add ${candidate.name}.displayName = '${candidate.name}'`,
+			});
+		}
+		return findings;
+	});
 }
 
 /**
@@ -265,12 +210,10 @@ export function fixDisplayNames(cfg: QualityCfg, analysis?: QualityAnalysis): { 
 			}
 			const statement = candidate.statement;
 			const start = statement.getStart(parsed);
-			const lineStart = src.lastIndexOf('\n', start - 1) + 1;
-			const indent = src.slice(lineStart, start);
+			const indent = src.slice(src.lastIndexOf('\n', start - 1) + 1, start);
 			const lineEnd = src.indexOf('\n', statement.end);
 			const insertAt = lineEnd < 0 ? src.length : lineEnd > 0 && src[lineEnd - 1] === '\r' ? lineEnd - 1 : lineEnd;
-			const tail = src.slice(statement.end, insertAt);
-			if (!S_REGEX.test(indent) || !S_REGEX.test(tail)) {
+			if (!S_REGEX.test(indent) || !S_REGEX.test(src.slice(statement.end, insertAt))) {
 				skipped++;
 				continue;
 			}
@@ -282,12 +225,10 @@ export function fixDisplayNames(cfg: QualityCfg, analysis?: QualityAnalysis): { 
 		let updated = src;
 		const lineBreak = src.includes('\r\n') ? '\r\n' : '\n';
 		for (const [at, edit] of [...edits.entries()].sort((a, b) => b[0] - a[0])) {
-			const lines = edit.names.map((name) => `${edit.indent}${name}.displayName = '${name}';`).join(lineBreak);
-			updated = `${updated.slice(0, at)}${lineBreak}${lines}${updated.slice(at)}`;
+			updated = `${updated.slice(0, at)}${lineBreak}${edit.names.map((name) => `${edit.indent}${name}.displayName = '${name}';`).join(lineBreak)}${updated.slice(at)}`;
 			fixed += edit.names.length;
 		}
-		const valid = ts.createSourceFile(file, updated, ts.ScriptTarget.Latest, true, scriptKind(file));
-		if ((valid as ts.SourceFile & { parseDiagnostics?: readonly ts.Diagnostic[] }).parseDiagnostics?.length) {
+		if ((ts.createSourceFile(file, updated, ts.ScriptTarget.Latest, true, scriptKind(file)) as ts.SourceFile & { parseDiagnostics?: readonly ts.Diagnostic[] }).parseDiagnostics?.length) {
 			skipped += [...edits.values()].reduce((count, edit) => count + edit.names.length, 0);
 			continue;
 		}

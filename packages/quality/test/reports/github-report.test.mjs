@@ -20,10 +20,11 @@ CONFIG
 
 const repo = 'acme/project';
 /**
+ * Builds an API path for the test repository.
  *
- * @param endpoint
+ * @param endpoint Optional repository API endpoint suffix.
  *
- * @return
+ * @return Repository API path used by the report fixture.
  */
 const apiPath = (endpoint) => `repos/acme/project${endpoint ? `/${endpoint}` : ''}`;
 test('GitHub report classifies open issues and security alerts without exposing secret values', () => {
@@ -132,10 +133,11 @@ test('GitHub report classifies open issues and security alerts without exposing 
 });
 test('GitHub report keeps unavailable alert counts unknown instead of reporting zero', () => {
 	/**
+	 * Returns a stubbed API response for a GitHub report request.
 	 *
-	 * @param path
+	 * @param path Requested GitHub API path.
 	 *
-	 * @return
+	 * @return The fixture response for the requested path.
 	 */
 	const api = (path) => {
 		if (path === apiPath('')) return { ok: true, value: { default_branch: 'main' } };

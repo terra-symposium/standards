@@ -21,11 +21,8 @@ CONFIG
 
 const [inputPath, outputPath] = process.argv.slice(2);
 const report = JSON.parse(await fs.readFile(inputPath, 'utf8'));
-const repo = report.repo;
 const refs = report.refs ?? [report.ref];
-const outputDir = outputPath.slice(0, outputPath.lastIndexOf('/'));
 const usedHues = [];
-const DARK = '#17251C';
 const LIGHT = '#E6F0E8';
 
 /*//////////////////////////////////////////////////
@@ -33,97 +30,74 @@ HELPERS
 //////////////////////////////////////////////////*/
 
 /**
+ * Runs a Git command in the repository named by the report and returns its output.
  *
- * @param args
+ * @param args Git command arguments, excluding the `git` executable name.
  *
- * @return
+ * @return Standard output with trailing line breaks removed.
  */
 function git(args) {
-	return execFileSync('git', args, { cwd: repo, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }).trimEnd();
+	return execFileSync('git', args, { cwd: report.repo, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }).trimEnd();
 }
 
 /**
+ * Converts an OKLCH hue and color coordinates to an sRGB hexadecimal color.
  *
- * @param props
+ * @param value Hue angle in degrees.
+ * @param lightness OKLCH lightness value.
+ * @param chroma OKLCH chroma value.
  *
- * @return
- */
-function readExcerpt({ sha, path, start, end }) {
-	return git(['show', `${sha}:${path}`])
-		.split('\n')
-		.slice(start - 1, end)
-		.join('\n');
-}
-
-/**
- *
- * @return
- */
-function hue() {
-	for (let attempt = 0; attempt < 100; attempt += 1) {
-		let value = randomInt(0, 360);
-		if (value >= 70 && value <= 130) value += 60;
-		if (usedHues.every((existing) => Math.min(Math.abs(existing - value), 360 - Math.abs(existing - value)) >= 35)) {
-			usedHues.push(value);
-			return value;
-		}
-	}
-	return (usedHues.at(-1) ?? 0) + 37;
-}
-
-/**
- *
- * @param value
- * @param lightness
- * @param chroma
- *
- * @return
+ * @return The converted color as a hexadecimal string.
  */
 function hex(value, lightness, chroma) {
 	return new Color('oklch', [lightness, chroma, value]).to('srgb').toString({ format: 'hex' });
 }
 
 /**
+ * Generates a coordinated color palette using separated hues.
  *
- * @return
+ * @return Palette colors for slide surfaces, text, rules, and accents.
  */
 function theme() {
-	const primaryHue = hue();
-	const secondaryHue = (primaryHue + 150) % 360;
+	let primaryHue;
+	for (let attempt = 0; attempt < 100; attempt += 1) {
+		let value = randomInt(0, 360);
+		if (value >= 70 && value <= 130) value += 60;
+		if (usedHues.every((existing) => Math.min(Math.abs(existing - value), 360 - Math.abs(existing - value)) >= 35)) {
+			usedHues.push(value);
+			primaryHue = value;
+			break;
+		}
+	}
+	primaryHue ??= (usedHues.at(-1) ?? 0) + 37;
 	return {
 		surface: hex(primaryHue, 0.975, 0.018),
 		tone: hex(primaryHue, 0.93, 0.045),
 		rule: hex(primaryHue, 0.78, 0.085),
 		text: hex(primaryHue, 0.26, 0.055),
 		muted: hex(primaryHue, 0.43, 0.045),
-		secondary: hex(secondaryHue, 0.56, 0.14),
+		secondary: hex((primaryHue + 150) % 360, 0.56, 0.14),
 	};
 }
 
 /**
+ * Adds a text box after checking that each line fits the configured width.
  *
- * @param value
- * @param maxChars
- * @param name
- */
-function assertLines(value, maxChars, name) {
-	for (const line of String(value).split('\n')) {
-		if (line.length > maxChars) throw new Error(`${name} line has ${line.length} characters; max is ${maxChars}. Add a deliberate line break or widen the frame.`);
-	}
-}
-
-/**
+ * @param slide Slide that receives the text box.
+ * @param value Text content to display.
+ * @param position Text box position and dimensions.
+ * @param style Optional text styling and maximum line length.
+ * @param name Shape name used in the presentation.
  *
- * @param slide
- * @param value
- * @param position
- * @param style
- * @param name
- *
- * @return
+ * @return The created text box shape.
  */
 function addText(slide, value, position, style = {}, name = 'text') {
-	assertLines(value, style.maxChars ?? Math.floor(position.width / Math.max(7, (style.fontSize ?? 16) * 0.52)), name);
+	for (const line of String(value).split('\n')) {
+		if (line.length > (style.maxChars ?? Math.floor(position.width / Math.max(7, (style.fontSize ?? 16) * 0.52))))
+			throw new Error(
+				`${name} line has ${line.length} characters; max is ${style.maxChars ?? Math.floor(position.width / Math.max(7, (style.fontSize ?? 16) * 0.52))}. Add a deliberate line break or widen the frame.`,
+			);
+	}
 	const shape = slide.shapes.add({ geometry: 'textbox', name, position, fill: 'none', line: { style: 'solid', fill: 'none', width: 0 } });
 	shape.text = value;
 	shape.text.style = {
@@ -142,52 +116,56 @@ function addText(slide, value, position, style = {}, name = 'text') {
 }
 
 /**
+ * Adds a rectangular shape to a slide.
  *
- * @param slide
- * @param position
- * @param fill
- * @param line
- * @param name
+ * @param slide Slide that receives the rectangle.
+ * @param position Rectangle position and dimensions.
+ * @param fill Rectangle fill color or value.
+ * @param line Optional border color; `none` omits the border.
+ * @param name Shape name used in the presentation.
  *
- * @return
+ * @return The created rectangle shape.
  */
 function rect(slide, position, fill, line = 'none', name = 'panel') {
 	return slide.shapes.add({ geometry: 'rect', name, position, fill, line: { style: 'solid', fill: line, width: line === 'none' ? 0 : 1 } });
 }
 
 /**
+ * Adds a rounded card with the palette's rule color as its border.
  *
- * @param slide
- * @param position
- * @param colors
- * @param name
- * @param fill
+ * @param slide Slide that receives the card.
+ * @param position Card position and dimensions.
+ * @param colors Palette supplying the border color and default fill.
+ * @param name Shape name used in the presentation.
+ * @param fill Optional card fill color.
  *
- * @return
+ * @return The created card shape.
  */
 function card(slide, position, colors, name, fill = colors.tone) {
 	return slide.shapes.add({ geometry: 'roundRect', name, position, fill, line: { style: 'solid', fill: colors.rule, width: 1 } });
 }
 
 /**
+ * Adds a one-point-high horizontal rule to a slide.
  *
- * @param slide
- * @param left
- * @param top
- * @param width
- * @param color
- * @param name
+ * @param slide Slide that receives the rule.
+ * @param left Rule's left coordinate.
+ * @param top Rule's top coordinate.
+ * @param width Rule width.
+ * @param color Rule color.
+ * @param name Shape name used in the presentation.
  *
- * @return
+ * @return The created rule shape.
  */
 function rule(slide, left, top, width, color, name) {
 	return rect(slide, { left, top, width, height: 1 }, color, 'none', name);
 }
 
 /**
+ * Adds source references to a slide's visible speaker notes.
  *
- * @param slide
- * @param lines
+ * @param slide Slide that receives the notes.
+ * @param lines Source references to list in the notes.
  */
 function notes(slide, lines) {
 	slide.speakerNotes.textFrame.setText(`[Sources]\n${lines.map((line) => `- ${line}`).join('\n')}`);
@@ -195,20 +173,20 @@ function notes(slide, lines) {
 }
 
 /**
+ * Wraps each input line at word boundaries to fit the character limit.
  *
- * @param value
- * @param maxChars
+ * @param value Text that may contain multiple lines.
+ * @param maxChars Maximum characters per output line.
  *
- * @return
+ * @return The wrapped text joined with newline characters.
  */
 function wrapLines(value, maxChars) {
 	return String(value)
 		.split('\n')
 		.flatMap((line) => {
-			const words = line.split(/\s+/);
 			const lines = [];
 			let current = '';
-			for (const word of words) {
+			for (const word of line.split(/\s+/)) {
 				if (!word) continue;
 				if (current && `${current} ${word}`.length > maxChars) {
 					lines.push(current);
@@ -222,11 +200,12 @@ function wrapLines(value, maxChars) {
 }
 
 /**
+ * Adds the title, page number, and top rule shared by content slides.
  *
- * @param slide
- * @param title
- * @param page
- * @param colors
+ * @param slide Slide that receives the header.
+ * @param title Text displayed as the slide title.
+ * @param page One-based slide number.
+ * @param colors Palette used for text and rule colors.
  */
 function header(slide, title, page, colors) {
 	addText(slide, title, { left: 48, top: 42, width: 1136, height: 42 }, { fontSize: 30, color: colors.text, maxChars: 62 }, `title-${page}`);
@@ -235,11 +214,12 @@ function header(slide, title, page, colors) {
 }
 
 /**
+ * Adds a bottom rule and footer text to a content slide.
  *
- * @param slide
- * @param value
- * @param page
- * @param colors
+ * @param slide Slide that receives the footer.
+ * @param value Footer text to display.
+ * @param page Slide number used to name the footer shapes.
+ * @param colors Palette used for text and rule colors.
  */
 function footer(slide, value, page, colors) {
 	rule(slide, 48, 674, 1184, colors.rule, `footer-rule-${page}`);
@@ -247,422 +227,90 @@ function footer(slide, value, page, colors) {
 }
 
 /**
+ * Maps a date to its rounded day position in a plan's 90-day timeline.
  *
- * @param line
+ * @param date Date to position, formatted as `YYYY-MM-DD`.
+ * @param plan Plan containing the timeline start and end dates.
  *
- * @return
+ * @return Rounded day offset scaled from the plan interval to 90 days.
  */
-function codeRuns(line) {
-	const pattern =
-		/(\/\/.*$|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|`(?:\\.|[^`\\])*`|\b(?:const|let|var|function|return|if|else|try|catch|async|await|export|from|import|new|throw|type|interface|extends|as|typeof|true|false|null|undefined)\b|\b\d+(?:\.\d+)?\b|[A-Za-z_$][\w$]*|[{}()]|\[|\]|[.,;:=<>!?+*-]|\x2f)/g;
-	const runs = [];
-	let last = 0;
-	for (const match of line.matchAll(pattern)) {
-		if (match.index > last) runs.push({ run: line.slice(last, match.index), textStyle: { color: LIGHT, fill: LIGHT } });
-		const token = match[0];
-		const color = token.startsWith('//')
-			? '#7FA18B'
-			: /^['"`]/.test(token)
-				? '#F6C177'
-				: /^(const|let|var|function|return|if|else|try|catch|async|await|export|from|import|new|throw|type|interface|extends|as|typeof|true|false|null|undefined)$/.test(token)
-					? '#C7DDD0'
-					: /^\d/.test(token)
-						? '#F6C177'
-						: /^[A-Za-z_$]/.test(token)
-							? LIGHT
-							: '#AFC4B5';
-		runs.push({ run: token, textStyle: { color, fill: color } });
-		last = match.index + token.length;
-	}
-	if (last < line.length) runs.push({ run: line.slice(last), textStyle: { color: LIGHT, fill: LIGHT } });
-	return runs.length ? runs : [{ run: ' ', textStyle: { color: LIGHT, fill: LIGHT } }];
+function planDay(date, plan) {
+	const start = new Date(`${plan.start}T00:00:00Z`).getTime();
+	return Math.round(((new Date(`${date}T00:00:00Z`).getTime() - start) / (new Date(`${plan.end}T00:00:00Z`).getTime() - start)) * 90);
 }
-
-/**
- *
- * @param slide
- * @param codeInput
- * @param position
- * @param colors
- *
- * @return
- */
-function addCode(slide, codeInput, position, colors) {
-	const source = readExcerpt(codeInput);
-	const lines = source.split('\n').map((line) => line.replaceAll('\t', '    '));
-	const longest = Math.max(...lines.map((line) => line.length));
-	const fontSize = Math.max(8, Math.min(14, Math.floor((position.width - 36) / Math.max(1, longest * 0.58))));
-	if (fontSize === 8 && longest * 0.58 * fontSize > position.width - 36)
-		throw new Error(`Code excerpt ${codeInput.path}:${codeInput.start}-${codeInput.end} is too wide; use a wider layout or a narrower complete range.`);
-	const codeHeight = Math.min(position.height, Math.max(86, 62 + lines.length * Math.ceil(fontSize * 1.35)));
-	const panelPosition = { ...position, height: codeHeight };
-	rect(slide, panelPosition, DARK, colors.rule, `code-${codeInput.sha}`);
-	addText(
-		slide,
-		`${codeInput.path} · ${codeInput.sha}`,
-		{ left: position.left + 18, top: position.top + 14, width: position.width - 36, height: 18 },
-		{ fontSize: 14, color: '#C7DDD0', maxChars: 85 },
-		`code-label-${codeInput.sha}`,
+if (!inputPath || !outputPath) throw new Error('Usage: generate-weekly-review.mjs <report.json> <output.pptx>');
+if (!refs.filter(Boolean).length) throw new Error('Provide report.ref or report.refs.');
+if (!report.bigFive)
+	throw new Error(
+		'A Big Five progress timeline is required. Assess every objective against the complete Git history on the requested refs through the report end date, then supply deliverable assessments with full commit SHAs.',
 	);
-	const shape = slide.shapes.add({
-		geometry: 'textbox',
-		name: `code-body-${codeInput.sha}`,
-		position: { left: position.left + 18, top: position.top + 44, width: position.width - 36, height: codeHeight - 56 },
-		fill: 'none',
-		line: { style: 'solid', fill: 'none', width: 0 },
-	});
-	shape.text.style = { fontSize, typeface: 'Menlo', alignment: 'left', verticalAlignment: 'top', wrap: 'none', autoFit: 'none', insets: { top: 0, right: 0, bottom: 0, left: 0 } };
-	shape.text = lines.map((line) => codeRuns(line));
-	return `${codeInput.sha} · ${codeInput.path}:${codeInput.start}-${codeInput.end}`;
-}
-
-/**
- *
- * @param slide
- * @param image
- * @param position
- * @param colors
- * @param page
- *
- * @return
- */
-async function addScreenshot(slide, image, position, colors, page) {
-	card(slide, position, colors, `screenshot-frame-${page}`, colors.tone);
-	const bytes = await fs.readFile(image.path);
-	slide.images.add({
-		blob: bytes,
-		contentType: 'image/png',
-		alt: image.alt,
-		fit: 'cover',
-		geometry: 'roundRect',
-		borderRadius: 12,
-		position: { left: position.left + 8, top: position.top + 8, width: position.width - 16, height: position.height - 16 },
-	});
-	return `${image.route} · ${image.path}`;
-}
-
-/**
- *
- * @return
- */
-function parseCommits() {
-	const fmt = '%H%x09%h%x09%aN%x09%aI%x09%s';
-	return git(['log', ...refs, `--since=${report.since}`, `--until=${report.until}`, '--no-merges', `--format=${fmt}`])
-		.split('\n')
-		.filter(Boolean)
-		.map((line) => {
-			const [sha, short, author, authoredAt, ...subject] = line.split('\t');
-			return { sha, short, author, date: authoredAt.slice(0, 10), subject: subject.join('\t'), paths: git(['show', '--format=', '--name-only', sha]).split('\n').filter(Boolean) };
-		});
-}
-
-/**
- *
- * @return
- */
-function parseHistoryCommits() {
+(async function main() {
 	if (git(['rev-parse', '--is-shallow-repository']) === 'true') throw new Error('A complete Big Five assessment requires full Git history; fetch or unshallow the authoritative refs first.');
-	const fmt = '%H%x09%h%x09%aN%x09%aI%x09%s';
-	return git(['log', ...refs, `--until=${report.until}`, '--no-merges', `--format=${fmt}`])
+	const historyCommits = git(['log', ...refs, `--until=${report.until}`, '--no-merges', '--format=%H%x09%h%x09%aN%x09%aI%x09%s'])
 		.split('\n')
 		.filter(Boolean)
 		.map((line) => {
 			const [sha, short, author, authoredAt, ...subject] = line.split('\t');
 			return { sha, short, author, date: authoredAt.slice(0, 10), subject: subject.join('\t') };
 		});
-}
-
-/**
- *
- * @param value
- * @param length
- *
- * @return
- */
-/**
- *
- * @param date
- * @param plan
- *
- * @return
- */
-function planDay(date, plan) {
-	const start = new Date(`${plan.start}T00:00:00Z`).getTime();
-	const end = new Date(`${plan.end}T00:00:00Z`).getTime();
-	const value = new Date(`${date}T00:00:00Z`).getTime();
-	return Math.round(((value - start) / (end - start)) * 90);
-}
-
-/**
- *
- * @param plan
- * @param contributor
- * @param props
- *
- * @return
- */
-function validPlan(plan, contributor, { requirePreviousObjective = true, allowUnknownProgress = false } = {}) {
-	if (!plan) return false;
-	const required = [plan.source, plan.start, plan.end, plan.asOf, plan.outcome, ...(requirePreviousObjective ? [plan.previousObjective] : [])];
-	if (!required.every((value) => typeof value === 'string' && value.length))
-		throw new Error(`${contributor.name}: plan requires source, start, end, asOf, outcome${requirePreviousObjective ? ', and previousObjective' : ''}.`);
-	if (!Array.isArray(plan.milestones) || !plan.milestones.length || plan.milestones.length > 6) throw new Error(`${contributor.name}: plan requires one to six milestones.`);
-	const planStart = new Date(`${plan.start}T00:00:00Z`);
-	const planEnd = new Date(`${plan.end}T00:00:00Z`);
-	const asOf = new Date(`${plan.asOf}T00:00:00Z`);
-	if ([planStart, planEnd, asOf].some((date) => Number.isNaN(date.valueOf())) || planStart >= planEnd || asOf < planStart || asOf > planEnd)
-		throw new Error(`${contributor.name}: plan start, end, and asOf must be ordered ISO dates.`);
-	for (const milestone of plan.milestones) {
-		if (![milestone.name, milestone.start, milestone.end, milestone.evidence].every((value) => typeof value === 'string' && value.length))
-			throw new Error(`${contributor.name}: each milestone requires name, start, end, and evidence.`);
-		if (!(allowUnknownProgress && milestone.progress === null) && (!Number.isInteger(milestone.progress) || milestone.progress < 0 || milestone.progress > 100))
-			throw new Error(`${contributor.name}: milestone progress must be an integer from 0 through 100${allowUnknownProgress ? ' or null when progress is unverified' : ''}.`);
-		const start = new Date(`${milestone.start}T00:00:00Z`);
-		const end = new Date(`${milestone.end}T00:00:00Z`);
-		if (Number.isNaN(start.valueOf()) || Number.isNaN(end.valueOf()) || start < planStart || end > planEnd || start >= end)
-			throw new Error(`${contributor.name}: milestone dates must sit within the plan window.`);
-	}
-	return true;
-}
-
-/**
- *
- * @param plan
- * @param historyCommits
- *
- * @return
- */
-function assessBigFiveTimeline(plan, historyCommits) {
-	if (typeof plan?.source !== 'string' || !plan.source.trim() || !Array.isArray(plan.objectives) || plan.objectives.length !== 5)
-		throw new Error('Big Five timeline requires a source and five objectives, each assessed against the complete history of the requested refs.');
-	const historyBySha = new Map(historyCommits.map((commit) => [commit.sha, commit]));
-	const progressByStatus = { complete: 1, partial: 0.5, not_found: 0 };
-	const milestones = plan.objectives.map((objective) => {
-		if (typeof objective.name !== 'string' || !objective.name.trim() || !Array.isArray(objective.deliverables) || !objective.deliverables.length)
-			throw new Error('Each Big Five objective requires a name and source-backed deliverable assessments.');
-		let score = 0;
-		const evidence = [];
-		for (const deliverable of objective.deliverables) {
-			if (typeof deliverable.name !== 'string' || !deliverable.name.trim() || !Object.hasOwn(progressByStatus, deliverable.status))
-				throw new Error(`${objective.name}: each deliverable requires a name and status complete, partial, or not_found.`);
-			const shas = deliverable.commits ?? [];
-			if (!Array.isArray(shas) || (deliverable.status !== 'not_found' && !shas.length))
-				throw new Error(`${objective.name} · ${deliverable.name}: complete/partial evidence requires commit SHAs; not_found requires none.`);
-			if (deliverable.status === 'not_found' && shas.length) throw new Error(`${objective.name} · ${deliverable.name}: not_found cannot cite commits.`);
-			for (const sha of shas) {
-				const commit = historyBySha.get(sha);
-				if (!commit) throw new Error(`${objective.name} · ${deliverable.name}: ${sha} is not in the complete history of the requested refs through ${report.until}.`);
-				if (!commit.paths) commit.paths = git(['show', '--format=', '--name-only', sha]).split('\n').filter(Boolean);
-				evidence.push(commit);
-			}
-			score += progressByStatus[deliverable.status];
-		}
-		const uniqueEvidence = [...new Map(evidence.map((commit) => [commit.sha, commit])).values()].sort((a, b) => a.date.localeCompare(b.date));
+	report.bigFive = (() => {
+		const plan = report.bigFive;
+		if (typeof plan?.source !== 'string' || !plan.source.trim() || !Array.isArray(plan.objectives) || plan.objectives.length !== 5)
+			throw new Error('Big Five timeline requires a source and five objectives, each assessed against the complete history of the requested refs.');
+		const historyBySha = new Map(historyCommits.map((commit) => [commit.sha, commit]));
+		const progressByStatus = { complete: 1, partial: 0.5, not_found: 0 };
+		const allDates = historyCommits.map((commit) => commit.date).sort();
+		if (!allDates.length) throw new Error('The requested refs contain no Git history for the Big Five assessment.');
 		return {
-			name: objective.name,
-			progress: Math.round((score / objective.deliverables.length) * 100),
-			start: uniqueEvidence[0]?.date ?? '',
-			end: uniqueEvidence.at(-1)?.date ?? '',
-			deliverables: objective.deliverables,
-			evidence: uniqueEvidence,
+			title: plan.title ?? 'Big Five progress across full Git history',
+			source: plan.source,
+			start: allDates[0],
+			end: report.until.slice(0, 10),
+			asOf: report.until.slice(0, 10),
+			outcome: 'Progress is measured by expected deliverables supported in full Git history.',
+			progressBasis: 'Complete = 100%; partial = 50%; no Git evidence = 0% evidenced, not proof of no work.',
+			historyCount: historyBySha.size,
+			milestones: plan.objectives.map((objective) => {
+				if (typeof objective.name !== 'string' || !objective.name.trim() || !Array.isArray(objective.deliverables) || !objective.deliverables.length)
+					throw new Error('Each Big Five objective requires a name and source-backed deliverable assessments.');
+				let score = 0;
+				const evidence = [];
+				for (const deliverable of objective.deliverables) {
+					if (typeof deliverable.name !== 'string' || !deliverable.name.trim() || !Object.hasOwn(progressByStatus, deliverable.status))
+						throw new Error(`${objective.name}: each deliverable requires a name and status complete, partial, or not_found.`);
+					const shas = deliverable.commits ?? [];
+					if (!Array.isArray(shas) || (deliverable.status !== 'not_found' && !shas.length))
+						throw new Error(`${objective.name} · ${deliverable.name}: complete/partial evidence requires commit SHAs; not_found requires none.`);
+					if (deliverable.status === 'not_found' && shas.length) throw new Error(`${objective.name} · ${deliverable.name}: not_found cannot cite commits.`);
+					for (const sha of shas) {
+						const commit = historyBySha.get(sha);
+						if (!commit) throw new Error(`${objective.name} · ${deliverable.name}: ${sha} is not in the complete history of the requested refs through ${report.until}.`);
+						if (!commit.paths) commit.paths = git(['show', '--format=', '--name-only', sha]).split('\n').filter(Boolean);
+						evidence.push(commit);
+					}
+					score += progressByStatus[deliverable.status];
+				}
+				const uniqueEvidence = [...new Map(evidence.map((commit) => [commit.sha, commit])).values()].sort((a, b) => a.date.localeCompare(b.date));
+				return {
+					name: objective.name,
+					progress: Math.round((score / objective.deliverables.length) * 100),
+					start: uniqueEvidence[0]?.date ?? '',
+					end: uniqueEvidence.at(-1)?.date ?? '',
+					deliverables: objective.deliverables,
+					evidence: uniqueEvidence,
+				};
+			}),
 		};
-	});
-	const allDates = historyCommits.map((commit) => commit.date).sort();
-	if (!allDates.length) throw new Error('The requested refs contain no Git history for the Big Five assessment.');
-	return {
-		title: plan.title ?? 'Big Five progress across full Git history',
-		source: plan.source,
-		start: allDates[0],
-		end: report.until.slice(0, 10),
-		asOf: report.until.slice(0, 10),
-		outcome: 'Progress is measured by expected deliverables supported in full Git history.',
-		progressBasis: 'Complete = 100%; partial = 50%; no Git evidence = 0% evidenced, not proof of no work.',
-		historyCount: historyCommits.length,
-		milestones,
-	};
-}
-
-/**
- *
- * @param deck
- * @param section
- * @param colors
- * @param page
- * @param sources
- */
-function addPlanSlide(deck, section, colors, page, sources) {
-	const plan = section.plan;
-	const slide = deck.slides.add();
-	slide.background.fill = colors.surface;
-	header(slide, `${section.name} · 90-day action plan`, page, colors);
-	const elapsed = planDay(plan.asOf, plan);
-	addText(slide, plan.outcome, { left: 58, top: 140, width: 1120, height: 46 }, { fontSize: 20, color: colors.muted, maxChars: 120 }, `plan-outcome-${page}`);
-	addText(slide, `Last week said: ${plan.previousObjective}`, { left: 58, top: 202, width: 1120, height: 20 }, { fontSize: 15, color: colors.muted, maxChars: 112 }, `plan-previous-objective-${page}`);
-	addText(
-		slide,
-		`${plan.scheduleLabel ?? 'Indicative weeks 1–12'} · ${plan.start} → ${plan.end} · as of ${plan.asOf} · day ${elapsed} of 90`,
-		{ left: 58, top: 230, width: 760, height: 20 },
-		{ fontSize: 15, color: colors.text, maxChars: 100 },
-		`plan-window-${page}`,
-	);
-	if (plan.progressBasis) addText(slide, plan.progressBasis, { left: 58, top: 258, width: 1120, height: 20 }, { fontSize: 13, color: colors.muted, maxChars: 120 }, `plan-basis-${page}`);
-	const labelLeft = 58;
-	const chartLeft = 404;
-	const chartWidth = 790;
-	const chartTop = 290;
-	const laneHeight = 48;
-	const marker = chartLeft + (elapsed / 90) * chartWidth;
-	['DAY 1', 'DAY 30', 'DAY 60', 'DAY 90'].forEach((label, i) => {
-		const x = chartLeft + (i / 3) * chartWidth;
-		rule(slide, x, chartTop - 12, 1, colors.rule, `plan-grid-${page}-${i}`);
-		addText(
-			slide,
-			label,
-			{ left: x - (i === 3 ? 38 : 0), top: chartTop - 38, width: 44, height: 16 },
-			{ fontSize: 11, color: colors.muted, maxChars: 6, alignment: i === 3 ? 'right' : 'left' },
-			`plan-axis-${page}-${i}`,
-		);
-	});
-	plan.milestones.forEach((milestone, i) => {
-		const top = chartTop + i * laneHeight;
-		const start = planDay(milestone.start, plan);
-		const end = planDay(milestone.end, plan);
-		const left = chartLeft + (start / 90) * chartWidth;
-		const width = Math.max(12, ((end - start) / 90) * chartWidth);
-		addText(slide, milestone.name, { left: labelLeft, top: top + 7, width: 320, height: 20 }, { fontSize: 16, color: colors.text, maxChars: 40 }, `plan-name-${page}-${i}`);
-		addText(slide, `${milestone.progress}%`, { left: 338, top: top + 7, width: 48, height: 20 }, { fontSize: 14, color: colors.muted, alignment: 'right', maxChars: 4 }, `plan-progress-${page}-${i}`);
-		rect(slide, { left, top: top + 6, width, height: 20 }, colors.tone, colors.rule, `plan-track-${page}-${i}`);
-		rect(slide, { left, top: top + 6, width: Math.max(2, width * (milestone.progress / 100)), height: 20 }, colors.secondary, 'none', `plan-complete-${page}-${i}`);
-	});
-	rule(slide, marker, chartTop - 52, 2, colors.secondary, `plan-asof-${page}`);
-	addText(slide, 'AS OF', { left: marker - 24, top: chartTop - 66, width: 50, height: 14 }, { fontSize: 10, color: colors.text, alignment: 'center', maxChars: 6 }, `plan-asof-label-${page}`);
-	addText(
-		slide,
-		plan.progressBasis ?? 'Progress key: 100 = complete in notes or closed PR · 50 = in progress or open PR · 0 = no verified completion',
-		{ left: 58, top: 610, width: 820, height: 18 },
-		{ fontSize: 13, color: colors.muted, maxChars: 120 },
-		`plan-legend-${page}`,
-	);
-	footer(slide, `Planning context only · ${plan.source.split(' · https://')[0]}`, page, colors);
-	notes(slide, [...sources, plan.source, ...plan.milestones.map((milestone) => `${milestone.name}: ${milestone.evidence}`)]);
-}
-
-/**
- *
- * @param deck
- * @param section
- * @param colors
- * @param page
- * @param sources
- */
-function addMeetingSlide(deck, section, colors, page, sources) {
-	const meeting = section.meeting;
-	const slide = deck.slides.add();
-	slide.background.fill = colors.surface;
-	header(slide, meeting.title ?? `${section.name} · meeting notes`, page, colors);
-	meeting.columns.forEach((column, i) => {
-		const left = 58 + (i % 2) * 582;
-		const top = 164 + Math.floor(i / 2) * 226;
-		card(slide, { left, top, width: 556, height: 192 }, colors, `meeting-${page}-${i}`, i === 0 ? colors.tone : colors.surface);
-		addText(slide, column.title, { left: left + 24, top: top + 20, width: 500, height: 22 }, { fontSize: 20, color: colors.text, maxChars: 34 }, `meeting-title-${page}-${i}`);
-		addText(slide, column.body.join('\n'), { left: left + 24, top: top + 58, width: 500, height: 112 }, { fontSize: 16, color: colors.muted, maxChars: 58 }, `meeting-body-${page}-${i}`);
-	});
-	footer(slide, meeting.footer ?? 'Meeting notes provide context; GitHub and Git remain the delivery evidence.', page, colors);
-	notes(slide, [...sources, ...(meeting.sources ?? [])]);
-}
-
-/**
- *
- * @param deck
- * @param section
- * @param goal
- * @param colors
- * @param page
- * @param sources
- */
-function addContributorSummary(deck, section, goal, colors, page, sources) {
-	const slide = deck.slides.add();
-	slide.background.fill = colors.surface;
-	header(slide, `${section.name} · summary`, page, colors);
-	const identity = section.name.includes('bot') ? 'Automated Git identity' : section.name.includes('unverified') ? 'Unverified Git identity' : 'Recorded Git identity';
-	addText(
-		slide,
-		`${section.commitCount} non-merge commits · ${identity}`,
-		{ left: 58, top: 158, width: 1120, height: 30 },
-		{ fontSize: 20, color: colors.muted, maxChars: 74 },
-		`contribution-meta-${page}`,
-	);
-	const outcomes = section.slides.flatMap((i) => i.bullets ?? []).slice(0, 6);
-	const body = outcomes.length ? wrapLines(outcomes.join('\n'), 64) : '• No contribution detail was supplied for this identity.';
-	card(slide, { left: 58, top: 214, width: 680, height: 332 }, colors, `contribution-outcomes-${page}`);
-	addText(slide, 'Recorded outcomes', { left: 84, top: 238, width: 600, height: 26 }, { fontSize: 20, color: colors.text, maxChars: 34 }, `contribution-heading-${page}`);
-	addText(slide, body, { left: 84, top: 282, width: 600, height: 230 }, { fontSize: 17, color: colors.text, maxChars: 66 }, `contribution-body-${page}`);
-	card(slide, { left: 770, top: 214, width: 452, height: 332 }, colors, `contribution-goal-${page}`, colors.tone);
-	addText(
-		slide,
-		goal?.person ? `Stated goal · ${goal.person}` : 'Goal match',
-		{ left: 796, top: 238, width: 400, height: 26 },
-		{ fontSize: 20, color: colors.text, maxChars: 34 },
-		`contribution-goal-heading-${page}`,
-	);
-	addText(
-		slide,
-		wrapLines(goal?.goal ?? 'No person-to-plan match is verified for this Git identity.', 44),
-		{ left: 796, top: 282, width: 400, height: 176 },
-		{ fontSize: 17, color: colors.text, maxChars: 44 },
-		`contribution-goal-body-${page}`,
-	);
-	addText(slide, goal?.status ?? 'Attribution not verified', { left: 796, top: 476, width: 400, height: 28 }, { fontSize: 15, color: colors.muted, maxChars: 44 }, `contribution-status-${page}`);
-	footer(slide, `${section.commitCount} commits · ${identity.toLowerCase()} · branch evidence only`, page, colors);
-	notes(slide, [...sources, ...(goal ? [`${goal.source} · ${goal.status}`] : []), ...section.slides.flatMap((i) => i.sources ?? [])]);
-}
-
-/**
- *
- * @param deck
- * @param goal
- * @param colors
- * @param page
- * @param sources
- */
-function addNoCommitsSlide(deck, goal, colors, page, sources) {
-	const slide = deck.slides.add();
-	slide.background.fill = colors.surface;
-	header(slide, `${goal.person} · no attributed commits`, page, colors);
-	card(slide, { left: 58, top: 164, width: 720, height: 350 }, colors, `no-commits-${page}`);
-	addText(slide, 'Standard Git comparison', { left: 86, top: 190, width: 650, height: 28 }, { fontSize: 21, color: colors.text, maxChars: 38 }, `no-commits-heading-${page}`);
-	addText(
-		slide,
-		wrapLines(`Goal\n${goal.goal}\n\nGit status\n${goal.status}\n\nNo commits were attributed to this person during the reporting window.`, 66),
-		{ left: 86, top: 238, width: 650, height: 240 },
-		{ fontSize: 17, color: colors.text, maxChars: 66 },
-		`no-commits-body-${page}`,
-	);
-	card(slide, { left: 808, top: 164, width: 414, height: 350 }, colors, `no-commits-context-${page}`, colors.tone);
-	addText(slide, 'Evidence source', { left: 834, top: 190, width: 360, height: 28 }, { fontSize: 20, color: colors.text, maxChars: 32 }, `no-commits-source-heading-${page}`);
-	addText(slide, wrapLines(goal.source, 40), { left: 834, top: 238, width: 360, height: 180 }, { fontSize: 16, color: colors.muted, maxChars: 40 }, `no-commits-source-${page}`);
-	addText(
-		slide,
-		wrapLines('A missing commit does not establish whether the work happened.', 40),
-		{ left: 834, top: 438, width: 360, height: 54 },
-		{ fontSize: 15, color: colors.text, maxChars: 40 },
-		`no-commits-caveat-${page}`,
-	);
-	footer(slide, 'Git attribution comparison · no performance conclusion', page, colors);
-	notes(slide, [...sources, `${goal.source} · ${goal.status}`]);
-}
-
-/**
- *
- * @return
- */
-async function main() {
-	const historyCommits = parseHistoryCommits();
-	report.bigFive = assessBigFiveTimeline(report.bigFive, historyCommits);
-	const commits = parseCommits();
+	})();
+	const commits = git(['log', ...refs, `--since=${report.since}`, `--until=${report.until}`, '--no-merges', '--format=%H%x09%h%x09%aN%x09%aI%x09%s'])
+		.split('\n')
+		.filter(Boolean)
+		.map((line) => {
+			const [sha, short, author, authoredAt, ...subject] = line.split('\t');
+			return { sha, short, author, date: authoredAt.slice(0, 10), subject: subject.join('\t'), paths: git(['show', '--format=', '--name-only', sha]).split('\n').filter(Boolean) };
+		});
 	const mergeCount = Number(git(['rev-list', '--count', ...refs, `--since=${report.since}`, `--until=${report.until}`, '--merges']));
 	const counts = new Map(commits.map((commit) => [commit.author, commits.filter((other) => other.author === commit.author).length]));
-	const screenshotCount = report.contributors.flatMap((section) => section.slides).filter((i) => i.screenshot).length;
 	const sources = [
 		`Refs: ${refs.join(', ')}`,
 		`Window: ${report.since} through ${report.until} (${report.timezone})`,
@@ -739,32 +387,30 @@ async function main() {
 		const chartLeft = 404;
 		const chartWidth = 790;
 		const chartTop = 300;
-		const laneHeight = 54;
 		const rangeStart = new Date(`${plan.start}T00:00:00Z`).valueOf();
-		const rangeEnd = new Date(`${plan.end}T00:00:00Z`).valueOf();
-		const range = Math.max(1, rangeEnd - rangeStart);
+		const range = Math.max(1, new Date(`${plan.end}T00:00:00Z`).valueOf() - rangeStart);
 		/**
+		 * Maps a date to its horizontal position on the Big Five timeline.
 		 *
-		 * @param date
+		 * @param date Date to position, formatted as `YYYY-MM-DD`.
 		 *
-		 * @return
+		 * @return Horizontal coordinate within the chart.
 		 */
 		const timelineX = (date) => chartLeft + ((new Date(`${date}T00:00:00Z`).valueOf() - rangeStart) / range) * chartWidth;
 		const marker = timelineX(plan.asOf);
 		for (let index = 0; index <= 4; index += 1) {
 			const x = chartLeft + (index / 4) * chartWidth;
-			const date = new Date(rangeStart + (range * index) / 4).toISOString().slice(0, 4);
 			rule(slide, x, chartTop - 12, 1, colors.rule, `big-five-grid-${page}-${index}`);
 			addText(
 				slide,
-				date,
+				new Date(rangeStart + (range * index) / 4).toISOString().slice(0, 4),
 				{ left: x - (index === 4 ? 48 : 0), top: chartTop - 38, width: 56, height: 16 },
 				{ fontSize: 11, color: colors.muted, maxChars: 7, alignment: index === 4 ? 'right' : 'left' },
 				`big-five-axis-${page}-${index}`,
 			);
 		}
 		plan.milestones.forEach((milestone, i) => {
-			const top = chartTop + i * laneHeight;
+			const top = chartTop + i * 54;
 			addText(slide, wrapLines(milestone.name, 32), { left: 58, top: top + 5, width: 264, height: 38 }, { fontSize: 14, color: colors.text, maxChars: 32 }, `big-five-name-${page}-${i}`);
 			addText(
 				slide,
@@ -787,11 +433,14 @@ async function main() {
 			`big-five-legend-${page}`,
 		);
 		footer(slide, 'Git evidence measures what is in the repository; it does not prove work absent from Git.', page, colors);
-		const objectiveSources = plan.milestones.flatMap((milestone) => [
-			`${milestone.name}: ${milestone.deliverables.map((i) => `${i.name} — ${i.status}`).join('; ')}`,
-			...milestone.evidence.map((commit) => `${commit.sha} · ${commit.date} · ${commit.subject} · ${commit.paths.join(', ')}`),
+		notes(slide, [
+			...sources,
+			plan.source,
+			...plan.milestones.flatMap((milestone) => [
+				`${milestone.name}: ${milestone.deliverables.map((i) => `${i.name} — ${i.status}`).join('; ')}`,
+				...milestone.evidence.map((commit) => `${commit.sha} · ${commit.date} · ${commit.subject} · ${commit.paths.join(', ')}`),
+			]),
 		]);
-		notes(slide, [...sources, plan.source, ...objectiveSources]);
 		page += 1;
 	}
 	{
@@ -799,13 +448,12 @@ async function main() {
 		const slide = deck.slides.add();
 		slide.background.fill = colors.surface;
 		header(slide, report.overview.title, page, colors);
-		const metrics = [
+		[
 			[String(commits.length), 'non-merge commits'],
 			[String(counts.size), 'contributors'],
 			[String(mergeCount), 'merge commits'],
-			[String(screenshotCount), 'verified UI captures'],
-		];
-		metrics.forEach(([value, label], i) => {
+			[String(report.contributors.flatMap((section) => section.slides).filter((i) => i.screenshot).length), 'verified UI captures'],
+		].forEach(([value, label], i) => {
 			const left = 58 + i * 272;
 			addText(slide, value, { left, top: 168, width: 210, height: 54 }, { fontSize: 46, color: colors.text, maxChars: 5 }, `metric-${i}`);
 			addText(slide, label, { left, top: 226, width: 210, height: 20 }, { fontSize: 14, color: colors.muted, maxChars: 28 }, `metric-label-${i}`);
@@ -846,32 +494,183 @@ async function main() {
 	}
 	const sections = report.contributors;
 	const matchedSections = new Set();
-	const contributorSections = [
+	for (const { goal, section } of [
 		...orderedGoals.map((goal) => {
 			const section = sections.find((i) => i.name.toLowerCase() === goal.person.toLowerCase() || i.name.toLowerCase().startsWith(`${goal.person.toLowerCase()} `));
 			if (section) matchedSections.add(section);
 			return { goal, section };
 		}),
 		...sections.filter((section) => !matchedSections.has(section)).map((section) => ({ section })),
-	];
-	for (const { goal, section } of contributorSections) {
+	]) {
 		const colors = theme();
 		if (!section || section.commitCount <= 0) {
 			if (goal) {
-				addNoCommitsSlide(deck, goal, colors, page, sources);
+				const slide = deck.slides.add();
+				slide.background.fill = colors.surface;
+				header(slide, `${goal.person} · no attributed commits`, page, colors);
+				card(slide, { left: 58, top: 164, width: 720, height: 350 }, colors, `no-commits-${page}`);
+				addText(slide, 'Standard Git comparison', { left: 86, top: 190, width: 650, height: 28 }, { fontSize: 21, color: colors.text, maxChars: 38 }, `no-commits-heading-${page}`);
+				addText(
+					slide,
+					wrapLines(`Goal\n${goal.goal}\n\nGit status\n${goal.status}\n\nNo commits were attributed to this person during the reporting window.`, 66),
+					{ left: 86, top: 238, width: 650, height: 240 },
+					{ fontSize: 17, color: colors.text, maxChars: 66 },
+					`no-commits-body-${page}`,
+				);
+				card(slide, { left: 808, top: 164, width: 414, height: 350 }, colors, `no-commits-context-${page}`, colors.tone);
+				addText(slide, 'Evidence source', { left: 834, top: 190, width: 360, height: 28 }, { fontSize: 20, color: colors.text, maxChars: 32 }, `no-commits-source-heading-${page}`);
+				addText(slide, wrapLines(goal.source, 40), { left: 834, top: 238, width: 360, height: 180 }, { fontSize: 16, color: colors.muted, maxChars: 40 }, `no-commits-source-${page}`);
+				addText(
+					slide,
+					wrapLines('A missing commit does not establish whether the work happened.', 40),
+					{ left: 834, top: 438, width: 360, height: 54 },
+					{ fontSize: 15, color: colors.text, maxChars: 40 },
+					`no-commits-caveat-${page}`,
+				);
+				footer(slide, 'Git attribution comparison · no performance conclusion', page, colors);
+				notes(slide, [...sources, `${goal.source} · ${goal.status}`]);
 				page += 1;
 			}
 			continue;
 		}
 		if (section.meeting) {
-			addMeetingSlide(deck, section, colors, page, sources);
+			const meeting = section.meeting;
+			const slide = deck.slides.add();
+			slide.background.fill = colors.surface;
+			header(slide, meeting.title ?? `${section.name} · meeting notes`, page, colors);
+			meeting.columns.forEach((column, i) => {
+				const left = 58 + (i % 2) * 582;
+				const top = 164 + Math.floor(i / 2) * 226;
+				card(slide, { left, top, width: 556, height: 192 }, colors, `meeting-${page}-${i}`, i === 0 ? colors.tone : colors.surface);
+				addText(slide, column.title, { left: left + 24, top: top + 20, width: 500, height: 22 }, { fontSize: 20, color: colors.text, maxChars: 34 }, `meeting-title-${page}-${i}`);
+				addText(slide, column.body.join('\n'), { left: left + 24, top: top + 58, width: 500, height: 112 }, { fontSize: 16, color: colors.muted, maxChars: 58 }, `meeting-body-${page}-${i}`);
+			});
+			footer(slide, meeting.footer ?? 'Meeting notes provide context; GitHub and Git remain the delivery evidence.', page, colors);
+			notes(slide, [...sources, ...(meeting.sources ?? [])]);
 			page += 1;
 		}
-		if (validPlan(section.plan, section)) {
-			addPlanSlide(deck, section, colors, page, sources);
+		if (section.plan) {
+			const plan = section.plan;
+			if (![plan.source, plan.start, plan.end, plan.asOf, plan.outcome, plan.previousObjective].every((value) => typeof value === 'string' && value.length))
+				throw new Error(`${section.name}: plan requires source, start, end, asOf, outcome, and previousObjective.`);
+			if (!Array.isArray(plan.milestones) || !plan.milestones.length || plan.milestones.length > 6) throw new Error(`${section.name}: plan requires one to six milestones.`);
+			const planStart = new Date(`${plan.start}T00:00:00Z`);
+			const planEnd = new Date(`${plan.end}T00:00:00Z`);
+			const asOf = new Date(`${plan.asOf}T00:00:00Z`);
+			if ([planStart, planEnd, asOf].some((date) => Number.isNaN(date.valueOf())) || planStart >= planEnd || asOf < planStart || asOf > planEnd)
+				throw new Error(`${section.name}: plan start, end, and asOf must be ordered ISO dates.`);
+			for (const milestone of plan.milestones) {
+				if (![milestone.name, milestone.start, milestone.end, milestone.evidence].every((value) => typeof value === 'string' && value.length))
+					throw new Error(`${section.name}: each milestone requires name, start, end, and evidence.`);
+				if (!Number.isInteger(milestone.progress) || milestone.progress < 0 || milestone.progress > 100) throw new Error(`${section.name}: milestone progress must be an integer from 0 through 100.`);
+				const start = new Date(`${milestone.start}T00:00:00Z`);
+				const end = new Date(`${milestone.end}T00:00:00Z`);
+				if (Number.isNaN(start.valueOf()) || Number.isNaN(end.valueOf()) || start < planStart || end > planEnd || start >= end)
+					throw new Error(`${section.name}: milestone dates must sit within the plan window.`);
+			}
+			const slide = deck.slides.add();
+			slide.background.fill = colors.surface;
+			header(slide, `${section.name} · 90-day action plan`, page, colors);
+			const elapsed = planDay(plan.asOf, plan);
+			addText(slide, plan.outcome, { left: 58, top: 140, width: 1120, height: 46 }, { fontSize: 20, color: colors.muted, maxChars: 120 }, `plan-outcome-${page}`);
+			addText(
+				slide,
+				`Last week said: ${plan.previousObjective}`,
+				{ left: 58, top: 202, width: 1120, height: 20 },
+				{ fontSize: 15, color: colors.muted, maxChars: 112 },
+				`plan-previous-objective-${page}`,
+			);
+			addText(
+				slide,
+				`${plan.scheduleLabel ?? 'Indicative weeks 1–12'} · ${plan.start} → ${plan.end} · as of ${plan.asOf} · day ${elapsed} of 90`,
+				{ left: 58, top: 230, width: 760, height: 20 },
+				{ fontSize: 15, color: colors.text, maxChars: 100 },
+				`plan-window-${page}`,
+			);
+			if (plan.progressBasis) addText(slide, plan.progressBasis, { left: 58, top: 258, width: 1120, height: 20 }, { fontSize: 13, color: colors.muted, maxChars: 120 }, `plan-basis-${page}`);
+			const chartLeft = 404;
+			const chartWidth = 790;
+			const chartTop = 290;
+			const marker = chartLeft + (elapsed / 90) * chartWidth;
+			['DAY 1', 'DAY 30', 'DAY 60', 'DAY 90'].forEach((label, i) => {
+				const x = chartLeft + (i / 3) * chartWidth;
+				rule(slide, x, chartTop - 12, 1, colors.rule, `plan-grid-${page}-${i}`);
+				addText(
+					slide,
+					label,
+					{ left: x - (i === 3 ? 38 : 0), top: chartTop - 38, width: 44, height: 16 },
+					{ fontSize: 11, color: colors.muted, maxChars: 6, alignment: i === 3 ? 'right' : 'left' },
+					`plan-axis-${page}-${i}`,
+				);
+			});
+			plan.milestones.forEach((milestone, i) => {
+				const top = chartTop + i * 48;
+				const [start, end] = [planDay(milestone.start, plan), planDay(milestone.end, plan)];
+				const left = chartLeft + (start / 90) * chartWidth;
+				const width = Math.max(12, ((end - start) / 90) * chartWidth);
+				addText(slide, milestone.name, { left: 58, top: top + 7, width: 320, height: 20 }, { fontSize: 16, color: colors.text, maxChars: 40 }, `plan-name-${page}-${i}`);
+				addText(
+					slide,
+					`${milestone.progress}%`,
+					{ left: 338, top: top + 7, width: 48, height: 20 },
+					{ fontSize: 14, color: colors.muted, alignment: 'right', maxChars: 4 },
+					`plan-progress-${page}-${i}`,
+				);
+				rect(slide, { left, top: top + 6, width, height: 20 }, colors.tone, colors.rule, `plan-track-${page}-${i}`);
+				rect(slide, { left, top: top + 6, width: Math.max(2, width * (milestone.progress / 100)), height: 20 }, colors.secondary, 'none', `plan-complete-${page}-${i}`);
+			});
+			rule(slide, marker, chartTop - 52, 2, colors.secondary, `plan-asof-${page}`);
+			addText(slide, 'AS OF', { left: marker - 24, top: chartTop - 66, width: 50, height: 14 }, { fontSize: 10, color: colors.text, alignment: 'center', maxChars: 6 }, `plan-asof-label-${page}`);
+			addText(
+				slide,
+				plan.progressBasis ?? 'Progress key: 100 = complete in notes or closed PR · 50 = in progress or open PR · 0 = no verified completion',
+				{ left: 58, top: 610, width: 820, height: 18 },
+				{ fontSize: 13, color: colors.muted, maxChars: 120 },
+				`plan-legend-${page}`,
+			);
+			footer(slide, `Planning context only · ${plan.source.split(' · https://')[0]}`, page, colors);
+			notes(slide, [...sources, plan.source, ...plan.milestones.map((milestone) => `${milestone.name}: ${milestone.evidence}`)]);
 			page += 1;
 		}
-		addContributorSummary(deck, section, goal, colors, page, sources);
+		const slide = deck.slides.add();
+		slide.background.fill = colors.surface;
+		header(slide, `${section.name} · summary`, page, colors);
+		const identity = section.name.includes('bot') ? 'Automated Git identity' : section.name.includes('unverified') ? 'Unverified Git identity' : 'Recorded Git identity';
+		addText(
+			slide,
+			`${section.commitCount} non-merge commits · ${identity}`,
+			{ left: 58, top: 158, width: 1120, height: 30 },
+			{ fontSize: 20, color: colors.muted, maxChars: 74 },
+			`contribution-meta-${page}`,
+		);
+		const outcomes = section.slides.flatMap((i) => i.bullets ?? []).slice(0, 6);
+		card(slide, { left: 58, top: 214, width: 680, height: 332 }, colors, `contribution-outcomes-${page}`);
+		addText(slide, 'Recorded outcomes', { left: 84, top: 238, width: 600, height: 26 }, { fontSize: 20, color: colors.text, maxChars: 34 }, `contribution-heading-${page}`);
+		addText(
+			slide,
+			outcomes.length ? wrapLines(outcomes.join('\n'), 64) : '• No contribution detail was supplied for this identity.',
+			{ left: 84, top: 282, width: 600, height: 230 },
+			{ fontSize: 17, color: colors.text, maxChars: 66 },
+			`contribution-body-${page}`,
+		);
+		card(slide, { left: 770, top: 214, width: 452, height: 332 }, colors, `contribution-goal-${page}`, colors.tone);
+		addText(
+			slide,
+			goal?.person ? `Stated goal · ${goal.person}` : 'Goal match',
+			{ left: 796, top: 238, width: 400, height: 26 },
+			{ fontSize: 20, color: colors.text, maxChars: 34 },
+			`contribution-goal-heading-${page}`,
+		);
+		addText(
+			slide,
+			wrapLines(goal?.goal ?? 'No person-to-plan match is verified for this Git identity.', 44),
+			{ left: 796, top: 282, width: 400, height: 176 },
+			{ fontSize: 17, color: colors.text, maxChars: 44 },
+			`contribution-goal-body-${page}`,
+		);
+		addText(slide, goal?.status ?? 'Attribution not verified', { left: 796, top: 476, width: 400, height: 28 }, { fontSize: 15, color: colors.muted, maxChars: 44 }, `contribution-status-${page}`);
+		footer(slide, `${section.commitCount} commits · ${identity.toLowerCase()} · branch evidence only`, page, colors);
+		notes(slide, [...sources, ...(goal ? [`${goal.source} · ${goal.status}`] : []), ...section.slides.flatMap((i) => i.sources ?? [])]);
 		page += 1;
 		for (const item of section.slides) {
 			const slide = deck.slides.add();
@@ -881,9 +680,77 @@ async function main() {
 			addText(slide, item.heading, { left: 58, top: 252, width: 500, height: 24 }, { fontSize: 20, color: colors.text, maxChars: 44 }, `heading-${page}`);
 			addText(slide, item.bullets.join('\n'), { left: 58, top: 292, width: 500, height: 186 }, { fontSize: 17, color: colors.text, maxChars: 56 }, `bullets-${page}`);
 			let codeSource = '';
-			if (item.screenshot) codeSource = await addScreenshot(slide, item.screenshot, { left: 590, top: 164, width: 632, height: 390 }, colors, page);
-			else if (item.code) codeSource = addCode(slide, item.code, { left: 590, top: 164, width: 632, height: 412 }, colors);
-			else {
+			if (item.screenshot) {
+				const image = item.screenshot;
+				const position = { left: 590, top: 164, width: 632, height: 390 };
+				card(slide, position, colors, `screenshot-frame-${page}`, colors.tone);
+				slide.images.add({
+					blob: await fs.readFile(image.path),
+					contentType: 'image/png',
+					alt: image.alt,
+					fit: 'cover',
+					geometry: 'roundRect',
+					borderRadius: 12,
+					position: { left: position.left + 8, top: position.top + 8, width: position.width - 16, height: position.height - 16 },
+				});
+				codeSource = `${image.route} · ${image.path}`;
+			} else if (item.code) {
+				const codeInput = item.code;
+				const position = { left: 590, top: 164, width: 632, height: 412 };
+				const lines = git(['show', `${codeInput.sha}:${codeInput.path}`])
+					.split('\n')
+					.slice(codeInput.start - 1, codeInput.end)
+					.join('\n')
+					.split('\n')
+					.map((line) => line.replaceAll('\t', '    '));
+				const longest = Math.max(...lines.map((line) => line.length));
+				const fontSize = Math.max(8, Math.min(14, Math.floor((position.width - 36) / Math.max(1, longest * 0.58))));
+				if (fontSize === 8 && longest * 0.58 * fontSize > position.width - 36)
+					throw new Error(`Code excerpt ${codeInput.path}:${codeInput.start}-${codeInput.end} is too wide; use a wider layout or a narrower complete range.`);
+				const codeHeight = Math.min(position.height, Math.max(86, 62 + lines.length * Math.ceil(fontSize * 1.35)));
+				rect(slide, { ...position, height: codeHeight }, '#17251C', colors.rule, `code-${codeInput.sha}`);
+				addText(
+					slide,
+					`${codeInput.path} · ${codeInput.sha}`,
+					{ left: position.left + 18, top: position.top + 14, width: position.width - 36, height: 18 },
+					{ fontSize: 14, color: '#C7DDD0', maxChars: 85 },
+					`code-label-${codeInput.sha}`,
+				);
+				const shape = slide.shapes.add({
+					geometry: 'textbox',
+					name: `code-body-${codeInput.sha}`,
+					position: { left: position.left + 18, top: position.top + 44, width: position.width - 36, height: codeHeight - 56 },
+					fill: 'none',
+					line: { style: 'solid', fill: 'none', width: 0 },
+				});
+				shape.text.style = { fontSize, typeface: 'Menlo', alignment: 'left', verticalAlignment: 'top', wrap: 'none', autoFit: 'none', insets: { top: 0, right: 0, bottom: 0, left: 0 } };
+				shape.text = lines.map((line) => {
+					const runs = [];
+					let last = 0;
+					for (const match of line.matchAll(
+						/(\/\/.*$|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|`(?:\\.|[^`\\])*`|\b(?:const|let|var|function|return|if|else|try|catch|async|await|export|from|import|new|throw|type|interface|extends|as|typeof|true|false|null|undefined)\b|\b\d+(?:\.\d+)?\b|[A-Za-z_$][\w$]*|[{}()]|\[|\]|[.,;:=<>!?+*-]|\x2f)/g,
+					)) {
+						if (match.index > last) runs.push({ run: line.slice(last, match.index), textStyle: { color: LIGHT, fill: LIGHT } });
+						const token = match[0];
+						const color = token.startsWith('//')
+							? '#7FA18B'
+							: /^['"`]/.test(token)
+								? '#F6C177'
+								: /^(const|let|var|function|return|if|else|try|catch|async|await|export|from|import|new|throw|type|interface|extends|as|typeof|true|false|null|undefined)$/.test(token)
+									? '#C7DDD0'
+									: /^\d/.test(token)
+										? '#F6C177'
+										: /^[A-Za-z_$]/.test(token)
+											? LIGHT
+											: '#AFC4B5';
+						runs.push({ run: token, textStyle: { color, fill: color } });
+						last = match.index + token.length;
+					}
+					if (last < line.length) runs.push({ run: line.slice(last), textStyle: { color: LIGHT, fill: LIGHT } });
+					return runs.length ? runs : [{ run: ' ', textStyle: { color: LIGHT, fill: LIGHT } }];
+				});
+				codeSource = `${codeInput.sha} · ${codeInput.path}:${codeInput.start}-${codeInput.end}`;
+			} else {
 				card(slide, { left: 590, top: 164, width: 632, height: 286 }, colors, `commit-panel-${page}`);
 				addText(slide, item.commitTrailTitle, { left: 620, top: 190, width: 540, height: 24 }, { fontSize: 20, color: colors.text, maxChars: 46 }, `trail-title-${page}`);
 				addText(slide, item.commitTrail.join('\n'), { left: 620, top: 236, width: 540, height: 170 }, { fontSize: 16, typeface: 'Menlo', color: colors.text, maxChars: 62 }, `trail-${page}`);
@@ -909,18 +776,10 @@ async function main() {
 		notes(slide, sources);
 		page += 1;
 	}
-	await fs.mkdir(outputDir, { recursive: true });
-	const pptx = await PresentationFile.exportPptx(deck);
-	await pptx.save(outputPath);
+	await fs.mkdir(outputPath.slice(0, outputPath.lastIndexOf('/')), { recursive: true });
+	await (await PresentationFile.exportPptx(deck)).save(outputPath);
 	console.log(JSON.stringify({ outputPath, slides: deck.slides.items.length, commits: commits.length, mergeCount }, null, 2));
-}
-if (!inputPath || !outputPath) throw new Error('Usage: generate-weekly-review.mjs <report.json> <output.pptx>');
-if (!refs.filter(Boolean).length) throw new Error('Provide report.ref or report.refs.');
-if (!report.bigFive)
-	throw new Error(
-		'A Big Five progress timeline is required. Assess every objective against the complete Git history on the requested refs through the report end date, then supply deliverable assessments with full commit SHAs.',
-	);
-main().catch((error) => {
+})().catch((error) => {
 	console.error(error);
 	process.exitCode = 1;
 });

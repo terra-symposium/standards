@@ -98,9 +98,7 @@ export const QUALITY_CAPABILITY_AUTOFIXES: readonly QualityAutofixName[] = [
 	'documentedCommands',
 ];
 
-/**
- *
- */
+/** Describes whether a language profile supports a capability and where it is implemented. */
 export type LanguageCapability = { status: 'supported' | 'not-applicable'; provider: string; reason?: string };
 
 /**
@@ -141,8 +139,6 @@ const NOT_APPLICABLE_CHECK_REASONS: Partial<Record<QualityCheckName, string>> = 
 	'ui-patterns': 'UI pattern analysis applies to JavaScript and TypeScript UI components.',
 	'ui-recommendations': 'UI recommendations analyze JavaScript and TypeScript UI components.',
 };
-const CHECKSTYLE_CONFIG = fileURLToPath(new URL('../../quality-configs/checkstyle.xml', import.meta.url));
-const PMD_CONFIG = fileURLToPath(new URL('../../quality-configs/pmd-rules.xml', import.meta.url));
 const NATIVE_CHECKS: Record<LanguageProfileId, Partial<Record<QualityCheckName, string>>> = {
 	c: {
 		document: 'Doxygen',
@@ -352,7 +348,7 @@ export const LANGUAGE_PROFILES: readonly { id: LanguageProfileId; sourceExtensio
 				name: 'java-checkstyle',
 				phase: 'Static quality',
 				command: 'checkstyle',
-				args: ['-c', CHECKSTYLE_CONFIG, '{files}'],
+				args: ['-c', fileURLToPath(new URL('../../quality-configs/checkstyle.xml', import.meta.url)), '{files}'],
 				qualityChecks: ['document', 'import', 'name', 'lint'],
 				tool: {
 					command: 'checkstyle',
@@ -365,7 +361,7 @@ export const LANGUAGE_PROFILES: readonly { id: LanguageProfileId; sourceExtensio
 				name: 'java-pmd',
 				phase: 'Static quality',
 				command: 'pmd',
-				args: ['check', '-d', '{files}', '-R', PMD_CONFIG, '-f', 'text'],
+				args: ['check', '-d', '{files}', '-R', fileURLToPath(new URL('../../quality-configs/pmd-rules.xml', import.meta.url)), '-f', 'text'],
 				qualityChecks: ['import', 'name', 'performance-patterns', 'lint', 'dead-code', 'security'],
 				tool: { command: 'pmd', versionArgs: ['--version'], minimumVersion: [7, 0, 0], install: 'Install PMD 7 or add the PMD Maven/Gradle plugin to the repository.' },
 			},
@@ -495,8 +491,11 @@ export function resolveLanguageProfiles(cfg: QualityCfg): LanguageProfileResolut
 	for (const profileId of cfg.languageProfiles ?? []) {
 		const profile = LANGUAGE_PROFILES.find((candidate) => candidate.id === profileId);
 		if (!profile) continue;
-		const skippedDirs = new Set([...(cfg.skippedDirectories ?? []), '.venv', 'venv', '__pycache__', '.tox', '.ruff_cache', '.pytest_cache', '.gradle', 'target', 'vendor', 'generated', 'out']);
-		const sourceFiles = srcFiles({ ...cfg, extensions: profile.sourceExtensions, skippedDirectories: [...skippedDirs] });
+		const sourceFiles = srcFiles({
+			...cfg,
+			extensions: profile.sourceExtensions,
+			skippedDirectories: [...new Set([...(cfg.skippedDirectories ?? []), '.venv', 'venv', '__pycache__', '.tox', '.ruff_cache', '.pytest_cache', '.gradle', 'target', 'vendor', 'generated', 'out'])],
+		});
 		if (!sourceFiles.length) {
 			for (const check of profile.checks) result.skipped.push({ name: check.name, profileId, reason: `no ${profileId} source files were found` });
 			continue;
@@ -512,8 +511,7 @@ export function resolveLanguageProfiles(cfg: QualityCfg): LanguageProfileResolut
 				result.skipped.push({ name: check.name, profileId, reason: 'no files matched this check' });
 				continue;
 			}
-			const args = check.args.flatMap((argument) => (argument === '{files}' ? files : argument === '{files-comma}' ? [files.join(',')] : [argument]));
-			result.checks.push({ ...check, args, profileId, files });
+			result.checks.push({ ...check, args: check.args.flatMap((argument) => (argument === '{files}' ? files : argument === '{files-comma}' ? [files.join(',')] : [argument])), profileId, files });
 		}
 	}
 	// Documentation coverage applies to every discovered supported language, even when its full profile is not selected.
@@ -528,8 +526,12 @@ export function resolveLanguageProfiles(cfg: QualityCfg): LanguageProfileResolut
 					continue;
 				}
 				const checkFiles = check.fileExtensions ? files.filter((file) => check.fileExtensions!.some((extension) => file.endsWith(extension))) : files;
-				const args = check.args.flatMap((argument) => (argument === '{files}' ? checkFiles : argument === '{files-comma}' ? [checkFiles.join(',')] : [argument]));
-				result.checks.push({ ...check, args, profileId: profile.id, files: checkFiles });
+				result.checks.push({
+					...check,
+					args: check.args.flatMap((argument) => (argument === '{files}' ? checkFiles : argument === '{files-comma}' ? [checkFiles.join(',')] : [argument])),
+					profileId: profile.id,
+					files: checkFiles,
+				});
 			}
 		}
 	}
@@ -561,37 +563,16 @@ export function inspectLanguageProfileTool(tool: LanguageProfileTool, cwd: strin
 	const result = spawnSync(tool.command, tool.versionArgs, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
 	if (result.error) return { error: `Required tool "${tool.command}" is unavailable. ${tool.install}` };
 	if (result.status !== 0) return { error: `Could not read the version of "${tool.command}". ${tool.install}` };
-	const output = `${result.stdout ?? ''}\n${result.stderr ?? ''}`;
-	const detected = parseVersion(output);
+	const detected = `${result.stdout ?? ''}\n${result.stderr ?? ''}`
+		.match(/(?:^|\D)(\d+)\.(\d+)(?:\.(\d+))?/u)
+		?.slice(1)
+		.map((part) => Number(part ?? 0)) as [number, number, number] | undefined;
 	if (!detected) return { error: `Could not parse the version reported by "${tool.command}". ${tool.install}` };
-	if (compVersions(detected, tool.minimumVersion) < 0) return { error: `"${tool.command}" ${detected.join('.')} is below the supported minimum ${tool.minimumVersion.join('.')}. ${tool.install}` };
+	if (
+		detected[0] < tool.minimumVersion[0] ||
+		(detected[0] === tool.minimumVersion[0] && detected[1] < tool.minimumVersion[1]) ||
+		(detected[0] === tool.minimumVersion[0] && detected[1] === tool.minimumVersion[1] && detected[2] < tool.minimumVersion[2])
+	)
+		return { error: `"${tool.command}" ${detected.join('.')} is below the supported minimum ${tool.minimumVersion.join('.')}. ${tool.install}` };
 	return { version: detected.join('.') };
-}
-
-/**
- * Extracts a three-part version from native tool output.
- *
- * @param output Combined version command output.
- *
- * @return Parsed numeric version, or `undefined` when output has no semantic version.
- */
-function parseVersion(output: string): [number, number, number] | undefined {
-	const match = output.match(/(?:^|\D)(\d+)\.(\d+)(?:\.(\d+))?/u);
-	if (!match) return undefined;
-	return [Number(match[1]), Number(match[2]), Number(match[3] ?? 0)];
-}
-
-/**
- * Compares a detected semantic version against a profile's minimum version.
- *
- * @param detected Version returned by a tool.
- * @param minimum Minimum supported profile version.
- *
- * @return Negative, zero, or positive according to version ordering.
- */
-function compVersions(detected: [number, number, number], minimum: [number, number, number]): number {
-	for (let index = 0; index < detected.length; index++) {
-		if (detected[index] !== minimum[index]) return detected[index]! - minimum[index]!;
-	}
-	return 0;
 }

@@ -3,15 +3,28 @@
  * Animates a quality check while synchronous work blocks the runner's main thread.
  */
 
-import { writeSync } from 'node:fs';
+/*//////////////////////////////////////////////////
+IMPORTS
+//////////////////////////////////////////////////*/
+
+// API
 import { workerData } from 'node:worker_threads';
+import { writeSync } from 'node:fs';
+
+/*//////////////////////////////////////////////////
+CONFIG
+//////////////////////////////////////////////////*/
 
 const { label, sharedBuffer } = workerData as { label: string; sharedBuffer: SharedArrayBuffer };
 const state = new Int32Array(sharedBuffer);
 const frames = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
-let frame = 0;
 
-/** Draws the next spinner frame until the parent stops the check.
+/*//////////////////////////////////////////////////
+HELPERS
+//////////////////////////////////////////////////*/
+
+/**
+ * Draws the next spinner frame until the parent stops the check.
  *
  * @return Nothing; frames are written directly to standard error.
  */
@@ -22,10 +35,9 @@ function draw(): void {
 		Atomics.notify(state, 2);
 		return;
 	}
-	writeSync(2, `\r  ${frames[frame++ % frames.length]} ${label}`);
+	writeSync(2, `\r  ${frames[Atomics.add(state, 3, 1) % frames.length]} ${label}`);
 	Atomics.store(state, 1, 1);
 	Atomics.notify(state, 1);
 	setTimeout(draw, 90);
 }
-
 draw();

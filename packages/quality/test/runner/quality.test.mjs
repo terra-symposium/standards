@@ -26,13 +26,13 @@ import { DOCUMENTATION_DESCRIPTION_NOTICE } from '../../dist/index.js';
 /**
  * Creates a fresh pattern for finding the HELPERS section label.
  *
- * @return
+ * @return A fresh global regular expression for the section label.
  */
 const NHELPERS_N_G_REGEX = () => /\nHELPERS\n/g;
 /**
  * Creates a fresh pattern for finding the COMPONENTS section label.
  *
- * @return
+ * @return A fresh global regular expression for the section label.
  */
 const NCOMPONENTS_N_G_REGEX = () => /\nCOMPONENTS\n/g;
 afterEach(() => {

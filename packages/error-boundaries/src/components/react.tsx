@@ -36,11 +36,11 @@ HELPERS
  */
 export function withErrorBoundary<P extends object>(ComponentToWrap: React.ComponentType<P>, name: string, onErr?: ErrorReporter): React.ComponentType<P> {
 	/**
-	 * Renders the wrapped component inside the configured boundary.
+	 * Renders the wrapped component inside a boundary configured with the supplied metadata.
 	 *
 	 * @param props Props forwarded unchanged to the wrapped component.
 	 *
-	 * @return The wrapped component as a React element under the error boundary.
+	 * @returns The wrapped component as a React element under the error boundary.
 	 */
 	function BoundedComponent(props: P): React.JSX.Element {
 		return (
@@ -57,32 +57,36 @@ export function withErrorBoundary<P extends object>(ComponentToWrap: React.Compo
 export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
 	state: ErrorBoundaryState = { error: null };
 	/**
+	 * Stores a descendant render error in boundary state so rendering switches to its fallback.
 	 *
-	 * @param err
+	 * @param err The render error caught by the boundary.
 	 *
-	 * @return
+	 * @returns The next state containing the render error.
 	 */
 	static getDerivedStateFromError(err: Error): ErrorBoundaryState {
 		return { error: err };
 	}
 	/**
+	 * Reports a caught descendant render error with the boundary name and component stack.
 	 *
-	 * @param err
-	 * @param info
+	 * @param err The render error caught by the boundary.
+	 * @param info React metadata for the failed descendant component.
 	 */
 	componentDidCatch(err: Error, info: React.ErrorInfo): void {
 		this.props.onError?.(err, { name: this.props.name ?? 'Component', componentStack: info.componentStack ?? null });
 	}
 	/**
+	 * Clears a stored render error when the reset key changes.
 	 *
-	 * @param prev
+	 * @param prev The boundary props from the previous render.
 	 */
 	componentDidUpdate(prev: ErrorBoundaryProps): void {
 		if (prev.resetKey !== this.props.resetKey && this.state.error) this.setState({ error: null });
 	}
 	/**
+	 * Renders children normally, or the configured fallback or default alert after an error.
 	 *
-	 * @return
+	 * @returns The boundary's children or error fallback.
 	 */
 	render(): React.ReactNode {
 		if (!this.state.error) return this.props.children;

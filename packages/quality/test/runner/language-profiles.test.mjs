@@ -277,10 +277,11 @@ test('profile defaults can be overridden while arbitrary language commands remai
 	fixtureFile(root, 'src/app.py', 'print("ready")\n');
 	const marker = join(root, 'commands.txt');
 	/**
+	 * Builds Node arguments that append a phase to the fixture marker.
 	 *
-	 * @param phase
+	 * @param phase Name of the configured command phase.
 	 *
-	 * @return
+	 * @return Arguments for the Node process.
 	 */
 	const append = (phase) => ['-e', `require('node:fs').appendFileSync(${JSON.stringify(marker)}, ${JSON.stringify(`${phase}\n`)})`];
 	const cfg = createQualityCfg({

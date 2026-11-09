@@ -34,8 +34,9 @@ REGEX
 
 const UNKNOWN_QUALITY_CLI_ARGUMENT_REGEX = /Unknown quality CLI argument/;
 /**
+ * Creates a fresh global pattern for locating the `RecordData` type import.
  *
- * @return
+ * @return A global regular expression that matches the import statement.
  */
 const IMPORT_TYPE_RECORDDATA_FROM_TYPES_G_REGEX = () => /import type \{ RecordData \} from '\.\/types';/g;
 const REPORTER_PLAYWRIGHT_REPORTER_JS_U_REGEX = /^--reporter=.*playwright-reporter\.js$/u;
@@ -270,11 +271,12 @@ test('full quality continues after failed scripts and prints their details under
 	const root = fixtureRoot('terra-quality-cli-continue-failures-');
 	const marker = join(root, 'ran.txt');
 	/**
+	 * Builds a Node command that records a message and exits with the requested status.
 	 *
-	 * @param message
-	 * @param exitCode
+	 * @param message Text appended to the fixture marker.
+	 * @param exitCode Process exit status for the command.
 	 *
-	 * @return
+	 * @return Command and arguments for the quality command fixture.
 	 */
 	const cmd = (message, exitCode = 1) => ({
 		command: process.execPath,
@@ -398,11 +400,12 @@ test('full quality orders phases, groups suites, de-duplicates invocations, and 
 	);
 	fixtureFile(root, 'bin/node', `#!/bin/sh\nprintf '%s\\n' "$@" > ${JSON.stringify(nodeArgsMarker)}\nprintf 'unit-node\\n' >> ${JSON.stringify(marker)}\n`, 0o755);
 	/**
+	 * Builds a Node command that records a label and can report failure.
 	 *
-	 * @param label
-	 * @param failure
+	 * @param label Text appended to the fixture marker.
+	 * @param failure Whether the command should exit unsuccessfully.
 	 *
-	 * @return
+	 * @return Command and arguments for the quality command fixture.
 	 */
 	const recorded = (label, failure = false) => ({
 		command: process.execPath,
@@ -837,10 +840,11 @@ export type Result = RecordData;
 		`import { runQualityFromCfg } from ${JSON.stringify(runnerUrl)};\nawait runQualityFromCfg(new URL('./quality.json', import.meta.url).pathname, process.argv.slice(2));\n`,
 	);
 	/**
+	 * Runs the fixture quality script with the supplied CLI arguments.
 	 *
-	 * @param args
+	 * @param args Arguments passed to the quality script.
 	 *
-	 * @return
+	 * @return The synchronous child-process result.
 	 */
 	const runQuality = (...args) => spawnSync(process.execPath, [script, ...args], { cwd: root, encoding: 'utf8' });
 	const original = readFileSync(src, 'utf8');

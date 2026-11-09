@@ -74,7 +74,6 @@ by writing `arc.graph.arc`.
 `/dashboard/problem/<ref>` takes a **room id**, not a problem id. Open problems through the arc
 instead.
 
-
 ## Gotchas
 
 `--project=root-generation` without a file filter also runs `generation.spec.ts`. That brings in the
@@ -90,7 +89,6 @@ cover image, so treat that path as unsupported.
 
 `generation.spec.ts`'s `setupWorker` errors mention `tests/_config.json`. The real file is
 `scripts/generation/_config.json`.
-
 
 ## Checklist
 

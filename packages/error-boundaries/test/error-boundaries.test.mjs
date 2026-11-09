@@ -30,8 +30,9 @@ test('captures component metadata and exposes reset-key recovery state', () => {
 	assert.equal(
 		withErrorBoundary(
 			/**
+			 * Renders the simple panel used to verify the wrapper's display name.
 			 *
-			 * @return
+			 * @returns A div element representing the panel.
 			 */
 			function Panel() {
 				return React.createElement('div');

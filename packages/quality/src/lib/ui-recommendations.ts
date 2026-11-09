@@ -29,26 +29,6 @@ export type UiRecommendationSettings = { rules?: UiRecommendationRule[]; extensi
 
 /** A source location and the shared component that may replace its native JSX element. */
 export type UiComponentRecommendation = { file: string; line: number; column: number; element: string; component: string; import: string; variant?: string; reason: string };
-const DEFAULT_RULES: UiRecommendationRule[] = [
-	{ element: 'button', component: 'Button', import: '@/components/ui/button', reason: 'Use the shared button primitive to keep action variants and interaction states consistent.' },
-	{
-		element: 'input',
-		component: 'Input',
-		import: '@/components/ui/input',
-		types: ['date', 'datetime-local', 'email', 'file', 'month', 'number', 'password', 'search', 'tel', 'text', 'time', 'url', 'week'],
-		reason: 'Use the shared input primitive to keep control sizing, focus, and validation states consistent.',
-	},
-	{
-		element: 'input',
-		component: 'Button',
-		import: '@/components/ui/button',
-		types: ['button', 'reset', 'submit'],
-		reason: 'Use the shared button primitive for this input-based action while preserving its type.',
-	},
-	{ element: 'a', component: 'ButtonLink', import: '@/components/ui/button', when: 'button-like', reason: 'This action-styled link can use ButtonLink while retaining anchor navigation semantics.' },
-	{ element: 'a', component: 'ButtonLink', import: '@/components/ui/button', when: 'text-link', reason: 'This styled text link can use ButtonLink while retaining anchor navigation semantics.' },
-];
-const DEFAULT_EXTS = ['.astro', '.jsx', '.tsx'];
 
 /*//////////////////////////////////////////////////
 HELPERS
@@ -81,22 +61,6 @@ function staticAttrValue(attr: ts.JsxAttribute | undefined): string | undefined 
  */
 function jsxAttr(element: ts.JsxOpeningLikeElement, name: string): ts.JsxAttribute | undefined {
 	return element.attributes.properties.find((property): property is ts.JsxAttribute => ts.isJsxAttribute(property) && ts.isIdentifier(property.name) && property.name.text === name);
-}
-
-/**
- * Checks whether static anchor classes resemble an action control.
- *
- * @param value Static class attribute value.
- *
- * @return `true` when the link has button-like spacing and shape.
- */
-function isButtonLike(value: string | undefined): boolean {
-	const classes = new Set((value ?? '').split(S_U_REGEX).filter(Boolean));
-	const hasHorizontalPadding = [...classes].some((className) => /^px-/u.test(className));
-	const hasVerticalPadding = [...classes].some((className) => /^py-/u.test(className));
-	const hasShape = [...classes].some((className) => className === 'border' || className === 'inline-flex' || className === 'flex' || className.startsWith('rounded'));
-	const hasActionStyle = [...classes].some((className) => className === 'font-medium' || className === 'no-underline' || className.startsWith('bg-'));
-	return hasHorizontalPadding && hasVerticalPadding && hasShape && hasActionStyle;
 }
 
 /**
@@ -133,48 +97,6 @@ function staticClasses(element: ts.JsxOpeningLikeElement): string | undefined {
 	return staticAttrValue(jsxAttr(element, 'className')) ?? staticAttrValue(jsxAttr(element, 'class'));
 }
 
-/**
- * Checks whether a recommendation rule applies to one intrinsic JSX element.
- *
- * @param rule Configured replacement and conditions.
- * @param element JSX opening element to inspect.
- *
- * @return `true` when the rule's element, input type, and style conditions match.
- */
-function ruleMatches(rule: UiRecommendationRule, element: ts.JsxOpeningLikeElement): boolean {
-	const type = jsxAttr(element, 'type');
-	if (rule.types) {
-		const typeValue = type ? staticAttrValue(type) : 'text';
-		if (typeValue === undefined || !rule.types.includes(typeValue.toLowerCase())) return false;
-	}
-	if (rule.when === 'button-like') return isButtonLike(staticClasses(element));
-	if (rule.when === 'text-link') return Boolean(textLinkVariant(staticClasses(element)));
-	return true;
-}
-
-/**
- * Checks whether a source file belongs to a UI primitive implementation directory.
- *
- * @param file Repository-relative source path.
- * @param ignoredDirs Explicit repository-relative directories to skip.
- * @param ignoredFiles Explicit repository-relative files to skip.
- *
- * @return `true` when the file is an implementation or an explicitly skipped path.
- */
-function isIgnoredFile(file: string, ignoredDirs: string[], ignoredFiles: Set<string>): boolean {
-	const norm = file.replaceAll('\\', '/');
-	const segments = norm.split('/');
-	const primitiveDir = segments.some((segment, i) => segment === 'components' && segments[i + 1] === 'ui');
-	return (
-		primitiveDir ||
-		ignoredFiles.has(norm) ||
-		ignoredDirs.some((directory) => {
-			const prefix = directory.replaceAll('\\', '/').replace(/^\/+|\/+$/gu, '');
-			return prefix && (norm === prefix || norm.startsWith(`${prefix}/`));
-		})
-	);
-}
-
 /*//////////////////////////////////////////////////
 RECOMMENDATIONS
 //////////////////////////////////////////////////*/
@@ -191,44 +113,96 @@ RECOMMENDATIONS
  */
 export function uiComponentRecommendations(cfg: QualityCfg): UiComponentRecommendation[] {
 	const settings = cfg.uiRecommendations;
-	const rules = settings?.rules ?? DEFAULT_RULES;
-	const exts = settings?.extensions ?? DEFAULT_EXTS;
-	const ignoredFiles = new Set((settings?.ignoredFiles ?? []).map((file) => file.replaceAll('\\', '/')));
-	const findings: UiComponentRecommendation[] = [];
-	for (const file of srcFiles({ ...cfg, extensions: exts })) {
-		const relativeFile = displayPath(cfg, file).replaceAll('\\', '/');
-		if (isIgnoredFile(relativeFile, settings?.ignoredDirectories ?? [], ignoredFiles)) continue;
-		const source = readFileSync(file, 'utf8');
-		const scriptKind = file.endsWith('.jsx') ? ts.ScriptKind.JSX : ts.ScriptKind.TSX;
-		const parsed = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, scriptKind);
-		/**
-		 *
-		 * @param node
-		 */
-		const visit = (node: ts.Node): void => {
-			if ((ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) && ts.isIdentifier(node.tagName)) {
-				const element = node.tagName.text;
-				if (element === element.toLowerCase()) {
-					const rule = rules.find((candidate) => candidate.element === element && ruleMatches(candidate, node));
-					if (rule) {
-						const { line, character } = parsed.getLineAndCharacterOfPosition(node.getStart(parsed));
-						const variant = rule.variant ?? (element === 'a' && rule.when === 'text-link' ? textLinkVariant(staticClasses(node)) : undefined);
-						findings.push({
-							file: relativeFile,
-							line: line + 1,
-							column: character + 1,
-							element,
-							component: rule.component,
-							import: rule.import,
-							...(variant ? { variant } : {}),
-							reason: rule.reason ?? `Review whether this native <${element}> should use the shared ${rule.component} component.`,
+	return ((rules: UiRecommendationRule[], exts: string[], ignoredFiles: Set<string>) => {
+		const findings: UiComponentRecommendation[] = [];
+		for (const file of srcFiles({ ...cfg, extensions: exts })) {
+			const relativeFile = displayPath(cfg, file).replaceAll('\\', '/');
+			const pathSegments = relativeFile.split('/');
+			if (
+				pathSegments.some((segment, i) => segment === 'components' && pathSegments[i + 1] === 'ui') ||
+				ignoredFiles.has(relativeFile) ||
+				(settings?.ignoredDirectories ?? []).some((directory) => {
+					const prefix = directory.replaceAll('\\', '/').replace(/^\/+|\/+$/gu, '');
+					return prefix && (relativeFile === prefix || relativeFile.startsWith(`${prefix}/`));
+				})
+			)
+				continue;
+			const parsed = ts.createSourceFile(file, readFileSync(file, 'utf8'), ts.ScriptTarget.Latest, true, file.endsWith('.jsx') ? ts.ScriptKind.JSX : ts.ScriptKind.TSX);
+			const pending: ts.Node[] = [parsed];
+			while (pending.length) {
+				const currentNode = pending.pop()!;
+				if ((ts.isJsxOpeningElement(currentNode) || ts.isJsxSelfClosingElement(currentNode)) && ts.isIdentifier(currentNode.tagName)) {
+					const element = currentNode.tagName.text;
+					if (element === element.toLowerCase()) {
+						const rule = rules.find((candidate) => {
+							if (candidate.element !== element) return false;
+							if (candidate.types) {
+								if (jsxAttr(currentNode, 'type') && staticAttrValue(jsxAttr(currentNode, 'type')) === undefined) return false;
+								if (!candidate.types.includes(staticAttrValue(jsxAttr(currentNode, 'type'))?.toLowerCase() ?? 'text')) return false;
+							}
+							if (candidate.when === 'button-like') {
+								const classes = new Set((staticClasses(currentNode) ?? '').split(S_U_REGEX).filter(Boolean));
+								return (
+									[...classes].some((className) => /^px-/u.test(className)) &&
+									[...classes].some((className) => /^py-/u.test(className)) &&
+									[...classes].some((className) => className === 'border' || className === 'inline-flex' || className === 'flex' || className.startsWith('rounded')) &&
+									[...classes].some((className) => className === 'font-medium' || className === 'no-underline' || className.startsWith('bg-'))
+								);
+							}
+							if (candidate.when === 'text-link') return Boolean(textLinkVariant(staticClasses(currentNode)));
+							return true;
 						});
+						if (rule) {
+							const { line, character } = parsed.getLineAndCharacterOfPosition(currentNode.getStart(parsed));
+							const variant = rule.variant ?? (element === 'a' && rule.when === 'text-link' ? textLinkVariant(staticClasses(currentNode)) : undefined);
+							findings.push({
+								file: relativeFile,
+								line: line + 1,
+								column: character + 1,
+								element,
+								component: rule.component,
+								import: rule.import,
+								...(variant ? { variant } : {}),
+								reason: rule.reason ?? `Review whether this native <${element}> should use the shared ${rule.component} component.`,
+							});
+						}
 					}
 				}
+				const descendants: ts.Node[] = [];
+				ts.forEachChild(currentNode, (child) => {
+					descendants.push(child);
+				});
+				for (let index = descendants.length - 1; index >= 0; index--) pending.push(descendants[index]!);
 			}
-			ts.forEachChild(node, visit);
-		};
-		visit(parsed);
-	}
-	return findings.sort((a, b) => a.file.localeCompare(b.file) || a.line - b.line || a.column - b.column);
+		}
+		return findings.sort((a, b) => a.file.localeCompare(b.file) || a.line - b.line || a.column - b.column);
+	})(
+		settings?.rules ?? [
+			{ element: 'button', component: 'Button', import: '@/components/ui/button', reason: 'Use the shared button primitive to keep action variants and interaction states consistent.' },
+			{
+				element: 'input',
+				component: 'Input',
+				import: '@/components/ui/input',
+				types: ['date', 'datetime-local', 'email', 'file', 'month', 'number', 'password', 'search', 'tel', 'text', 'time', 'url', 'week'],
+				reason: 'Use the shared input primitive to keep control sizing, focus, and validation states consistent.',
+			},
+			{
+				element: 'input',
+				component: 'Button',
+				import: '@/components/ui/button',
+				types: ['button', 'reset', 'submit'],
+				reason: 'Use the shared button primitive for this input-based action while preserving its type.',
+			},
+			{
+				element: 'a',
+				component: 'ButtonLink',
+				import: '@/components/ui/button',
+				when: 'button-like',
+				reason: 'This action-styled link can use ButtonLink while retaining anchor navigation semantics.',
+			},
+			{ element: 'a', component: 'ButtonLink', import: '@/components/ui/button', when: 'text-link', reason: 'This styled text link can use ButtonLink while retaining anchor navigation semantics.' },
+		],
+		settings?.extensions ?? ['.astro', '.jsx', '.tsx'],
+		new Set((settings?.ignoredFiles ?? []).map((file) => file.replaceAll('\\', '/'))),
+	);
 }

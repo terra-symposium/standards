@@ -237,6 +237,8 @@ See [Terra conventions](references/conventions.md) for the repository-derived ru
 
 Compact every file in the requested scope until further reduction would hide intent or change behavior. For UI repositories, standardize shared component variants before compacting call sites.
 
+For a compaction request across multiple repositories, use the root-level [all-repos skill](../../../../../.agents/skills/all-repos/SKILL.md) to discover scope and launch one Cloud task per repository in parallel. Pass this complete Hygiene skill to each task and state the user's goal and stopping threshold; for example, “find and apply 3 additional behavior-preserving compaction changes per repository.” The coordinator handles discovery and dispatch; this skill's compaction workflow and each repository's own instructions govern the work in that repository.
+
 ### 1. Prepare the repository
 
 #### 1.1 Establish scope
