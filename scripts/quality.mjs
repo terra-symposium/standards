@@ -4,7 +4,7 @@ import { runQualityFromCfg } from '../packages/quality/dist/lib/runner.js';
 
 try {
 	await runQualityFromCfg(undefined, process.argv.slice(2));
-} catch (error) {
-	console.error(error instanceof Error ? error.message : String(error));
+} catch (err) {
+	console.error(err instanceof Error ? err.message : String(err));
 	process.exitCode = 1;
 }

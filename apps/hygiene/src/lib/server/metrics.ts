@@ -32,7 +32,6 @@ HELPERS
  * @returns Counts of individual passed, failed, and skipped testcases.
  */
 export function parseJUnit(xml: string): TestCounts {
-	const root = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '@_', allowBooleanAttributes: true }).parse(xml) as XmlNode;
 	const counts: TestCounts = { passed: 0, failed: 0, skipped: 0 };
 	function visit(value: unknown): void {
 		if (Array.isArray(value)) {
@@ -51,7 +50,7 @@ export function parseJUnit(xml: string): TestCounts {
 		if ('testsuite' in node) visit(node.testsuite);
 		if ('testsuites' in node) visit(node.testsuites);
 	}
-	visit(root);
+	visit(new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '@_', allowBooleanAttributes: true }).parse(xml) as XmlNode);
 	return counts;
 }
 

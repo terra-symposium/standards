@@ -102,11 +102,9 @@ export default async function handler(request: Request): Promise<Response> {
 		async () => {
 			if (kind === 'installation' || kind === 'installation_repositories') {
 				for (const repo of event.repositories ?? event.repositories_added ?? []) {
-					const owner = repositoryOwner(repo, event.installation?.account?.login);
-					await sql`INSERT INTO repositories (id, installation_id, owner, name, private, active) VALUES (${repo.id}, ${installationId}, ${owner}, ${repo.name}, ${repo.private}, true)
+					await sql`INSERT INTO repositories (id, installation_id, owner, name, private, active) VALUES (${repo.id}, ${installationId}, ${repositoryOwner(repo, event.installation?.account?.login)}, ${repo.name}, ${repo.private}, true)
             ON CONFLICT (id) DO UPDATE SET installation_id = excluded.installation_id, owner = excluded.owner, name = excluded.name, private = excluded.private, active = true, updated_at = now()`;
-					const defaultBranches = ['main', 'development'];
-					for (const branch of defaultBranches) await sql`INSERT INTO branches (repository_id, name) VALUES (${repo.id}, ${branch}) ON CONFLICT DO NOTHING`;
+					for (const branch of ['main', 'development']) await sql`INSERT INTO branches (repository_id, name) VALUES (${repo.id}, ${branch}) ON CONFLICT DO NOTHING`;
 				}
 				for (const repo of event.repositories_removed ?? []) await sql`UPDATE repositories SET active = false, updated_at = now() WHERE id = ${repo.id}`;
 				if (event.action === 'deleted') await sql`UPDATE repositories SET active = false, updated_at = now() WHERE installation_id = ${installationId}`;

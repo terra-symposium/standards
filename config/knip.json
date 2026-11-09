@@ -2,17 +2,22 @@
 	"$schema": "https://unpkg.com/knip@6/schema.json",
 	"ignore": ["config/eslint.config.mjs"],
 	"ignoreDependencies": ["pptxgenjs", "prettier"],
+	"ignoreBinaries": ["clang"],
 	"ignoreFiles": ["packages/*/dist/**"],
 	"ignoreIssues": { "packages/braces/lib/utils.js": ["exports"] },
 	"workspaces": {
+		".": {
+			"entry": ["scripts/quality.mjs"],
+			"project": ["scripts/**/*.mjs"]
+		},
 		"packages/error-boundaries": {
-			"entry": ["src/index.ts", "src/react.tsx", "src/astro.ts", "src/next.ts", "test/*.test.mjs"
+			"entry": ["src/index.ts", "src/components/react.tsx", "src/lib/astro.ts", "src/lib/astro-integration.ts", "src/lib/next.ts", "test/*.test.mjs"
 			],
 			"project": ["src/**/*.ts", "test/**/*.mjs"],
 			"ignoreDependencies": ["@types/react-dom", "react-dom"]
 		},
 		"packages/reporting": {
-			"entry": ["src/core.ts", "src/playwright.ts", "src/viewports.ts", "src/load-testing.ts", "src/spreadsheet.ts", "src/slideshow.ts", "src/metadata.ts", "test/*.test.mjs"],
+			"entry": ["src/index.ts", "src/lib/core.ts", "src/lib/playwright.ts", "src/lib/viewports.ts", "src/lib/load-testing.ts", "src/lib/spreadsheet.ts", "src/lib/slideshow.ts", "test/*.test.mjs"],
 			"project": ["src/**/*.ts", "test/**/*.mjs"]
 		},
 		"packages/testing": {
@@ -22,25 +27,27 @@
 		"packages/quality": {
 			"entry": [
 				"src/index.ts",
-				"src/runner.ts",
+				"src/lib/runner.ts",
+				"src/lib/dev.ts",
 				"src/app/workspace-test-runner.ts",
-				"src/naming.ts",
-				"src/object-forwarding.ts",
-				"src/single-use.ts",
-				"src/port.ts",
-				"src/history-report.ts",
+				"src/lib/error-boundaries-astro.ts",
+				"src/lib/error-boundaries-react.ts",
+				"src/lib/naming.ts",
+				"src/lib/object-forwarding.ts",
+				"src/lib/single-use.ts",
+				"src/lib/port.ts",
 				"test/**/*.test.mjs"
 			],
 			"project": ["src/**/*.ts", "test/**/*.mjs"]
 		},
 		"docs": {
-			"entry": ["src/pages/**/*.astro", "astro.config.mjs", "scripts/*.mjs"],
-			"project": ["src/**/*.astro", "src/**/*.tsx", "src/**/*.ts", "src/**/*.mdx", "scripts/**/*.mjs"],
+			"entry": ["src/pages/**/*.astro", "astro.config.mjs", "scripts/*.mjs", "agents/**/scripts/*.mjs"],
+			"project": ["src/**/*.astro", "src/**/*.tsx", "src/**/*.ts", "src/**/*.mdx", "scripts/**/*.mjs", "agents/**/scripts/**/*.mjs"],
 			"ignoreDependencies": ["@terra-symposium/styling"]
 		},
 		"apps/hygiene": {
-			"entry": ["src/pages/index.astro", "netlify/functions/*.mts", "scripts/*.ts", "test/*.test.ts"],
-			"project": ["src/**/*.ts", "src/**/*.tsx", "netlify/functions/**/*.mts", "scripts/**/*.ts", "test/**/*.ts"]
+			"entry": ["src/pages/index.astro", "config/**/*.mjs", "netlify/functions/*.mts", "scripts/*.ts", "test/*.test.ts"],
+			"project": ["src/**/*.ts", "src/**/*.tsx", "config/**/*.mjs", "netlify/functions/**/*.mts", "scripts/**/*.ts", "test/**/*.ts"]
 		}
 	}
 }

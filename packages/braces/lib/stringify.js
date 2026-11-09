@@ -6,11 +6,9 @@
 const utils = require('./utils');
 module.exports = (ast, options = {}) => {
 	const stringify = (node, parent = {}) => {
-		const invalidBlock = options.escapeInvalid && utils.isInvalidBrace(parent);
-		const invalidNode = node.invalid === true && options.escapeInvalid === true;
 		let output = '';
 		if (node.value) {
-			if ((invalidBlock || invalidNode) && utils.isOpenOrClose(node)) {
+			if (((options.escapeInvalid && utils.isInvalidBrace(parent)) || (node.invalid === true && options.escapeInvalid === true)) && utils.isOpenOrClose(node)) {
 				return '\\' + node.value;
 			}
 			return node.value;

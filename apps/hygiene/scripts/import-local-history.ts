@@ -13,7 +13,7 @@ import { db } from '../src/lib/server/db.js';
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { ingestHistoryReport } from '../src/lib/server/ingest.js';
+import { buildRunId, persistHistoryReport } from '../src/lib/server/ingest.js';
 import { parseHistoryReport } from '../src/lib/server/history.js';
 import { tmpdir } from 'node:os';
 
@@ -21,7 +21,6 @@ import { tmpdir } from 'node:os';
 CONFIG
 //////////////////////////////////////////////////*/
 
-const appRoot = resolve(fileURLToPath(new URL('..', import.meta.url)));
 const args = process.argv.slice(2);
 
 /*//////////////////////////////////////////////////
@@ -51,42 +50,34 @@ function option(name: string): string {
  * @returns Standard output without leading or trailing whitespace.
  */
 function git(root: string, args: string[]): string {
-	return execFileSync('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+	return execFileSync('git', args, {
+		cwd: root,
+		encoding: 'utf8',
+		stdio: ['ignore', 'pipe', 'pipe'],
+	}).trim();
 }
 
-/**
- * Extracts a normalized owner/name identifier from a GitHub remote URL.
- *
- * @param remote Git remote URL in HTTPS or SSH form.
- *
- * @returns Lowercase owner/name, or `null` when the URL is not a GitHub repository remote.
- */
-function githubRepo(remote: string): string | null {
-	const match = /(?:github\.com[:/])([^/]+\/[^/]+?)(?:\.git)?$/i.exec(remote);
-	return match?.[1]?.toLowerCase() ?? null;
-}
-
-/**
+/*
  * Imports local Git history for a repository and enabled branch.
  *
  * The script reads the local database configuration, builds a detached temporary
  * worktree at the branch head, ingests its history, and removes the worktree.
  */
-async function main(): Promise<void> {
-	const localEnv = resolve(appRoot, '.env.local');
+
+void (async (): Promise<void> => {
+	const localEnv = resolve(fileURLToPath(new URL('..', import.meta.url)), '.env.local');
 	if (existsSync(localEnv)) process.loadEnvFile(localEnv);
 	const repo = option('--repository');
 	const checkout = resolve(option('--checkout'));
 	const branch = option('--branch');
 	if (!/^[^/\s]+\/[^/\s]+$/.test(repo)) throw new Error('Repository must use owner/name format.');
 	if (!/^[A-Za-z0-9._/-]{1,100}$/.test(branch) || branch.includes('..') || branch.startsWith('/')) throw new Error('Invalid branch name.');
-	if (githubRepo(git(checkout, ['remote', 'get-url', 'origin'])) !== repo.toLowerCase()) throw new Error('Checkout origin does not match the requested GitHub repository.');
+	if (/(?:github\.com[:/])([^/]+\/[^/]+?)(?:\.git)?$/i.exec(git(checkout, ['remote', 'get-url', 'origin']))?.[1]?.toLowerCase() !== repo.toLowerCase())
+		throw new Error('Checkout origin does not match the requested GitHub repository.');
 	const sql = db();
-	const repoRows = await sql`SELECT id FROM repositories WHERE active AND lower(owner || '/' || name) = lower(${repo})`;
-	const repoRow = repoRows[0] as { id: number } | undefined;
+	const repoRow = (await sql`SELECT id FROM repositories WHERE active AND lower(owner || '/' || name) = lower(${repo})`)[0] as { id: number } | undefined;
 	if (!repoRow) throw new Error('Repository is not connected to this dashboard database.');
-	const branchRows = await sql`SELECT name FROM branches WHERE repository_id = ${repoRow.id} AND name = ${branch} AND enabled`;
-	if (!branchRows.length) throw new Error(`Branch ${branch} is not enabled for ${repo}.`);
+	if (!(await sql`SELECT name FROM branches WHERE repository_id = ${repoRow.id} AND name = ${branch} AND enabled`).length) throw new Error(`Branch ${branch} is not enabled for ${repo}.`);
 	let revision: string;
 	try {
 		revision = git(checkout, ['rev-parse', '--verify', `refs/remotes/origin/${branch}^{commit}`]);
@@ -97,8 +88,29 @@ async function main(): Promise<void> {
 	const worktree = join(temporaryRoot, basename(checkout) || 'checkout');
 	try {
 		git(checkout, ['worktree', 'add', '--detach', worktree, revision]);
-		const history = parseHistoryReport(createHistoryReport(worktree, { repository: repo, branch, baseSha: null }));
-		await ingestHistoryReport(repoRow.id, history);
+		const history = parseHistoryReport(
+			createHistoryReport(worktree, {
+				repository: repo,
+				branch,
+				baseSha: null,
+			}),
+		);
+		const report = parseHistoryReport(history);
+		const historySql = db();
+		const historyRepo = (await historySql`SELECT owner, name FROM repositories WHERE id = ${repoRow.id} AND active`)[0] as { owner: string; name: string } | undefined;
+		if (!historyRepo || `${historyRepo.owner}/${historyRepo.name}`.toLowerCase() !== report.repository.toLowerCase()) throw new Error('report does not match an active repository');
+		if (!(await historySql`SELECT name FROM branches WHERE repository_id = ${repoRow.id} AND name = ${report.branch} AND enabled`).length) throw new Error('branch is not enabled');
+		await persistHistoryReport(
+			repoRow.id,
+			buildRunId({
+				repository: report.repository,
+				branch: report.branch,
+				headSha: report.headSha,
+				completedAt: report.generatedAt,
+			}),
+			report,
+			report.generatedAt,
+		);
 		console.info(`Imported ${history.commits.length.toLocaleString()} commits for ${repo} (${branch}) through ${history.headSha.slice(0, 9)}.`);
 	} finally {
 		try {
@@ -108,8 +120,7 @@ async function main(): Promise<void> {
 		}
 		rmSync(temporaryRoot, { recursive: true, force: true });
 	}
-}
-main().catch((err: unknown) => {
+})().catch((err: unknown) => {
 	console.error(err instanceof Error ? err.message : 'Local history import failed.');
 	process.exitCode = 1;
 });

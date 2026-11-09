@@ -173,68 +173,65 @@ export const withResponsivePlaywright = <T extends PlaywrightTestConfig>(cfg: T,
 		path.resolve(process.cwd(), 'packages/reporting/dist'),
 	];
 	const sharedDist = sharedDistCandidates.find((c) => fs.existsSync(c)) || sharedDistCandidates[0];
-	const resolvedSharedDist = fs.existsSync(sharedDist) ? fs.realpathSync(sharedDist) : sharedDist;
-	const external = [...(cfg.build?.external || []), path.join(resolvedSharedDist, '**')];
 	const projects = (cfg.projects || []) as Array<{ dependencies?: readonly string[]; name?: string; testMatch?: unknown; grep?: unknown; use?: Record<string, unknown> }>;
-	const dependencyProjects = new Set(projects.flatMap((p) => p.dependencies || []));
-	const singleRun = new Set(opts.singleRunProjects || []);
-	/**
-	 * Identifies projects that should run once instead of expanding across viewports.
-	 *
-	 * @param project Playwright project whose dependencies and test pattern are inspected.
-	 * @param idx Project index used to create a stable fallback name.
-	 *
-	 * @return `true` when the project is setup-only and should not expand across viewports.
-	 */
-	const isSetup = (project: (typeof projects)[number], idx: number): boolean => {
-		const name = project.name || `project-${idx + 1}`;
-		const match = Array.isArray(project.testMatch) ? project.testMatch : [project.testMatch];
-		const matchText = match.map((e) => (e instanceof RegExp ? e.source : String(e || ''))).join(' ');
-		return dependencyProjects.has(name) || /setup/i.test(name) || /\.setup\.[cm]?[jt]sx?/i.test(matchText);
+	const projectPolicy = {
+		dependencies: new Set(projects.flatMap((project) => project.dependencies || [])),
+		singleRun: new Set(opts.singleRunProjects || []),
 	};
-	const responsiveProjects = projects.flatMap((p, i) => {
-		const baseName = p.name || `project-${i + 1}`;
-		if (isSetup(p, i) || singleRun.has(baseName)) return [p];
-		return viewports.map((v) => ({
-			...p,
-			name: visualProjectName(baseName, v, viewports),
-			...(opts.viewportPolicy === 'declared'
-				? {
-						grep: p.grep
-							? new RegExp(
-									`(?=[\\s\\S]*(?:${p.grep instanceof RegExp ? p.grep.source : p.grep}))(?=[\\s\\S]*@viewport:${v.name.replace(A_Z0_9_GI_REGEX(), '\\$&')}(?=\\s|$))`,
-									p.grep instanceof RegExp ? p.grep.flags : '',
-								)
-							: new RegExp(`(?:^|\\s)@viewport:${v.name.replace(A_Z0_9_GI_REGEX(), '\\$&')}(?=\\s|$)`),
-					}
-				: {}),
-			use: { ...(p.use || {}), viewport: { width: v.width, height: v.height }, screenshot: { mode: 'on', fullPage: true, caret: 'initial' } },
-		}));
-	});
-	const cfgdReporters = cfg.reporter ? (Array.isArray(cfg.reporter) ? cfg.reporter : [cfg.reporter]) : [];
-	const reportingOpts = {
-		viewportCatalog: opts.viewportCatalog,
-		outputRoot: opts.outputRoot,
-		screenshotsDirectory: opts.screenshotsDirectory,
-		supplementalResultsFile: opts.supplementalResultsFile,
-		qualityConfigFile: opts.qualityConfigFile,
-		loadTesting,
-		screenshotOnlySlideshow: opts.screenshotOnlySlideshow ?? process.env.TERRA_SCREENSHOT_ONLY_SLIDESHOW !== '0',
-	};
-	const reporters = [
-		...cfgdReporters.filter((r) => {
-			const name = Array.isArray(r) ? r[0] : r;
-			return !(typeof name === 'string' && name.includes('@terra-symposium/standards-reporting/playwright'));
-		}),
-		['@terra-symposium/standards-reporting/playwright', reportingOpts],
-	];
 	return {
 		...cfg,
 		metadata: { ...(cfg.metadata || {}), terraLoadTestingEnabled: loadTesting.enabled },
-		build: { ...(cfg.build || {}), external },
+		build: {
+			...(cfg.build || {}),
+			external: [...(cfg.build?.external || []), path.join(fs.existsSync(sharedDist) ? fs.realpathSync(sharedDist) : sharedDist, '**')],
+		},
 		outputDir: opts.outputDir || 'tests/results/playwright-output',
-		projects: responsiveProjects,
-		reporter: reporters,
+		projects: projects.flatMap((p, i) => {
+			const projectState = {
+				baseName: p.name || `project-${i + 1}`,
+				matchText: (Array.isArray(p.testMatch) ? p.testMatch : [p.testMatch]).map((entry) => (entry instanceof RegExp ? entry.source : String(entry || ''))).join(' '),
+			};
+			if (
+				projectPolicy.dependencies.has(projectState.baseName) ||
+				/setup/i.test(projectState.baseName) ||
+				/\.setup\.[cm]?[jt]sx?/i.test(projectState.matchText) ||
+				projectPolicy.singleRun.has(projectState.baseName)
+			)
+				return [p];
+			return viewports.map((v) => ({
+				...p,
+				name: visualProjectName(projectState.baseName, v, viewports),
+				...(opts.viewportPolicy === 'declared'
+					? {
+							grep: p.grep
+								? new RegExp(
+										`(?=[\\s\\S]*(?:${p.grep instanceof RegExp ? p.grep.source : p.grep}))(?=[\\s\\S]*@viewport:${v.name.replace(A_Z0_9_GI_REGEX(), '\\$&')}(?=\\s|$))`,
+										p.grep instanceof RegExp ? p.grep.flags : '',
+									)
+								: new RegExp(`(?:^|\\s)@viewport:${v.name.replace(A_Z0_9_GI_REGEX(), '\\$&')}(?=\\s|$)`),
+						}
+					: {}),
+				use: { ...(p.use || {}), viewport: { width: v.width, height: v.height }, screenshot: { mode: 'on', fullPage: true, caret: 'initial' } },
+			}));
+		}),
+		reporter: [
+			...(cfg.reporter ? (Array.isArray(cfg.reporter) ? cfg.reporter : [cfg.reporter]) : []).filter((r) => {
+				const name = Array.isArray(r) ? r[0] : r;
+				return !(typeof name === 'string' && name.includes('@terra-symposium/standards-reporting/playwright'));
+			}),
+			[
+				'@terra-symposium/standards-reporting/playwright',
+				{
+					viewportCatalog: opts.viewportCatalog,
+					outputRoot: opts.outputRoot,
+					screenshotsDirectory: opts.screenshotsDirectory,
+					supplementalResultsFile: opts.supplementalResultsFile,
+					qualityConfigFile: opts.qualityConfigFile,
+					loadTesting,
+					screenshotOnlySlideshow: opts.screenshotOnlySlideshow ?? process.env.TERRA_SCREENSHOT_ONLY_SLIDESHOW !== '0',
+				},
+			],
+		],
 		use: { ...(cfg.use || {}), screenshot: { mode: 'on', fullPage: true, caret: 'initial' } },
 	} as T;
 };

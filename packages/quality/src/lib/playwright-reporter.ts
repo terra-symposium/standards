@@ -22,7 +22,11 @@ type PlaywrightStatus = 'passed' | 'failed' | 'timedOut' | 'skipped' | 'interrup
 /**
  * Result data retained for one Playwright test attempt.
  */
-type PlaywrightTestResult = { status: PlaywrightStatus; retry: number; error?: { message?: string } };
+type PlaywrightTestResult = {
+	status: PlaywrightStatus;
+	retry: number;
+	error?: { message?: string };
+};
 /**
  * Structural test data needed to report progress without importing Playwright.
  */
@@ -38,36 +42,6 @@ type PlaywrightTestCase = {
 /*//////////////////////////////////////////////////
 HELPERS
 //////////////////////////////////////////////////*/
-
-/**
- * Resolves a completed Playwright test to one of the supported case statuses.
- *
- * @param test Playwright test case.
- * @param result Last result recorded for the test, if it ran.
- *
- * @return Normalized pass, fail, or skip status.
- */
-function qualityStatus(test: PlaywrightTestCase, result?: PlaywrightTestResult): 'PASS' | 'FAIL' | 'SKIP' {
-	if (!result || result.status === 'skipped' || test.expectedStatus === 'skipped') return 'SKIP';
-	const outcome = test.outcome?.();
-	if (outcome === 'skipped') return 'SKIP';
-	if (outcome === 'expected' || outcome === 'flaky') return 'PASS';
-	if (outcome === 'unexpected') return 'FAIL';
-	if (result.status === (test.expectedStatus ?? 'passed')) return 'PASS';
-	return result.status === 'passed' || result.status === 'failed' || result.status === 'timedOut' || result.status === 'interrupted' ? 'FAIL' : 'SKIP';
-}
-
-/**
- * Returns a stable display name for a test, including its suite path when present.
- *
- * @param test Playwright test case.
- *
- * @return A deterministic display name.
- */
-function testName(test: PlaywrightTestCase): string {
-	const titlePath = test.titlePath?.();
-	return titlePath?.length ? titlePath.join(' › ') : test.title;
-}
 
 /*//////////////////////////////////////////////////
 REPORTER
@@ -91,7 +65,12 @@ export default class QualityPlaywrightReporter {
 	 *
 	 * @param opts Optional sinks for output and progress.
 	 */
-	constructor(opts: { write?: (text: string) => void; writeProgress?: (text: string) => void } = {}) {
+	constructor(
+		opts: {
+			write?: (text: string) => void;
+			writeProgress?: (text: string) => void;
+		} = {},
+	) {
 		this.write = opts.write ?? ((text) => void process.stdout.write(text));
 		this.writeProgress = opts.writeProgress ?? ((text) => void process.stderr.write(text));
 	}
@@ -133,8 +112,7 @@ export default class QualityPlaywrightReporter {
 	 */
 	onTestEnd(test: PlaywrightTestCase, result: PlaywrightTestResult): void {
 		this.lastResults.set(test, result);
-		const canRetry = (result.status === 'failed' || result.status === 'timedOut') && result.retry < (test.retries ?? 0) && test.expectedStatus !== result.status;
-		if (!canRetry) this.finish(test);
+		if (!((result.status === 'failed' || result.status === 'timedOut') && result.retry < (test.retries ?? 0) && test.expectedStatus !== result.status)) this.finish(test);
 	}
 
 	/**
@@ -146,10 +124,28 @@ export default class QualityPlaywrightReporter {
 		const counts = { PASS: 0, FAIL: 0, SKIP: 0 };
 		for (const test of this.tests) {
 			const latestResult = this.lastResults.get(test) ?? test.results?.at(-1);
-			const status = this.started.has(test) && !latestResult ? 'FAIL' : qualityStatus(test, latestResult);
+			let status: 'PASS' | 'FAIL' | 'SKIP';
+			if (this.started.has(test) && !latestResult) {
+				status = 'FAIL';
+			} else if (!latestResult || latestResult.status === 'skipped' || test.expectedStatus === 'skipped') {
+				status = 'SKIP';
+			} else {
+				const outcome = test.outcome?.();
+				if (outcome === 'skipped') status = 'SKIP';
+				else if (outcome === 'expected' || outcome === 'flaky') status = 'PASS';
+				else if (outcome === 'unexpected') status = 'FAIL';
+				else if (latestResult.status === (test.expectedStatus ?? 'passed')) status = 'PASS';
+				else status = latestResult.status === 'passed' || latestResult.status === 'failed' || latestResult.status === 'timedOut' || latestResult.status === 'interrupted' ? 'FAIL' : 'SKIP';
+			}
 			counts[status] += 1;
 			const msg = status === 'FAIL' ? latestResult?.error?.message?.replace(/\s+/gu, ' ').trim() : undefined;
-			if (status !== 'PASS') this.write(`  [${status}] ${testName(test)}${msg ? ` — ${msg}` : ''}\n`);
+			if (status !== 'PASS')
+				this.write(
+					`  [${status}] ${(() => {
+						const titlePath = test.titlePath?.();
+						return titlePath?.length ? titlePath.join(' › ') : test.title;
+					})()}${msg ? ` — ${msg}` : ''}\n`,
+				);
 			this.finish(test);
 		}
 		this.write(`Playwright ${result.status}: ${counts.PASS} passed, ${counts.FAIL} failed, ${counts.SKIP} skipped\n`);

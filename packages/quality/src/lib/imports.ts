@@ -29,50 +29,6 @@ HELPERS
 //////////////////////////////////////////////////*/
 
 /**
- * Resolves a relative or configured alias import against the repository filesystem.
- *
- * @param specifier Module specifier written by the importing source file.
- * @param importer Absolute path of the file containing the import.
- * @param cfg Quality configuration containing aliases and the repository root.
- *
- * @return The resolved file path, or `null` when no supported target exists.
- */
-function resolveImport(specifier: string, importer: string, cfg: QualityCfg): string | null {
-	const alias = Object.entries(cfg.aliases ?? {}).find(([p]) => specifier.startsWith(p));
-	const raw = alias ? resolve(cfg.root, alias[1], specifier.slice(alias[0].length)) : specifier.startsWith('.') ? resolve(dirname(importer), specifier) : null;
-	if (!raw) return null;
-	const stripped = /\.(?:c|m)?(?:j|t)sx?$/.test(raw) ? raw.slice(0, raw.lastIndexOf('.')) : raw;
-	for (const b of [...new Set([raw, stripped])])
-		for (const ext of MODULE_EXTS) {
-			const candidate = b + ext;
-			if (isFile(candidate)) return candidate;
-			const idx = join(b, `index${ext}`);
-			if (isFile(idx)) return idx;
-		}
-	return null;
-}
-
-/**
- * Extracts static import, export, dynamic-import, and CommonJS require specifiers from a source file.
- *
- * @param fileName Absolute path to the source file to parse.
- *
- * @return Module specifiers found in the file.
- */
-function specifiers(fileName: string): string[] {
-	const src = readFileSync(fileName, 'utf8');
-	const file = ts.createSourceFile(fileName, src, ts.ScriptTarget.Latest, true);
-	const vals: string[] = [];
-	ts.forEachChild(file, (n) => {
-		if (ts.isImportDeclaration(n) && ts.isStringLiteral(n.moduleSpecifier)) vals.push(n.moduleSpecifier.text);
-		if (ts.isExportDeclaration(n) && n.moduleSpecifier && ts.isStringLiteral(n.moduleSpecifier)) vals.push(n.moduleSpecifier.text);
-		if (ts.isCallExpression(n) && n.arguments.length === 1 && ts.isStringLiteral(n.arguments[0]) && (n.expression.kind === ts.SyntaxKind.ImportKeyword || n.expression.getText(file) === 'require'))
-			vals.push(n.arguments[0].text);
-	});
-	return vals;
-}
-
-/**
  * Checks all configured internal imports, including assets and extensionless modules.
  *
  * @param cfg Quality configuration defining the source scope and alias rules.
@@ -82,11 +38,41 @@ function specifiers(fileName: string): string[] {
 export function checkImports(cfg: QualityCfg): ImportFailure[] {
 	const failures: ImportFailure[] = [];
 	for (const i of srcFiles(cfg)) {
-		for (const s of specifiers(i)) {
+		const file = ts.createSourceFile(i, readFileSync(i, 'utf8'), ts.ScriptTarget.Latest, true);
+		const specifiers: string[] = [];
+		ts.forEachChild(file, (node) => {
+			if (ts.isImportDeclaration(node) && ts.isStringLiteral(node.moduleSpecifier)) specifiers.push(node.moduleSpecifier.text);
+			if (ts.isExportDeclaration(node) && node.moduleSpecifier && ts.isStringLiteral(node.moduleSpecifier)) specifiers.push(node.moduleSpecifier.text);
+			if (
+				ts.isCallExpression(node) &&
+				node.arguments.length === 1 &&
+				ts.isStringLiteral(node.arguments[0]) &&
+				(node.expression.kind === ts.SyntaxKind.ImportKeyword || node.expression.getText(file) === 'require')
+			)
+				specifiers.push(node.arguments[0].text);
+		});
+		for (const s of specifiers) {
 			if (cfg.externalPrefixes?.some((p) => s.startsWith(p))) continue;
 			if (!s.startsWith('.') && !Object.keys(cfg.aliases ?? {}).some((p) => s.startsWith(p))) continue;
 			if (s.startsWith('.') && extname(s) && !MODULE_EXTS.includes(extname(s))) continue;
-			if (!resolveImport(s, i, cfg)) failures.push({ importer: displayPath(cfg, i), specifier: s });
+			const alias = Object.entries(cfg.aliases ?? {}).find(([prefix]) => s.startsWith(prefix));
+			const raw = alias ? resolve(cfg.root, alias[1], s.slice(alias[0].length)) : s.startsWith('.') ? resolve(dirname(i), s) : null;
+			let resolved = false;
+			if (raw) {
+				resolveLoop: for (const base of [...new Set([raw, /\.(?:c|m)?(?:j|t)sx?$/.test(raw) ? raw.slice(0, raw.lastIndexOf('.')) : raw])]) {
+					for (const ext of MODULE_EXTS) {
+						if (isFile(base + ext)) {
+							resolved = true;
+							break resolveLoop;
+						}
+						if (isFile(join(base, `index${ext}`))) {
+							resolved = true;
+							break resolveLoop;
+						}
+					}
+				}
+			}
+			if (!resolved) failures.push({ importer: displayPath(cfg, i), specifier: s });
 		}
 	}
 	return failures;

@@ -114,12 +114,24 @@ export function parseBuildReport(input: unknown): BuildReport {
 	if (report.conclusion !== 'success' && report.conclusion !== 'failure') throw new Error('Invalid build report conclusion');
 	const junitXml = report.junitXml == null ? null : report.junitXml;
 	if (junitXml !== null && (typeof junitXml !== 'string' || Buffer.byteLength(junitXml, 'utf8') > 5_000_000)) throw new Error('Invalid JUnit report');
-	const tests = junitXml === null ? null : parseJUnit(junitXml);
-	const quality = report.quality == null ? null : parseQualityReport(report.quality);
+	const normCounts = {
+		tests: junitXml === null ? null : parseJUnit(junitXml),
+		quality: report.quality == null ? null : parseQualityReport(report.quality),
+	};
 	const history = report.history == null ? null : parseHistoryReport(report.history);
 	if (history && (history.repository.toLowerCase() !== report.repository.toLowerCase() || history.branch !== report.branch || history.headSha !== report.headSha))
 		throw new Error('Build history report does not match repository, branch, or head');
-	return { schemaVersion: 1, repository: report.repository, branch: report.branch, headSha: report.headSha, completedAt: report.completedAt, conclusion: report.conclusion, tests, quality, history };
+	return {
+		schemaVersion: 1,
+		repository: report.repository,
+		branch: report.branch,
+		headSha: report.headSha,
+		completedAt: report.completedAt,
+		conclusion: report.conclusion,
+		tests: normCounts.tests,
+		quality: normCounts.quality,
+		history,
+	};
 }
 
 /**

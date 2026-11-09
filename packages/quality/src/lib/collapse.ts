@@ -17,46 +17,9 @@ import { sourceKind } from './source-kind.js';
 CONFIG
 //////////////////////////////////////////////////*/
 
-const SUPPORTED = new Set(['.cjs', '.cts', '.js', '.jsx', '.mjs', '.mts', '.ts', '.tsx']);
-
 /*//////////////////////////////////////////////////
 HELPERS
 //////////////////////////////////////////////////*/
-
-/**
- * Finds the body span of an object, type literal, mapped type, or interface that can be collapsed safely.
- *
- * @param n AST node being considered for whitespace collapsing.
- * @param src Original source text used to locate interface braces.
- *
- * @return Collapsible source span, or `undefined` when the node is unsupported or contains JSX.
- */
-function candidateSpan(n: ts.Node, src: string): { start: number; end: number } | undefined {
-	if (ts.isObjectLiteralExpression(n)) {
-		let containsJsx = false;
-		/**
-		 *
-		 * @param c
-		 */
-		const findJsx = (c: ts.Node): void => {
-			if (ts.isJsxElement(c) || ts.isJsxSelfClosingElement(c) || ts.isJsxFragment(c)) {
-				containsJsx = true;
-				return;
-			}
-			ts.forEachChild(c, findJsx);
-		};
-		ts.forEachChild(n, findJsx);
-		if (containsJsx) return undefined;
-		return { start: n.getStart(), end: n.end };
-	}
-	if (ts.isTypeLiteralNode(n) || ts.isMappedTypeNode(n)) return { start: n.getStart(), end: n.end };
-	if (ts.isInterfaceDeclaration(n)) {
-		const start = src.indexOf('{', n.name.end);
-		const end = src.lastIndexOf('}', n.end - 1);
-		if (start >= 0 && end >= start) return { start, end: end + 1 };
-	}
-	return undefined;
-}
 
 /*//////////////////////////////////////////////////
 EXPORTS
@@ -71,72 +34,10 @@ EXPORTS
  */
 export function collapseTypesAndObjects(fileName: string): boolean {
 	// ENVIRONMENT
-	if (!SUPPORTED.has(extname(fileName))) return false;
+	if (!new Set(['.cjs', '.cts', '.js', '.jsx', '.mjs', '.mts', '.ts', '.tsx']).has(extname(fileName))) return false;
 	const original = readFileSync(fileName, 'utf8');
 	const parsed = ts.createSourceFile(fileName, original, ts.ScriptTarget.Latest, true, sourceKind(fileName));
 	const edits: { start: number; end: number; text: string }[] = [];
-
-	// HELPERS
-	/**
-	 *
-	 * @param n
-	 * @param start
-	 * @param text
-	 *
-	 * @return
-	 */
-	const collapse = (n: ts.Node, start: number, text: string): string | undefined => {
-		if (!/[\r\n]/.test(text)) return undefined;
-		const protectedRanges: { start: number; end: number }[] = [];
-		/**
-		 *
-		 * @param c
-		 */
-		const protectLiterals = (c: ts.Node): void => {
-			if (
-				ts.isStringLiteral(c) ||
-				ts.isRegularExpressionLiteral(c) ||
-				ts.isNoSubstitutionTemplateLiteral(c) ||
-				ts.isTemplateHead(c) ||
-				ts.isTemplateMiddle(c) ||
-				ts.isTemplateTail(c) ||
-				ts.isJsxText(c)
-			) {
-				protectedRanges.push({ start: c.getStart(parsed) - start, end: c.end - start });
-				return;
-			}
-			ts.forEachChild(c, protectLiterals);
-		};
-		protectLiterals(n);
-		/**
-		 *
-		 * @param pos
-		 *
-		 * @return
-		 */
-		const isProtected = (pos: number): boolean => protectedRanges.some((r) => pos >= r.start && pos < r.end);
-		const scanner = ts.createScanner(ts.ScriptTarget.Latest, false, parsed.languageVariant, text);
-		let result = '';
-		let whitespace = false;
-		for (let token = scanner.scan(); token !== ts.SyntaxKind.EndOfFileToken; token = scanner.scan()) {
-			const tokenStart = scanner.getTokenPos();
-			if ((token === ts.SyntaxKind.SingleLineCommentTrivia || token === ts.SyntaxKind.MultiLineCommentTrivia) && !isProtected(tokenStart)) return undefined;
-			if (token === ts.SyntaxKind.WhitespaceTrivia || token === ts.SyntaxKind.NewLineTrivia) {
-				if (isProtected(tokenStart)) {
-					if (whitespace && result && !result.endsWith(' ')) result += ' ';
-					result += scanner.getTokenText();
-					whitespace = false;
-					continue;
-				}
-				whitespace = true;
-				continue;
-			}
-			if (whitespace && result && !result.endsWith(' ')) result += ' ';
-			result += scanner.getTokenText();
-			whitespace = false;
-		}
-		return result;
-	};
 
 	// ANALYSE
 	/**
@@ -144,12 +45,81 @@ export function collapseTypesAndObjects(fileName: string): boolean {
 	 * @param n
 	 */
 	const visit = (n: ts.Node): void => {
-		const span = candidateSpan(n, original);
+		let span: { start: number; end: number } | undefined;
+		if (ts.isObjectLiteralExpression(n)) {
+			let containsJsx = false;
+			/**
+			 *
+			 * @param child
+			 */
+			const findJsx = (child: ts.Node): void => {
+				if (ts.isJsxElement(child) || ts.isJsxSelfClosingElement(child) || ts.isJsxFragment(child)) {
+					containsJsx = true;
+					return;
+				}
+				ts.forEachChild(child, findJsx);
+			};
+			ts.forEachChild(n, findJsx);
+			if (!containsJsx) span = { start: n.getStart(), end: n.end };
+		} else if (ts.isTypeLiteralNode(n) || ts.isMappedTypeNode(n)) span = { start: n.getStart(), end: n.end };
+		else if (ts.isInterfaceDeclaration(n)) {
+			const start = original.indexOf('{', n.name.end);
+			const end = original.lastIndexOf('}', n.end - 1);
+			if (start >= 0 && end >= start) span = { start, end: end + 1 };
+		}
 		if (span) {
-			const text = collapse(n, span.start, original.slice(span.start, span.end));
-			if (text !== undefined) {
-				edits.push({ ...span, text });
-				return;
+			const text = original.slice(span.start, span.end);
+			if (/[\r\n]/.test(text)) {
+				const protectedRanges: { start: number; end: number }[] = [];
+				/**
+				 *
+				 * @param child
+				 */
+				const protectLiterals = (child: ts.Node): void => {
+					if (
+						ts.isStringLiteral(child) ||
+						ts.isRegularExpressionLiteral(child) ||
+						ts.isNoSubstitutionTemplateLiteral(child) ||
+						ts.isTemplateHead(child) ||
+						ts.isTemplateMiddle(child) ||
+						ts.isTemplateTail(child) ||
+						ts.isJsxText(child)
+					) {
+						protectedRanges.push({ start: child.getStart(parsed) - span.start, end: child.end - span.start });
+						return;
+					}
+					ts.forEachChild(child, protectLiterals);
+				};
+				protectLiterals(n);
+				const isProtected = (position: number): boolean => protectedRanges.some((range) => position >= range.start && position < range.end);
+				const scanner = ts.createScanner(ts.ScriptTarget.Latest, false, parsed.languageVariant, text);
+				let collapsedText = '';
+				let whitespace = false;
+				let containsComment = false;
+				for (let token = scanner.scan(); token !== ts.SyntaxKind.EndOfFileToken; token = scanner.scan()) {
+					const tokenStart = scanner.getTokenPos();
+					if ((token === ts.SyntaxKind.SingleLineCommentTrivia || token === ts.SyntaxKind.MultiLineCommentTrivia) && !isProtected(tokenStart)) {
+						containsComment = true;
+						break;
+					}
+					if (token === ts.SyntaxKind.WhitespaceTrivia || token === ts.SyntaxKind.NewLineTrivia) {
+						if (isProtected(tokenStart)) {
+							if (whitespace && collapsedText && !collapsedText.endsWith(' ')) collapsedText += ' ';
+							collapsedText += scanner.getTokenText();
+							whitespace = false;
+							continue;
+						}
+						whitespace = true;
+						continue;
+					}
+					if (whitespace && collapsedText && !collapsedText.endsWith(' ')) collapsedText += ' ';
+					collapsedText += scanner.getTokenText();
+					whitespace = false;
+				}
+				if (!containsComment) {
+					edits.push({ ...span, text: collapsedText });
+					return;
+				}
 			}
 		}
 		ts.forEachChild(n, visit);

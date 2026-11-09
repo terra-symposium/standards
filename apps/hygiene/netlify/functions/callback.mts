@@ -7,7 +7,9 @@ IMPORTS
 //////////////////////////////////////////////////*/
 
 // API
-import { createSession, equalSecret, sessionCookie } from '../../src/lib/server/auth.js';
+import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
+import { db } from '../../src/lib/server/db.js';
+import { encrypt, sessionCookie } from '../../src/lib/server/auth.js';
 
 /*//////////////////////////////////////////////////
 HELPERS
@@ -30,7 +32,7 @@ export default async function handler(request: Request): Promise<Response> {
 			.map((part) => part.trim())
 			.find((part) => part.startsWith('terra_hygiene_state='))
 			?.split('=')[1] ?? '';
-	if (!state || !equalSecret(state, saved)) return new Response('Invalid sign-in state', { status: 400 });
+	if (!state || Buffer.byteLength(state) !== Buffer.byteLength(saved) || !timingSafeEqual(Buffer.from(state), Buffer.from(saved))) return new Response('Invalid sign-in state', { status: 400 });
 	const code = url.searchParams.get('code');
 	if (!code) return new Response('Missing sign-in code', { status: 400 });
 	const tokenResponse = await fetch('https://github.com/login/oauth/access_token', {
@@ -49,6 +51,10 @@ export default async function handler(request: Request): Promise<Response> {
 		return new Response('GitHub user lookup failed', { status: 502 });
 	}
 	const user = (await userResponse.json()) as { id: number; login: string };
-	const token = await createSession(user.id, user.login, tokenData.access_token, tokenData.refresh_token, tokenData.expires_in);
-	return new Response(null, { status: 302, headers: { Location: '/', 'Set-Cookie': sessionCookie(token) } });
+	const sessionToken = randomBytes(32).toString('base64url');
+	await db()`INSERT INTO sessions (token_expires_at, token_hash, github_user_id, github_login, access_token_ciphertext, refresh_token_ciphertext, expires_at) VALUES (${tokenData.expires_in ? new Date(Date.now() + tokenData.expires_in * 1000).toISOString() : null}, ${createHash('sha256').update(sessionToken).digest('hex')}, ${user.id}, ${user.login}, ${encrypt(tokenData.access_token)}, ${tokenData.refresh_token ? encrypt(tokenData.refresh_token) : null}, now() + interval '7 days')`;
+	return new Response(null, {
+		status: 302,
+		headers: { Location: '/', 'Set-Cookie': sessionCookie(sessionToken) },
+	});
 }

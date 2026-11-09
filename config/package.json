@@ -15,14 +15,15 @@
     "test": "cd .. && pnpm --filter './packages/**' -r build && node packages/testing/src/cli.mjs run --manifest config/terra-tests.json",
     "quality": "cd .. && pnpm --filter @terra-symposium/standards-quality build && node scripts/quality.mjs quality --skip-commands --skip-recommendations",
     "docs": "cd .. && docs dev --port 2050",
-    "prepare": "cd .. && husky config/husky"
+    "prepare": "cd .. && husky config/husky",
+    "changeset": "changeset",
+    "release": "changeset publish"
   },
   "devDependencies": {
     "@changesets/cli": "^3.0.3",
     "@eslint/js": "^10.0.1",
     "@terra-symposium/docs": "^0.4.3",
     "@types/node": "^26.6.5",
-    "astro": "7.4.4",
     "eslint": "^10.13.0",
     "globals": "^17.13.0",
     "husky": "^9.1.7",

@@ -159,9 +159,7 @@ export const normalizeLoadTestingConfig = (raw: LoadTestingConfig = {}, override
  */
 export const readLoadTestingConfig = (file: string | undefined = undefined, overrides: LoadTestingOverrides = {}): NormalizedLoadTestingConfig => {
 	const rootConfig = path.resolve(process.cwd(), 'quality.json');
-	const configFile = path.resolve(process.cwd(), 'config/quality.json');
-	const defaultFile = fs.existsSync(rootConfig) ? rootConfig : configFile;
-	const cfgFile = path.resolve(file ?? defaultFile);
+	const cfgFile = path.resolve(file ?? (fs.existsSync(rootConfig) ? rootConfig : path.resolve(process.cwd(), 'config/quality.json')));
 	if (!fs.existsSync(cfgFile)) return { ...normalizeLoadTestingConfig({}, overrides), root: process.cwd() };
 	let parsed: unknown;
 	try {
@@ -252,10 +250,11 @@ export const loadGradeCounts = (measurements: readonly Pick<LoadMeasurement, 'gr
 export const timeLoadOperation = async <T>(name: string, op: () => T | Promise<T>, rec: (measurement: LoadMeasurementInput) => void, budget?: LoadBudgetOverride): Promise<T> => {
 	if (!name.trim()) throw new Error('A named load measurement is required.');
 	const valid = budget ? validateLoadBudgetOverride(budget) : undefined;
-	const start = performance.now();
-	try {
-		return await op();
-	} finally {
-		rec({ name, kind: 'operation', durationMs: performance.now() - start, ...(valid ? { budget: valid } : {}) });
-	}
+	return await (async (start) => {
+		try {
+			return await op();
+		} finally {
+			rec({ name, kind: 'operation', durationMs: performance.now() - start, ...(valid ? { budget: valid } : {}) });
+		}
+	})(performance.now());
 };

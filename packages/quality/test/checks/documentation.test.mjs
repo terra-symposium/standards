@@ -23,7 +23,10 @@ TESTS
 
 test('C documentation checks static definitions and header declarations with ownership, pointer parameters, and locations', () => {
 	const root = fixtureRoot('terra-quality-c-documentation-');
-	fixtureFile(root, 'src/c/compression/api.h', `/**
+	fixtureFile(
+		root,
+		'src/c/compression/api.h',
+		`/**
  * @brief Copies bytes into the output buffer.
  * @param input source bytes
  * @param output destination buffer
@@ -32,8 +35,12 @@ test('C documentation checks static definitions and header declarations with own
  * @author kai
  */
 size_t copy_bytes(const char *input, char *output, size_t size);
-`);
-	fixtureFile(root, 'src/c/compression/api.c', `#define FAKE_CALL(x) x(1)
+`,
+	);
+	fixtureFile(
+		root,
+		'src/c/compression/api.c',
+		`#define FAKE_CALL(x) x(1)
 /**
  * Copies bytes into the output buffer.
  * @param input source bytes
@@ -47,9 +54,13 @@ size_t copy_bytes(const char *input, char *output, size_t size) { return size; }
  * @author kai
  */
 static void clear_buffer(void) { const char *text = "fake_call()"; (void)text; }
-`);
+`,
+	);
 	const cfg = createQualityCfg({ root, sourceRoots: ['src/c'], extensions: [], documentation: { cAuthors: { 'src/c': 'haadi', 'src/c/compression': 'kai' } } });
-	assert.deepEqual(documentationFindings(cfg).map(({ name, file, line }) => [name, file, line]), []);
+	assert.deepEqual(
+		documentationFindings(cfg).map(({ name, file, line }) => [name, file, line]),
+		[],
+	);
 });
 test('C documentation treats matching header prototypes and source definitions as one documentation contract', () => {
 	const root = fixtureRoot('terra-quality-c-documentation-dedup-');
@@ -60,11 +71,17 @@ test('C documentation treats matching header prototypes and source definitions a
 	assert.equal(findings.length, 1);
 	fixtureFile(root, 'src/c/other/api.h', `/** Transforms a value.\n * @param value input value\n * @return transformed value\n * @author haadi\n */\nint transform_value(int value);\n`);
 	fixtureFile(root, 'src/c/other/impl.c', 'int transform_value(int value) { return value; }\n');
-	assert.deepEqual(documentationFindings(cfg).filter(({ kind, name }) => kind === 'function' && name === 'transform_value'), []);
+	assert.deepEqual(
+		documentationFindings(cfg).filter(({ kind, name }) => kind === 'function' && name === 'transform_value'),
+		[],
+	);
 });
 test('C documentation reports missing, stale, ordered, undescribed, return, summary, and author fields', () => {
 	const root = fixtureRoot('terra-quality-c-documentation-errors-');
-	fixtureFile(root, 'src/c/encryption/crypto.c', `/**
+	fixtureFile(
+		root,
+		'src/c/encryption/crypto.c',
+		`/**
  *
  * @param extra unused
  * @param output
@@ -78,7 +95,8 @@ int undocumented(void);
  * @author marceline
  */
 int empty_result(void);
-`);
+`,
+	);
 	fixtureFile(root, 'src/c/login/session.c', `/** Starts a login session.\n * @author kai\n */\nvoid login_session(void);\n`);
 	const cfg = createQualityCfg({ root, sourceRoots: ['src/c'], extensions: [], documentation: { cAuthors: { 'src/c/encryption': 'marceline', 'src/c/login': 'marceline' } } });
 	const findings = documentationFindings(cfg);
@@ -94,7 +112,10 @@ int empty_result(void);
 });
 test('C documentation ignores comments, literals, macro bodies, controls, and pointer declarations', () => {
 	const root = fixtureRoot('terra-quality-c-documentation-mask-');
-	fixtureFile(root, 'src/c/main.c', `#define HIDDEN() fake(1)
+	fixtureFile(
+		root,
+		'src/c/main.c',
+		`#define HIDDEN() fake(1)
 const char *text = "fake_call()";
 /* fake_comment() */
 void (*callback)(int value);
@@ -104,9 +125,13 @@ void (*callback)(int value);
  * @author haadi
  */
 void invoke(void (*callback)(int), int value) { if (value) callback(value); }
-`);
+`,
+	);
 	const cfg = createQualityCfg({ root, sourceRoots: ['src/c'], extensions: [], documentation: { cAuthors: { 'src/c': 'haadi' } } });
-	assert.deepEqual(documentationFindings(cfg).map(({ name }) => name), []);
+	assert.deepEqual(
+		documentationFindings(cfg).map(({ name }) => name),
+		[],
+	);
 });
 test('documentation policy excludes generated and vendor source trees', () => {
 	const root = fixtureRoot('terra-quality-documentation-pruned-');

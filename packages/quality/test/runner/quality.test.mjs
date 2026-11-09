@@ -351,13 +351,13 @@ test(
 	'Prettier keeps short objects and types inline while wrapping constructs over print width',
 	{ skip: !existsSync(fileURLToPath(new URL('../../../../node_modules/.bin/prettier', import.meta.url))) },
 	() => {
-	const root = mkdtempSync(join(tmpdir(), 'terra-quality-prettier-wrap-'));
-	mkdirSync(join(root, 'src'));
-	const file = join(root, 'src', 'main.ts');
-	writeFileSync(join(root, '.prettierrc.json'), '{ "printWidth": 60, "singleQuote": true }\n');
-	writeFileSync(
-		file,
-		`const short = {
+		const root = mkdtempSync(join(tmpdir(), 'terra-quality-prettier-wrap-'));
+		mkdirSync(join(root, 'src'));
+		const file = join(root, 'src', 'main.ts');
+		writeFileSync(join(root, '.prettierrc.json'), '{ "printWidth": 60, "singleQuote": true }\n');
+		writeFileSync(
+			file,
+			`const short = {
 	alpha: true,
 	beta: false,
 };
@@ -371,14 +371,14 @@ const long = {
 };
 void [short, long];
 `,
-	);
-	const prettier = fileURLToPath(new URL('../../../../node_modules/.bin/prettier', import.meta.url));
-	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], tools: { prettier } });
-	runQualityCli(cfg, ['format', '--all']);
-	const result = readFileSync(file, 'utf8');
-	assert.match(result, /const short = \{ alpha: true, beta: false,? \};/);
-	assert.match(result, /type Short = \{ alpha: boolean; beta: boolean,? \};/);
-	assert.match(result, /const long = \{\n/);
+		);
+		const prettier = fileURLToPath(new URL('../../../../node_modules/.bin/prettier', import.meta.url));
+		const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], tools: { prettier } });
+		runQualityCli(cfg, ['format', '--all']);
+		const result = readFileSync(file, 'utf8');
+		assert.match(result, /const short = \{ alpha: true, beta: false,? \};/);
+		assert.match(result, /type Short = \{ alpha: boolean; beta: boolean,? \};/);
+		assert.match(result, /const long = \{\n/);
 	},
 );
 test('maintenance adds headers and grouped sorted imports', () => {

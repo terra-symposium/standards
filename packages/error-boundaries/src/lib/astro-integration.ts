@@ -7,7 +7,23 @@
 CONFIG
 //////////////////////////////////////////////////*/
 
-const HYDRATION_FALLBACK = `(() => {
+/*//////////////////////////////////////////////////
+FUNCTIONS
+//////////////////////////////////////////////////*/
+
+/**
+ * Adds a shared accessible fallback before Astro starts hydrating any page islands.
+ *
+ * @return An Astro integration that handles each failed island without replacing the page.
+ */
+export function terraErrorBoundaryIntegration() {
+	return {
+		name: '@terra-symposium/standards-error-boundaries',
+		hooks: {
+			'astro:config:setup': ({ injectScript }: { injectScript: (stage: 'before-hydration', content: string) => void }) => {
+				injectScript(
+					'before-hydration',
+					`(() => {
 	if (window.__terraHydrationBoundaryInstalled) return;
 	window.__terraHydrationBoundaryInstalled = true;
 	document.addEventListener('astro:hydration-error', (event) => {
@@ -33,23 +49,8 @@ const HYDRATION_FALLBACK = `(() => {
 		island.insertAdjacentElement('afterend', fallback);
 		console.error('[Terra error boundary] island hydration failed', event.detail?.error);
 	});
-})();`;
-
-/*//////////////////////////////////////////////////
-FUNCTIONS
-//////////////////////////////////////////////////*/
-
-/**
- * Adds a shared accessible fallback before Astro starts hydrating any page islands.
- *
- * @return An Astro integration that handles each failed island without replacing the page.
- */
-export function terraErrorBoundaryIntegration() {
-	return {
-		name: '@terra-symposium/standards-error-boundaries',
-		hooks: {
-			'astro:config:setup': ({ injectScript }: { injectScript: (stage: 'before-hydration', content: string) => void }) => {
-				injectScript('before-hydration', HYDRATION_FALLBACK);
+})();`,
+				);
 			},
 		},
 	};

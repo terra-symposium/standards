@@ -146,10 +146,8 @@ const parse = (input, options = {}) => {
 
 		if (value === CHAR_DOUBLE_QUOTE || value === CHAR_SINGLE_QUOTE || value === CHAR_BACKTICK) {
 			const open = value;
+			value = options.keepQuotes === true ? open : '';
 			let next;
-			if (options.keepQuotes !== true) {
-				value = '';
-			}
 			while (index < length && (next = advance())) {
 				if (next === CHAR_BACKSLASH) {
 					value += next + advance();
@@ -173,9 +171,7 @@ const parse = (input, options = {}) => {
 			}
 			nesting++;
 			depth++;
-			const dollar = (prev.value && prev.value.slice(-1) === '$') || block.dollar === true;
-			const brace = { type: 'brace', open: true, close: false, dollar, depth, commas: 0, ranges: 0, nodes: [] };
-			block = push(brace);
+			block = push({ type: 'brace', open: true, close: false, dollar: (prev.value && prev.value.slice(-1) === '$') || block.dollar === true, depth, commas: 0, ranges: 0, nodes: [] });
 			stack.push(block);
 			push({ type: 'open', value });
 			continue;
@@ -203,8 +199,7 @@ const parse = (input, options = {}) => {
 		if (value === CHAR_COMMA && depth > 0) {
 			if (block.ranges > 0) {
 				block.ranges = 0;
-				const open = block.nodes.shift();
-				block.nodes = [open, { type: 'text', value: stringify(block) }];
+				block.nodes = [block.nodes.shift(), { type: 'text', value: stringify(block) }];
 			}
 			push({ type: 'comma', value });
 			block.commas++;
@@ -265,9 +260,8 @@ const parse = (input, options = {}) => {
 
 			// get the location of the block on parent.nodes (block's siblings)
 			const parent = stack[stack.length - 1];
-			const index = parent.nodes.indexOf(block);
 			// replace the (invalid) block with it's nodes
-			parent.nodes.splice(index, 1, ...block.nodes);
+			parent.nodes.splice(parent.nodes.indexOf(block), 1, ...block.nodes);
 		}
 	} while (stack.length > 0);
 	push({ type: 'eos' });

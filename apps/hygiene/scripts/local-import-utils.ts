@@ -58,18 +58,6 @@ export function git(root: string, args: string[]): string {
 }
 
 /**
- * Extracts a normalized owner/name identifier from a GitHub remote URL.
- *
- * @param remote Git remote URL in HTTPS or SSH form.
- *
- * @returns Lowercase owner/name, or `null` when the URL is not a GitHub repository remote.
- */
-export function githubRepository(remote: string): string | null {
-	const match = /(?:github\.com[:/])([^/]+\/[^/]+?)(?:\.git)?$/i.exec(remote);
-	return match?.[1]?.toLowerCase() ?? null;
-}
-
-/**
  * Confirms that an import target matches the requested GitHub repository and branch.
  *
  * @param repo Requested GitHub repository in owner/name form.
@@ -80,7 +68,8 @@ export function githubRepository(remote: string): string | null {
 export function validateImportTarget(repo: string, checkout: string, branch: string): void {
 	if (!/^[^/\s]+\/[^/\s]+$/.test(repo)) throw new Error('Repository must use owner/name format.');
 	if (!/^[A-Za-z0-9._/-]{1,100}$/.test(branch) || branch.includes('..') || branch.startsWith('/')) throw new Error('Invalid branch name.');
-	if (githubRepository(git(checkout, ['remote', 'get-url', 'origin'])) !== repo.toLowerCase()) throw new Error('Checkout origin does not match the requested GitHub repository.');
+	if (/(?:github\.com[:/])([^/]+\/[^/]+?)(?:\.git)?$/i.exec(git(checkout, ['remote', 'get-url', 'origin']))?.[1]?.toLowerCase() !== repo.toLowerCase())
+		throw new Error('Checkout origin does not match the requested GitHub repository.');
 }
 
 /**

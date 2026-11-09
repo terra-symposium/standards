@@ -51,7 +51,6 @@ HELPERS
  * @return Sorted absolute paths for files that belong to the configured source scope.
  */
 export function srcFiles(cfg: QualityCfg): string[] {
-	const roots = [...cfg.sourceRoots, ...(cfg.includeRoots ?? [])];
 	const exts = new Set(cfg.extensions);
 	const skippedFiles = new Set((cfg.skippedFiles ?? []).map((file) => resolve(cfg.root, file)));
 	const files: string[] = [];
@@ -62,27 +61,13 @@ export function srcFiles(cfg: QualityCfg): string[] {
 	 * @return
 	 */
 	const isSkippedDir = (dir: string): boolean => {
-		const repoPath = relative(cfg.root, dir);
 		return (cfg.skippedDirectories ?? []).some((skipped) => {
 			const norm = normalize(skipped.replaceAll('\\', '/'));
 			if (!norm || norm === '.') return false;
 			if (!norm.includes(sep)) return basename(dir) === norm;
 			const skippedPath = resolve(cfg.root, norm);
-			return dir === skippedPath || dir.startsWith(`${skippedPath}${sep}`) || repoPath === norm;
+			return dir === skippedPath || dir.startsWith(`${skippedPath}${sep}`) || relative(cfg.root, dir) === norm;
 		});
-	};
-	/**
-	 *
-	 * @param file
-	 *
-	 * @return
-	 */
-	const isSkippedRootFile = (file: string): boolean => {
-		if (skippedFiles.has(resolve(file))) return true;
-		for (let dir = dirname(resolve(file)); ; dir = dirname(dir)) {
-			if (SCAN_PRUNED_DIRS.has(basename(dir)) || isSkippedDir(dir)) return true;
-			if (dir === cfg.root || dirname(dir) === dir) return false;
-		}
 	};
 	/**
 	 *
@@ -92,7 +77,12 @@ export function srcFiles(cfg: QualityCfg): string[] {
 		if (!existsSync(dir)) return;
 		const entry = statSync(dir);
 		if (entry.isFile()) {
-			if (!isSkippedRootFile(dir) && exts.has(dir.slice(dir.lastIndexOf('.')))) files.push(dir);
+			if (skippedFiles.has(resolve(dir))) return;
+			for (let parent = dirname(resolve(dir)); ; parent = dirname(parent)) {
+				if (SCAN_PRUNED_DIRS.has(basename(parent)) || isSkippedDir(parent)) return;
+				if (parent === cfg.root || dirname(parent) === parent) break;
+			}
+			if (exts.has(dir.slice(dir.lastIndexOf('.')))) files.push(dir);
 			return;
 		}
 		if (!entry.isDirectory() || SCAN_PRUNED_DIRS.has(basename(dir)) || isSkippedDir(dir)) return;
@@ -105,7 +95,7 @@ export function srcFiles(cfg: QualityCfg): string[] {
 			if (!skippedFiles.has(resolve(path)) && exts.has(e.name.slice(e.name.lastIndexOf('.')))) files.push(path);
 		}
 	};
-	for (const root of roots) walk(root);
+	for (const root of [...cfg.sourceRoots, ...(cfg.includeRoots ?? [])]) walk(root);
 	return files.sort((a, b) => a.localeCompare(b));
 }
 
@@ -118,13 +108,21 @@ export function srcFiles(cfg: QualityCfg): string[] {
  */
 export function workingSrcFiles(cfg: QualityCfg): string[] {
 	const changed = new Set(
-		execFileSync('git', ['diff', '--name-only', '--diff-filter=ACMR'], { cwd: cfg.root, encoding: 'utf8' })
-			.concat(execFileSync('git', ['ls-files', '--others', '--exclude-standard'], { cwd: cfg.root, encoding: 'utf8' }))
+		execFileSync('git', ['diff', '--name-only', '--diff-filter=ACMR'], {
+			cwd: cfg.root,
+			encoding: 'utf8',
+		})
+			.concat(
+				execFileSync('git', ['ls-files', '--others', '--exclude-standard'], {
+					cwd: cfg.root,
+					encoding: 'utf8',
+				}),
+			)
 			.split('\n')
 			.filter(Boolean)
 			.map((p) => join(cfg.root, p)),
 	);
-	return srcFiles(cfg).filter((f) => changed.has(f));
+	return srcFiles(cfg).filter((f) => changed.size > 0 && changed.has(f));
 }
 
 /**

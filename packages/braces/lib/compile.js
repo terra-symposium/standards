@@ -7,9 +7,7 @@ const fill = require('fill-range');
 const utils = require('./utils');
 const compile = (ast, options = {}) => {
 	const walk = (node, parent = {}) => {
-		const invalidBlock = utils.isInvalidBrace(parent);
-		const invalidNode = node.invalid === true && options.escapeInvalid === true;
-		const invalid = invalidBlock === true || invalidNode === true;
+		const invalid = utils.isInvalidBrace(parent) === true || (node.invalid === true && options.escapeInvalid === true);
 		const prefix = options.escapeInvalid === true ? '\\' : '';
 		let output = '';
 		if (node.isOpen === true) return prefix + node.value;

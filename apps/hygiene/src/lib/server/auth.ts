@@ -7,7 +7,7 @@ IMPORTS
 //////////////////////////////////////////////////*/
 
 // API
-import { createCipheriv, createDecipheriv, createHash, randomBytes, timingSafeEqual } from 'node:crypto';
+import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'node:crypto';
 import { db } from './db.js';
 import { repositoryAdmin } from './github.js';
 
@@ -63,11 +63,10 @@ function key(): Buffer {
  * @param value Plaintext value to encrypt.
  * @returns A base64url-encoded authenticated ciphertext.
  */
-function encrypt(value: string): string {
+export function encrypt(value: string): string {
 	const iv = randomBytes(12);
 	const cipher = createCipheriv('aes-256-gcm', key(), iv);
-	const data = Buffer.concat([cipher.update(value, 'utf8'), cipher.final()]);
-	return Buffer.concat([iv, cipher.getAuthTag(), data]).toString('base64url');
+	return Buffer.concat([iv, cipher.getAuthTag(), Buffer.concat([cipher.update(value, 'utf8'), cipher.final()])]).toString('base64url');
 }
 
 /**
@@ -82,39 +81,6 @@ function decrypt(value: string): string {
 	const decipher = createDecipheriv('aes-256-gcm', key(), data.subarray(0, 12));
 	decipher.setAuthTag(data.subarray(12, 28));
 	return Buffer.concat([decipher.update(data.subarray(28)), decipher.final()]).toString('utf8');
-}
-
-/**
- * Reads the session token from the request's cookie header.
- *
- * @param request Incoming request whose cookie header may contain the session cookie.
- * @returns The raw session token, or `undefined` when no session cookie is present.
- */
-function sessionToken(request: Request): string | undefined {
-	return request.headers
-		.get('cookie')
-		?.split(';')
-		.map((part) => part.trim())
-		.find((part) => part.startsWith(`${COOKIE}=`))
-		?.slice(COOKIE.length + 1);
-}
-
-/**
- * Creates a random session token and stores its hash and encrypted GitHub credentials.
- *
- * @param userId GitHub numeric account ID.
- * @param login GitHub account login.
- * @param accessToken OAuth access token to encrypt and store.
- * @param refreshToken Optional OAuth refresh token to encrypt and store.
- * @param expiresIn Optional access-token lifetime in seconds.
- * @returns The raw random token to place in the user's cookie.
- */
-export async function createSession(userId: number, login: string, accessToken: string, refreshToken?: string, expiresIn?: number): Promise<string> {
-	const token = randomBytes(32).toString('base64url');
-	const sql = db();
-	const tokenExpires = expiresIn ? new Date(Date.now() + expiresIn * 1000).toISOString() : null;
-	await sql`INSERT INTO sessions (token_hash, github_user_id, github_login, access_token_ciphertext, refresh_token_ciphertext, token_expires_at, expires_at) VALUES (${digest(token)}, ${userId}, ${login}, ${encrypt(accessToken)}, ${refreshToken ? encrypt(refreshToken) : null}, ${tokenExpires}, now() + interval '7 days')`;
-	return token;
 }
 
 /**
@@ -136,12 +102,17 @@ export function sessionCookie(token: string, maxAge = 604800, origin = process.e
  * @returns The authenticated GitHub identity and access token, or `null` when the session is absent or invalid.
  */
 export async function session(request: Request): Promise<Session | null> {
-	const raw = sessionToken(request);
+	const raw = request.headers
+		.get('cookie')
+		?.split(';')
+		.map((part) => part.trim())
+		.find((part) => part.startsWith(`${COOKIE}=`))
+		?.slice(COOKIE.length + 1);
 	if (!raw) return null;
 	const sql = db();
-	const rows =
-		await sql`SELECT github_user_id, github_login, access_token_ciphertext, refresh_token_ciphertext, token_expires_at FROM sessions WHERE token_hash = ${digest(raw)} AND expires_at > now()`;
-	const row = rows[0] as { github_user_id: number; github_login: string; access_token_ciphertext: string; refresh_token_ciphertext: string | null; token_expires_at: string | null } | undefined;
+	const row = (
+		await sql`SELECT github_user_id, github_login, access_token_ciphertext, refresh_token_ciphertext, token_expires_at FROM sessions WHERE token_hash = ${digest(raw)} AND expires_at > now()`
+	)[0] as { github_user_id: number; github_login: string; access_token_ciphertext: string; refresh_token_ciphertext: string | null; token_expires_at: string | null } | undefined;
 	if (!row) return null;
 	let accessToken = decrypt(row.access_token_ciphertext);
 	if (row.token_expires_at && new Date(row.token_expires_at).getTime() < Date.now() + 60_000) {
@@ -160,23 +131,9 @@ export async function session(request: Request): Promise<Session | null> {
 		const data = (await response.json()) as { access_token?: string; refresh_token?: string; expires_in?: number };
 		if (!data.access_token) return null;
 		accessToken = data.access_token;
-		const expires = data.expires_in ? new Date(Date.now() + data.expires_in * 1000).toISOString() : null;
-		await sql`UPDATE sessions SET access_token_ciphertext = ${encrypt(accessToken)}, refresh_token_ciphertext = ${data.refresh_token ? encrypt(data.refresh_token) : row.refresh_token_ciphertext}, token_expires_at = ${expires} WHERE token_hash = ${digest(raw)}`;
+		await sql`UPDATE sessions SET access_token_ciphertext = ${encrypt(accessToken)}, refresh_token_ciphertext = ${data.refresh_token ? encrypt(data.refresh_token) : row.refresh_token_ciphertext}, token_expires_at = ${data.expires_in ? new Date(Date.now() + data.expires_in * 1000).toISOString() : null} WHERE token_hash = ${digest(raw)}`;
 	}
 	return { github_user_id: Number(row.github_user_id), github_login: row.github_login, access_token: accessToken };
-}
-
-/**
- * Deletes the current session from the database when its cookie contains a token.
- *
- * @param request Request whose session token should be removed.
- */
-export async function removeSession(request: Request): Promise<void> {
-	const raw = sessionToken(request);
-	if (raw) {
-		const sql = db();
-		await sql`DELETE FROM sessions WHERE token_hash = ${digest(raw)}`;
-	}
 }
 
 /**
@@ -188,17 +145,4 @@ export async function removeSession(request: Request): Promise<void> {
  */
 export async function canReadRepository(user: Session, repo: { owner: string; name: string }): Promise<boolean> {
 	return repositoryAdmin(repo.owner, repo.name, user.github_login, user.access_token);
-}
-
-/**
- * Compares secret strings without returning early for matching prefixes.
- *
- * @param a First secret value.
- * @param b Second secret value.
- * @returns Whether the UTF-8 byte sequences are equal.
- */
-export function equalSecret(a: string, b: string): boolean {
-	const left = Buffer.from(a);
-	const right = Buffer.from(b);
-	return left.length === right.length && timingSafeEqual(left, right);
 }

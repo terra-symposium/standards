@@ -28,17 +28,16 @@ HELPERS
  *
  * @return Nothing; frames are written directly to standard error.
  */
-function draw(): void {
+function draw(frame = 0): void {
 	if (Atomics.load(state, 0)) {
 		writeSync(2, '\r\u001b[2K');
 		Atomics.store(state, 2, 1);
 		Atomics.notify(state, 2);
 		return;
 	}
-	writeSync(2, `\r  ${frames[frame++ % frames.length]} ${label}`);
+	writeSync(2, `\r  ${frames[frame % frames.length]} ${label}`);
 	Atomics.store(state, 1, 1);
 	Atomics.notify(state, 1);
-	setTimeout(draw, 90);
+	setTimeout(() => draw(frame + 1), 90);
 }
-let frame = 0;
 draw();

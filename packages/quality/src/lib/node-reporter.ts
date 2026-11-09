@@ -29,8 +29,21 @@ type NodeTestE = {
 		line?: number;
 		skip?: boolean | string;
 		todo?: boolean | string;
-		counts?: { tests?: number; passed?: number; failed?: number; skipped?: number; todo?: number; cancelled?: number };
-		details?: { type?: string; passed?: boolean; skip?: boolean | string; todo?: boolean | string; error?: { message?: string } | string };
+		counts?: {
+			tests?: number;
+			passed?: number;
+			failed?: number;
+			skipped?: number;
+			todo?: number;
+			cancelled?: number;
+		};
+		details?: {
+			type?: string;
+			passed?: boolean;
+			skip?: boolean | string;
+			todo?: boolean | string;
+			error?: { message?: string } | string;
+		};
 	};
 };
 
@@ -65,23 +78,6 @@ export function qualityNodeReporterOptions(curr: string | undefined, reporterUrl
 HELPERS
 //////////////////////////////////////////////////*/
 
-/**
- * Formats one terminal Node test result without forwarding child output.
- *
- * @param e Terminal pass or fail event from node:test.
- * @param status Normalized status for the test case.
- *
- * @return One stable, single-line result.
- */
-function fmtNodeResult(e: NodeTestE, status: 'PASS' | 'FAIL' | 'SKIP'): string {
-	const data = e.data;
-	const nesting = Math.max(0, data?.nesting ?? 0);
-	const err = data?.details?.error;
-	const msg = typeof err === 'string' ? err : err?.message;
-	const detail = status === 'FAIL' && msg ? ` — ${msg.replace(/\s+/gu, ' ').trim()}` : '';
-	return `${'  '.repeat(nesting)}[${status}] ${data?.name ?? 'unnamed test'}${detail}\n`;
-}
-
 /*//////////////////////////////////////////////////
 REPORTER
 //////////////////////////////////////////////////*/
@@ -112,9 +108,7 @@ export async function* qualityNodeReporter(src: AsyncIterable<NodeTestE>, opts?:
 	let lastProgressTotal = -1;
 	let terminalProtocol: 'complete' | 'legacy' | undefined;
 	let summaryCounts: NonNullable<NodeTestE['data']>['counts'];
-	/** Tracks whether a pending enqueue belongs to a test case or a suite. */
-	type Pending = { counted: boolean };
-	const pendingByIdentity = new Map<string, Pending[]>();
+	const pendingByIdentity = new Map<string, { counted: boolean }[]>();
 	const seenTerminal = new Set<string>();
 	/**
 	 *
@@ -143,16 +137,23 @@ export async function* qualityNodeReporter(src: AsyncIterable<NodeTestE>, opts?:
 		 *
 		 * @return
 		 */
-		const normPath = (path: string): string => path.replace(/^file:\/\//u, '').replace(/\\/gu, '/');
 		/**
 		 *
 		 * @param path
 		 *
 		 * @return
 		 */
-		const basename = (path: string): string => normPath(path).split('/').at(-1) ?? '';
-		const fileLikeName = /(?:^|[/\\])[^/\\]+\.(?:test|spec)\.(?:[cm]?js|tsx?)$/u.test(data.name);
-		return data.name === data.file || (data.file !== undefined && basename(data.name) === basename(data.file)) || (fileLikeName && (data.file === undefined || data.line === 1));
+		const basename = (path: string): string =>
+			path
+				.replace(/^file:\/\//u, '')
+				.replace(/\\/gu, '/')
+				.split('/')
+				.at(-1) ?? '';
+		return (
+			data.name === data.file ||
+			(data.file !== undefined && basename(data.name) === basename(data.file)) ||
+			(/(?:^|[/\\])[^/\\]+\.(?:test|spec)\.(?:[cm]?js|tsx?)$/u.test(data.name) && (data.file === undefined || data.line === 1))
+		);
 	};
 	/**
 	 *
@@ -161,29 +162,6 @@ export async function* qualityNodeReporter(src: AsyncIterable<NodeTestE>, opts?:
 		lastProgressCompleted = completed;
 		lastProgressTotal = Math.max(completed, enqueued);
 		qualityProgress('Cases', lastProgressCompleted, lastProgressTotal, reportProgress, { finalize: false });
-	};
-	/**
-	 *
-	 * @param data
-	 * @param counted
-	 */
-	const rememberPending = (data: NodeTestE['data'], counted: boolean): void => {
-		const key = identity(data);
-		pendingByIdentity.set(key, [...(pendingByIdentity.get(key) ?? []), { counted }]);
-	};
-	/**
-	 *
-	 * @param data
-	 *
-	 * @return
-	 */
-	const takePending = (data: NodeTestE['data']): Pending | undefined => {
-		const key = identity(data);
-		const entries = pendingByIdentity.get(key) ?? [];
-		const [pending] = entries.splice(0, 1);
-		if (entries.length) pendingByIdentity.set(key, entries);
-		else pendingByIdentity.delete(key);
-		return pending;
 	};
 	for await (const e of src) {
 		if (e.type === 'test:summary') {
@@ -195,7 +173,8 @@ export async function* qualityNodeReporter(src: AsyncIterable<NodeTestE>, opts?:
 			if (isFileSuite(e.data)) continue;
 			const counted = e.data?.type !== 'suite';
 			if (counted) enqueued += 1;
-			rememberPending(e.data, counted);
+			const key = identity(e.data);
+			pendingByIdentity.set(key, [...(pendingByIdentity.get(key) ?? []), { counted }]);
 			continue;
 		}
 		if (e.type !== 'test:complete' && e.type !== 'test:pass' && e.type !== 'test:fail') continue;
@@ -205,12 +184,18 @@ export async function* qualityNodeReporter(src: AsyncIterable<NodeTestE>, opts?:
 		const data = e.data;
 		if (isFileSuite(data)) continue;
 		const details = data?.details;
-		const isSuite = details?.type === 'suite' || data?.type === 'suite';
-		const terminalKey = identity(data, true);
-		if (seenTerminal.has(terminalKey)) continue;
-		seenTerminal.add(terminalKey);
-		const pending = takePending(data);
-		if (isSuite) {
+		const terminalState = {
+			isSuite: details?.type === 'suite' || data?.type === 'suite',
+			key: identity(data, true),
+		};
+		if (seenTerminal.has(terminalState.key)) continue;
+		seenTerminal.add(terminalState.key);
+		const pendingKey = identity(data);
+		const pendingEntries = pendingByIdentity.get(pendingKey) ?? [];
+		const [pending] = pendingEntries.splice(0, 1);
+		if (pendingEntries.length) pendingByIdentity.set(pendingKey, pendingEntries);
+		else pendingByIdentity.delete(pendingKey);
+		if (terminalState.isSuite) {
 			if (pending?.counted) {
 				enqueued = Math.max(completed, enqueued - 1);
 				if (hasProgress) liveProgress();
@@ -222,12 +207,19 @@ export async function* qualityNodeReporter(src: AsyncIterable<NodeTestE>, opts?:
 		liveProgress();
 		hasProgress = true;
 		const failed = e.type === 'test:fail' || (e.type === 'test:complete' && details?.passed === false);
-		const skip = details?.skip ?? data?.skip;
-		const todo = details?.todo ?? data?.todo;
-		const isExpectedTodoFailure = todo && failed;
-		const status = skip || isExpectedTodoFailure ? 'SKIP' : failed ? 'FAIL' : 'PASS';
+		const status = (details?.skip ?? data?.skip) || ((details?.todo ?? data?.todo) && failed) ? 'SKIP' : failed ? 'FAIL' : 'PASS';
 		counts[status] += 1;
-		if (status !== 'PASS') yield fmtNodeResult(e, status);
+		if (status !== 'PASS') {
+			const result = ((data) => {
+				const err = data?.details?.error;
+				const msg = typeof err === 'string' ? err : err?.message;
+				return {
+					data,
+					detail: status === 'FAIL' && msg ? ` — ${msg.replace(/\s+/gu, ' ').trim()}` : '',
+				};
+			})(e.data);
+			yield `${'  '.repeat(Math.max(0, result.data?.nesting ?? 0))}[${status}] ${result.data?.name ?? 'unnamed test'}${result.detail}\n`;
+		}
 	}
 	const total = summaryCounts?.tests ?? enqueued;
 	const finalCompleted = summaryCounts?.tests ?? completed;
@@ -238,7 +230,10 @@ export async function* qualityNodeReporter(src: AsyncIterable<NodeTestE>, opts?:
 	}
 	if (!hasProgress && total === 0) qualityProgress('Cases', 0, 0, reportProgress, { finalize: true });
 	else if (lastProgressCompleted === finalCompleted && lastProgressTotal === total) reportProgress('\n');
-	else qualityProgress('Cases', finalCompleted, total, reportProgress, { finalize: true });
+	else
+		qualityProgress('Cases', finalCompleted, total, reportProgress, {
+			finalize: true,
+		});
 	if (finalCompleted < total) yield `Node tests incomplete: ${total - finalCompleted} enqueued cases did not report a result\n`;
 	yield `Node tests: ${counts.PASS} passed, ${counts.FAIL} failed, ${counts.SKIP} skipped\n`;
 }
@@ -255,14 +250,12 @@ export async function* qualityNodeReporter(src: AsyncIterable<NodeTestE>, opts?:
  *
  * @return The per-case result lines accepted by the Node reporter API.
  */
-async function* defaultQualityNodeReporter(src: AsyncIterable<NodeTestE>, opts?: unknown): AsyncGenerator<string> {
+export default async function* defaultQualityNodeReporter(src: AsyncIterable<NodeTestE>, opts?: unknown): AsyncGenerator<string> {
 	const isTestWorker = process.env.NODE_TEST_CONTEXT === 'child-v8';
-	const ownsReporter = process.env.TERRA_QUALITY_NODE_REPORTER_OWNER === '1' && !isTestWorker;
 	if (isTestWorker) delete process.env.TERRA_QUALITY_NODE_REPORTER_OWNER;
-	if (!ownsReporter) {
+	if (isTestWorker || process.env.TERRA_QUALITY_NODE_REPORTER_OWNER !== '1') {
 		for await (const _event of src) void _event;
 		return;
 	}
 	yield* qualityNodeReporter(src, opts);
 }
-export default defaultQualityNodeReporter;

@@ -16,7 +16,4 @@ import { fileURLToPath } from 'node:url';
 CONFIG
 //////////////////////////////////////////////////*/
 
-export default defineConfig({
-	outDir: fileURLToPath(new URL('../../../dist/apps/hygiene/', import.meta.url)),
-	integrations: [__terraErrorBoundaryIntegration(), react()],
-});
+export default defineConfig({ outDir: fileURLToPath(new URL('../../../dist/apps/hygiene/', import.meta.url)), integrations: [__terraErrorBoundaryIntegration(), react()] });

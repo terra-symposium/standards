@@ -27,8 +27,7 @@ const append = (queue = '', stash = '', enclose = false) => {
 	return utils.flatten(result);
 };
 const expand = (ast, options = {}) => {
-	const rangeLimit = options.rangeLimit === undefined ? 1000 : options.rangeLimit;
-	const walk = (node, parent = {}) => {
+	const walk = (node, parent = {}, rangeLimit = options.rangeLimit === undefined ? 1000 : options.rangeLimit, enclose = utils.encloseBrace(node)) => {
 		node.queue = [];
 		let p = parent;
 		let q = parent.queue;
@@ -57,7 +56,6 @@ const expand = (ast, options = {}) => {
 			node.nodes = [];
 			return;
 		}
-		const enclose = utils.encloseBrace(node);
 		let queue = node.queue;
 		let block = node;
 		while (block.type !== 'brace' && block.type !== 'root' && block.parent) {
@@ -79,7 +77,7 @@ const expand = (ast, options = {}) => {
 				queue.push(append(queue.pop(), child.value));
 				continue;
 			}
-			if (child.nodes) walk(child, node);
+			if (child.nodes) walk(child, node, rangeLimit);
 		}
 		return queue;
 	};

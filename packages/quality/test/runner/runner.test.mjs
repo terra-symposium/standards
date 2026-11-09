@@ -20,6 +20,10 @@ import { fileURLToPath } from 'node:url';
 import { fixtureFile, fixtureRoot, fixtureText, resetExitCode } from '../../support/fixtures.mjs';
 import { join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
+/*//////////////////////////////////////////////////
+REGEX
+//////////////////////////////////////////////////*/
+const COULD_NOT_FIND_CONFIG_FILE_REGEX = /Could not find config file/;
 
 /*//////////////////////////////////////////////////
 REGEX
@@ -357,7 +361,7 @@ test('the executable loads ESLint flat config from config/', { skip: !ESLINT_AVA
 	const runner = fileURLToPath(new URL('../../dist/lib/runner.js', import.meta.url));
 	const result = spawnSync(process.execPath, [runner, 'lint', '--all'], { cwd: root, encoding: 'utf8' });
 	assert.equal(result.status, 0, result.stderr);
-	assert.doesNotMatch(result.stderr, /Could not find config file/);
+	assert.doesNotMatch(result.stderr, COULD_NOT_FIND_CONFIG_FILE_REGEX);
 });
 test('the executable loads ESLint flat config from configured configRoot', { skip: !ESLINT_AVAILABLE }, () => {
 	const root = fixtureRoot('terra-quality-eslint-config-root-');
@@ -370,7 +374,7 @@ test('the executable loads ESLint flat config from configured configRoot', { ski
 	const runner = fileURLToPath(new URL('../../dist/lib/runner.js', import.meta.url));
 	const result = spawnSync(process.execPath, [runner, 'lint', '--all'], { cwd: root, encoding: 'utf8' });
 	assert.equal(result.status, 0, result.stderr);
-	assert.doesNotMatch(result.stderr, /Could not find config file/);
+	assert.doesNotMatch(result.stderr, COULD_NOT_FIND_CONFIG_FILE_REGEX);
 });
 test('the executable prefers centralized ESLint config over the root compatibility fallback', { skip: !ESLINT_AVAILABLE }, () => {
 	const root = fixtureRoot('terra-quality-eslint-config-precedence-');

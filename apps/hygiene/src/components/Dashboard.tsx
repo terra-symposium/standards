@@ -107,13 +107,19 @@ function LineChart({ values, color, label }: { values: number[]; color: string; 
 	if (!values.length) return <div className="empty">No data yet</div>;
 	const width = 700;
 	const height = 180;
-	const max = Math.max(...values);
-	const min = Math.min(...values);
-	const points = values.map((value, i) => `${(i / Math.max(1, values.length - 1)) * width},${height - ((value - min) / Math.max(1, max - min)) * (height - 24) - 12}`).join(' ');
+	const scale = { max: Math.max(...values), min: Math.min(...values) };
 	return (
 		<svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label={label} preserveAspectRatio="none">
 			<line x1="0" y1="168" x2="700" y2="168" stroke="#27423c" />
-			<polyline points={points} fill="none" stroke={color} strokeWidth="3" vectorEffect="non-scaling-stroke" strokeLinejoin="round" strokeLinecap="round" />
+			<polyline
+				points={values.map((value, i) => `${(i / Math.max(1, values.length - 1)) * width},${height - ((value - scale.min) / Math.max(1, scale.max - scale.min)) * (height - 24) - 12}`).join(' ')}
+				fill="none"
+				stroke={color}
+				strokeWidth="3"
+				vectorEffect="non-scaling-stroke"
+				strokeLinejoin="round"
+				strokeLinecap="round"
+			/>
 		</svg>
 	);
 }
@@ -177,67 +183,6 @@ export default function Dashboard() {
 	const latestCommit = detail?.latestCommit;
 	const currentBranch = detail?.branches.find((i) => i.name === branch);
 	const pageCount = Math.max(1, Math.ceil((detail?.commitTotal ?? 0) / (detail?.commitPageSize ?? 25)));
-	const firstVisibleCommit = detail?.commitTotal ? (commitPage - 1) * (detail.commitPageSize ?? 25) + 1 : 0;
-	const lastVisibleCommit = Math.min(commitPage * (detail?.commitPageSize ?? 25), detail?.commitTotal ?? 0);
-	async function addBranch(event: React.FormEvent<HTMLFormElement>) {
-		event.preventDefault();
-		if (!selected) return;
-		const input = event.currentTarget.elements.namedItem('branch') as HTMLInputElement;
-		const name = input.value.trim();
-		const response = await fetch(`/api/repo?id=${selected}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ branch: name, enabled: true }) });
-		if (!response.ok) {
-			setErr('Could not add branch');
-			return;
-		}
-		setHistoryMessage(`Branch ${name} added. Run a local report import to populate its history and metrics.`);
-		setBranch(name);
-		setCommitPage(1);
-		input.value = '';
-	}
-	const kpis = [
-		{
-			key: 'score',
-			className: 'kpi feature',
-			label: (
-				<>
-					HYGIENE SCORE <span>ⓘ</span>
-				</>
-			),
-			value: (
-				<>
-					{latest?.metrics.score ?? '—'}
-					<small>{latest?.metrics.score === null || !latest ? '' : '/ 100'}</small>
-				</>
-			),
-			detail:
-				latest?.metrics.score === null || !latest
-					? 'Awaiting both test and quality reports'
-					: `${latest.source === 'local' ? `Local analysis${latest.quality_policy_branch ? ` · ${latest.quality_policy_branch} quality policy` : ''}` : 'GitHub Actions'} · equal blend of test and quality pass rates`,
-		},
-		{
-			key: 'test-rate',
-			className: 'kpi',
-			label: 'TEST PASS RATE',
-			value: percent(latest?.metrics.testRate ?? null),
-			detail: latest?.metrics.tests ? `${latest.metrics.tests.passed} passed · ${latest.metrics.tests.failed} failed · ${latest.metrics.tests.skipped} skipped` : 'JUnit report missing',
-		},
-		{
-			key: 'quality-rate',
-			className: 'kpi',
-			label: 'QUALITY CHECK RATE',
-			value: percent(latest?.metrics.qualityRate ?? null),
-			detail: latest?.metrics.quality
-				? `${latest.metrics.quality.clean} / ${latest.metrics.quality.enabled} checks clean · ${latest.metrics.quality.findings} findings · ${latest.metrics.quality.enabled}/${latest.metrics.quality.total} coverage`
-				: 'Terra Quality report missing',
-		},
-		{
-			key: 'source-lines',
-			className: 'kpi',
-			label: 'SOURCE LINES',
-			value: latestCommit?.source_lines.toLocaleString() ?? '—',
-			detail: latestCommit ? `As of ${date(latestCommit.committed_at)}` : 'Waiting for a full history report',
-		},
-	];
 	return (
 		<div className="app-shell">
 			<aside className="sidebar">
@@ -383,7 +328,28 @@ export default function Dashboard() {
 									))}
 								<form
 									onSubmit={(event) => {
-										void addBranch(event);
+										void (async () => {
+											event.preventDefault();
+											if (!selected) return;
+											const input = event.currentTarget.elements.namedItem('branch') as HTMLInputElement;
+											const name = input.value.trim();
+											if (
+												!(
+													await fetch(`/api/repo?id=${selected}`, {
+														method: 'POST',
+														headers: { 'Content-Type': 'application/json' },
+														body: JSON.stringify({ branch: name, enabled: true }),
+													})
+												).ok
+											) {
+												setErr('Could not add branch');
+												return;
+											}
+											setHistoryMessage(`Branch ${name} added. Run a local report import to populate its history and metrics.`);
+											setBranch(name);
+											setCommitPage(1);
+											input.value = '';
+										})();
 									}}
 								>
 									<input name="branch" aria-label="Additional branch" placeholder="Add branch" pattern="[A-Za-z0-9._/-]+" />
@@ -392,7 +358,50 @@ export default function Dashboard() {
 							</div>
 							{err && <div className="error">{err}</div>}
 							<section className="kpis">
-								{kpis.map(({ key, className, label, value, detail }) => (
+								{[
+									{
+										key: 'score',
+										className: 'kpi feature',
+										label: (
+											<>
+												HYGIENE SCORE <span>ⓘ</span>
+											</>
+										),
+										value: (
+											<>
+												{latest?.metrics.score ?? '—'}
+												<small>{latest?.metrics.score === null || !latest ? '' : '/ 100'}</small>
+											</>
+										),
+										detail:
+											latest?.metrics.score === null || !latest
+												? 'Awaiting both test and quality reports'
+												: `${latest.source === 'local' ? `Local analysis${latest.quality_policy_branch ? ` · ${latest.quality_policy_branch} quality policy` : ''}` : 'GitHub Actions'} · equal blend of test and quality pass rates`,
+									},
+									{
+										key: 'test-rate',
+										className: 'kpi',
+										label: 'TEST PASS RATE',
+										value: percent(latest?.metrics.testRate ?? null),
+										detail: latest?.metrics.tests ? `${latest.metrics.tests.passed} passed · ${latest.metrics.tests.failed} failed · ${latest.metrics.tests.skipped} skipped` : 'JUnit report missing',
+									},
+									{
+										key: 'quality-rate',
+										className: 'kpi',
+										label: 'QUALITY CHECK RATE',
+										value: percent(latest?.metrics.qualityRate ?? null),
+										detail: latest?.metrics.quality
+											? `${latest.metrics.quality.clean} / ${latest.metrics.quality.enabled} checks clean · ${latest.metrics.quality.findings} findings · ${latest.metrics.quality.enabled}/${latest.metrics.quality.total} coverage`
+											: 'Terra Quality report missing',
+									},
+									{
+										key: 'source-lines',
+										className: 'kpi',
+										label: 'SOURCE LINES',
+										value: latestCommit?.source_lines.toLocaleString() ?? '—',
+										detail: latestCommit ? `As of ${date(latestCommit.committed_at)}` : 'Waiting for a full history report',
+									},
+								].map(({ key, className, label, value, detail }) => (
 									<div className={className} key={key}>
 										<div className="kpi-label">{label}</div>
 										<div className="kpi-value">{value}</div>
@@ -494,7 +503,8 @@ export default function Dashboard() {
 								</div>
 								<div className="pagination">
 									<span>
-										Showing {firstVisibleCommit.toLocaleString()}–{lastVisibleCommit.toLocaleString()} of {(detail?.commitTotal ?? 0).toLocaleString()} indexed commits
+										Showing {(detail?.commitTotal ? (commitPage - 1) * (detail.commitPageSize ?? 25) + 1 : 0).toLocaleString()}–
+										{Math.min(commitPage * (detail?.commitPageSize ?? 25), detail?.commitTotal ?? 0).toLocaleString()} of {(detail?.commitTotal ?? 0).toLocaleString()} indexed commits
 									</span>
 									<div>
 										<button onClick={() => setCommitPage((page) => Math.max(1, page - 1))} disabled={commitPage <= 1}>
