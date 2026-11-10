@@ -66,15 +66,11 @@ function theme() {
 }
 
 
-function assertLines(value, maxChars, name) {
+function addText(slide, value, position, style = {}, name = 'text') {
+	const maxChars = style.maxChars ?? Math.floor(position.width / Math.max(7, (style.fontSize ?? 16) * 0.52));
 	for (const line of String(value).split('\n')) {
 		if (line.length > maxChars) throw new Error(`${name} line has ${line.length} characters; max is ${maxChars}. Add a deliberate line break or widen the frame.`);
 	}
-}
-
-
-function addText(slide, value, position, style = {}, name = 'text') {
-	assertLines(value, style.maxChars ?? Math.floor(position.width / Math.max(7, (style.fontSize ?? 16) * 0.52)), name);
 	const shape = slide.shapes.add({ geometry: 'textbox', name, position, fill: 'none', line: { style: 'solid', fill: 'none', width: 0 } });
 	shape.text = value;
 	shape.text.style = {
@@ -304,79 +300,6 @@ function assessBigFiveTimeline(plan, historyCommits) {
 }
 
 
-function addPlanSlide(deck, section, colors, page, sources) {
-	const plan = section.plan;
-	const slide = deck.slides.add();
-	slide.background.fill = colors.surface;
-	header(slide, `${section.name} · 90-day action plan`, page, colors);
-	const elapsed = planDay(plan.asOf, plan);
-	addText(slide, plan.outcome, { left: 58, top: 140, width: 1120, height: 46 }, { fontSize: 20, color: colors.muted, maxChars: 120 }, `plan-outcome-${page}`);
-	addText(slide, `Last week said: ${plan.previousObjective}`, { left: 58, top: 202, width: 1120, height: 20 }, { fontSize: 15, color: colors.muted, maxChars: 112 }, `plan-previous-objective-${page}`);
-	addText(
-		slide,
-		`${plan.scheduleLabel ?? 'Indicative weeks 1–12'} · ${plan.start} → ${plan.end} · as of ${plan.asOf} · day ${elapsed} of 90`,
-		{ left: 58, top: 230, width: 760, height: 20 },
-		{ fontSize: 15, color: colors.text, maxChars: 100 },
-		`plan-window-${page}`,
-	);
-	if (plan.progressBasis) addText(slide, plan.progressBasis, { left: 58, top: 258, width: 1120, height: 20 }, { fontSize: 13, color: colors.muted, maxChars: 120 }, `plan-basis-${page}`);
-	const chartLeft = 404;
-	const chartWidth = 790;
-	const chartTop = 290;
-	const marker = chartLeft + (elapsed / 90) * chartWidth;
-	['DAY 1', 'DAY 30', 'DAY 60', 'DAY 90'].forEach((label, i) => {
-		const x = chartLeft + (i / 3) * chartWidth;
-		rule(slide, x, chartTop - 12, 1, colors.rule, `plan-grid-${page}-${i}`);
-		addText(
-			slide,
-			label,
-			{ left: x - (i === 3 ? 38 : 0), top: chartTop - 38, width: 44, height: 16 },
-			{ fontSize: 11, color: colors.muted, maxChars: 6, alignment: i === 3 ? 'right' : 'left' },
-			`plan-axis-${page}-${i}`,
-		);
-	});
-	plan.milestones.forEach((milestone, i) => {
-		const top = chartTop + i * 48;
-		const start = planDay(milestone.start, plan);
-		const end = planDay(milestone.end, plan);
-		const left = chartLeft + (start / 90) * chartWidth;
-		const width = Math.max(12, ((end - start) / 90) * chartWidth);
-		addText(slide, milestone.name, { left: 58, top: top + 7, width: 320, height: 20 }, { fontSize: 16, color: colors.text, maxChars: 40 }, `plan-name-${page}-${i}`);
-		addText(slide, `${milestone.progress}%`, { left: 338, top: top + 7, width: 48, height: 20 }, { fontSize: 14, color: colors.muted, alignment: 'right', maxChars: 4 }, `plan-progress-${page}-${i}`);
-		rect(slide, { left, top: top + 6, width, height: 20 }, colors.tone, colors.rule, `plan-track-${page}-${i}`);
-		rect(slide, { left, top: top + 6, width: Math.max(2, width * (milestone.progress / 100)), height: 20 }, colors.secondary, 'none', `plan-complete-${page}-${i}`);
-	});
-	rule(slide, marker, chartTop - 52, 2, colors.secondary, `plan-asof-${page}`);
-	addText(slide, 'AS OF', { left: marker - 24, top: chartTop - 66, width: 50, height: 14 }, { fontSize: 10, color: colors.text, alignment: 'center', maxChars: 6 }, `plan-asof-label-${page}`);
-	addText(
-		slide,
-		plan.progressBasis ?? 'Progress key: 100 = complete in notes or closed PR · 50 = in progress or open PR · 0 = no verified completion',
-		{ left: 58, top: 610, width: 820, height: 18 },
-		{ fontSize: 13, color: colors.muted, maxChars: 120 },
-		`plan-legend-${page}`,
-	);
-	footer(slide, `Planning context only · ${plan.source.split(' · https://')[0]}`, page, colors);
-	notes(slide, [...sources, plan.source, ...plan.milestones.map((milestone) => `${milestone.name}: ${milestone.evidence}`)]);
-}
-
-
-function addMeetingSlide(deck, section, colors, page, sources) {
-	const meeting = section.meeting;
-	const slide = deck.slides.add();
-	slide.background.fill = colors.surface;
-	header(slide, meeting.title ?? `${section.name} · meeting notes`, page, colors);
-	meeting.columns.forEach((column, i) => {
-		const left = 58 + (i % 2) * 582;
-		const top = 164 + Math.floor(i / 2) * 226;
-		card(slide, { left, top, width: 556, height: 192 }, colors, `meeting-${page}-${i}`, i === 0 ? colors.tone : colors.surface);
-		addText(slide, column.title, { left: left + 24, top: top + 20, width: 500, height: 22 }, { fontSize: 20, color: colors.text, maxChars: 34 }, `meeting-title-${page}-${i}`);
-		addText(slide, column.body.join('\n'), { left: left + 24, top: top + 58, width: 500, height: 112 }, { fontSize: 16, color: colors.muted, maxChars: 58 }, `meeting-body-${page}-${i}`);
-	});
-	footer(slide, meeting.footer ?? 'Meeting notes provide context; GitHub and Git remain the delivery evidence.', page, colors);
-	notes(slide, [...sources, ...(meeting.sources ?? [])]);
-}
-
-
 function addContributorSummary(deck, section, goal, colors, page, sources) {
 	const slide = deck.slides.add();
 	slide.background.fill = colors.surface;
@@ -412,34 +335,6 @@ function addContributorSummary(deck, section, goal, colors, page, sources) {
 	addText(slide, goal?.status ?? 'Attribution not verified', { left: 796, top: 476, width: 400, height: 28 }, { fontSize: 15, color: colors.muted, maxChars: 44 }, `contribution-status-${page}`);
 	footer(slide, `${section.commitCount} commits · ${identity.toLowerCase()} · branch evidence only`, page, colors);
 	notes(slide, [...sources, ...(goal ? [`${goal.source} · ${goal.status}`] : []), ...section.slides.flatMap((i) => i.sources ?? [])]);
-}
-
-
-function addNoCommitsSlide(deck, goal, colors, page, sources) {
-	const slide = deck.slides.add();
-	slide.background.fill = colors.surface;
-	header(slide, `${goal.person} · no attributed commits`, page, colors);
-	card(slide, { left: 58, top: 164, width: 720, height: 350 }, colors, `no-commits-${page}`);
-	addText(slide, 'Standard Git comparison', { left: 86, top: 190, width: 650, height: 28 }, { fontSize: 21, color: colors.text, maxChars: 38 }, `no-commits-heading-${page}`);
-	addText(
-		slide,
-		wrapLines(`Goal\n${goal.goal}\n\nGit status\n${goal.status}\n\nNo commits were attributed to this person during the reporting window.`, 66),
-		{ left: 86, top: 238, width: 650, height: 240 },
-		{ fontSize: 17, color: colors.text, maxChars: 66 },
-		`no-commits-body-${page}`,
-	);
-	card(slide, { left: 808, top: 164, width: 414, height: 350 }, colors, `no-commits-context-${page}`, colors.tone);
-	addText(slide, 'Evidence source', { left: 834, top: 190, width: 360, height: 28 }, { fontSize: 20, color: colors.text, maxChars: 32 }, `no-commits-source-heading-${page}`);
-	addText(slide, wrapLines(goal.source, 40), { left: 834, top: 238, width: 360, height: 180 }, { fontSize: 16, color: colors.muted, maxChars: 40 }, `no-commits-source-${page}`);
-	addText(
-		slide,
-		wrapLines('A missing commit does not establish whether the work happened.', 40),
-		{ left: 834, top: 438, width: 360, height: 54 },
-		{ fontSize: 15, color: colors.text, maxChars: 40 },
-		`no-commits-caveat-${page}`,
-	);
-	footer(slide, 'Git attribution comparison · no performance conclusion', page, colors);
-	notes(slide, [...sources, `${goal.source} · ${goal.status}`]);
 }
 
 
@@ -652,17 +547,115 @@ async function main() {
 		const colors = theme();
 		if (!section || section.commitCount <= 0) {
 			if (goal) {
-				addNoCommitsSlide(deck, goal, colors, page, sources);
+				const slide = deck.slides.add();
+				slide.background.fill = colors.surface;
+				header(slide, `${goal.person} · no attributed commits`, page, colors);
+				card(slide, { left: 58, top: 164, width: 720, height: 350 }, colors, `no-commits-${page}`);
+				addText(slide, 'Standard Git comparison', { left: 86, top: 190, width: 650, height: 28 }, { fontSize: 21, color: colors.text, maxChars: 38 }, `no-commits-heading-${page}`);
+				addText(
+					slide,
+					wrapLines(`Goal\n${goal.goal}\n\nGit status\n${goal.status}\n\nNo commits were attributed to this person during the reporting window.`, 66),
+					{ left: 86, top: 238, width: 650, height: 240 },
+					{ fontSize: 17, color: colors.text, maxChars: 66 },
+					`no-commits-body-${page}`,
+				);
+				card(slide, { left: 808, top: 164, width: 414, height: 350 }, colors, `no-commits-context-${page}`, colors.tone);
+				addText(slide, 'Evidence source', { left: 834, top: 190, width: 360, height: 28 }, { fontSize: 20, color: colors.text, maxChars: 32 }, `no-commits-source-heading-${page}`);
+				addText(slide, wrapLines(goal.source, 40), { left: 834, top: 238, width: 360, height: 180 }, { fontSize: 16, color: colors.muted, maxChars: 40 }, `no-commits-source-${page}`);
+				addText(
+					slide,
+					wrapLines('A missing commit does not establish whether the work happened.', 40),
+					{ left: 834, top: 438, width: 360, height: 54 },
+					{ fontSize: 15, color: colors.text, maxChars: 40 },
+					`no-commits-caveat-${page}`,
+				);
+				footer(slide, 'Git attribution comparison · no performance conclusion', page, colors);
+				notes(slide, [...sources, `${goal.source} · ${goal.status}`]);
 				page += 1;
 			}
 			continue;
 		}
 		if (section.meeting) {
-			addMeetingSlide(deck, section, colors, page, sources);
+			const meeting = section.meeting;
+			const slide = deck.slides.add();
+			slide.background.fill = colors.surface;
+			header(slide, meeting.title ?? `${section.name} · meeting notes`, page, colors);
+			meeting.columns.forEach((column, i) => {
+				const left = 58 + (i % 2) * 582;
+				const top = 164 + Math.floor(i / 2) * 226;
+				card(slide, { left, top, width: 556, height: 192 }, colors, `meeting-${page}-${i}`, i === 0 ? colors.tone : colors.surface);
+				addText(slide, column.title, { left: left + 24, top: top + 20, width: 500, height: 22 }, { fontSize: 20, color: colors.text, maxChars: 34 }, `meeting-title-${page}-${i}`);
+				addText(slide, column.body.join('\n'), { left: left + 24, top: top + 58, width: 500, height: 112 }, { fontSize: 16, color: colors.muted, maxChars: 58 }, `meeting-body-${page}-${i}`);
+			});
+			footer(slide, meeting.footer ?? 'Meeting notes provide context; GitHub and Git remain the delivery evidence.', page, colors);
+			notes(slide, [...sources, ...(meeting.sources ?? [])]);
 			page += 1;
 		}
 		if (validPlan(section.plan, section)) {
-			addPlanSlide(deck, section, colors, page, sources);
+			const plan = section.plan;
+			const slide = deck.slides.add();
+			slide.background.fill = colors.surface;
+			header(slide, `${section.name} · 90-day action plan`, page, colors);
+			const elapsed = planDay(plan.asOf, plan);
+			addText(slide, plan.outcome, { left: 58, top: 140, width: 1120, height: 46 }, { fontSize: 20, color: colors.muted, maxChars: 120 }, `plan-outcome-${page}`);
+			addText(
+				slide,
+				`Last week said: ${plan.previousObjective}`,
+				{ left: 58, top: 202, width: 1120, height: 20 },
+				{ fontSize: 15, color: colors.muted, maxChars: 112 },
+				`plan-previous-objective-${page}`,
+			);
+			addText(
+				slide,
+				`${plan.scheduleLabel ?? 'Indicative weeks 1–12'} · ${plan.start} → ${plan.end} · as of ${plan.asOf} · day ${elapsed} of 90`,
+				{ left: 58, top: 230, width: 760, height: 20 },
+				{ fontSize: 15, color: colors.text, maxChars: 100 },
+				`plan-window-${page}`,
+			);
+			if (plan.progressBasis) addText(slide, plan.progressBasis, { left: 58, top: 258, width: 1120, height: 20 }, { fontSize: 13, color: colors.muted, maxChars: 120 }, `plan-basis-${page}`);
+			const chartLeft = 404;
+			const chartWidth = 790;
+			const chartTop = 290;
+			const marker = chartLeft + (elapsed / 90) * chartWidth;
+			['DAY 1', 'DAY 30', 'DAY 60', 'DAY 90'].forEach((label, i) => {
+				const x = chartLeft + (i / 3) * chartWidth;
+				rule(slide, x, chartTop - 12, 1, colors.rule, `plan-grid-${page}-${i}`);
+				addText(
+					slide,
+					label,
+					{ left: x - (i === 3 ? 38 : 0), top: chartTop - 38, width: 44, height: 16 },
+					{ fontSize: 11, color: colors.muted, maxChars: 6, alignment: i === 3 ? 'right' : 'left' },
+					`plan-axis-${page}-${i}`,
+				);
+			});
+			plan.milestones.forEach((milestone, i) => {
+				const top = chartTop + i * 48;
+				const start = planDay(milestone.start, plan);
+				const end = planDay(milestone.end, plan);
+				const left = chartLeft + (start / 90) * chartWidth;
+				const width = Math.max(12, ((end - start) / 90) * chartWidth);
+				addText(slide, milestone.name, { left: 58, top: top + 7, width: 320, height: 20 }, { fontSize: 16, color: colors.text, maxChars: 40 }, `plan-name-${page}-${i}`);
+				addText(
+					slide,
+					`${milestone.progress}%`,
+					{ left: 338, top: top + 7, width: 48, height: 20 },
+					{ fontSize: 14, color: colors.muted, alignment: 'right', maxChars: 4 },
+					`plan-progress-${page}-${i}`,
+				);
+				rect(slide, { left, top: top + 6, width, height: 20 }, colors.tone, colors.rule, `plan-track-${page}-${i}`);
+				rect(slide, { left, top: top + 6, width: Math.max(2, width * (milestone.progress / 100)), height: 20 }, colors.secondary, 'none', `plan-complete-${page}-${i}`);
+			});
+			rule(slide, marker, chartTop - 52, 2, colors.secondary, `plan-asof-${page}`);
+			addText(slide, 'AS OF', { left: marker - 24, top: chartTop - 66, width: 50, height: 14 }, { fontSize: 10, color: colors.text, alignment: 'center', maxChars: 6 }, `plan-asof-label-${page}`);
+			addText(
+				slide,
+				plan.progressBasis ?? 'Progress key: 100 = complete in notes or closed PR · 50 = in progress or open PR · 0 = no verified completion',
+				{ left: 58, top: 610, width: 820, height: 18 },
+				{ fontSize: 13, color: colors.muted, maxChars: 120 },
+				`plan-legend-${page}`,
+			);
+			footer(slide, `Planning context only · ${plan.source.split(' · https://')[0]}`, page, colors);
+			notes(slide, [...sources, plan.source, ...plan.milestones.map((milestone) => `${milestone.name}: ${milestone.evidence}`)]);
 			page += 1;
 		}
 		addContributorSummary(deck, section, goal, colors, page, sources);

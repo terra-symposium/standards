@@ -214,74 +214,6 @@ export type SlideshowOptions = { title?: string; author?: string; company?: stri
 /** One test result paired with a graded timing measurement for the report. */
 type LoadRow = { result: VisualResult; measurement: NonNullable<VisualResult['loadMeasurements']>[number] };
 /**
- * Adds a run-level load summary slide and names the slowest measurements.
- *
- * @param presentation
- * @param results
- */
-const addLoadSummarySlide = (presentation: Presentation, results: readonly VisualResult[]): void => {
-	const measurements: LoadRow[] = results.flatMap((r) => (r.loadMeasurements || []).map((measurement) => ({ result: r, measurement })));
-	const counts = loadGradeCounts(measurements.map(({ measurement }) => measurement));
-	const slowest = [...measurements].sort((a, b) => b.measurement.durationMs - a.measurement.durationMs).slice(0, 6);
-	const slide = presentation.addSlide();
-	slide.background = { color: COLOURS.surface };
-	slide.addText('Load timing summary', { bold: true, color: COLOURS.ink, fontFace: 'Aptos Display', fontSize: 26, margin: 0, x: 0.55, y: 0.45, w: 12.2, h: 0.5 });
-	slide.addText(`${measurements.length} measurements   ·   ${counts.pass} pass   ·   ${counts.warning} warning   ·   ${counts.fail} fail`, {
-		bold: true,
-		color: COLOURS.accent,
-		fontFace: 'Aptos',
-		fontSize: 17,
-		margin: 0,
-		x: 0.58,
-		y: 1.28,
-		w: 12.1,
-		h: 0.35,
-	});
-	slide.addText(
-		slowest.length
-			? `Slowest measurements\n${slowest.map(({ result: r, measurement }) => `${measurement.grade.toUpperCase()}  ${measurement.durationMs.toFixed(1)} ms  ${r.file} · ${r.title} · ${measurement.name}`).join('\n')}`
-			: 'No load measurements were collected.',
-		{ color: COLOURS.ink, fontFace: 'Aptos', fontSize: 13, fit: 'shrink', margin: 0.08, valign: 'mid', x: 0.58, y: 2.05, w: 12.1, h: 4.3 },
-	);
-};
-/**
- * Adds paginated slides containing every individual test, page, and operation measurement.
- *
- * @param presentation
- * @param results
- *
- * @return
- */
-const addLoadDetailSlides = (presentation: Presentation, results: readonly VisualResult[]): number => {
-	const measurements: LoadRow[] = results.flatMap((r) => (r.loadMeasurements || []).map((measurement) => ({ result: r, measurement })));
-	const pageSize = 12;
-	const pages = Math.max(1, Math.ceil(measurements.length / pageSize));
-	for (let page = 0; page < pages; page += 1) {
-		const lines = measurements
-			.slice(page * pageSize, (page + 1) * pageSize)
-			.map(
-				({ result: r, measurement }) =>
-					`${measurement.grade.toUpperCase().padEnd(7)} ${measurement.durationMs.toFixed(1).padStart(9)} ms  ${measurement.kind.padEnd(9)} ${r.file} · ${r.title} · ${measurement.name}  [warn ${measurement.budget.warnMs} / fail ${measurement.budget.failMs} ms]`,
-			);
-		const slide = presentation.addSlide();
-		slide.background = { color: COLOURS.surface };
-		slide.addText(`Load timing details ${page + 1}/${pages}`, { bold: true, color: COLOURS.ink, fontFace: 'Aptos Display', fontSize: 22, margin: 0, x: 0.55, y: 0.4, w: 12.2, h: 0.45 });
-		slide.addText(lines.join('\n') || 'No load measurements were collected.', {
-			color: COLOURS.ink,
-			fontFace: 'Aptos',
-			fontSize: 11,
-			fit: 'shrink',
-			margin: 0.08,
-			valign: 'mid',
-			x: 0.55,
-			y: 1.05,
-			w: 12.2,
-			h: 5.95,
-		});
-	}
-	return pages;
-};
-/**
  * Writes screenshot-backed results as single-viewport or responsive review slides.
  *
  * @param file Output path for the slideshow artifact.
@@ -302,7 +234,29 @@ export const writeSlideshow = async (file: string, results: readonly VisualResul
 	presentation.title = opts.title || 'Test evidence slideshow';
 	let slideNumber = 0;
 	if (loadEnabled) {
-		addLoadSummarySlide(presentation, results);
+		const measurements: LoadRow[] = results.flatMap((r) => (r.loadMeasurements || []).map((measurement) => ({ result: r, measurement })));
+		const counts = loadGradeCounts(measurements.map(({ measurement }) => measurement));
+		const slowest = [...measurements].sort((a, b) => b.measurement.durationMs - a.measurement.durationMs).slice(0, 6);
+		const slide = presentation.addSlide();
+		slide.background = { color: COLOURS.surface };
+		slide.addText('Load timing summary', { bold: true, color: COLOURS.ink, fontFace: 'Aptos Display', fontSize: 26, margin: 0, x: 0.55, y: 0.45, w: 12.2, h: 0.5 });
+		slide.addText(`${measurements.length} measurements   ·   ${counts.pass} pass   ·   ${counts.warning} warning   ·   ${counts.fail} fail`, {
+			bold: true,
+			color: COLOURS.accent,
+			fontFace: 'Aptos',
+			fontSize: 17,
+			margin: 0,
+			x: 0.58,
+			y: 1.28,
+			w: 12.1,
+			h: 0.35,
+		});
+		slide.addText(
+			slowest.length
+				? `Slowest measurements\n${slowest.map(({ result: r, measurement }) => `${measurement.grade.toUpperCase()}  ${measurement.durationMs.toFixed(1)} ms  ${r.file} · ${r.title} · ${measurement.name}`).join('\n')}`
+				: 'No load measurements were collected.',
+			{ color: COLOURS.ink, fontFace: 'Aptos', fontSize: 13, fit: 'shrink', margin: 0.08, valign: 'mid', x: 0.58, y: 2.05, w: 12.1, h: 4.3 },
+		);
 		slideNumber += 1;
 	}
 	const groups = new Map<string, VisualResult[]>();
@@ -328,7 +282,34 @@ export const writeSlideshow = async (file: string, results: readonly VisualResul
 		slide.addText('Test evidence slideshow', { align: 'center', bold: true, color: COLOURS.accent, fontFace: 'Aptos Display', fontSize: 30, x: 0.8, y: 2.6, w: 11.7, h: 0.6 });
 		slide.addText('No browser test results were collected in this run.', { align: 'center', color: COLOURS.muted, fontFace: 'Aptos', fontSize: 16, x: 1.2, y: 3.35, w: 10.9, h: 0.5 });
 	}
-	if (loadEnabled) addLoadDetailSlides(presentation, results);
+	if (loadEnabled) {
+		const measurements: LoadRow[] = results.flatMap((r) => (r.loadMeasurements || []).map((measurement) => ({ result: r, measurement })));
+		const pageSize = 12;
+		const pages = Math.max(1, Math.ceil(measurements.length / pageSize));
+		for (let page = 0; page < pages; page += 1) {
+			const lines = measurements
+				.slice(page * pageSize, (page + 1) * pageSize)
+				.map(
+					({ result: r, measurement }) =>
+						`${measurement.grade.toUpperCase().padEnd(7)} ${measurement.durationMs.toFixed(1).padStart(9)} ms  ${measurement.kind.padEnd(9)} ${r.file} · ${r.title} · ${measurement.name}  [warn ${measurement.budget.warnMs} / fail ${measurement.budget.failMs} ms]`,
+				);
+			const slide = presentation.addSlide();
+			slide.background = { color: COLOURS.surface };
+			slide.addText(`Load timing details ${page + 1}/${pages}`, { bold: true, color: COLOURS.ink, fontFace: 'Aptos Display', fontSize: 22, margin: 0, x: 0.55, y: 0.4, w: 12.2, h: 0.45 });
+			slide.addText(lines.join('\n') || 'No load measurements were collected.', {
+				color: COLOURS.ink,
+				fontFace: 'Aptos',
+				fontSize: 11,
+				fit: 'shrink',
+				margin: 0.08,
+				valign: 'mid',
+				x: 0.55,
+				y: 1.05,
+				w: 12.2,
+				h: 5.95,
+			});
+		}
+	}
 	await presentation.writeFile({ fileName: file });
 	await neutralizeApplicationMetadata(file);
 };
