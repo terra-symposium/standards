@@ -110,18 +110,17 @@ export const writeSpreadsheet = async (file: string, run: ReportRun): Promise<vo
 		sheet.columns = [{ width: 32 }, ...Array.from({ length: loadEnabled ? 9 : 6 }, () => ({ width: 14 }))];
 	}
 	for (const fileName of orderedFiles(run)) {
-		const vals = resultsForFile(run, fileName);
 		const base =
 			[...fileName]
 				.map((c) => ('\\/:*?[]'.includes(c) ? '_' : c))
 				.join('')
 				.replace(/^'+|'+$/g, '')
 				.slice(0, 31) || 'Results';
-		const used = new Set([...book.worksheets.map((s) => s.name.toLowerCase()), ...['summary', 'projects', 'run diagnostics']]);
 		let sheetName = base;
 		let suffix = 2;
-		while (used.has(sheetName.toLowerCase())) {
-			const label = ` (${suffix++})`;
+		while (new Set([...book.worksheets.map((s) => s.name.toLowerCase()), ...['summary', 'projects', 'run diagnostics']]).has(sheetName.toLowerCase())) {
+			const label = ` (${suffix})`;
+			suffix += 1;
 			sheetName = `${base.slice(0, 31 - label.length)}${label}`;
 		}
 		const sheet = book.addWorksheet(sheetName);
@@ -157,7 +156,7 @@ export const writeSpreadsheet = async (file: string, run: ReportRun): Promise<vo
 				{ width: 14 },
 				{ width: 18 },
 			];
-		for (const val of vals) {
+		for (const val of resultsForFile(run, fileName)) {
 			const row = sheet.addRow([
 				val.project,
 				val.groups,
@@ -203,10 +202,9 @@ export const writeSpreadsheet = async (file: string, run: ReportRun): Promise<vo
 		}
 	}
 	if (loadEnabled) {
-		const results = run.results;
 		const sheet = book.addWorksheet('Load timings');
 		sheet.addRow(['File', 'Test title', 'Project', 'Viewport', 'Kind', 'Measurement', 'Duration (ms)', 'Warn at (ms)', 'Fail at (ms)', 'Grade']);
-		for (const result of results) {
+		for (const result of run.results) {
 			for (const measurement of result.loadMeasurements || []) {
 				const row = sheet.addRow([
 					result.file,
