@@ -157,9 +157,6 @@ export type ReportingOptions = {
 	loadTesting?: LoadTestingConfig;
 };
 
-/** Describes a Playwright attachment passed to the shared reporter. */
-type ReporterAttachment = { body?: Buffer; contentType?: string; name?: string; path?: string };
-
 /*//////////////////////////////////////////////////
 HELPERS
 //////////////////////////////////////////////////*/
@@ -211,41 +208,10 @@ const terminalText = (chunk: string | Buffer): string => stripAnsi(chunk.toStrin
  *
  * @return Attachment text, or an empty string when it is unavailable.
  */
-const readAttachment = (attachment: ReporterAttachment): string => {
+const readAttachment = (attachment: { body?: Buffer; contentType?: string; name?: string; path?: string }): string => {
 	if (attachment.body) return attachment.body.toString('utf8');
 	if (attachment.path && fs.existsSync(attachment.path)) return fs.readFileSync(attachment.path, 'utf8');
 	return '';
-};
-
-/**
- * Reads timing samples and a test override from the fixture attachment.
- *
- * @param attachments
- *
- * @return
- */
-const loadAttachment = (attachments: readonly ReporterAttachment[]): { measurements: LoadMeasurementInput[]; testBudget?: LoadBudgetOverride } => {
-	const attachment = attachments.find((v) => v.name === 'load-testing' && v.contentType === 'application/json');
-	if (!attachment) return { measurements: [] };
-	try {
-		const parsed = JSON.parse(readAttachment(attachment)) as Record<string, unknown>;
-		return {
-			measurements: Array.isArray(parsed.measurements)
-				? parsed.measurements.flatMap((v): LoadMeasurementInput[] => {
-						if (!v || typeof v !== 'object') return [];
-						const row = v as Record<string, unknown>;
-						if (typeof row.name !== 'string' || !row.name.trim() || !['page', 'operation'].includes(String(row.kind))) return [];
-						if (typeof row.durationMs !== 'number' || !Number.isFinite(row.durationMs) || row.durationMs < 0) return [];
-						let budget: LoadBudgetOverride | undefined;
-						if (row.budget && typeof row.budget === 'object') budget = validateLoadBudgetOverride(row.budget as LoadBudgetOverride);
-						return [{ name: redactEvidence(row.name), kind: row.kind as LoadMeasurementInput['kind'], durationMs: row.durationMs, ...(budget ? { budget } : {}) }];
-					})
-				: [],
-			...(parsed.testBudget && typeof parsed.testBudget === 'object' ? { testBudget: validateLoadBudgetOverride(parsed.testBudget as LoadBudgetOverride) } : {}),
-		};
-	} catch {
-		return { measurements: [] };
-	}
 };
 
 /**
@@ -541,7 +507,29 @@ export default class ProgressReporter {
 			fs.mkdirSync(path.dirname(screenshot), { recursive: true });
 			fs.writeFileSync(screenshot, attachment.body);
 		}
-		const attachedLoad = loadAttachment(result.attachments);
+		let attachedLoad: { measurements: LoadMeasurementInput[]; testBudget?: LoadBudgetOverride } = { measurements: [] };
+		const loadAttachment = result.attachments.find((v) => v.name === 'load-testing' && v.contentType === 'application/json');
+		if (loadAttachment) {
+			try {
+				const parsed = JSON.parse(readAttachment(loadAttachment)) as Record<string, unknown>;
+				attachedLoad = {
+					measurements: Array.isArray(parsed.measurements)
+						? parsed.measurements.flatMap((value): LoadMeasurementInput[] => {
+								if (!value || typeof value !== 'object') return [];
+								const row = value as Record<string, unknown>;
+								if (typeof row.name !== 'string' || !row.name.trim() || !['page', 'operation'].includes(String(row.kind))) return [];
+								if (typeof row.durationMs !== 'number' || !Number.isFinite(row.durationMs) || row.durationMs < 0) return [];
+								let budget: LoadBudgetOverride | undefined;
+								if (row.budget && typeof row.budget === 'object') budget = validateLoadBudgetOverride(row.budget as LoadBudgetOverride);
+								return [{ name: redactEvidence(row.name), kind: row.kind as LoadMeasurementInput['kind'], durationMs: row.durationMs, ...(budget ? { budget } : {}) }];
+							})
+						: [],
+					...(parsed.testBudget && typeof parsed.testBudget === 'object' ? { testBudget: validateLoadBudgetOverride(parsed.testBudget as LoadBudgetOverride) } : {}),
+				};
+			} catch {
+				attachedLoad = { measurements: [] };
+			}
+		}
 		this.results.push(addLoadMeasurements(
 			{
 			...testIdentity(test, test.parent.project()?.name || test.titlePath().find((v) => v.startsWith('root-')) || 'unknown', this.options.viewportCatalog),
