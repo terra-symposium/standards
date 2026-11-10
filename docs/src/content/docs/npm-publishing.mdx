@@ -5,40 +5,39 @@ description: The central Terra publisher, package access, release steps, and tro
 
 # npm package publishing
 
-Terra package releases run through GitHub Actions. Maintainers do not need a local npm login or a new sign-in for each release. Never print, copy, or commit the publisher credential.
+Terra package releases run through the Standards GitHub Actions workflow. Maintainers can publish without an npm login on their computer. The workflow reads its publisher credential from the Standards repository secret named PACKAGES_TOKEN. Keep that value private; never print it or put it in source, logs, or artifacts.
 
 ## The central publisher
 
-The Standards repository owns .github/workflows/publish-packages.yml. Its repository secrets page currently lists PACKAGES_TOKEN. The workflow currently refers to NPM_TOKEN, so the secret name and workflow do not match. The workflow publishes four packages from the Standards checkout: @terra-symposium/standards-quality, @terra-symposium/standards-error-boundaries, @terra-symposium/standards-reporting, and @terra-symposium/standards-testing.
+The workflow at .github/workflows/publish-packages.yml is the single Terra publisher. It builds and publishes the four Standards packages plus @terra-symposium/docs. All five publishing steps use PACKAGES_TOKEN. Do not create separate npm tokens or trusted-publisher connections for individual repositories.
 
-Use one central npm credential for all Terra packages, stored only as a GitHub Actions secret in Standards. Route publishing through an explicit allowlist in the shared workflow. Each package entry must identify its source repository and immutable ref, build it from a clean checkout, verify the package name and version, and publish only if that version is absent. Reject unknown packages and never accept arbitrary repository input. Do not create per-repository npm tokens or publisher workflows.
+The workflow gets Docs source from Terra-Symposium/docs at an explicit 40-character commit SHA. It validates the SHA format, checks out that exact revision, installs from the repository's config lockfile, builds the package, and verifies the package name before publishing. The Standards packages are built from the checked out Standards revision.
 
-The existing workflow does not include Docs or other packages outside Standards. Before extending the allowlist, confirm that the existing token is authorized to publish each added package. A secret name on GitHub does not prove its npm scope. Keep package access limited to the Terra packages that the central publisher releases.
+The secret exists in the Standards repository, but its name alone does not prove npm grants write access to every package. The token must have publish access to all five package names. If a publish returns 403 or 404, keep the workflow and credential centralized; resolve the npm token's scope for that package rather than adding another publisher. Do not paste or expose the token to diagnose it.
 
-## npm trusted publishers
+## Release a package
 
-npm trusted publishing uses GitHub OIDC and avoids an npm token, but each connection is associated with one package. A connection for Docs cannot publish all Terra packages. Use it only if Terra accepts maintaining a separate trusted publisher per package; otherwise use the shared token workflow.
+1. Update the package version and release notes in its source repository, then merge the reviewed change.
+2. For Docs, identify the full 40-character commit SHA to publish. Open the Standards repository's Actions tab and run **Publish shared packages** with that SHA. The default SHA is a known Docs revision; replace it with the reviewed release revision when needed.
+3. Confirm each expected package and version in the workflow output. The workflow skips a version that npm already has.
+4. Verify the published version on npm, then update consumers and lockfiles.
 
-An OIDC exchange 404 such as package not found means npm did not match the request to an authorized package and publisher. Check package name, organization, repository, workflow filename, and environment. Do not repeat a failed publish unchanged.
+The workflow does not accept a repository URL or arbitrary package name. This keeps the publisher limited to the configured Terra packages. Never overwrite or unpublish an existing release; publish a new version instead.
 
-## Release procedure
+## Trusted publishers and OIDC
 
-1. Update the package version and release notes in its source repository.
-2. Merge the reviewed change to its release branch.
-3. Run the Standards Publish shared packages workflow and select an allowlisted package and immutable source ref.
-4. Confirm the workflow output names the expected package and version, then verify the version on npm.
-5. Update consumers and lockfiles after that version is available.
+npm trusted publishing uses GitHub OIDC instead of a token, but each trusted-publisher configuration is package-specific. It cannot serve as one publisher for every Terra package. Terra uses the central Standards workflow and its one repository secret for this reason.
 
-The workflow should skip a version already published, fail closed on registry/authentication errors, and never overwrite or unpublish a released version.
+An OIDC exchange 404 such as package not found indicates npm did not match the package and publisher configuration. Do not create another per-package connection as a workaround; use the shared publisher described above.
 
 ## Troubleshooting
 
 | Symptom | Check |
 | --- | --- |
-| ENEEDAUTH | Verify the workflow references the configured Actions secret and npm accepts its credential type. |
-| OIDC exchange returns 404 | Check the package-specific trusted-publisher fields or use the central token workflow. |
-| Publish returns 403/404 | Verify that the existing token can publish that package and that it belongs to the Terra scope. |
-| Version already exists | Verify it on npm and release a new version. |
-| npm view fails | Distinguish a missing version from authentication or network failure before publishing. |
+| ENEEDAUTH | Confirm the central workflow references PACKAGES_TOKEN and that the Actions secret remains configured. |
+| Publish returns 403/404 | The token may lack write access to that package. Resolve access for the central token; do not create a second publisher. |
+| Version already exists | Verify that version on npm. Release a new version if further changes are needed. |
+| Docs checkout fails | Supply a valid full 40-character commit SHA from Terra-Symposium/docs. |
+| Docs build fails | Check the selected revision and the repository's config lockfile and build workflow. |
 
-Keep the credential in Standards Actions secrets only. Do not place it in consumer repositories, logs, artifacts, workflow text, or .npmrc. Rotate the single credential through the npm account process and update the central secret without exposing its value.
+Keep the credential only in Standards Actions secrets. Do not copy it to consumer repositories, workflow text, .npmrc, logs, or build artifacts. Rotate the central credential through npm's account process and update PACKAGES_TOKEN without exposing its value.
