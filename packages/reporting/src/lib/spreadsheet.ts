@@ -56,8 +56,8 @@ const styleHeader = (sheet: ExcelJS.Worksheet): void => {
 /**
  * Applies a timing grade and its semantic color treatment to a cell.
  *
- * @param cell
- * @param grade
+ * @param cell Spreadsheet cell whose value and formatting should reflect the grade.
+ * @param grade Load grade to display, such as `pass`, `warning`, or `fail`.
  */
 const styleLoadGrade = (cell: ExcelJS.Cell, grade: string): void => {
 	const style = LOAD_STYLES[grade] || LOAD_STYLES.fail;
@@ -67,10 +67,11 @@ const styleLoadGrade = (cell: ExcelJS.Cell, grade: string): void => {
 	cell.alignment = { horizontal: 'center', vertical: 'middle' };
 };
 /**
+ * Returns the most severe timing grade present in a visual result.
  *
- * @param val
+ * @param val Normalized visual result whose load measurements should be summarized.
  *
- * @return
+ * @return The highest grade present, or an empty string when no measurements exist.
  */
 const resultLoadGrade = (val: VisualResult): string => {
 	const counts = loadGradeCounts(val.loadMeasurements || []);

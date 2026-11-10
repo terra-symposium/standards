@@ -40,8 +40,9 @@ export const diagnosticsTest = base.extend({
 	page: async ({ page, context: ctx }, use, info): Promise<void> => {
 		const diagnostics: BrowserDiagnostic[] = [];
 		/**
+		 * Registers listeners that retain diagnostics from a Playwright page.
 		 *
-		 * @param tgt
+		 * @param tgt Page whose console, page errors, and failed requests should be recorded.
 		 */
 		const observe = (tgt: typeof page): void => {
 			tgt.on('console', (m) => {
@@ -89,8 +90,9 @@ export const loadTest = diagnosticsTest.extend<{ load: LoadTestController }>({
 			const pending: Promise<void>[] = [];
 			let testBudget: LoadBudgetOverride | undefined;
 			/**
+			 * Captures a page navigation timing when the page finishes loading.
 			 *
-			 * @param tgt
+			 * @param tgt Page whose navigation timing should be recorded.
 			 */
 			const observe = (tgt: typeof page): void => {
 				tgt.on('load', () => {
@@ -215,15 +217,15 @@ const readAttachment = (attachment: { body?: Buffer; contentType?: string; name?
 };
 
 /**
- * Grades the test duration and attached page/operation samples for one result.
+ * Adds graded load measurements to a result when load testing is enabled.
  *
- * @param result
- * @param id
- * @param inputs
- * @param testBudget
- * @param cfg
+ * @param result Normalized visual result whose duration and measurements should be graded.
+ * @param id Stable test identity used to resolve configured budgets.
+ * @param inputs Validated page and operation measurements attached to the test.
+ * @param testBudget Optional budget override for the full test duration.
+ * @param cfg Load-testing configuration that determines whether measurements are enabled.
  *
- * @return
+ * @return The original result when disabled, otherwise a copy with graded measurements.
  */
 const addLoadMeasurements = (
 	result: VisualResult,
@@ -247,9 +249,8 @@ const addLoadMeasurements = (
  * Creates the framework-neutral identity fields shared by all result records.
  *
  * @param test Playwright test identity.
- * @param cfgdProject
+ * @param cfgdProject Configured Playwright project name used to derive the report identity.
  * @param viewportCatalog Catalog used to resolve viewport labels and sizes.
- * @param cfgdProjectgured Playwright project name.
  *
  * @return Framework-neutral identity fields for a visual result.
  */
@@ -276,9 +277,9 @@ const testIdentity = (
 /**
  * Redacts personal identifiers and configured secrets from report text.
  *
- * @param val
+ * @param val Untrusted report value to sanitize and redact.
  *
- * @return
+ * @return Printable text with terminal escapes and sensitive identifiers removed.
  */
 const redactEvidence = (val: unknown): string => {
 	let text = Array.from(stripAnsi(String(val ?? '')))
