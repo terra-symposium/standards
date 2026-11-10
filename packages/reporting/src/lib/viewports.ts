@@ -166,21 +166,6 @@ export const withResponsivePlaywright = <T extends PlaywrightTestConfig>(cfg: T,
 	];
 	const sharedDist = sharedDistCandidates.find((c) => fs.existsSync(c)) || sharedDistCandidates[0];
 	const projects = (cfg.projects || []) as Array<{ dependencies?: readonly string[]; name?: string; testMatch?: unknown; use?: Record<string, unknown> }>;
-	const projectsWithViewports = projects.flatMap((p, i) => {
-		const baseName = p.name || `project-${i + 1}`;
-		if (
-			projects.some((project) => (project.dependencies || []).includes(baseName)) ||
-			/setup/i.test(baseName) ||
-			/\.setup\.[cm]?[jt]sx?/i.test((Array.isArray(p.testMatch) ? p.testMatch : [p.testMatch]).map((e) => (e instanceof RegExp ? e.source : String(e || ''))).join(' ')) ||
-			(opts.singleRunProjects || []).includes(baseName)
-		)
-			return [p];
-		return viewports.map((v) => ({
-			...p,
-			name: visualProjectName(baseName, v, viewports),
-			use: { ...(p.use || {}), viewport: { width: v.width, height: v.height }, screenshot: { mode: 'on', fullPage: true, caret: 'initial' } },
-		}));
-	});
 	return {
 		...cfg,
 		metadata: { ...(cfg.metadata || {}), terraLoadTestingEnabled: loadTesting.enabled },
@@ -189,7 +174,21 @@ export const withResponsivePlaywright = <T extends PlaywrightTestConfig>(cfg: T,
 			external: [...(cfg.build?.external || []), path.join(fs.existsSync(sharedDist) ? fs.realpathSync(sharedDist) : sharedDist, '**')],
 		},
 		outputDir: opts.outputDir || 'test-results/playwright-output',
-		projects: projectsWithViewports,
+		projects: projects.flatMap((p, i) => {
+			const baseName = p.name || `project-${i + 1}`;
+			if (
+				projects.some((project) => (project.dependencies || []).includes(baseName)) ||
+				/setup/i.test(baseName) ||
+				/\.setup\.[cm]?[jt]sx?/i.test((Array.isArray(p.testMatch) ? p.testMatch : [p.testMatch]).map((e) => (e instanceof RegExp ? e.source : String(e || ''))).join(' ')) ||
+				(opts.singleRunProjects || []).includes(baseName)
+			)
+				return [p];
+			return viewports.map((v) => ({
+				...p,
+				name: visualProjectName(baseName, v, viewports),
+				use: { ...(p.use || {}), viewport: { width: v.width, height: v.height }, screenshot: { mode: 'on', fullPage: true, caret: 'initial' } },
+			}));
+		}),
 		reporter: [
 			...(cfg.reporter ? (Array.isArray(cfg.reporter) ? cfg.reporter : [cfg.reporter]) : []).filter((r) => {
 			const name = Array.isArray(r) ? r[0] : r;

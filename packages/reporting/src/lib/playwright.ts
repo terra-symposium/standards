@@ -95,7 +95,8 @@ export const loadTest = diagnosticsTest.extend<{ load: LoadTestController }>({
 			const observe = (tgt: typeof page): void => {
 				tgt.on('load', () => {
 					if (!enabled || tgt.url() === 'about:blank') return;
-					const pendingLoad = tgt
+					pending.push(
+						tgt
 						.evaluate(() => {
 							const entry = performance.getEntries().find((i) => String(i.entryType) === 'navigation') as PerformanceNavigationTiming | undefined;
 							return entry ? { durationMs: entry.duration, pathname: location.pathname } : undefined;
@@ -104,8 +105,8 @@ export const loadTest = diagnosticsTest.extend<{ load: LoadTestController }>({
 							if (!navigation || navigation.durationMs <= 0) return;
 							measurements.push({ name: `page load: ${navigation.pathname || '/'}`, kind: 'page', durationMs: navigation.durationMs });
 						})
-						.catch(() => undefined);
-					pending.push(pendingLoad);
+							.catch(() => undefined),
+					);
 				});
 			};
 			observe(page);
@@ -204,16 +205,6 @@ export const parseDiagnostics = (raw: string): string[] => {
 const terminalText = (chunk: string | Buffer): string => stripAnsi(chunk.toString('utf8')).trim();
 
 /**
- * Identifies terminal output that should be retained as diagnostic evidence.
- *
- * @param val
- * @param valormalized terminal output.
- *
- * @return Whether the output contains a diagnostic keyword.
- */
-const isTerminalDiagnostic = (val: string): boolean => /\b(?:error|errors|failed|failure|exception|warning|warn|timeout|requestfailed|pageerror)\b/i.test(val);
-
-/**
  * Reads an inline or file-backed Playwright attachment.
  *
  * @param attachment Attachment metadata supplied by Playwright.
@@ -225,31 +216,6 @@ const readAttachment = (attachment: ReporterAttachment): string => {
 	if (attachment.path && fs.existsSync(attachment.path)) return fs.readFileSync(attachment.path, 'utf8');
 	return '';
 };
-
-/**
- * Extracts one named JSON diagnostic attachment.
- *
- * @param attachments Attachments emitted for one test result.
- * @param name Diagnostic attachment name to locate.
- *
- * @return Parsed diagnostic lines from the matching attachment.
- */
-const diagnosticText = (attachments: readonly ReporterAttachment[], name: string): string[] => {
-	const attachment = attachments.find((v) => v.name === name && v.contentType === 'application/json');
-	const raw = attachment ? readAttachment(attachment) : '';
-	if (!raw) return [];
-	return parseDiagnostics(raw);
-};
-
-/**
- * Resolves the path of a captured screenshot attachment.
- *
- * @param attachments Attachments emitted for one test result.
- *
- * @return Screenshot path, or an empty string when no screenshot exists.
- */
-const screenshotAttachment = (attachments: readonly ReporterAttachment[]): ReporterAttachment | undefined =>
-	attachments.find((v) => ['visual', 'screenshot'].includes(v.name || '') && v.contentType === 'image/png');
 
 /**
  * Reads timing samples and a test override from the fixture attachment.
@@ -338,38 +304,6 @@ const testIdentity = (
 };
 
 /**
- * Resolves the title path portion used by the stable test budget key.
- *
- * @param test
- *
- * @return
- */
-const testTitleParts = (test: { location: { file: string }; title: string; titlePath: () => string[] }): string[] => {
-	const file = path.basename(test.location.file);
-	const fullTitlePath = test.titlePath();
-	const fileIdx = fullTitlePath.findIndex((v) => v.endsWith(file));
-	return fullTitlePath.slice(fileIdx >= 0 ? fileIdx + 1 : 0).filter(Boolean);
-};
-
-/**
- * Generates a stable filename for a copied screenshot.
- *
- * @param result Result whose identity contributes to the filename.
- * @param idx
- * @param idxesult position used to keep duplicate names distinct.
- *
- * @return A filesystem-safe screenshot filename.
- */
-const screenshotName = (result: VisualResult, idx: number): string => {
-	return `${String(idx + 1).padStart(4, '0')}-${
-		`${result.project}-${result.file}-${result.title}-${result.viewport}`
-			.replace(/[^a-z0-9_-]+/gi, '-')
-			.replace(/^-+|-+$/g, '')
-			.toLowerCase() || 'screenshot'
-	}.png`;
-};
-
-/**
  * Copies captured screenshots into the timestamped run directory.
  *
  * @param results Results whose screenshot paths should be relocated.
@@ -383,7 +317,10 @@ const copyScreenshots = (results: readonly VisualResult[], runDir: string): Visu
 	fs.mkdirSync(imgs, { recursive: true });
 	return results.map((r, i) => {
 		if (!r.screenshot || !fs.existsSync(r.screenshot)) return r;
-		const dest = path.join(imgs, screenshotName(r, i));
+		const dest = path.join(
+			imgs,
+			`${String(i + 1).padStart(4, '0')}-${`${r.project}-${r.file}-${r.title}-${r.viewport}`.replace(/[^a-z0-9_-]+/gi, '-').replace(/^-+|-+$/g, '').toLowerCase() || 'screenshot'}.png`,
+		);
 		fs.copyFileSync(r.screenshot, dest);
 		return { ...r, screenshot: dest };
 	});
@@ -588,7 +525,7 @@ export default class ProgressReporter {
 	 */
 	onStdOut(chunk: string | Buffer, test?: object, result?: object): void {
 		const val = terminalText(chunk);
-		if (!val || !isTerminalDiagnostic(val)) return;
+		if (!val || !/\b(?:error|errors|failed|failure|exception|warning|warn|timeout|requestfailed|pageerror)\b/i.test(val)) return;
 		if (!test || !result) {
 			this.runDiagnostics.push(val);
 			return;
@@ -617,19 +554,22 @@ export default class ProgressReporter {
 	 */
 	onTestEnd(test: import('@playwright/test/reporter').TestCase, result: import('@playwright/test/reporter').TestResult): void {
 		this.completedTests.add(test.id);
-		const attachment = screenshotAttachment(result.attachments);
+		const attachment = result.attachments.find((v) => ['visual', 'screenshot'].includes(v.name || '') && v.contentType === 'image/png');
 		let screenshot = attachment?.path || '';
 		if (!screenshot && attachment?.body) {
 			screenshot = path.resolve(`test-results/playwright-output/${test.id.replace(/[^a-z0-9_-]/gi, '-')}-screenshot.png`);
 			fs.mkdirSync(path.dirname(screenshot), { recursive: true });
 			fs.writeFileSync(screenshot, attachment.body);
 		}
-		const titleParts = testTitleParts(test);
-		const testId = loadTestId(test.location.file, titleParts, this.options.loadTesting.root);
 		const attachedLoad = loadAttachment(result.attachments);
-		const norm: VisualResult = {
+		this.results.push(addLoadMeasurements(
+			{
 			...testIdentity(test, test.parent.project()?.name || test.titlePath().find((v) => v.startsWith('root-')) || 'unknown', this.options.viewportCatalog),
-			browserErrors: redactEvidence(diagnosticText(result.attachments, 'browser-diagnostics').join('\n')),
+			browserErrors: redactEvidence(
+				parseDiagnostics(
+					readAttachment(result.attachments.find((v) => v.name === 'browser-diagnostics' && v.contentType === 'application/json') || {}),
+				).join('\n'),
+			),
 			duration: result.duration,
 			error: redactEvidence(result.error?.message?.split('\n')[0] || ''),
 			retry: result.retry,
@@ -637,8 +577,16 @@ export default class ProgressReporter {
 			status: normalizeVisualStatus(result.status),
 			terminalErrors: redactEvidence(this.terminalDiagnostics.get(result)?.join('\n') || ''),
 			visual: screenshot ? 'Embedded' : result.attachments.some((v) => v.name === 'visual-error') ? 'Capture failed' : 'No visual surface',
-		};
-		this.results.push(addLoadMeasurements(norm, testId, attachedLoad.measurements, attachedLoad.testBudget, this.options.loadTesting));
+			},
+			loadTestId(
+				test.location.file,
+				test.titlePath().filter((v, i, all) => i > all.findIndex((part) => part.endsWith(path.basename(test.location.file)))),
+				this.options.loadTesting.root,
+			),
+			attachedLoad.measurements,
+			attachedLoad.testBudget,
+			this.options.loadTesting,
+		));
 		this.terminalDiagnostics.delete(result);
 	}
 

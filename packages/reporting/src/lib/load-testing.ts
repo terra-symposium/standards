@@ -35,18 +35,18 @@ export type NormalizedLoadTestingConfig = {
 /** Optional inputs that have higher precedence than quality.json values. */
 export type LoadTestingOverrides = LoadTestingConfig;
 /**
+ * Determines whether an untrusted value is a plain object record.
  *
- * @param val
+ * @param val Value to inspect.
  *
- * @return
+ * @return Whether the value is a non-null, non-array object.
  */
 const isRec = (val: unknown): val is Record<string, unknown> => !!val && typeof val === 'object' && !Array.isArray(val);
 /**
  * Validates one partial budget and returns a fresh object.
  *
- * @param val
+ * @param val Candidate budget object to validate.
  * @param label Location used in configuration errors.
- * @param valandidate budget from quality.json or test code.
  *
  * @return A validated partial budget.
  */
@@ -75,7 +75,7 @@ export const validateLoadBudgetOverride = (val: LoadBudgetOverride): LoadBudgetO
 /**
  * Validates a named budget map.
  *
- * @param val
+ * @param val Candidate map of budget overrides.
  * @param label Location used in configuration errors.
  * @param valandidate map from configuration.
  *
@@ -89,7 +89,7 @@ const budgetMap = (val: unknown, label: string): Record<string, LoadBudgetOverri
 /**
  * Checks that a complete budget has an ordered warning/failure boundary.
  *
- * @param val
+ * @param val Complete warning and failure thresholds to validate.
  * @param label Location used in configuration errors.
  * @param valudget to validate.
  *
@@ -114,12 +114,12 @@ export const normalizeLoadTestingConfig = (raw: LoadTestingConfig = {}, override
 		{ failMs: optDefault.failMs ?? rawDefault.failMs ?? DEFAULT_LOAD_BUDGET.failMs, warnMs: optDefault.warnMs ?? rawDefault.warnMs ?? DEFAULT_LOAD_BUDGET.warnMs },
 		'loadTesting.defaultBudget',
 	);
-	/**
+	/** Merges two validated override maps, with additional values taking precedence.
 	 *
-	 * @param base
-	 * @param additional
+	 * @param base Existing validated overrides.
+	 * @param additional New validated overrides to apply.
 	 *
-	 * @return
+	 * @return A merged override map.
 	 */
 	const mergeMaps = (base: Record<string, LoadBudgetOverride>, additional: Record<string, LoadBudgetOverride>): Record<string, LoadBudgetOverride> => {
 		const merged: Record<string, LoadBudgetOverride> = { ...base };
