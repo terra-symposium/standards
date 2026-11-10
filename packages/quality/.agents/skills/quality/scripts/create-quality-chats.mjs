@@ -75,9 +75,10 @@ function gitValue(directory, args) {
 
 function remoteIdentity(remote) {
 	const value = remote.trim().toLowerCase();
-	const url = value.match(/^https?:\/\//) ? new URL(value) : undefined;
+	const url = /^[a-z][a-z\d+.-]*:\/\//i.test(value) ? new URL(value) : undefined;
 	const ssh = url ? undefined : value.match(/^(?:[^@]+@)?([^:]+):(.+)$/);
-	const parsed = url ? `${url.hostname}${url.pathname}` : ssh ? `${ssh[1]}/${ssh[2]}` : value;
+	const host = url?.port ? `${url.hostname}:${url.port}` : url?.hostname;
+	const parsed = url ? `${host}${url.pathname}` : ssh ? `${ssh[1]}/${ssh[2]}` : value;
 	const normalized = parsed.replace(/\.git$/, '').replace(/\/+$/, '');
 	return canonicalRemoteAliases.get(normalized) || normalized;
 }
