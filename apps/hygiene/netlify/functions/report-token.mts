@@ -21,7 +21,7 @@ HELPERS
  *
  * @param request POST request containing the repository ID in its JSON body.
  *
- * @returns A no-store JSON token response, or an error for invalid, unauthorized, or unsupported requests.
+ * @return A no-store JSON token response, or an error for invalid, unauthorized, or unsupported requests.
  */
 export default async function handler(request: Request): Promise<Response> {
 	if (request.method !== 'POST') return new Response('Method not allowed', { status: 405 });

@@ -12,7 +12,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 // COMPONENTS
-import QualityPlaywrightReporter from '../../dist/lib/playwright-reporter.js';
+import { QualityPlaywrightReporter } from '../../dist/lib/index.js';
 
 /*//////////////////////////////////////////////////
 HELPERS

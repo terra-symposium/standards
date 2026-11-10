@@ -58,7 +58,7 @@ static void clear_buffer(void) { const char *text = "fake_call()"; (void)text; }
 	);
 	const cfg = createQualityCfg({ root, sourceRoots: ['src/c'], extensions: [], documentation: { cAuthors: { 'src/c': 'haadi', 'src/c/compression': 'kai' } } });
 	assert.deepEqual(
-		documentationFindings(cfg).map(({ name, file, line }) => [name, file, line]),
+		documentationFindings(cfg).map(({ name: n, file: f, line: l }) => [n, f, l]),
 		[],
 	);
 });
@@ -67,12 +67,12 @@ test('C documentation treats matching header prototypes and source definitions a
 	fixtureFile(root, 'src/c/module/api.h', 'int transform(int value);\n');
 	fixtureFile(root, 'src/c/module/impl.c', 'int transform(int value) { return value; }\n');
 	const cfg = createQualityCfg({ root, sourceRoots: ['src/c'], extensions: [] });
-	const findings = documentationFindings(cfg).filter(({ kind, name }) => kind === 'function' && name === 'transform');
+	const findings = documentationFindings(cfg).filter(({ kind: k, name: n }) => k === 'function' && n === 'transform');
 	assert.equal(findings.length, 1);
 	fixtureFile(root, 'src/c/other/api.h', `/** Transforms a value.\n * @param value input value\n * @return transformed value\n * @author haadi\n */\nint transform_value(int value);\n`);
 	fixtureFile(root, 'src/c/other/impl.c', 'int transform_value(int value) { return value; }\n');
 	assert.deepEqual(
-		documentationFindings(cfg).filter(({ kind, name }) => kind === 'function' && name === 'transform_value'),
+		documentationFindings(cfg).filter(({ kind: k, name: n }) => k === 'function' && n === 'transform_value'),
 		[],
 	);
 });
@@ -100,15 +100,15 @@ int empty_result(void);
 	fixtureFile(root, 'src/c/login/session.c', `/** Starts a login session.\n * @author kai\n */\nvoid login_session(void);\n`);
 	const cfg = createQualityCfg({ root, sourceRoots: ['src/c'], extensions: [], documentation: { cAuthors: { 'src/c/encryption': 'marceline', 'src/c/login': 'marceline' } } });
 	const findings = documentationFindings(cfg);
-	assert.ok(findings.some(({ name, reason }) => name === '<summary>' && reason.includes('summary')));
-	assert.ok(findings.some(({ name, reason }) => name === '@param order' && reason.includes('order')));
-	assert.ok(findings.some(({ name, reason }) => name === '@param output' && reason.includes('description')));
-	assert.ok(findings.some(({ name, reason }) => name === '@param extra' && reason.includes('stale')));
-	assert.ok(findings.some(({ name }) => name === '@return'));
-	assert.ok(findings.some(({ name }) => name === '@author marceline'));
-	assert.ok(findings.some(({ file, name }) => file.endsWith('session.c') && name === '@author marceline'));
-	assert.ok(findings.some(({ name, reason }) => name === '@return' && reason.includes('description')));
-	assert.ok(findings.some(({ file, line, name }) => file.endsWith('crypto.c') && line === 9 && name === 'undocumented'));
+	assert.ok(findings.some(({ name: n, reason: r }) => n === '<summary>' && r.includes('summary')));
+	assert.ok(findings.some(({ name: n, reason: r }) => n === '@param order' && r.includes('order')));
+	assert.ok(findings.some(({ name: n, reason: r }) => n === '@param output' && r.includes('description')));
+	assert.ok(findings.some(({ name: n, reason: r }) => n === '@param extra' && r.includes('stale')));
+	assert.ok(findings.some(({ name: n }) => n === '@return'));
+	assert.ok(findings.some(({ name: n }) => n === '@author marceline'));
+	assert.ok(findings.some(({ file: f, name: n }) => f.endsWith('session.c') && n === '@author marceline'));
+	assert.ok(findings.some(({ name: n, reason: r }) => n === '@return' && r.includes('description')));
+	assert.ok(findings.some(({ file: f, line: l, name: n }) => f.endsWith('crypto.c') && l === 9 && n === 'undocumented'));
 });
 test('C documentation ignores comments, literals, macro bodies, controls, and pointer declarations', () => {
 	const root = fixtureRoot('terra-quality-c-documentation-mask-');
@@ -129,7 +129,7 @@ void invoke(void (*callback)(int), int value) { if (value) callback(value); }
 	);
 	const cfg = createQualityCfg({ root, sourceRoots: ['src/c'], extensions: [], documentation: { cAuthors: { 'src/c': 'haadi' } } });
 	assert.deepEqual(
-		documentationFindings(cfg).map(({ name }) => name),
+		documentationFindings(cfg).map(({ name: n }) => n),
 		[],
 	);
 });
@@ -140,7 +140,7 @@ test('documentation policy excludes generated and vendor source trees', () => {
 	fixtureFile(root, 'src/vendor/vendor.ts', 'function vendorHelper() { return true; }\n');
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
 	assert.deepEqual(
-		documentationFindings(cfg).map(({ name }) => name),
+		documentationFindings(cfg).map(({ name: n }) => n),
 		['documentedScope'],
 	);
 });
@@ -163,7 +163,7 @@ test('documented commands diagnose and fix only deprecated pnpm directory flags 
 	);
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], documentation: { commandRoots: ['docs'] } });
 	assert.deepEqual(
-		documentedCommandFindings(cfg).map(({ line, command: cmd }) => [line, cmd]),
+		documentedCommandFindings(cfg).map(({ line: l, command: c }) => [l, c]),
 		[
 			[3, 'pnpm -C packages/app test'],
 			[4, 'pnpm --prefix "packages/docs" build -- --watch'],
@@ -260,7 +260,7 @@ const namedArrow = (flag: boolean) => flag;
 	);
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
 	assert.deepEqual(
-		documentationFindings(cfg).map(({ kind, name }) => [kind, name]),
+		documentationFindings(cfg).map(({ kind: k, name: n }) => [k, n]),
 		[
 			['param', '@param key'],
 			['return', '@return'],
@@ -289,7 +289,7 @@ void [privateHelper, publicHelper];
 	);
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], documentation: { required: { types: true, functions: false, exportedFunctions: true } } });
 	assert.deepEqual(
-		documentationFindings(cfg).map(({ kind, name }) => [kind, name]),
+		documentationFindings(cfg).map(({ kind: k, name: n }) => [k, n]),
 		[
 			['summary', '<TSDoc summary>'],
 			['param', '@param value'],
@@ -329,7 +329,7 @@ test('documentation errors identify detached TSDoc and accept declaration and fi
 	);
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
 	assert.deepEqual(
-		documentationFindings(cfg).map(({ kind, name, severity }) => [kind, name, severity]),
+		documentationFindings(cfg).map(({ kind: k, name: n, severity: s }) => [k, n, s]),
 		[['orphan', '<detached TSDoc>', 'error']],
 	);
 	assert.equal(removeNonCodeComments(`${root}/src/main.ts`), true);
@@ -349,21 +349,25 @@ test('documentation description audit accepts TSDoc attached to a type member', 
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
 	assert.deepEqual(documentationFindings(cfg), []);
 });
-test('documentation findings recognize the props scaffold for destructured parameters', () => {
+test('documentation findings reject props aggregates and require individual destructured parameter tags', () => {
 	const root = fixtureRoot('terra-quality-destructured-function-doc-');
 	fixtureFile(
 		root,
 		'src/main.ts',
-		`/** Renders the selected label. */
+		`/**
+ * Renders the selected label.
+ * @param props - The aggregate display options.
+ */
 export function renderLabel({ label }: { label: string }) { return label; }
 `,
 	);
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], documentation: { required: { exportedFunctions: true } } });
 	assert.deepEqual(
-		documentationFindings(cfg).map((f) => [f.kind, f.name]),
+		documentationFindings(cfg).map((f) => [f.kind, f.name, f.reason]),
 		[
-			['param', '@param props'],
-			['return', '@return'],
+			['param', '@param props', 'replace the aggregate props tag with an individual @param tag for each binding'],
+			['param', '@param label', 'document the label parameter'],
+			['return', '@return', 'document the value returned by this function'],
 		],
 	);
 });

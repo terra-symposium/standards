@@ -48,15 +48,7 @@ The configured updater command is currently broken and is shown only to identify
    This command currently points to a missing `document-gem.spec.ts` test target, so it is not a working updater in this checkout. Repair and verify that implementation before invoking it. Do not treat the command's presence as evidence of a successful update.
 
 8. If state is invalid, stop and refresh it through the shared `authenticate()` helper in the website checkout's `scripts/generation/_auth.ts` only when that workflow is authorized. Do not put credentials in files or use a native file picker.
-9. Run the local Fast-mode harness:
-
-   ```sh
-   GEMINI_STORAGE_STATE=/absolute/path/to/playwright/.auth/user.json \
-   GEMINI_CHROME_PATH=/absolute/path/to/Google\ Chrome \
-   pnpm exec tsx --tsconfig astro/tsconfig.json scripts/export/canvas.mts
-   ```
-
-   It stores raw and normalized responses in Downloads and does not mutate Sanity.
+9. Use a locally saved Canvas capture obtained through the approved in-app browser workflow. The Canvas exporter now lives in the private Uni Notes repository and only prepares local source files; it is not a Terra Docs generation harness. Keep the source capture and provider output under Downloads for review.
 
 10. Inspect raw output before normalization: one outer four-backtick `markdown` fence, first body line H2, supported fenced code and tables, no unsupported blocks or citation markers. Preserve raw and normalized artifacts together.
 11. On a syntax/schema/coverage failure, pass the exact failure to the bounded healer and make the smallest prompt/driver correction. After retries are exhausted, stop and report the final error and diagnostic path.

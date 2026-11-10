@@ -20,6 +20,7 @@ import { tmpdir } from 'node:os';
 CONFIG
 //////////////////////////////////////////////////*/
 
+const appRoot = resolve(fileURLToPath(new URL('..', import.meta.url)));
 const args = process.argv.slice(2);
 
 /*//////////////////////////////////////////////////
@@ -31,7 +32,7 @@ HELPERS
  *
  * @param name Option name whose following argument supplies the value.
  *
- * @returns The option value after validation.
+ * @return The option value after validation.
  */
 function option(name: string): string {
 	const index = args.indexOf(name);
@@ -40,17 +41,23 @@ function option(name: string): string {
 	return value;
 }
 
+
+
+
 /**
  * Runs Git in a selected checkout and trims its textual output.
  *
  * @param root Working tree in which Git resolves the command.
  * @param args Git subcommand and arguments to execute.
  *
- * @returns Standard output without leading or trailing whitespace.
+ * @return Standard output without leading or trailing whitespace.
  */
 function git(root: string, args: string[]): string {
 	return execFileSync('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
 }
+
+
+
 
 /**
  * Runs a child command quietly with CI mode enabled.
@@ -59,29 +66,33 @@ function git(root: string, args: string[]): string {
  * @param cmdArgs Arguments passed to the executable.
  * @param cwd Working directory used to resolve the command.
  *
- * @returns The command's exit status, using `1` when the process has no status.
+ * @return The command's exit status, using `1` when the process has no status.
  */
 function run(cmd: string, cmdArgs: string[], cwd: string): number {
 	const result = spawnSync(cmd, cmdArgs, { cwd, stdio: 'ignore', env: { ...process.env, CI: 'true' } });
 	if (result.error) throw result.error;
 	return result.status ?? 1;
 }
-
-void (async (): Promise<void> => {
-	const localEnv = resolve(fileURLToPath(new URL('..', import.meta.url)), '.env.local');
+(async function main(): Promise<void> {
+	const localEnv = resolve(appRoot, '.env.local');
 	if (existsSync(localEnv)) process.loadEnvFile(localEnv);
 	const repo = option('--repository');
 	const checkout = resolve(option('--checkout'));
 	const branch = option('--branch');
-	const completedAtIndex = args.indexOf('--completed-at');
-	const requestedCompletedAt = completedAtIndex < 0 ? undefined : args[completedAtIndex + 1];
+	const requestedCompletedAt = (function optionalOption(name: string): string | undefined {
+	const index = args.indexOf(name);
+	if (index < 0) return undefined;
+	const value = args[index + 1];
+	if (!value || value.startsWith('--') || args.lastIndexOf(name) !== index) throw new Error(`Pass ${name} <value>.`);
+	return value;
+})('--completed-at');
 	if (!/^[^/\s]+\/[^/\s]+$/.test(repo)) throw new Error('Repository must use owner/name format.');
 	if (!/^[A-Za-z0-9._/-]{1,100}$/.test(branch) || branch.includes('..') || branch.startsWith('/')) throw new Error('Invalid branch name.');
-	if (completedAtIndex >= 0 && (!requestedCompletedAt || requestedCompletedAt.startsWith('--') || args.lastIndexOf('--completed-at') !== completedAtIndex))
-		throw new Error('Pass --completed-at <value>.');
 	if (requestedCompletedAt && !Number.isFinite(Date.parse(requestedCompletedAt))) throw new Error('Invalid report timestamp.');
-	if (/(?:github\.com[:/])([^/]+\/[^/]+?)(?:\.git)?$/i.exec(git(checkout, ['remote', 'get-url', 'origin']))?.[1]?.toLowerCase() !== repo.toLowerCase())
-		throw new Error('Checkout origin does not match the requested GitHub repository.');
+	if ((function githubRepo(remote: string): string | null {
+	const match = /(?:github\.com[:/])([^/]+\/[^/]+?)(?:\.git)?$/i.exec(remote);
+	return match?.[1]?.toLowerCase() ?? null;
+})(git(checkout, ['remote', 'get-url', 'origin'])) !== repo.toLowerCase()) throw new Error('Checkout origin does not match the requested GitHub repository.');
 	const sql = db();
 	const repoRow = (await sql`SELECT id FROM repositories WHERE active AND lower(owner || '/' || name) = lower(${repo})`)[0] as { id: number } | undefined;
 	if (!repoRow) throw new Error('Repository is not connected to this dashboard database.');
@@ -108,8 +119,9 @@ void (async (): Promise<void> => {
 		const qualityConfigPath = join(worktree, 'config/quality.json');
 		const qualityPolicyBranch = existsSync(qualityConfigPath) ? branch : 'development';
 		if (!existsSync(qualityConfigPath)) {
+			const sharedPolicy = git(checkout, ['show', 'origin/development:config/quality.json']);
 			mkdirSync(join(worktree, 'config'), { recursive: true });
-			writeFileSync(qualityConfigPath, `${git(checkout, ['show', 'origin/development:config/quality.json'])}\n`);
+			writeFileSync(qualityConfigPath, `${sharedPolicy}\n`);
 		}
 		const testStatus = run(
 			'pnpm',
@@ -135,6 +147,8 @@ void (async (): Promise<void> => {
 			],
 			worktree,
 		);
+		const junitXml = existsSync(junitPath) ? readFileSync(junitPath, 'utf8') : null;
+		const quality = existsSync(qualityPath) ? (JSON.parse(readFileSync(qualityPath, 'utf8')) as unknown) : null;
 		const headSha = git(worktree, ['rev-parse', 'HEAD']);
 		const report = parseBuildReport({
 			schemaVersion: 1,
@@ -143,17 +157,19 @@ void (async (): Promise<void> => {
 			headSha,
 			completedAt: requestedCompletedAt ?? new Date().toISOString(),
 			conclusion: testStatus === 0 && qualityStatus === 0 ? 'success' : 'failure',
-			junitXml: existsSync(junitPath) ? readFileSync(junitPath, 'utf8') : null,
-			quality: existsSync(qualityPath) ? (JSON.parse(readFileSync(qualityPath, 'utf8')) as unknown) : null,
+			junitXml,
+			quality,
 			history: null,
 		});
 		await ingestBuildReport(Number(repoRow.id), report, 'local', qualityPolicyBranch);
+		const testCounts = report.tests ? `${report.tests.passed} passed, ${report.tests.failed} failed, ${report.tests.skipped} skipped` : 'JUnit report missing';
+		const qualityCounts = report.quality
+			? `${report.quality.clean}/${report.quality.enabled} clean checks, ${report.quality.findings} findings, ${report.quality.total} total checks`
+			: 'Terra Quality report missing';
 		console.info(`Imported local report for ${repo} (${branch}) at ${headSha.slice(0, 9)}.`);
 		console.info(`Terra Quality policy: ${qualityPolicyBranch} branch configuration${qualityPolicyBranch === branch ? '' : ' (the target branch has no config/quality.json)'}.`);
-		console.info(`Tests: ${report.tests ? `${report.tests.passed} passed, ${report.tests.failed} failed, ${report.tests.skipped} skipped` : 'JUnit report missing'}; command exit ${testStatus}.`);
-		console.info(
-			`Quality: ${report.quality ? `${report.quality.clean}/${report.quality.enabled} clean checks, ${report.quality.findings} findings, ${report.quality.total} total checks` : 'Terra Quality report missing'}; command exit ${qualityStatus}.`,
-		);
+		console.info(`Tests: ${testCounts}; command exit ${testStatus}.`);
+		console.info(`Quality: ${qualityCounts}; command exit ${qualityStatus}.`);
 	} finally {
 		try {
 			git(checkout, ['worktree', 'remove', '--force', worktree]);
@@ -162,7 +178,7 @@ void (async (): Promise<void> => {
 		}
 		rmSync(temporaryRoot, { recursive: true, force: true });
 	}
-})().catch((err: unknown) => {
-	console.error(err instanceof Error ? err.message : 'Local report import failed.');
+})().catch((e: unknown) => {
+	console.error(e instanceof Error ? e.message : 'Local report import failed.');
 	process.exitCode = 1;
 });

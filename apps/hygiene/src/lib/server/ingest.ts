@@ -9,7 +9,7 @@ IMPORTS
 // API
 import { createHash } from 'node:crypto';
 import { db } from './db.js';
-import { parseBuildReport, reportTargetsTrackedBranch } from './history.js';
+import { parseBuildReport, parseHistoryReport, reportTargetsTrackedBranch } from './history.js';
 
 // TYPES
 import type { BuildReport, HistoryReport } from './history.js';
@@ -22,7 +22,9 @@ HELPERS
  * Normalize report inputs before they are written to Neon.
  *
  * @param input Untrusted build report value to validate and normalize.
- * @returns The normalized report and its parsed test and quality counts.
+ *
+ * @return The normalized report and its parsed test and quality counts.
+ *
  * @throws {Error} If the report or its nested data fails validation.
  */
 export function buildReportCounts(input: unknown): { report: BuildReport; tests: BuildReport['tests']; quality: BuildReport['quality'] } {
@@ -34,10 +36,12 @@ export function buildReportCounts(input: unknown): { report: BuildReport; tests:
  * Give each build a stable numeric key so retries of the same payload are idempotent.
  *
  * @param report Build identity fields used to derive a stable key.
- * @returns A positive numeric identifier derived from the report identity hash.
+ *
+ * @return A positive numeric identifier derived from the report identity hash.
  */
 export function buildRunId(report: Pick<BuildReport, 'repository' | 'branch' | 'headSha' | 'completedAt'>): number {
-	return Number.parseInt(createHash('sha256').update([report.repository.toLowerCase(), report.branch, report.headSha, report.completedAt].join('\0')).digest('hex').slice(0, 13), 16) + 1;
+	const identity = [report.repository.toLowerCase(), report.branch, report.headSha, report.completedAt].join('\0');
+	return Number.parseInt(createHash('sha256').update(identity).digest('hex').slice(0, 13), 16) + 1;
 }
 
 /**
@@ -48,18 +52,19 @@ export function buildRunId(report: Pick<BuildReport, 'repository' | 'branch' | '
  * @param report Validated history snapshot or delta to persist.
  * @param completedAt Timestamp used to prevent an older snapshot replacing newer history.
  */
-export async function persistHistoryReport(repoId: number, runId: number, report: HistoryReport, completedAt: string): Promise<void> {
-	const queryState = { client: db(), snapshot: report.mode === 'snapshot', commits: JSON.stringify(report.commits) };
-	await (0, queryState.client)`WITH eligible AS (
+async function persistHistoryReport(repoId: number, runId: number, report: HistoryReport, completedAt: string): Promise<void> {
+	const sql = db();
+	const snapshot = report.mode === 'snapshot';
+	await sql`WITH eligible AS (
 		SELECT b.history_count
 		FROM branches b JOIN repositories r ON r.id = b.repository_id
 		WHERE b.repository_id = ${repoId} AND b.name = ${report.branch} AND b.enabled AND r.active
-			AND ((${queryState.snapshot} AND (b.history_updated_at IS NULL OR b.history_updated_at <= ${completedAt}::timestamptz))
-				OR (NOT ${queryState.snapshot} AND b.history_status = 'complete' AND b.history_head = ${report.baseSha}))
+			AND ((${snapshot} AND (b.history_updated_at IS NULL OR b.history_updated_at <= ${completedAt}::timestamptz))
+				OR (NOT ${snapshot} AND b.history_status = 'complete' AND b.history_head = ${report.baseSha}))
 	), incoming AS (
 		SELECT ordinality::integer AS ordinal, value->>'sha' AS sha, (value->>'authorDate')::timestamptz AS committed_at,
 			(value->>'additions')::integer AS additions, (value->>'deletions')::integer AS deletions, (value->>'sourceLines')::integer AS source_lines
-		FROM jsonb_array_elements(${queryState.commits}::jsonb) WITH ORDINALITY AS item(value, ordinality)
+		FROM jsonb_array_elements(${JSON.stringify(report.commits)}::jsonb) WITH ORDINALITY AS item(value, ordinality)
 	), recorded AS (
 		INSERT INTO history_reports (repository_id, run_id, run_attempt, branch, mode, head_sha, imported_at)
 		SELECT ${repoId}, ${runId}, 1, ${report.branch}, ${report.mode}, ${report.headSha}, now() FROM eligible
@@ -67,21 +72,39 @@ export async function persistHistoryReport(repoId: number, runId: number, report
 		RETURNING branch
 	), upserted AS (
 		INSERT INTO commits (repository_id, branch, position, sha, committed_at, additions, deletions, source_lines)
-		SELECT ${repoId}, ${report.branch}, CASE WHEN ${queryState.snapshot} THEN incoming.ordinal ELSE eligible.history_count + incoming.ordinal END,
+		SELECT ${repoId}, ${report.branch}, CASE WHEN ${snapshot} THEN incoming.ordinal ELSE eligible.history_count + incoming.ordinal END,
 			incoming.sha, incoming.committed_at, incoming.additions, incoming.deletions, incoming.source_lines
 		FROM eligible CROSS JOIN incoming CROSS JOIN recorded
 		ON CONFLICT (repository_id, branch, sha) DO UPDATE SET position = excluded.position, committed_at = excluded.committed_at,
 			additions = excluded.additions, deletions = excluded.deletions, source_lines = excluded.source_lines
 		RETURNING sha
 	), removed AS (
-		DELETE FROM commits c WHERE ${queryState.snapshot} AND c.repository_id = ${repoId} AND c.branch = ${report.branch}
+		DELETE FROM commits c WHERE ${snapshot} AND c.repository_id = ${repoId} AND c.branch = ${report.branch}
 			AND EXISTS (SELECT 1 FROM recorded) AND NOT EXISTS (SELECT 1 FROM incoming WHERE incoming.sha = c.sha)
 		RETURNING sha
 	)
 	UPDATE branches b SET history_head = ${report.headSha},
-		history_count = CASE WHEN ${queryState.snapshot} THEN (SELECT count(*) FROM incoming) ELSE b.history_count + (SELECT count(*) FROM incoming) END,
+		history_count = CASE WHEN ${snapshot} THEN (SELECT count(*) FROM incoming) ELSE b.history_count + (SELECT count(*) FROM incoming) END,
 		history_status = 'complete', history_updated_at = ${completedAt}::timestamptz, updated_at = now()
 	WHERE b.repository_id = ${repoId} AND b.name = ${report.branch} AND EXISTS (SELECT 1 FROM recorded)`;
+}
+
+/**
+ * Persist a local history import without presenting it as a CI build.
+ *
+ * @param repoId Database ID of the repository that owns the imported history.
+ * @param input Untrusted history report to validate and persist.
+ *
+ * @throws {Error} If the report does not match an active repository or enabled branch.
+ */
+export async function ingestHistoryReport(repoId: number, input: unknown): Promise<void> {
+	const report = parseHistoryReport(input);
+	const sql = db();
+	const repo = (await sql`SELECT owner, name FROM repositories WHERE id = ${repoId} AND active`)[0] as { owner: string; name: string } | undefined;
+	if (!repo || `${repo.owner}/${repo.name}`.toLowerCase() !== report.repository.toLowerCase()) throw new Error('report does not match an active repository');
+	if (!(await sql`SELECT name FROM branches WHERE repository_id = ${repoId} AND name = ${report.branch} AND enabled`).length) throw new Error('branch is not enabled');
+	const runId = buildRunId({ repository: report.repository, branch: report.branch, headSha: report.headSha, completedAt: report.generatedAt });
+	await persistHistoryReport(repoId, runId, report, report.generatedAt);
 }
 
 /**
@@ -91,6 +114,7 @@ export async function persistHistoryReport(repoId: number, runId: number, report
  * @param report Validated build report to persist.
  * @param source Origin label stored with the build record.
  * @param qualityPolicyBranch Branch whose quality configuration produced the report, if known.
+ *
  * @throws {Error} If the report does not match an active repository or enabled branch.
  */
 export async function ingestBuildReport(repoId: number, report: BuildReport, source: 'github-actions' | 'local' = 'github-actions', qualityPolicyBranch: string | null = null): Promise<void> {

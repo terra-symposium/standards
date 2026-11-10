@@ -9,7 +9,7 @@ IMPORTS
 // API
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { createHistoryReport, isHistorySourcePath } from '../../dist/lib/history-report.js';
+import { createHistoryReport, isHistorySourcePath } from '../../dist/lib/index.js';
 import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
 import { mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';

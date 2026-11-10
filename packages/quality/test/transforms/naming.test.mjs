@@ -58,16 +58,17 @@ test('naming maps are immutable and identifier tokenisation preserves separators
 	assert.deepEqual(identifierTokens('article_error-2_value'), ['article', 'error', '2', 'value']);
 	assert.deepEqual(identifierTokens(''), []);
 });
-test('callback aliases shorten only documented idioms and preserve domain-specific names', () => {
-	assert.equal(callbackAlias('customer'), 'customer');
-	assert.equal(callbackAlias('unknownValue'), 'unknownValue');
-	assert.equal(callbackAlias('field'), 'field');
-	assert.equal(callbackAlias('label'), 'label');
-	assert.equal(callbackAlias('customer', ['c']), 'customer');
-	assert.equal(callbackAlias('customer', ['c', 'v', 'r', 'x', 'd', 'e', 'n', 's']), 'customer');
+test('callback aliases shorten every supported name to one letter without collisions', () => {
+	assert.equal(callbackAlias('member'), 'm');
+	assert.equal(callbackAlias('unknownValue'), 'u');
+	assert.equal(callbackAlias('field'), 'f');
+	assert.equal(callbackAlias('label'), 'l');
+	assert.equal(callbackAlias('customer', ['c']), 'v');
+	assert.equal(callbackAlias('customer', ['c', 'v']), 'r');
+	assert.equal(callbackAlias('_unused'), '_unused');
 	assert.equal(renameId('index', { numericIndex: true }), 'i');
-	assert.equal(renameId('node', { callback: true }), 'node');
-	assert.equal(renameId('node', { callback: true, reserved: ['n'] }), 'node');
+	assert.equal(renameId('node', { callback: true }), 'n');
+	assert.equal(renameId('node', { callback: true, reserved: ['n'] }), 'v');
 	assert.equal(renameId('Request'), 'Request');
 	assert.equal(renameId('_'), '_');
 });
@@ -145,7 +146,8 @@ const rendered = problemRendererPair('hint', (block) => <_ProblemHint block={blo
 const ordinary = (customer) => customer.id;
 function handle(customer: string) { return customer; }
 const view = <button onClick={(event) => handle(event.type)}>Open</button>;
-void [mapped, rendered, ordinary, handle, view];
+const column = { render: (member) => member.signature };
+void [mapped, rendered, ordinary, handle, view, column];
 `;
 	const file = ts.createSourceFile('fixture.tsx', src, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
 	const callbacks = [];
@@ -154,18 +156,57 @@ void [mapped, rendered, ordinary, handle, view];
 	 * @param node
 	 */
 	const visit = (node) => {
-		if (ts.isIdentifier(node) && ['block', 'customer', 'index', 'event'].includes(node.text) && ts.isParameter(node.parent)) callbacks.push(node);
+		if (ts.isIdentifier(node) && ['block', 'customer', 'index', 'event', 'member'].includes(node.text) && ts.isParameter(node.parent)) callbacks.push(node);
 		ts.forEachChild(node, visit);
 	};
 	visit(file);
-	assert.equal(callbacks.length, 6);
+	assert.equal(callbacks.length, 7);
 	const supported = callbacks.filter((n) => isCallbackDeclaration(n));
-	assert.equal(supported.length, 5);
-	assert.equal(renameDeclaration(supported[0]), 'customer');
+	assert.equal(supported.length, 6);
+	assert.equal(renameDeclaration(supported[0]), 'c');
 	assert.equal(renameDeclaration(supported[1]), 'i');
-	assert.equal(renameDeclaration(supported[2]), 'block');
-	assert.equal(renameDeclaration(supported[3]), 'customer');
-	assert.equal(renameDeclaration(supported[4]), 'event');
+	assert.equal(renameDeclaration(supported[2]), 'b');
+	assert.equal(renameDeclaration(supported[3]), 'c');
+	assert.equal(renameDeclaration(supported[4]), 'e');
+	assert.equal(renameDeclaration(supported[5]), 'm');
+});
+test('naming reports initials for callbacks assigned to object properties', () => {
+	const root = fixtureRoot('terra-quality-object-callback-');
+	fixtureFile(root, 'src/main.ts', 'const spec = { render: (member) => member.signature };\nvoid spec;\n');
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
+	assert.deepEqual(
+		namingFindings(cfg).map(({ name: n, suggestion: s }) => [n, s]),
+		[['member', 'm']],
+	);
+});
+test('collection callback names use initials and resolve collisions in parameter order', () => {
+	const root = fixtureRoot('terra-quality-callback-initials-');
+	fixtureFile(
+		root,
+		'src/main.ts',
+		`const mapped = members.map((member, index) => member.id + index);
+const collided = values.map((member, metadata, m) => member + metadata + m);
+void [mapped, collided];
+`,
+	);
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
+	assert.deepEqual(
+		namingFindings(cfg).map(({ name: n, suggestion: s }) => [n, s]),
+		[
+			['member', 'm'],
+			['index', 'i'],
+			['member', 'v'],
+			['metadata', 'r'],
+		],
+	);
+	const file = ts.createSourceFile('fixture.ts', 'values.map((member, index) => member + index)', ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+	const params = [];
+	const visit = (node) => {
+		if (ts.isIdentifier(node) && ['member', 'index'].includes(node.text) && ts.isParameter(node.parent)) params.push(node);
+		ts.forEachChild(node, visit);
+	};
+	visit(file);
+	assert.deepEqual(params.map(renameDeclaration), ['m', 'i']);
 });
 test('alias analysis keeps only stable local identifier and type aliases', () => {
 	const root = fixtureRoot('terra-quality-alias-api-');
@@ -283,7 +324,7 @@ export const result = [third, independent];
 	);
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
 	assert.deepEqual(
-		aliasFindings(cfg).map((finding) => [finding.name, finding.replacement]),
+		aliasFindings(cfg).map((f) => [f.name, f.replacement]),
 		[['independent', 'independentBase']],
 	);
 	aliasFindings(cfg, true);

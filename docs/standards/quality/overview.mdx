@@ -138,7 +138,7 @@ Find naming drift and apply safe syntax-aware identifier renames.
 
 **Toggle:** `enabledChecks.name` · **Fix:** `autofix.name`
 
-Finds naming drift and safely renames whole words or prefixes after checking syntax, scope, collisions, protected paths, exports, shorthand properties, and JSX. Ambiguous or conflicting edits remain findings.
+Finds naming drift and safely renames whole words or prefixes after checking syntax, scope, collisions, protected paths, exports, shorthand properties, and JSX. Parameters in supported collection and event callbacks use one-letter initials (`member` becomes `m`, while a numeric `index` becomes `i`). Ambiguous or conflicting edits remain findings.
 
 Use `protectedIdentifiers` for stable domain names, public vocabulary, and abbreviations. Export renaming is off by default; enable it with `renameExports`. `--warn` checks without renaming, and naming findings still fail the run. Review API-facing edits before accepting them.
 
@@ -495,7 +495,7 @@ The default names and imports follow the common shadcn layout. Configure `uiReco
 }
 ```
 
-Configured rules replace the defaults. Omit `types` to match every instance of an element, or set it to limit input rules to specific `type` values. `when: "button-like"` limits anchor recommendations to static classes with button-like padding, shape, and action styling. `when: "text-link"` matches static anchor classes with a recognized text color and underline treatment, then infers a corresponding color-and-link treatment variant such as `primary-link` or `primary-underline`. A rule's explicit `variant` takes precedence over inference.
+Configured rules replace the defaults. Omit `types` to match every instance of an element, or set it to limit input rules to specific `type` values. `when: "button-like"` limits anchor recommendations to static classes with button-like padding, shape, and action styling. `when: "text-link"` matches static anchor classes with a recognized text color and underline treatment, then infers the matching underline variant such as `primary-underline`. A rule's explicit `variant` takes precedence over inference.
 
 #### Tailwind canonical classes
 

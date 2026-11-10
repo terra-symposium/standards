@@ -6,6 +6,8 @@ A configurable quality runner for JavaScript and TypeScript analysis plus native
 
 Terra Quality combines source checks such as documentation, import resolution, naming, forwarding, security, and configured UI-pattern checks with repository-owned tools and commands. Safe transformations can maintain layout, apply tool fixes, and rewrite supported syntax. Findings that require domain or runtime judgment remain for review.
 
+Naming also shortens parameters in supported callbacks to one-letter initials (`member` becomes `m`, and a numeric `index` becomes `i`), while resolving collisions within the callback. Documentation checks continue to report empty summaries, parameter descriptions, and return descriptions; maintenance never invents prose.
+
 Enable `accessibility` and `display-name` under `enabledChecks` to run the JSX accessible-name and React `forwardRef` display-name checks. They are opt-in so an existing consumer can review the findings before making them part of its quality gate. The accessibility check recognizes ARIA, associated labels, static child text, and image alternatives; fix mode copies a literal `title` into `aria-label` only when no visible or uncertain content supplies a name, and marks an unnamed inline SVG hidden only when its containing control already has a clear name. The display-name fixer adds a conventional name only at an unambiguous statement boundary. Dynamic labels, custom component semantics, wrapped components, and conflicting assignments remain for review.
 
 Set `performancePatterns` in `quality.json` to enable advisory detection of linear `find`, `filter`, `includes`, `indexOf`, or `some` lookups inside collection callbacks. Findings suggest precomputing a `Map` or `Set`; the check does not rewrite code or fail the quality run because whether the path is hot and the correct index semantics require measurement and review.
@@ -97,6 +99,10 @@ The runner controls a fixed phase order: **Format → Static quality → Tests �
 Selected test commands are grouped as **Unit / Contract**, **Integration**, **Browser / Cloud**, or **Other tests**. Each suite has a 24-cell progress bar. Node and Playwright suites also report individual case progress; other runners receive suite-level progress only. The runner suppresses native child test output when its custom case reporter owns the output, preventing duplicate case listings.
 
 Dead-code is reported as one group. Fix mode shows **Safe fixes** (Knip import consumers, ESLint unused declarations, single-use declaration/reference scans, classification, then only proven edits) followed by **Verification** (Knip reachability, final ESLint and single-use results, and TypeScript safety for candidate edits). All findings appear in stable path/line/rule/name order and fail quality.
+
+When a declaration is intentionally kept as a review-only single-use boundary, attach a reason to its declaration terminator: `// terra-quality-ignore single-use -- <reason>`. The marker applies only to that declaration and only suppresses a `REVIEW` finding; safe inline candidates remain actionable. Missing-reason, detached, or stale markers are reported until corrected or removed.
+
+Regex deduplication analyzes reusable regex declarations and constructors. Inline regex expressions in test sources remain in place for readable assertions and fixtures; named regex bindings in tests remain in scope for duplicate checks.
 
 ### GitHub report
 Add a `github` section to `quality.json` to include GitHub analytics in the same quality run and JSON report:

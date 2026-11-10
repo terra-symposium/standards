@@ -46,7 +46,7 @@ test('performance patterns are opt-in and report linear lookups nested in collec
 	assert.deepEqual(performancePatternFindings(cfg), []);
 	const enabled = createQualityCfg({ ...base, performancePatterns: {} });
 	assert.deepEqual(
-		performancePatternFindings(enabled).map(({ method, receiver, line }) => ({ method, receiver, line })),
+		performancePatternFindings(enabled).map(({ method: m, receiver: r, line: l }) => ({ method: m, receiver: r, line: l })),
 		[
 			{ method: 'find', receiver: 'records', line: 1 },
 			{ method: 'filter', receiver: 'records', line: 2 },
@@ -91,6 +91,17 @@ test('shared regex checks can exclude test directories where repeated literals a
 	assert.deepEqual(regexFindings(cfg), []);
 	assert.equal(fixRegexDedup(cfg).fixed, 0);
 	assert.match(fixtureText(root, 'tests/use.test.ts'), /const one = \/record\/g;/);
+});
+test('regex dedup ignores inline test expressions while keeping named test regexes in scope', () => {
+	const root = fixtureRoot('terra-quality-inline-test-regex-');
+	fixtureFile(root, 'src/use.ts', `export const sourcePattern = /shared/g;\n`);
+	fixtureFile(
+		root,
+		'tests/use.test.ts',
+		`import assert from 'node:assert/strict';\nassert.match('record', /record/);\nassert.match('record', /record/);\nconst reusablePattern = /shared/g;\nvoid reusablePattern;\n`,
+	);
+	const cfg = createQualityCfg({ root, sourceRoots: ['src', 'tests'], extensions: ['.ts'], regexDedup: { extensions: ['.ts'], sharedModule: 'shared/regex.mjs' } });
+	assert.deepEqual(regexFindings(cfg), [{ source: 'shared/g', count: 2, locations: ['src/use.ts:1', 'tests/use.test.ts:4'] }]);
 });
 test('repeated-class fixer creates deterministic file-local CLASSES constants and leaves dynamic/HTML sources alone', () => {
 	const root = fixtureRoot('terra-quality-classes-fix-');

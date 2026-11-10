@@ -34,7 +34,7 @@ const {
  * @param input - Brace pattern text to parse.
  * @param options - Parsing options, including maximum length, depth, and escaping behavior.
  *
- * @returns The root syntax-tree node and its parsed children.
+ * @return The root syntax-tree node and its parsed children.
  */
 
 const parse = (input, options = {}) => {
@@ -55,7 +55,6 @@ const parse = (input, options = {}) => {
 	let value;
 
 	// HELPERS
-
 	const advance = () => input[index++];
 	const push = (node) => {
 		if (node.type === 'text' && prev.type === 'dot') prev.type = 'text';
@@ -75,11 +74,9 @@ const parse = (input, options = {}) => {
 		value = advance();
 
 		// INVALID CHARACTERS
-
 		if (value === CHAR_ZERO_WIDTH_NOBREAK_SPACE || value === CHAR_NO_BREAK_SPACE) continue;
 
 		// ESCAPED CHARACTERS
-
 		if (value === CHAR_BACKSLASH) {
 			push({ type: 'text', value: (options.keepEscaping ? value : '') + advance() });
 			continue;
@@ -93,7 +90,6 @@ const parse = (input, options = {}) => {
 		}
 
 		// LEFT SQUARE BRACKET
-
 		if (value === CHAR_LEFT_SQUARE_BRACKET) {
 			brackets++;
 			let next;
@@ -119,7 +115,6 @@ const parse = (input, options = {}) => {
 		}
 
 		// PARENTHESES
-
 		if (value === CHAR_LEFT_PARENTHESES) {
 			if (nesting + 1 > maxDepth) {
 				throw new SyntaxError(`Input depth (${nesting + 1}), exceeds max depth (${maxDepth})`);
@@ -143,11 +138,12 @@ const parse = (input, options = {}) => {
 		}
 
 		// QUOTED TEXT
-
 		if (value === CHAR_DOUBLE_QUOTE || value === CHAR_SINGLE_QUOTE || value === CHAR_BACKTICK) {
 			const open = value;
-			value = options.keepQuotes === true ? open : '';
 			let next;
+			if (options.keepQuotes !== true) {
+				value = '';
+			}
 			while (index < length && (next = advance())) {
 				if (next === CHAR_BACKSLASH) {
 					value += next + advance();
@@ -164,7 +160,6 @@ const parse = (input, options = {}) => {
 		}
 
 		// LEFT CURLY BRACE
-
 		if (value === CHAR_LEFT_CURLY_BRACE) {
 			if (nesting + 1 > maxDepth) {
 				throw new SyntaxError(`Input depth (${nesting + 1}), exceeds max depth (${maxDepth})`);
@@ -178,13 +173,11 @@ const parse = (input, options = {}) => {
 		}
 
 		// RIGHT CURLY BRACE
-
 		if (value === CHAR_RIGHT_CURLY_BRACE) {
 			if (block.type !== 'brace') {
 				push({ type: 'text', value });
 				continue;
 			}
-
 			block = stack.pop();
 			block.close = true;
 			push({ type: 'close', value });
@@ -195,11 +188,11 @@ const parse = (input, options = {}) => {
 		}
 
 		// COMMA
-
 		if (value === CHAR_COMMA && depth > 0) {
 			if (block.ranges > 0) {
 				block.ranges = 0;
-				block.nodes = [block.nodes.shift(), { type: 'text', value: stringify(block) }];
+				const open = block.nodes.shift();
+				block.nodes = [open, { type: 'text', value: stringify(block) }];
 			}
 			push({ type: 'comma', value });
 			block.commas++;
@@ -207,7 +200,6 @@ const parse = (input, options = {}) => {
 		}
 
 		// RANGE DOT
-
 		if (value === CHAR_DOT && depth > 0 && block.commas === 0) {
 			const siblings = block.nodes;
 			if (depth === 0 || siblings.length === 0) {
@@ -241,7 +233,6 @@ const parse = (input, options = {}) => {
 		}
 
 		// TEXT
-
 		push({ type: 'text', value });
 	}
 
@@ -249,19 +240,20 @@ const parse = (input, options = {}) => {
 	do {
 		block = stack.pop();
 		if (block.type !== 'root') {
-			block.nodes.forEach((node) => {
-				if (!node.nodes) {
-					if (node.type === 'open') node.isOpen = true;
-					if (node.type === 'close') node.isClose = true;
-					if (!node.nodes) node.type = 'text';
-					node.invalid = true;
+			block.nodes.forEach((n) => {
+				if (!n.nodes) {
+					if (n.type === 'open') n.isOpen = true;
+					if (n.type === 'close') n.isClose = true;
+					if (!n.nodes) n.type = 'text';
+					n.invalid = true;
 				}
 			});
 
 			// get the location of the block on parent.nodes (block's siblings)
 			const parent = stack[stack.length - 1];
+			const index = parent.nodes.indexOf(block);
 			// replace the (invalid) block with it's nodes
-			parent.nodes.splice(parent.nodes.indexOf(block), 1, ...block.nodes);
+			parent.nodes.splice(index, 1, ...block.nodes);
 		}
 	} while (stack.length > 0);
 	push({ type: 'eos' });

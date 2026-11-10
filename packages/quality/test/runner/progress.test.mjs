@@ -10,7 +10,7 @@ IMPORTS
 // API
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { qualityProgress, qualityProgressState } from '../../dist/lib/progress.js';
+import { qualityProgress, setQualityProgressSuppressed } from '../../dist/lib/index.js';
 
 /*//////////////////////////////////////////////////
 TESTS
@@ -69,11 +69,11 @@ test('progress updates always include a bar and rewrite one line even without a 
 });
 test('quiet output suppresses progress writes', () => {
 	const writes = [];
-	qualityProgressState.suppressed = true;
+	setQualityProgressSuppressed(true);
 	try {
 		qualityProgress('Quiet scan', 1, 2, (chunk) => writes.push(chunk));
 	} finally {
-		qualityProgressState.suppressed = false;
+		setQualityProgressSuppressed(false);
 	}
 	assert.deepEqual(writes, []);
 });

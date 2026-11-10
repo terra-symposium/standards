@@ -59,7 +59,7 @@ Each bullet is one top-level `node:test` case. Nested assertions remain within t
 - documentation findings detect missing tags on one-line TSDoc attached to an exported function
 - documentation findings warn for detached TSDoc and accept declaration and file-header comments
 - documentation description audit accepts TSDoc attached to a type member
-- documentation findings recognize the props scaffold for destructured parameters
+- documentation findings reject aggregate `@param props` tags and require individual destructured parameter tags
 
 documentation description audits report missing prose while accepting documented tags and optional
 tags

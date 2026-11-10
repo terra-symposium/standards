@@ -40,14 +40,14 @@ test('UI recommendations report native controls and shared text links with sourc
 	);
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.tsx'] });
 	assert.deepEqual(
-		uiComponentRecommendations(cfg).map(({ file, line, element, component, import: importPath, variant }) => ({ file, line, element, component, importPath, variant })),
+		uiComponentRecommendations(cfg).map(({ file: f, line: l, element: e, component: c, import: i, variant: v }) => ({ file: f, line: l, element: e, component: c, importPath: i, variant: v })),
 		[
 			{ file: 'src/view.tsx', line: 3, element: 'button', component: 'Button', importPath: '@/components/ui/button', variant: undefined },
 			{ file: 'src/view.tsx', line: 4, element: 'input', component: 'Input', importPath: '@/components/ui/input', variant: undefined },
 			{ file: 'src/view.tsx', line: 6, element: 'input', component: 'Button', importPath: '@/components/ui/button', variant: undefined },
 			{ file: 'src/view.tsx', line: 7, element: 'a', component: 'ButtonLink', importPath: '@/components/ui/button', variant: undefined },
 			{ file: 'src/view.tsx', line: 8, element: 'a', component: 'ButtonLink', importPath: '@/components/ui/button', variant: 'primary-underline' },
-			{ file: 'src/view.tsx', line: 9, element: 'a', component: 'ButtonLink', importPath: '@/components/ui/button', variant: 'primary-link' },
+			{ file: 'src/view.tsx', line: 9, element: 'a', component: 'ButtonLink', importPath: '@/components/ui/button', variant: 'primary-underline' },
 		],
 	);
 });
@@ -60,8 +60,8 @@ test('UI recommendations scan Astro markup and recognize the docs sidebar Button
 	);
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.astro'] });
 	assert.deepEqual(
-		uiComponentRecommendations(cfg).map(({ file, line, element, component, variant }) => ({ file, line, element, component, variant })),
-		[{ file: 'src/DocsLayout.astro', line: 2, element: 'a', component: 'ButtonLink', variant: 'primary-link' }],
+		uiComponentRecommendations(cfg).map(({ file: f, line: l, element: e, component: c, variant: v }) => ({ file: f, line: l, element: e, component: c, variant: v })),
+		[{ file: 'src/DocsLayout.astro', line: 2, element: 'a', component: 'ButtonLink', variant: 'primary-underline' }],
 	);
 });
 test('UI recommendation rules override defaults and honor input types and ignored source paths', () => {
@@ -83,7 +83,7 @@ test('UI recommendation rules override defaults and honor input types and ignore
 		},
 	});
 	assert.deepEqual(
-		uiComponentRecommendations(cfg).map(({ element, component }) => ({ element, component })),
+		uiComponentRecommendations(cfg).map(({ element: e, component: c }) => ({ element: e, component: c })),
 		[
 			{ element: 'button', component: 'ActionButton' },
 			{ element: 'input', component: 'Checkbox' },
@@ -106,7 +106,7 @@ test('ui-recommendations reports errors and fails when findings remain', async (
 		console.error = originalErr;
 	}
 	assert.match(output.join('\n'), /\[ERROR\] src\/view\.tsx:1:\d+ <button> should use <Button>/u);
-	assert.match(output.join('\n'), /\[ERROR\] src\/view\.tsx:1:\d+ <a> should use <ButtonLink variant="primary-link">/u);
+	assert.match(output.join('\n'), /\[ERROR\] src\/view\.tsx:1:\d+ <a> should use <ButtonLink variant="primary-underline">/u);
 	assert.equal(process.exitCode, 1);
 	process.exitCode = 0;
 });

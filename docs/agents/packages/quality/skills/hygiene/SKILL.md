@@ -204,6 +204,28 @@ Search callers and receiving components together. Start from the existing compon
 
 Preserve behavior, semantics, accessibility, types, evaluation order, side effects, component identity, and meaningful comments. For repeated homogeneous content, store semantic data in an array or map and render it with `.map()` rather than duplicating JSX. Keep data semantic; do not turn it into a private class-name matrix that bypasses shared variants. Prefer maps or helpers only when they reduce repetition without hiding differences. Keep documentation easy to scan: group related guidance under headings, separate headings and paragraphs with blank lines, and use whitespace between distinct examples or table sections instead of dense prose blocks.
 
+#### Aligned dense data
+
+For a sufficiently long, regular list whose entries have a clear visual correspondence, use whitespace to align related values into rows or columns, then place `prettier-ignore` immediately before the smallest block needed to preserve that layout. This can make CSS token scales, Tailwind configuration, lookup lists, tuples, and other repeated arrays easier to compare while keeping the data compact. Keep each row's ordering meaningful and its columns consistent. Use this only when alignment improves scanning; ordinary short lists and irregular data should use the standard formatter. Do not disable formatting for a whole file or add alignment that obscures meaning.
+
+```css
+:root {
+	/* prettier-ignore */
+	--primary-1: 43 22 13;    --primary-2: 58 27 13;      --primary-3: 84 37 14;       --primary-4: 109 45 13;
+	--primary-5: 133 55 13;   --primary-6: 163 65 13;     --primary-7: 195 79 14;      --primary-8: 225 91 17;
+}
+```
+
+```ts
+// prettier-ignore
+const CUSTOMER_CATEGORY_COLOR_KEYS = [
+	'tiger', 'red',  'coral',  'amber',  'yellow', 'lime',    'green', 'emerald', 'teal',  'cyan',
+	'sky',   'blue', 'indigo', 'violet', 'purple', 'fuchsia', 'pink',  'rose',    'brown', 'sand',
+] as const;
+```
+
+Repository examples include the aligned `CUSTOMER_CATEGORY_COLOR_KEYS` list in `contracting/salesphere/astro/src/lib/commercial.ts`, the `COLOR SCALES` list in `styling/src/lib/hue.ts`, and Prettier-protected Tailwind scales and configuration blocks in `personal/saibai-corpus/config/tailwind.preset.ts`. Preserve the smallest effective ignore scope and keep edits within the owning repository's formatting conventions.
+
 ### 3. Integrate and finish
 
 The parent reviews every diff, checks that every requested area and file was covered, and repeats the repository-wide search after integration. Respect each workspace's own component, icon, and formatting conventions instead of assuming packages share an implementation. Continue until no meaningful compaction remains. When commits are requested, commit each completed area on the requested development branch. Do not add or run tests unless the user asks for testing or verification.

@@ -22,15 +22,15 @@ Terra's `astro/src/lib/types.tsx` supplies these axes and family variants:
 
 ```ts
 type UiColor = 'primary' | 'secondary' | 'gray' | 'destructive';
-type UiType = 'default' | 'outline' | 'ghost' | 'tonal' | 'saturated' | 'link' | 'underline';
+type UiType = 'default' | 'outline' | 'ghost' | 'tonal' | 'saturated' | 'underline';
 type UiSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl';
 
 type ActionVariant = UiColor | `${UiColor}-${Exclude<UiType, 'default' | 'saturated'>}`;
 type ControlVariant = UiColor | `${UiColor}-${Extract<UiType, 'outline' | 'ghost' | 'tonal'>}`;
-type SurfaceVariant = UiColor | `${UiColor}-${Exclude<UiType, 'default' | 'link' | 'underline'>}`;
+type SurfaceVariant = UiColor | `${UiColor}-${Exclude<UiType, 'default' | 'underline'>}`;
 ```
 
-`ActionVariant` allows default, outline, ghost, tonal, link, and underline. `ControlVariant` allows default, outline, ghost, and tonal; reuse this same type for toggles and fields when their public choices match. `SurfaceVariant` adds saturated and excludes link treatments. In each family, a bare color means its default treatment.
+`ActionVariant` allows default, outline, ghost, tonal, and underline. Button links default to the underline treatment; there is no separate link treatment. `ControlVariant` allows default, outline, ghost, and tonal; reuse this same type for toggles and fields when their public choices match. `SurfaceVariant` adds saturated and excludes underline. Card variants use tonal as their default and do not expose the surface family's bare-color default. For action, control, and general surface variants, a bare color means the family's default treatment.
 
 Use all four shared colors and all five `UiSize` keys in each applicable family. Family grids define every supported color/treatment pair and exclude invalid combinations. Buttons may keep action-only `icon` sizes. Keep success, warning, error, and info as semantic states, not colors. Aliases map to canonical variants at component boundaries.
 

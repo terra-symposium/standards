@@ -23,7 +23,7 @@ HELPERS
  * @param repo Repository payload whose nested owner or full name may identify the owner.
  * @param installationOwner Installation account login used only when the repository payload omits its owner.
  *
- * @returns The repository owner's login; throws when no owner can be resolved.
+ * @return The repository owner's login; throws when no owner can be resolved.
  */
 export function repositoryOwner(repo: GithubRepository, installationOwner?: string): string {
 	const fullNameOwner = repo.full_name?.split('/');
@@ -39,7 +39,7 @@ export function repositoryOwner(repo: GithubRepository, installationOwner?: stri
  * @param signature Value of the `x-hub-signature-256` header.
  * @param secret Configured GitHub webhook secret used to compute the expected digest.
  *
- * @returns `true` only when the supplied signature matches the body digest.
+ * @return `true` only when the supplied signature matches the body digest.
  */
 export function verifySignature(body: string, signature: string, secret: string): boolean {
 	const expected = Buffer.from(`sha256=${createHmac('sha256', secret).update(body).digest('hex')}`);
@@ -55,7 +55,7 @@ export function verifySignature(body: string, signature: string, secret: string)
  * @param process Work to perform for a newly claimed delivery.
  * @param release Operation that removes a failed delivery claim so GitHub can retry it.
  *
- * @returns `true` when the delivery was processed, `false` when an existing claim suppresses it.
+ * @return `true` when the delivery was processed, `false` when an existing claim suppresses it.
  */
 export async function acceptDelivery(delivery: string | null, claim: () => Promise<boolean>, process: () => Promise<void>, release: () => Promise<void>): Promise<boolean> {
 	if (delivery && !(await claim())) return false;
@@ -73,7 +73,7 @@ export async function acceptDelivery(delivery: string | null, claim: () => Promi
  *
  * @param request POST webhook request containing the signed event and delivery headers.
  *
- * @returns A 202 response after handling the event, or an error response for invalid requests.
+ * @return A 202 response after handling the event, or an error response for invalid requests.
  */
 export default async function handler(request: Request): Promise<Response> {
 	if (request.method !== 'POST') return new Response('Method not allowed', { status: 405 });

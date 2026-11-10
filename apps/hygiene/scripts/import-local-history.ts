@@ -13,7 +13,7 @@ import { db } from '../src/lib/server/db.js';
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { buildRunId, persistHistoryReport } from '../src/lib/server/ingest.js';
+import { ingestHistoryReport } from '../src/lib/server/ingest.js';
 import { parseHistoryReport } from '../src/lib/server/history.js';
 import { tmpdir } from 'node:os';
 
@@ -96,21 +96,7 @@ void (async (): Promise<void> => {
 			}),
 		);
 		const report = parseHistoryReport(history);
-		const historySql = db();
-		const historyRepo = (await historySql`SELECT owner, name FROM repositories WHERE id = ${repoRow.id} AND active`)[0] as { owner: string; name: string } | undefined;
-		if (!historyRepo || `${historyRepo.owner}/${historyRepo.name}`.toLowerCase() !== report.repository.toLowerCase()) throw new Error('report does not match an active repository');
-		if (!(await historySql`SELECT name FROM branches WHERE repository_id = ${repoRow.id} AND name = ${report.branch} AND enabled`).length) throw new Error('branch is not enabled');
-		await persistHistoryReport(
-			repoRow.id,
-			buildRunId({
-				repository: report.repository,
-				branch: report.branch,
-				headSha: report.headSha,
-				completedAt: report.generatedAt,
-			}),
-			report,
-			report.generatedAt,
-		);
+		await ingestHistoryReport(repoRow.id, report);
 		console.info(`Imported ${history.commits.length.toLocaleString()} commits for ${repo} (${branch}) through ${history.headSha.slice(0, 9)}.`);
 	} finally {
 		try {

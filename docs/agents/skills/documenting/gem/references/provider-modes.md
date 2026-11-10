@@ -11,7 +11,7 @@ This reference explains the boundary used by the generation code. It is not a pr
 | Model selection | `Gemini.mode()` selects the configured Fast/Pro/Thinking UI mode | `model` is sent in the `/v1/chat/completions` request |
 | Knowledge files | Uploaded through Gemini's hidden `input[type="file"]` and verified after reload | Current `_openai.ts` does not upload `files`; put source in prompt/context or implement that intentionally |
 | External mutation | Updating the Gem changes Gemini account state and must be explicit | A chat completion is a request, not a saved instruction mutation |
-| Local verification | `scripts/export/canvas.mts` saves raw/normalized output under OS Downloads | Call `OpenAI.chat()` and validate its returned text with the same document contract |
+| Local verification | Use a saved local source capture and inspect the Gemini response against the document contract | Call `OpenAI.chat()` and validate its returned text with the same document contract |
 
 ## Headed versus non-headed Gemini
 

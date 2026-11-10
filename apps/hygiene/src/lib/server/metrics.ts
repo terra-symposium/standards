@@ -17,7 +17,6 @@ CONFIG
 export type TestCounts = { passed: number; failed: number; skipped: number };
 /** Total, enabled, clean, and finding counts parsed from a Terra Quality report. */
 export type QualityCounts = { total: number; enabled: number; clean: number; findings: number };
-
 /** Generic XML node used while traversing parsed JUnit content. */
 type XmlNode = Record<string, unknown>;
 
@@ -29,11 +28,13 @@ HELPERS
  * Count testcases once; suite totals can double count nested suites.
  *
  * @param xml JUnit XML document to parse.
- * @returns Counts of individual passed, failed, and skipped testcases.
+ *
+ * @return Counts of individual passed, failed, and skipped testcases.
  */
 export function parseJUnit(xml: string): TestCounts {
+	const root = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '@_', allowBooleanAttributes: true }).parse(xml) as XmlNode;
 	const counts: TestCounts = { passed: 0, failed: 0, skipped: 0 };
-	function visit(value: unknown): void {
+	(function visit(value: unknown): void {
 		if (Array.isArray(value)) {
 			for (const item of value) visit(item);
 			return;
@@ -49,8 +50,7 @@ export function parseJUnit(xml: string): TestCounts {
 		}
 		if ('testsuite' in node) visit(node.testsuite);
 		if ('testsuites' in node) visit(node.testsuites);
-	}
-	visit(new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '@_', allowBooleanAttributes: true }).parse(xml) as XmlNode);
+	})(root);
 	return counts;
 }
 
@@ -58,7 +58,9 @@ export function parseJUnit(xml: string): TestCounts {
  * Validates a Terra Quality JSON report and summarizes its check statuses.
  *
  * @param input Untrusted report value to validate.
- * @returns Total, non-skipped, clean, and finding counts.
+ *
+ * @return Total, non-skipped, clean, and finding counts.
+ *
  * @throws {Error} If the report schema or a check entry is invalid.
  */
 export function parseQualityReport(input: unknown): QualityCounts {
@@ -93,7 +95,8 @@ export function parseQualityReport(input: unknown): QualityCounts {
  *
  * @param tests Parsed test totals, or `null` when no test report is available.
  * @param quality Parsed quality totals, or `null` when no quality report is available.
- * @returns Both input summaries, their rates, and the rounded combined score when calculable.
+ *
+ * @return Both input summaries, their rates, and the rounded combined score when calculable.
  */
 export function score(
 	tests: TestCounts | null,
