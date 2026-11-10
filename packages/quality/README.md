@@ -65,17 +65,30 @@ uv add --dev ruff mypy bandit vulture interrogate pydoclint
 
 On Debian or Ubuntu, install the C tools with `sudo apt-get install clang clang-format clang-tidy`; install the Java and Python tools with the package manager or project wrappers used by that repository. The profile check prints its tested minimum if the installed version is too old.
 
-Build and test commands remain repository-owned. Add them to `qualityCommands` using the project’s existing Make, Maven, Gradle, Python, or other wrapper. A configured command whose name matches a profile check replaces that default; other commands run alongside the profiles. SpotBugs runs in repository health after build commands and accepts Maven `target/classes` or Gradle `build/classes/java/main`; override `java-spotbugs` for a different build layout. For example:
+Builds and functional tests are separate suites from quality. Keep `build` and `test` scripts in the repository, and run them as separate workflow steps. Never put a build, unit test, integration test, contract test, browser test, Playwright test, or example execution in `qualityCommands` or `recommendationCommands`, directly or through a wrapper. Quality and hygiene commands may format-check, lint, type-check, inspect dependencies and source, validate documentation, and run other static checks. A configured hygiene command whose name matches a profile check replaces that default; other hygiene commands run alongside the profiles. SpotBugs is a static analysis check and requires compiled classes; run the build suite first in the workflow, then run the SpotBugs hygiene check against those artifacts. For example:
 
 ```json
 {
 	"qualityCommands": [
-		{ "name": "c-build", "command": "make", "args": ["test"] },
-		{ "name": "java-test", "command": "./mvnw", "args": ["test"] },
-		{ "name": "python-tests", "command": "uv", "args": ["run", "pytest"] }
+		{ "name": "c-doc-params", "command": "make", "args": ["check-doc-params"] },
+		{ "name": "python-typecheck", "command": "uv", "args": ["run", "mypy", "src"] }
 	]
 }
 ```
+
+Expose and invoke the three suites independently. A repository may omit a suite it does not have; report that suite as not applicable rather than making an empty command pass.
+
+```json
+{
+	"scripts": {
+		"quality": "terra-quality quality --all",
+		"build": "<compile or generate project artifacts>",
+		"test": "<run unit, integration, contract, and browser tests>"
+	}
+}
+```
+
+The `quality` command must not call `build` or `test`, and neither `build` nor `test` may hide the other suite. Run quality, build, and functional tests as distinct CI/workflow steps so each result is visible and independently actionable. A test that needs built artifacts may consume artifacts from the preceding build step; it must not build them itself.
 
 Use the same command mechanism for unknown languages or industry-specific rules; Terra Quality does not imply regulatory compliance. To add a built-in language later, add its identifier, profile data record, and schema enum rather than a language parser.
 
@@ -93,10 +106,8 @@ pnpm exec terra-quality quality --all --warn
 
 The normal scope is changed and untracked files in a Git worktree. `--all` selects every file under `sourceRoots`; `--warn` disables autofixes and runs dead-code analysis once without a temporary fix preview. It reports rule-level fix candidates; fix mode then type-checks proposed dead-code edits before writing and may reject a candidate. Configured quality commands still run unless you pass `--skip-commands`.
 
-### Output order and tests
-The runner controls a fixed phase order: **Format → Static quality → Tests → Framework / type checks → Build → Repository health**. `quality.json` selects enabled checks and commands; it does not define phase order or test categories. Commands in ordinary phases keep their configured order; tests keep their configured order within each category. Interactive terminals animate a spinner while each check works, and findings appear as bullets directly below that check's completion status.
-
-Selected test commands are grouped as **Unit / Contract**, **Integration**, **Browser / Cloud**, or **Other tests**. Each suite has a 24-cell progress bar. Node and Playwright suites also report individual case progress; other runners receive suite-level progress only. The runner suppresses native child test output when its custom case reporter owns the output, preventing duplicate case listings.
+### Quality output
+The quality command reports hygiene checks only. It must not report or run a build or functional-test phase. Keep test output in the repository's separately invoked test suite; unit, integration, contract, and browser/Playwright cases all belong to that functional suite. Keep compilation and generated-artifact output in the separately invoked build suite.
 
 Dead-code is reported as one group. Fix mode shows **Safe fixes** (Knip import consumers, ESLint unused declarations, single-use declaration/reference scans, classification, then only proven edits) followed by **Verification** (Knip reachability, final ESLint and single-use results, and TypeScript safety for candidate edits). All findings appear in stable path/line/rule/name order and fail quality.
 

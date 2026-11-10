@@ -49,9 +49,9 @@ Measure the existing check and test runtime, then estimate the new rule's increm
 
 Update package documentation and schema, identify consumer configuration and release steps, and state that consumers need a published version before they can adopt the change. Report recurrence evidence, the selected automation level, expected benefit, runtime impact, validation run or skipped, and remaining manual cases.
 
-## Fixed check and test order
+## Separate validation suites
 
-Terra Quality owns the full-run order: **Format → Static quality → Tests → Framework / type checks → Build → Repository health**. `quality.json` continues to select checks and commands but does not set their order or test grouping. Test commands are grouped as **Unit / Contract**, **Integration**, **Browser / Cloud**, and **Other tests**. Every selected suite gets an overall progress bar; Node and Playwright also report per-case progress, while unknown runners show only suite progress. Commands keep their configured order within ordinary phases, and tests keep their configured order within each category.
+Terra Quality owns only the quality/hygiene run: formatting, static source analysis, type checks, and related hygiene checks. It must not invoke or report build or functional-test work. Repository workflows own three distinct steps: quality, build, and functional tests. Functional tests may group unit/contract, integration, browser/Cloud, and Playwright suites under the repository's `test` entry point. Keep each result visible as a separate workflow step; do not merge one suite into another through a wrapper.
 
 In interactive terminals, each full-run check shows an animated spinner while work is in progress. After completion, its findings appear as a bullet list directly beneath its status.
 
@@ -151,4 +151,18 @@ A repository should expose one canonical quality script and pass scope or report
 }
 ```
 
-Use `pnpm run quality` for the changed-file pass, `pnpm run quality -- --all` for the full scope, and add `-- --warn` for read-only review or CI. Keep build and test commands explicit in `qualityCommands` or in separate workflow steps.
+Use `pnpm run quality` for the changed-file pass, `pnpm run quality -- --all` for the full scope, and add `-- --warn` for read-only review or CI. Run quality, build, and functional tests as three separate workflow steps. `qualityCommands` may contain only additional code-hygiene checks; never use it for a build or any test. Keep unit, integration, contract, and browser/Playwright tests together in the functional-test suite, and keep compilation or artifact generation in the build suite. Do not hide a build inside `test`, tests inside `build`, or either suite inside `quality`.
+
+Use a consistent script contract where the repository supports the suite:
+
+```json
+{
+	"scripts": {
+		"quality": "terra-quality quality --all",
+		"build": "<compile or generate project artifacts>",
+		"test": "<run functional tests>"
+	}
+}
+```
+
+Omit a script only when the repository genuinely has no corresponding suite; report it as not applicable. Do not use a successful no-op script to imply that a suite ran.

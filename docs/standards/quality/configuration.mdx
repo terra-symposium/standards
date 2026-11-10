@@ -23,7 +23,7 @@ This example uses built-in checks without enabling external tools:
 }
 ```
 
-Install and configure a tool before enabling the check that invokes it. For example, linting requires an ESLint flat config at `root` or under `configRoot`. Build, test, and other repository commands are opt-in through `qualityCommands`.
+Install and configure a tool before enabling the check that invokes it. For example, linting requires an ESLint flat config at `root` or under `configRoot`. `qualityCommands` is for additional code hygiene checks only. Build and functional-test commands belong in separate repository scripts and workflow steps.
 
 ## Paths and source discovery
 
@@ -193,21 +193,22 @@ Tool names are resolved from `<root>/node_modules/.bin` first, then from the env
 
 ## Repository commands
 
-`qualityCommands` contains required subprocesses, commonly build and test commands. Each entry requires a unique lowercase `name` and a `command`; `args` is an optional array of strings. Terra Quality assigns commands to its fixed full-run phases and test groups, then preserves configured order within each phase or group; configuration does not define ordering or category fields.
+`qualityCommands` contains additional required code hygiene subprocesses that are not covered by built-in checks. Each entry requires a unique lowercase `name` and a `command`; `args` is an optional array of strings. Do not configure a build or a functional test here, including indirectly through a script. Keep builds, unit tests, integration tests, contract tests, and browser/Playwright tests in their own repository scripts and workflow steps.
 
 ```json
 {
 	"qualityCommands": [
-		{ "name": "build", "command": "pnpm", "args": ["run", "build"] },
-		{ "name": "test", "command": "pnpm", "args": ["run", "test"] }
+		{ "name": "c-doc-params", "command": "make", "args": ["check-doc-params"] }
 	],
-	"enabledCommands": { "test": true }
+	"enabledCommands": { "c-doc-params": true }
 }
 ```
 
+The quality suite must not call `build` or `test`. The build suite compiles or generates project artifacts without running tests. The functional-test suite runs assertions about behavior and may include unit, integration, contract, and browser/Playwright tests. Tests that consume build artifacts must use artifacts produced by the separate build step rather than building them implicitly. If a repository has no functional tests or no build, mark that suite not applicable instead of adding an empty passing command.
+
 Use `enabledCommands` to toggle one configured command. Set `enabledChecks.command` to `false` to disable the category or pass `--skip-commands` for one run.
 
-`recommendationCommands` uses the same entry shape. Use `enabledRecommendations` to toggle a command or `enabledChecks.recommend` to disable all recommendation commands. A nonzero subprocess status fails the quality run. Pass `--skip-recommendations` to omit these commands once.
+`recommendationCommands` follows the same hygiene-only rule. Never configure a build or functional test there, directly or through a wrapper. Use `enabledRecommendations` to toggle a hygiene command or `enabledChecks.recommend` to disable all recommendation commands. A nonzero subprocess status fails the quality run. Pass `--skip-recommendations` to omit these commands once.
 
 Commands run from `root`, inherit the caller's environment, and are not automatically limited to changed files. The runner does not provision credentials, databases, browsers, or other services.
 
@@ -275,4 +276,4 @@ Budget values are milliseconds; `failMs` must be greater than `warnMs`. Test bud
 
 ## This repository's configuration
 
-The root [`quality.json`](https://github.com/Terra-Symposium/standards/blob/main/quality.json) scans `packages` and `scripts`, enables several project-specific checks, preserves long one-line imports, and declares build and test commands. It excludes single-use analysis from `packages/quality`, where reusable declarations and package APIs are intentionally concentrated. Use it as a reference, then choose scope and rules that fit your repository. Repositories may instead keep the quality file and related tool configs together under `config/`; Terra Quality infers the repository root and discovers the tool configs there.
+The root [`quality.json`](https://github.com/Terra-Symposium/standards/blob/main/quality.json) scans `packages` and `scripts`, enables several project-specific checks, and preserves long one-line imports. It excludes single-use analysis from `packages/quality`, where reusable declarations and package APIs are intentionally concentrated. Use it as a reference, then choose scope and rules that fit your repository. Repositories may instead keep the quality file and related tool configs together under `config/`; Terra Quality infers the repository root and discovers the tool configs there. Build and functional tests are separate suites and must not be declared in `quality.json`.

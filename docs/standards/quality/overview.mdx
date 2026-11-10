@@ -541,11 +541,11 @@ The repository must provide Tailwind CSS v4 and a valid stylesheet. The check us
 
 #### Command
 
-Run explicit repository-owned quality commands such as build and test.
+Run explicit repository-owned code-hygiene commands that supplement built-in checks.
 
 **Toggle:** `enabledChecks.command` and `enabledCommands.<name>` · **Fix:** none
 
-Runs subprocesses in `qualityCommands` from `root` and propagates their status; it does not infer changed-file limits. Each item has a unique `name`, executable `command`, and optional string-array `args`.
+Runs additional code-hygiene subprocesses in `qualityCommands` from `root` and propagates their status; it does not infer changed-file limits. Each item has a unique `name`, executable `command`, and optional string-array `args`. Never configure build or functional-test commands here; invoke build and tests in separate repository scripts and workflow steps.
 
 Use `enabledCommands` for per-command switches, `--skip-commands` to skip once, or `enabledChecks.command: false` to disable the category. Document required services and credentials in your workflow.
 
@@ -555,18 +555,17 @@ Use `enabledCommands` for per-command switches, `--skip-commands` to skip once, 
 { "qualityCommands": [] }
 ```
 
-**After** — add explicit build and test commands so a normal quality run includes them:
+**After** — keep `qualityCommands` limited to hygiene checks, and expose build and test as independent scripts:
 
 ```json
 {
 	"qualityCommands": [
-		{ "name": "build", "command": "pnpm", "args": ["run", "build"] },
-		{ "name": "test", "command": "pnpm", "args": ["run", "test"] }
+		{ "name": "c-doc-params", "command": "make", "args": ["check-doc-params"] }
 	]
 }
 ```
 
-Run one configured command with `pnpm exec terra-quality domain test`.
+Keep `build` and `test` in the root package scripts and run each suite independently. A configured hygiene command can be run with `pnpm exec terra-quality domain c-doc-params`.
 
 #### Recommend
 
