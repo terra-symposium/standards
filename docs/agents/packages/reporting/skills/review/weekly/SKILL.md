@@ -9,7 +9,9 @@ Use only for Terra Symposium's weekly contributor deck. The shared `standup` ski
 
 ## 1. Terra-specific boundaries
 
-- Use the organization repository and reviewed ref as the source of truth; do not double-count the deployment mirror.
+Use the organization repository and reviewed ref as the source of truth; do not double-count the
+deployment mirror.
+
 - Netlify capacity is scarce. Never deploy to create report screenshots.
 
 ## 2. Establish goals before Git activity

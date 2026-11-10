@@ -1,6 +1,6 @@
-# Quality package test contract
+# Quality Package Tests
 
-The suite exercises the public package boundary from `dist/index.js` with isolated temporary repositories. It does not depend on the Standards checkout, installed application dependencies, or the current Git worktree. Command checks use executable fixtures that record arguments, so behavior can be tested without running each real formatter, linter, compiler, or repository build.
+Node test fixtures for the quality package’s checks, reports, runner, and source transforms. These are package tests, not the Standards-wide test manifest.
 
 ## What it does
 
@@ -19,7 +19,7 @@ Not applicable.
 ### One discovery path
 `pnpm run test` runs `node --test`. Node discovers the test files recursively under this directory exactly once. The folders below separate checks, transforms, runner behavior, and reports; shared fixture helpers live outside discovery in `support/fixtures.mjs`.
 
-Tests selected by a repository's `quality:all` command are grouped in this order: **Unit / Contract → Integration → Browser / Cloud → Other tests**. Each selected command gets a suite bar. Node and Playwright also report individual cases through the shared 24-cell progress display. Node keeps a single live line open while test files are still being discovered, then finalizes with the runner's exact summary count when available. Unknown runners show only suite progress, with no guessed case total.
+From `standards/main/`, run `pnpm --filter @terra-symposium/standards-quality test` to validate quality package tests.
 
 ### Dead-code output contract
 Dead-code is one static-quality group with two explicit stages:
@@ -34,19 +34,7 @@ findings; TypeScript safety checks for proposed edits.
 configured check before returning failure.
 
 
-```text
-Before                         After
-=== dead-code/knip-fix ===      STATIC QUALITY
-...                               Dead code
-=== dead-code/knip ===             Safe fixes      [████████████░░░░░░░░░░░░] 3/5
-...                               Verification    [████████████████████████] passed
-=== imports ===                  Imports         ✓ clean
-  ✓ clean                         Git diff        ✓ passed
-  ✓ clean
-=== diff ===                    TESTS [████████░░░░░░░░░░░░] 1/3 suites
-=== diff ===                      Unit / Contract · quality-contracts
-                                    Cases [████████████████████████] 5/5 ✓ passed
-```
+`checks/`, `reports/`, `runner/`, and `transforms/` group focused Node tests; `source-automation.test.mjs` covers source automation.
 
 ### Complete subtest inventory
 Each bullet is one top-level `node:test` case. Nested assertions remain within their owning contract case. The inventory contains **217 cases**.

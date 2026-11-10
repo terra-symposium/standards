@@ -245,7 +245,7 @@ export const loadGradeCounts = (measurements: readonly Pick<LoadMeasurement, 'gr
  * @param rec Callback that receives the completed measurement.
  * @param budget Optional helper-level budget override.
  *
- * @return The operation result.
+ * @return The operation result, or its original rejection after recording elapsed time.
  */
 export const timeLoadOperation = async <T>(name: string, op: () => T | Promise<T>, rec: (measurement: LoadMeasurementInput) => void, budget?: LoadBudgetOverride): Promise<T> => {
 	if (!name.trim()) throw new Error('A named load measurement is required.');

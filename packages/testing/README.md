@@ -1,6 +1,6 @@
-# Terra Standards Testing
+# Standards Test Runner
 
-`@terra-symposium/standards-testing` always runs Standards-owned shared checks first, then runs any repository-specific suites. The shared checks include linear-history validation. Repositories keep only their custom test files and commands; shared test logic and duplicate-suite validation stay in Standards.
+Manifest-driven runner and CLI for repository-owned test suites, plus a GitHub Action. A versioned manifest declares commands, working directories, and suite-owned files.
 
 ## What it does
 
@@ -24,7 +24,7 @@ Each suite has one command. `owns` is required and lists repository-relative fil
 
 Keep this canonical manifest as the ordered mapping of suite commands and file ownership; do not repeat the suite inventory in another runner or documentation list. Within those files, place each assertion with the source module, route, or domain it proves. When reorganizing tests, map each old file and case to its new owner and mark it as moved, merged, or retired; a retired assertion needs a reason and a surviving proof or an explicit coverage gap.
 
-After adding the package as a development dependency, run it locally with:
+The runner executes commands declared by the selected manifest. Review the manifest’s commands and working directories before running an unfamiliar plan.
 
 ```sh
 pnpm exec terra-test run --manifest config/terra-tests.json

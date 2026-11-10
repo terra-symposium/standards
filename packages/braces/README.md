@@ -1,6 +1,6 @@
-# braces [![Donate](https://img.shields.io/badge/Donate-PayPal-green.svg)](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=W8YFZ425KND68) [![NPM version](https://img.shields.io/npm/v/braces.svg?style=flat)](https://www.npmjs.com/package/braces) [![NPM monthly downloads](https://img.shields.io/npm/dm/braces.svg?style=flat)](https://npmjs.org/package/braces) [![NPM total downloads](https://img.shields.io/npm/dt/braces.svg?style=flat)](https://npmjs.org/package/braces) [![Linux Build Status](https://img.shields.io/travis/micromatch/braces.svg?style=flat&label=Travis)](https://travis-ci.org/micromatch/braces)
+# Vendored Braces
 
-> Bash-like brace expansion, implemented in JavaScript. Safer than other brace expansion libs, with complete support for the Bash 4.3 braces specification, without sacrificing speed.
+Vendored braces source preserved for repository use.
 
 ## What it does
 
@@ -98,9 +98,7 @@ Not applicable.
 ### Install
 Install with [npm](https://www.npmjs.com/):
 
-```sh
-$ npm install --save braces
-```
+## Security and Limitations
 
 ## Usage
 
@@ -111,9 +109,7 @@ See the [changelog](CHANGELOG.md) for details.
 
 The main export is a function that takes one or more brace `patterns` and `options`.
 
-```js
-const braces = require('braces');
-// braces(patterns[, options]);
+## Credits and license
 
 console.log(braces(['{01..05}', '{a..e}']));
 //=> ['(0[1-5])', '([a-e])']

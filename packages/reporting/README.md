@@ -1,6 +1,6 @@
-# @terra-symposium/standards-reporting
+# Reporting
 
-Reusable responsive Playwright diagnostics and evidence reports for Terra Symposium repositories.
+Reusable Playwright evidence reporting: normalizes test results, viewport data, and load grades, then writes spreadsheet and slideshow artifacts.
 
 ## What it does
 
@@ -17,7 +17,7 @@ Not applicable.
 pnpm add -D @terra-symposium/standards-reporting @playwright/test
 ```
 
-The package requires Node.js `>=18.18` and has an `@playwright/test >=1.52.0 <2` peer dependency. Spreadsheet, slideshow, and image-processing dependencies are installed with the package.
+From `standards/main/`, run `pnpm install`, then `pnpm --filter @terra-symposium/standards-reporting test` to validate the reporting package.
 
 ## Usage
 
@@ -26,17 +26,9 @@ The package requires Node.js `>=18.18` and has an `@playwright/test >=1.52.0 <2`
 import { defineConfig } from '@playwright/test';
 import { withResponsivePlaywright } from '@terra-symposium/standards-reporting/viewports';
 
-export default withResponsivePlaywright(
-	defineConfig({
-		projects: [{ name: 'web', testMatch: '**/*.spec.ts' }],
-	}),
-	{
-		singleRunProjects: ['manual-browser-capture'],
-	},
-);
-```
+## Structure
 
-By default, regular projects run at the six shared viewport sizes. Set `PW_VIEWPORTS=mobile,lg` to select a subset. Setup projects and names listed in `singleRunProjects` run once. The helper enables full-page screenshots and the shared reporter.
+`src/` exports reporting helpers; `test/` covers the API; `.agents/skills/` contains maintainer guidance. The package depends on Playwright and Office artifact libraries.
 
 A timestamped directory under `tests/results/visual` contains the workbook, slideshow, and copied screenshots. Each Playwright result screenshot and keyed visual capture is also stored with metadata under `tests/results/visual/screenshots`. Repeated test/viewport captures replace their previous file, and each new slideshow is rebuilt from the whole folder, so interrupted and subset runs retain earlier evidence. The run marker records the current test and viewport inventory across processes in the same logical run; captures outside that inventory, from older runs, or from legacy folders are visibly labeled `HISTORICAL CAPTURE` and never counted as current coverage. The Playwright output directory defaults to `tests/results/playwright-output`.
 

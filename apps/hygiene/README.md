@@ -1,6 +1,6 @@
-# Standards repository hygiene
+# Standards Hygiene App
 
-Separate Astro/React dashboard for admins of repositories that install the Terra Hygiene GitHub App. The site stores normalized test, quality, and commit counts in Neon. It discards uploaded report contents after parsing and never stores source files or build logs.
+Netlify dashboard for browsing repository hygiene reports and test or quality metrics imported from local checkouts. It uses GitHub OAuth, Netlify Functions, and Neon; it is separate from the root Standards documentation site.
 
 ## What it does
 
@@ -14,7 +14,7 @@ Not applicable.
 
 Use the Netlify CLI's local emulator to run the dashboard and its Functions together. In this linked project the CLI can load database and GitHub credentials from the production environment; no deployment is needed. Override `APP_ORIGIN` to `http://127.0.0.1:8888`, and add `http://127.0.0.1/api/callback` as an additional callback URL in the GitHub App settings. Loopback HTTP cookies are allowed only for `127.0.0.1`; hosted origins continue to require secure cookies. If you run without the linked site's environment, copy `config/.env.example` to `apps/hygiene/.env` and fill in those values locally.
 
-Run database migrations once with `pnpm --filter @terra-symposium/hygiene-dashboard db:migrate`. The migration runner reads `process.env` and does not load `.env` files, so expose one of its supported database URL variables in your shell before running it; Netlify Dev loading `apps/hygiene/.env` does not apply to this command. Then from `apps/hygiene` start the local server with `APP_ORIGIN=http://127.0.0.1:8888 pnpm exec netlify dev --context production --command 'pnpm exec astro dev --host 127.0.0.1 --port 4321' --functions netlify/functions --port 8888 --target-port 4321`. Netlify Dev proxies the Astro dev server and exposes the Functions at the same `/api/*` paths used by the hosted app. Open `http://127.0.0.1:8888`. This does not deploy the site.
+## Credits and license
 
 To populate local commit history without deploying, import a full local checkout for each tracked branch:
 

@@ -22,11 +22,20 @@ Use for end-to-end build, deployment, and GitHub security health reviews. Read-o
 
 ### Verify builds and deployment
 
-- Build every deployable workspace with the same scripts/configuration used by CI or Netlify. Capture exit status and warnings.
-- Run required type generation or schema validation. Do not weaken checks or replace them with stubs.
-- Authenticate to Netlify and confirm site identity before reading deploy state. Inspect the matching branch/commit, build command, versions, context, output, warnings, and runtime errors.
-- A local green build is not remote deployment evidence. Do not copy Netlify secrets locally; use public config, mocks, or approved remote endpoints.
-- If a failure is pre-application, repair install/config/toolchain first. If it reaches app build, reproduce the same workspace and command before editing code.
+Build every deployable workspace with the same scripts/configuration used by CI or Netlify. Capture
+exit status and warnings.
+
+Run required type generation or schema validation. Do not weaken checks or replace them with stubs.
+
+Authenticate to Netlify and confirm site identity before reading deploy state. Inspect the matching
+branch/commit, build command, versions, context, output, warnings, and runtime errors.
+
+A local green build is not remote deployment evidence. Do not copy Netlify secrets locally; use
+public config, mocks, or approved remote endpoints.
+
+If a failure is pre-application, repair install/config/toolchain first. If it reaches app build,
+reproduce the same workspace and command before editing code.
+
 
 ### Review GitHub findings
 
@@ -96,15 +105,46 @@ For tests, document a suite when its responsibility is not clear from its name a
 
 Test suites need both an executable hierarchy and comments at the right scope. A fence documents the file section; `describe` documents a runner-visible behavior boundary; a group comment groups adjacent cases that do not need a separate runner boundary; a phase comment explains a substantial flow inside one test. Do not substitute one level for another or leave a long suite as an undifferentiated run of test declarations.
 
-- Use one full-width `TESTS` section fence for the test region of a file. It is a file-level section, not a suite or group heading.
-- Under the fence, make the top-level `describe`/`test.describe` express the file's test responsibility. Use nested `describe`/`test.describe` for a distinct behavior, state boundary, or setup context that readers may need to run or understand separately. Use the shared `describeGroup` wrapper for independently selectable Node groups; it must remain a normal Node test suite so `--test-name-pattern` can filter it.
-- Use a concise uppercase group comment such as `// CUSTOMER SEARCH` or `// KEYBOARD ACCESSIBILITY` only for a contiguous block of related tests that does not warrant another runner-visible suite. Put it directly above the first test or the setup hook it scopes. Do not repeat a suite title as a comment or section fence.
-- Put setup hooks at the narrowest suite that owns their prerequisites. A hook that changes shared state belongs in a serial suite only when tests genuinely depend on execution order; prefer independent tests and isolated fixtures over serial execution.
-- Use data-driven cases when inputs vary but the contract and assertions stay the same. Give each case a descriptive test title and keep materially different outcomes as separate named tests or nested suites.
-- Keep tests in the same group adjacent: no blank lines between their declarations. Put one blank line before the next group comment. Do not add blank lines between a group comment and its first declaration.
-- Group by behavior or contract (for example, `// AUTHENTICATED STATE`, `// HEADER CONTAINMENT`, `// KEYBOARD ACCESSIBILITY`), not by test count, implementation file, or historical milestone. Prefer nested `describe`/`test.describe` when the grouping is also a meaningful runner/filter boundary; otherwise use a line comment.
-- Add a short TSDoc directly above a suite when its responsibility is not clear from the suite name. Add individual test TSDoc only when the scenario or expected invariant is not clear from its group and test title; never paraphrase the title.
-- For a long test, add uppercase phase comments only where execution crosses a meaningful boundary: `// PREPARE EVIDENCE`, `// PERFORM USER ACTION`, `// VERIFY PERSISTENCE`, or `// ASSERT THE CONTRACT`. Keep code in each phase together with no blank lines inside the phase. Do not label every assertion or narrate obvious fixture setup.
+Use one full-width `TESTS` section fence for the test region of a file. It is a file-level section,
+not a suite or group heading.
+
+Under the fence, make the top-level `describe`/`test.describe` express the file's test
+responsibility. Use nested `describe`/`test.describe` for a distinct behavior, state boundary, or
+setup context that readers may need to run or understand separately. Use the shared `describeGroup`
+wrapper for independently selectable Node groups; it must remain a normal Node test suite so
+`--test-name-pattern` can filter it.
+
+Use a concise uppercase group comment such as `// CUSTOMER SEARCH` or `// KEYBOARD ACCESSIBILITY`
+only for a contiguous block of related tests that does not warrant another runner-visible suite. Put
+it directly above the first test or the setup hook it scopes. Do not repeat a suite title as a
+comment or section fence.
+
+Put setup hooks at the narrowest suite that owns their prerequisites. A hook that changes shared
+state belongs in a serial suite only when tests genuinely depend on execution order; prefer
+independent tests and isolated fixtures over serial execution.
+
+Use data-driven cases when inputs vary but the contract and assertions stay the same. Give each case
+a descriptive test title and keep materially different outcomes as separate named tests or nested
+suites.
+
+Keep tests in the same group adjacent: no blank lines between their declarations. Put one blank line
+before the next group comment. Do not add blank lines between a group comment and its first
+declaration.
+
+Group by behavior or contract (for example, `// AUTHENTICATED STATE`, `// HEADER CONTAINMENT`, `//
+KEYBOARD ACCESSIBILITY`), not by test count, implementation file, or historical milestone. Prefer
+nested `describe`/`test.describe` when the grouping is also a meaningful runner/filter boundary;
+otherwise use a line comment.
+
+Add a short TSDoc directly above a suite when its responsibility is not clear from the suite name.
+Add individual test TSDoc only when the scenario or expected invariant is not clear from its group
+and test title; never paraphrase the title.
+
+For a long test, add uppercase phase comments only where execution crosses a meaningful boundary:
+`// PREPARE EVIDENCE`, `// PERFORM USER ACTION`, `// VERIFY PERSISTENCE`, or `// ASSERT THE
+CONTRACT`. Keep code in each phase together with no blank lines inside the phase. Do not label every
+assertion or narrate obvious fixture setup.
+
 
 ```ts
 /*//////////////////////////////////////////////////
@@ -164,13 +204,32 @@ Run a Node group by passing its literal title to the suite runner, or use Playwr
 ### Quality bar
 
 - Prefer one accurate comment over several paraphrases.
-- Explain why, invariants, boundaries, and consequences; omit comments that merely translate `if`, `map`, or a component name.
+
+Explain why, invariants, boundaries, and consequences; omit comments that merely translate `if`,
+`map`, or a component name.
+
 - Keep comments adjacent to the code they govern and move them when the code moves.
-- Preserve comments that are prompt context, generated-source markers, legal notices, or product documentation unless their owning workflow says otherwise.
-- Protect literal strings, templates, JSX text, regexes, and generated content from structural comment tooling.
-- Check for duplicate fences, empty adjacent sections, orphaned labels, stale parameter names, misleading return descriptions, and comments that contradict tests.
-- Reject filler wording such as “Input overrides used by the surrounding operation” or “Result produced by this function.” Each parameter description must explain its semantic role, source, constraints, or effect, and each return description must explain the value's contract, edge behavior, or downstream use.
-- Do not mass-generate documentation from names or signatures. Never emit formulaic comments such as `Describes the X type`, `Shared type for X`, `Allowed values for X`, `Props accepted by X`, or `Result produced by this function`; these are not documentation. A documentation-only pass still requires function-by-function or type-by-type review and a final search for generic, blank, duplicated, orphaned, or stale tags.
+
+Preserve comments that are prompt context, generated-source markers, legal notices, or product
+documentation unless their owning workflow says otherwise.
+
+Protect literal strings, templates, JSX text, regexes, and generated content from structural comment
+tooling.
+
+Check for duplicate fences, empty adjacent sections, orphaned labels, stale parameter names,
+misleading return descriptions, and comments that contradict tests.
+
+Reject filler wording such as “Input overrides used by the surrounding operation” or “Result
+produced by this function.” Each parameter description must explain its semantic role, source,
+constraints, or effect, and each return description must explain the value's contract, edge
+behavior, or downstream use.
+
+Do not mass-generate documentation from names or signatures. Never emit formulaic comments such as
+`Describes the X type`, `Shared type for X`, `Allowed values for X`, `Props accepted by X`, or
+`Result produced by this function`; these are not documentation. A documentation-only pass still
+requires function-by-function or type-by-type review and a final search for generic, blank,
+duplicated, orphaned, or stale tags.
+
 
 See [Terra conventions](references/conventions.md) for the repository-derived rules and quality-tool behavior used to shape this skill.
 

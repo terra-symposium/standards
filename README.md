@@ -1,6 +1,6 @@
-# Standards
+# Terra Symposium Standards
 
-Standards is a pnpm workspace of reusable packages for analysis and maintenance of repositories under the Terra Symposium conventions.
+A pnpm workspace and npm publisher for Terra's shared quality, error-boundary, testing, and reporting packages, with a documentation site for using them.
 
 ## What it does
 
@@ -200,7 +200,7 @@ pnpm exec docs build
 pnpm exec docs preview
 ```
 
-Package changes use [Changesets](https://github.com/changesets/changesets). Add a changeset for a publishable package change with `pnpm changeset`; documentation-only changes do not require a package version bump. Pull requests and pushes to `main` run the repository quality workflow. The release workflow versions and publishes packages after changesets are merged.
+`pnpm docs:dev` starts the standards documentation site. `pnpm test` builds the workspace packages and runs the shared test manifest.
 
 ## Validation
 

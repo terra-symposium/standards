@@ -1,6 +1,6 @@
-# Document Gem snapshots
+# Documenting Gem Snapshots
 
-Create a versioned folder for each saved Gem state, keyed by Gem ID and a timestamp or revision. Keep metadata, exact saved instructions, and a knowledge manifest together. Add local knowledge copies only when they do not already have a stable repository source; otherwise record the path and SHA-256. Keep pre-update and post-update snapshots for comparison.
+Archived revisions of the documenting gem skill’s captured knowledge. Use these files as historical reference, not as current policy.
 
 ## What it does
 

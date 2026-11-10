@@ -1,6 +1,6 @@
-# @terra-symposium/standards-quality
+# Standards Quality Package
 
-A configurable quality runner for JavaScript and TypeScript analysis plus native-language command profiles. Define source scope, policy, tools, and repository commands in `quality.json`; run them locally with the `terra-quality` CLI or in CI.
+TypeScript quality tooling for repository checks, source maintenance transforms, and report generation. The JSON schema defines its configuration contract.
 
 ## What it does
 
@@ -27,7 +27,7 @@ Not applicable.
 pnpm add -D @terra-symposium/standards-quality
 ```
 
-In an npm-managed repository, use `npm install --save-dev @terra-symposium/standards-quality` instead.
+## Security and Limitations
 
 ## Usage
 
@@ -38,16 +38,9 @@ In an npm-managed repository, use `npm install --save-dev @terra-symposium/stand
 ### Native language profiles
 Terra Quality keeps its built-in syntax analysis scoped to JavaScript and TypeScript. Opt into the full C, Java, or Python check suite with `languageProfiles`; each profile discovers its own file extensions under `sourceRoots`, so native files are not sent through the TypeScript analyzer. Function documentation checks are discovered automatically for all four supported language groups whenever their sources appear under `sourceRoots`. C and header declarations use Doxygen blocks. Set `documentation.cAuthors` to map repository-relative C source directory prefixes to required `@author` names; the longest matching prefix takes precedence. C checks report missing summaries, parameter descriptions and order, return descriptions, and authors without generating prose. For a repository with no JavaScript or TypeScript sources, leave `extensions` empty:
 
-```json
-{
-	"$schema": "./node_modules/@terra-symposium/standards-quality/quality.schema.json",
-	"sourceRoots": ["src"],
-	"extensions": [],
-	"languageProfiles": ["c", "java", "python"]
-}
-```
+Add focused fixtures and tests for each new rule or transform; record user-facing changes in [CHANGELOG.md](CHANGELOG.md).
 
-Selected profiles run only when matching source exists. Checks skip when their language source is absent and fail with the required minimum version and installation guidance when a needed tool or required configuration is missing. Terra Quality never installs tools. Pin native tool versions in the repository or CI image for reproducible runs. JSON reports include the complete check/autofix capability map, including explicit not-applicable entries and reasons.
+## Credits and license
 
 | Profile  | Default checks                                                                                                 | Native prerequisites                                                                                 |
 | -------- | -------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
