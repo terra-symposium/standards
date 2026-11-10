@@ -24,6 +24,10 @@ jobs:
         with:
           node-version: 22.23.4
           registry-url: https://registry.npmjs.org
+      - name: Verify npm publisher authentication
+        run: npm whoami
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.PACKAGES_TOKEN }}
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
       - name: Publish quality when missing
