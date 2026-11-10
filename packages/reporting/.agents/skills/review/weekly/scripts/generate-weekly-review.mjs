@@ -29,20 +29,12 @@ const LIGHT = '#E6F0E8';
 HELPERS
 //////////////////////////////////////////////////*/
 
-/**
- *
- * @param args
- *
- * @return
- */
+
 function git(args) {
 	return execFileSync('git', args, { cwd: report.repo, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }).trimEnd();
 }
 
-/**
- *
- * @return
- */
+
 function hue() {
 	for (let attempt = 0; attempt < 100; attempt += 1) {
 		let value = randomInt(0, 360);
@@ -55,22 +47,12 @@ function hue() {
 	return (usedHues.at(-1) ?? 0) + 37;
 }
 
-/**
- *
- * @param value
- * @param lightness
- * @param chroma
- *
- * @return
- */
+
 function hex(value, lightness, chroma) {
 	return new Color('oklch', [lightness, chroma, value]).to('srgb').toString({ format: 'hex' });
 }
 
-/**
- *
- * @return
- */
+
 function theme() {
 	const primaryHue = hue();
 	return {
@@ -83,28 +65,14 @@ function theme() {
 	};
 }
 
-/**
- *
- * @param value
- * @param maxChars
- * @param name
- */
+
 function assertLines(value, maxChars, name) {
 	for (const line of String(value).split('\n')) {
 		if (line.length > maxChars) throw new Error(`${name} line has ${line.length} characters; max is ${maxChars}. Add a deliberate line break or widen the frame.`);
 	}
 }
 
-/**
- *
- * @param slide
- * @param value
- * @param position
- * @param style
- * @param name
- *
- * @return
- */
+
 function addText(slide, value, position, style = {}, name = 'text') {
 	assertLines(value, style.maxChars ?? Math.floor(position.width / Math.max(7, (style.fontSize ?? 16) * 0.52)), name);
 	const shape = slide.shapes.add({ geometry: 'textbox', name, position, fill: 'none', line: { style: 'solid', fill: 'none', width: 0 } });
@@ -124,66 +92,28 @@ function addText(slide, value, position, style = {}, name = 'text') {
 	return shape;
 }
 
-/**
- *
- * @param slide
- * @param position
- * @param fill
- * @param line
- * @param name
- *
- * @return
- */
+
 function rect(slide, position, fill, line = 'none', name = 'panel') {
 	return slide.shapes.add({ geometry: 'rect', name, position, fill, line: { style: 'solid', fill: line, width: line === 'none' ? 0 : 1 } });
 }
 
-/**
- *
- * @param slide
- * @param position
- * @param colors
- * @param name
- * @param fill
- *
- * @return
- */
+
 function card(slide, position, colors, name, fill = colors.tone) {
 	return slide.shapes.add({ geometry: 'roundRect', name, position, fill, line: { style: 'solid', fill: colors.rule, width: 1 } });
 }
 
-/**
- *
- * @param slide
- * @param left
- * @param top
- * @param width
- * @param color
- * @param name
- *
- * @return
- */
+
 function rule(slide, left, top, width, color, name) {
 	return rect(slide, { left, top, width, height: 1 }, color, 'none', name);
 }
 
-/**
- *
- * @param slide
- * @param lines
- */
+
 function notes(slide, lines) {
 	slide.speakerNotes.textFrame.setText(`[Sources]\n${lines.map((line) => `- ${line}`).join('\n')}`);
 	slide.speakerNotes.setVisible(true);
 }
 
-/**
- *
- * @param value
- * @param maxChars
- *
- * @return
- */
+
 function wrapLines(value, maxChars) {
 	return String(value)
 		.split('\n')
@@ -203,40 +133,20 @@ function wrapLines(value, maxChars) {
 		.join('\n');
 }
 
-/**
- *
- * @param slide
- * @param title
- * @param page
- * @param colors
- */
+
 function header(slide, title, page, colors) {
 	addText(slide, title, { left: 48, top: 42, width: 1136, height: 42 }, { fontSize: 30, color: colors.text, maxChars: 62 }, `title-${page}`);
 	addText(slide, String(page).padStart(2, '0'), { left: 1180, top: 44, width: 52, height: 20 }, { fontSize: 14, color: colors.muted, alignment: 'right', maxChars: 2 }, `page-${page}`);
 	rule(slide, 48, 108, 1184, colors.rule, `rule-${page}`);
 }
 
-/**
- *
- * @param slide
- * @param value
- * @param page
- * @param colors
- */
+
 function footer(slide, value, page, colors) {
 	rule(slide, 48, 674, 1184, colors.rule, `footer-rule-${page}`);
 	addText(slide, value, { left: 48, top: 682, width: 1160, height: 18 }, { fontSize: 12, color: colors.muted, maxChars: 165 }, `footer-${page}`);
 }
 
-/**
- *
- * @param slide
- * @param codeInput
- * @param position
- * @param colors
- *
- * @return
- */
+
 function addCode(slide, codeInput, position, colors) {
 	const lines = git(['show', `${codeInput.sha}:${codeInput.path}`])
 		.split('\n')
@@ -293,16 +203,7 @@ function addCode(slide, codeInput, position, colors) {
 	return `${codeInput.sha} · ${codeInput.path}:${codeInput.start}-${codeInput.end}`;
 }
 
-/**
- *
- * @param slide
- * @param image
- * @param position
- * @param colors
- * @param page
- *
- * @return
- */
+
 async function addScreenshot(slide, image, position, colors, page) {
 	card(slide, position, colors, `screenshot-frame-${page}`, colors.tone);
 	const bytes = await fs.readFile(image.path);
@@ -318,20 +219,8 @@ async function addScreenshot(slide, image, position, colors, page) {
 	return `${image.route} · ${image.path}`;
 }
 
-/**
- *
- * @param value
- * @param length
- *
- * @return
- */
-/**
- *
- * @param date
- * @param plan
- *
- * @return
- */
+
+
 function planDay(date, plan) {
 	const start = new Date(`${plan.start}T00:00:00Z`).getTime();
 	const end = new Date(`${plan.end}T00:00:00Z`).getTime();
@@ -339,14 +228,7 @@ function planDay(date, plan) {
 	return Math.round(((value - start) / (end - start)) * 90);
 }
 
-/**
- *
- * @param plan
- * @param contributor
- * @param props
- *
- * @return
- */
+
 function validPlan(plan, contributor, { requirePreviousObjective = true, allowUnknownProgress = false } = {}) {
 	if (!plan) return false;
 	if (![plan.source, plan.start, plan.end, plan.asOf, plan.outcome, ...(requirePreviousObjective ? [plan.previousObjective] : [])].every((value) => typeof value === 'string' && value.length))
@@ -370,13 +252,7 @@ function validPlan(plan, contributor, { requirePreviousObjective = true, allowUn
 	return true;
 }
 
-/**
- *
- * @param plan
- * @param historyCommits
- *
- * @return
- */
+
 function assessBigFiveTimeline(plan, historyCommits) {
 	if (typeof plan?.source !== 'string' || !plan.source.trim() || !Array.isArray(plan.objectives) || plan.objectives.length !== 5)
 		throw new Error('Big Five timeline requires a source and five objectives, each assessed against the complete history of the requested refs.');
@@ -427,14 +303,7 @@ function assessBigFiveTimeline(plan, historyCommits) {
 	};
 }
 
-/**
- *
- * @param deck
- * @param section
- * @param colors
- * @param page
- * @param sources
- */
+
 function addPlanSlide(deck, section, colors, page, sources) {
 	const plan = section.plan;
 	const slide = deck.slides.add();
@@ -490,14 +359,7 @@ function addPlanSlide(deck, section, colors, page, sources) {
 	notes(slide, [...sources, plan.source, ...plan.milestones.map((milestone) => `${milestone.name}: ${milestone.evidence}`)]);
 }
 
-/**
- *
- * @param deck
- * @param section
- * @param colors
- * @param page
- * @param sources
- */
+
 function addMeetingSlide(deck, section, colors, page, sources) {
 	const meeting = section.meeting;
 	const slide = deck.slides.add();
@@ -514,15 +376,7 @@ function addMeetingSlide(deck, section, colors, page, sources) {
 	notes(slide, [...sources, ...(meeting.sources ?? [])]);
 }
 
-/**
- *
- * @param deck
- * @param section
- * @param goal
- * @param colors
- * @param page
- * @param sources
- */
+
 function addContributorSummary(deck, section, goal, colors, page, sources) {
 	const slide = deck.slides.add();
 	slide.background.fill = colors.surface;
@@ -560,14 +414,7 @@ function addContributorSummary(deck, section, goal, colors, page, sources) {
 	notes(slide, [...sources, ...(goal ? [`${goal.source} · ${goal.status}`] : []), ...section.slides.flatMap((i) => i.sources ?? [])]);
 }
 
-/**
- *
- * @param deck
- * @param goal
- * @param colors
- * @param page
- * @param sources
- */
+
 function addNoCommitsSlide(deck, goal, colors, page, sources) {
 	const slide = deck.slides.add();
 	slide.background.fill = colors.surface;
@@ -595,10 +442,7 @@ function addNoCommitsSlide(deck, goal, colors, page, sources) {
 	notes(slide, [...sources, `${goal.source} · ${goal.status}`]);
 }
 
-/**
- *
- * @return
- */
+
 async function main() {
 	if (git(['rev-parse', '--is-shallow-repository']) === 'true') throw new Error('A complete Big Five assessment requires full Git history; fetch or unshallow the authoritative refs first.');
 	const historyCommits = git(['log', ...refs, `--until=${report.until}`, '--no-merges', `--format=${'%H%x09%h%x09%aN%x09%aI%x09%s'}`])
@@ -697,12 +541,7 @@ async function main() {
 		const chartTop = 300;
 		const rangeStart = new Date(`${plan.start}T00:00:00Z`).valueOf();
 		const range = Math.max(1, new Date(`${plan.end}T00:00:00Z`).valueOf() - rangeStart);
-		/**
-		 *
-		 * @param date
-		 *
-		 * @return
-		 */
+
 		const timelineX = (date) => chartLeft + ((new Date(`${date}T00:00:00Z`).valueOf() - rangeStart) / range) * chartWidth;
 		const marker = timelineX(plan.asOf);
 		for (let index = 0; index <= 4; index += 1) {

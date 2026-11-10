@@ -165,36 +165,41 @@ export const withResponsivePlaywright = <T extends PlaywrightTestConfig>(cfg: T,
 		path.resolve(process.cwd(), 'packages/reporting/dist'),
 	];
 	const sharedDist = sharedDistCandidates.find((c) => fs.existsSync(c)) || sharedDistCandidates[0];
-	const external = [...(cfg.build?.external || []), path.join(fs.existsSync(sharedDist) ? fs.realpathSync(sharedDist) : sharedDist, '**')];
 	const projects = (cfg.projects || []) as Array<{ dependencies?: readonly string[]; name?: string; testMatch?: unknown; use?: Record<string, unknown> }>;
-	const dependencyProjects = new Set(projects.flatMap((p) => p.dependencies || []));
-	const singleRun = new Set(opts.singleRunProjects || []);
-	const responsiveProjects = projects.flatMap((p, i) => {
+	const projectsWithViewports = projects.flatMap((p, i) => {
 		const baseName = p.name || `project-${i + 1}`;
-		const matchText = (Array.isArray(p.testMatch) ? p.testMatch : [p.testMatch]).map((e) => (e instanceof RegExp ? e.source : String(e || ''))).join(' ');
-		if (dependencyProjects.has(baseName) || /setup/i.test(baseName) || /\.setup\.[cm]?[jt]sx?/i.test(matchText) || singleRun.has(baseName)) return [p];
+		if (
+			projects.some((project) => (project.dependencies || []).includes(baseName)) ||
+			/setup/i.test(baseName) ||
+			/\.setup\.[cm]?[jt]sx?/i.test((Array.isArray(p.testMatch) ? p.testMatch : [p.testMatch]).map((e) => (e instanceof RegExp ? e.source : String(e || ''))).join(' ')) ||
+			(opts.singleRunProjects || []).includes(baseName)
+		)
+			return [p];
 		return viewports.map((v) => ({
 			...p,
 			name: visualProjectName(baseName, v, viewports),
 			use: { ...(p.use || {}), viewport: { width: v.width, height: v.height }, screenshot: { mode: 'on', fullPage: true, caret: 'initial' } },
 		}));
 	});
-	const cfgdReporters = cfg.reporter ? (Array.isArray(cfg.reporter) ? cfg.reporter : [cfg.reporter]) : [];
-	const reportingOpts = { outputRoot: opts.outputRoot, supplementalResultsFile: opts.supplementalResultsFile, qualityConfigFile: opts.qualityConfigFile, loadTesting };
-	const reporters = [
-		...cfgdReporters.filter((r) => {
-			const name = Array.isArray(r) ? r[0] : r;
-			return !(typeof name === 'string' && name.includes('@terra-symposium/standards-reporting/playwright'));
-		}),
-		['@terra-symposium/standards-reporting/playwright', reportingOpts],
-	];
 	return {
 		...cfg,
 		metadata: { ...(cfg.metadata || {}), terraLoadTestingEnabled: loadTesting.enabled },
-		build: { ...(cfg.build || {}), external },
+		build: {
+			...(cfg.build || {}),
+			external: [...(cfg.build?.external || []), path.join(fs.existsSync(sharedDist) ? fs.realpathSync(sharedDist) : sharedDist, '**')],
+		},
 		outputDir: opts.outputDir || 'test-results/playwright-output',
-		projects: responsiveProjects,
-		reporter: reporters,
+		projects: projectsWithViewports,
+		reporter: [
+			...(cfg.reporter ? (Array.isArray(cfg.reporter) ? cfg.reporter : [cfg.reporter]) : []).filter((r) => {
+			const name = Array.isArray(r) ? r[0] : r;
+			return !(typeof name === 'string' && name.includes('@terra-symposium/standards-reporting/playwright'));
+			}),
+			[
+				'@terra-symposium/standards-reporting/playwright',
+				{ outputRoot: opts.outputRoot, supplementalResultsFile: opts.supplementalResultsFile, qualityConfigFile: opts.qualityConfigFile, loadTesting },
+			],
+		],
 		use: { ...(cfg.use || {}), screenshot: { mode: 'on', fullPage: true, caret: 'initial' } },
 	} as T;
 };
