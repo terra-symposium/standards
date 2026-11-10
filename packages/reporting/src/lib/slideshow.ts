@@ -93,10 +93,8 @@ const previewImg = async (file: string, viewportSize: string): Promise<{ data: s
 	const metadata = await sharp(file).metadata();
 	const width = metadata.width || 1;
 	const [viewportWidth, viewportHeight] = viewportSize.split('×').map((v) => Number.parseInt(v, 10));
-	const viewportPreviewHeight = viewportWidth && viewportHeight ? Math.round((width * viewportHeight) / viewportWidth) : Math.round(width / 0.38);
-	const height = Math.min(metadata.height || 1, Math.max(1, viewportPreviewHeight));
-	const data = await sharp(file).extract({ height, left: 0, top: 0, width }).png().toBuffer();
-	return { data: `data:image/png;base64,${data.toString('base64')}`, height, width };
+	const height = Math.min(metadata.height || 1, Math.max(1, viewportWidth && viewportHeight ? Math.round((width * viewportHeight) / viewportWidth) : Math.round(width / 0.38)));
+	return { data: `data:image/png;base64,${(await sharp(file).extract({ height, left: 0, top: 0, width }).png().toBuffer()).toString('base64')}`, height, width };
 };
 /**
  * Sorts responsive results by their rendered viewport width.
@@ -184,10 +182,8 @@ const addResponsiveSlide = async (presentation: Presentation, group: readonly Vi
 	const width = (12.55 - gap * (cols - 1)) / cols;
 	const height = (6.02 - gap * (rows - 1)) / rows;
 	for (const [idx, r] of group.entries()) {
-		const col = idx % cols;
-		const row = Math.floor(idx / cols);
-		const x = 0.38 + col * (width + gap);
-		const y = 1.02 + row * (height + gap);
+		const x = 0.38 + (idx % cols) * (width + gap);
+		const y = 1.02 + Math.floor(idx / cols) * (height + gap);
 		slide.addShape(presentation.ShapeType.roundRect, { fill: { color: 'FFFFFF' }, line: { color: COLOURS.line, width: 1 }, x, y, w: width, h: height, rectRadius: 0.04 });
 		const loadGrade = resultLoadGrade(r);
 		slide.addText(`${r.viewport} · ${r.viewportSize} · ${r.status}${loadGrade ? ` · Load ${loadGrade}` : ''}`, {
@@ -320,8 +316,11 @@ export const writeSlideshow = async (file: string, results: readonly VisualResul
 			const prev = byViewport.get(result.viewport);
 			if (!prev || result.retry >= prev.retry) byViewport.set(result.viewport, result);
 		}
-		const ordered = [...byViewport.values()].sort((a, b) => viewportWidth(a) - viewportWidth(b));
-		await addResponsiveSlide(presentation, ordered, ++slideNumber);
+		await addResponsiveSlide(
+			presentation,
+			[...byViewport.values()].sort((a, b) => viewportWidth(a) - viewportWidth(b)),
+			++slideNumber,
+		);
 	}
 	if (!slideNumber) {
 		const slide = presentation.addSlide();

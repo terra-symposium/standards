@@ -150,7 +150,7 @@ export type ResponsivePlaywrightOptions = {
  * `singleRunProjects`. The helper adds full-page automatic screenshots and the shared
  * evidence reporter while preserving any other configured reporters.
  *
- * @param cfg
+ * @param cfg Playwright configuration whose regular projects should be expanded.
  * @param opts Shared matrix and reporting options.
  * @param config Existing Playwright configuration.
  *
@@ -165,27 +165,14 @@ export const withResponsivePlaywright = <T extends PlaywrightTestConfig>(cfg: T,
 		path.resolve(process.cwd(), 'packages/reporting/dist'),
 	];
 	const sharedDist = sharedDistCandidates.find((c) => fs.existsSync(c)) || sharedDistCandidates[0];
-	const resolvedSharedDist = fs.existsSync(sharedDist) ? fs.realpathSync(sharedDist) : sharedDist;
-	const external = [...(cfg.build?.external || []), path.join(resolvedSharedDist, '**')];
+	const external = [...(cfg.build?.external || []), path.join(fs.existsSync(sharedDist) ? fs.realpathSync(sharedDist) : sharedDist, '**')];
 	const projects = (cfg.projects || []) as Array<{ dependencies?: readonly string[]; name?: string; testMatch?: unknown; use?: Record<string, unknown> }>;
 	const dependencyProjects = new Set(projects.flatMap((p) => p.dependencies || []));
 	const singleRun = new Set(opts.singleRunProjects || []);
-	/**
-	 *
-	 * @param project
-	 * @param idx
-	 *
-	 * @return
-	 */
-	const isSetup = (project: (typeof projects)[number], idx: number): boolean => {
-		const name = project.name || `project-${idx + 1}`;
-		const match = Array.isArray(project.testMatch) ? project.testMatch : [project.testMatch];
-		const matchText = match.map((e) => (e instanceof RegExp ? e.source : String(e || ''))).join(' ');
-		return dependencyProjects.has(name) || /setup/i.test(name) || /\.setup\.[cm]?[jt]sx?/i.test(matchText);
-	};
 	const responsiveProjects = projects.flatMap((p, i) => {
 		const baseName = p.name || `project-${i + 1}`;
-		if (isSetup(p, i) || singleRun.has(baseName)) return [p];
+		const matchText = (Array.isArray(p.testMatch) ? p.testMatch : [p.testMatch]).map((e) => (e instanceof RegExp ? e.source : String(e || ''))).join(' ');
+		if (dependencyProjects.has(baseName) || /setup/i.test(baseName) || /\.setup\.[cm]?[jt]sx?/i.test(matchText) || singleRun.has(baseName)) return [p];
 		return viewports.map((v) => ({
 			...p,
 			name: visualProjectName(baseName, v, viewports),

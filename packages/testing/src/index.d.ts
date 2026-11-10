@@ -1,5 +1,7 @@
 /**
  * packages/testing/src/index.d.ts
+ * A named repository-owned command with explicit test-file ownership.
+ * Describes one command in the repository test plan and the source paths it owns.
  */
 
 /** A named repository-owned command with explicit test-file ownership. */
@@ -14,7 +16,7 @@ export type TestPlanResult = { passed: number; failed: number; selected: string[
  * @param root - Repository root.
  * @param manifestPath - Repository-relative plan path.
  *
- * @returns The validated test plan, or an empty plan when the manifest is absent.
+ * @return The validated test plan, or an empty plan when the manifest is absent.
  */
 export function readTestPlan(root: string, manifestPath?: string): TestPlan;
 /**
@@ -23,7 +25,7 @@ export function readTestPlan(root: string, manifestPath?: string): TestPlan;
  * @param value - Parsed manifest value.
  * @param root - Repository root used to validate suite working directories.
  *
- * @returns Nothing when valid; throws when the plan is malformed.
+ * @return Nothing when valid; throws when the plan is malformed.
  */
 export function validateTestPlan(value: unknown, root: string): asserts value is TestPlan;
 /**
@@ -31,6 +33,6 @@ export function validateTestPlan(value: unknown, root: string): asserts value is
  *
  * @param options - Repository root, manifest selection, and optional suite filter.
  *
- * @returns Counts of passing and failing checks and the selected suite names.
+ * @return Counts of passing and failing checks and the selected suite names.
  */
 export function runTestPlan(options: { root: string; manifest?: string; suites?: string[]; sharedOnly?: boolean }): TestPlanResult;

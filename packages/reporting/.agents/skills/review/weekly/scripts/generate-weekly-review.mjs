@@ -21,11 +21,8 @@ CONFIG
 
 const [inputPath, outputPath] = process.argv.slice(2);
 const report = JSON.parse(await fs.readFile(inputPath, 'utf8'));
-const repo = report.repo;
 const refs = report.refs ?? [report.ref];
-const outputDir = outputPath.slice(0, outputPath.lastIndexOf('/'));
 const usedHues = [];
-const DARK = '#17251C';
 const LIGHT = '#E6F0E8';
 
 /*//////////////////////////////////////////////////
@@ -39,20 +36,7 @@ HELPERS
  * @return
  */
 function git(args) {
-	return execFileSync('git', args, { cwd: repo, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }).trimEnd();
-}
-
-/**
- *
- * @param props
- *
- * @return
- */
-function readExcerpt({ sha, path, start, end }) {
-	return git(['show', `${sha}:${path}`])
-		.split('\n')
-		.slice(start - 1, end)
-		.join('\n');
+	return execFileSync('git', args, { cwd: report.repo, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }).trimEnd();
 }
 
 /**
@@ -89,14 +73,13 @@ function hex(value, lightness, chroma) {
  */
 function theme() {
 	const primaryHue = hue();
-	const secondaryHue = (primaryHue + 150) % 360;
 	return {
 		surface: hex(primaryHue, 0.975, 0.018),
 		tone: hex(primaryHue, 0.93, 0.045),
 		rule: hex(primaryHue, 0.78, 0.085),
 		text: hex(primaryHue, 0.26, 0.055),
 		muted: hex(primaryHue, 0.43, 0.045),
-		secondary: hex(secondaryHue, 0.56, 0.14),
+		secondary: hex((primaryHue + 150) % 360, 0.56, 0.14),
 	};
 }
 
@@ -205,10 +188,9 @@ function wrapLines(value, maxChars) {
 	return String(value)
 		.split('\n')
 		.flatMap((line) => {
-			const words = line.split(/\s+/);
 			const lines = [];
 			let current = '';
-			for (const word of words) {
+			for (const word of line.split(/\s+/)) {
 				if (!word) continue;
 				if (current && `${current} ${word}`.length > maxChars) {
 					lines.push(current);
@@ -248,38 +230,6 @@ function footer(slide, value, page, colors) {
 
 /**
  *
- * @param line
- *
- * @return
- */
-function codeRuns(line) {
-	const pattern =
-		/(\/\/.*$|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|`(?:\\.|[^`\\])*`|\b(?:const|let|var|function|return|if|else|try|catch|async|await|export|from|import|new|throw|type|interface|extends|as|typeof|true|false|null|undefined)\b|\b\d+(?:\.\d+)?\b|[A-Za-z_$][\w$]*|[{}()]|\[|\]|[.,;:=<>!?+*-]|\x2f)/g;
-	const runs = [];
-	let last = 0;
-	for (const match of line.matchAll(pattern)) {
-		if (match.index > last) runs.push({ run: line.slice(last, match.index), textStyle: { color: LIGHT, fill: LIGHT } });
-		const token = match[0];
-		const color = token.startsWith('//')
-			? '#7FA18B'
-			: /^['"`]/.test(token)
-				? '#F6C177'
-				: /^(const|let|var|function|return|if|else|try|catch|async|await|export|from|import|new|throw|type|interface|extends|as|typeof|true|false|null|undefined)$/.test(token)
-					? '#C7DDD0'
-					: /^\d/.test(token)
-						? '#F6C177'
-						: /^[A-Za-z_$]/.test(token)
-							? LIGHT
-							: '#AFC4B5';
-		runs.push({ run: token, textStyle: { color, fill: color } });
-		last = match.index + token.length;
-	}
-	if (last < line.length) runs.push({ run: line.slice(last), textStyle: { color: LIGHT, fill: LIGHT } });
-	return runs.length ? runs : [{ run: ' ', textStyle: { color: LIGHT, fill: LIGHT } }];
-}
-
-/**
- *
  * @param slide
  * @param codeInput
  * @param position
@@ -288,15 +238,18 @@ function codeRuns(line) {
  * @return
  */
 function addCode(slide, codeInput, position, colors) {
-	const source = readExcerpt(codeInput);
-	const lines = source.split('\n').map((line) => line.replaceAll('\t', '    '));
+	const lines = git(['show', `${codeInput.sha}:${codeInput.path}`])
+		.split('\n')
+		.slice(codeInput.start - 1, codeInput.end)
+		.join('\n')
+		.split('\n')
+		.map((line) => line.replaceAll('\t', '    '));
 	const longest = Math.max(...lines.map((line) => line.length));
 	const fontSize = Math.max(8, Math.min(14, Math.floor((position.width - 36) / Math.max(1, longest * 0.58))));
 	if (fontSize === 8 && longest * 0.58 * fontSize > position.width - 36)
 		throw new Error(`Code excerpt ${codeInput.path}:${codeInput.start}-${codeInput.end} is too wide; use a wider layout or a narrower complete range.`);
 	const codeHeight = Math.min(position.height, Math.max(86, 62 + lines.length * Math.ceil(fontSize * 1.35)));
-	const panelPosition = { ...position, height: codeHeight };
-	rect(slide, panelPosition, DARK, colors.rule, `code-${codeInput.sha}`);
+	rect(slide, { ...position, height: codeHeight }, '#17251C', colors.rule, `code-${codeInput.sha}`);
 	addText(
 		slide,
 		`${codeInput.path} · ${codeInput.sha}`,
@@ -312,7 +265,31 @@ function addCode(slide, codeInput, position, colors) {
 		line: { style: 'solid', fill: 'none', width: 0 },
 	});
 	shape.text.style = { fontSize, typeface: 'Menlo', alignment: 'left', verticalAlignment: 'top', wrap: 'none', autoFit: 'none', insets: { top: 0, right: 0, bottom: 0, left: 0 } };
-	shape.text = lines.map((line) => codeRuns(line));
+	shape.text = lines.map((line) => {
+		const runs = [];
+		let last = 0;
+		for (const match of line.matchAll(
+			/(\/\/.*$|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|`(?:\\.|[^`\\])*`|\b(?:const|let|var|function|return|if|else|try|catch|async|await|export|from|import|new|throw|type|interface|extends|as|typeof|true|false|null|undefined)\b|\b\d+(?:\.\d+)?\b|[A-Za-z_$][\w$]*|[{}()]|\[|\]|[.,;:=<>!?+*-]|\x2f)/g,
+		)) {
+			if (match.index > last) runs.push({ run: line.slice(last, match.index), textStyle: { color: LIGHT, fill: LIGHT } });
+			const token = match[0];
+			const color = token.startsWith('//')
+				? '#7FA18B'
+				: /^['"`]/.test(token)
+					? '#F6C177'
+					: /^(const|let|var|function|return|if|else|try|catch|async|await|export|from|import|new|throw|type|interface|extends|as|typeof|true|false|null|undefined)$/.test(token)
+						? '#C7DDD0'
+						: /^\d/.test(token)
+							? '#F6C177'
+							: /^[A-Za-z_$]/.test(token)
+								? LIGHT
+								: '#AFC4B5';
+			runs.push({ run: token, textStyle: { color, fill: color } });
+			last = match.index + token.length;
+		}
+		if (last < line.length) runs.push({ run: line.slice(last), textStyle: { color: LIGHT, fill: LIGHT } });
+		return runs.length ? runs : [{ run: ' ', textStyle: { color: LIGHT, fill: LIGHT } }];
+	});
 	return `${codeInput.sha} · ${codeInput.path}:${codeInput.start}-${codeInput.end}`;
 }
 
@@ -339,37 +316,6 @@ async function addScreenshot(slide, image, position, colors, page) {
 		position: { left: position.left + 8, top: position.top + 8, width: position.width - 16, height: position.height - 16 },
 	});
 	return `${image.route} · ${image.path}`;
-}
-
-/**
- *
- * @return
- */
-function parseCommits() {
-	const fmt = '%H%x09%h%x09%aN%x09%aI%x09%s';
-	return git(['log', ...refs, `--since=${report.since}`, `--until=${report.until}`, '--no-merges', `--format=${fmt}`])
-		.split('\n')
-		.filter(Boolean)
-		.map((line) => {
-			const [sha, short, author, authoredAt, ...subject] = line.split('\t');
-			return { sha, short, author, date: authoredAt.slice(0, 10), subject: subject.join('\t'), paths: git(['show', '--format=', '--name-only', sha]).split('\n').filter(Boolean) };
-		});
-}
-
-/**
- *
- * @return
- */
-function parseHistoryCommits() {
-	if (git(['rev-parse', '--is-shallow-repository']) === 'true') throw new Error('A complete Big Five assessment requires full Git history; fetch or unshallow the authoritative refs first.');
-	const fmt = '%H%x09%h%x09%aN%x09%aI%x09%s';
-	return git(['log', ...refs, `--until=${report.until}`, '--no-merges', `--format=${fmt}`])
-		.split('\n')
-		.filter(Boolean)
-		.map((line) => {
-			const [sha, short, author, authoredAt, ...subject] = line.split('\t');
-			return { sha, short, author, date: authoredAt.slice(0, 10), subject: subject.join('\t') };
-		});
 }
 
 /**
@@ -403,8 +349,7 @@ function planDay(date, plan) {
  */
 function validPlan(plan, contributor, { requirePreviousObjective = true, allowUnknownProgress = false } = {}) {
 	if (!plan) return false;
-	const required = [plan.source, plan.start, plan.end, plan.asOf, plan.outcome, ...(requirePreviousObjective ? [plan.previousObjective] : [])];
-	if (!required.every((value) => typeof value === 'string' && value.length))
+	if (![plan.source, plan.start, plan.end, plan.asOf, plan.outcome, ...(requirePreviousObjective ? [plan.previousObjective] : [])].every((value) => typeof value === 'string' && value.length))
 		throw new Error(`${contributor.name}: plan requires source, start, end, asOf, outcome${requirePreviousObjective ? ', and previousObjective' : ''}.`);
 	if (!Array.isArray(plan.milestones) || !plan.milestones.length || plan.milestones.length > 6) throw new Error(`${contributor.name}: plan requires one to six milestones.`);
 	const planStart = new Date(`${plan.start}T00:00:00Z`);
@@ -506,11 +451,9 @@ function addPlanSlide(deck, section, colors, page, sources) {
 		`plan-window-${page}`,
 	);
 	if (plan.progressBasis) addText(slide, plan.progressBasis, { left: 58, top: 258, width: 1120, height: 20 }, { fontSize: 13, color: colors.muted, maxChars: 120 }, `plan-basis-${page}`);
-	const labelLeft = 58;
 	const chartLeft = 404;
 	const chartWidth = 790;
 	const chartTop = 290;
-	const laneHeight = 48;
 	const marker = chartLeft + (elapsed / 90) * chartWidth;
 	['DAY 1', 'DAY 30', 'DAY 60', 'DAY 90'].forEach((label, i) => {
 		const x = chartLeft + (i / 3) * chartWidth;
@@ -524,12 +467,12 @@ function addPlanSlide(deck, section, colors, page, sources) {
 		);
 	});
 	plan.milestones.forEach((milestone, i) => {
-		const top = chartTop + i * laneHeight;
+		const top = chartTop + i * 48;
 		const start = planDay(milestone.start, plan);
 		const end = planDay(milestone.end, plan);
 		const left = chartLeft + (start / 90) * chartWidth;
 		const width = Math.max(12, ((end - start) / 90) * chartWidth);
-		addText(slide, milestone.name, { left: labelLeft, top: top + 7, width: 320, height: 20 }, { fontSize: 16, color: colors.text, maxChars: 40 }, `plan-name-${page}-${i}`);
+		addText(slide, milestone.name, { left: 58, top: top + 7, width: 320, height: 20 }, { fontSize: 16, color: colors.text, maxChars: 40 }, `plan-name-${page}-${i}`);
 		addText(slide, `${milestone.progress}%`, { left: 338, top: top + 7, width: 48, height: 20 }, { fontSize: 14, color: colors.muted, alignment: 'right', maxChars: 4 }, `plan-progress-${page}-${i}`);
 		rect(slide, { left, top: top + 6, width, height: 20 }, colors.tone, colors.rule, `plan-track-${page}-${i}`);
 		rect(slide, { left, top: top + 6, width: Math.max(2, width * (milestone.progress / 100)), height: 20 }, colors.secondary, 'none', `plan-complete-${page}-${i}`);
@@ -657,9 +600,22 @@ function addNoCommitsSlide(deck, goal, colors, page, sources) {
  * @return
  */
 async function main() {
-	const historyCommits = parseHistoryCommits();
+	if (git(['rev-parse', '--is-shallow-repository']) === 'true') throw new Error('A complete Big Five assessment requires full Git history; fetch or unshallow the authoritative refs first.');
+	const historyCommits = git(['log', ...refs, `--until=${report.until}`, '--no-merges', `--format=${'%H%x09%h%x09%aN%x09%aI%x09%s'}`])
+		.split('\n')
+		.filter(Boolean)
+		.map((line) => {
+			const [sha, short, author, authoredAt, ...subject] = line.split('\t');
+			return { sha, short, author, date: authoredAt.slice(0, 10), subject: subject.join('\t') };
+		});
 	report.bigFive = assessBigFiveTimeline(report.bigFive, historyCommits);
-	const commits = parseCommits();
+	const commits = git(['log', ...refs, `--since=${report.since}`, `--until=${report.until}`, '--no-merges', `--format=${'%H%x09%h%x09%aN%x09%aI%x09%s'}`])
+		.split('\n')
+		.filter(Boolean)
+		.map((line) => {
+			const [sha, short, author, authoredAt, ...subject] = line.split('\t');
+			return { sha, short, author, date: authoredAt.slice(0, 10), subject: subject.join('\t'), paths: git(['show', '--format=', '--name-only', sha]).split('\n').filter(Boolean) };
+		});
 	const mergeCount = Number(git(['rev-list', '--count', ...refs, `--since=${report.since}`, `--until=${report.until}`, '--merges']));
 	const counts = new Map(commits.map((commit) => [commit.author, commits.filter((other) => other.author === commit.author).length]));
 	const screenshotCount = report.contributors.flatMap((section) => section.slides).filter((i) => i.screenshot).length;
@@ -739,10 +695,8 @@ async function main() {
 		const chartLeft = 404;
 		const chartWidth = 790;
 		const chartTop = 300;
-		const laneHeight = 54;
 		const rangeStart = new Date(`${plan.start}T00:00:00Z`).valueOf();
-		const rangeEnd = new Date(`${plan.end}T00:00:00Z`).valueOf();
-		const range = Math.max(1, rangeEnd - rangeStart);
+		const range = Math.max(1, new Date(`${plan.end}T00:00:00Z`).valueOf() - rangeStart);
 		/**
 		 *
 		 * @param date
@@ -764,7 +718,7 @@ async function main() {
 			);
 		}
 		plan.milestones.forEach((milestone, i) => {
-			const top = chartTop + i * laneHeight;
+			const top = chartTop + i * 54;
 			addText(slide, wrapLines(milestone.name, 32), { left: 58, top: top + 5, width: 264, height: 38 }, { fontSize: 14, color: colors.text, maxChars: 32 }, `big-five-name-${page}-${i}`);
 			addText(
 				slide,
@@ -787,11 +741,14 @@ async function main() {
 			`big-five-legend-${page}`,
 		);
 		footer(slide, 'Git evidence measures what is in the repository; it does not prove work absent from Git.', page, colors);
-		const objectiveSources = plan.milestones.flatMap((milestone) => [
-			`${milestone.name}: ${milestone.deliverables.map((i) => `${i.name} — ${i.status}`).join('; ')}`,
-			...milestone.evidence.map((commit) => `${commit.sha} · ${commit.date} · ${commit.subject} · ${commit.paths.join(', ')}`),
+		notes(slide, [
+			...sources,
+			plan.source,
+			...plan.milestones.flatMap((milestone) => [
+				`${milestone.name}: ${milestone.deliverables.map((i) => `${i.name} — ${i.status}`).join('; ')}`,
+				...milestone.evidence.map((commit) => `${commit.sha} · ${commit.date} · ${commit.subject} · ${commit.paths.join(', ')}`),
+			]),
 		]);
-		notes(slide, [...sources, plan.source, ...objectiveSources]);
 		page += 1;
 	}
 	{
@@ -799,13 +756,12 @@ async function main() {
 		const slide = deck.slides.add();
 		slide.background.fill = colors.surface;
 		header(slide, report.overview.title, page, colors);
-		const metrics = [
+		[
 			[String(commits.length), 'non-merge commits'],
 			[String(counts.size), 'contributors'],
 			[String(mergeCount), 'merge commits'],
 			[String(screenshotCount), 'verified UI captures'],
-		];
-		metrics.forEach(([value, label], i) => {
+		].forEach(([value, label], i) => {
 			const left = 58 + i * 272;
 			addText(slide, value, { left, top: 168, width: 210, height: 54 }, { fontSize: 46, color: colors.text, maxChars: 5 }, `metric-${i}`);
 			addText(slide, label, { left, top: 226, width: 210, height: 20 }, { fontSize: 14, color: colors.muted, maxChars: 28 }, `metric-label-${i}`);
@@ -846,15 +802,14 @@ async function main() {
 	}
 	const sections = report.contributors;
 	const matchedSections = new Set();
-	const contributorSections = [
+	for (const { goal, section } of [
 		...orderedGoals.map((goal) => {
 			const section = sections.find((i) => i.name.toLowerCase() === goal.person.toLowerCase() || i.name.toLowerCase().startsWith(`${goal.person.toLowerCase()} `));
 			if (section) matchedSections.add(section);
 			return { goal, section };
 		}),
 		...sections.filter((section) => !matchedSections.has(section)).map((section) => ({ section })),
-	];
-	for (const { goal, section } of contributorSections) {
+	]) {
 		const colors = theme();
 		if (!section || section.commitCount <= 0) {
 			if (goal) {
@@ -909,9 +864,8 @@ async function main() {
 		notes(slide, sources);
 		page += 1;
 	}
-	await fs.mkdir(outputDir, { recursive: true });
-	const pptx = await PresentationFile.exportPptx(deck);
-	await pptx.save(outputPath);
+	await fs.mkdir(outputPath.slice(0, outputPath.lastIndexOf('/')), { recursive: true });
+	await (await PresentationFile.exportPptx(deck)).save(outputPath);
 	console.log(JSON.stringify({ outputPath, slides: deck.slides.items.length, commits: commits.length, mergeCount }, null, 2));
 }
 if (!inputPath || !outputPath) throw new Error('Usage: generate-weekly-review.mjs <report.json> <output.pptx>');

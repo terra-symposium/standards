@@ -182,10 +182,8 @@ const addResultSheet = (book: ExcelJS.Workbook, name: string, vals: readonly Vis
 			val.visual === 'Embedded' ? '' : val.visual,
 		]);
 		row.alignment = { vertical: 'top' };
-		const durationCol = loadEnabled ? 8 : 7;
-		const retryCol = loadEnabled ? 9 : 8;
-		row.getCell(durationCol).numFmt = '0';
-		row.getCell(retryCol).numFmt = '0';
+		row.getCell(loadEnabled ? 8 : 7).numFmt = '0';
+		row.getCell(loadEnabled ? 9 : 8).numFmt = '0';
 		styleStatus(row.getCell(6), val.status);
 		if (loadEnabled && resultLoadGrade(val)) styleLoadGrade(row.getCell(7), resultLoadGrade(val));
 		if (val.browserErrors) row.getCell(loadEnabled ? 11 : 10).note = val.browserErrors;

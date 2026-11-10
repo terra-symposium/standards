@@ -1,7 +1,23 @@
 #!/usr/bin/env node
+
+/*//////////////////////////////////////////////////
+IMPORTS
+//////////////////////////////////////////////////*/
+
+// API
 import { resolve } from 'node:path';
 import { runTestPlan } from './index.mjs';
 
+/*//////////////////////////////////////////////////
+HELPERS
+//////////////////////////////////////////////////*/
+
+/**
+ *
+ * @param args
+ *
+ * @return
+ */
 function parseArgs(args) {
 	const [cmd, ...rest] = args;
 	if (cmd !== 'run') throw new Error('Usage: terra-test run [--root <path>] [--manifest <path>] [--suites <name,name>] [--shared-only]');
@@ -29,7 +45,6 @@ function parseArgs(args) {
 	}
 	return options;
 }
-
 try {
 	const result = runTestPlan(parseArgs(process.argv.slice(2)));
 	if (result.failed) process.exitCode = 1;

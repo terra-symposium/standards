@@ -63,8 +63,7 @@ const budgetOverride = (val: unknown, label: string): LoadBudgetOverride => {
 /**
  * Validates and copies a partial budget supplied by a test helper.
  *
- * @param val
- * @param valandidate partial threshold override.
+ * @param val Partial threshold override to validate.
  *
  * @return A validated partial budget.
  */
@@ -190,7 +189,7 @@ export const gradeLoad = (durationMs: number, budget: LoadBudget): LoadGrade => 
  * Resolves and grades one measurement using test/helper overrides, named config, and defaults.
  *
  * @param input Raw timing measurement.
- * @param cfg
+ * @param cfg Normalized load-testing settings containing named and default budgets.
  * @param testId Stable test key for per-test budgets.
  * @param testOverride Optional budget set directly by the test fixture.
  * @param cfgrmalized repository timing settings.
@@ -224,13 +223,11 @@ export const loadGradeCounts = (measurements: readonly Pick<LoadMeasurement, 'gr
  * Times an operation, records its duration even when it throws, and preserves its value/error.
  *
  * @param name Stable human-readable operation name.
- * @param op
- * @param rec
+ * @param op Operation to time and invoke.
+ * @param rec Callback that receives the elapsed measurement.
  * @param budget Optional helper-level budget override.
- * @param opo time.
- * @param recllback receiving the elapsed measurement.
  *
- * @return The operation result.
+ * @return The operation result, or its original rejection after recording elapsed time.
  */
 export const timeLoadOperation = async <T>(name: string, op: () => T | Promise<T>, rec: (measurement: LoadMeasurementInput) => void, budget?: LoadBudgetOverride): Promise<T> => {
 	if (!name.trim()) throw new Error('A named load measurement is required.');

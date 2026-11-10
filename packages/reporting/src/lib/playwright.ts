@@ -110,24 +110,23 @@ export const loadTest = diagnosticsTest.extend<{ load: LoadTestController }>({
 			};
 			observe(page);
 			ctx.on('page', observe);
-			const controller: LoadTestController = {
-				setTestBudget: (budget) => {
-					testBudget = validateLoadBudgetOverride(budget);
-				},
-				measure: async <T>(name: string, op: () => T | Promise<T>, budget?: LoadBudgetOverride): Promise<T> => {
-					if (!enabled) return op();
-					return timeLoadOperation(
-						name,
-						op,
-						(measurement) => {
-							measurements.push(measurement);
-						},
-						budget,
-					);
-				},
-			};
 			try {
-				await use(controller);
+				await use({
+					setTestBudget: (budget) => {
+						testBudget = validateLoadBudgetOverride(budget);
+					},
+					measure: async <T>(name: string, op: () => T | Promise<T>, budget?: LoadBudgetOverride): Promise<T> => {
+						if (!enabled) return op();
+						return timeLoadOperation(
+							name,
+							op,
+							(measurement) => {
+								measurements.push(measurement);
+							},
+							budget,
+						);
+					},
+				});
 			} finally {
 				ctx.off('page', observe);
 				await Promise.all(pending);
@@ -167,8 +166,7 @@ HELPERS
 /**
  * Removes terminal color escapes before diagnostics enter an artifact.
  *
- * @param val
- * @param valerminal output that may contain ANSI escape sequences.
+ * @param val Terminal output that may contain ANSI escape sequences.
  *
  * @return Terminal output with ANSI formatting removed.
  */
@@ -471,8 +469,7 @@ const supplementalResults = (file: string, loadTesting: ReturnType<typeof readLo
 	if (!fs.existsSync(file)) return { results: [unavailable(`Supplemental results file was not found: ${file}`)], diagnostics: [] };
 	try {
 		const payload = JSON.parse(fs.readFileSync(file, 'utf8')) as { complete?: unknown; results?: unknown; runDiagnostics?: unknown };
-		const rows = Array.isArray(payload.results) ? payload.results : [];
-		const results = rows.map((v): VisualResult => {
+		const results = (Array.isArray(payload.results) ? payload.results : []).map((v): VisualResult => {
 			const row = v && typeof v === 'object' ? (v as Record<string, unknown>) : {};
 			const rawDuration = Number(row.duration ?? row.duration_ms ?? 0);
 			const result: VisualResult = {
@@ -552,8 +549,7 @@ export default class ProgressReporter {
 			const files = new Set<string>();
 			for (const test of suite.allTests()) {
 				const file = path.basename(test.location.file);
-				const cfgd = test.parent.project()?.name || test.titlePath().find((v) => v.startsWith('root-')) || 'unknown';
-				const project = baseVisualProjectName(cfgd, this.options.viewportCatalog);
+				const project = baseVisualProjectName(test.parent.project()?.name || test.titlePath().find((v) => v.startsWith('root-')) || 'unknown', this.options.viewportCatalog);
 				files.add(file);
 				projectFiles.set(project, new Set([...(projectFiles.get(project) || []), file]));
 			}

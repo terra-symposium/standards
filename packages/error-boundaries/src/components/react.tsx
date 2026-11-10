@@ -57,32 +57,36 @@ export function withErrorBoundary<P extends object>(ComponentToWrap: React.Compo
 export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
 	state: ErrorBoundaryState = { error: null };
 	/**
+	 * Derives fallback state when a descendant throws while rendering.
 	 *
-	 * @param err
+	 * @param err Render error caught by React.
 	 *
-	 * @return
+	 * @return State that makes the boundary render its fallback UI.
 	 */
 	static getDerivedStateFromError(err: Error): ErrorBoundaryState {
 		return { error: err };
 	}
 	/**
+	 * Reports a caught descendant error through the boundary's configured callback.
 	 *
-	 * @param err
-	 * @param info
+	 * @param err Error thrown by a descendant while rendering.
+	 * @param info React metadata describing the failed component tree.
 	 */
 	componentDidCatch(err: Error, info: React.ErrorInfo): void {
 		this.props.onError?.(err, { name: this.props.name ?? 'Component', componentStack: info.componentStack ?? null });
 	}
 	/**
+	 * Clears the stored error when the boundary's reset key changes.
 	 *
-	 * @param prev
+	 * @param prev Props from the previous render.
 	 */
 	componentDidUpdate(prev: ErrorBoundaryProps): void {
 		if (prev.resetKey !== this.props.resetKey && this.state.error) this.setState({ error: null });
 	}
 	/**
+	 * Renders the children normally or the configured fallback after an error.
 	 *
-	 * @return
+	 * @return Child content or an accessible fallback element.
 	 */
 	render(): React.ReactNode {
 		if (!this.state.error) return this.props.children;
