@@ -30,3 +30,6 @@ tests/results/
 # Vendored dependencies
 vendor/
 **/vendor/
+
+# Local error logs
+error.log
