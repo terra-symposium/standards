@@ -21,7 +21,7 @@ import { writeSpreadsheet } from './spreadsheet.js';
 import { VISUAL_VIEWPORTS } from './viewports.js';
 
 // TYPES
-import type { LoadBudgetOverride, LoadMeasurement, LoadMeasurementInput, LoadTestingConfig, ProjectDefinition, ReportRun, VisualResult } from './core.js';
+import type { LoadBudgetOverride, LoadMeasurementInput, LoadTestingConfig, ProjectDefinition, VisualResult } from './core.js';
 import type { ViewportCatalog } from './viewports.js';
 
 /*//////////////////////////////////////////////////
@@ -229,19 +229,20 @@ const loadAttachment = (attachments: readonly ReporterAttachment[]): { measureme
 	if (!attachment) return { measurements: [] };
 	try {
 		const parsed = JSON.parse(readAttachment(attachment)) as Record<string, unknown>;
-		const measurements = Array.isArray(parsed.measurements)
-			? parsed.measurements.flatMap((v): LoadMeasurementInput[] => {
-					if (!v || typeof v !== 'object') return [];
-					const row = v as Record<string, unknown>;
-					if (typeof row.name !== 'string' || !row.name.trim() || !['page', 'operation'].includes(String(row.kind))) return [];
-					if (typeof row.durationMs !== 'number' || !Number.isFinite(row.durationMs) || row.durationMs < 0) return [];
-					let budget: LoadBudgetOverride | undefined;
-					if (row.budget && typeof row.budget === 'object') budget = validateLoadBudgetOverride(row.budget as LoadBudgetOverride);
-					return [{ name: redactEvidence(row.name), kind: row.kind as LoadMeasurementInput['kind'], durationMs: row.durationMs, ...(budget ? { budget } : {}) }];
-				})
-			: [];
-		const testBudget = parsed.testBudget && typeof parsed.testBudget === 'object' ? validateLoadBudgetOverride(parsed.testBudget as LoadBudgetOverride) : undefined;
-		return { measurements, ...(testBudget ? { testBudget } : {}) };
+		return {
+			measurements: Array.isArray(parsed.measurements)
+				? parsed.measurements.flatMap((v): LoadMeasurementInput[] => {
+						if (!v || typeof v !== 'object') return [];
+						const row = v as Record<string, unknown>;
+						if (typeof row.name !== 'string' || !row.name.trim() || !['page', 'operation'].includes(String(row.kind))) return [];
+						if (typeof row.durationMs !== 'number' || !Number.isFinite(row.durationMs) || row.durationMs < 0) return [];
+						let budget: LoadBudgetOverride | undefined;
+						if (row.budget && typeof row.budget === 'object') budget = validateLoadBudgetOverride(row.budget as LoadBudgetOverride);
+						return [{ name: redactEvidence(row.name), kind: row.kind as LoadMeasurementInput['kind'], durationMs: row.durationMs, ...(budget ? { budget } : {}) }];
+					})
+				: [],
+			...(parsed.testBudget && typeof parsed.testBudget === 'object' ? { testBudget: validateLoadBudgetOverride(parsed.testBudget as LoadBudgetOverride) } : {}),
+		};
 	} catch {
 		return { measurements: [] };
 	}
@@ -266,11 +267,14 @@ const addLoadMeasurements = (
 	cfg: ReturnType<typeof readLoadTestingConfig>,
 ): VisualResult => {
 	if (!cfg.enabled) return result;
-	const measurements: LoadMeasurement[] = [
-		gradeLoadMeasurement({ name: 'test duration', kind: 'test', durationMs: result.duration, ...(testBudget ? { budget: testBudget } : {}) }, cfg, id),
-		...inputs.map((input) => gradeLoadMeasurement(input, cfg, id)),
-	];
-	return { ...result, loadMeasurements: measurements, loadTestId: id };
+	return {
+		...result,
+		loadMeasurements: [
+			gradeLoadMeasurement({ name: 'test duration', kind: 'test', durationMs: result.duration, ...(testBudget ? { budget: testBudget } : {}) }, cfg, id),
+			...inputs.map((input) => gradeLoadMeasurement(input, cfg, id)),
+		],
+		loadTestId: id,
+	};
 };
 
 /**
@@ -304,29 +308,6 @@ const testIdentity = (
 };
 
 /**
- * Copies captured screenshots into the timestamped run directory.
- *
- * @param results Results whose screenshot paths should be relocated.
- * @param runDir
- * @param runDirtamped output directory for the current run.
- *
- * @return Results with copied screenshot paths.
- */
-const copyScreenshots = (results: readonly VisualResult[], runDir: string): VisualResult[] => {
-	const imgs = path.join(runDir, 'images');
-	fs.mkdirSync(imgs, { recursive: true });
-	return results.map((r, i) => {
-		if (!r.screenshot || !fs.existsSync(r.screenshot)) return r;
-		const dest = path.join(
-			imgs,
-			`${String(i + 1).padStart(4, '0')}-${`${r.project}-${r.file}-${r.title}-${r.viewport}`.replace(/[^a-z0-9_-]+/gi, '-').replace(/^-+|-+$/g, '').toLowerCase() || 'screenshot'}.png`,
-		);
-		fs.copyFileSync(r.screenshot, dest);
-		return { ...r, screenshot: dest };
-	});
-};
-
-/**
  * Redacts personal identifiers and configured secrets from report text.
  *
  * @param val
@@ -346,30 +327,6 @@ const redactEvidence = (val: unknown): string => {
 		if (secret && /(?:secret|token|password|credential|private.?key|api.?key|publishable.?key|service[_-]?role.?key)/i.test(name)) text = text.replaceAll(secret, '[redacted secret]');
 	}
 	return text.replaceAll(process.cwd(), '[workspace]');
-};
-
-/**
- * Converts untrusted supplemental timing values to supported measurement inputs.
- *
- * @param val
- *
- * @return
- */
-const supplementalMeasurements = (val: unknown): LoadMeasurementInput[] => {
-	if (!Array.isArray(val)) return [];
-	return val.flatMap((e): LoadMeasurementInput[] => {
-		if (!e || typeof e !== 'object') return [];
-		const row = e as Record<string, unknown>;
-		if (typeof row.name !== 'string' || !row.name.trim() || !['page', 'operation'].includes(String(row.kind))) return [];
-		if (typeof row.durationMs !== 'number' || !Number.isFinite(row.durationMs) || row.durationMs < 0) return [];
-		let budget: LoadBudgetOverride | undefined;
-		try {
-			if (row.budget && typeof row.budget === 'object') budget = validateLoadBudgetOverride(row.budget as LoadBudgetOverride);
-		} catch {
-			return [];
-		}
-		return [{ name: redactEvidence(row.name), kind: row.kind as LoadMeasurementInput['kind'], durationMs: row.durationMs, ...(budget ? { budget } : {}) }];
-	});
 };
 
 /**
@@ -426,15 +383,38 @@ const supplementalResults = (file: string, loadTesting: ReturnType<typeof readLo
 				viewportSize: 'N/A',
 			};
 			if (!loadTesting.enabled) return result;
-			const rawFile = String(row.file || path.basename(file));
-			const titlePath = [String(row.groups || ''), String(row.title || 'Untitled supplemental result')].filter(Boolean).flatMap((part) => part.split(' › '));
-			const id = String(row.loadTestId || row.testId || loadTestId(rawFile, titlePath, loadTesting.root));
-			const testBudget = row.testBudget && typeof row.testBudget === 'object' ? validateLoadBudgetOverride(row.testBudget as LoadBudgetOverride) : undefined;
-			return addLoadMeasurements(result, id, supplementalMeasurements(row.loadMeasurements), testBudget, loadTesting);
+			return addLoadMeasurements(
+				result,
+				String(
+					row.loadTestId ||
+						row.testId ||
+						loadTestId(
+							String(row.file || path.basename(file)),
+							[String(row.groups || ''), String(row.title || 'Untitled supplemental result')].filter(Boolean).flatMap((part) => part.split(' › ')),
+							loadTesting.root,
+						),
+				),
+				Array.isArray(row.loadMeasurements)
+					? row.loadMeasurements.flatMap((value): LoadMeasurementInput[] => {
+							if (!value || typeof value !== 'object') return [];
+							const measurement = value as Record<string, unknown>;
+							if (typeof measurement.name !== 'string' || !measurement.name.trim() || !['page', 'operation'].includes(String(measurement.kind))) return [];
+							if (typeof measurement.durationMs !== 'number' || !Number.isFinite(measurement.durationMs) || measurement.durationMs < 0) return [];
+							let budget: LoadBudgetOverride | undefined;
+							try {
+								if (measurement.budget && typeof measurement.budget === 'object') budget = validateLoadBudgetOverride(measurement.budget as LoadBudgetOverride);
+							} catch {
+								return [];
+							}
+							return [{ name: redactEvidence(measurement.name), kind: measurement.kind as LoadMeasurementInput['kind'], durationMs: measurement.durationMs, ...(budget ? { budget } : {}) }];
+						})
+					: [],
+				row.testBudget && typeof row.testBudget === 'object' ? validateLoadBudgetOverride(row.testBudget as LoadBudgetOverride) : undefined,
+				loadTesting,
+			);
 		});
-		const diagnostics = Array.isArray(payload.runDiagnostics) ? payload.runDiagnostics.map(redactEvidence) : [];
 		if (payload.complete === false) results.unshift(unavailable('The supplemental test run reported an incomplete result inventory.'));
-		return { results, diagnostics };
+		return { results, diagnostics: Array.isArray(payload.runDiagnostics) ? payload.runDiagnostics.map(redactEvidence) : [] };
 	} catch (err) {
 		return { results: [unavailable(`Could not read supplemental results: ${err instanceof Error ? err.message : String(err)}`)], diagnostics: [] };
 	}
@@ -613,10 +593,22 @@ export default class ProgressReporter {
 		}
 		const runDir = path.resolve(this.options.outputRoot, new Date().toISOString().replace(/[:.]/g, '-'));
 		fs.mkdirSync(runDir, { recursive: true });
-		const browserResults = copyScreenshots(this.results, runDir);
+		fs.mkdirSync(path.join(runDir, 'images'), { recursive: true });
+		const browserResults = this.results.map((result, index) => {
+			if (!result.screenshot || !fs.existsSync(result.screenshot)) return result;
+			const destination = path.join(
+				runDir,
+				'images',
+				`${String(index + 1).padStart(4, '0')}-${`${result.project}-${result.file}-${result.title}-${result.viewport}`.replace(/[^a-z0-9_-]+/gi, '-').replace(/^-+|-+$/g, '').toLowerCase() || 'screenshot'}.png`,
+			);
+			fs.copyFileSync(result.screenshot, destination);
+			return { ...result, screenshot: destination };
+		});
 		const supplemental = this.options.supplementalResultsFile ? supplementalResults(path.resolve(this.options.supplementalResultsFile), this.options.loadTesting) : { results: [], diagnostics: [] };
 		const results = [...browserResults, ...supplemental.results];
-		const run: ReportRun = {
+		const spreadsheet = path.join(runDir, this.options.reportFile);
+		const slideshow = path.join(runDir, this.options.slideshowFile);
+		await writeSpreadsheet(spreadsheet, {
 			featureFiles: [...new Set([...this.options.featureFiles, ...supplemental.results.map((r) => r.file)])],
 			projects: [
 				...this.options.projects,
@@ -630,14 +622,10 @@ export default class ProgressReporter {
 			results,
 			runDiagnostics: [...this.runDiagnostics.map(redactEvidence), ...supplemental.diagnostics],
 			loadTestingEnabled: this.options.loadTesting.enabled,
-		};
-		const spreadsheet = path.join(runDir, this.options.reportFile);
-		const slideshow = path.join(runDir, this.options.slideshowFile);
-		await writeSpreadsheet(spreadsheet, run);
+		});
 		await writeSlideshow(slideshow, this.options.loadTesting.enabled ? results : browserResults, { loadTestingEnabled: this.options.loadTesting.enabled });
 		process.stdout.write(`Test spreadsheet: ${spreadsheet}\nTest slideshow: ${slideshow}\n`);
-		const measurements = results.flatMap((r) => r.loadMeasurements || []);
-		const loadCounts = loadGradeCounts(measurements);
+		const loadCounts = loadGradeCounts(results.flatMap((r) => r.loadMeasurements || []));
 		if (this.options.loadTesting.enabled) process.stdout.write(`Load budgets: ${loadCounts.pass} pass, ${loadCounts.warning} warning, ${loadCounts.fail} fail.\n`);
 		return loadCounts.fail ? 'failed' : undefined;
 	}

@@ -40,62 +40,6 @@ type Presentation = {
 	writeFile: (options: { fileName: string }) => Promise<string>;
 };
 const COLOURS = { accent: '1F4E78', ink: '16202A', line: 'D8DEE6', muted: '52606D', surface: 'F5F7FA' };
-/** Holds screenshot dimensions and review cues for one slide image. */
-type ImgReview = { cues: string[]; height: number; width: number };
-/**
- * Derives visual-review prompts from screenshot dimensions and test diagnostics.
- *
- * @param file Screenshot path used for dimension analysis.
- * @param r Result metadata and diagnostics used to derive review cues.
- *
- * @return Screenshot dimensions and prompts for visual review.
- */
-const reviewImg = async (file: string, r: VisualResult): Promise<ImgReview> => {
-	const metadata = await sharp(file).metadata();
-	const width = metadata.width || 0;
-	const height = metadata.height || 0;
-	const cues: string[] = [];
-	if (height > width * 2.2) cues.push('Long full-page capture: inspect vertical rhythm, repeated whitespace, and section transitions.');
-	if (r.viewport !== 'xl') cues.push(`Responsive capture: inspect breakpoint changes at ${r.viewportSize}, especially wrapping, navigation, grids, and overflow.`);
-	if (r.browserErrors) cues.push('Browser diagnostics were captured; check whether the visible surface reflects the reported error.');
-	if (r.terminalErrors) cues.push('Terminal diagnostics were captured; compare the visible state with the runtime warning or failure.');
-	if (r.status !== 'passed') cues.push(`Test status is ${r.status}; confirm whether the visible defect is causal or incidental.`);
-	if (!cues.length) cues.push('Inspect alignment, text wrapping, control density, whitespace, and visual hierarchy for issues not covered by assertions.');
-	return { cues, height, width };
-};
-/**
- * Fits an image into a bounded slide region while preserving its aspect ratio.
- *
- * @param width Source image width.
- * @param height Source image height.
- * @param x Left edge of the target region.
- * @param y Top edge of the target region.
- * @param maxWidth Maximum target width.
- * @param maxHeight Maximum target height.
- *
- * @return Positioned dimensions that fit inside the target region.
- */
-const fitImg = (width: number, height: number, x: number, y: number, maxWidth: number, maxHeight: number): { h: number; w: number; x: number; y: number } => {
-	const scale = Math.min(maxWidth / Math.max(width, 1), maxHeight / Math.max(height, 1));
-	const fittedWidth = width * scale;
-	const fittedHeight = height * scale;
-	return { h: fittedHeight, w: fittedWidth, x: x + (maxWidth - fittedWidth) / 2, y: y + (maxHeight - fittedHeight) / 2 };
-};
-/**
- * Crops a tall screenshot into a slide-friendly preview while retaining the original in notes.
- *
- * @param file Screenshot path to preview.
- * @param viewportSize
- *
- * @return Base64 image data and preview dimensions.
- */
-const previewImg = async (file: string, viewportSize: string): Promise<{ data: string; height: number; width: number }> => {
-	const metadata = await sharp(file).metadata();
-	const width = metadata.width || 1;
-	const [viewportWidth, viewportHeight] = viewportSize.split('×').map((v) => Number.parseInt(v, 10));
-	const height = Math.min(metadata.height || 1, Math.max(1, viewportWidth && viewportHeight ? Math.round((width * viewportHeight) / viewportWidth) : Math.round(width / 0.38)));
-	return { data: `data:image/png;base64,${(await sharp(file).extract({ height, left: 0, top: 0, width }).png().toBuffer()).toString('base64')}`, height, width };
-};
 /**
  * Sorts responsive results by their rendered viewport width.
  *
@@ -104,41 +48,6 @@ const previewImg = async (file: string, viewportSize: string): Promise<{ data: s
  * @return Numeric viewport width, or a final sort value when unavailable.
  */
 const viewportWidth = (r: VisualResult): number => Number.parseInt(r.viewportSize.split('×')[0] || '', 10) || Number.MAX_SAFE_INTEGER;
-/**
- * Builds the visible review copy and diagnostics for one result.
- *
- * @param r Result metadata and diagnostics to describe.
- * @param review Screenshot review cues to include.
- *
- * @return Text shown beside the screenshot and in speaker notes.
- */
-const resultLoadGrade = (r: VisualResult): string => {
-	const counts = loadGradeCounts(r.loadMeasurements || []);
-	return counts.fail ? 'fail' : counts.warning ? 'warning' : counts.pass ? 'pass' : '';
-};
-/**
- *
- * @param r
- * @param review
- *
- * @return
- */
-const slideCopy = (r: VisualResult, review: ImgReview): string => {
-	const grade = resultLoadGrade(r);
-	const measurements = r.loadMeasurements || [];
-	const lines = [
-		`${r.project} · ${r.viewport} · ${r.viewportSize}`,
-		r.groups || r.file,
-		`Status: ${r.status}${r.duration ? ` · ${r.duration} ms` : ''}${grade ? ` · Load: ${grade}` : ''}`,
-		...measurements.map((i) => `Load ${i.kind}: ${i.name} — ${i.durationMs.toFixed(1)} ms (${i.grade}; warn ${i.budget.warnMs} / fail ${i.budget.failMs} ms)`),
-		'',
-		...review.cues.map((c) => `• ${c}`),
-	];
-	if (r.error) lines.push('', `Test error: ${r.error}`);
-	if (r.browserErrors) lines.push('', `Browser: ${r.browserErrors}`);
-	if (r.terminalErrors) lines.push('', `Terminal: ${r.terminalErrors}`);
-	return lines.join('\n');
-};
 /**
  * Adds a single-result slide with its screenshot and review prompts.
  *
@@ -185,7 +94,8 @@ const addResponsiveSlide = async (presentation: Presentation, group: readonly Vi
 		const x = 0.38 + (idx % cols) * (width + gap);
 		const y = 1.02 + Math.floor(idx / cols) * (height + gap);
 		slide.addShape(presentation.ShapeType.roundRect, { fill: { color: 'FFFFFF' }, line: { color: COLOURS.line, width: 1 }, x, y, w: width, h: height, rectRadius: 0.04 });
-		const loadGrade = resultLoadGrade(r);
+		const gradeCounts = loadGradeCounts(r.loadMeasurements || []);
+		const loadGrade = gradeCounts.fail ? 'fail' : gradeCounts.warning ? 'warning' : gradeCounts.pass ? 'pass' : '';
 		slide.addText(`${r.viewport} · ${r.viewportSize} · ${r.status}${loadGrade ? ` · Load ${loadGrade}` : ''}`, {
 			bold: true,
 			color: COLOURS.accent,
@@ -198,10 +108,41 @@ const addResponsiveSlide = async (presentation: Presentation, group: readonly Vi
 			h: 0.2,
 		});
 		if (r.screenshot && fs.existsSync(r.screenshot)) {
-			const review = await reviewImg(r.screenshot, r);
-			const preview = await previewImg(r.screenshot, r.viewportSize);
-			slide.addImage({ data: preview.data, ...fitImg(preview.width, preview.height, x + 0.08, y + 0.38, width - 0.16, height - 0.46) });
-			notes.push(`${r.viewport}: full-page screenshot images/${path.basename(r.screenshot)}\n${slideCopy(r, review)}`);
+			const reviewMetadata = await sharp(r.screenshot).metadata();
+			const cues: string[] = [];
+			if ((reviewMetadata.height || 0) > (reviewMetadata.width || 0) * 2.2) cues.push('Long full-page capture: inspect vertical rhythm, repeated whitespace, and section transitions.');
+			if (r.viewport !== 'xl') cues.push(`Responsive capture: inspect breakpoint changes at ${r.viewportSize}, especially wrapping, navigation, grids, and overflow.`);
+			if (r.browserErrors) cues.push('Browser diagnostics were captured; check whether the visible surface reflects the reported error.');
+			if (r.terminalErrors) cues.push('Terminal diagnostics were captured; compare the visible state with the runtime warning or failure.');
+			if (r.status !== 'passed') cues.push(`Test status is ${r.status}; confirm whether the visible defect is causal or incidental.`);
+			if (!cues.length) cues.push('Inspect alignment, text wrapping, control density, whitespace, and visual hierarchy for issues not covered by assertions.');
+			const previewMetadata = await sharp(r.screenshot).metadata();
+			const previewWidth = previewMetadata.width || 1;
+			const [viewportWidth, viewportHeight] = r.viewportSize.split('×').map((value) => Number.parseInt(value, 10));
+			const previewHeight = Math.min(previewMetadata.height || 1, Math.max(1, viewportWidth && viewportHeight ? Math.round((previewWidth * viewportHeight) / viewportWidth) : Math.round(previewWidth / 0.38)));
+			const scale = Math.min((width - 0.16) / Math.max(previewWidth, 1), (height - 0.46) / Math.max(previewHeight, 1));
+			const fittedWidth = previewWidth * scale;
+			const fittedHeight = previewHeight * scale;
+			slide.addImage({
+				data: `data:image/png;base64,${(await sharp(r.screenshot).extract({ height: previewHeight, left: 0, top: 0, width: previewWidth }).png().toBuffer()).toString('base64')}`,
+				h: fittedHeight,
+				w: fittedWidth,
+				x: x + 0.08 + (width - 0.16 - fittedWidth) / 2,
+				y: y + 0.38 + (height - 0.46 - fittedHeight) / 2,
+			});
+			notes.push(
+				`${r.viewport}: full-page screenshot images/${path.basename(r.screenshot)}\n${[
+					`${r.project} · ${r.viewport} · ${r.viewportSize}`,
+					r.groups || r.file,
+					`Status: ${r.status}${r.duration ? ` · ${r.duration} ms` : ''}${loadGrade ? ` · Load: ${loadGrade}` : ''}`,
+					...(r.loadMeasurements || []).map((measurement) => `Load ${measurement.kind}: ${measurement.name} — ${measurement.durationMs.toFixed(1)} ms (${measurement.grade}; warn ${measurement.budget.warnMs} / fail ${measurement.budget.failMs} ms)`),
+					'',
+					...cues.map((cue) => `• ${cue}`),
+					...(r.error ? ['', `Test error: ${r.error}`] : []),
+					...(r.browserErrors ? ['', `Browser: ${r.browserErrors}`] : []),
+					...(r.terminalErrors ? ['', `Terminal: ${r.terminalErrors}`] : []),
+				].join('\n')}`,
+			);
 		} else {
 			slide.addText('SCREENSHOT MISSING', { align: 'center', bold: true, color: '9A3412', fontFace: 'Aptos', fontSize: 12, x: x + 0.2, y: y + height / 2 - 0.14, w: width - 0.4, h: 0.28 });
 			notes.push(`${r.viewport}: no screenshot captured`);
@@ -287,16 +228,18 @@ export const writeSlideshow = async (file: string, results: readonly VisualResul
 		const pageSize = 12;
 		const pages = Math.max(1, Math.ceil(measurements.length / pageSize));
 		for (let page = 0; page < pages; page += 1) {
-			const lines = measurements
-				.slice(page * pageSize, (page + 1) * pageSize)
-				.map(
-					({ result: r, measurement }) =>
-						`${measurement.grade.toUpperCase().padEnd(7)} ${measurement.durationMs.toFixed(1).padStart(9)} ms  ${measurement.kind.padEnd(9)} ${r.file} · ${r.title} · ${measurement.name}  [warn ${measurement.budget.warnMs} / fail ${measurement.budget.failMs} ms]`,
-				);
 			const slide = presentation.addSlide();
 			slide.background = { color: COLOURS.surface };
 			slide.addText(`Load timing details ${page + 1}/${pages}`, { bold: true, color: COLOURS.ink, fontFace: 'Aptos Display', fontSize: 22, margin: 0, x: 0.55, y: 0.4, w: 12.2, h: 0.45 });
-			slide.addText(lines.join('\n') || 'No load measurements were collected.', {
+			slide.addText(
+				measurements
+					.slice(page * pageSize, (page + 1) * pageSize)
+					.map(
+						({ result: r, measurement }) =>
+							`${measurement.grade.toUpperCase().padEnd(7)} ${measurement.durationMs.toFixed(1).padStart(9)} ms  ${measurement.kind.padEnd(9)} ${r.file} · ${r.title} · ${measurement.name}  [warn ${measurement.budget.warnMs} / fail ${measurement.budget.failMs} ms]`,
+					)
+					.join('\n') || 'No load measurements were collected.',
+				{
 				color: COLOURS.ink,
 				fontFace: 'Aptos',
 				fontSize: 11,
@@ -307,7 +250,8 @@ export const writeSlideshow = async (file: string, results: readonly VisualResul
 				y: 1.05,
 				w: 12.2,
 				h: 5.95,
-			});
+				},
+			);
 		}
 	}
 	await presentation.writeFile({ fileName: file });
