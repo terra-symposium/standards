@@ -97,14 +97,14 @@ export const loadTest = diagnosticsTest.extend<{ load: LoadTestController }>({
 					if (!enabled || tgt.url() === 'about:blank') return;
 					pending.push(
 						tgt
-						.evaluate(() => {
-							const entry = performance.getEntries().find((i) => String(i.entryType) === 'navigation') as PerformanceNavigationTiming | undefined;
-							return entry ? { durationMs: entry.duration, pathname: location.pathname } : undefined;
-						})
-						.then((navigation) => {
-							if (!navigation || navigation.durationMs <= 0) return;
-							measurements.push({ name: `page load: ${navigation.pathname || '/'}`, kind: 'page', durationMs: navigation.durationMs });
-						})
+							.evaluate(() => {
+								const entry = performance.getEntries().find((i) => String(i.entryType) === 'navigation') as PerformanceNavigationTiming | undefined;
+								return entry ? { durationMs: entry.duration, pathname: location.pathname } : undefined;
+							})
+							.then((navigation) => {
+								if (!navigation || navigation.durationMs <= 0) return;
+								measurements.push({ name: `page load: ${navigation.pathname || '/'}`, kind: 'page', durationMs: navigation.durationMs });
+							})
 							.catch(() => undefined),
 					);
 				});
@@ -439,31 +439,29 @@ export default class ProgressReporter {
 				attachedLoad = { measurements: [] };
 			}
 		}
-		this.results.push(addLoadMeasurements(
-			{
-			...testIdentity(test, test.parent.project()?.name || test.titlePath().find((v) => v.startsWith('root-')) || 'unknown', this.options.viewportCatalog),
-			browserErrors: redactEvidence(
-				parseDiagnostics(
-					readAttachment(result.attachments.find((v) => v.name === 'browser-diagnostics' && v.contentType === 'application/json') || {}),
-				).join('\n'),
+		this.results.push(
+			addLoadMeasurements(
+				{
+					...testIdentity(test, test.parent.project()?.name || test.titlePath().find((v) => v.startsWith('root-')) || 'unknown', this.options.viewportCatalog),
+					browserErrors: redactEvidence(parseDiagnostics(readAttachment(result.attachments.find((v) => v.name === 'browser-diagnostics' && v.contentType === 'application/json') || {})).join('\n')),
+					duration: result.duration,
+					error: redactEvidence(result.error?.message?.split('\n')[0] || ''),
+					retry: result.retry,
+					screenshot,
+					status: normalizeVisualStatus(result.status),
+					terminalErrors: redactEvidence(this.terminalDiagnostics.get(result)?.join('\n') || ''),
+					visual: screenshot ? 'Embedded' : result.attachments.some((v) => v.name === 'visual-error') ? 'Capture failed' : 'No visual surface',
+				},
+				loadTestId(
+					test.location.file,
+					test.titlePath().filter((v, i, all) => i > all.findIndex((part) => part.endsWith(path.basename(test.location.file)))),
+					this.options.loadTesting.root,
+				),
+				attachedLoad.measurements,
+				attachedLoad.testBudget,
+				this.options.loadTesting,
 			),
-			duration: result.duration,
-			error: redactEvidence(result.error?.message?.split('\n')[0] || ''),
-			retry: result.retry,
-			screenshot,
-			status: normalizeVisualStatus(result.status),
-			terminalErrors: redactEvidence(this.terminalDiagnostics.get(result)?.join('\n') || ''),
-			visual: screenshot ? 'Embedded' : result.attachments.some((v) => v.name === 'visual-error') ? 'Capture failed' : 'No visual surface',
-			},
-			loadTestId(
-				test.location.file,
-				test.titlePath().filter((v, i, all) => i > all.findIndex((part) => part.endsWith(path.basename(test.location.file)))),
-				this.options.loadTesting.root,
-			),
-			attachedLoad.measurements,
-			attachedLoad.testBudget,
-			this.options.loadTesting,
-		));
+		);
 		this.terminalDiagnostics.delete(result);
 	}
 
@@ -491,23 +489,28 @@ export default class ProgressReporter {
 		const runDir = path.resolve(this.options.outputRoot, new Date().toISOString().replace(/[:.]/g, '-'));
 		fs.mkdirSync(runDir, { recursive: true });
 		fs.mkdirSync(path.join(runDir, 'images'), { recursive: true });
-		const browserResults = this.results.map((result, index) => {
+		const browserResults = this.results.map((result, i) => {
 			if (!result.screenshot || !fs.existsSync(result.screenshot)) return result;
 			const destination = path.join(
 				runDir,
 				'images',
-				`${String(index + 1).padStart(4, '0')}-${`${result.project}-${result.file}-${result.title}-${result.viewport}`.replace(/[^a-z0-9_-]+/gi, '-').replace(/^-+|-+$/g, '').toLowerCase() || 'screenshot'}.png`,
+				`${String(i + 1).padStart(4, '0')}-${
+					`${result.project}-${result.file}-${result.title}-${result.viewport}`
+						.replace(/[^a-z0-9_-]+/gi, '-')
+						.replace(/^-+|-+$/g, '')
+						.toLowerCase() || 'screenshot'
+				}.png`,
 			);
 			fs.copyFileSync(result.screenshot, destination);
 			return { ...result, screenshot: destination };
 		});
-		let supplemental: { results: VisualResult[]; diagnostics: string[] } = { results: [], diagnostics: [] };
+		const supplemental: { results: VisualResult[]; diagnostics: string[] } = { results: [], diagnostics: [] };
 		if (this.options.supplementalResultsFile) {
 			const supplementalFile = path.resolve(this.options.supplementalResultsFile);
-			const unavailable = (error: string): VisualResult => ({
+			const unavailable = (err: string): VisualResult => ({
 				browserErrors: '',
 				duration: 0,
-				error,
+				error: err,
 				file: path.basename(supplementalFile),
 				groups: 'Supplemental results',
 				project: 'supplemental',
@@ -577,8 +580,8 @@ export default class ProgressReporter {
 					});
 					if (payload.complete === false) supplemental.results.unshift(unavailable('The supplemental test run reported an incomplete result inventory.'));
 					supplemental.diagnostics = Array.isArray(payload.runDiagnostics) ? payload.runDiagnostics.map(redactEvidence) : [];
-				} catch (error) {
-					supplemental.results = [unavailable(`Could not read supplemental results: ${error instanceof Error ? error.message : String(error)}`)];
+				} catch (err) {
+					supplemental.results = [unavailable(`Could not read supplemental results: ${err instanceof Error ? err.message : String(err)}`)];
 					supplemental.diagnostics = [];
 				}
 			}

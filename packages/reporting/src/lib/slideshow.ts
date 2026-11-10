@@ -127,7 +127,16 @@ export const writeSlideshow = async (file: string, results: readonly VisualResul
 			w: 12.55,
 			h: 0.34,
 		});
-		slide.addText(`${first.project} · responsive comparison · ${first.groups || first.file}`, { color: COLOURS.muted, fontFace: 'Aptos', fontSize: 8.5, margin: 0, x: 0.38, y: 0.62, w: 12.55, h: 0.2 });
+		slide.addText(`${first.project} · responsive comparison · ${first.groups || first.file}`, {
+			color: COLOURS.muted,
+			fontFace: 'Aptos',
+			fontSize: 8.5,
+			margin: 0,
+			x: 0.38,
+			y: 0.62,
+			w: 12.55,
+			h: 0.2,
+		});
 		slide.addShape(presentation.ShapeType.line, { line: { color: COLOURS.line, width: 1 }, x: 0.38, y: 0.9, w: 12.55, h: 0 });
 		const notes: string[] = [];
 		const gap = 0.12;
@@ -164,7 +173,10 @@ export const writeSlideshow = async (file: string, results: readonly VisualResul
 				const previewMetadata = await sharp(r.screenshot).metadata();
 				const previewWidth = previewMetadata.width || 1;
 				const [viewportWidth, viewportHeight] = r.viewportSize.split('×').map((value) => Number.parseInt(value, 10));
-				const previewHeight = Math.min(previewMetadata.height || 1, Math.max(1, viewportWidth && viewportHeight ? Math.round((previewWidth * viewportHeight) / viewportWidth) : Math.round(previewWidth / 0.38)));
+				const previewHeight = Math.min(
+					previewMetadata.height || 1,
+					Math.max(1, viewportWidth && viewportHeight ? Math.round((previewWidth * viewportHeight) / viewportWidth) : Math.round(previewWidth / 0.38)),
+				);
 				const scale = Math.min((width - 0.16) / Math.max(previewWidth, 1), (height - 0.46) / Math.max(previewHeight, 1));
 				const fittedWidth = previewWidth * scale;
 				const fittedHeight = previewHeight * scale;
@@ -180,7 +192,10 @@ export const writeSlideshow = async (file: string, results: readonly VisualResul
 						`${r.project} · ${r.viewport} · ${r.viewportSize}`,
 						r.groups || r.file,
 						`Status: ${r.status}${r.duration ? ` · ${r.duration} ms` : ''}${loadGrade ? ` · Load: ${loadGrade}` : ''}`,
-						...(r.loadMeasurements || []).map((measurement) => `Load ${measurement.kind}: ${measurement.name} — ${measurement.durationMs.toFixed(1)} ms (${measurement.grade}; warn ${measurement.budget.warnMs} / fail ${measurement.budget.failMs} ms)`),
+						...(r.loadMeasurements || []).map(
+							(measurement) =>
+								`Load ${measurement.kind}: ${measurement.name} — ${measurement.durationMs.toFixed(1)} ms (${measurement.grade}; warn ${measurement.budget.warnMs} / fail ${measurement.budget.failMs} ms)`,
+						),
 						'',
 						...cues.map((cue) => `• ${cue}`),
 						...(r.error ? ['', `Test error: ${r.error}`] : []),
@@ -217,18 +232,7 @@ export const writeSlideshow = async (file: string, results: readonly VisualResul
 							`${measurement.grade.toUpperCase().padEnd(7)} ${measurement.durationMs.toFixed(1).padStart(9)} ms  ${measurement.kind.padEnd(9)} ${r.file} · ${r.title} · ${measurement.name}  [warn ${measurement.budget.warnMs} / fail ${measurement.budget.failMs} ms]`,
 					)
 					.join('\n') || 'No load measurements were collected.',
-				{
-				color: COLOURS.ink,
-				fontFace: 'Aptos',
-				fontSize: 11,
-				fit: 'shrink',
-				margin: 0.08,
-				valign: 'mid',
-				x: 0.55,
-				y: 1.05,
-				w: 12.2,
-				h: 5.95,
-				},
+				{ color: COLOURS.ink, fontFace: 'Aptos', fontSize: 11, fit: 'shrink', margin: 0.08, valign: 'mid', x: 0.55, y: 1.05, w: 12.2, h: 5.95 },
 			);
 		}
 	}

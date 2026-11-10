@@ -169,10 +169,7 @@ export const withResponsivePlaywright = <T extends PlaywrightTestConfig>(cfg: T,
 	return {
 		...cfg,
 		metadata: { ...(cfg.metadata || {}), terraLoadTestingEnabled: loadTesting.enabled },
-		build: {
-			...(cfg.build || {}),
-			external: [...(cfg.build?.external || []), path.join(fs.existsSync(sharedDist) ? fs.realpathSync(sharedDist) : sharedDist, '**')],
-		},
+		build: { ...(cfg.build || {}), external: [...(cfg.build?.external || []), path.join(fs.existsSync(sharedDist) ? fs.realpathSync(sharedDist) : sharedDist, '**')] },
 		outputDir: opts.outputDir || 'test-results/playwright-output',
 		projects: projects.flatMap((p, i) => {
 			const baseName = p.name || `project-${i + 1}`;
@@ -191,8 +188,8 @@ export const withResponsivePlaywright = <T extends PlaywrightTestConfig>(cfg: T,
 		}),
 		reporter: [
 			...(cfg.reporter ? (Array.isArray(cfg.reporter) ? cfg.reporter : [cfg.reporter]) : []).filter((r) => {
-			const name = Array.isArray(r) ? r[0] : r;
-			return !(typeof name === 'string' && name.includes('@terra-symposium/standards-reporting/playwright'));
+				const name = Array.isArray(r) ? r[0] : r;
+				return !(typeof name === 'string' && name.includes('@terra-symposium/standards-reporting/playwright'));
 			}),
 			[
 				'@terra-symposium/standards-reporting/playwright',

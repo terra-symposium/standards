@@ -29,11 +29,9 @@ const LIGHT = '#E6F0E8';
 HELPERS
 //////////////////////////////////////////////////*/
 
-
 function git(args) {
 	return execFileSync('git', args, { cwd: report.repo, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }).trimEnd();
 }
-
 
 function hue() {
 	for (let attempt = 0; attempt < 100; attempt += 1) {
@@ -47,11 +45,9 @@ function hue() {
 	return (usedHues.at(-1) ?? 0) + 37;
 }
 
-
 function hex(value, lightness, chroma) {
 	return new Color('oklch', [lightness, chroma, value]).to('srgb').toString({ format: 'hex' });
 }
-
 
 function theme() {
 	const primaryHue = hue();
@@ -64,7 +60,6 @@ function theme() {
 		secondary: hex((primaryHue + 150) % 360, 0.56, 0.14),
 	};
 }
-
 
 function addText(slide, value, position, style = {}, name = 'text') {
 	const maxChars = style.maxChars ?? Math.floor(position.width / Math.max(7, (style.fontSize ?? 16) * 0.52));
@@ -88,27 +83,22 @@ function addText(slide, value, position, style = {}, name = 'text') {
 	return shape;
 }
 
-
 function rect(slide, position, fill, line = 'none', name = 'panel') {
 	return slide.shapes.add({ geometry: 'rect', name, position, fill, line: { style: 'solid', fill: line, width: line === 'none' ? 0 : 1 } });
 }
-
 
 function card(slide, position, colors, name, fill = colors.tone) {
 	return slide.shapes.add({ geometry: 'roundRect', name, position, fill, line: { style: 'solid', fill: colors.rule, width: 1 } });
 }
 
-
 function rule(slide, left, top, width, color, name) {
 	return rect(slide, { left, top, width, height: 1 }, color, 'none', name);
 }
-
 
 function notes(slide, lines) {
 	slide.speakerNotes.textFrame.setText(`[Sources]\n${lines.map((line) => `- ${line}`).join('\n')}`);
 	slide.speakerNotes.setVisible(true);
 }
-
 
 function wrapLines(value, maxChars) {
 	return String(value)
@@ -129,19 +119,16 @@ function wrapLines(value, maxChars) {
 		.join('\n');
 }
 
-
 function header(slide, title, page, colors) {
 	addText(slide, title, { left: 48, top: 42, width: 1136, height: 42 }, { fontSize: 30, color: colors.text, maxChars: 62 }, `title-${page}`);
 	addText(slide, String(page).padStart(2, '0'), { left: 1180, top: 44, width: 52, height: 20 }, { fontSize: 14, color: colors.muted, alignment: 'right', maxChars: 2 }, `page-${page}`);
 	rule(slide, 48, 108, 1184, colors.rule, `rule-${page}`);
 }
 
-
 function footer(slide, value, page, colors) {
 	rule(slide, 48, 674, 1184, colors.rule, `footer-rule-${page}`);
 	addText(slide, value, { left: 48, top: 682, width: 1160, height: 18 }, { fontSize: 12, color: colors.muted, maxChars: 165 }, `footer-${page}`);
 }
-
 
 function addCode(slide, codeInput, position, colors) {
 	const lines = git(['show', `${codeInput.sha}:${codeInput.path}`])
@@ -199,7 +186,6 @@ function addCode(slide, codeInput, position, colors) {
 	return `${codeInput.sha} · ${codeInput.path}:${codeInput.start}-${codeInput.end}`;
 }
 
-
 async function addScreenshot(slide, image, position, colors, page) {
 	card(slide, position, colors, `screenshot-frame-${page}`, colors.tone);
 	const bytes = await fs.readFile(image.path);
@@ -215,15 +201,12 @@ async function addScreenshot(slide, image, position, colors, page) {
 	return `${image.route} · ${image.path}`;
 }
 
-
-
 function planDay(date, plan) {
 	const start = new Date(`${plan.start}T00:00:00Z`).getTime();
 	const end = new Date(`${plan.end}T00:00:00Z`).getTime();
 	const value = new Date(`${date}T00:00:00Z`).getTime();
 	return Math.round(((value - start) / (end - start)) * 90);
 }
-
 
 function validPlan(plan, contributor, { requirePreviousObjective = true, allowUnknownProgress = false } = {}) {
 	if (!plan) return false;
@@ -247,7 +230,6 @@ function validPlan(plan, contributor, { requirePreviousObjective = true, allowUn
 	}
 	return true;
 }
-
 
 function assessBigFiveTimeline(plan, historyCommits) {
 	if (typeof plan?.source !== 'string' || !plan.source.trim() || !Array.isArray(plan.objectives) || plan.objectives.length !== 5)
@@ -299,7 +281,6 @@ function assessBigFiveTimeline(plan, historyCommits) {
 	};
 }
 
-
 function addContributorSummary(deck, section, goal, colors, page, sources) {
 	const slide = deck.slides.add();
 	slide.background.fill = colors.surface;
@@ -336,7 +317,6 @@ function addContributorSummary(deck, section, goal, colors, page, sources) {
 	footer(slide, `${section.commitCount} commits · ${identity.toLowerCase()} · branch evidence only`, page, colors);
 	notes(slide, [...sources, ...(goal ? [`${goal.source} · ${goal.status}`] : []), ...section.slides.flatMap((i) => i.sources ?? [])]);
 }
-
 
 async function main() {
 	if (git(['rev-parse', '--is-shallow-repository']) === 'true') throw new Error('A complete Big Five assessment requires full Git history; fetch or unshallow the authoritative refs first.');

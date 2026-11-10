@@ -231,11 +231,10 @@ export const loadGradeCounts = (measurements: readonly Pick<LoadMeasurement, 'gr
  */
 export const timeLoadOperation = async <T>(name: string, op: () => T | Promise<T>, rec: (measurement: LoadMeasurementInput) => void, budget?: LoadBudgetOverride): Promise<T> => {
 	if (!name.trim()) throw new Error('A named load measurement is required.');
-	const valid = budget ? validateLoadBudgetOverride(budget) : undefined;
-	const start = performance.now();
+	const timing = { budget: budget ? validateLoadBudgetOverride(budget) : undefined, startedAt: performance.now() };
 	try {
 		return await op();
 	} finally {
-		rec({ name, kind: 'operation', durationMs: performance.now() - start, ...(valid ? { budget: valid } : {}) });
+		rec({ name, kind: 'operation', durationMs: performance.now() - timing.startedAt, ...(timing.budget ? { budget: timing.budget } : {}) });
 	}
 };
