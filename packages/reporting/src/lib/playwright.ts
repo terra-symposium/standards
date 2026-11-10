@@ -204,16 +204,6 @@ export const parseDiagnostics = (raw: string): string[] => {
 const terminalText = (chunk: string | Buffer): string => stripAnsi(chunk.toString('utf8')).trim();
 
 /**
- * Identifies terminal output that should be retained as diagnostic evidence.
- *
- * @param val
- * @param valormalized terminal output.
- *
- * @return Whether the output contains a diagnostic keyword.
- */
-const isTerminalDiagnostic = (val: string): boolean => /\b(?:error|errors|failed|failure|exception|warning|warn|timeout|requestfailed|pageerror)\b/i.test(val);
-
-/**
  * Reads an inline or file-backed Playwright attachment.
  *
  * @param attachment Attachment metadata supplied by Playwright.
@@ -240,16 +230,6 @@ const diagnosticText = (attachments: readonly ReporterAttachment[], name: string
 	if (!raw) return [];
 	return parseDiagnostics(raw);
 };
-
-/**
- * Resolves the path of a captured screenshot attachment.
- *
- * @param attachments Attachments emitted for one test result.
- *
- * @return Screenshot path, or an empty string when no screenshot exists.
- */
-const screenshotAttachment = (attachments: readonly ReporterAttachment[]): ReporterAttachment | undefined =>
-	attachments.find((v) => ['visual', 'screenshot'].includes(v.name || '') && v.contentType === 'image/png');
 
 /**
  * Reads timing samples and a test override from the fixture attachment.
@@ -352,24 +332,6 @@ const testTitleParts = (test: { location: { file: string }; title: string; title
 };
 
 /**
- * Generates a stable filename for a copied screenshot.
- *
- * @param result Result whose identity contributes to the filename.
- * @param idx
- * @param idxesult position used to keep duplicate names distinct.
- *
- * @return A filesystem-safe screenshot filename.
- */
-const screenshotName = (result: VisualResult, idx: number): string => {
-	return `${String(idx + 1).padStart(4, '0')}-${
-		`${result.project}-${result.file}-${result.title}-${result.viewport}`
-			.replace(/[^a-z0-9_-]+/gi, '-')
-			.replace(/^-+|-+$/g, '')
-			.toLowerCase() || 'screenshot'
-	}.png`;
-};
-
-/**
  * Copies captured screenshots into the timestamped run directory.
  *
  * @param results Results whose screenshot paths should be relocated.
@@ -383,7 +345,15 @@ const copyScreenshots = (results: readonly VisualResult[], runDir: string): Visu
 	fs.mkdirSync(imgs, { recursive: true });
 	return results.map((r, i) => {
 		if (!r.screenshot || !fs.existsSync(r.screenshot)) return r;
-		const dest = path.join(imgs, screenshotName(r, i));
+		const dest = path.join(
+			imgs,
+			`${String(i + 1).padStart(4, '0')}-${
+				`${r.project}-${r.file}-${r.title}-${r.viewport}`
+					.replace(/[^a-z0-9_-]+/gi, '-')
+					.replace(/^-+|-+$/g, '')
+					.toLowerCase() || 'screenshot'
+			}.png`,
+		);
 		fs.copyFileSync(r.screenshot, dest);
 		return { ...r, screenshot: dest };
 	});
@@ -588,7 +558,7 @@ export default class ProgressReporter {
 	 */
 	onStdOut(chunk: string | Buffer, test?: object, result?: object): void {
 		const val = terminalText(chunk);
-		if (!val || !isTerminalDiagnostic(val)) return;
+		if (!val || !/\b(?:error|errors|failed|failure|exception|warning|warn|timeout|requestfailed|pageerror)\b/i.test(val)) return;
 		if (!test || !result) {
 			this.runDiagnostics.push(val);
 			return;
@@ -617,7 +587,7 @@ export default class ProgressReporter {
 	 */
 	onTestEnd(test: import('@playwright/test/reporter').TestCase, result: import('@playwright/test/reporter').TestResult): void {
 		this.completedTests.add(test.id);
-		const attachment = screenshotAttachment(result.attachments);
+		const attachment = result.attachments.find((v) => ['visual', 'screenshot'].includes(v.name || '') && v.contentType === 'image/png');
 		let screenshot = attachment?.path || '';
 		if (!screenshot && attachment?.body) {
 			screenshot = path.resolve(`test-results/playwright-output/${test.id.replace(/[^a-z0-9_-]/gi, '-')}-screenshot.png`);

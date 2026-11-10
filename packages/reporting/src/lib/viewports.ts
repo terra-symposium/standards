@@ -179,14 +179,12 @@ export const withResponsivePlaywright = <T extends PlaywrightTestConfig>(cfg: T,
 			use: { ...(p.use || {}), viewport: { width: v.width, height: v.height }, screenshot: { mode: 'on', fullPage: true, caret: 'initial' } },
 		}));
 	});
-	const cfgdReporters = cfg.reporter ? (Array.isArray(cfg.reporter) ? cfg.reporter : [cfg.reporter]) : [];
-	const reportingOpts = { outputRoot: opts.outputRoot, supplementalResultsFile: opts.supplementalResultsFile, qualityConfigFile: opts.qualityConfigFile, loadTesting };
 	const reporters = [
-		...cfgdReporters.filter((r) => {
+		...(cfg.reporter ? (Array.isArray(cfg.reporter) ? cfg.reporter : [cfg.reporter]) : []).filter((r) => {
 			const name = Array.isArray(r) ? r[0] : r;
 			return !(typeof name === 'string' && name.includes('@terra-symposium/standards-reporting/playwright'));
 		}),
-		['@terra-symposium/standards-reporting/playwright', reportingOpts],
+		['@terra-symposium/standards-reporting/playwright', { outputRoot: opts.outputRoot, supplementalResultsFile: opts.supplementalResultsFile, qualityConfigFile: opts.qualityConfigFile, loadTesting }],
 	];
 	return {
 		...cfg,
