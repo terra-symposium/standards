@@ -13,12 +13,12 @@ The workflow at .github/workflows/publish-packages.yml is the single Terra publi
 
 The workflow gets Docs source from Terra-Symposium/docs at an explicit 40-character commit SHA. It validates the SHA format, checks out that exact revision, installs from the repository's config lockfile, builds the package, and verifies the package name before publishing. The Standards packages are built from the checked out Standards revision.
 
-The secret exists in the Standards repository, but its name alone does not prove npm grants write access to every package. The token must have publish access to all five package names. If a publish returns 403 or 404, keep the workflow and credential centralized; resolve the npm token's scope for that package rather than adding another publisher. Do not paste or expose the token to diagnose it.
+One GitHub secret name does not prove that its stored value is the current npm credential. The credential must have publish access to all five package names. If npm shows the required access but publishing still returns 403 or 404, compare the npm token's creation or rotation date with the PACKAGES_TOKEN last-updated date. GitHub cannot reveal a saved secret value. Replace the value of this existing secret with the intended token; do not add another secret, token, or publisher connection. Keep the token only in the Standards repository secret.
 
 ## Release a package
 
 1. Update the package version and release notes in its source repository, then merge the reviewed change.
-2. For Docs, identify the full 40-character commit SHA to publish. Open the Standards repository's Actions tab and run **Publish shared packages** with that SHA. The default SHA is a known Docs revision; replace it with the reviewed release revision when needed.
+2. For Docs, identify the full 40-character commit SHA to publish. Open the Standards repository's Actions tab and run Publish shared packages with that SHA. The default SHA is a known Docs revision; replace it with the reviewed release revision when needed.
 3. Confirm each expected package and version in the workflow output. The workflow skips a version that npm already has.
 4. Verify the published version on npm, then update consumers and lockfiles.
 
@@ -26,16 +26,14 @@ The workflow does not accept a repository URL or arbitrary package name. This ke
 
 ## Trusted publishers and OIDC
 
-npm trusted publishing uses GitHub OIDC instead of a token, but each trusted-publisher configuration is package-specific. It cannot serve as one publisher for every Terra package. Terra uses the central Standards workflow and its one repository secret for this reason.
-
-An OIDC exchange 404 such as package not found indicates npm did not match the package and publisher configuration. Do not create another per-package connection as a workaround; use the shared publisher described above.
+npm trusted publishing uses GitHub OIDC instead of a token, but each trusted-publisher configuration is package-specific. It cannot serve as one publisher for every Terra package. Terra uses the central Standards workflow and its one repository secret for this reason. An OIDC exchange 404 such as package not found indicates npm did not match the package and publisher configuration. Do not create another per-package connection as a workaround; use the shared publisher described above.
 
 ## Troubleshooting
 
 | Symptom | Check |
 | --- | --- |
 | ENEEDAUTH | Confirm the central workflow references PACKAGES_TOKEN and that the Actions secret remains configured. |
-| Publish returns 403/404 | The token may lack write access to that package. Resolve access for the central token; do not create a second publisher. |
+| Publish returns 403/404 | Check token write access and compare its creation or rotation date with the existing PACKAGES_TOKEN last-updated date. If they differ, replace that secret's value with the intended token. Do not create another publisher. |
 | Version already exists | Verify that version on npm. Release a new version if further changes are needed. |
 | Docs checkout fails | Supply a valid full 40-character commit SHA from Terra-Symposium/docs. |
 | Docs build fails | Check the selected revision and the repository's config lockfile and build workflow. |
