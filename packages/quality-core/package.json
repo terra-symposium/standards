@@ -1,0 +1,40 @@
+{
+  "name": "@terra-symposium/standards-quality-core",
+  "version": "0.2.0",
+  "description": "Shared source-scope and analysis utilities for Terra quality capabilities.",
+  "type": "module",
+  "engines": {
+    "node": ">=18.18"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org",
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Terra-Symposium/standards.git"
+  },
+  "scripts": {
+    "build": "tsc -p config/tsconfig.json",
+    "test": "npm run build && node --test",
+    "prepare": "npm run build"
+  },
+  "dependencies": {
+    "typescript": "^5.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.5"
+  }
+}

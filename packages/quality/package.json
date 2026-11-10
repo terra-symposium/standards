@@ -1,6 +1,6 @@
 {
   "name": "@terra-symposium/standards-quality",
-  "version": "2.1.3",
+  "version": "2.2.0",
   "description": "Configurable quality checks and maintenance tooling for software repositories",
   "homepage": "https://standards-docs.netlify.app/",
   "type": "module",
@@ -29,7 +29,15 @@
     "./naming": "./dist/lib/naming.js",
     "./object-forwarding": "./dist/lib/object-forwarding.js",
     "./single-use": "./dist/lib/single-use.js",
-    "./port": "./dist/lib/port.js"
+    "./port": "./dist/lib/port.js",
+    "./documentation": "./dist/lib/documentation.js",
+    "./formatting": "./dist/lib/formatting.js",
+    "./imports": "./dist/lib/imports.js",
+    "./patterns": "./dist/lib/patterns.js",
+    "./security": "./dist/lib/security.js",
+    "./ui-quality": "./dist/lib/ui-quality.js",
+    "./language-checks": "./dist/lib/language-checks.js",
+    "./reports": "./dist/lib/reports.js"
   },
   "files": [
     "dist",
@@ -43,7 +51,18 @@
   },
   "dependencies": {
     "@terra-symposium/standards-error-boundaries": "^0.1.2",
-    "typescript": "^5.0.0"
+    "typescript": "^5.0.0",
+    "@terra-symposium/standards-quality-core": "workspace:*",
+    "@terra-symposium/standards-documentation": "workspace:*",
+    "@terra-symposium/standards-formatting": "workspace:*",
+    "@terra-symposium/standards-imports": "workspace:*",
+    "@terra-symposium/standards-naming": "workspace:*",
+    "@terra-symposium/standards-refactoring": "workspace:*",
+    "@terra-symposium/standards-security": "workspace:*",
+    "@terra-symposium/standards-ui-quality": "workspace:*",
+    "@terra-symposium/standards-patterns": "workspace:*",
+    "@terra-symposium/standards-language-checks": "workspace:*",
+    "@terra-symposium/standards-quality-reports": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^26.6.5",

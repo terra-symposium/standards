@@ -25,6 +25,7 @@
 			"project": ["src/**/*.mjs"]
 		},
 		"packages/quality": {
+			"ignoreDependencies": ["eslint"],
 			"entry": [
 				"src/index.ts",
 				"src/lib/runner.ts",
@@ -32,10 +33,18 @@
 				"src/app/workspace-test-runner.ts",
 				"src/lib/error-boundaries-astro.ts",
 				"src/lib/error-boundaries-react.ts",
+				"src/lib/documentation.ts",
+				"src/lib/formatting.ts",
+				"src/lib/imports.ts",
+				"src/lib/language-checks.ts",
 				"src/lib/naming.ts",
 				"src/lib/object-forwarding.ts",
+				"src/lib/patterns.ts",
+				"src/lib/reports.ts",
+				"src/lib/security.ts",
 				"src/lib/single-use.ts",
 				"src/lib/port.ts",
+				"src/lib/ui-quality.ts",
 				"test/**/*.test.mjs"
 			],
 			"project": ["src/**/*.ts", "test/**/*.mjs"]
@@ -48,6 +57,50 @@
 		"apps/hygiene": {
 			"entry": ["src/pages/index.astro", "config/**/*.mjs", "netlify/functions/*.mts", "scripts/*.ts", "test/*.test.ts"],
 			"project": ["src/**/*.ts", "src/**/*.tsx", "config/**/*.mjs", "netlify/functions/**/*.mts", "scripts/**/*.ts", "test/**/*.ts"]
+		},
+		"packages/quality-core": {
+			"entry": ["src/index.ts", "test/**/*.test.mjs"],
+			"project": ["src/**/*.ts", "test/**/*.mjs"]
+		},
+		"packages/documentation": {
+			"entry": ["src/index.ts", "src/cli.ts", "test/**/*.test.mjs"],
+			"project": ["src/**/*.ts", "test/**/*.mjs"]
+		},
+		"packages/formatting": {
+			"entry": ["src/index.ts", "src/cli.ts", "test/**/*.test.mjs"],
+			"project": ["src/**/*.ts", "test/**/*.mjs"]
+		},
+		"packages/imports": {
+			"entry": ["src/index.ts", "src/cli.ts", "test/**/*.test.mjs"],
+			"project": ["src/**/*.ts", "test/**/*.mjs"]
+		},
+		"packages/naming": {
+			"entry": ["src/index.ts", "src/cli.ts", "test/**/*.test.mjs"],
+			"project": ["src/**/*.ts", "test/**/*.mjs"]
+		},
+		"packages/refactoring": {
+			"entry": ["src/index.ts", "src/cli.ts", "test/**/*.test.mjs"],
+			"project": ["src/**/*.ts", "test/**/*.mjs"]
+		},
+		"packages/security": {
+			"entry": ["src/index.ts", "src/cli.ts", "test/**/*.test.mjs"],
+			"project": ["src/**/*.ts", "test/**/*.mjs"]
+		},
+		"packages/ui-quality": {
+			"entry": ["src/index.ts", "src/cli.ts", "test/**/*.test.mjs"],
+			"project": ["src/**/*.ts", "test/**/*.mjs"]
+		},
+		"packages/patterns": {
+			"entry": ["src/index.ts", "src/cli.ts", "test/**/*.test.mjs"],
+			"project": ["src/**/*.ts", "test/**/*.mjs"]
+		},
+		"packages/language-checks": {
+			"entry": ["src/index.ts", "src/cli.ts", "test/**/*.test.mjs"],
+			"project": ["src/**/*.ts", "test/**/*.mjs"]
+		},
+		"packages/quality-reports": {
+			"entry": ["src/index.ts", "src/cli.ts", "test/**/*.test.mjs"],
+			"project": ["src/**/*.ts", "test/**/*.mjs"]
 		}
 	}
 }

@@ -195,3 +195,26 @@ Not applicable.
 ## Credits and license
 
 Not applicable.
+
+
+## Capability packages
+
+The aggregate `@terra-symposium/standards-quality` package remains the compatibility CLI and full workflow. The check implementations are also published by capability family, so consumers can import a focused API or run a focused CLI without installing the aggregate package. All capability CLIs use the repository's existing `quality.json` (or `config/quality.json`), source roots, changed-file default, `--all`, and read-only `--warn` behavior.
+
+| Package | CLI | Capability |
+| --- | --- | --- |
+| `@terra-symposium/standards-quality-core` | API only | Shared config, source scope, analysis context, and CLI contracts |
+| `@terra-symposium/standards-documentation` | `terra-documentation` | TSDoc/JSDoc, C Doxygen, empty scaffolding, documented commands |
+| `@terra-symposium/standards-formatting` | `terra-formatting` | Source layout, safe transforms, and Prettier integration |
+| `@terra-symposium/standards-imports` | `terra-imports` | Import resolution and duplicate imports |
+| `@terra-symposium/standards-naming` | `terra-naming` | Identifier and alias naming checks |
+| `@terra-symposium/standards-refactoring` | `terra-refactoring` | Forwarding and single-use/dead-code analysis |
+| `@terra-symposium/standards-security` | `terra-security` | Built-in security findings |
+| `@terra-symposium/standards-ui-quality` | `terra-ui-quality` | Accessibility, display names, boundaries, UI recommendations |
+| `@terra-symposium/standards-patterns` | `terra-patterns` | Performance, repeated classes, Tailwind, regex, UI patterns |
+| `@terra-symposium/standards-language-checks` | `terra-language-checks` | C, Java, and Python profiles and tool detection |
+| `@terra-symposium/standards-quality-reports` | `terra-quality-reports` | GitHub/history reports and test reporters |
+
+Each capability package root exports its API and TypeScript declarations; its `./cli` subpath exposes the command entry point. The aggregate package keeps the existing `terra-quality` and `terra-quality-dev` bins and legacy subpath imports as compatibility facades. Use the aggregate for the ordered Format → Static quality → Tests → Framework/type checks → Build → Repository health workflow, configured commands, progress, and combined reports.
+
+The capability packages are grouped by reusable areas of behavior rather than by individual rules. This keeps the public dependency graph useful without requiring a separate release for every check. Changesets records the new packages and aggregate compatibility release together.

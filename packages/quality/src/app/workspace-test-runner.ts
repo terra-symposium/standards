@@ -10,8 +10,8 @@ IMPORTS
 // API
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { qualityNodeReporterOptions } from '../lib/node-reporter.js';
-import { qualityProgress } from '../lib/progress.js';
+import { qualityNodeReporterOptions } from '@terra-symposium/standards-quality-reports';
+import { qualityProgress } from '@terra-symposium/standards-quality-core';
 import { spawnSync } from 'node:child_process';
 
 /*//////////////////////////////////////////////////

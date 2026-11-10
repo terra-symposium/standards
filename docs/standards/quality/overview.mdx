@@ -593,3 +593,23 @@ Items use `name`, `command`, and optional `args`; changes they make follow the c
 ```
 
 The command output is shown and a nonzero status fails the quality run.
+
+
+## Capability packages
+
+Terra Quality is available as an aggregate workflow and as focused capability packages. The aggregate `@terra-symposium/standards-quality` remains the stable CLI and compatibility layer; the capability packages expose their own APIs and commands for consumers that only need one family of checks. They all read the same `quality.json` or `config/quality.json` and share changed-file defaults, `--all`, and read-only `--warn` semantics.
+
+| Package | Command | Scope |
+| --- | --- | --- |
+| `@terra-symposium/standards-documentation` | `terra-documentation` | TSDoc/JSDoc, Doxygen, empty scaffolds, documented commands |
+| `@terra-symposium/standards-formatting` | `terra-formatting` | Source layout, safe transforms, Prettier |
+| `@terra-symposium/standards-imports` | `terra-imports` | Import resolution and duplicate imports |
+| `@terra-symposium/standards-naming` | `terra-naming` | Naming and alias checks |
+| `@terra-symposium/standards-refactoring` | `terra-refactoring` | Forwarding and single-use/dead-code analysis |
+| `@terra-symposium/standards-security` | `terra-security` | Source security findings |
+| `@terra-symposium/standards-ui-quality` | `terra-ui-quality` | Accessibility, display names, boundaries, UI recommendations |
+| `@terra-symposium/standards-patterns` | `terra-patterns` | Performance, repeated classes, Tailwind, regex, UI patterns |
+| `@terra-symposium/standards-language-checks` | `terra-language-checks` | C, Java, and Python profiles |
+| `@terra-symposium/standards-quality-reports` | `terra-quality-reports` | GitHub/history and test-runner reports |
+
+The API-only `@terra-symposium/standards-quality-core` supplies shared config and source-scope contracts. Install the aggregate when you need ordered phases, repository-command orchestration, progress, or combined reports. Package family boundaries keep each public surface reusable while avoiding a package per individual rule.

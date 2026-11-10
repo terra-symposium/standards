@@ -1,0 +1,48 @@
+{
+  "name": "@terra-symposium/standards-refactoring",
+  "version": "0.2.0",
+  "description": "Safe source refactoring and single-use analysis.",
+  "type": "module",
+  "engines": {
+    "node": ">=18.18"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./cli": {
+      "types": "./dist/cli.d.ts",
+      "import": "./dist/cli.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org",
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Terra-Symposium/standards.git"
+  },
+  "scripts": {
+    "build": "tsc -p config/tsconfig.json",
+    "test": "npm run build && node --test",
+    "prepare": "npm run build"
+  },
+  "dependencies": {
+    "@terra-symposium/standards-quality-core": "workspace:*",
+    "typescript": "^5.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.5"
+  },
+  "bin": {
+    "terra-refactoring": "dist/cli.js"
+  }
+}

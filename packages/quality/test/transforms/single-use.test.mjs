@@ -882,3 +882,60 @@ void built;
 	const parsed = ts.createSourceFile('main.tsx', updated, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
 	assert.equal(parsed.parseDiagnostics.length, 0);
 });
+test('single-use inline markers suppress only a reasoned review boundary and keep autofix from rewriting it', () => {
+	const root = fixtureRoot('terra-quality-single-use-inline-ignore-');
+	const original = `function keepBoundary() { return 'ready'; } // terra-quality-ignore single-use -- The named boundary preserves a stable stack frame for the caller.\nexport const result = keepBoundary();\n`;
+	fixtureFile(root, 'src/main.ts', original);
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
+	assert.deepEqual(singleUseFindings(cfg), []);
+	assert.equal(fixSingleUseDeclarations(cfg), 0);
+	assert.equal(fixtureText(root, 'src/main.ts'), original);
+});
+test('single-use inline markers remain discoverable after template literals', () => {
+	const root = fixtureRoot('terra-quality-single-use-inline-ignore-template-');
+	const original = `const route = \`/resource/${'${id}'}\`;\nfunction keepBoundary() { return route; } // terra-quality-ignore single-use -- Preserve the named boundary after the preceding template expression.\nexport const result = keepBoundary();\n`;
+	fixtureFile(root, 'src/main.ts', original);
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
+	assert.deepEqual(
+		singleUseFindings(cfg).map(({ name: n }) => n),
+		['route'],
+	);
+	assert.equal(fixSingleUseDeclarations(cfg), 0);
+	assert.equal(fixtureText(root, 'src/main.ts'), original);
+});
+test('single-use inline markers are reported when malformed, unattached, or stale', () => {
+	const root = fixtureRoot('terra-quality-single-use-inline-ignore-stale-');
+	fixtureFile(
+		root,
+		'src/main.ts',
+		`function malformed() { return 1; } // terra-quality-ignore single-use --\nexport const malformedResult = malformed();\n// terra-quality-ignore single-use -- This marker is detached from the declaration.\nfunction detached() { return 2; }\nexport const first = detached();\nfunction stale() { return 3; } // terra-quality-ignore single-use -- This declaration now has multiple consumers.\nexport const third = stale();\nexport const fourth = stale();\n`,
+	);
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
+	const findings = singleUseFindings(cfg);
+	const directiveFindings = findings.filter((f) => f.name === 'single-use-ignore');
+	assert.equal(directiveFindings.length, 3);
+	assert.ok(directiveFindings.some((f) => f.reason.includes('non-empty reason')));
+	assert.equal(directiveFindings.filter((f) => f.reason.includes('stale')).length, 2);
+	assert.ok(
+		findings.some((f) => f.name === 'malformed'),
+		'malformed markers do not hide the candidate',
+	);
+	assert.ok(
+		findings.some((f) => f.name === 'detached'),
+		'detached markers do not hide the candidate',
+	);
+});
+test('malformed inline markers do not block safe inlining and are removed with the declaration', () => {
+	const root = fixtureRoot('terra-quality-single-use-malformed-inline-');
+	const original = `const safe = 3; // terra-quality-ignore single-use --\nexport const result = safe;\n`;
+	fixtureFile(root, 'src/main.ts', original);
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
+	const initial = singleUseFindings(cfg);
+	assert.ok(initial.some((f) => f.name === 'single-use-ignore'));
+	assert.ok(initial.some((f) => f.name === 'safe' && f.decision === 'INLINE'));
+	assert.equal(fixSingleUseDeclarations(cfg), 1);
+	const updated = fixtureText(root, 'src/main.ts');
+	assert.doesNotMatch(updated, /terra-quality-ignore/);
+	assert.match(updated, /export const result = \(?3\)?/);
+	assert.deepEqual(singleUseFindings(cfg), []);
+});
