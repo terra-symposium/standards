@@ -9,7 +9,7 @@ Trigger: **Read and follow the Terra Standards Quality skill for `<owner/reposit
 
 ## Coordinator mode
 
-Create one Codex Cloud chat per repository through Codex app task controls. Before each dispatch or resume, check the connected account's remaining usage and confirm the repository, Cloud environment, branch, and model. Stop if the allowance or repository access is unavailable. Never substitute a local task for Cloud.
+Create one Codex Cloud chat per repository through Codex app task controls. Give each chat the persistent goal of completing the quality skill with `pnpm run quality:all` exiting 0; keep the goal active through red runs, repair passes, and context compactions. Before each dispatch or resume, check the connected account's remaining usage and confirm the repository, Cloud environment, branch, and model. Stop if the allowance or repository access is unavailable. Never substitute a local task for Cloud.
 
 Track each task independently until its exact gate exits 0. A nonzero result from repository findings is work in progress, not a final result; continue through repair passes and context compactions. A repository on hold or explicitly skipped is not a green result.
 
