@@ -43,7 +43,7 @@ This example uses built-in checks without enabling external tools:
 }
 ```
 
-Install and configure a tool before enabling the check that invokes it. For example, linting requires an ESLint flat config at `root` or under `configRoot`. Build, test, and other repository commands are opt-in through `qualityCommands`.
+Install and configure a tool before enabling the check that invokes it. For example, linting requires an ESLint flat config at `root` or under `configRoot`. Keep builds and functional tests in separate scripts and CI steps; `qualityCommands` is for static and hygiene checks.
 
 ## Paths and source discovery
 
@@ -232,19 +232,16 @@ Tool names are resolved from `<root>/node_modules/.bin` first, then from the env
 
 ## Repository commands
 
-`qualityCommands` contains required subprocesses, commonly build and test commands. Each entry requires a unique lowercase `name` and a `command`; `args` is an optional array of strings. Terra Quality assigns commands to its fixed full-run phases and test groups, then preserves configured order within each phase or group; configuration does not define ordering or category fields.
+`qualityCommands` contains repository-owned static or hygiene checks that are not covered by a built-in check. Never put a build, unit test, integration test, contract test, browser test, Playwright test, or example execution here, directly or through a wrapper. Keep `build` and `test` as separate scripts and CI workflow steps so their results are independently actionable. Each command entry requires a unique lowercase `name` and a `command`; `args` is an optional array of strings. Terra Quality assigns static commands to its fixed full-run phases and preserves configured order within each phase; configuration does not define ordering or category fields.
 
 ```json
 {
-	"qualityCommands": [
-		{ "name": "build", "command": "pnpm", "args": ["run", "build"] },
-		{ "name": "test", "command": "pnpm", "args": ["run", "test"] }
-	],
-	"enabledCommands": { "test": true }
+	"qualityCommands": [{ "name": "c-doc-params", "command": "make", "args": ["check-doc-params"] }],
+	"enabledCommands": { "c-doc-params": true }
 }
 ```
 
-Use `enabledCommands` to toggle one configured command. Set `enabledChecks.command` to `false` to disable the category or pass `--skip-commands` for one run.
+Use `enabledCommands` to toggle one configured static command. Set `enabledChecks.command` to `false` to disable the category or pass `--skip-commands` for one run.
 
 `recommendationCommands` uses the same entry shape. Use `enabledRecommendations` to toggle a command or `enabledChecks.recommend` to disable all recommendation commands. A nonzero subprocess status fails the quality run. Pass `--skip-recommendations` to omit these commands once.
 

@@ -57,24 +57,9 @@ const reportProgress = (label: string, idx: number, total: number): void => {
 	if (idx === 0 || idx === total || idx % Math.max(1, Math.ceil(total / 20)) === 0) qualityProgress(label, idx, total);
 };
 /** A single-consumer source issue and the safety recommendation for handling it. */
-export type SingleUseFinding = {
-	file: string;
-	line: number;
-	name: string;
-	decision: 'INLINE' | 'REVIEW';
-	autofixable: boolean;
-	reason: string;
-	agentAction: string;
-};
+export type SingleUseFinding = { file: string; line: number; name: string; decision: 'INLINE' | 'REVIEW'; autofixable: boolean; reason: string; agentAction: string };
 /** A declaration eligible for consumer counting and possible inlining. */
-type Candidate = {
-	file: string;
-	source: ts.SourceFile;
-	statement: ts.Statement;
-	name: ts.Identifier;
-	symbol: ts.Symbol;
-	kind: 'type' | 'interface' | 'variable' | 'function';
-};
+type Candidate = { file: string; source: ts.SourceFile; statement: ts.Statement; name: ts.Identifier; symbol: ts.Symbol; kind: 'type' | 'interface' | 'variable' | 'function' };
 /**
  * Detects authored TSDoc that the single-use fixer must preserve for agent review.
  *
@@ -396,10 +381,7 @@ function typeReferences(candidate: Candidate, references: Map<ts.Symbol, Referen
  * @return Source-and-name keys for declarations referenced from Astro files.
  */
 function astroConsumersFor(cfg: QualityCfg, program: ts.Program): Set<string> {
-	const astroFiles = srcFiles({
-		...cfg,
-		extensions: [...new Set([...cfg.extensions, '.astro'])],
-	}).filter((path) => path.endsWith('.astro'));
+	const astroFiles = srcFiles({ ...cfg, extensions: [...new Set([...cfg.extensions, '.astro'])] }).filter((path) => path.endsWith('.astro'));
 	const signature = astroFiles
 		.map((f) => {
 			const stats = statSync(f);
@@ -501,13 +483,7 @@ function isPackageEntryExport(cfg: QualityCfg, candidate: Candidate, checker: ts
 		const manifestPath = join(dir, 'package.json');
 		if (!statSync(manifestPath, { throwIfNoEntry: false })?.isFile()) continue;
 		try {
-			const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as {
-				exports?: unknown;
-				main?: string;
-				module?: string;
-				types?: string;
-				typings?: string;
-			};
+			const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as { exports?: unknown; main?: string; module?: string; types?: string; typings?: string };
 			const tgts: string[] = [];
 			const pending: unknown[] = [manifest.exports];
 			while (pending.length) {
@@ -601,6 +577,34 @@ function hasImportedTypeAnnotation(candidate: Candidate, checker: ts.TypeChecker
 		inspect(d.type);
 		return imported;
 	});
+}
+
+/**
+ * Detects explicit annotations that can change overload or generic call resolution.
+ *
+ * @param candidate Variable candidate whose annotation may affect its consumer.
+ * @param checker TypeScript checker used to inspect call signatures.
+ * @param reference Sole consumer that would receive the initializer.
+ *
+ * @return Whether replacing the annotated reference could select a different signature.
+ */
+function hasCallSensitiveTypeAnnotation(candidate: Candidate, checker: ts.TypeChecker, reference: Reference): boolean {
+	if (candidate.kind !== 'variable' || !ts.isVariableDeclaration(candidate.name.parent) || !candidate.name.parent.type) return false;
+	let value: ts.Expression = reference.node;
+	while (
+		ts.isParenthesizedExpression(value.parent) ||
+		ts.isAsExpression(value.parent) ||
+		ts.isTypeAssertionExpression(value.parent) ||
+		ts.isNonNullExpression(value.parent) ||
+		ts.isSatisfiesExpression(value.parent)
+	) {
+		value = value.parent;
+	}
+	const parent = value.parent;
+	const call = (ts.isCallExpression(parent) && parent.arguments.includes(value)) || (ts.isNewExpression(parent) && parent.arguments?.includes(value)) ? parent : undefined;
+	if (!call) return false;
+	const signatures = checker.getSignaturesOfType(checker.getTypeAtLocation(call.expression), ts.SignatureKind.Call);
+	return signatures.length > 1 || signatures.some((signature) => Boolean(signature.typeParameters?.length));
 }
 
 /**
@@ -1277,6 +1281,7 @@ function findingsFromAnalysis(
 		else if (c.kind === 'variable' && (ts.isJsxOpeningElement(use.node.parent) || ts.isJsxSelfClosingElement(use.node.parent)))
 			[canInline, reason] = [false, 'this is a standalone JSX component; keep its component identity and declaration boundary, or export it from its definition if it is a module-level component'];
 		else if (hasImportedTypeAnnotation(c, checker)) [canInline, reason] = [false, 'inlining would remove a required imported type annotation'];
+		else if (hasCallSensitiveTypeAnnotation(c, checker, use)) [canInline, reason] = [false, 'inlining could change overload or generic call resolution'];
 		if (hasMeaningfulLeadingTSDoc(c)) {
 			canInline = false;
 			reason = 'attached TSDoc is authored documentation and requires agent review before changing its declaration boundary';
@@ -1426,10 +1431,7 @@ export function deadCodeEditsIntroduceTypeErrors(program: ts.Program, updates: M
 	qualityProgress('TypeScript validation', 0, total);
 	const opts = program.getCompilerOptions();
 	const host = ts.createCompilerHost(opts);
-	const originalHostMethods = {
-		getSourceFile: host.getSourceFile.bind(host),
-		fileExists: host.fileExists.bind(host),
-	};
+	const originalHostMethods = { getSourceFile: host.getSourceFile.bind(host), fileExists: host.fileExists.bind(host) };
 	const originalDiagnostics: ts.Diagnostic[] = [];
 	for (const [fileIndex, file] of files.entries()) {
 		const sourceFile = program.getSourceFile(file);
@@ -1457,11 +1459,7 @@ export function deadCodeEditsIntroduceTypeErrors(program: ts.Program, updates: M
 	};
 	host.readFile = (fileName) => virtualFiles.get(fileName) ?? ts.sys.readFile(fileName);
 	host.fileExists = (fileName) => virtualFiles.has(fileName) || originalHostMethods.fileExists(fileName);
-	const updatedProgram = ts.createProgram({
-		rootNames: program.getRootFileNames(),
-		options: opts,
-		host,
-	});
+	const updatedProgram = ts.createProgram({ rootNames: program.getRootFileNames(), options: opts, host });
 	/**
 	 * Creates a stable comparison key for one TypeScript diagnostic.
 	 *
@@ -1516,13 +1514,7 @@ export function fixSingleUseDeclarations(cfg: QualityCfg, changedFileNames?: Set
 		const astroConsumers = astroConsumersFor(cfg, program);
 		const { byCandidate: directivesByCandidate } = singleUseIgnoreDirectives(cfg, program.getSourceFiles(), candidates);
 		const edits = new Map<string, { start: number; end: number; text: string }[]>();
-		const pending: {
-			fileEdits: { file: string; start: number; end: number; text: string }[];
-			referenceLength: number;
-			nestedReference: boolean;
-			candidateKey: string;
-			jsxFile?: string;
-		}[] = [];
+		const pending: { fileEdits: { file: string; start: number; end: number; text: string }[]; referenceLength: number; nestedReference: boolean; candidateKey: string; jsxFile?: string }[] = [];
 		for (const c of candidates) {
 			if (hasGeneratedSourceHeader(c.source.text)) continue;
 			if (hasAstroConsumer(c, astroConsumers) || isCfgdPublicContract(cfg, c, checker) || isPackageEntryExport(cfg, c, checker, program)) continue;
@@ -1544,7 +1536,7 @@ export function fixSingleUseDeclarations(cfg: QualityCfg, changedFileNames?: Set
 			if (c.kind === 'variable' && !initSafeToInline(c, checker, ref)) continue;
 			if (c.kind === 'variable' && isStateRestorationReference(ref)) continue;
 			if (c.kind === 'variable' && isWriteReference(ref)) continue;
-			if (hasImportedTypeAnnotation(c, checker)) continue;
+			if (hasImportedTypeAnnotation(c, checker) || hasCallSensitiveTypeAnnotation(c, checker, ref)) continue;
 			const replacement = (() => {
 				const typeReference = referenceTgt(ref.node);
 				if ((ts.isTypeAliasDeclaration(c.statement) || ts.isInterfaceDeclaration(c.statement)) && ts.isTypeReferenceNode(typeReference)) {
@@ -1600,11 +1592,7 @@ export function fixSingleUseDeclarations(cfg: QualityCfg, changedFileNames?: Set
 					const val = c.source.text.slice(r.pos, r.end);
 					return !(S_REGEX.test(c.source.text.slice(0, r.pos)) && S_S_W_CM_JT_SX_B_REGEX.test(val)) && !/^\/\*\/{10,}/.test(val) && !/^\/\/\s*[A-Z][A-Z _-]*\s*$/.test(val);
 				})
-				.map((r) => ({
-					start: r.pos,
-					end: r.end,
-					text: c.source.text.slice(r.pos, r.end),
-				}));
+				.map((r) => ({ start: r.pos, end: r.end, text: c.source.text.slice(r.pos, r.end) }));
 			const commentTexts = [
 				...comments.map(({ text: val }) => val).filter((val) => !val.startsWith('/**')),
 				...(() => {
@@ -1620,19 +1608,8 @@ export function fixSingleUseDeclarations(cfg: QualityCfg, changedFileNames?: Set
 				})(),
 			];
 			const inlineReplacement = commentTexts.length ? `${commentTexts.map((v) => (v.startsWith('//') ? `/* ${v.slice(2).trim()} */` : v)).join(' ')} ${replacement}` : replacement;
-			const candidateEdits: {
-				file: string;
-				start: number;
-				end: number;
-				text: string;
-			}[] = [];
-			for (const comment of comments)
-				candidateEdits.push({
-					file: c.file,
-					start: comment.start,
-					end: comment.end,
-					text: '',
-				});
+			const candidateEdits: { file: string; start: number; end: number; text: string }[] = [];
+			for (const comment of comments) candidateEdits.push({ file: c.file, start: comment.start, end: comment.end, text: '' });
 			const componentType = ts.isFunctionDeclaration(c.statement) && c.statement.parameters[0]?.type ? `React.ComponentType<${c.statement.parameters[0].type.getText(c.source)}>` : undefined;
 			const jsxName = (() => {
 				const parent = ref.node.parent;
@@ -1649,31 +1626,17 @@ export function fixSingleUseDeclarations(cfg: QualityCfg, changedFileNames?: Set
 				});
 				if (ts.isJsxElement(el) && el.children.length) props.push(`children: <>${el.children.map((child) => child.getText(ref.source)).join('')}</>`);
 				const call = `${reactCreateElementName(ref.source)}(${componentType ? `(${inlineReplacement} as ${componentType})` : inlineReplacement}, { ${props.join(', ')} })`;
-				return {
-					start: el.getStart(ref.source),
-					end: el.getEnd(),
-					text: ts.isJsxElement(el.parent) || ts.isJsxFragment(el.parent) ? `{${call}}` : call,
-				};
+				return { start: el.getStart(ref.source), end: el.getEnd(), text: ts.isJsxElement(el.parent) || ts.isJsxFragment(el.parent) ? `{${call}}` : call };
 			})();
 			let jsxFile: string | undefined;
 			if (jsxName) {
 				candidateEdits.push({ file: ref.file, ...jsxName });
 				jsxFile = ref.file;
 			} else if (ts.isShorthandPropertyAssignment(ref.node.parent)) {
-				candidateEdits.push({
-					file: ref.file,
-					start: ref.node.getStart(ref.source),
-					end: ref.node.getEnd(),
-					text: `${ref.node.text}: ${inlineReplacement}`,
-				});
+				candidateEdits.push({ file: ref.file, start: ref.node.getStart(ref.source), end: ref.node.getEnd(), text: `${ref.node.text}: ${inlineReplacement}` });
 			} else {
 				const tgt = ts.isTypeQueryNode(ref.node.parent) ? ref.node.parent : referenceTgt(ref.node);
-				candidateEdits.push({
-					file: ref.file,
-					start: tgt.getStart(ref.source),
-					end: tgt.getEnd(),
-					text: inlineReplacement,
-				});
+				candidateEdits.push({ file: ref.file, start: tgt.getStart(ref.source), end: tgt.getEnd(), text: inlineReplacement });
 			}
 			const removedImport = (() => {
 				for (const statement of ref.source.statements) {
@@ -1682,21 +1645,9 @@ export function fixSingleUseDeclarations(cfg: QualityCfg, changedFileNames?: Set
 					if (!bindings || !ts.isNamedImports(bindings)) continue;
 					const specifier = bindings.elements.find((element) => canonical(checker, checker.getSymbolAtLocation(element.name)) === c.symbol);
 					if (!specifier) continue;
-					if (bindings.elements.length === 1)
-						return {
-							start: statement.getStart(ref.source),
-							end: statement.getEnd(),
-						};
+					if (bindings.elements.length === 1) return { start: statement.getStart(ref.source), end: statement.getEnd() };
 					const idx = bindings.elements.indexOf(specifier);
-					return idx === 0
-						? {
-								start: specifier.getStart(ref.source),
-								end: bindings.elements[1]!.getStart(ref.source),
-							}
-						: {
-								start: bindings.elements[idx - 1]!.getEnd(),
-								end: specifier.getEnd(),
-							};
+					return idx === 0 ? { start: specifier.getStart(ref.source), end: bindings.elements[1]!.getStart(ref.source) } : { start: bindings.elements[idx - 1]!.getEnd(), end: specifier.getEnd() };
 				}
 				return null;
 			})();
@@ -1707,12 +1658,7 @@ export function fixSingleUseDeclarations(cfg: QualityCfg, changedFileNames?: Set
 			const lineEnd = c.source.text.indexOf('\n', statementEnd);
 			const trailingEnd = lineEnd < 0 ? c.source.text.length : lineEnd;
 			const ownsLine = S_U_REGEX.test(c.source.text.slice(lineStart, statementStart)) && S_U_REGEX.test(c.source.text.slice(statementEnd, trailingEnd));
-			candidateEdits.push({
-				file: c.file,
-				start: ownsLine ? lineStart : statementStart,
-				end: ownsLine ? (lineEnd < 0 ? statementEnd : lineEnd + 1) : statementEnd,
-				text: '',
-			});
+			candidateEdits.push({ file: c.file, start: ownsLine ? lineStart : statementStart, end: ownsLine ? (lineEnd < 0 ? statementEnd : lineEnd + 1) : statementEnd, text: '' });
 			const referenceEdit = candidateEdits.find((e) => e.file === ref.file && e.end > e.start)!;
 			pending.push({
 				fileEdits: candidateEdits,
@@ -1736,14 +1682,7 @@ export function fixSingleUseDeclarations(cfg: QualityCfg, changedFileNames?: Set
 				const source = program.getSourceFile(file)!;
 				const imports = source.statements.filter(ts.isImportDeclaration);
 				const pos = imports.length ? imports[imports.length - 1]!.end : (source.statements[0]?.getStart(source) ?? 0);
-				edits.set(file, [
-					...(edits.get(file) ?? []),
-					{
-						start: pos,
-						end: pos,
-						text: `${pos ? '\n' : ''}import { createElement as ${reactCreateElementName(source)} } from 'react';\n`,
-					},
-				]);
+				edits.set(file, [...(edits.get(file) ?? []), { start: pos, end: pos, text: `${pos ? '\n' : ''}import { createElement as ${reactCreateElementName(source)} } from 'react';\n` }]);
 			}
 			const invalidFiles = new Set<string>();
 			for (const [file, fileEdits] of edits) {
