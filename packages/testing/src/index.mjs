@@ -7,7 +7,7 @@ IMPORTS
 //////////////////////////////////////////////////*/
 
 // API
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { isAbsolute, relative, resolve, sep } from 'node:path';
 import { spawnSync } from 'node:child_process';
 
@@ -16,6 +16,14 @@ CONFIG
 //////////////////////////////////////////////////*/
 
 const emptyTestPlan = { version: 1, suites: [] };
+/**
+ * Checks whether one resolved path is the repository root or one of its descendants.
+ *
+ * @param root Absolute repository root.
+ * @param path Absolute or root-relative path to check.
+ *
+ * @return Whether the path remains inside the repository boundary.
+ */
 const isInside = (root, path) => {
 	const rel = relative(root, path);
 	return rel === '' || (rel !== '..' && !rel.startsWith(`..${sep}`) && !isAbsolute(rel));
@@ -24,6 +32,56 @@ const isInside = (root, path) => {
 /*//////////////////////////////////////////////////
 HELPERS
 //////////////////////////////////////////////////*/
+
+/**
+ * Recursively lists source files under test directories and test-named files.
+ *
+ * @param root Directory to search for workspace tests.
+ *
+ * @return Repository-relative, slash-normalized test file paths.
+ */
+function listTestFiles(root) {
+	const files = [];
+	const visit = (dir) => {
+		for (const entry of readdirSync(dir, { withFileTypes: true })) {
+			if (entry.name === 'node_modules' || entry.name === '.git') continue;
+			const path = resolve(dir, entry.name);
+			if (entry.isDirectory()) visit(path);
+			else if (
+				entry.isFile() &&
+				((/(^|\/)(test|tests)\//u.test(relative(root, path).replaceAll('\\', '/')) && /\.[cm]?[jt]sx?$/u.test(entry.name)) || /\.(?:test|spec)\.[cm]?[jt]sx?$/u.test(entry.name))
+			)
+				files.push(relative(root, path).replaceAll('\\', '/'));
+		}
+	};
+	visit(root);
+	return files;
+}
+
+/**
+ * Converts the supported glob syntax into a regular expression.
+ *
+ * @param pattern Glob pattern using `*`, `**`, and `?` wildcards.
+ *
+ * @return A regular expression that matches the complete normalized path.
+ */
+function globRegex(pattern) {
+	let source = '^';
+	for (let i = 0; i < pattern.length; i++) {
+		const char = pattern[i];
+		if (char === '*') {
+			if (pattern[i + 1] === '*') {
+				i++;
+				if (pattern[i + 1] === '/') {
+					i++;
+					source += '(?:.*/)?';
+				} else source += '.*';
+			} else source += '[^/]*';
+		} else if (char === '?') source += '[^/]';
+		else source += char.replace(/[|\\{}()[\]^$+?.]/gu, '\\$&');
+	}
+	return new RegExp(`${source}$`, 'u');
+}
 
 /**
  * Checks the current GitHub event range against the shared linear-history policy.
@@ -106,7 +164,7 @@ function runLinearHistory(root) {
  *
  * @return {{version: 1, suites: Array<{name: string, command: string, args: string[], cwd?: string, owns?: string[]}>}}
  */
-export function readTestPlan(root, manifestPath = '.terra-tests.json') {
+export function readTestPlan(root, manifestPath = defaultManifestPath(root)) {
 	const absoluteRoot = resolve(root);
 	if (!manifestPath) return emptyTestPlan;
 	if (isAbsolute(manifestPath) || !isInside(absoluteRoot, resolve(absoluteRoot, manifestPath))) throw new Error(`Test manifest must be inside the repository: ${manifestPath}`);
@@ -115,6 +173,18 @@ export function readTestPlan(root, manifestPath = '.terra-tests.json') {
 	const plan = JSON.parse(readFileSync(absoluteManifest, 'utf8'));
 	validateTestPlan(plan, absoluteRoot);
 	return plan;
+}
+
+/**
+ * Prefer the centralized config location while retaining compatibility with existing consumers.
+ * @param {string} root Repository root.
+ * @return {string} Repository-relative manifest path.
+ */
+function defaultManifestPath(root) {
+	const absoluteRoot = resolve(root);
+	if (existsSync(resolve(absoluteRoot, 'config/terra-tests.json'))) return 'config/terra-tests.json';
+	if (existsSync(resolve(absoluteRoot, 'tests/terra-tests.json'))) return 'tests/terra-tests.json';
+	return '.terra-tests.json';
 }
 
 /**
@@ -132,6 +202,8 @@ export function validateTestPlan(value, root) {
 	const names = new Set();
 	const cmds = new Set();
 	const owners = new Map();
+	const ownedFiles = new Map();
+	const testFiles = listTestFiles(resolve(root));
 	for (const [index, raw] of plan.suites.entries()) {
 		if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new Error(`Test suite ${index + 1} must be an object.`);
 		const suite = /** @type {Record<string, unknown>} */ (raw);
@@ -147,39 +219,37 @@ export function validateTestPlan(value, root) {
 		const cmdKey = JSON.stringify([suite.command, args, relative(resolve(root), absoluteCwd)]);
 		if (cmds.has(cmdKey)) throw new Error(`Duplicate test command in suite ${suite.name}; each command must run once.`);
 		cmds.add(cmdKey);
-		if (suite.owns !== undefined && (!Array.isArray(suite.owns) || suite.owns.some((owner) => typeof owner !== 'string' || owner.trim() === '')))
-			throw new Error(`Test suite ${suite.name} owns must be a list of non-empty repository paths or suite identifiers.`);
+		if (!Array.isArray(suite.owns) || suite.owns.some((owner) => typeof owner !== 'string' || owner.trim() === ''))
+			throw new Error(`Test suite ${suite.name} owns must be a list of non-empty repository-relative file globs.`);
 		for (const owner of /** @type {string[]} */ (suite.owns ?? [])) {
 			const norm = owner.replaceAll('\\', '/').replace(/\/+$/u, '');
 			if (!norm || isAbsolute(norm) || norm === '..' || norm.startsWith('../') || norm.split('/').includes('..')) throw new Error(`Test suite ${suite.name} has an invalid owner: ${owner}`);
-			const previous = [...owners.entries()].find(([claimed]) => norm === claimed || norm.startsWith(`${claimed}/`) || claimed.startsWith(`${norm}/`));
-			if (previous) throw new Error(`Test ownership overlaps: ${norm} is claimed by ${previous[1]} and ${suite.name}.`);
+			if (owners.has(norm)) throw new Error(`Test ownership overlaps: ${norm} is claimed by ${owners.get(norm)} and ${suite.name}.`);
 			owners.set(norm, suite.name);
+			for (const file of testFiles.filter((path) => globRegex(norm).test(path))) {
+				const previous = ownedFiles.get(file);
+				if (previous) throw new Error(`Test file ownership overlaps: ${file} is claimed by ${previous} and ${suite.name}.`);
+				ownedFiles.set(file, suite.name);
+			}
 		}
 	}
+	const omitted = testFiles.filter((file) => !ownedFiles.has(file));
+	if (omitted.length) throw new Error(`Test files are not owned by any suite: ${omitted.join(', ')}`);
 }
-
-/**
- * Settings for selecting the repository manifest and requested test suites.
- *
- * @typedef {object} TestPlanOptions
- * @property {string} root - Absolute repository root where the test plan is loaded.
- * @property {string} [manifest] - Repository-relative test manifest path.
- * @property {string[]} [suites] - Optional suite names to run from the manifest.
- * @property {boolean} [sharedOnly] - Run only shared checks without custom suites.
- */
 
 /**
  * Runs the requested suites serially and aggregates failures into one process result.
  *
- * @param {TestPlanOptions} props - Repository root and optional test-plan selections.
+ * @param {string} root - Absolute repository root.
+ * @param {string} [manifest] - Repository-relative test manifest path.
+ * @param {string[]} [requested] - Optional suite names to run from the manifest.
+ * @param {boolean} [sharedOnly] - Run only shared checks without custom suites.
  *
  * @return {{passed: number, failed: number, selected: string[]}}
  */
-export function runTestPlan({ root, manifest = '.terra-tests.json', suites: requested = [], sharedOnly = false }) {
+export function runTestPlan({ root, manifest, suites: requested = [], sharedOnly = false }) {
 	const absoluteRoot = resolve(root);
-	const plan = sharedOnly ? emptyTestPlan : readTestPlan(absoluteRoot, manifest);
-	const allSuites = /** @type {Array<{name: string, command: string, args?: string[], cwd?: string}>} */ (plan.suites);
+	const allSuites = /** @type {Array<{name: string, command: string, args?: string[], cwd?: string}>} */ ((sharedOnly ? emptyTestPlan : readTestPlan(absoluteRoot, manifest)).suites);
 	const selected = sharedOnly ? [] : requested.length ? allSuites.filter((suite) => requested.includes(suite.name)) : allSuites;
 	const known = new Set(allSuites.map((suite) => suite.name));
 	const unknown = requested.filter((name) => !known.has(name));

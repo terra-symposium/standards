@@ -10,14 +10,32 @@ IMPORTS
 // API
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { terraErrorBoundaryIntegration } from '../dist/lib/astro-integration.js';
 import { withErrorBoundary } from '../dist/components/react.js';
 
 // COMPONENTS
 import React from 'react';
 import { ErrorBoundary } from '../dist/components/react.js';
+
+/*//////////////////////////////////////////////////
+TESTS
+//////////////////////////////////////////////////*/
+
 test('exports the shared boundary lifecycle and HOC', () => {
 	assert.equal(typeof ErrorBoundary, 'function');
 	assert.equal(typeof withErrorBoundary, 'function');
+});
+test('Astro integration injects a pre-hydration page boundary', () => {
+	let injected;
+	terraErrorBoundaryIntegration().hooks['astro:config:setup']({
+		injectScript: (stage, content) => {
+			injected = { stage, content };
+		},
+	});
+	assert.equal(injected.stage, 'before-hydration');
+	assert.match(injected.content, /astro:hydration-error/u);
+	assert.match(injected.content, /data-terra-hydration-fallback/u);
+	assert.match(injected.content, /role', 'alert'/u);
 });
 test('captures component metadata and exposes reset-key recovery state', () => {
 	const reports = [];
@@ -30,9 +48,9 @@ test('captures component metadata and exposes reset-key recovery state', () => {
 	assert.equal(
 		withErrorBoundary(
 			/**
-			 * Renders the simple panel used to verify the wrapper's display name.
+			 * Supplies a small component for checking the generated HOC display name.
 			 *
-			 * @returns A div element representing the panel.
+			 * @return A React element used by the error-boundary wrapper.
 			 */
 			function Panel() {
 				return React.createElement('div');

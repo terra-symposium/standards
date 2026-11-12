@@ -1,0 +1,105 @@
+---
+title: Documentation authoring
+description: Organise accurate, task-focused Docs pages with supported visual blocks.
+---
+
+The Standards site is organised around reader tasks. A section names a product or topic; numbered groups set a predictable reading order; each leaf answers one primary question and points to the next step.
+
+## Information architecture
+
+Use the directory tree to express the subject hierarchy. The Docs catalog turns directories into groups and Markdown or MDX files into leaves.
+
+| Level          | Owns                                             | Example                                         |
+| -------------- | ------------------------------------------------ | ----------------------------------------------- |
+| Section        | A product or coherent documentation domain.      | Quality, Error Boundaries, Testing.             |
+| Numbered group | A stage or topic family within one section.      | 0 Getting started, 1 Packages, 2 Configuration. |
+| Leaf           | One tutorial, how-to, reference, or explanation. | Add a React error boundary.                     |
+
+Number prefixes are part of the group directory name. Use a leading digit and a short kebab-case subject, such as `0-getting-started` or `2-configuration`. Number groups in the order a new reader should encounter them; keep the number consistent across the section even as leaves are added.
+
+## Choose a page type
+
+The page type determines what belongs in the leaf. Separate first-use instructions from rationale and exact reference when the reader’s purpose changes.
+
+||| [Tutorial]
+A tutorial takes a new user to a working first result. State prerequisites, show the complete sequence, and verify the outcome.
+|||
+
+||| [How-to guide]
+A how-to solves one concrete task for a reader who already understands the product. Include the decision points and expected result.
+|||
+
+||| [Reference]
+A reference describes exact exports, fields, defaults, limits, and outputs. Keep names aligned with manifests, declarations, and implementation.
+|||
+
+||| [Explanation]
+An explanation connects design choices, boundaries, trade-offs, and failure modes. Link to the procedure or reference instead of repeating it.
+|||
+
+This separation follows the [Diátaxis documentation model](https://diataxis.fr/start-here/). A leaf can link the page types together, but it should not bury them in one long undifferentiated page.
+
+## Choose a block for the relationship
+
+Introduce a visual block with a sentence that explains what the reader should notice. Use tables for repeated facts, diagrams for real relationships, tabs for alternatives, accordions for secondary detail, and callouts for bounded guidance.
+
+| Reader need                            | Use                                     | Good fit                                                         |
+| -------------------------------------- | --------------------------------------- | ---------------------------------------------------------------- |
+| Compare repeated properties            | Table                                   | Package entry points, supported options, browser viewports.      |
+| Follow a sequence or branching process | Nodes diagram                           | Quality run phases, telemetry flow, test ownership validation.   |
+| Choose between alternatives            | Tabs                                    | React versus Astro, pnpm versus npm, local versus CI invocation. |
+| Open optional or lengthy detail        | Accordion                               | Advanced flags, compatibility paths, troubleshooting cases.      |
+| Notice one important constraint        | Note, tip, warning, caution, or example | Data boundary, destructive side effect, or worked input.         |
+
+## Supported interactive blocks
+
+The Docs renderer accepts the block forms below. Keep the content within a block focused; do not invent JSX wrappers or component names.
+
+=== [Accordions]
+Use an accordion for secondary details that a reader may not need on the first pass. Each block has a title and matching closing delimiter.
+
+# Example: `=== [Compatibility details]` opens the block and a final `===` closes it.
+
+||| [Tabs]
+Use tabs for genuinely alternative instructions or views. Each tab starts with `||| [Title]` and closes with `|||`. Keep comparable information in each tab and label the choice clearly.
+|||
+
+The `<Nodes />` block renders a diagram from valid node and edge arrays. Use it for a process or relationship that prose would make harder to follow. Keep the source facts and implementation detail in the surrounding text.
+
+:::warning[Do not make a Docs-only product demo]
+
+When the existing Website or another application already demonstrates the behavior, use that implementation and its browser-test fixtures. Label deterministic fixture data clearly; never present it as a live production incident.
+
+:::
+
+## Write from verified sources
+
+Derive package names, exports, flags, schema fields, peer requirements, side effects, and runtime limits from package manifests, declarations, implementation, tests, or an authoritative application source. Put prerequisites before commands and explain what each command changes.
+
+Keep one paragraph to one idea. Use a concise opening statement, descriptive headings, complete runnable code examples, and tables for repeated properties. Avoid headings that merely restate a nearby title and avoid duplicating another leaf’s reference material.
+
+For every image, use an informative alt text and a caption describing the state shown. Store the asset beside the owning section. Use synthetic or deterministic local data; exclude credentials, personal data, raw error payloads, and production identifiers.
+
+## Authoring workflow
+
+The flow below is the expected path from a reader need to a reviewable rendered page.
+
+<Nodes
+	direction="LR"
+	nodes={[
+		{ id: 'need', type: 'origin', data: { title: 'Identify reader need' } },
+		{ id: 'source', type: 'process', data: { title: 'Verify source facts' } },
+		{ id: 'leaf', type: 'process', data: { title: 'Choose page and blocks' } },
+		{ id: 'route', type: 'process', data: { title: 'Add links and assets' } },
+		{ id: 'render', type: 'terminal', data: { title: 'Build and inspect' } },
+	]}
+	edges={[
+		{ id: 'need-source', source: 'need', target: 'source' },
+		{ id: 'source-leaf', source: 'source', target: 'leaf' },
+		{ id: 'leaf-route', source: 'leaf', target: 'route' },
+		{ id: 'route-render', source: 'route', target: 'render' },
+	]}
+	height={230}
+/>
+
+Before finishing, read the source again, check every public route and image path, run `pnpm run docs:build`, and inspect the built page at its real route. Review a second page to confirm section selection, group numbering, titles, and anchors remain correct. The [Standards workspace guide](/contributing/0-workspace/getting-started/) covers the local preview workflow.

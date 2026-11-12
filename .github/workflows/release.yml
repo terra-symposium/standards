@@ -14,6 +14,9 @@ jobs:
       pull-requests: write
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: astral-sh/setup-uv@v7
       - uses: pnpm/action-setup@v6
         with:
           version: 10.30.3
@@ -23,12 +26,13 @@ jobs:
       - name: Enable npm trusted publishing
         run: npm install --global npm@11.5.1
       - run: pnpm install --frozen-lockfile
-      - run: pnpm quality:all
+      - run: uv sync --locked --group dev
+      - name: Verify full-repository quality
+        run: pnpm run quality --all --warn
+      - run: pnpm --filter @terra-symposium/standards-quality test
       - uses: changesets/action@v2
         with:
-          publish: pnpm release
-          branch: development
-          title: 'chore: release shared packages'
-          summary: Version and publish shared package changes.
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          publish-script: pnpm release
+          pr-base-branch: development
+          pr-title: 'chore: release shared packages'

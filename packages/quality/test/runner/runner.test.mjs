@@ -12,14 +12,20 @@ IMPORTS
 
 // API
 import assert from 'node:assert/strict';
+import { createRequire } from 'node:module';
 import test from 'node:test';
+import { QUALITY_CHECK_NAMES } from '@terra-symposium/standards-quality-core';
 // prettier-ignore
 import { createQualityAnalysis, createQualityCfg, loadQualityCfg, qualityAutofixEnabled, qualityCheckEnabled, qualityCmdEnabled, qualityRecommendationEnabled, runFormatter, runQuality, runQualityCli, runQualityFromCfg, runTypecheck } from '../../dist/index.js';
-import { existsSync, lstatSync, readFileSync, readdirSync, readlinkSync, symlinkSync } from 'node:fs';
+import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, readlinkSync, realpathSync, symlinkSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { fixtureFile, fixtureRoot, fixtureText, resetExitCode } from '../../support/fixtures.mjs';
 import { join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
+/*//////////////////////////////////////////////////
+REGEX
+//////////////////////////////////////////////////*/
+const COULD_NOT_FIND_CONFIG_FILE_REGEX = /Could not find config file/;
 
 /*//////////////////////////////////////////////////
 REGEX
@@ -27,6 +33,9 @@ REGEX
 
 const FINDINGS_SUMMARY_REGEX = /FINDINGS SUMMARY/;
 const ERR_KNIP_EXPORTS_SRC_MAIN_TS_1_CLIENT_REGEX = /\[ERROR\] knip\/exports: src\/main\.ts:1 Client/;
+const ESLINT_BIN = fileURLToPath(new URL('../../../../config/node_modules/.bin/eslint', import.meta.url));
+const PRETTIER_BIN = fileURLToPath(new URL('../../../../config/node_modules/.bin/prettier', import.meta.url));
+const ESLINT_AVAILABLE = existsSync(ESLINT_BIN);
 
 /*//////////////////////////////////////////////////
 REGEX
@@ -34,9 +43,9 @@ REGEX
 
 const UNKNOWN_QUALITY_CLI_ARGUMENT_REGEX = /Unknown quality CLI argument/;
 /**
- * Creates a fresh global pattern for locating the `RecordData` type import.
+ * Matches the import declaration used by the naming repair fixture.
  *
- * @return A global regular expression that matches the import statement.
+ * @return A fresh global regular expression for finding that declaration.
  */
 const IMPORT_TYPE_RECORDDATA_FROM_TYPES_G_REGEX = () => /import type \{ RecordData \} from '\.\/types';/g;
 const REPORTER_PLAYWRIGHT_REPORTER_JS_U_REGEX = /^--reporter=.*playwright-reporter\.js$/u;
@@ -152,6 +161,54 @@ test('CLI writes a versioned report with check statuses and finding counts', () 
 	assert.ok(report.checks.some((check) => check.name === 'imports' && check.status === 'passed' && check.findings === 0));
 	resetExitCode();
 });
+test('warn and safe-fix quality passes leave missing documentation for an author to write', () => {
+	const root = fixtureRoot('terra-quality-documentation-is-author-owned-');
+	const source = fixtureFile(root, 'src/main.ts', 'export function getCourseTitle(title: string) { return title.trim(); }\n');
+	const original = readFileSync(source, 'utf8');
+	const cfg = createQualityCfg({
+		root,
+		sourceRoots: ['src'],
+		extensions: ['.ts'],
+		documentation: { required: { types: false, functions: true, exportedFunctions: true } },
+		autofix: { document: false },
+		enabledChecks: {
+			accessibility: false,
+			alias: false,
+			command: false,
+			'dead-code': false,
+			diff: false,
+			'display-name': false,
+			document: true,
+			'documented-commands': false,
+			'error-boundaries': false,
+			forward: false,
+			format: false,
+			github: false,
+			import: false,
+			knip: false,
+			lint: false,
+			name: false,
+			'performance-patterns': false,
+			recommend: false,
+			'repeated-classes': false,
+			'regex-dedup': false,
+			security: false,
+			'tailwind-canonical': false,
+			type: false,
+			'ui-patterns': false,
+			'ui-recommendations': false,
+		},
+	});
+	for (const args of [
+		['quality', '--all', '--warn', '--skip-commands', '--skip-recommendations'],
+		['quality', '--all', '--safe-fix', '--skip-commands', '--skip-recommendations'],
+	]) {
+		resetExitCode();
+		runQualityCli(cfg, args);
+		assert.equal(readFileSync(source, 'utf8'), original);
+	}
+	resetExitCode();
+});
 test('repeated naming repair never appends a second import for an already-bound local name', () => {
 	const root = fixtureRoot('terra-quality-naming-import-idempotence-');
 	const src = fixtureFile(
@@ -169,41 +226,146 @@ export const record: RecordData = { id: organization ? 'one' : 'two' };
 		extensions: ['.ts'],
 		enabledChecks: { import: false, document: false, format: false, lint: false, knip: false, type: false, command: false, recommend: false, diff: false },
 	});
-	runQualityCli(cfg, ['naming', '--all']);
+	runQualityCli(cfg, ['naming', '--all', '--fix']);
 	const first = readFileSync(src, 'utf8');
-	runQualityCli(cfg, ['naming', '--all']);
+	runQualityCli(cfg, ['naming', '--all', '--fix']);
 	assert.equal(readFileSync(src, 'utf8'), first);
 	assert.equal((first.match(IMPORT_TYPE_RECORDDATA_FROM_TYPES_G_REGEX()) ?? []).length, 1);
 	assert.match(first, /const org = true/);
+});
+test('naming repair never imports symbols from dependency declaration trees into Canvas sources', () => {
+	const root = fixtureRoot('terra-quality-dependency-import-repair-');
+	const original = `import type { DependencyMarker } from '../config/node_modules/.pnpm/vite@6.4.1/node_modules/vite/types/index';
+const marker: DependencyMarker = {};
+export const canvas: CanvasDocument = {};
+void marker;
+`;
+	fixtureFile(root, 'src/Canvas.tsx', original);
+	fixtureFile(root, 'config/node_modules/.pnpm/vite@6.4.1/node_modules/vite/types/index.d.ts', 'export interface DependencyMarker {}\nexport interface CanvasDocument {}\n');
+	const cfg = createQualityCfg({
+		root,
+		sourceRoots: ['src'],
+		extensions: ['.tsx'],
+		enabledChecks: { import: false, document: false, format: false, lint: false, knip: false, type: false, command: false, recommend: false, diff: false },
+	});
+	resetExitCode();
+	runQualityCli(cfg, ['naming', '--all', '--fix']);
+	assert.equal(fixtureText(root, 'src/Canvas.tsx'), original);
+	resetExitCode();
+});
+test('safe fixes leave captured Canvas exports byte-identical when their leading imports resolve through prose', () => {
+	const root = fixtureRoot('terra-quality-captured-canvas-source-');
+	const canvas = fixtureFile(
+		root,
+		'content/Canvas.tsx',
+		`\nimport { List } from '../config/node_modules/.pnpm/postcss@8/node_modules/postcss/lib/list.d';
+import { It, at, it, st } from '../config/node_modules/.pnpm/rolldown@1/node_modules/rolldown/dist/shared/config.d';
+import { send } from '../config/node_modules/.pnpm/vite@8/node_modules/vite/dist/node/index.d';
+Skip to content
+Dashboard
+Course materials
+`,
+	);
+	const originalCanvas = fixtureText(root, 'content/Canvas.tsx');
+	const bundleText = `!function(e){${'var module={};module.exports=function(value){return value+1};'.repeat(220)}};\n//# sourceMappingURL=bundle.js.map\n`;
+	fixtureFile(root, 'content/viewer/bundle.js', bundleText);
+	const source = fixtureFile(
+		root,
+		'src/main.ts',
+		`import type { DependencyMarker } from '../config/node_modules/.pnpm/vite@8/node_modules/vite/types/index';
+const marker: DependencyMarker = {};
+const canvas: CanvasDocument = {};
+const organization = true;
+void organization;
+export { marker, canvas };
+`,
+	);
+	fixtureFile(root, 'config/node_modules/.pnpm/vite@8/node_modules/vite/types/index.d.ts', 'export interface DependencyMarker {}\nexport interface CanvasDocument {}\n');
+	const cfg = createQualityCfg({
+		root,
+		sourceRoots: ['.'],
+		extensions: ['.ts', '.tsx'],
+		enabledChecks: {
+			name: true,
+			document: false,
+			format: false,
+			import: false,
+			lint: false,
+			knip: false,
+			type: false,
+			command: false,
+			recommend: false,
+			forward: false,
+			alias: false,
+			'display-name': false,
+			accessibility: false,
+			'dead-code': false,
+			security: false,
+			'repeated-classes': false,
+			'tailwind-canonical': false,
+			'regex-dedup': false,
+			'ui-patterns': false,
+			'ui-recommendations': false,
+			diff: false,
+		},
+	});
+	const originalSource = fixtureText(root, 'src/main.ts');
+	resetExitCode();
+	runQualityCli(cfg, ['quality', '--all', '--skip-commands']);
+	assert.equal(fixtureText(root, 'content/Canvas.tsx'), originalCanvas);
+	assert.equal(fixtureText(root, 'content/viewer/bundle.js'), bundleText);
+	assert.equal(fixtureText(root, 'src/main.ts'), originalSource);
+	resetExitCode();
+	runQualityCli(cfg, ['quality', '--all', '--warn', '--fix', '--skip-commands']);
+	assert.equal(fixtureText(root, 'content/Canvas.tsx'), originalCanvas);
+	assert.equal(fixtureText(root, 'content/viewer/bundle.js'), bundleText);
+	assert.equal(fixtureText(root, 'src/main.ts'), originalSource);
+	resetExitCode();
+	runQualityCli(cfg, ['quality', '--all', '--safe-fix', '--skip-commands']);
+	assert.equal(fixtureText(root, 'content/Canvas.tsx'), originalCanvas);
+	assert.equal(fixtureText(root, 'content/viewer/bundle.js'), bundleText);
+	assert.match(fixtureText(root, 'src/main.ts'), /const org = true/u);
+	assert.doesNotMatch(fixtureText(root, 'src/main.ts'), /import\s+\{\s*CanvasDocument\s*\}/u);
+	assert.equal(readFileSync(source, 'utf8'), fixtureText(root, 'src/main.ts'));
+	assert.ok(canvas.endsWith('/content/Canvas.tsx'));
+	const fixedSource = fixtureText(root, 'src/main.ts');
+	resetExitCode();
+	runQualityCli(cfg, ['quality', '--all', '--fix', '--skip-commands']);
+	assert.equal(fixtureText(root, 'content/Canvas.tsx'), originalCanvas);
+	assert.equal(fixtureText(root, 'content/viewer/bundle.js'), bundleText);
+	assert.equal(fixtureText(root, 'src/main.ts'), fixedSource);
+	resetExitCode();
 });
 test('naming autofix never text-rewrites Astro properties or string literals', () => {
 	const root = fixtureRoot('terra-quality-naming-astro-safe-');
 	const src = fixtureFile(root, 'src/index.astro', `---\nconst error = Astro.locals.user;\nconst message = 'Salesphere user';\n---\n<p>{message}</p>\n`);
 	const original = readFileSync(src, 'utf8');
-	const cfg = createQualityCfg({
-		root,
-		sourceRoots: ['src'],
-		extensions: ['.astro'],
-		enabledChecks: {
-			import: false,
-			document: false,
-			format: false,
-			lint: false,
-			knip: false,
-			'dead-code': false,
-			type: false,
-			command: false,
-			recommend: false,
-			diff: false,
-			alias: false,
-			forward: false,
-			security: false,
-			'repeated-classes': false,
-			'regex-dedup': false,
-			'ui-patterns': false,
-		},
-	});
-	runQualityCli(cfg, ['naming', '--all']);
+	runQualityCli(
+		createQualityCfg({
+			root,
+			sourceRoots: ['src'],
+			extensions: ['.astro'],
+			enabledChecks: {
+				import: false,
+				document: false,
+				format: false,
+				lint: false,
+				knip: false,
+				'dead-code': false,
+				type: false,
+				command: false,
+				recommend: false,
+				diff: false,
+				alias: false,
+				forward: false,
+				security: false,
+				'repeated-classes': false,
+				'regex-dedup': false,
+				'ui-patterns': false,
+			},
+		}),
+		['naming', '--all', '--fix'],
+	);
 	assert.equal(readFileSync(src, 'utf8'), original);
 });
 test('the executable handles help without a config and rejects unknown commands before config loading', () => {
@@ -271,12 +433,12 @@ test('full quality continues after failed scripts and prints their details under
 	const root = fixtureRoot('terra-quality-cli-continue-failures-');
 	const marker = join(root, 'ran.txt');
 	/**
-	 * Builds a Node command that records a message and exits with the requested status.
+	 * Builds a configured command that writes a marker and exits with the requested status.
 	 *
-	 * @param message Text appended to the fixture marker.
-	 * @param exitCode Process exit status for the command.
+	 * @param message Text written to the shared marker and standard error.
+	 * @param exitCode Exit status returned by the command.
 	 *
-	 * @return Command and arguments for the quality command fixture.
+	 * @return Command configuration accepted by the quality runner.
 	 */
 	const cmd = (message, exitCode = 1) => ({
 		command: process.execPath,
@@ -344,23 +506,149 @@ test('the executable rejects linting without an ESLint flat config before runnin
 	assert.match(result.stderr, /ESLint flat config is required for quality/);
 	assert.doesNotMatch(result.stderr, /couldn't find an eslint\.config/);
 });
-test('loadQualityCfg resolves a quality file root relative to the configuration file', () => {
+test('the executable loads ESLint flat config from config/', { skip: !ESLINT_AVAILABLE }, () => {
+	const root = fixtureRoot('terra-quality-eslint-config-directory-');
+	const workspaceRoot = fileURLToPath(new URL('../../../../', import.meta.url));
+	fixtureFile(root, 'package.json', '{}\n');
+	symlinkSync(resolve(workspaceRoot, 'config/node_modules'), join(root, 'node_modules'), 'dir');
+	fixtureFile(root, 'quality.json', JSON.stringify({ sourceRoots: ['src'], extensions: ['.ts'] }));
+	fixtureFile(root, 'config/eslint.config.mjs', 'export default [];\n');
+	fixtureFile(root, 'src/main.ts', 'const value = true;\n');
+	const runner = fileURLToPath(new URL('../../dist/lib/runner.js', import.meta.url));
+	const result = spawnSync(process.execPath, [runner, 'lint', '--all'], { cwd: root, encoding: 'utf8' });
+	assert.equal(result.status, 0, result.stderr);
+	assert.doesNotMatch(result.stderr, COULD_NOT_FIND_CONFIG_FILE_REGEX);
+});
+test('lint resolves CommonJS from the nearest package boundary while retaining import checks', { skip: !ESLINT_AVAILABLE }, () => {
+	const root = fixtureRoot('terra-quality-eslint-commonjs-boundary-');
+	const workspaceRoot = fileURLToPath(new URL('../../../../', import.meta.url));
+	fixtureFile(root, 'package.json', '{"type":"module"}\n');
+	symlinkSync(resolve(workspaceRoot, 'config/node_modules'), join(root, 'node_modules'), 'dir');
+	fixtureFile(root, 'quality.json', JSON.stringify({ sourceRoots: ['src', 'packages'], extensions: ['.js'], tools: { eslint: 'config/node_modules/.bin/eslint' } }));
+	fixtureFile(
+		root,
+		'config/eslint.config.mjs',
+		`import globals from 'globals';
+import ts from 'typescript-eslint';
+export default ts.config(
+  { languageOptions: { globals: globals.node, parserOptions: { sourceType: 'module' } } },
+  ...ts.configs.recommended,
+  { files: ['**/*.js'], languageOptions: { sourceType: 'module' } },
+);
+`,
+	);
+	fixtureFile(root, 'src/main.js', "const fs = require('node:fs');\nvoid fs;\n");
+	fixtureFile(root, 'packages/cjs/package.json', JSON.stringify({ name: 'commonjs-fixture' }));
+	fixtureFile(root, 'packages/cjs/index.js', "const fs = require('node:fs');\nvoid fs;\nreturn;\n");
+	const runner = fileURLToPath(new URL('../../dist/lib/runner.js', import.meta.url));
+	const result = spawnSync(process.execPath, [runner, 'lint', '--all'], { cwd: root, encoding: 'utf8' });
+	const output = `${result.stdout}\n${result.stderr}`;
+	assert.equal(result.status, 1, output);
+	assert.match(output, /src\/main\.js/u);
+	assert.doesNotMatch(output, /packages\/cjs\/index\.js/u);
+	assert.equal((output.match(/@typescript-eslint\/no-require-imports/gu) ?? []).length, 1, output);
+
+	fixtureFile(root, 'packages/cjs/dynamic.js', "const request = 'node:fs';\nconst fs = require(request);\nvoid fs;\n");
+	const dynamicResult = spawnSync(process.execPath, [runner, 'lint', '--all'], { cwd: root, encoding: 'utf8' });
+	const dynamicOutput = `${dynamicResult.stdout}\n${dynamicResult.stderr}`;
+	assert.equal(dynamicResult.status, 1, dynamicOutput);
+	assert.match(dynamicOutput, /src\/main\.js/u);
+	assert.match(dynamicOutput, /packages\/cjs\/dynamic\.js/u);
+	assert.doesNotMatch(dynamicOutput, /packages\/cjs\/index\.js/u);
+	assert.equal((dynamicOutput.match(/@typescript-eslint\/no-require-imports/gu) ?? []).length, 2, dynamicOutput);
+});
+test('nested consumer ESLint runs do not require CommonJS access to Quality Core', { skip: !ESLINT_AVAILABLE }, () => {
+	const root = fixtureRoot('terra-quality-pnpm-eslint-api-');
+	const workspaceRoot = fileURLToPath(new URL('../../../../', import.meta.url));
+	fixtureFile(root, 'package.json', '{"type":"module"}\n');
+	mkdirSync(join(root, 'node_modules'), { recursive: true });
+	symlinkSync(resolve(workspaceRoot, 'config/node_modules/eslint'), join(root, 'node_modules/eslint'), 'dir');
+	fixtureFile(
+		root,
+		'node_modules/@terra-symposium/standards-quality-core/package.json',
+		JSON.stringify({ name: '@terra-symposium/standards-quality-core', exports: { '.': { import: './dist/index.js' } } }),
+	);
+	fixtureFile(root, 'node_modules/@terra-symposium/standards-quality-core/dist/index.js', 'export const qualityProgress = () => {};\n');
+	fixtureFile(root, 'quality.json', JSON.stringify({ sourceRoots: ['src'], extensions: ['.ts'] }));
+	fixtureFile(root, 'config/eslint.config.mjs', 'export default [];\n');
+	fixtureFile(root, 'src/main.ts', 'export const value = true;\n');
+	const consumerRequire = createRequire(join(root, 'package.json'));
+	assert.throws(() => consumerRequire.resolve('@terra-symposium/standards-quality-core'), { code: 'ERR_PACKAGE_PATH_NOT_EXPORTED' });
+	const runner = fileURLToPath(new URL('../../dist/lib/runner.js', import.meta.url));
+	const result = spawnSync(process.execPath, [runner, 'lint', '--all'], { cwd: root, encoding: 'utf8' });
+	assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+	assert.equal(existsSync(join(root, 'node_modules/@terra-symposium/standards-quality-core/dist/index.js')), true);
+});
+test('the executable loads ESLint flat config from configured configRoot', { skip: !ESLINT_AVAILABLE }, () => {
+	const root = fixtureRoot('terra-quality-eslint-config-root-');
+	const workspaceRoot = fileURLToPath(new URL('../../../../', import.meta.url));
+	fixtureFile(root, 'package.json', '{}\n');
+	symlinkSync(resolve(workspaceRoot, 'config/node_modules'), join(root, 'node_modules'), 'dir');
+	fixtureFile(root, 'quality.json', JSON.stringify({ configRoot: 'tooling', sourceRoots: ['src'], extensions: ['.ts'] }));
+	fixtureFile(root, 'tooling/eslint.config.mjs', 'export default [];\n');
+	fixtureFile(root, 'src/main.ts', 'const value = true;\n');
+	const runner = fileURLToPath(new URL('../../dist/lib/runner.js', import.meta.url));
+	const result = spawnSync(process.execPath, [runner, 'lint', '--all'], { cwd: root, encoding: 'utf8' });
+	assert.equal(result.status, 0, result.stderr);
+	assert.doesNotMatch(result.stderr, COULD_NOT_FIND_CONFIG_FILE_REGEX);
+});
+test('the executable prefers centralized ESLint config over the root compatibility fallback', { skip: !ESLINT_AVAILABLE }, () => {
+	const root = fixtureRoot('terra-quality-eslint-config-precedence-');
+	const workspaceRoot = fileURLToPath(new URL('../../../../', import.meta.url));
+	fixtureFile(root, 'package.json', '{"type":"module"}\n');
+	symlinkSync(resolve(workspaceRoot, 'config/node_modules'), join(root, 'node_modules'), 'dir');
+	fixtureFile(root, 'quality.json', JSON.stringify({ sourceRoots: ['src'], extensions: ['.js'] }));
+	fixtureFile(root, 'eslint.config.cjs', "module.exports = [{ files: ['**/*.js'], rules: { 'no-console': 'error' } }];\n");
+	fixtureFile(root, 'config/eslint.config.js', "export default [{ files: ['**/*.js'], rules: { 'no-console': 'off' } }];\n");
+	fixtureFile(root, 'src/main.js', 'console.log(true);\n');
+	const runner = fileURLToPath(new URL('../../dist/lib/runner.js', import.meta.url));
+	const result = spawnSync(process.execPath, [runner, 'lint', '--all'], { cwd: root, encoding: 'utf8' });
+	assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+	assert.doesNotMatch(`${result.stdout}\n${result.stderr}`, /no-console/u);
+});
+test('loadQualityCfg infers the project root from an explicit config/quality.json path', () => {
 	const root = fixtureRoot('terra-quality-load-config-');
 	const cfgDir = join(root, 'config');
-	const cfgPath = fixtureFile(
-		root,
-		'config/quality.json',
-		JSON.stringify({ root: '..', sourceRoots: ['src'], extensions: ['.ts'], loadTesting: { enabled: false, defaultBudget: { warnMs: 3000, failMs: 7000 } } }),
+	const cfg = loadQualityCfg(
+		fixtureFile(root, 'config/quality.json', JSON.stringify({ root: '.', sourceRoots: ['src'], extensions: ['.ts'], loadTesting: { enabled: false, defaultBudget: { warnMs: 3000, failMs: 7000 } } })),
 	);
-	const cfg = loadQualityCfg(cfgPath);
 	assert.equal(cfg.root, root);
+	assert.equal(cfg.configRoot, join(root, 'config'));
 	assert.deepEqual(cfg.sourceRoots, [join(root, 'src')]);
 	assert.deepEqual(cfg.extensions, ['.ts']);
 	assert.deepEqual(cfg.loadTesting, { enabled: false, defaultBudget: { warnMs: 3000, failMs: 7000 } });
 	assert.equal(cfgDir, join(root, 'config'));
-	const schema = JSON.parse(readFileSync(join(process.cwd(), 'quality.schema.json'), 'utf8'));
+	const schema = JSON.parse(readFileSync(new URL('../../quality.schema.json', import.meta.url), 'utf8'));
 	assert.ok(schema.properties.loadTesting);
 	assert.ok(schema.$defs.loadBudget);
+});
+test('quality check names are validated at runtime and match the strict schema', () => {
+	const root = fixtureRoot('terra-quality-unknown-check-');
+	assert.throws(() => createQualityCfg({ root, sourceRoots: [], extensions: ['.ts'], enabledChecks: { 'db-shapes': false } }), /Unknown quality check: db-shapes/u);
+	const schema = JSON.parse(readFileSync(new URL('../../quality.schema.json', import.meta.url), 'utf8'));
+	assert.deepEqual(Object.keys(schema.$defs.checkToggles.properties).sort(), [...QUALITY_CHECK_NAMES].sort());
+	assert.equal(schema.$defs.checkToggles.additionalProperties, false);
+});
+test('loadQualityCfg keeps explicit root overrides relative to the inferred project root for nested apps', () => {
+	const appRoot = join(fixtureRoot('terra-quality-load-nested-config-'), 'projects/app');
+	const cfg = loadQualityCfg(fixtureFile(appRoot, 'config/quality.json', JSON.stringify({ root: 'workspace', sourceRoots: ['src'], extensions: ['.ts'] })));
+	assert.equal(cfg.root, join(appRoot, 'workspace'));
+	assert.deepEqual(cfg.sourceRoots, [join(appRoot, 'workspace/src')]);
+});
+test('loadQualityCfg resolves repository root and custom configRoot independently', () => {
+	const root = fixtureRoot('terra-quality-explicit-config-root-');
+	const cfg = loadQualityCfg(fixtureFile(root, 'shared/quality.json', JSON.stringify({ root: '../repo', configRoot: 'tooling', sourceRoots: ['src'], extensions: ['.ts'] })));
+	assert.equal(cfg.root, join(root, 'repo'));
+	assert.equal(cfg.configRoot, join(root, 'repo/tooling'));
+	assert.deepEqual(cfg.sourceRoots, [join(root, 'repo/src')]);
+});
+test('loadQualityCfg discovers config/quality.json when the root adapter is absent', () => {
+	const root = fixtureRoot('terra-quality-default-config-directory-');
+	fixtureFile(root, 'config/quality.json', JSON.stringify({ root: '.', sourceRoots: ['src'], extensions: ['.ts'] }));
+	const script = `import { loadQualityCfg } from ${JSON.stringify(new URL('../../dist/index.js', import.meta.url).href)}; console.log(loadQualityCfg().root);`;
+	const result = spawnSync(process.execPath, ['--input-type=module', '-e', script], { cwd: root, encoding: 'utf8' });
+	assert.equal(result.status, 0, result.stderr);
+	assert.equal(result.stdout.trim(), realpathSync(root));
 });
 test('configuration toggles default to enabled and honor explicit category, item, CLI, and recommendation disables', () => {
 	const cfg = createQualityCfg({
@@ -385,7 +673,7 @@ test('configuration toggles default to enabled and honor explicit category, item
 	assert.equal(qualityCmdEnabled(enabled, 'build'), true);
 	assert.equal(qualityRecommendationEnabled(enabled, 'architecture'), true);
 });
-test('full quality orders phases, groups suites, de-duplicates invocations, and continues after a failing test', () => {
+test('full quality orders phases, preserves configured suite order, de-duplicates invocations, and continues after a failing test', () => {
 	const root = fixtureRoot('terra-quality-phase-order-');
 	const marker = join(root, 'runs.txt');
 	const gitMarker = join(root, 'diff-runs.txt');
@@ -400,12 +688,12 @@ test('full quality orders phases, groups suites, de-duplicates invocations, and 
 	);
 	fixtureFile(root, 'bin/node', `#!/bin/sh\nprintf '%s\\n' "$@" > ${JSON.stringify(nodeArgsMarker)}\nprintf 'unit-node\\n' >> ${JSON.stringify(marker)}\n`, 0o755);
 	/**
-	 * Builds a Node command that records a label and can report failure.
+	 * Builds a command fixture that records its label and can report failure.
 	 *
-	 * @param label Text appended to the fixture marker.
-	 * @param failure Whether the command should exit unsuccessfully.
+	 * @param label Text appended to the shared invocation marker.
+	 * @param failure Whether the command should exit with a failure status.
 	 *
-	 * @return Command and arguments for the quality command fixture.
+	 * @return Command configuration accepted by the quality runner.
 	 */
 	const recorded = (label, failure = false) => ({
 		command: process.execPath,
@@ -423,17 +711,33 @@ test('full quality orders phases, groups suites, de-duplicates invocations, and 
 			{ name: 'custom-static', ...recorded('static') },
 			{ name: 'security-check', ...recorded('security-check') },
 			{ name: 'lint-check', command: process.execPath, args: ['-e', `require('node:fs').appendFileSync(${JSON.stringify(marker)}, 'static-format-option\\n');`, '--', '--format', 'json'] },
-			{ name: 'browser-e2e', command: 'pnpm', args: ['--filter', '@fixture/ui', 'run', 'e2e', '--reporter=dot'] },
-			{ name: 'cli-smoke', command: 'pnpm', args: ['exec', 'playwright', 'test'] },
+			{
+				name: 'browser-e2e',
+				command: 'pnpm',
+				args: ['--filter', '@fixture/ui', 'run', 'e2e', '--reporter=dot'],
+			},
+			{
+				name: 'cli-smoke',
+				command: 'pnpm',
+				args: ['exec', 'playwright', 'test'],
+			},
 			{ name: 'other-test', ...recorded('other') },
 			{ name: 'integration-test', ...recorded('integration') },
 			{ name: 'unit-test', ...recorded('unit', true) },
 			{ name: 'unit-test-copy', ...recorded('unit', true) },
-			{ name: 'unit-node', command: 'node', args: ['--test', 'sample.test.mjs', '--test-reporter', 'spec', '--test-reporter-destination=stderr'] },
+			{
+				name: 'unit-node',
+				command: 'node',
+				args: ['--test', 'sample.test.mjs', '--test-reporter', 'spec', '--test-reporter-destination=stderr'],
+			},
 			{ name: 'typecheck', ...recorded('types') },
 			{ name: 'production-build', ...recorded('build') },
 			{ name: 'github-audit', ...recorded('health') },
-			{ name: 'configured-diff-check', command: 'git', args: ['diff', '--check'] },
+			{
+				name: 'configured-diff-check',
+				command: 'git',
+				args: ['diff', '--check'],
+			},
 		],
 		enabledChecks: {
 			document: false,
@@ -512,16 +816,18 @@ test('full quality orders phases, groups suites, de-duplicates invocations, and 
 	);
 	const groupOrder = ['Unit Test', 'Unit Node', 'Integration Test', 'Browser E2e', 'Cli Smoke', 'Other Test'].map((group) => text.indexOf(group));
 	assert.ok(groupOrder.every((position) => position >= 0));
+	const suiteStatuses = ['✗ Unit Test', '✓ Unit Node', '✓ Integration Test', '✓ Browser E2e', '✓ Cli Smoke', '✓ Other Test'].map((status) => text.indexOf(status));
+	assert.ok(suiteStatuses.every((position) => position >= 0));
 	assert.deepEqual(
-		groupOrder,
-		[...groupOrder].sort((left, right) => left - right),
+		suiteStatuses,
+		[...suiteStatuses].sort((left, right) => left - right),
 	);
 	assert.match(text, /✗ Unit Test/);
 	assert.doesNotMatch(text, NODE_TESTS_PLAYWRIGHT_TESTS_REGEX, 'the fixture runners do not fabricate child case output');
 	assert.doesNotMatch(progress.join(''), NODE_TESTS_PLAYWRIGHT_TESTS_REGEX);
 	resetExitCode();
 });
-test('full quality prepares safe fixes before dead-code verification and tests', () => {
+test('full quality reports dead-code once under static quality', () => {
 	const root = fixtureRoot('terra-quality-dead-code-output-groups-');
 	const cfg = createQualityCfg({
 		root,
@@ -554,12 +860,12 @@ test('full quality prepares safe fixes before dead-code verification and tests',
 	console.error = (...parts) => output.push(parts.join(' '));
 	try {
 		resetExitCode();
-		runQualityCli(cfg, ['quality:all', '--all', '--skip-commands', '--skip-recommendations']);
+		runQualityCli(cfg, ['quality:all', '--all', '--skip-commands', '--skip-recommendations', '--fix']);
 	} finally {
 		console.error = originalErr;
 	}
 	const text = output.join('\n');
-	const pos = ['PREPARING SAFE FIXES', 'FORMAT', 'STATIC QUALITY', 'Dead Code', 'TESTS'].map((label) => text.indexOf(label));
+	const pos = ['STATIC QUALITY', '⠋ Dead Code', '✓ Dead Code', 'TESTS'].map((label) => text.indexOf(label));
 	assert.ok(pos.every((position) => position >= 0));
 	assert.deepEqual(
 		pos,
@@ -606,7 +912,7 @@ test('full quality keeps the supplemental TypeScript project check when extensio
 		},
 	});
 	resetExitCode();
-	runQualityCli(cfg, ['quality:all', '--all', '--skip-commands', '--skip-recommendations']);
+	runQualityCli(cfg, ['quality:all', '--all', '--skip-commands', '--skip-recommendations', '--fix']);
 	const invocations = fixtureText(root, 'tsc-args.jsonl')
 		.trim()
 		.split('\n')
@@ -620,15 +926,14 @@ test('createQualityAnalysis caches all selected source text and only creates AST
 	const root = fixtureRoot('terra-quality-analysis-');
 	fixtureFile(root, 'src/main.ts', 'export const value = true;\n');
 	fixtureFile(root, 'src/view.astro', '<div>view</div>\n');
-	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts', '.astro'] });
-	const analysis = createQualityAnalysis(cfg);
+	const analysis = createQualityAnalysis(createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts', '.astro'] }));
 	assert.deepEqual(analysis.files, [join(root, 'src/main.ts'), join(root, 'src/view.astro')].sort());
 	assert.equal(analysis.texts.get(join(root, 'src/view.astro')), '<div>view</div>\n');
 	assert.equal(analysis.sources.has(join(root, 'src/main.ts')), true);
 	assert.equal(analysis.sources.has(join(root, 'src/view.astro')), false);
 	assert.equal(typeof analysis.checker.getTypeAtLocation(analysis.sources.get(join(root, 'src/main.ts')).statements[0]), 'object');
 });
-test('runFormatter supports legacy and typed invocation forms, ignores Astro targets, and batches large scopes', () => {
+test('runFormatter supports legacy and typed invocation forms, includes Astro targets, and batches large scopes', () => {
 	const root = fixtureRoot('terra-quality-formatter-api-');
 	const cmd = recordingCmd(root);
 	fixtureFile(root, 'src/main.ts', 'const value = true;\n');
@@ -639,21 +944,106 @@ test('runFormatter supports legacy and typed invocation forms, ignores Astro tar
 	assert.deepEqual(invocations, [['--ignore-unknown', '--check', 'src/main.ts']]);
 	runFormatter(cfg, ['--write', 'src/main.ts']);
 	invocations = recordedCmds(root);
-	assert.deepEqual(invocations[1], ['--ignore-unknown', '--log-level=warn', '--write', 'src/main.ts']);
+	assert.deepEqual(invocations[1], ['--version']);
+	assert.deepEqual(invocations[2], ['--ignore-unknown', '--log-level=warn', '--write', 'src/main.ts']);
+	assert.deepEqual(invocations[3], ['--ignore-unknown', '--log-level=warn', '--check', 'src/main.ts']);
 	runFormatter(cfg, { fix: false, all: true, strict: false });
 	invocations = recordedCmds(root);
-	assert.deepEqual(invocations[2], ['--check', '--ignore-unknown', join(root, 'src/main.ts')]);
-	assert.equal(invocations.length, 3);
+	assert.deepEqual(invocations[4], ['--check', '--ignore-unknown', join(root, 'src/main.ts'), join(root, 'src/view.astro')]);
+	assert.equal(invocations.length, 5);
+});
+test('format CLI restricts structural formatting to its explicit target', () => {
+	const root = fixtureRoot('terra-quality-format-explicit-target-');
+	const target = fixtureFile(root, 'src/target.ts', 'export function target(value: boolean) {\n\tif (value) {\n\t\treturn true;\n\t}\n\treturn false;\n}\n');
+	const untouched = fixtureFile(root, 'src/untouched.ts', 'export function untouched(value: boolean) {\n\tif (value) {\n\t\treturn true;\n\t}\n\treturn false;\n}\n');
+	const originalUntouched = readFileSync(untouched, 'utf8');
+	const prettier = recordingCmd(root);
+	runQualityCli(createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], tools: { prettier } }), ['format', '--safe-fix', 'src/target.ts']);
+	assert.match(readFileSync(target, 'utf8'), /if \(value\)\s+return true;/u);
+	assert.equal(readFileSync(untouched, 'utf8'), originalUntouched);
+});
+test('format fix retries a write when Prettier reports unstable output', () => {
+	const root = fixtureRoot('terra-quality-format-retry-');
+	const target = fixtureFile(root, 'src/main.ts', "export const value='ready'\n");
+	const writes = fixtureFile(root, 'prettier-write-count.txt', '0');
+	const canonical = "export const value = 'ready';\n";
+	const prettier = fixtureFile(
+		root,
+		'bin/prettier.mjs',
+		`#!/usr/bin/env node
+import { readFileSync, writeFileSync } from 'node:fs';
+const target = ${JSON.stringify(target)};
+const writes = ${JSON.stringify(writes)};
+if (process.argv.includes('--version')) process.stdout.write('prettier 3\\n');
+else if (process.argv.includes('--write')) {
+	const count = Number(readFileSync(writes, 'utf8')) + 1;
+	writeFileSync(writes, String(count));
+	if (count > 1) writeFileSync(target, ${JSON.stringify(canonical)});
+} else if (process.argv.includes('--check') && readFileSync(target, 'utf8') !== ${JSON.stringify(canonical)}) process.exitCode = 1;
+`,
+		0o755,
+	);
+	runFormatter(createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], tools: { prettier } }), { fix: true, all: true, strict: false });
+	assert.equal(readFileSync(target, 'utf8'), canonical);
+	assert.equal(readFileSync(writes, 'utf8'), '2');
+});
+test('format fix excludes generated files while keeping authored sources in scope', () => {
+	const root = fixtureRoot('terra-quality-format-generated-');
+	const original = '// This file was generated by a fixture.\nexport function target(value: boolean) {\n\tif (value) {\n\t\treturn true;\n\t}\n\treturn false;\n}\n';
+	const target = fixtureFile(root, 'src/generated.ts', original);
+	const authored = fixtureFile(root, 'src/main.ts', 'export const ready = true;\n');
+	const prettier = recordingCmd(root);
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], tools: { prettier } });
+	runFormatter(cfg, { fix: true, all: true, strict: false });
+	assert.equal(readFileSync(target, 'utf8'), original);
+	assert.ok(recordedCmds(root).some((args) => args.includes(authored)));
+	assert.equal(
+		recordedCmds(root).some((args) => args.includes(target)),
+		false,
+	);
+	runFormatter(cfg, { fix: false, all: true, strict: false }, ['src']);
+	assert.ok(recordedCmds(root).some((args) => args.includes(authored)));
+	assert.equal(
+		recordedCmds(root).some((args) => args.includes(target)),
+		false,
+	);
 });
 test('runFormatter passes the complete source set in one argument-safe invocation', () => {
 	const root = fixtureRoot('terra-quality-formatter-batches-');
 	const cmd = recordingCmd(root);
 	for (let idx = 0; idx < 201; idx += 1) fixtureFile(root, `src/file-${String(idx).padStart(3, '0')}.ts`, `const value${idx} = true;\n`);
-	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], tools: { prettier: cmd } });
-	runFormatter(cfg, { fix: false, all: true, strict: false });
+	runFormatter(createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], tools: { prettier: cmd } }), { fix: false, all: true, strict: false });
 	const invocations = recordedCmds(root);
 	assert.equal(invocations.length, 1);
 	assert.equal(invocations[0].filter((a) => !a.startsWith('-')).length, 201);
+});
+test('runFormatter discovers Prettier config and ignore files under config/', () => {
+	const root = fixtureRoot('terra-quality-formatter-config-directory-');
+	const cmd = recordingCmd(root);
+	fixtureFile(root, 'src/main.ts', 'const value = true;\n');
+	fixtureFile(root, '.prettierrc.mjs', 'export default { singleQuote: false };\n');
+	fixtureFile(root, '.prettierignore', 'src/\n');
+	fixtureFile(root, 'config/.prettierrc.mjs', 'export default {};\n');
+	fixtureFile(root, 'config/.prettierignore', 'dist/\n');
+	runFormatter(createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], tools: { prettier: cmd } }), { fix: false, all: true, strict: false });
+	const args = recordedCmds(root)[0];
+	assert.ok(args.includes('--config'));
+	assert.ok(args.includes(join(root, 'config/.prettierrc.mjs')));
+	assert.ok(args.includes('--ignore-path'));
+	assert.ok(args.includes(join(root, 'config/.prettierignore')));
+	assert.equal(args.includes(join(root, '.prettierrc.mjs')), false);
+	assert.equal(args.includes(join(root, '.prettierignore')), false);
+});
+test('runFormatter discovers Prettier config and ignore files from configured configRoot', () => {
+	const root = fixtureRoot('terra-quality-formatter-config-root-');
+	const cmd = recordingCmd(root);
+	fixtureFile(root, 'src/main.ts', 'const value = true;\n');
+	fixtureFile(root, 'tooling/.prettierrc.mjs', 'export default {};\n');
+	fixtureFile(root, 'tooling/.prettierignore', 'dist/\n');
+	runFormatter(createQualityCfg({ root, configRoot: 'tooling', sourceRoots: ['src'], extensions: ['.ts'], tools: { prettier: cmd } }), { fix: false, all: true, strict: false });
+	const args = recordedCmds(root)[0];
+	assert.ok(args.includes(join(root, 'tooling/.prettierrc.mjs')));
+	assert.ok(args.includes(join(root, 'tooling/.prettierignore')));
 });
 test('runTypecheck honors custom command ownership and does not invoke it for a scoped file-only request', () => {
 	const root = fixtureRoot('terra-quality-typecheck-');
@@ -665,6 +1055,22 @@ test('runTypecheck honors custom command ownership and does not invoke it for a 
 	runTypecheck(cfg);
 	assert.equal(readFileSync(marker, 'utf8'), 'ran');
 });
+test('runTypecheck discovers the default tsconfig under configured configRoot', () => {
+	const root = fixtureRoot('terra-quality-typecheck-config-root-');
+	const cmd = recordingCmd(root, 'tsc-args.jsonl', 'bin/record-tsc.mjs');
+	fixtureFile(root, 'tsconfig.json', '{"extends":"./legacy.json"}\n');
+	fixtureFile(root, 'tooling/tsconfig.json', '{}\n');
+	runTypecheck(createQualityCfg({ root, configRoot: 'tooling', sourceRoots: ['src'], extensions: ['.ts'], tools: { tsc: cmd } }));
+	assert.deepEqual(recordedCmds(root, 'tsc-args.jsonl'), [['--noEmit', '-p', join(root, 'tooling/tsconfig.json')]]);
+});
+test('scoped TypeScript checks use the project config without passing explicit files', () => {
+	const root = fixtureRoot('terra-quality-typecheck-project-scope-');
+	const cmd = recordingCmd(root, 'tsc-args.jsonl', 'bin/record-tsc.mjs');
+	fixtureFile(root, 'tooling/tsconfig.json', '{}\n');
+	fixtureFile(root, 'src/main.ts', 'export const value = true;\n');
+	runTypecheck(createQualityCfg({ root, configRoot: 'tooling', sourceRoots: ['src'], extensions: ['.ts'], tools: { tsc: cmd } }), ['src/main.ts']);
+	assert.deepEqual(recordedCmds(root, 'tsc-args.jsonl'), [['--noEmit', '-p', join(root, 'tooling/tsconfig.json')]]);
+});
 test('CLI domain dispatch runs enabled commands, skips disabled commands, and rejects unknown domains', () => {
 	const root = fixtureRoot('terra-quality-domain-api-');
 	const marker = join(root, 'domain-ran.txt');
@@ -673,24 +1079,25 @@ test('CLI domain dispatch runs enabled commands, skips disabled commands, and re
 	runQualityCli(cfg, ['domain', 'fixture']);
 	assert.equal(readFileSync(marker, 'utf8'), 'ran');
 	fixtureFile(root, 'domain-ran.txt', 'reset');
-	const disabled = createQualityCfg({ root, sourceRoots: [], extensions: ['.ts'], qualityCommands: [cmd], enabledCommands: { fixture: false } });
-	runQualityCli(disabled, ['domain', 'fixture']);
+	runQualityCli(createQualityCfg({ root, sourceRoots: [], extensions: ['.ts'], qualityCommands: [cmd], enabledCommands: { fixture: false } }), ['domain', 'fixture']);
 	assert.equal(readFileSync(marker, 'utf8'), 'reset');
 	assert.throws(() => runQualityCli(cfg, ['domain', 'missing']), /Unknown quality domain/);
 });
 test('runQualityFromCfg loads JSON and reaches the same explicit domain boundary as an in-memory configuration', () => {
 	const root = fixtureRoot('terra-quality-from-config-');
 	const marker = join(root, 'from-config.txt');
-	const cfg = fixtureFile(
-		root,
-		'quality.json',
-		JSON.stringify({
-			sourceRoots: [],
-			extensions: ['.ts'],
-			qualityCommands: [{ name: 'fixture', command: process.execPath, args: ['-e', `require('node:fs').writeFileSync(${JSON.stringify(marker)}, 'ran')`] }],
-		}),
+	runQualityFromCfg(
+		fixtureFile(
+			root,
+			'quality.json',
+			JSON.stringify({
+				sourceRoots: [],
+				extensions: ['.ts'],
+				qualityCommands: [{ name: 'fixture', command: process.execPath, args: ['-e', `require('node:fs').writeFileSync(${JSON.stringify(marker)}, 'ran')`] }],
+			}),
+		),
+		['domain', 'fixture'],
 	);
-	runQualityFromCfg(cfg, ['domain', 'fixture']);
 	assert.equal(readFileSync(marker, 'utf8'), 'ran');
 });
 test('runQuality honors disabled findings categories without leaking a failure status', () => {
@@ -706,7 +1113,7 @@ test('runQuality honors disabled findings categories without leaking a failure s
 	assert.deepEqual(result.documentation, []);
 	assert.equal(process.exitCode, 0);
 });
-test('quality autofix fills missing TSDoc tags then reports blank prose for agent assistance', () => {
+test('quality autofix preserves comment bytes and reports missing TSDoc for agent repair', () => {
 	const root = fixtureRoot('terra-quality-tsdoc-quality-run-');
 	fixtureFile(
 		root,
@@ -743,18 +1150,18 @@ export function useDashboardConfigurationDialog(initialConfigure: DashboardConfi
 		},
 	});
 	resetExitCode();
-	runQualityCli(cfg, ['quality', '--all', '--skip-commands', '--skip-recommendations']);
+	const originalSource = fixtureText(root, 'src/main.ts');
+	runQualityCli(cfg, ['quality', '--all', '--skip-commands', '--skip-recommendations', '--fix']);
 	const src = fixtureText(root, 'src/main.ts');
-	assert.match(src, /@param initialConfigure\n \* @param allowed\n \*\n \* @return/);
-	assert.match(fixtureText(root, 'src/unrelated.ts'), /@return[\s\S]*function privateHelper\(\)/);
+	assert.equal(src, originalSource);
+	assert.equal(fixtureText(root, 'src/unrelated.ts'), 'function privateHelper() { return true; }\n');
 	assert.deepEqual(
 		runQuality(cfg).documentation.map((f) => [f.kind, f.name, f.severity]),
 		[
 			['param', '@param initialConfigure', 'error'],
 			['param', '@param allowed', 'error'],
 			['return', '@return', 'error'],
-			['summary', '<TSDoc summary>', 'error'],
-			['return', '@return', 'error'],
+			['function', 'privateHelper', 'error'],
 		],
 	);
 	assert.equal(process.exitCode, 1, 'documentation errors fail quality');
@@ -771,26 +1178,197 @@ test('CLI lint applies its autofix policy while the Knip audit remains read-only
 		0o755,
 	);
 	fixtureFile(root, 'src/main.ts', 'const value = true;\nvoid value;\n');
-	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], tools: { eslint, knip } });
+	fixtureFile(root, 'src/generated.ts', '// Generated by a code generator.\nexport const value = true;\n');
+	fixtureFile(root, 'knip.json', '{"entry": ["legacy.ts"]}\n');
+	fixtureFile(root, 'tooling/knip.json', '{}\n');
+	const cfg = createQualityCfg({ root, configRoot: 'tooling', sourceRoots: ['src'], extensions: ['.ts'], tools: { eslint, knip } });
 	runQualityCli(cfg, ['lint', '--all', '--warn']);
 	assert.deepEqual(recordedCmds(root, 'eslint-args.jsonl'), [
 		['--cache', '--cache-strategy', 'content', '--cache-location', 'node_modules/.cache/eslint', '--no-warn-ignored', join(root, 'src/main.ts')],
 	]);
 	cfg.enabledChecks = { lint: false };
-	runQualityCli(cfg, ['knip', '--all']);
-	assert.deepEqual(recordedCmds(root, 'knip-args.jsonl'), [
-		['--reporter', 'json', '--no-config-hints'],
-		['--reporter', 'json', '--no-config-hints'],
-	]);
+	runQualityCli(cfg, ['knip', '--all', '--fix']);
+	const initialCalls = recordedCmds(root, 'knip-args.jsonl');
+	assert.equal(initialCalls.length, 2);
+	assert.ok(initialCalls.every((args) => args[0] === '--config' && args.slice(2).join(' ') === '--reporter json --no-config-hints'));
+	const overlays = initialCalls.map((args) => args[1]);
+	assert.ok(overlays.every((path) => path !== join(root, 'tooling/knip.json')));
+	assert.notEqual(overlays[0], overlays[1], 'each Knip run gets its own temporary tool overlay');
 	runQualityCli(cfg, ['knip', '--all', '--warn']);
-	assert.deepEqual(recordedCmds(root, 'knip-args.jsonl').at(-1), ['--reporter', 'json', '--no-config-hints']);
+	const finalArgs = recordedCmds(root, 'knip-args.jsonl').at(-1);
+	assert.deepEqual(finalArgs.slice(0, 1), ['--config']);
+	assert.notEqual(finalArgs[1], join(root, 'tooling/knip.json'));
+	assert.deepEqual(finalArgs.slice(2), ['--reporter', 'json', '--no-config-hints']);
+});
+test('Knip shares source classification and normalizes nested package paths to repository scope', () => {
+	const root = fixtureRoot('terra-quality-knip-source-scope-');
+	const packageRoot = join(root, 'config');
+	fixtureFile(root, 'config/package.json', JSON.stringify({ name: 'nested-workspace', private: true }));
+	const knipConfig = fixtureFile(root, 'config/knip.json', JSON.stringify({ entry: ['src/main.js'], project: ['**/*.js'], ignoreFiles: ['existing.generated.js'] }));
+	fixtureFile(root, 'config/src/main.js', 'export const ready = true;\n');
+	fixtureFile(root, 'config/content/bundle.js', `!function(e){function t(r){return e[r]}}({${'var module={};'.repeat(1_000)}});\n`);
+	fixtureFile(root, 'config/content/orphan.js', 'export const orphan = true;\n');
+	const marker = join(root, 'knip-result.jsonl');
+	const knip = fixtureFile(
+		root,
+		'bin/record-knip.mjs',
+		`#!/usr/bin/env node
+import { appendFileSync, readFileSync } from 'node:fs';
+const args = process.argv.slice(2);
+const configPath = args[args.indexOf('--config') + 1];
+appendFileSync(${JSON.stringify(marker)}, JSON.stringify({ cwd: process.cwd(), configPath, config: JSON.parse(readFileSync(configPath, 'utf8')) }) + '\\n');
+process.stdout.write(JSON.stringify({ issues: [{ file: 'content/orphan.js', files: [{ name: 'content/orphan.js' }] }] }));
+process.exitCode = 1;
+`,
+		0o755,
+	);
+	const cfg = createQualityCfg({ root, configRoot: 'config', sourceRoots: ['config'], extensions: ['.js'], tools: { knip }, enabledChecks: { lint: false } });
+	const originalErr = console.error;
+	const output = [];
+	console.error = (...parts) => output.push(parts.join(' '));
+	try {
+		resetExitCode();
+		runQualityCli(cfg, ['knip', '--all', '--warn']);
+	} finally {
+		console.error = originalErr;
+		resetExitCode();
+	}
+	const invocation = JSON.parse(fixtureText(root, 'knip-result.jsonl'));
+	assert.equal(invocation.cwd, realpathSync(packageRoot));
+	assert.notEqual(invocation.configPath, knipConfig, 'source filtering uses a temporary merged Knip config');
+	assert.deepEqual(invocation.config.ignoreFiles, ['existing.generated.js', 'content/bundle.js']);
+	assert.equal(readFileSync(knipConfig, 'utf8'), JSON.stringify({ entry: ['src/main.js'], project: ['**/*.js'], ignoreFiles: ['existing.generated.js'] }));
+	assert.match(output.join('\n'), /config\/content\/orphan\.js/);
+});
+test('Knip resolves configured executables before entering a nested package and normalizes findings', () => {
+	const root = fixtureRoot('terra-quality-knip-nested-executable-');
+	const packageRoot = join(root, 'config');
+	fixtureFile(root, 'config/package.json', JSON.stringify({ name: 'nested-workspace', private: true }));
+	fixtureFile(root, 'config/knip.json', JSON.stringify({ entry: ['src/main.js'], project: ['src/**/*.js'] }));
+	fixtureFile(root, 'config/src/main.js', 'export const ready = true;\n');
+	fixtureFile(root, 'config/src/orphan.js', 'export const orphan = true;\n');
+	const executable = fixtureFile(
+		root,
+		'config/node_modules/.bin/knip',
+		`#!/usr/bin/env node
+import { appendFileSync } from 'node:fs';
+appendFileSync(${JSON.stringify(join(root, 'knip-result.jsonl'))}, JSON.stringify({ cwd: process.cwd(), executable: process.argv[1] }) + '\\n');
+process.stdout.write(JSON.stringify({ issues: [{ file: 'src/orphan.js', files: [{ name: 'src/orphan.js' }] }] }));
+process.exitCode = 1;
+`,
+		0o755,
+	);
+	const cfg = createQualityCfg({ root, configRoot: 'config', sourceRoots: ['config'], extensions: ['.js'], tools: { knip: 'config/node_modules/.bin/knip' }, enabledChecks: { lint: false } });
+	const originalErr = console.error;
+	const output = [];
+	console.error = (...parts) => output.push(parts.join(' '));
+	try {
+		resetExitCode();
+		runQualityCli(cfg, ['knip', '--all', '--warn']);
+	} finally {
+		console.error = originalErr;
+		resetExitCode();
+	}
+	const invocation = JSON.parse(fixtureText(root, 'knip-result.jsonl'));
+	assert.equal(invocation.cwd, realpathSync(packageRoot));
+	assert.equal(invocation.executable, executable);
+	assert.match(output.join('\n'), /config\/src\/orphan\.js/);
+});
+test('Knip selects the config root when explicit workspaces target both config and repository packages', () => {
+	const root = fixtureRoot('terra-quality-knip-explicit-config-root-');
+	fixtureFile(root, 'package.json', JSON.stringify({ name: 'workspace-shell', private: true }));
+	fixtureFile(root, 'config/package.json', JSON.stringify({ name: 'nested-app', private: true, devDependencies: { knip: '6.0.0' } }));
+	fixtureFile(root, 'config/quality-runner.mjs', 'export {};');
+	fixtureFile(root, 'src/pages/index.astro', '<h1>Home</h1>');
+	fixtureFile(
+		root,
+		'config/knip.json',
+		JSON.stringify({ workspaces: { '.': { entry: ['quality-runner.mjs'], project: ['**/*.{js,mjs,ts,tsx}'] }, '..': { entry: ['src/pages/**/*.astro'], project: ['src/**/*.{astro,js,ts,tsx}'] } } }),
+	);
+	const executable = fixtureFile(
+		root,
+		'config/node_modules/.bin/knip',
+		`#!/usr/bin/env node\nimport { appendFileSync } from 'node:fs';\nappendFileSync(${JSON.stringify(join(root, 'knip-cwd.jsonl'))}, JSON.stringify({ cwd: process.cwd() }) + '\\n');\nprocess.stdout.write(JSON.stringify({ issues: [] }));\n`,
+		0o755,
+	);
+	runQualityCli(createQualityCfg({ root, configRoot: 'config', sourceRoots: ['src'], extensions: ['.astro', '.js'], tools: { knip: executable }, enabledChecks: { lint: false } }), [
+		'knip',
+		'--all',
+		'--warn',
+	]);
+	assert.equal(JSON.parse(fixtureText(root, 'knip-cwd.jsonl')).cwd, realpathSync(join(root, 'config')));
+});
+test('Knip selects the repository root for explicit package workspaces defined from the repository', () => {
+	const root = fixtureRoot('terra-quality-knip-explicit-repo-root-');
+	fixtureFile(root, 'package.json', JSON.stringify({ name: 'workspace-shell', private: true }));
+	fixtureFile(root, 'packages/app/package.json', JSON.stringify({ name: 'app', private: true }));
+	fixtureFile(root, 'packages/app/src/main.js', 'export const ready = true;');
+	fixtureFile(root, 'config/knip.json', JSON.stringify({ workspaces: { 'packages/*': { entry: ['src/main.js'], project: ['src/**/*.js'] } } }));
+	const executable = fixtureFile(
+		root,
+		'config/node_modules/.bin/knip',
+		`#!/usr/bin/env node\nimport { appendFileSync } from 'node:fs';\nappendFileSync(${JSON.stringify(join(root, 'knip-cwd.jsonl'))}, JSON.stringify({ cwd: process.cwd() }) + '\\n');\nprocess.stdout.write(JSON.stringify({ issues: [] }));\n`,
+		0o755,
+	);
+	runQualityCli(createQualityCfg({ root, configRoot: 'config', sourceRoots: ['packages'], extensions: ['.js'], tools: { knip: executable }, enabledChecks: { lint: false } }), [
+		'knip',
+		'--all',
+		'--warn',
+	]);
+	assert.equal(JSON.parse(fixtureText(root, 'knip-cwd.jsonl')).cwd, realpathSync(root));
+});
+test('Knip accounts for configured tools only and reports unrelated dependencies and binaries', () => {
+	const root = fixtureRoot('terra-quality-knip-configured-tools-');
+	fixtureFile(root, 'config/package.json', JSON.stringify({ name: 'nested-workspace', private: true, devDependencies: { knip: '^6.0.0', prettier: '^3.0.0', 'unused-package': '1.0.0' } }));
+	fixtureFile(root, 'config/knip.json', '{}\n');
+	fixtureFile(root, 'config/src/main.js', 'export const ready = true;\n');
+	const knip = fixtureFile(
+		root,
+		'config/node_modules/.bin/knip',
+		`#!/usr/bin/env node
+import { appendFileSync, readFileSync } from 'node:fs';
+const args = process.argv.slice(2);
+const configPath = args[args.indexOf('--config') + 1];
+const config = JSON.parse(readFileSync(configPath, 'utf8'));
+appendFileSync(${JSON.stringify(join(root, 'knip-config.jsonl'))}, JSON.stringify({ ignoreDependencies: config.ignoreDependencies, ignoreBinaries: config.ignoreBinaries }) + '\\n');
+process.stdout.write(JSON.stringify({ issues: [{ file: 'package.json', devDependencies: [{ name: 'unused-package', line: 1 }], binaries: [{ name: 'unused-binary' }] }] }));
+process.exitCode = 1;
+`,
+		0o755,
+	);
+	const prettier = fixtureFile(root, 'config/node_modules/.bin/prettier', '#!/usr/bin/env node\nprocess.exitCode = 0;\n', 0o755);
+	const cfg = createQualityCfg({
+		root,
+		configRoot: 'config',
+		sourceRoots: ['config'],
+		extensions: ['.js'],
+		tools: { knip: 'config/node_modules/.bin/knip', prettier: 'config/node_modules/.bin/prettier', clang: 'clang' },
+		enabledChecks: { lint: false },
+	});
+	assert.equal(existsSync(knip), true);
+	assert.equal(existsSync(prettier), true);
+	const originalErr = console.error;
+	const output = [];
+	console.error = (...parts) => output.push(parts.join(' '));
+	try {
+		resetExitCode();
+		runQualityCli(cfg, ['knip', '--all', '--warn']);
+		assert.equal(process.exitCode, 1);
+	} finally {
+		console.error = originalErr;
+		resetExitCode();
+	}
+	const config = JSON.parse(fixtureText(root, 'knip-config.jsonl'));
+	assert.deepEqual(config.ignoreDependencies, ['knip', 'prettier']);
+	assert.deepEqual(config.ignoreBinaries, ['clang']);
+	assert.match(output.join('\n'), /unused-package/);
+	assert.match(output.join('\n'), /unused-binary/);
 });
 test('CLI lint passes the complete file set in one ESLint invocation', () => {
 	const root = fixtureRoot('terra-quality-lint-batches-');
 	const eslint = recordingCmd(root, 'eslint-args.jsonl', 'bin/record-eslint.mjs');
 	for (let idx = 0; idx < 11; idx += 1) fixtureFile(root, `src/file-${String(idx).padStart(2, '0')}.ts`, 'export {}\n');
-	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], tools: { eslint } });
-	runQualityCli(cfg, ['lint', '--all', '--warn']);
+	runQualityCli(createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], tools: { eslint } }), ['lint', '--all', '--warn']);
 	const invocations = recordedCmds(root, 'eslint-args.jsonl');
 	assert.equal(invocations.length, 1);
 	assert.equal(invocations[0].filter((arg) => arg.endsWith('.ts')).length, 11);
@@ -840,11 +1418,11 @@ export type Result = RecordData;
 		`import { runQualityFromCfg } from ${JSON.stringify(runnerUrl)};\nawait runQualityFromCfg(new URL('./quality.json', import.meta.url).pathname, process.argv.slice(2));\n`,
 	);
 	/**
-	 * Runs the fixture quality script with the supplied CLI arguments.
+	 * Runs the generated quality wrapper with the supplied CLI arguments.
 	 *
-	 * @param args Arguments passed to the quality script.
+	 * @param args Arguments passed through to the quality CLI.
 	 *
-	 * @return The synchronous child-process result.
+	 * @return Spawn result containing the wrapper's status and captured output.
 	 */
 	const runQuality = (...args) => spawnSync(process.execPath, [script, ...args], { cwd: root, encoding: 'utf8' });
 	const original = readFileSync(src, 'utf8');
@@ -852,11 +1430,11 @@ export type Result = RecordData;
 	assert.equal(readOnly.status, 1, readOnly.stderr);
 	assert.match(readOnly.stderr, /Duplicate named import/u);
 	assert.equal(readFileSync(src, 'utf8'), original);
-	const fixedRun = runQuality('quality:all', '--all', '--skip-commands', '--skip-recommendations');
+	const fixedRun = runQuality('quality:all', '--all', '--skip-commands', '--skip-recommendations', '--fix');
 	assert.equal(fixedRun.status, 0, fixedRun.stderr);
 	const fixed = readFileSync(src, 'utf8');
 	assert.equal((fixed.match(IMPORT_TYPE_RECORDDATA_FROM_TYPES_G_REGEX()) ?? []).length, 1);
-	const repeatRun = runQuality('quality:all', '--all', '--skip-commands', '--skip-recommendations');
+	const repeatRun = runQuality('quality:all', '--all', '--skip-commands', '--skip-recommendations', '--fix');
 	assert.equal(repeatRun.status, 0, repeatRun.stderr);
 	assert.equal(readFileSync(src, 'utf8'), fixed);
 });
@@ -948,6 +1526,7 @@ if (args.includes('--format') && args.includes('json'))
 	assert.doesNotMatch(outputText, FINDINGS_SUMMARY_REGEX);
 	assert.doesNotMatch(outputEvents.join(''), /(?:^|\n)\s*test feedback(?:\n|$)/u);
 	assert.match(outputText, /✓ Contract/);
+	assert.ok(outputEvents.findLastIndex((line) => line.includes('✗ Dead Code')) < outputEvents.findLastIndex((line) => line.includes('✓ Contract')));
 	resetExitCode();
 });
 test('the fixing quality command inlines safe values without broad comment cleanup', () => {
@@ -987,7 +1566,7 @@ CONFIG
 		},
 	});
 	resetExitCode();
-	runQualityCli(cfg, ['quality', '--all', '--skip-commands', '--skip-recommendations']);
+	runQualityCli(cfg, ['quality', '--all', '--skip-commands', '--skip-recommendations', '--fix']);
 	assert.match(fixtureText(root, 'src/view.ts'), /void \('ready'\)/);
 	assert.match(fixtureText(root, 'src/view.ts'), CONFIG_10_REGEX);
 	assert.match(fixtureText(root, 'src/untouched.ts'), CONFIG_10_REGEX);
@@ -1013,7 +1592,7 @@ process.stdout.write(JSON.stringify([{ filePath: file, messages: text.includes('
 	assert.equal(process.exitCode, 1);
 	assert.match(readFileSync(src, 'utf8'), FN_UNUSED_REGEX);
 	resetExitCode();
-	runQualityCli(cfg, ['dead-code', '--all']);
+	runQualityCli(cfg, ['dead-code', '--all', '--fix']);
 	assert.equal(process.exitCode, 0);
 	assert.doesNotMatch(readFileSync(src, 'utf8'), FN_UNUSED_REGEX);
 	assert.match(readFileSync(src, 'utf8'), /function used/);
@@ -1063,7 +1642,7 @@ process.stdout.write(JSON.stringify(files.map((filePath) => {
 		return true;
 	};
 	try {
-		runQualityCli(cfg, ['dead-code', '--all']);
+		runQualityCli(cfg, ['dead-code', '--all', '--fix']);
 	} finally {
 		process.stderr.write = originalStderrWrite;
 	}
@@ -1081,12 +1660,8 @@ process.stdout.write(JSON.stringify(files.map((filePath) => {
 	resetExitCode();
 });
 test('dead-code runs only the configured unused-variable rule through the local flat-config API', (t) => {
-	const workspaceRoot = fileURLToPath(new URL('../../../../', import.meta.url));
-	const workspaceModules = resolve(workspaceRoot, 'node_modules');
-	if (!existsSync(resolve(workspaceModules, 'eslint', 'package.json'))) {
-		t.skip('workspace ESLint is unavailable');
-		return;
-	}
+	const workspaceModules = resolve(fileURLToPath(new URL('../../../../', import.meta.url)), 'config/node_modules');
+	if (!existsSync(resolve(workspaceModules, 'eslint', 'package.json'))) throw new Error('The configured ESLint installation is required for this package test.');
 	const root = fixtureRoot('terra-quality-dead-code-focused-eslint-');
 	fixtureFile(root, 'src/[main].js', 'const unused = 1;\n');
 	fixtureFile(root, 'package.json', '{}\n');
@@ -1155,13 +1730,118 @@ test('dead-code CLI fails read-only for safe single-use fixes, then inlines the 
 		assert.match(output.join('\n'), /Agent action: Run the canonical dead-code autofix/);
 		output.length = 0;
 		resetExitCode();
-		runQualityCli(cfg, ['dead-code', '--all']);
+		runQualityCli(cfg, ['dead-code', '--all', '--fix']);
 		assert.equal(process.exitCode, 0);
 	} finally {
 		console.error = originalErr;
 	}
 	assert.doesNotMatch(readFileSync(src, 'utf8'), /const label/);
 	assert.match(readFileSync(src, 'utf8'), /export const result = \('ready'\)/);
+	resetExitCode();
+});
+test('full quality blocks on review-only single-use rewrites while safely fixing proven cases', () => {
+	const root = fixtureRoot('terra-quality-single-use-review-gate-');
+	const src = fixtureFile(
+		root,
+		'src/main.ts',
+		"const direct = 1;\nexport const value = direct;\nexport async function readValue() { const result = await Promise.resolve('ready'); const label = 'ready'; return { result, label }; }\n",
+	);
+	const cfg = createQualityCfg({
+		root,
+		sourceRoots: ['src'],
+		extensions: ['.ts'],
+		enabledChecks: {
+			format: false,
+			import: false,
+			name: false,
+			alias: false,
+			forward: false,
+			document: false,
+			lint: false,
+			knip: false,
+			'dead-code': true,
+			type: false,
+			recommend: false,
+			command: false,
+			diff: false,
+			github: false,
+		},
+	});
+	const originalErr = console.error;
+	const originalInfo = console.info;
+	const errs = [];
+	const info = [];
+	console.error = (...parts) => errs.push(parts.join(' '));
+	console.info = (...parts) => info.push(parts.join(' '));
+	try {
+		resetExitCode();
+		runQualityCli(cfg, ['quality', '--all', '--fix', '--skip-commands', '--skip-recommendations']);
+		assert.equal(process.exitCode, 1);
+		assert.match(errs.join('\n'), /\[ERROR\] typescript\/single-use: src\/main\.ts/);
+		assert.doesNotMatch(info.join('\n'), /non-blocking inlining suggestions/);
+		assert.doesNotMatch(readFileSync(src, 'utf8'), /const direct = 1/);
+		resetExitCode();
+		runQualityCli(cfg, ['dead-code', '--all', '--warn']);
+		assert.equal(process.exitCode, 1);
+		assert.match(errs.join('\n'), /\[ERROR\] typescript\/single-use: src\/main\.ts/);
+	} finally {
+		console.error = originalErr;
+		console.info = originalInfo;
+	}
+	resetExitCode();
+});
+test('full quality formats files changed by safe dead-code rewrites before verification', () => {
+	const root = fixtureRoot('terra-quality-dead-code-final-format-');
+	fixtureFile(root, 'node_modules/playwright-core/package.json', JSON.stringify({ name: 'playwright-core', types: 'types.d.ts' }));
+	fixtureFile(
+		root,
+		'node_modules/playwright-core/types.d.ts',
+		`export interface Locator {
+  getByRole(role: string, options?: { name?: string | RegExp }): Locator;
+  click(): Promise<void>;
+}
+export interface Page extends Locator {}
+`,
+	);
+	const source = fixtureFile(
+		root,
+		'src/main.ts',
+		`import type { Page } from 'playwright-core';
+async function inspect(page: Page) {
+  const saveButton = page.getByRole('button', { name: 'Save' });
+  await saveButton.click();
+}
+`,
+	);
+	const cfg = createQualityCfg({
+		root,
+		sourceRoots: ['src'],
+		extensions: ['.ts'],
+		tools: { prettier: PRETTIER_BIN },
+		enabledChecks: {
+			import: false,
+			name: false,
+			alias: false,
+			forward: false,
+			document: false,
+			lint: false,
+			knip: false,
+			'dead-code': true,
+			type: false,
+			recommend: false,
+			command: false,
+			diff: false,
+			github: false,
+		},
+	});
+	resetExitCode();
+	runQualityCli(cfg, ['quality', '--all', '--safe-fix', '--skip-commands', '--skip-recommendations']);
+	assert.equal(process.exitCode, 0);
+	assert.doesNotMatch(readFileSync(source, 'utf8'), /const saveButton/u);
+	assert.match(readFileSync(source, 'utf8'), /await .*getByRole/u);
+	resetExitCode();
+	runQualityCli(cfg, ['quality', '--all', '--warn', '--skip-commands', '--skip-recommendations']);
+	assert.equal(process.exitCode, 0);
 	resetExitCode();
 });
 test('dead-code warn preview copies formatter and browser-test configs before comparing Knip findings', () => {
@@ -1258,7 +1938,7 @@ process.stdout.write(JSON.stringify([{ filePath: file, messages }]));
 	);
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], tools: { eslint }, enabledChecks: { knip: false } });
 	resetExitCode();
-	runQualityCli(cfg, ['dead-code', '--all']);
+	runQualityCli(cfg, ['dead-code', '--all', '--fix']);
 	assert.equal(process.exitCode, 0);
 	const updated = fixtureText(root, 'src/main.ts');
 	assert.doesNotMatch(updated, /UnusedShape|AlsoUnused|Obsolete private shape/);
@@ -1292,7 +1972,7 @@ process.stdout.write(JSON.stringify([{ filePath: file, messages }]));
 	const originalErr = [console.error][0];
 	console.error = (...parts) => output.push(parts.join(' '));
 	try {
-		runQualityCli(cfg, ['dead-code', '--all']);
+		runQualityCli(cfg, ['dead-code', '--all', '--fix']);
 	} finally {
 		console.error = originalErr;
 	}
@@ -1324,7 +2004,7 @@ process.stdout.write(JSON.stringify([{ filePath: file, messages: offset < 0 ? []
 	const originalErr = [console.error][0];
 	console.error = (...parts) => output.push(parts.join(' '));
 	try {
-		runQualityCli(cfg, ['dead-code', '--all']);
+		runQualityCli(cfg, ['dead-code', '--all', '--fix']);
 	} finally {
 		console.error = originalErr;
 	}
@@ -1398,7 +2078,7 @@ test('dead-code reports a contradictory Knip result as an error', () => {
 	);
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], tools: { knip }, enabledChecks: { lint: false } });
 	resetExitCode();
-	runQualityCli(cfg, ['dead-code', '--all']);
+	runQualityCli(cfg, ['dead-code', '--all', '--fix']);
 	assert.equal(process.exitCode, 1, 'a detector disagreement is an error');
 	assert.match(fixtureText(root, 'src/auth.ts'), EXPORT_FN_CREATECLIENT_REGEX);
 	assert.match(fixtureText(root, 'src/consumer.ts'), /makeClient\(\)/);
@@ -1406,6 +2086,23 @@ test('dead-code reports a contradictory Knip result as an error', () => {
 	assert.equal(readFileSync(owner, 'utf8'), `export function createClient() { return 'ready'; }\n`);
 	assert.equal(readFileSync(consumer, 'utf8'), `import { createClient as makeClient } from './auth';\nexport const result = makeClient();\n`);
 	assert.equal(readFileSync(namespaceConsumer, 'utf8'), `import * as Auth from './auth';\nexport const namespaceResult = Auth.createClient();\n`);
+	resetExitCode();
+});
+test('dead-code preserves exports consumed by aliased TypeScript import types', () => {
+	const root = fixtureRoot('terra-quality-knip-import-type-consumer-');
+	const owner = fixtureFile(root, 'src/sanity.types.ts', `/** Generated type inventory. */\nexport type WorkshopCalendarRows = Array<{ start: string }>;\n`);
+	fixtureFile(root, 'src/actions.ts', `export type WorkshopCalendarSrc = import('@/sanity.types').WorkshopCalendarRows[number];\n`);
+	const knip = fixtureFile(
+		root,
+		'bin/knip-import-type.mjs',
+		`#!/usr/bin/env node\nprocess.stdout.write(JSON.stringify({ issues: [{ file: 'src/sanity.types.ts', types: [{ name: 'WorkshopCalendarRows', line: 2 }] }] }));\nprocess.exitCode = 1;\n`,
+		0o755,
+	);
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], aliases: { '@/': 'src/' }, tools: { knip }, enabledChecks: { lint: false } });
+	resetExitCode();
+	runQualityCli(cfg, ['dead-code', '--all', '--fix']);
+	assert.equal(process.exitCode, 1);
+	assert.equal(readFileSync(owner, 'utf8'), `/** Generated type inventory. */\nexport type WorkshopCalendarRows = Array<{ start: string }>;\n`);
 	resetExitCode();
 });
 test('dead-code warn reports manual findings with explicit autofix status and makes no source edits', () => {
@@ -1458,7 +2155,7 @@ test('dead-code reports Astro-consumed exports when Knip disagrees without modif
 	);
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.tsx', '.astro'], tools: { knip }, enabledChecks: { lint: false } });
 	resetExitCode();
-	runQualityCli(cfg, ['dead-code', '--all']);
+	runQualityCli(cfg, ['dead-code', '--all', '--fix']);
 	assert.equal(process.exitCode, 1, 'a detector disagreement is an error');
 	assert.equal(readFileSync(owner, 'utf8'), `export function Widget() { return null; }\n`);
 	assert.equal(readFileSync(astroPage, 'utf8'), `---\nimport { Widget as PageWidget } from './widget';\n---\n<PageWidget />\n`);
@@ -1514,7 +2211,7 @@ process.stdout.write(JSON.stringify([{ filePath: ${JSON.stringify(src)}, message
 	);
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], tools: { knip, eslint } });
 	resetExitCode();
-	runQualityCli(cfg, ['dead-code', '--all']);
+	runQualityCli(cfg, ['dead-code', '--all', '--fix']);
 	assert.equal(process.exitCode, 1, 'the unsupported ESLint location is an error');
 	assert.match(fixtureText(root, 'src/auth.ts'), EXPORT_FN_CREATECLIENT_REGEX);
 	assert.match(fixtureText(root, 'src/auth.ts'), /const extra = 1/);
@@ -1558,7 +2255,7 @@ test('dead-code preserves Astro frontmatter consumers resolved through configure
 	);
 	const cfg = createQualityCfg({ root, sourceRoots: ['astro/src'], extensions: ['.ts', '.astro'], aliases: { '@/': 'astro/src/' }, tools: { knip }, enabledChecks: { lint: false } });
 	resetExitCode();
-	runQualityCli(cfg, ['dead-code', '--all']);
+	runQualityCli(cfg, ['dead-code', '--all', '--fix']);
 	assert.equal(process.exitCode, 1, 'a detector disagreement is an error');
 	assert.equal(readFileSync(owner, 'utf8'), `export function createClient() { return 'ready'; }\n`);
 	assert.equal(readFileSync(astroPage, 'utf8'), `---\nimport { createClient } from '@/lib/auth.server';\nconst client = createClient();\n---\n<p>{client}</p>\n`);
@@ -1589,7 +2286,7 @@ if (issues.length) process.exitCode = 1;
 	);
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], tools: { knip }, enabledChecks: { lint: false }, frameworkEntryExports: { 'src/pages/**/*.ts': ['GET'] } });
 	resetExitCode();
-	runQualityCli(cfg, ['dead-code', '--all']);
+	runQualityCli(cfg, ['dead-code', '--all', '--fix']);
 	assert.equal(process.exitCode, 0);
 	assert.match(fixtureText(root, 'src/pages/api/report.ts'), EXPORT_CONST_GET_REGEX);
 	assert.match(fixtureText(root, 'src/pages/api/report.ts'), /const extra/);
@@ -1616,7 +2313,7 @@ if (issues.length) process.exitCode = 1;
 	);
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], tools: { knip }, enabledChecks: { lint: false } });
 	resetExitCode();
-	runQualityCli(cfg, ['dead-code', '--all']);
+	runQualityCli(cfg, ['dead-code', '--all', '--fix']);
 	assert.equal(process.exitCode, 1);
 	assert.equal(existsSync(unused), true);
 	resetExitCode();
@@ -1644,7 +2341,7 @@ process.stdout.write(JSON.stringify(reports));
 	);
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], tools: { eslint }, enabledChecks: { knip: false } });
 	resetExitCode();
-	runQualityCli(cfg, ['dead-code', '--all']);
+	runQualityCli(cfg, ['dead-code', '--all', '--fix']);
 	assert.equal(process.exitCode, 1, 'the type-rejected file remains an actionable error');
 	assert.match(readFileSync(src, 'utf8'), /function keep/);
 	assert.doesNotMatch(fixtureText(root, 'src/unused.ts'), /removeMe/);
@@ -1658,6 +2355,21 @@ test('dead-code fails closed when Knip exits unsuccessfully with an empty invent
 	assert.throws(() => runQualityCli(cfg, ['dead-code', '--warn']), /failure without findings/);
 	assert.equal(fixtureText(root, 'src/main.ts'), 'export const value = 1;\n');
 });
+test('dead-code accepts Knip duplicate findings grouped as nested arrays', () => {
+	const root = fixtureRoot('terra-quality-knip-duplicates-');
+	fixtureFile(root, 'src/runtime.ts', 'export const warn = 1;\nexport const error = 2;\n');
+	const knip = fixtureFile(
+		root,
+		'bin/knip.mjs',
+		`#!/usr/bin/env node\nprocess.stdout.write(JSON.stringify({ issues: [{ file: 'src/runtime.ts', duplicates: [[{ name: 'warn', line: 1 }, { name: 'error', line: 2 }]] }] }));\nprocess.exitCode = 1;\n`,
+		0o755,
+	);
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], tools: { knip }, enabledChecks: { lint: false } });
+	resetExitCode();
+	runQualityCli(cfg, ['dead-code', '--warn']);
+	assert.equal(process.exitCode, 1, 'duplicate exports remain actionable quality findings');
+	resetExitCode();
+});
 test('dead-code validates the full Knip inventory before changing any export', () => {
 	const root = fixtureRoot('terra-quality-knip-incomplete-inventory-');
 	const src = fixtureFile(root, 'src/main.ts', 'export const unused = 1;\n');
@@ -1668,7 +2380,7 @@ test('dead-code validates the full Knip inventory before changing any export', (
 		0o755,
 	);
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], tools: { knip }, enabledChecks: { lint: false } });
-	assert.throws(() => runQualityCli(cfg, ['dead-code', '--all']), /outside the repository/);
+	assert.throws(() => runQualityCli(cfg, ['dead-code', '--all', '--fix']), /outside the repository/);
 	assert.equal(readFileSync(src, 'utf8'), 'export const unused = 1;\n', 'malformed inventory is rejected before a partial fix');
 });
 test('dead-code fails closed when ESLint omits a configured source file', () => {
@@ -1697,18 +2409,18 @@ test('CLI recommendation execution is opt-in per invocation and command failures
 		recommendationCommands: [{ name: 'fixture', command: cmd, args: ['--advice'] }],
 	});
 	resetExitCode();
-	runQualityCli(cfg, ['quality', '--all']);
+	runQualityCli(cfg, ['quality', '--all', '--fix']);
 	assert.deepEqual(recordedCmds(root, 'recommendations.jsonl'), [['--advice']]);
 	assert.equal(process.exitCode, 0);
 	fixtureFile(root, 'recommendations.jsonl', '');
 	const failingCmd = fixtureFile(root, 'bin/failing-recommendation.mjs', '#!/usr/bin/env node\nprocess.exitCode = 2;\n', 0o755);
 	cfg.recommendationCommands = [{ name: 'fixture-failure', command: failingCmd }];
 	resetExitCode();
-	runQualityCli(cfg, ['quality', '--all']);
-	assert.equal(process.exitCode, 2);
+	runQualityCli(cfg, ['quality', '--all', '--fix']);
+	assert.equal(process.exitCode, 1, 'quality normalizes any failed recommendation command to a failing exit status');
 	fixtureFile(root, 'recommendations.jsonl', '');
 	resetExitCode();
-	runQualityCli(cfg, ['quality', '--all', '--skip-recommendations']);
+	runQualityCli(cfg, ['quality', '--all', '--skip-recommendations', '--fix']);
 	assert.equal(readFileSync(join(root, 'recommendations.jsonl'), 'utf8'), '');
 });
 test('CLI UI-pattern dispatch reports findings through the process exit status', () => {
@@ -1716,7 +2428,7 @@ test('CLI UI-pattern dispatch reports findings through the process exit status',
 	fixtureFile(root, 'src/view.tsx', '<button>Legacy</button>\n');
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.tsx'], uiPatterns: { forbidden: ['<button'] } });
 	resetExitCode();
-	runQualityCli(cfg, ['ui-patterns', '--all']);
+	runQualityCli(cfg, ['ui-patterns', '--all', '--fix']);
 	assert.equal(process.exitCode, 1);
 	resetExitCode();
 });
@@ -1724,15 +2436,26 @@ test('quality CLI checks and autofixes Tailwind canonical-class suggestions', as
 	const root = fixtureRoot('terra-quality-tailwind-cli-');
 	fixtureFile(root, 'package.json', '{"type":"module"}\n');
 	fixtureFile(root, 'styles/tailwind.css', '@import "tailwindcss";\n');
-	fixtureFile(root, 'node_modules/tailwindcss/package.json', JSON.stringify({ name: 'tailwindcss', type: 'module', main: 'index.mjs' }));
+	fixtureFile(root, 'node_modules/@tailwindcss/node/package.json', JSON.stringify({ name: '@tailwindcss/node', type: 'module', main: 'index.mjs' }));
 	fixtureFile(
 		root,
-		'node_modules/tailwindcss/index.mjs',
+		'node_modules/@tailwindcss/node/index.mjs',
 		`export async function __unstable__loadDesignSystem() {
-	return { canonicalizeCandidates(candidates) { return candidates.map((candidate) => candidate === 'border-[var(--sl-color-gray-5)]' ? 'border-(--sl-color-gray-5)' : candidate); } };
+	return {
+		canonicalizeCandidates(candidates) { return candidates.map((candidate) => candidate === 'border-[var(--sl-color-gray-5)]' ? 'border-(--sl-color-gray-5)' : candidate); },
+		resolveThemeValue(key) { return key === '--spacing' ? '0.25rem' : undefined; },
+		candidatesToAst(candidates) {
+			return candidates.map((candidate) => {
+				const match = /^(auto-rows|h)-(?:\\[(\\d+)px\\]|(\\d+))$/.exec(candidate);
+				if (!match) return null;
+				const value = match[2] ? match[2] + 'px' : 'calc(var(--spacing) * ' + match[3] + ')';
+				return [{ kind: 'rule', nodes: [{ kind: 'declaration', property: match[1] === 'h' ? 'height' : 'grid-auto-rows', value, important: false }] }];
+			});
+		},
+	};
 }\n`,
 	);
-	fixtureFile(root, 'src/view.tsx', '<div className="border-[var(--sl-color-gray-5)]" />\n');
+	fixtureFile(root, 'src/view.tsx', '<div className="border-[var(--sl-color-gray-5)] auto-rows-[220px] h-[52px]" />\n');
 	const cfg = createQualityCfg({
 		root,
 		sourceRoots: ['src'],
@@ -1761,17 +2484,17 @@ test('quality CLI checks and autofixes Tailwind canonical-class suggestions', as
 	});
 	resetExitCode();
 	await runQualityCli({ ...cfg, enabledChecks: { ...cfg.enabledChecks, 'tailwind-canonical': false } }, ['tailwind-canonical']);
-	await assert.rejects(runQualityCli({ ...cfg, autofix: { tailwindCanonical: false } }, ['tailwind-canonical']), /failed with 1 suggestion/);
+	await assert.rejects(runQualityCli({ ...cfg, autofix: { tailwindCanonical: false } }, ['tailwind-canonical']), /failed with 3 suggestions/);
 	await runQualityCli(cfg, ['quality', '--all', '--warn', '--skip-commands', '--skip-recommendations', '--report-json', 'quality.json']);
 	assert.equal(process.exitCode, 1, 'full quality records a Tailwind failure and continues instead of rejecting');
 	assert.deepEqual(
 		JSON.parse(fixtureText(root, 'quality.json')).checks.find((check) => check.name === 'tailwind-canonical'),
-		{ name: 'tailwind-canonical', status: 'failed', findings: 1 },
+		{ name: 'tailwind-canonical', status: 'failed', findings: 3 },
 	);
-	assert.equal(fixtureText(root, 'src/view.tsx'), '<div className="border-[var(--sl-color-gray-5)]" />\n');
+	assert.equal(fixtureText(root, 'src/view.tsx'), '<div className="border-[var(--sl-color-gray-5)] auto-rows-[220px] h-[52px]" />\n');
 	resetExitCode();
-	await runQualityCli(cfg, ['quality', '--all', '--skip-commands', '--skip-recommendations']);
-	assert.equal(fixtureText(root, 'src/view.tsx'), '<div className="border-(--sl-color-gray-5)" />\n');
+	await runQualityCli(cfg, ['quality', '--all', '--skip-commands', '--skip-recommendations', '--fix']);
+	assert.equal(fixtureText(root, 'src/view.tsx'), '<div className="border-(--sl-color-gray-5) auto-rows-55 h-13" />\n');
 	await runQualityCli(cfg, ['tailwind-canonical', '--warn', '--report-json', 'quality.json']);
 	assert.deepEqual(
 		JSON.parse(fixtureText(root, 'quality.json')).checks.find((check) => check.name === 'tailwind-canonical'),

@@ -1,0 +1,98 @@
+{
+	"$schema": "../packages/quality/quality.schema.json",
+	"root": ".",
+	"sourceRoots": ["."],
+	"languageProfiles": ["c", "java", "python"],
+	"extensions": [
+		".astro",
+		".c",
+		".cjs",
+		".cpp",
+		".cts",
+		".css",
+		".h",
+		".html",
+		".java",
+		".js",
+		".jsx",
+		".json",
+		".jsonc",
+		".md",
+		".mdx",
+		".mjs",
+		".mts",
+		".py",
+		".pyi",
+		".rs",
+		".sh",
+		".sql",
+		".toml",
+		".ts",
+		".tsx",
+		".yaml",
+		".yml"
+	],
+	"tools": {
+		"eslint": "config/node_modules/.bin/eslint",
+		"knip": "config/node_modules/.bin/knip",
+		"prettier": "config/node_modules/.bin/prettier",
+		"clang": "clang"
+	},
+	"oneLineImports": true,
+	"renameExports": true,
+	"typecheckCommand": {
+		"command": "node",
+		"args": ["config/scripts/typecheck.mjs"]
+	},
+	"prettierPrintWidth": 200,
+	"github": {
+		"repositories": ["salesphere-vh/salesphere", "Terra-Symposium/terra-symposium-website", "Terra-Symposium/standards", "kaimacann/portfolio"],
+		"requiredFeatures": ["dependencyGraph", "dependabotAlerts", "malwareAlerts", "securityUpdates", "versionUpdates", "groupedUpdates"]
+	},
+	"qualityCommands": [],
+	"autofix": {
+		"document": false
+	},
+	"documentation": {
+		"commandRoots": ["docs"],
+		"required": {
+			"types": true,
+			"functions": true,
+			"exportedFunctions": true
+		}
+	},
+	"performancePatterns": {
+		"extensions": [".js", ".jsx", ".ts", ".tsx"]
+	},
+	"security": {
+		"clientRoots": ["apps/hygiene/src/components"],
+		"runtimeRoots": [".agents/skills/all-repos/scripts", "apps/hygiene/netlify/functions", "apps/hygiene/scripts", "apps/hygiene/src/lib/server", "config", "packages", "scripts"]
+	},
+	"enabledChecks": {
+		"error-boundaries": true,
+		"document": true,
+		"format": true,
+		"import": true,
+		"name": true,
+		"forward": true,
+		"accessibility": true,
+		"display-name": true,
+		"performance-patterns": true,
+		"documented-commands": true,
+		"lint": true,
+		"knip": true,
+		"dead-code": true,
+		"type": true,
+		"recommend": true,
+		"command": true,
+		"diff": true,
+		"alias": true,
+		"security": true,
+		"repeated-classes": true,
+		"tailwind-canonical": true,
+		"regex-dedup": true,
+		"ui-patterns": true,
+		"ui-recommendations": true,
+		"github": true
+	}
+}

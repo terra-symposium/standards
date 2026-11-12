@@ -11,10 +11,10 @@ IMPORTS
 // API
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { createQualityCfg, inspectLanguageProfileTool, resolveLanguageProfiles, runQualityCli } from '../../dist/index.js';
+import { createQualityCfg, documentationFindings, inspectLanguageProfileTool, resolveLanguageProfiles, runQualityCli } from '../../dist/index.js';
 import { delimiter, dirname, join } from 'node:path';
 import { fixtureFile, fixtureRoot, fixtureText, resetExitCode } from '../../support/fixtures.mjs';
-import { readFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, symlinkSync } from 'node:fs';
 
 // DATA
 import { LANGUAGE_CAPABILITIES, QUALITY_CAPABILITY_AUTOFIXES, QUALITY_CAPABILITY_CHECKS } from '../../dist/index.js';
@@ -64,7 +64,7 @@ function fakeProfileTool(root, name, version) {
 	return fixtureFile(
 		root,
 		`bin/${name}`,
-		`#!/usr/bin/env node\nimport { appendFileSync } from 'node:fs';\nif (process.argv[2] === '--version' || process.argv[2] === '-version') console.log(${JSON.stringify(`${name} ${version}`)});\nelse appendFileSync(process.env.TERRA_QUALITY_PROFILE_MARKER, JSON.stringify({ name: ${JSON.stringify(name)}, args: process.argv.slice(2) }) + '\\n');\n`,
+		`#!/usr/bin/env node\nimport { appendFileSync } from 'node:fs';\nif (process.argv[2] === '--version' || process.argv[2] === '-version') console.log(${JSON.stringify(`${name} ${version}`)});\nelse if (process.argv.includes('-ast-dump=json')) console.log(JSON.stringify({ kind: 'TranslationUnitDecl', inner: [] }));\nelse appendFileSync(process.env.TERRA_QUALITY_PROFILE_MARKER, JSON.stringify({ name: ${JSON.stringify(name)}, args: process.argv.slice(2) }) + '\\n');\n`,
 		0o755,
 	);
 }
@@ -81,7 +81,6 @@ test('language profiles resolve only matching source files and optional project 
 	fixtureFile(root, 'src/Second.java', 'class Second {}\n');
 	fixtureFile(root, 'src/worker.py', 'pass\n');
 	fixtureFile(root, 'src/types.pyi', 'def work() -> None: ...\n');
-	fixtureFile(root, 'Doxyfile', 'INPUT = src\n');
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], languageProfiles: ['c', 'java', 'python'] });
 	const resolved = resolveLanguageProfiles(cfg);
 	assert.deepEqual(
@@ -90,7 +89,6 @@ test('language profiles resolve only matching source files and optional project 
 			'c-format',
 			'c-static-analysis',
 			'c-clang-tidy',
-			'c-documentation',
 			'java-format',
 			'java-checkstyle',
 			'java-pmd',
@@ -116,6 +114,7 @@ test('language profiles resolve only matching source files and optional project 
 		resolved.checks.find(({ name }) => name === 'python-lint')?.files.map((path) => path.slice(root.length + 1)),
 		['src/types.pyi', 'src/worker.py'],
 	);
+	assert.deepEqual(resolved.checks.find(({ name }) => name === 'python-docstring-coverage')?.args.slice(0, 2), ['--style=google', '--fail-under=100']);
 	const pmdArgs = resolved.checks.find(({ name }) => name === 'java-pmd')?.args ?? [];
 	assert.equal(pmdArgs[0], 'check');
 	assert.equal(pmdArgs[1], '-d');
@@ -137,7 +136,7 @@ test('selected profiles with no matching sources are reported as skipped', () =>
 		['java-format', 'java-checkstyle', 'java-pmd', 'java-spotbugs'],
 	);
 	assert.ok(resolved.skipped.every(({ reason }) => reason === 'no java source files were found'));
-	runQualityCli(cfg, ['quality', '--all', '--report-json', 'profile-report.json']);
+	runQualityCli(cfg, ['quality', '--all', '--report-json', 'profile-report.json', '--fix']);
 	const report = JSON.parse(fixtureText(root, 'profile-report.json'));
 	assert.equal(report.checks.find(({ name }) => name === 'command:java-format')?.status, 'skipped');
 	assert.equal(report.checks.find(({ name }) => name === 'command:java-checkstyle')?.status, 'skipped');
@@ -159,36 +158,29 @@ test('every built-in check and autofix has an explicit per-language capability d
 		}
 	}
 });
-test('documentation commands resolve automatically for detected source even when a full profile is not selected', () => {
+test('language documentation commands follow configured extensions when a full profile is not selected', () => {
 	const root = fixtureRoot('terra-quality-auto-documentation-profile-');
 	fixtureFile(root, 'src/private.py', 'def helper(value): return value\n');
-	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: [] });
-	const resolved = resolveLanguageProfiles(cfg);
+	const unconfigured = resolveLanguageProfiles(createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] }));
+	assert.deepEqual(unconfigured.checks, []);
+	assert.deepEqual(unconfigured.failed, []);
+	const configured = resolveLanguageProfiles(createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts', '.py'] }));
 	assert.deepEqual(
-		resolved.checks.map(({ name }) => name),
+		configured.checks.map(({ name }) => name),
 		['python-docstring-coverage', 'python-docstring-signatures'],
 	);
+	assert.deepEqual(
+		configured.checks.flatMap(({ files }) => files.map((path) => path.slice(root.length + 1))),
+		['src/private.py', 'src/private.py'],
+	);
 });
-test('missing required documentation configuration fails and JSON reports explicit N/A capabilities', () => {
+test('C documentation is a built-in source check and does not require a Doxyfile', () => {
 	const root = fixtureRoot('terra-quality-documentation-prerequisite-');
 	fixtureFile(root, 'src/main.c', 'static int helper(void) { return 1; }\n');
-	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: [], enabledChecks: { ...DISABLED_SOURCE_CHECKS, document: true } });
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.c'], enabledChecks: { ...DISABLED_SOURCE_CHECKS, document: true } });
 	const resolved = resolveLanguageProfiles(cfg);
-	assert.deepEqual(resolved.failed, [{ name: 'c-documentation', profileId: 'c', reason: 'required configuration Doxyfile is absent' }]);
-	const previousErr = console.error;
-	console.error = () => {};
-	try {
-		runQualityCli(cfg, ['quality', '--all', '--warn', '--report-json', 'report.json']);
-		const report = JSON.parse(fixtureText(root, 'report.json'));
-		assert.equal(report.checks.find(({ name }) => name === 'command:c-documentation')?.status, 'failed');
-		assert.match(report.checks.find(({ name }) => name === 'command:c-documentation')?.reason ?? '', /Doxyfile is absent/);
-		const inaccessible = report.checks.find(({ name }) => name === 'c:accessibility');
-		assert.equal(inaccessible?.status, 'not-applicable');
-		assert.match(inaccessible?.reason ?? '', /JSX\/TSX/);
-	} finally {
-		console.error = previousErr;
-		resetExitCode();
-	}
+	assert.deepEqual(resolved.failed, []);
+	assert.ok(documentationFindings(cfg).some(({ name, reason }) => name === 'helper' && reason.includes('missing documentation block')));
 });
 test('profile tool checks enforce their minimum version and include installation guidance', () => {
 	const root = fixtureRoot('terra-quality-language-tool-version-');
@@ -208,10 +200,18 @@ test('selected profiles fail clearly when a required tool is missing', () => {
 	const previousPath = process.env.PATH;
 	const previousErr = console.error;
 	const errs = [];
-	process.env.PATH = join(root, 'empty-bin');
+	const gitExecutable = previousPath
+		?.split(delimiter)
+		.map((directory) => join(directory, process.platform === 'win32' ? 'git.exe' : 'git'))
+		.find(existsSync);
+	assert.ok(gitExecutable, 'git must be available to verify Quality source discovery');
+	const isolatedPath = join(root, 'empty-bin');
+	mkdirSync(isolatedPath, { recursive: true });
+	symlinkSync(gitExecutable, join(isolatedPath, process.platform === 'win32' ? 'git.exe' : 'git'));
+	process.env.PATH = isolatedPath;
 	console.error = (...values) => errs.push(values.join(' '));
 	try {
-		runQualityCli(cfg, ['quality', '--all']);
+		runQualityCli(cfg, ['quality', '--all', '--fix']);
 		assert.equal(process.exitCode, 1);
 		assert.ok(errs.some((line) => line.includes('Required tool "ruff" is unavailable')));
 		assert.ok(errs.some((line) => line.includes('uv add --dev ruff')));
@@ -229,12 +229,10 @@ test('C, Java, and Python profiles invoke their native checks in phase order', (
 	fixtureFile(root, 'src/App.java', 'class App {}\n');
 	fixtureFile(root, 'src/worker.py', 'pass\n');
 	fixtureFile(root, 'src/types.pyi', 'def work() -> None: ...\n');
-	fixtureFile(root, 'Doxyfile', 'INPUT = src\n');
 	for (const [name, version] of [
 		['clang-format', '18.0.0'],
 		['clang', '18.0.0'],
 		['clang-tidy', '18.0.0'],
-		['doxygen', '1.9.8'],
 		['google-java-format', '1.36.0'],
 		['checkstyle', '14.0.0'],
 		['pmd', '7.13.0'],
@@ -254,15 +252,18 @@ test('C, Java, and Python profiles invoke their native checks in phase order', (
 	process.env.PATH = [join(root, 'bin'), dirname(process.execPath), previousPath].filter(Boolean).join(delimiter);
 	process.env.TERRA_QUALITY_PROFILE_MARKER = marker;
 	try {
-		const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: [], languageProfiles: ['c', 'java', 'python'], enabledChecks: { ...DISABLED_SOURCE_CHECKS, document: true } });
-		runQualityCli(cfg, ['quality', '--all', '--warn']);
+		runQualityCli(createQualityCfg({ root, sourceRoots: ['src'], extensions: [], languageProfiles: ['c', 'java', 'python'], enabledChecks: { ...DISABLED_SOURCE_CHECKS, document: true } }), [
+			'quality',
+			'--all',
+			'--warn',
+		]);
 		const calls = readFileSync(marker, 'utf8')
 			.trim()
 			.split('\n')
 			.map((line) => JSON.parse(line));
 		assert.deepEqual(
 			calls.map(({ name }) => name),
-			['clang-format', 'google-java-format', 'ruff', 'clang', 'clang-tidy', 'doxygen', 'checkstyle', 'pmd', 'ruff', 'bandit', 'vulture', 'interrogate', 'pydoclint', 'mypy', 'spotbugs'],
+			['clang-format', 'google-java-format', 'ruff', 'clang', 'clang-tidy', 'checkstyle', 'pmd', 'ruff', 'bandit', 'vulture', 'interrogate', 'pydoclint', 'mypy', 'spotbugs'],
 		);
 		resetExitCode();
 	} finally {
@@ -276,28 +277,23 @@ test('profile defaults can be overridden while arbitrary language commands remai
 	const root = fixtureRoot('terra-quality-language-command-overrides-');
 	fixtureFile(root, 'src/app.py', 'print("ready")\n');
 	const marker = join(root, 'commands.txt');
-	/**
-	 * Builds Node arguments that append a phase to the fixture marker.
-	 *
-	 * @param phase Name of the configured command phase.
-	 *
-	 * @return Arguments for the Node process.
-	 */
 	const append = (phase) => ['-e', `require('node:fs').appendFileSync(${JSON.stringify(marker)}, ${JSON.stringify(`${phase}\n`)})`];
-	const cfg = createQualityCfg({
-		root,
-		sourceRoots: ['src'],
-		extensions: [],
-		languageProfiles: ['python'],
-		enabledChecks: DISABLED_SOURCE_CHECKS,
-		enabledCommands: { 'python-mypy': false, 'python-bandit': false, 'python-vulture': false },
-		qualityCommands: [
-			{ name: 'python-format', command: process.execPath, args: append('format') },
-			{ name: 'python-lint', command: process.execPath, args: append('lint') },
-			{ name: 'rust-tests', command: process.execPath, args: append('custom') },
-		],
-	});
-	runQualityCli(cfg, ['quality', '--all']);
+	runQualityCli(
+		createQualityCfg({
+			root,
+			sourceRoots: ['src'],
+			extensions: [],
+			languageProfiles: ['python'],
+			enabledChecks: DISABLED_SOURCE_CHECKS,
+			enabledCommands: { 'python-mypy': false, 'python-bandit': false, 'python-vulture': false },
+			qualityCommands: [
+				{ name: 'python-format', command: process.execPath, args: append('format') },
+				{ name: 'python-lint', command: process.execPath, args: append('lint') },
+				{ name: 'rust-tests', command: process.execPath, args: append('custom') },
+			],
+		}),
+		['quality', '--all', '--fix'],
+	);
 	assert.equal(fixtureText(root, 'commands.txt'), 'format\nlint\ncustom\n');
 	resetExitCode();
 });
@@ -313,7 +309,7 @@ test('profile safe fixes run only in fix mode and use their native formatter/lin
 	try {
 		const enabledCmds = { 'python-mypy': false, 'python-bandit': false, 'python-vulture': false };
 		const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: [], languageProfiles: ['python'], enabledChecks: DISABLED_SOURCE_CHECKS, enabledCommands: enabledCmds });
-		runQualityCli(cfg, ['quality', '--all']);
+		runQualityCli(cfg, ['quality', '--all', '--fix']);
 		const calls = readFileSync(marker, 'utf8')
 			.trim()
 			.split('\n')

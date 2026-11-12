@@ -2,9 +2,9 @@ name: Terra test plan
 description: Run a repository test plan once with shared suite validation and reporting.
 inputs:
   manifest:
-    description: Repository-relative JSON test-plan path.
+    description: Repository-relative JSON test-plan path. Defaults to config/terra-tests.json, then tests/terra-tests.json, then the legacy root path.
     required: false
-    default: .terra-tests.json
+    default: ''
   suites:
     description: Optional comma-separated suite names. Empty runs every suite in manifest order.
     required: false
@@ -24,7 +24,10 @@ runs:
         TERRA_TEST_SHARED_ONLY: ${{ inputs.shared-only }}
       run: |
         set -euo pipefail
-        args=(run --root "$GITHUB_WORKSPACE" --manifest "$TERRA_TEST_MANIFEST")
+        args=(run --root "$GITHUB_WORKSPACE")
+        if [[ -n "$TERRA_TEST_MANIFEST" ]]; then
+          args+=(--manifest "$TERRA_TEST_MANIFEST")
+        fi
         if [[ -n "$TERRA_TEST_SUITES" ]]; then
           args+=(--suites "$TERRA_TEST_SUITES")
         fi

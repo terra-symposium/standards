@@ -9,7 +9,7 @@ IMPORTS
 // API
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { createHistoryReport, isHistorySourcePath } from '../../dist/lib/history-report.js';
+import { createHistoryReport, isHistorySourcePath } from '../../dist/lib/index.js';
 import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
 import { mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
@@ -34,19 +34,14 @@ function git(root, args, date) {
 /**
  * Create a temporary repository with source, tests, exclusions, renames, and dated commits.
  *
- * @return Temporary repository root and the first, second, and HEAD commit SHAs.
+ * @return A temporary Git repository and cleanup helper.
  */
 function historyFixture() {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-history-'));
 	git(root, ['init', '-q']);
 	git(root, ['config', 'user.name', 'Terra Test']);
 	git(root, ['config', 'user.email', 'terra@example.test']);
-	/**
-	 * Writes fixture contents beneath the temporary repository root.
-	 *
-	 * @param path Repository-relative file path.
-	 * @param contents Text to write to the fixture file.
-	 */
+
 	const write = (path, contents) => {
 		const tgt = join(root, path);
 		mkdirSync(join(tgt, '..'), { recursive: true });
@@ -140,12 +135,7 @@ test('merge commits count source changes against their first parent', () => {
 		git(root, ['init', '-q', '--initial-branch=main']);
 		git(root, ['config', 'user.name', 'Terra Test']);
 		git(root, ['config', 'user.email', 'terra@example.test']);
-		/**
-		 * Writes fixture contents beneath the temporary repository root.
-		 *
-		 * @param path Repository-relative file path.
-		 * @param contents Text to write to the fixture file.
-		 */
+
 		const write = (path, contents) => {
 			const tgt = join(root, path);
 			mkdirSync(join(tgt, '..'), { recursive: true });
@@ -164,8 +154,7 @@ test('merge commits count source changes against their first parent', () => {
 		git(root, ['commit', '-qm', 'main change']);
 		git(root, ['merge', '--no-ff', '-qm', 'merge feature', 'feature']);
 		const headSha = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim();
-		const report = createHistoryReport(root, { repository: 'owner/repo', branch: 'main' });
-		const merge = report.commits.find((commit) => commit.sha === headSha);
+		const merge = createHistoryReport(root, { repository: 'owner/repo', branch: 'main' }).commits.find((commit) => commit.sha === headSha);
 		assert.ok(merge);
 		assert.equal(merge.additions, 1);
 		assert.equal(merge.deletions, 0);

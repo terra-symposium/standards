@@ -1,0 +1,34 @@
+---
+title: Quality check map
+description: Choose the reference for built-in source checks or optional tools and repository commands.
+---
+
+Terra Quality separates source analysis from native tool and repository command execution. Use the map below to go directly to the check family; exact field names and defaults are in the [quality.json reference](/quality/2-configuration/quality-json/).
+
+| Reference                                                           | Covers                                                                                         |
+| ------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| [Source checks](/quality/3-checks/source-checks/)                   | Documentation, formatting, imports, naming, accessibility, boundaries, and performance checks. |
+| [Refactoring checks](/quality/3-checks/refactoring-checks/)         | Forwarding, aliases, single-use declarations, and dead-code analysis.                          |
+| [Repository pattern checks](/quality/3-checks/repository-patterns/) | Security, repeated classes, regex, Tailwind, and UI conventions.                               |
+| [Tool and command checks](/quality/3-checks/tooling-checks/)        | ESLint, Knip, TypeScript, diff checks, configured commands, and recommendations.               |
+| [Capability packages](/quality/1-packages/package-map/)             | The public API and CLI for each package.                                                       |
+
+A typical run first selects source files, executes built-in checks, applies eligible fixes, then runs configured tools and commands in the aggregate runner's fixed phase order. The diagram shows that relationship at a high level.
+
+<Nodes
+	direction="LR"
+	nodes={[
+		{ id: 'scope', type: 'origin', data: { title: 'Select source scope' } },
+		{ id: 'built-in', type: 'process', data: { title: 'Built-in checks' } },
+		{ id: 'tools', type: 'process', data: { title: 'Configured tools' } },
+		{ id: 'commands', type: 'process', data: { title: 'Repository commands' } },
+		{ id: 'report', type: 'terminal', data: { title: 'Findings and exit status' } },
+	]}
+	edges={[
+		{ id: 'scope-built-in', source: 'scope', target: 'built-in' },
+		{ id: 'built-in-tools', source: 'built-in', target: 'tools' },
+		{ id: 'tools-commands', source: 'tools', target: 'commands' },
+		{ id: 'commands-report', source: 'commands', target: 'report' },
+	]}
+	height={230}
+/>

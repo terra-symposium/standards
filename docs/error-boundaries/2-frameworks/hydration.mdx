@@ -1,0 +1,43 @@
+---
+title: Contain Astro island failures
+description: Add a static island fallback or page-level recovery for Astro hydration errors.
+---
+
+Use an Astro hydration boundary for failures that occur before a framework island finishes hydrating. It complements a React `ErrorBoundary`: the Astro fallback can appear even when the island's client code did not start.
+
+## Wrap one island
+
+```astro
+---
+import AstroErrorBoundary from '@terra-symposium/standards-error-boundaries/astro-boundary';
+import Workspace from '../components/Workspace.tsx';
+---
+
+<AstroErrorBoundary
+	title="Workspace unavailable"
+	description="The interactive workspace did not start. Reload to try again."
+>
+	<Workspace client:load />
+</AstroErrorBoundary>
+```
+
+The wrapper provides server-rendered HTML and listens for Astro's cancelable `astro:hydration-error` event. When the failing island is inside it, the component is hidden and the adjacent `role="alert"` fallback is revealed. Its reload link returns to the current URL. Choose a title and description that explain the user-facing impact; do not put error details into the visible fallback.
+
+=== [Page-level integration]
+
+To provide one fallback for any failed island on a page, add the integration in `astro.config.mjs`:
+
+```js
+import { defineConfig } from 'astro/config';
+import { terraErrorBoundaryIntegration } from '@terra-symposium/standards-error-boundaries/astro-integration';
+
+export default defineConfig({
+	integrations: [terraErrorBoundaryIntegration()],
+});
+```
+
+The integration installs a listener before hydration. It ignores already-handled events and disconnected targets, prevents Astro's default handling for the captured event, and inserts an accessible reload fallback next to the failed island.
+
+Use either the wrapper or page-level integration according to the desired recovery scope. Avoid installing both around the same failure without testing the event order; the first handler that prevents the event owns that recovery. A server-rendering failure before HTML is sent remains the server/framework's responsibility.
+
+# The Terra Website's browser suite covers both the shared React fallback and Astro hydration-error reporting in `tests/astro/error-analysis/render-capture.spec.ts`. Use that existing fixture rather than adding a second demo page. For Astro response statuses, see [route error helpers](/error-boundaries/2-frameworks/route-errors/).

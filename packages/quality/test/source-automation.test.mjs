@@ -9,8 +9,12 @@ IMPORTS
 
 // API
 import assert from 'node:assert/strict';
+import { execFileSync, spawnSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import test from 'node:test';
-import { accessibilityFindings, createQualityCfg, displayNameFindings, fixAccessibleNames, fixDisplayNames, qualityCheckEnabled } from '../dist/index.js';
+import { fileURLToPath } from 'node:url';
+import { accessibilityFindings, createQualityCfg, displayNameFindings, fixAccessibleNames, fixDisplayNames, qualityCheckEnabled, runQualityCli } from '../dist/index.js';
 import { fixtureFile, fixtureRoot, fixtureText } from '../support/fixtures.mjs';
 
 /*//////////////////////////////////////////////////
@@ -20,14 +24,120 @@ HELPERS
 /**
  * Creates a quality config scoped to one JSX fixture.
  *
- * @param source JSX source written to the fixture file.
+ * @param source JSX contents written to the fixture's view component.
  *
- * @return Fixture root and its quality configuration.
+ * @return Fixture root and quality configuration targeting the view component.
  */
 function fixtureConfig(source) {
 	const root = fixtureRoot('terra-quality-accessibility-');
 	fixtureFile(root, 'src/view.tsx', source);
 	return { root, cfg: createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.tsx'] }) };
+}
+
+/**
+ * Confirms the explicit quality fix command preserves workflow behavior and generated assets.
+ *
+ * @return Nothing.
+ */
+function verifySafeFixSourceOwnership() {
+	const root = fixtureRoot('terra-quality-source-fix-ownership-');
+	execFileSync('git', ['init', '--quiet'], { cwd: root });
+	fixtureFile(root, 'package.json', JSON.stringify({ type: 'module' }));
+	fixtureFile(root, '.prettierrc.json', JSON.stringify({ useTabs: true, tabWidth: 2 }));
+	const workflow = fixtureFile(
+		root,
+		'scripts/run-quality.mjs',
+		`import { appendFileSync } from 'node:fs';
+import { runQualityFromCfg } from './quality-stub.mjs';
+
+/** Preserve the CLI argument order while identifiers receive concise aliases. */
+function recordEvaluation(name, value) {
+	appendFileSync('evaluation-order.log', name + '\\n');
+	return value;
+}
+
+const repositoryRoot = recordEvaluation('root', process.cwd());
+const command = recordEvaluation('args', process.argv.slice(2));
+await runQualityFromCfg(repositoryRoot, command);
+`,
+	);
+	fixtureFile(
+		root,
+		'scripts/quality-stub.mjs',
+		`import { appendFileSync } from 'node:fs';
+import { join } from 'node:path';
+
+export async function runQualityFromCfg(root, args) {
+	appendFileSync(join(root, 'forwarded-args.jsonl'), JSON.stringify(args) + '\\n');
+}
+`,
+	);
+	const declaration = `/// <reference types="vite/client" />\n\ninterface ImportMetaEnv {\n\treadonly VITE_API_URL: string;\n}\n\ninterface ImportMeta {\n\treadonly env: ImportMetaEnv;\n}\n`;
+	const minified = `!function(e){${'var module={};module.exports=function(value){return value+1};'.repeat(220)}};
+//# sourceMappingURL=bundle.js.map
+`;
+	const courseDataPath = fixtureFile(root, 'content/course-data.js', `globalThis.COURSE_DATA = { title: 'Captured course', modules: [{ name: 'Week one' }] };\n`);
+	fixtureFile(root, 'src/vite-env.d.ts', declaration);
+	fixtureFile(root, 'content/viewer/bundle.js', minified);
+	const cfg = createQualityCfg({
+		root,
+		sourceRoots: ['.'],
+		extensions: ['.js', '.mjs', '.ts', '.tsx'],
+		tools: { prettier: fileURLToPath(new URL('../../../config/node_modules/.bin/prettier', import.meta.url)) },
+		enabledChecks: {
+			document: false,
+			format: true,
+			import: false,
+			name: true,
+			forward: false,
+			accessibility: false,
+			'display-name': false,
+			'performance-patterns': false,
+			'documented-commands': false,
+			lint: false,
+			knip: false,
+			'dead-code': false,
+			type: false,
+			recommend: false,
+			command: false,
+			diff: false,
+			alias: false,
+			security: false,
+			'repeated-classes': false,
+			'tailwind-canonical': false,
+			'regex-dedup': false,
+			'ui-patterns': false,
+			'ui-recommendations': false,
+			'error-boundaries': false,
+			github: false,
+		},
+	});
+	const beforeCourseData = readFileSync(courseDataPath, 'utf8');
+	const beforeDeclaration = readFileSync(join(root, 'src/vite-env.d.ts'), 'utf8');
+	const beforeMinified = readFileSync(join(root, 'content/viewer/bundle.js'), 'utf8');
+	const originalWorkflow = readFileSync(workflow, 'utf8');
+	runQualityCli(cfg, ['quality', '--warn', '--skip-commands', '--skip-recommendations']);
+	assert.equal(readFileSync(workflow, 'utf8'), originalWorkflow, 'warning mode must not modify an untracked source');
+	assert.equal(readFileSync(courseDataPath, 'utf8'), beforeCourseData);
+	assert.equal(readFileSync(join(root, 'src/vite-env.d.ts'), 'utf8'), beforeDeclaration);
+	assert.equal(readFileSync(join(root, 'content/viewer/bundle.js'), 'utf8'), beforeMinified);
+	runQualityCli(cfg, ['quality', '--safe-fix', '--skip-commands', '--skip-recommendations']);
+	const fixedWorkflow = readFileSync(workflow, 'utf8');
+	assert.match(fixedWorkflow, /const repoRoot = recordEvaluation\(["']root["'], process\.cwd\(\)\);/u);
+	assert.match(fixedWorkflow, /const cmd = recordEvaluation\(["']args["'], process\.argv\.slice\(2\)\);/u);
+	assert.match(fixedWorkflow, /runQualityFromCfg\(repoRoot, cmd\)/u);
+	assert.match(fixedWorkflow, /\/\*\* Preserve the CLI argument order while identifiers receive concise aliases\. \*\//u);
+	assert.ok(fixedWorkflow.indexOf('node:fs') < fixedWorkflow.indexOf('quality-stub.mjs'));
+	assert.doesNotMatch(fixedWorkflow, /\/\/\s*(?:API|IMPORTS|HELPERS|CONFIG)\b/u);
+	assert.equal(readFileSync(courseDataPath, 'utf8'), beforeCourseData);
+	assert.equal(readFileSync(join(root, 'src/vite-env.d.ts'), 'utf8'), beforeDeclaration);
+	assert.equal(readFileSync(join(root, 'content/viewer/bundle.js'), 'utf8'), beforeMinified);
+	assert.deepEqual(execFileSync('git', ['ls-files', 'scripts/run-quality.mjs'], { cwd: root, encoding: 'utf8' }).trim(), '');
+	const execution = spawnSync(process.execPath, [workflow, 'quality', '--warn', 'extra'], { cwd: root, encoding: 'utf8' });
+	assert.equal(execution.status, 0, execution.stderr);
+	assert.equal(readFileSync(join(root, 'evaluation-order.log'), 'utf8'), 'root\nargs\n');
+	assert.deepEqual(JSON.parse(readFileSync(join(root, 'forwarded-args.jsonl'), 'utf8')), ['quality', '--warn', 'extra']);
+	return root;
 }
 
 /*//////////////////////////////////////////////////
@@ -67,6 +177,9 @@ test('new default-path checks require an explicit rollout toggle', () => {
 	assert.equal(qualityCheckEnabled(enabled, 'accessibility'), true);
 	assert.equal(qualityCheckEnabled(enabled, 'display-name'), true);
 	assert.equal(qualityCheckEnabled(enabled, 'documented-commands'), true);
+});
+test('explicit safe fixes preserve untracked workflow semantics and leave captured assets untouched', () => {
+	verifySafeFixSourceOwnership();
 });
 test('aria-labelledby requires a literal reference with source-evident content', () => {
 	const { cfg } = fixtureConfig(`
@@ -234,6 +347,19 @@ test('displayName assignments resolve within lexical scope when component names 
 	assert.deepEqual(fixDisplayNames(cfg), { fixed: 1, skipped: 0 });
 	assert.match(fixtureText(root, 'src/components.tsx'), /function second\(\) \{\n\tconst Button = forwardRef\(\(\) => null\);\n\tButton\.displayName = 'Button';/);
 	assert.deepEqual(displayNameFindings(cfg), []);
+});
+test('displayName accepts a shared primitive name while preserving review for custom strings', () => {
+	const root = fixtureRoot('terra-quality-display-name-shared-primitive-');
+	fixtureFile(
+		root,
+		'src/components.tsx',
+		`const AccordionTrigger = React.forwardRef(() => null);\nAccordionTrigger.displayName = AccordionPrimitive.Trigger.displayName;\nconst Custom = React.forwardRef(() => null);\nCustom.displayName = 'SpecializedName';\n`,
+	);
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.tsx'] });
+	assert.deepEqual(displayNameFindings(cfg), [{ file: 'src/components.tsx', line: 3, column: 7, component: 'Custom', recommendation: 'review existing Custom.displayName assignment' }]);
+	assert.deepEqual(fixDisplayNames(cfg), { fixed: 0, skipped: 1 });
+	assert.match(fixtureText(root, 'src/components.tsx'), /AccordionTrigger\.displayName = AccordionPrimitive\.Trigger\.displayName/);
+	assert.match(fixtureText(root, 'src/components.tsx'), /Custom\.displayName = 'SpecializedName'/);
 });
 test('displayName fixer leaves malformed source untouched', () => {
 	const root = fixtureRoot('terra-quality-display-name-malformed-');

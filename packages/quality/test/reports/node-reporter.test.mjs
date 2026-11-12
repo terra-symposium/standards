@@ -17,9 +17,9 @@ REGEX
 //////////////////////////////////////////////////*/
 
 /**
- * Creates a fresh global pattern for extracting progress fractions.
+ * Creates a fresh global matcher for test-count progress counters.
  *
- * @return A global regular expression that matches an `N/N` fraction.
+ * @return Global regular expression for extracting a passed/total count.
  */
 const D_D_GU_REGEX = () => /(\d+\/\d+)/gu;
 

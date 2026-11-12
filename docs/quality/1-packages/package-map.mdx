@@ -1,0 +1,43 @@
+---
+title: Quality package map
+description: Choose the aggregate runner, shared core, and focused package for a reusable capability.
+---
+
+Terra Quality publishes one aggregate runner, an API-only shared core, and focused capability packages. Use the aggregate when a repository needs one ordered command and combined reports; use a capability directly when an integration needs one family of checks.
+
+## Choose the package boundary
+
+||| [Aggregate workflow]
+
+Use `@terra-symposium/standards-quality` for the full schema, phase ordering, configured commands, progress, external-tool orchestration, compatibility APIs, combined reports, and development-port helpers.
+|||
+
+||| [Focused capability]
+
+Install a capability package when an integration needs only its check family or public helper. Each capability exposes its own API and CLI and reads the same `quality.json` through `standards-quality-core`.
+|||
+
+## Package references
+
+Each capability has a leaf reference with its installation, public exports, CLI scope, configuration, and ownership limits.
+
+| Package                                                           | Responsibility                                                                               | CLI                                  |
+| ----------------------------------------------------------------- | -------------------------------------------------------------------------------------------- | ------------------------------------ |
+| [standards-quality](/quality/1-packages/quality/)                 | Aggregate schema, phase orchestration, compatibility APIs, commands, reports, and dev ports. | `terra-quality`, `terra-quality-dev` |
+| [standards-quality-core](/quality/1-packages/quality-core/)       | Shared configuration, source scope, analysis context, types, and CLI flags.                  | API only                             |
+| [standards-documentation](/quality/1-packages/documentation/)     | TSDoc/JSDoc, Doxygen, and documented commands.                                               | `terra-documentation`                |
+| [standards-formatting](/quality/1-packages/formatting/)           | Source layout, safe structural transforms, and Prettier integration.                         | `terra-formatting`                   |
+| [standards-imports](/quality/1-packages/imports/)                 | Local import resolution and duplicate-import findings.                                       | `terra-imports`                      |
+| [standards-language-checks](/quality/1-packages/language-checks/) | Optional C, Java, and Python profiles.                                                       | `terra-language-checks`              |
+| [standards-naming](/quality/1-packages/naming/)                   | Naming and alias checks with safe rename helpers.                                            | `terra-naming`                       |
+| [standards-patterns](/quality/1-packages/patterns/)               | Performance, repeated classes, regex, Tailwind, and UI patterns.                             | `terra-patterns`                     |
+| [standards-quality-reports](/quality/1-packages/quality-reports/) | GitHub/history reports and test-runner reporters.                                            | `terra-quality-reports`              |
+| [standards-refactoring](/quality/1-packages/refactoring/)         | Forwarding, single-use, and dead-code analysis.                                              | `terra-refactoring`                  |
+| [standards-security](/quality/1-packages/security/)               | Built-in repository source-security findings.                                                | `terra-security`                     |
+| [standards-ui-quality](/quality/1-packages/ui-quality/)           | Accessibility, display names, boundaries, and UI recommendations.                            | `terra-ui-quality`                   |
+
+=== [Package authoring boundary]
+The shared core is a dependency for capability authors. It owns generic source scope and shared contracts, not check-specific findings. Capability packages must not import from the aggregate runner; the aggregate composes their public APIs.
+===
+
+For rule enablement and autofix limits, read the [source check reference](/quality/3-checks/source-checks/) and [tool check reference](/quality/3-checks/tooling-checks/).

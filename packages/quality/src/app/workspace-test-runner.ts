@@ -10,17 +10,14 @@ IMPORTS
 // API
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { qualityNodeReporterOptions } from '../lib/node-reporter.js';
-import { qualityProgress } from '../lib/progress.js';
+import { qualityNodeReporterOptions } from '@terra-symposium/standards-quality-reports';
+import { qualityProgress } from '@terra-symposium/standards-quality-core';
 import { spawnSync } from 'node:child_process';
 
 /*//////////////////////////////////////////////////
 RUNNER
 //////////////////////////////////////////////////*/
 
-const env = { ...process.env };
-env.NODE_OPTIONS = qualityNodeReporterOptions(env.NODE_OPTIONS, new URL('../lib/node-reporter.js', import.meta.url).href);
-env.TERRA_QUALITY_NODE_REPORTER_OWNER = '1';
 const suites = [
 	'@terra-symposium/standards-error-boundaries',
 	'@terra-symposium/standards-quality',
@@ -32,7 +29,11 @@ let failed = false;
 console.error('\nTESTS\n  Unit / Contract · Standards workspace');
 qualityProgress('Test suites', 0, suites.length);
 for (const [idx, name] of suites.entries()) {
-	const result = spawnSync('pnpm', ['--filter', name, 'test'], { cwd: resolve(dirname(fileURLToPath(import.meta.url)), '../../../..'), stdio: 'inherit', env });
+	const result = spawnSync('pnpm', ['--filter', name, 'test'], {
+		cwd: resolve(dirname(fileURLToPath(import.meta.url)), '../../../..'),
+		stdio: 'inherit',
+		env: { ...process.env, NODE_OPTIONS: qualityNodeReporterOptions(process.env.NODE_OPTIONS, new URL('../lib/node-reporter.js', import.meta.url).href), TERRA_QUALITY_NODE_REPORTER_OWNER: '1' },
+	});
 	if (result.error) {
 		console.error(`  ${name} failed to start: ${result.error.message}`);
 		failed = true;

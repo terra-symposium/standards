@@ -1,5 +1,0 @@
-{
-  "extends": "astro/tsconfigs/strict",
-  "compilerOptions": { "types": ["node"] },
-  "include": ["src", "netlify/functions", "test"]
-}

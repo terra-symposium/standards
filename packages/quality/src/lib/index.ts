@@ -3,23 +3,18 @@
  * Public API for the consolidated Terra quality package.
  */
 
-export * from './collapse.js';
-export * from './files.js';
-export * from './history-report.js';
-export * from './github-report.js';
-export * from './imports.js';
-export * from './inline-if.js';
-export * from './language-profiles.js';
-export * from './documentation.js';
-export * from './naming.js';
-export { qualityNodeReporter } from './node-reporter.js';
-export * from './object-forwarding.js';
+export * from '@terra-symposium/standards-quality-core';
+export * from '@terra-symposium/standards-documentation';
+export * from '@terra-symposium/standards-formatting';
+export * from '@terra-symposium/standards-imports';
+export * from '@terra-symposium/standards-language-checks';
+export * from '@terra-symposium/standards-naming';
+export * from '@terra-symposium/standards-patterns';
+export * from '@terra-symposium/standards-quality-reports';
+export * from '@terra-symposium/standards-refactoring';
+export * from '@terra-symposium/standards-security';
+export * from '@terra-symposium/standards-ui-quality';
+export { qualityNodeReporter } from '@terra-symposium/standards-quality-reports';
 export * from './port.js';
 export * from './runner.js';
-export * from './single-use.js';
-export * from './security.js';
-export * from './accessibility.js';
-export * from './display-name.js';
-export * from './patterns.js';
-export * from './ui-recommendations.js';
-export { default as QualityPlaywrightReporter } from './playwright-reporter.js';
+export { QualityPlaywrightReporter } from '@terra-symposium/standards-quality-reports';

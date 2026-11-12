@@ -1,6 +1,6 @@
 {
 	"name": "@terra-symposium/standards-reporting",
-	"version": "0.3.0",
+	"version": "0.6.2",
 	"description": "Reusable Playwright evidence reporting for Terra repositories",
 	"type": "module",
 	"main": "./dist/index.js",
@@ -29,16 +29,17 @@
 		"dist"
 	],
 	"scripts": {
-		"build": "tsc -p tsconfig.json",
+		"build": "tsc -p config/tsconfig.json",
+		"test": "npm run build && node --test test/*.test.mjs",
 		"prepare": "npm run build",
-		"pretest": "npm run build",
-		"test": "node --test test/*.test.mjs"
+		"typecheck": "tsc --noEmit -p config/tsconfig.json"
 	},
 	"dependencies": {
 		"exceljs": "^4.4.0",
 		"jszip": "^3.10.2",
 		"pptxgenjs": "^4.0.1",
-		"sharp": "^0.35.3"
+		"sharp": "^0.35.3",
+		"@terra-symposium/styling": "^0.1.34"
 	},
 	"peerDependencies": {
 		"@playwright/test": ">=1.52.0 <2"

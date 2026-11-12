@@ -1,8 +1,10 @@
 packages:
+  - config
   - packages/*
-  - docs
   - apps/*
-  - vendor/braces
+
+lockfileDir: config
+virtualStoreDir: node_modules/.pnpm
 
 allowBuilds:
   esbuild: true

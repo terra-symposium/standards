@@ -1,0 +1,24 @@
+---
+title: standards-quality-reports
+description: Build GitHub and history reports, plus Node and Playwright runner integrations.
+---
+
+`@terra-symposium/standards-quality-reports` publishes focused report builders and test-runner reporters. It is separate from the Playwright evidence and workbook utilities in [standards-reporting](/reporting/0-getting-started/overview/).
+
+## Install and run
+
+```sh
+pnpm add -D @terra-symposium/standards-quality-reports
+pnpm exec terra-quality-reports github --config config/quality.json
+pnpm exec terra-quality-reports history --config config/quality.json --report-json history.json
+```
+
+The `github` and `history` CLI subcommands use `quality.json`. They accept the common `--all` and `--warn` options; report commands do not edit source. The history command writes a file only when `--report-json PATH` is supplied. GitHub data requires the caller's GitHub CLI authentication and read permissions; unavailable permissions remain distinguishable from zero counts.
+
+## APIs and exports
+
+```ts
+import { buildGitHubReport, createHistoryReport, qualityNodeReporter, QualityPlaywrightReporter } from '@terra-symposium/standards-quality-reports';
+```
+
+The root and `./cli` exports include TypeScript declarations. Explicit subpaths include `/github`, `/history`, `/node-reporter`, and `/playwright-reporter`. Reports contain findings and metadata; consumers own artifact retention, upload destinations, and interpretation of missing or partial data.

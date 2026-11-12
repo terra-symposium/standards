@@ -1,5 +1,58 @@
 # @terra-symposium/standards-quality
 
+## 2.2.0
+
+### Minor Changes
+
+- Publish quality checks by capability family while keeping the aggregate CLI and compatibility exports.
+
+### Patch Changes
+
+- Updated dependencies
+  - @terra-symposium/standards-quality-core@0.2.0
+  - @terra-symposium/standards-documentation@0.2.0
+  - @terra-symposium/standards-formatting@0.2.0
+  - @terra-symposium/standards-imports@0.2.0
+  - @terra-symposium/standards-naming@0.2.0
+  - @terra-symposium/standards-refactoring@0.2.0
+  - @terra-symposium/standards-security@0.2.0
+  - @terra-symposium/standards-ui-quality@0.2.0
+  - @terra-symposium/standards-patterns@0.2.0
+  - @terra-symposium/standards-language-checks@0.2.0
+  - @terra-symposium/standards-quality-reports@0.2.0
+
+## 2.1.2
+
+### Patch Changes
+
+- Publish the error-boundaries package as a normal semver dependency instead of leaking the workspace protocol into the npm package.
+
+## 2.1.1
+
+### Patch Changes
+
+- Make React application root boundaries mandatory and automatically wrap unguarded JSX and JavaScript roots during Quality fixes.
+- Export the shared React boundary through the Quality package so consumers need only depend on `@terra-symposium/standards-quality`.
+- Run focused commands such as `error-boundaries` without incorrectly applying the full Quality lint-config preflight.
+
+## 2.1.0
+
+### Minor Changes
+
+- Add the `terra-quality-dev` launcher so repositories share Quality's port acquisition and dev-server startup behavior.
+
+## 2.0.8
+
+### Patch Changes
+
+- Autofix arbitrary length utilities to Tailwind spacing utilities when the generated declarations match.
+
+## 2.0.7
+
+### Patch Changes
+
+- Load Tailwind v4 design systems through Tailwind's Node runtime so canonical checks can read legacy configuration and plugin modules.
+
 ## 2.0.6
 
 ### Patch Changes

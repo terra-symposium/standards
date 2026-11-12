@@ -1,28 +1,28 @@
 {
-  "name": "@terra-symposium/hygiene-dashboard",
-  "private": true,
-  "type": "module",
-  "scripts": {
-    "dev": "astro dev",
-    "build": "astro build",
-    "test": "tsx --test test/*.test.ts",
-    "db:migrate": "node --experimental-strip-types scripts/migrate.ts",
-    "history:import": "tsx scripts/import-local-history.ts",
-    "reports:import": "tsx scripts/import-local-build-report.ts"
-  },
-  "dependencies": {
-    "@astrojs/react": "^7.1.0",
-    "@neondatabase/serverless": "^1.0.2",
-    "astro": "^7.4.0",
-    "fast-xml-parser": "^5.2.5",
-    "react": "^19.3.1",
-    "react-dom": "^19.3.1"
-  },
-  "devDependencies": {
-    "@types/node": "^26.6.5",
-    "@types/react": "^19.3.0",
-    "@types/react-dom": "^19.3.0",
-    "tsx": "^4.20.6",
-    "typescript": "^6.0.3"
-  }
+	"name": "@terra-symposium/hygiene-dashboard",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"dev": "terra-quality-dev -- astro --config config/astro.config.mjs --tsconfig config/tsconfig.json dev --host 127.0.0.1",
+		"build": "pnpm --dir ../.. exec terra-quality error-boundaries --all && astro --config config/astro.config.mjs --tsconfig config/tsconfig.json build",
+		"test": "tsx --test test/*.test.ts",
+		"typecheck": "astro check --config config/astro.config.mjs --tsconfig config/tsconfig.json"
+	},
+	"dependencies": {
+		"@astrojs/react": "^7.1.0",
+		"@neondatabase/serverless": "^1.0.2",
+		"@terra-symposium/standards-error-boundaries": "workspace:*",
+		"astro": "^7.4.0",
+		"fast-xml-parser": "^5.2.5",
+		"react": "^19.3.1",
+		"react-dom": "^19.3.1"
+	},
+	"devDependencies": {
+		"@astrojs/check": "^0.9.12",
+		"@terra-symposium/standards-quality": "workspace:*",
+		"@types/node": "^26.6.5",
+		"@types/react": "^19.3.0",
+		"tsx": "^4.20.6",
+		"typescript": "^6.0.3"
+	}
 }

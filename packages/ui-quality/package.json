@@ -1,0 +1,52 @@
+{
+	"name": "@terra-symposium/standards-ui-quality",
+	"version": "0.2.0",
+	"description": "Accessibility, display-name, error-boundary, and UI recommendation checks.",
+	"type": "module",
+	"engines": {
+		"node": ">=18.18"
+	},
+	"main": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js"
+		},
+		"./cli": {
+			"types": "./dist/cli.d.ts",
+			"import": "./dist/cli.js"
+		}
+	},
+	"files": [
+		"dist",
+		"README.md"
+	],
+	"publishConfig": {
+		"registry": "https://registry.npmjs.org",
+		"access": "public"
+	},
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/Terra-Symposium/standards.git"
+	},
+	"scripts": {
+		"build": "tsc -p config/tsconfig.json",
+		"test": "npm run build && node --test",
+		"prepare": "npm run build",
+		"typecheck": "tsc --noEmit -p config/tsconfig.json"
+	},
+	"dependencies": {
+		"@terra-symposium/standards-quality-core": "workspace:*",
+		"typescript": "^5.0.0"
+	},
+	"peerDependencies": {
+		"@terra-symposium/standards-error-boundaries": "^0.1.2"
+	},
+	"devDependencies": {
+		"@types/node": "^26.6.5"
+	},
+	"bin": {
+		"terra-ui-quality": "dist/cli.js"
+	}
+}

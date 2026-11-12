@@ -1,0 +1,7 @@
+interface:
+  display_name: 'Package Update'
+  short_description: 'Update Terra packages across Desktop consumers'
+  default_prompt: 'Use $package-update to update Terra packages across Desktop consumers and restart affected existing local servers.'
+
+policy:
+  allow_implicit_invocation: true

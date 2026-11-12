@@ -50,7 +50,7 @@ node scripts/create-repo-chats.mjs \
 
 For a quality sweep, the table uses one column per check declared by each repository's quality wrapper. For other worker skills, replace those check columns with the skill's goal or completion criteria. Example:
 
-| Repository / branch / commit | Typecheck | Lint | Tests | Commit | Push | Blocker |
-| --- | --- | --- | --- | --- | --- | --- |
-| rma-sports / `main` / `a1b2c3d` | ✓ | ✓ | ✓ | ✓ `d4e5f6a` | ✓ | ✓ None |
-| website / `main` / `e7f8a9b` | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ Lint reported 2 errors; tests not run |
+| Repository / branch / commit    | Typecheck | Lint | Tests | Commit      | Push | Blocker                                 |
+| ------------------------------- | --------- | ---- | ----- | ----------- | ---- | --------------------------------------- |
+| rma-sports / `main` / `a1b2c3d` | ✓         | ✓    | ✓     | ✓ `d4e5f6a` | ✓    | ✓ None                                  |
+| website / `main` / `e7f8a9b`    | ✓         | ✗    | ✗     | ✗           | ✗    | ✗ Lint reported 2 errors; tests not run |
