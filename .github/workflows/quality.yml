@@ -20,6 +20,7 @@ jobs:
         with:
           node-version: 22.23.4
           cache: pnpm
+          cache-dependency-path: config/pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
       - run: uv sync --locked --group dev
       - name: Capture full-repository quality findings
@@ -47,6 +48,7 @@ jobs:
         with:
           node-version: 22.23.4
           cache: pnpm
+          cache-dependency-path: config/pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
       - run: pnpm -r build
 
@@ -64,6 +66,7 @@ jobs:
         with:
           node-version: 22.23.4
           cache: pnpm
+          cache-dependency-path: config/pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @terra-symposium/standards-reporting exec playwright install --with-deps chromium
       - uses: ./packages/testing
@@ -84,5 +87,6 @@ jobs:
         with:
           node-version: 22.23.4
           cache: pnpm
+          cache-dependency-path: config/pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @terra-symposium/standards-testing pack --dry-run
