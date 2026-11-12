@@ -16,7 +16,7 @@ const PRUNED_DIRS = new Set(['.cache', '.git', '.next', '.playwright-mcp', '.pnp
  * @return Normalized root, environment, exclusions, and run mode.
  */
 function options(args) {
-	const values = { root: join(homedir(), 'Desktop'), environment: 'kai-macann-all', exclude: new Set(['compression']), dryRun: false, push: false };
+	const values = { root: join(homedir(), 'Desktop'), environment: 'kai-macann-all', exclude: new Set(['compression']), dryRun: false, push: true };
 	for (let index = 0; index < args.length; index += 1) {
 		const argument = args[index];
 		if (argument === '--root') values.root = args[++index];
@@ -24,8 +24,9 @@ function options(args) {
 		else if (argument === '--exclude-repo') values.exclude.add(args[++index].toLowerCase());
 		else if (argument === '--dry-run') values.dryRun = true;
 		else if (argument === '--push') values.push = true;
+		else if (argument === '--no-push') values.push = false;
 		else if (argument === '--help') {
-			console.log('Usage: provision-quality-chats.mjs [--root DIR] [--env ID] [--exclude-repo NAME] [--push] [--dry-run]');
+			console.log('Usage: provision-quality-chats.mjs [--root DIR] [--env ID] [--exclude-repo NAME] [--no-push] [--dry-run]');
 			process.exit(0);
 		} else {
 			throw new Error(`Unknown option: ${argument}`);
@@ -70,13 +71,12 @@ async function repoIdentity(root) {
  * Builds the one-line skill trigger scoped to one discovered repository.
  *
  * @param repo Repository name, identity, and workspace path.
- * @param options Explicit push authorization for the requested run.
+ * @param options Whether the user explicitly requested no push.
  * @return Instructions to show or submit for this repository.
  */
 function promptFor(repo, options) {
-	const pushAuthorization = options.push ? 'granted' : 'not granted';
 	const repository = repo.identity.split('/').slice(-2).join('/');
-	return `Read and follow the Terra Standards Quality skill for this repository: ${repository}; push authorization: ${pushAuthorization}.`;
+	return `Read and follow the Terra Standards Quality skill for this repository: ${repository}.${options.push ? '' : ' Do not push.'}`;
 }
 
 /**
