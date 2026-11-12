@@ -86,9 +86,9 @@ function assignedComponent(left: ts.Expression): string | undefined {
 /**
  * Returns whether a node introduces a lexical or function-scoped binding boundary.
  *
- * @param node
+ * @param node Syntax node to test.
  *
- * @return
+ * @return Whether the node establishes a lexical or function-scoped binding boundary.
  */
 function isBindingScope(node: ts.Node): boolean {
 	return (
@@ -107,9 +107,9 @@ function isBindingScope(node: ts.Node): boolean {
 /**
  * Finds the scope that owns a variable declaration, accounting for `var` hoisting.
  *
- * @param declaration
+ * @param declaration Variable declaration whose binding scope is needed.
  *
- * @return
+ * @return Nearest scope that owns the declaration according to `let`, `const`, or `var` rules.
  */
 function declarationScope(declaration: ts.VariableDeclaration): ts.Node {
 	const list = declaration.parent;
@@ -126,11 +126,11 @@ function declarationScope(declaration: ts.VariableDeclaration): ts.Node {
 /**
  * Resolves a component property assignment to the nearest same-named candidate binding.
  *
- * @param node
- * @param name
- * @param byName
+ * @param node Assignment node whose enclosing scopes are searched.
+ * @param name Component binding name being resolved.
+ * @param byName Candidate component declarations grouped by name.
  *
- * @return
+ * @return Candidate declarations in the nearest matching scope, or an empty array.
  */
 function candidatesForAssignment(node: ts.Node, name: string, byName: Map<string, Candidate[]>): Candidate[] {
 	const candidates = byName.get(name);
@@ -148,7 +148,6 @@ function candidatesForAssignment(node: ts.Node, name: string, byName: Map<string
  *
  * @param file Absolute source filename to inspect.
  * @param analysis Optional shared parse context that avoids repeated reads and AST construction.
- * @param cfg Quality configuration used to render diagnostic paths.
  *
  * @return Eligible named declarations, including whether an existing assignment is matching or conflicting.
  */
@@ -158,10 +157,7 @@ function candidatesForFile(file: string, analysis?: QualityAnalysis): Candidate[
 	if ((parsed as ts.SourceFile & { parseDiagnostics?: readonly ts.Diagnostic[] }).parseDiagnostics?.length) return [];
 	const candidates: Candidate[] = [];
 	const byName = new Map<string, Candidate[]>();
-	/**
-	 *
-	 * @param node
-	 */
+
 	const collect = (node: ts.Node): void => {
 		if (ts.isVariableStatement(node)) {
 			for (const declaration of node.declarationList.declarations) {
@@ -174,16 +170,14 @@ function candidatesForFile(file: string, analysis?: QualityAnalysis): Candidate[
 		ts.forEachChild(node, collect);
 	};
 	collect(parsed);
-	/**
-	 *
-	 * @param node
-	 */
+
 	const inspectAssignments = (node: ts.Node): void => {
 		if (ts.isBinaryExpression(node) && node.operatorToken.kind >= ts.SyntaxKind.FirstAssignment && node.operatorToken.kind <= ts.SyntaxKind.LastAssignment) {
 			const name = assignedComponent(node.left);
 			const targets = name ? candidatesForAssignment(node, name, byName) : undefined;
 			if (targets) {
-				const exact = node.operatorToken.kind === ts.SyntaxKind.EqualsToken && ts.isStringLiteralLike(node.right) && node.right.text === name;
+				const inheritsDisplayName = ts.isPropertyAccessExpression(node.right) && !node.right.questionDotToken && node.right.name.text === 'displayName';
+				const exact = node.operatorToken.kind === ts.SyntaxKind.EqualsToken && ((ts.isStringLiteralLike(node.right) && node.right.text === name) || inheritsDisplayName);
 				for (const target of targets) {
 					if (target.assignment === 'missing' || !exact) target.assignment = exact ? 'matching' : 'conflicting';
 				}
@@ -285,8 +279,7 @@ export function fixDisplayNames(cfg: QualityCfg, analysis?: QualityAnalysis): { 
 			updated = `${updated.slice(0, at)}${lineBreak}${edit.names.map((n) => `${edit.indent}${n}.displayName = '${n}';`).join(lineBreak)}${updated.slice(at)}`;
 			fixed += edit.names.length;
 		}
-		const valid = ts.createSourceFile(file, updated, ts.ScriptTarget.Latest, true, scriptKind(file));
-		if ((valid as ts.SourceFile & { parseDiagnostics?: readonly ts.Diagnostic[] }).parseDiagnostics?.length) {
+		if ((ts.createSourceFile(file, updated, ts.ScriptTarget.Latest, true, scriptKind(file)) as ts.SourceFile & { parseDiagnostics?: readonly ts.Diagnostic[] }).parseDiagnostics?.length) {
 			skipped += [...edits.values()].reduce((c, e) => c + e.names.length, 0);
 			continue;
 		}

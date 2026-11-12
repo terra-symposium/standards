@@ -14,6 +14,9 @@ jobs:
       pull-requests: write
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: astral-sh/setup-uv@v7
       - uses: pnpm/action-setup@v6
         with:
           version: 10.30.3
@@ -23,6 +26,9 @@ jobs:
       - name: Enable npm trusted publishing
         run: npm install --global npm@11.5.1
       - run: pnpm install --frozen-lockfile
+      - run: uv sync --locked --group dev
+      - name: Verify full-repository quality
+        run: pnpm run quality --all --warn
       - run: pnpm --filter @terra-symposium/standards-quality test
       - uses: changesets/action@v2
         with:

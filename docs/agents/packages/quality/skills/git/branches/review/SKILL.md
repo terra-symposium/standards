@@ -28,7 +28,6 @@ namespace.
 Preserve all unrelated dirty or untracked work and branches. Do not switch, reset, rebase, or remove
 a branch checked out in another worktree without first accounting for its state.
 
-
 ## 2. Inspect each branch's complete change
 
 Compare the branch to its intended target using merge-base, commit history, and the complete diff.
@@ -61,7 +60,6 @@ Run relevant local tests, lint, type checks, builds, or other quality checks for
 Follow explicit user instructions about which external statuses are relevant. Report exactly what
 ran and its result; local checks do not make a failed required check pass unless the user explicitly
 directs that policy.
-
 
 ## 4. Fix, integrate, close, or retain
 
@@ -96,7 +94,6 @@ Retain branches with unique useful work, failed or incomplete validation, unreso
 unclear targets, unavailable source refs, or unaccounted changes. Explain what is needed to proceed
 rather than treating branch age or naming as grounds for deletion.
 
-
 ## 5. Clean up refs after disposition
 
 Complete authorized cleanup in the same task after verifying integration or explicit abandonment. A
@@ -119,7 +116,6 @@ Remote deletion does not remove a separate local branch in another checkout. Ver
 namespaces and report remote source deletion, local branch deletion, review-ref deletion, and
 tracking-ref pruning separately. Never claim cleanup is complete until absence is verified in the
 checkout and remote that were actually changed.
-
 
 ## 6. Report
 

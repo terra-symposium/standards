@@ -1,20 +1,21 @@
 {
 	"$schema": "https://unpkg.com/knip@6/schema.json",
-	"ignore": ["config/eslint.config.mjs"],
-	"ignoreDependencies": ["pptxgenjs", "prettier"],
-	"ignoreBinaries": ["clang"],
-	"ignoreFiles": ["packages/*/dist/**"],
-	"ignoreIssues": { "packages/braces/lib/utils.js": ["exports"] },
 	"workspaces": {
 		".": {
 			"entry": ["scripts/quality.mjs"],
 			"project": ["scripts/**/*.mjs"]
 		},
+		"config": {
+			"entry": ["scripts/build-docs.mjs", "scripts/typecheck.mjs"],
+			"project": ["scripts/**/*.mjs"]
+		},
+		"packages/braces": {
+			"entry": ["index.js", "test/**/*.test.mjs"],
+			"project": ["lib/**/*.js", "test/**/*.mjs"]
+		},
 		"packages/error-boundaries": {
-			"entry": ["src/index.ts", "src/components/react.tsx", "src/lib/astro.ts", "src/lib/astro-integration.ts", "src/lib/next.ts", "test/*.test.mjs"
-			],
-			"project": ["src/**/*.ts", "test/**/*.mjs"],
-			"ignoreDependencies": ["@types/react-dom", "react-dom"]
+			"entry": ["src/index.ts", "src/components/react.tsx", "src/lib/astro.ts", "src/lib/astro-integration.ts", "src/lib/next.ts", "test/*.test.mjs"],
+			"project": ["src/**/*.ts", "test/**/*.mjs"]
 		},
 		"packages/reporting": {
 			"entry": ["src/index.ts", "src/lib/core.ts", "src/lib/playwright.ts", "src/lib/viewports.ts", "src/lib/load-testing.ts", "src/lib/spreadsheet.ts", "src/lib/slideshow.ts", "test/*.test.mjs"],
@@ -25,7 +26,6 @@
 			"project": ["src/**/*.mjs"]
 		},
 		"packages/quality": {
-			"ignoreDependencies": ["eslint"],
 			"entry": [
 				"src/index.ts",
 				"src/lib/runner.ts",
@@ -51,8 +51,7 @@
 		},
 		"docs": {
 			"entry": ["src/pages/**/*.astro", "astro.config.mjs", "scripts/*.mjs", "agents/**/scripts/*.mjs"],
-			"project": ["src/**/*.astro", "src/**/*.tsx", "src/**/*.ts", "src/**/*.mdx", "scripts/**/*.mjs", "agents/**/scripts/**/*.mjs"],
-			"ignoreDependencies": ["@terra-symposium/styling"]
+			"project": ["src/**/*.astro", "src/**/*.tsx", "src/**/*.ts", "src/**/*.mdx", "scripts/**/*.mjs", "agents/**/scripts/**/*.mjs"]
 		},
 		"apps/hygiene": {
 			"entry": ["src/pages/index.astro", "config/**/*.mjs", "netlify/functions/*.mts", "scripts/*.ts", "test/*.test.ts"],

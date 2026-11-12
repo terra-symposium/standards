@@ -6,12 +6,26 @@
 	"required": ["sourceRoots", "extensions"],
 	"properties": {
 		"$schema": { "type": "string" },
-		"root": { "type": "string", "description": "Repository root used for source paths and subprocess working directories. Relative to the inferred project root." },
-		"configRoot": { "type": "string", "description": "Directory searched for centralized tool configs such as ESLint, Prettier, Knip, and tsconfig.json. Relative to root; defaults to the quality.json directory when it is a config folder, otherwise root/config." },
+		"root": {
+			"type": "string",
+			"description": "Repository root used for source paths and subprocess working directories. Relative to the inferred project root."
+		},
+		"configRoot": {
+			"type": "string",
+			"description": "Directory searched for centralized tool configs such as ESLint, Prettier, Knip, and tsconfig.json. Relative to root; defaults to the quality.json directory when it is a config folder, otherwise root/config."
+		},
 		"sourceRoots": { "type": "array", "items": { "type": "string" } },
 		"includeRoots": { "type": "array", "items": { "type": "string" } },
-		"skippedDirectories": { "type": "array", "items": { "type": "string" }, "description": "Directory names or repository-relative directory paths excluded from source discovery." },
-		"skippedFiles": { "type": "array", "items": { "type": "string" }, "description": "Repository-relative files excluded from source discovery." },
+		"skippedDirectories": {
+			"type": "array",
+			"items": { "type": "string" },
+			"description": "Directory names or repository-relative directory paths excluded from source discovery."
+		},
+		"skippedFiles": {
+			"type": "array",
+			"items": { "type": "string" },
+			"description": "Repository-relative files excluded from source discovery."
+		},
 		"singleUse": {
 			"type": "object",
 			"properties": {
@@ -23,9 +37,35 @@
 			},
 			"additionalProperties": false
 		},
-		"extensions": { "type": "array", "items": { "type": "string", "pattern": "^\\." } },
-		"aliases": { "type": "object", "additionalProperties": { "type": "string" } },
-		"frameworkEntryExports": { "type": "object", "additionalProperties": { "type": "array", "items": { "type": "string" } } },
+		"extensions": {
+			"type": "array",
+			"items": { "type": "string", "pattern": "^\\." }
+		},
+		"aliases": {
+			"type": "object",
+			"additionalProperties": { "type": "string" }
+		},
+		"frameworkEntryExports": {
+			"type": "object",
+			"additionalProperties": { "type": "array", "items": { "type": "string" } }
+		},
+		"knipPackageMappings": {
+			"type": "array",
+			"items": {
+				"type": "object",
+				"required": ["sourceRoots", "packageRoot"],
+				"properties": {
+					"sourceRoots": {
+						"type": "array",
+						"minItems": 1,
+						"items": { "type": "string" }
+					},
+					"packageRoot": { "type": "string" }
+				},
+				"additionalProperties": false
+			},
+			"description": "Maps source trees to the package manifest that owns their dependencies when application sources live outside that package directory. Only imports found in those sources and declared by the mapped package count as usage."
+		},
 		"externalPrefixes": { "type": "array", "items": { "type": "string" } },
 		"renameExports": { "type": "boolean" },
 		"protectedIdentifiers": { "type": "array", "items": { "type": "string" } },
@@ -34,8 +74,16 @@
 		"documentation": {
 			"type": "object",
 			"properties": {
-				"commandRoots": { "type": "array", "items": { "type": "string" }, "description": "Markdown roots where fenced pnpm commands are checked for deprecated directory flags." },
-				"cAuthors": { "type": "object", "additionalProperties": { "type": "string" }, "description": "Repository-relative C source directory prefixes mapped to required @author names." },
+				"commandRoots": {
+					"type": "array",
+					"items": { "type": "string" },
+					"description": "Markdown roots where fenced pnpm commands are checked for deprecated directory flags."
+				},
+				"cAuthors": {
+					"type": "object",
+					"additionalProperties": { "type": "string" },
+					"description": "Repository-relative C source directory prefixes mapped to required @author names."
+				},
 				"required": {
 					"type": "object",
 					"properties": {
@@ -45,7 +93,10 @@
 							"default": true,
 							"description": "Require documentation for every named function, method, and constructor in configured source roots, including parameter and return documentation where applicable. Defaults to true for every supported language."
 						},
-						"exportedFunctions": { "type": "boolean", "description": "Require TSDoc for exported named functions, including substantive descriptions for every parameter." },
+						"exportedFunctions": {
+							"type": "boolean",
+							"description": "Require TSDoc for exported named functions, including substantive descriptions for every parameter."
+						},
 						"noInlineFunctions": { "type": "boolean" }
 					},
 					"additionalProperties": false
@@ -68,7 +119,17 @@
 				"forbiddenTerms": { "type": "array", "items": { "type": "string" } },
 				"forbiddenImports": { "type": "array", "items": { "type": "string" } },
 				"clientRoots": { "type": "array", "items": { "type": "string" } },
-				"allowProcessEnvRoots": { "type": "array", "items": { "type": "string" } }
+				"runtimeRoots": {
+					"type": "array",
+					"items": { "type": "string" },
+					"description": "Repository-relative Node-only file paths or directory roots where process.env access is expected. Prefer this positive runtime boundary to the legacy allowProcessEnvRoots field."
+				},
+				"allowProcessEnvRoots": {
+					"type": "array",
+					"items": { "type": "string" },
+					"deprecated": true,
+					"description": "Compatibility alias for runtimeRoots."
+				}
 			},
 			"additionalProperties": false
 		},
@@ -101,7 +162,10 @@
 		"performancePatterns": {
 			"type": "object",
 			"properties": {
-				"extensions": { "type": "array", "items": { "type": "string", "pattern": "^\\." } },
+				"extensions": {
+					"type": "array",
+					"items": { "type": "string", "pattern": "^\\." }
+				},
 				"ignoredFiles": { "type": "array", "items": { "type": "string" } }
 			},
 			"additionalProperties": false,
@@ -127,7 +191,10 @@
 						"additionalProperties": false
 					}
 				},
-				"extensions": { "type": "array", "items": { "enum": [".astro", ".jsx", ".tsx"] } },
+				"extensions": {
+					"type": "array",
+					"items": { "enum": [".astro", ".jsx", ".tsx"] }
+				},
 				"ignoredFiles": { "type": "array", "items": { "type": "string" } },
 				"ignoredDirectories": { "type": "array", "items": { "type": "string" } }
 			},
@@ -136,22 +203,37 @@
 		"github": {
 			"type": "object",
 			"properties": {
-				"repositories": { "type": "array", "uniqueItems": true, "items": { "type": "string", "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$" } },
+				"repositories": {
+					"type": "array",
+					"uniqueItems": true,
+					"items": {
+						"type": "string",
+						"pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"
+					}
+				},
 				"requiredFeatures": {
 					"type": "array",
 					"uniqueItems": true,
-					"items": { "enum": ["dependencyGraph", "dependabotAlerts", "malwareAlerts", "securityUpdates", "versionUpdates", "groupedUpdates", "secretScanning", "pushProtection", "codeScanning"] }
+					"items": {
+						"enum": ["dependencyGraph", "dependabotAlerts", "malwareAlerts", "securityUpdates", "versionUpdates", "groupedUpdates", "secretScanning", "pushProtection", "codeScanning"]
+					}
 				}
 			},
 			"additionalProperties": false
 		},
-		"enabledCommands": { "type": "object", "additionalProperties": { "type": "boolean" } },
-		"enabledRecommendations": { "type": "object", "additionalProperties": { "type": "boolean" } },
+		"enabledCommands": {
+			"type": "object",
+			"additionalProperties": { "type": "boolean" }
+		},
+		"enabledRecommendations": {
+			"type": "object",
+			"additionalProperties": { "type": "boolean" }
+		},
 		"languageProfiles": {
 			"type": "array",
 			"uniqueItems": true,
 			"items": { "enum": ["c", "java", "python"] },
-			"description": "Optional native-language quality profiles. Documentation coverage is always discovered for supported languages with source files; selecting a profile enables its remaining native checks."
+			"description": "Optional native-language quality profiles. A selected profile enables its native checks. Without a selected profile, native documentation checks run only for extensions listed in extensions."
 		},
 		"qualityCommands": {
 			"$ref": "#/$defs/commands",
@@ -178,35 +260,109 @@
 			"properties": {
 				"enabled": { "type": "boolean" },
 				"defaultBudget": { "$ref": "#/$defs/loadBudget" },
-				"testBudgets": { "type": "object", "additionalProperties": { "$ref": "#/$defs/loadBudget" } },
-				"operationBudgets": { "type": "object", "additionalProperties": { "$ref": "#/$defs/loadBudget" } }
+				"testBudgets": {
+					"type": "object",
+					"additionalProperties": { "$ref": "#/$defs/loadBudget" }
+				},
+				"operationBudgets": {
+					"type": "object",
+					"additionalProperties": { "$ref": "#/$defs/loadBudget" }
+				}
 			},
 			"additionalProperties": false
 		},
-		"tools": { "type": "object", "additionalProperties": { "type": "string" } }
+		"tools": {
+			"type": "object",
+			"properties": {
+				"prettier": { "type": "string" },
+				"tsc": { "type": "string" },
+				"eslint": { "type": "string" },
+				"knip": { "type": "string" },
+				"clang": {
+					"type": "string",
+					"description": "Executable for C declaration documentation parsing; defaults to clang."
+				}
+			},
+			"additionalProperties": { "type": "string" }
+		}
 	},
 	"$defs": {
 		"checkToggles": {
 			"type": "object",
 			"properties": {
-				"error-boundaries": { "type": "boolean", "const": true, "description": "Mandatory check requiring React application render roots to use an error boundary. This check cannot be disabled." },
+				"document": { "type": "boolean" },
+				"format": { "type": "boolean" },
+				"import": { "type": "boolean" },
+				"name": { "type": "boolean" },
+				"forward": { "type": "boolean" },
+				"error-boundaries": {
+					"type": "boolean",
+					"const": true,
+					"description": "Mandatory check requiring React application render roots to use an error boundary. This check cannot be disabled."
+				},
 				"accessibility": {
 					"type": "boolean",
 					"description": "Opt-in check for source-evident accessible names and decorative inline SVG exposure on native JSX controls and explicit interactive roles."
 				},
-				"display-name": { "type": "boolean", "description": "Opt-in check for direct React forwardRef declarations without displayName." },
-				"performance-patterns": { "type": "boolean", "description": "Reports configured syntax patterns that may repeat work in collection callbacks; advisory only." },
-				"documented-commands": { "type": "boolean", "description": "Checks deprecated pnpm directory flags in configured Markdown shell fences." }
+				"display-name": {
+					"type": "boolean",
+					"description": "Opt-in check for direct React forwardRef declarations without displayName."
+				},
+				"performance-patterns": {
+					"type": "boolean",
+					"description": "Reports configured syntax patterns that may repeat work in collection callbacks; advisory only."
+				},
+				"documented-commands": {
+					"type": "boolean",
+					"description": "Checks deprecated pnpm directory flags in configured Markdown shell fences."
+				},
+				"lint": { "type": "boolean" },
+				"knip": { "type": "boolean" },
+				"dead-code": { "type": "boolean" },
+				"type": { "type": "boolean" },
+				"recommend": { "type": "boolean" },
+				"command": { "type": "boolean" },
+				"diff": { "type": "boolean" },
+				"alias": { "type": "boolean" },
+				"security": { "type": "boolean" },
+				"repeated-classes": { "type": "boolean" },
+				"tailwind-canonical": { "type": "boolean" },
+				"regex-dedup": { "type": "boolean" },
+				"ui-patterns": { "type": "boolean" },
+				"ui-recommendations": { "type": "boolean" },
+				"github": { "type": "boolean" }
 			},
-			"additionalProperties": { "type": "boolean" }
+			"additionalProperties": false
 		},
 		"autofixToggles": {
 			"type": "object",
 			"properties": {
-				"errorBoundaries": { "type": "boolean", "const": true, "description": "Automatically wraps unguarded React render roots when Terra Quality runs with fixes enabled." },
-				"accessibility": { "type": "boolean", "description": "Copies a literal title into aria-label or hides an unnamed inline SVG inside an already named control." },
-				"displayName": { "type": "boolean", "description": "Adds a conventional displayName to a direct named forwardRef declaration." },
-				"documentedCommands": { "type": "boolean", "description": "Rewrites pnpm -C and --prefix to the repository's canonical --dir flag in configured Markdown shell fences." }
+				"document": {
+					"type": "boolean",
+					"const": false,
+					"description": "Documentation content is authored after source and caller review; no comment-generation fixer is available."
+				},
+				"duplicateImports": {
+					"type": "boolean",
+					"description": "Removes only repeated, identical import declarations without comments when fixes are enabled."
+				},
+				"errorBoundaries": {
+					"type": "boolean",
+					"const": true,
+					"description": "Automatically wraps unguarded React render roots when Terra Quality runs with fixes enabled."
+				},
+				"accessibility": {
+					"type": "boolean",
+					"description": "Copies a literal title into aria-label or hides an unnamed inline SVG inside an already named control."
+				},
+				"displayName": {
+					"type": "boolean",
+					"description": "Adds a conventional displayName to a direct named forwardRef declaration."
+				},
+				"documentedCommands": {
+					"type": "boolean",
+					"description": "Rewrites pnpm -C and --prefix to the repository's canonical --dir flag in configured Markdown shell fences."
+				}
 			},
 			"additionalProperties": { "type": "boolean" }
 		},

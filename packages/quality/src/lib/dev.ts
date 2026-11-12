@@ -1,8 +1,6 @@
 #!/usr/bin/env node
 
-/**
- * Starts a local development server after acquiring its configured TCP port.
- */
+// Starts a local development server after acquiring its configured TCP port.
 
 /*//////////////////////////////////////////////////
 IMPORTS
@@ -26,8 +24,8 @@ HELPERS
 function applyErrBoundaries(): void {
 	if (!existsSync('quality.json') && !existsSync('config/quality.json')) return;
 	const runner = fileURLToPath(new URL('./runner.js', import.meta.url));
-	const result = spawnSync(process.execPath, [runner, 'error-boundaries', '--all'], { cwd: process.cwd(), env: process.env, stdio: 'inherit' });
-	if (result.status !== 0) throw new Error('Could not apply the configured application error boundaries.');
+	if (spawnSync(process.execPath, [runner, 'error-boundaries', '--all', '--safe-fix'], { cwd: process.cwd(), env: process.env, stdio: 'inherit' }).status !== 0)
+		throw new Error('Could not apply the configured application error boundaries.');
 }
 
 /**
@@ -91,7 +89,12 @@ function run(executable: string, executableArgs: string[]): Promise<void> {
 		child.once('exit', finish);
 	});
 }
-(async function main(): Promise<void> {
+/**
+ * Parses wrapper and child ports, acquires the requested port, and starts the dev server.
+ *
+ * @return Resolves when the wrapped development server exits.
+ */
+async function main(): Promise<void> {
 	const args = process.argv.slice(2);
 	const separator = args.indexOf('--');
 	if (separator < 0 || separator === args.length - 1) throw new Error('Usage: terra-quality-dev [--port PORT] -- <dev-server> [arguments...]');
@@ -110,7 +113,9 @@ function run(executable: string, executableArgs: string[]): Promise<void> {
 	if (childPort === undefined) finalArgs.push('--port', String(port));
 	if (!finalArgs.includes('--strictPort')) finalArgs.push('--strictPort');
 	await run(cmd, finalArgs);
-})().catch((e) => {
+}
+
+main().catch((e) => {
 	console.error('[terra-quality-dev] ' + (e instanceof Error ? e.message : String(e)));
 	process.exitCode = 1;
 });

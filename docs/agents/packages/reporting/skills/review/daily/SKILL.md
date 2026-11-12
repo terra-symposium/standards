@@ -42,8 +42,8 @@ Cleanup is part of completing the task. After a run-created PR is merged, verify
 
 Give one concise row per repository in this table. Keep all issue counts and findings in `Issues`; use `State` for what remains after remediation and the delivery status:
 
-| Repo | Issues | State |
-| --- | --- | --- |
+| Repo | Issues                                                                                                | State                                                                                             |
+| ---- | ----------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
 | Name | Baseline quality issue/warning counts and other findings, including Dependabot alerts and PR findings | Remaining quality issue/warning count; unresolved blockers; fix and PR status, merge, and cleanup |
 
 `Issues` summarizes the configured quality command's baseline counts and all other findings, including every warning category, Dependabot setting or alert, and in-scope PR finding. `State` reports post-fix quality counts, remaining blockers, and PR review, merge, and cleanup status. Include exact commands and exit statuses. Do not reduce a warning-bearing result to pass/fail wording. Finish with the highest-priority user action, if any.

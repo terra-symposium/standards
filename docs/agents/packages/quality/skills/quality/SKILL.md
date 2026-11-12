@@ -15,6 +15,8 @@ Use this skill for a repository quality sweep. Each repository is an independent
 4. Review each repository's diff and stage only task changes. As soon as its complete wrapper is green, commit that repository; push immediately when the user has authorized pushing. Do not wait for other repositories. Keep working on the remaining tasks independently.
 5. Continue through every requested repository. A nonzero check, incomplete run, missing permission, or unavailable dependency remains a cross until resolved; never report partial results as green.
 
+For single-use findings, run the repository's full-scope `quality --all --safe-fix` command once, inspect the complete batch, then run its full-scope read-only Quality command. The fixer batches only declarations classified as mechanically safe to inline. Every remaining `REVIEW` finding requires an agent-authored semantic decision. Do not suppress source findings with comments or configuration exclusions; `// terra-quality-ignore single-use` is itself a blocking finding.
+
 The provisioner defaults to the user's `~/Desktop`, uses `kai-macann-all` as its environment selector, discovers nested Git repositories, and skips Compression. It verifies that the selected environment is available to the authenticated Codex CLI before creating any tasks. If the environment is not listed there, stop before partial provisioning and resolve the account/environment selection. Use `--push` only when the user has authorized pushing. It does not store credentials.
 
 ## Required report

@@ -33,7 +33,7 @@ export type LanguageProfileCheck = {
 	command: string;
 	args: string[];
 	qualityChecks: QualityCheckName[];
-	autofix?: { name: QualityAutofixName; command: string; args: string[] };
+	autofix?: { name: LangAutofixName; command: string; args: string[] };
 	tool?: LanguageProfileTool;
 	fileExtensions?: string[];
 	requiredFile?: string;
@@ -42,6 +42,9 @@ export type LanguageProfileCheck = {
 
 /** Fixed aggregate phase that owns a profile check. */
 export type LanguageQualityPhase = LanguageProfileCheck['phase'];
+
+/** Autofixes available to language profiles; authored TSDoc remains a manual documentation check. */
+type LangAutofixName = Exclude<QualityAutofixName, 'document'>;
 
 /** A profile check omitted because its source or optional project configuration is absent. */
 export type SkippedLanguageCheck = { name: string; profileId: string; reason: string };
@@ -78,8 +81,8 @@ export const QUALITY_CAPABILITY_CHECKS: readonly QualityCheckName[] = [
 ];
 
 /** Built-in autofixes that every language must explicitly support or explain as inapplicable. */
-export const QUALITY_CAPABILITY_AUTOFIXES: readonly QualityAutofixName[] = [
-	'document',
+export const QUALITY_CAPABILITY_AUTOFIXES: readonly LangAutofixName[] = [
+	'duplicateImports',
 	'format',
 	'name',
 	'lint',
@@ -173,21 +176,21 @@ const NATIVE_CHECKS: Record<LanguageProfileId, Partial<Record<QualityCheckName, 
 		security: 'Bandit and Ruff security rules',
 	},
 };
-const NATIVE_AUTOFIXES: Record<LanguageProfileId, Partial<Record<QualityAutofixName, string>>> = {
+const NATIVE_AUTOFIXES: Record<LanguageProfileId, Partial<Record<LangAutofixName, string>>> = {
 	c: { format: 'clang-format -i' },
 	java: { format: 'google-java-format --replace' },
 	python: { format: 'Ruff formatter and Ruff --fix' },
 };
 
 /** Full check and autofix disposition for every built-in language. */
-export const LANGUAGE_CAPABILITIES: Record<'js-ts' | LanguageProfileId, { checks: Record<QualityCheckName, LanguageCapability>; autofixes: Record<QualityAutofixName, LanguageCapability> }> = {
+export const LANGUAGE_CAPABILITIES: Record<'js-ts' | LanguageProfileId, { checks: Record<QualityCheckName, LanguageCapability>; autofixes: Record<LangAutofixName, LanguageCapability> }> = {
 	'js-ts': {
 		checks: Object.fromEntries(QUALITY_CAPABILITY_CHECKS.map((n) => [n, shared(n === 'document' ? 'Terra Quality JS/TS documentation analyzer' : 'Terra Quality JS/TS analyzer')])) as Record<
 			QualityCheckName,
 			LanguageCapability
 		>,
 		autofixes: Object.fromEntries(QUALITY_CAPABILITY_AUTOFIXES.map((n) => [n, n === 'documentedCommands' ? shared() : shared('Terra Quality JS/TS fixer')])) as Record<
-			QualityAutofixName,
+			LangAutofixName,
 			LanguageCapability
 		>,
 	},
@@ -204,7 +207,7 @@ export const LANGUAGE_CAPABILITIES: Record<'js-ts' | LanguageProfileId, { checks
 		) as Record<QualityCheckName, LanguageCapability>,
 		autofixes: Object.fromEntries(
 			QUALITY_CAPABILITY_AUTOFIXES.map((n) => [n, n === 'documentedCommands' ? shared() : NATIVE_AUTOFIXES.c[n] ? native(NATIVE_AUTOFIXES.c[n]!) : notApplicable(NO_NATIVE_FIX)]),
-		) as Record<QualityAutofixName, LanguageCapability>,
+		) as Record<LangAutofixName, LanguageCapability>,
 	},
 	java: {
 		checks: Object.fromEntries(
@@ -219,7 +222,7 @@ export const LANGUAGE_CAPABILITIES: Record<'js-ts' | LanguageProfileId, { checks
 		) as Record<QualityCheckName, LanguageCapability>,
 		autofixes: Object.fromEntries(
 			QUALITY_CAPABILITY_AUTOFIXES.map((n) => [n, n === 'documentedCommands' ? shared() : NATIVE_AUTOFIXES.java[n] ? native(NATIVE_AUTOFIXES.java[n]!) : notApplicable(NO_NATIVE_FIX)]),
-		) as Record<QualityAutofixName, LanguageCapability>,
+		) as Record<LangAutofixName, LanguageCapability>,
 	},
 	python: {
 		checks: Object.fromEntries(
@@ -234,7 +237,7 @@ export const LANGUAGE_CAPABILITIES: Record<'js-ts' | LanguageProfileId, { checks
 		) as Record<QualityCheckName, LanguageCapability>,
 		autofixes: Object.fromEntries(
 			QUALITY_CAPABILITY_AUTOFIXES.map((n) => [n, n === 'documentedCommands' ? shared() : NATIVE_AUTOFIXES.python[n] ? native(NATIVE_AUTOFIXES.python[n]!) : notApplicable(NO_NATIVE_FIX)]),
-		) as Record<QualityAutofixName, LanguageCapability>,
+		) as Record<LangAutofixName, LanguageCapability>,
 	},
 };
 
@@ -420,7 +423,7 @@ export const LANGUAGE_PROFILES: readonly { id: LanguageProfileId; sourceExtensio
 				name: 'python-docstring-coverage',
 				phase: 'Static quality',
 				command: 'interrogate',
-				args: ['--fail-under=100', '{files}'],
+				args: ['--style=google', '--fail-under=100', '{files}'],
 				qualityChecks: ['document'],
 				fileExtensions: ['.py', '.pyi'],
 				tool: {
@@ -496,11 +499,13 @@ export function resolveLanguageProfiles(cfg: QualityCfg): LanguageProfileResolut
 			result.checks.push({ ...check, args, profileId, files });
 		}
 	}
-	// Documentation coverage applies to every discovered supported language, even when its full profile is not selected.
+	// A configured source extension opts into that language's documentation checks; languageProfiles selects the full suite.
 	if (profileQualityCheckEnabled(cfg, 'document')) {
 		for (const profile of LANGUAGE_PROFILES) {
 			if (cfg.languageProfiles?.includes(profile.id)) continue;
-			const files = srcFiles({ ...cfg, extensions: profile.sourceExtensions, skippedDirectories: [...(cfg.skippedDirectories ?? []), 'generated', 'vendor', 'target', 'out'] });
+			const exts = profile.sourceExtensions.filter((ext) => cfg.extensions.includes(ext));
+			if (!exts.length) continue;
+			const files = srcFiles({ ...cfg, extensions: exts, skippedDirectories: [...(cfg.skippedDirectories ?? []), 'generated', 'vendor', 'target', 'out'] });
 			if (!files.length) continue;
 			for (const check of profile.checks.filter((c) => c.qualityChecks.includes('document'))) {
 				if (check.requiredFile && !existsSync(resolve(cfg.root, check.requiredFile))) {
@@ -542,16 +547,19 @@ export function inspectLanguageProfileTool(tool: LanguageProfileTool, cwd: strin
 	if (result.error) return { error: `Required tool "${tool.command}" is unavailable. ${tool.install}` };
 	if (result.status !== 0) return { error: `Could not read the version of "${tool.command}". ${tool.install}` };
 	const detected = (function parseVersion(output: string): [number, number, number] | undefined {
-	const match = output.match(/(?:^|\D)(\d+)\.(\d+)(?:\.(\d+))?/u);
-	if (!match) return undefined;
-	return [Number(match[1]), Number(match[2]), Number(match[3] ?? 0)];
-})(`${result.stdout ?? ''}\n${result.stderr ?? ''}`);
+		const match = output.match(/(?:^|\D)(\d+)\.(\d+)(?:\.(\d+))?/u);
+		if (!match) return undefined;
+		return [Number(match[1]), Number(match[2]), Number(match[3] ?? 0)];
+	})(`${result.stdout ?? ''}\n${result.stderr ?? ''}`);
 	if (!detected) return { error: `Could not parse the version reported by "${tool.command}". ${tool.install}` };
-	if ((function compVersions(detected: [number, number, number], minimum: [number, number, number]): number {
-	for (let index = 0; index < detected.length; index++) {
-		if (detected[index] !== minimum[index]) return detected[index]! - minimum[index]!;
-	}
-	return 0;
-})(detected, tool.minimumVersion) < 0) return { error: `"${tool.command}" ${detected.join('.')} is below the supported minimum ${tool.minimumVersion.join('.')}. ${tool.install}` };
+	if (
+		(function compVersions(detected: [number, number, number], minimum: [number, number, number]): number {
+			for (let index = 0; index < detected.length; index++) {
+				if (detected[index] !== minimum[index]) return detected[index]! - minimum[index]!;
+			}
+			return 0;
+		})(detected, tool.minimumVersion) < 0
+	)
+		return { error: `"${tool.command}" ${detected.join('.')} is below the supported minimum ${tool.minimumVersion.join('.')}. ${tool.install}` };
 	return { version: detected.join('.') };
 }

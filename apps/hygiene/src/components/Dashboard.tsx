@@ -100,7 +100,9 @@ function year(value: string): string {
 /**
  * Renders a line chart scaled to the range of the supplied values.
  *
- * @param props Values, stroke color, and accessible chart label.
+ * @param values Values plotted in order on the chart.
+ * @param color Stroke color used for the line.
+ * @param label Accessible label describing the chart.
  * @returns An empty-state message when there is no data, otherwise an SVG line chart.
  */
 function LineChart({ values, color, label }: { values: number[]; color: string; label: string }) {
@@ -370,20 +372,27 @@ export default function Dashboard() {
 								<form
 									onSubmit={(event) => {
 										void (async function addBranch(event: React.FormEvent<HTMLFormElement>) {
-		event.preventDefault();
-		if (!selected) return;
-		const input = event.currentTarget.elements.namedItem('branch') as HTMLInputElement;
-		const name = input.value.trim();
-		const response = await fetch(`/api/repo?id=${selected}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ branch: name, enabled: true }) });
-		if (!response.ok) {
-			setErr('Could not add branch');
-			return;
-		}
-		setHistoryMessage(`Branch ${name} added. Run a local report import to populate its history and metrics.`);
-		setBranch(name);
-		setCommitPage(1);
-		input.value = '';
-	})(event);
+											event.preventDefault();
+											if (!selected) return;
+											const input = event.currentTarget.elements.namedItem('branch') as HTMLInputElement;
+											const name = input.value.trim();
+											if (
+												!(
+													await fetch(`/api/repo?id=${selected}`, {
+														method: 'POST',
+														headers: { 'Content-Type': 'application/json' },
+														body: JSON.stringify({ branch: name, enabled: true }),
+													})
+												).ok
+											) {
+												setErr('Could not add branch');
+												return;
+											}
+											setHistoryMessage(`Branch ${name} added. Run a local report import to populate its history and metrics.`);
+											setBranch(name);
+											setCommitPage(1);
+											input.value = '';
+										})(event);
 									}}
 								>
 									<input name="branch" aria-label="Additional branch" placeholder="Add branch" pattern="[A-Za-z0-9._/-]+" />

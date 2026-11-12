@@ -15,11 +15,7 @@
 			"status": "live label matched repository source"
 		}
 	],
-	"historicalKnowledgeLabels": [
-		"002-docs-production-style-context.md",
-		"003-fast-mode-contract.md",
-		"sanity/schemas/docs.tsx"
-	],
+	"historicalKnowledgeLabels": ["002-docs-production-style-context.md", "003-fast-mode-contract.md", "sanity/schemas/docs.tsx"],
 	"conversationUploadsObservedSeparately": [
 		"Week1_Lecture-Chapter1_part1_v8.0.pptx",
 		"Week1-ReviewQuestion.docx",

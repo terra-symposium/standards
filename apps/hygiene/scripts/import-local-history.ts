@@ -50,11 +50,7 @@ function option(name: string): string {
  * @returns Standard output without leading or trailing whitespace.
  */
 function git(root: string, args: string[]): string {
-	return execFileSync('git', args, {
-		cwd: root,
-		encoding: 'utf8',
-		stdio: ['ignore', 'pipe', 'pipe'],
-	}).trim();
+	return execFileSync('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
 }
 
 /*
@@ -88,13 +84,7 @@ void (async (): Promise<void> => {
 	const worktree = join(temporaryRoot, basename(checkout) || 'checkout');
 	try {
 		git(checkout, ['worktree', 'add', '--detach', worktree, revision]);
-		const history = parseHistoryReport(
-			createHistoryReport(worktree, {
-				repository: repo,
-				branch,
-				baseSha: null,
-			}),
-		);
+		const history = parseHistoryReport(createHistoryReport(worktree, { repository: repo, branch, baseSha: null }));
 		const report = parseHistoryReport(history);
 		await ingestHistoryReport(repoRow.id, report);
 		console.info(`Imported ${history.commits.length.toLocaleString()} commits for ${repo} (${branch}) through ${history.headSha.slice(0, 9)}.`);

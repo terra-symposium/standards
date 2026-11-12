@@ -39,12 +39,6 @@ type PlaywrightTestCase = {
 HELPERS
 //////////////////////////////////////////////////*/
 
-
-
-
-
-
-
 /*//////////////////////////////////////////////////
 REPORTER
 //////////////////////////////////////////////////*/
@@ -110,8 +104,7 @@ export default class QualityPlaywrightReporter {
 	 */
 	onTestEnd(test: PlaywrightTestCase, result: PlaywrightTestResult): void {
 		this.lastResults.set(test, result);
-		const canRetry = (result.status === 'failed' || result.status === 'timedOut') && result.retry < (test.retries ?? 0) && test.expectedStatus !== result.status;
-		if (!canRetry) this.finish(test);
+		if (!((result.status === 'failed' || result.status === 'timedOut') && result.retry < (test.retries ?? 0) && test.expectedStatus !== result.status)) this.finish(test);
 	}
 
 	/**
@@ -123,21 +116,27 @@ export default class QualityPlaywrightReporter {
 		const counts = { PASS: 0, FAIL: 0, SKIP: 0 };
 		for (const test of this.tests) {
 			const latestResult = this.lastResults.get(test) ?? test.results?.at(-1);
-			const status = this.started.has(test) && !latestResult ? 'FAIL' : (function qualityStatus(test: PlaywrightTestCase, result?: PlaywrightTestResult): 'PASS' | 'FAIL' | 'SKIP' {
-	if (!result || result.status === 'skipped' || test.expectedStatus === 'skipped') return 'SKIP';
-	const outcome = test.outcome?.();
-	if (outcome === 'skipped') return 'SKIP';
-	if (outcome === 'expected' || outcome === 'flaky') return 'PASS';
-	if (outcome === 'unexpected') return 'FAIL';
-	if (result.status === (test.expectedStatus ?? 'passed')) return 'PASS';
-	return result.status === 'passed' || result.status === 'failed' || result.status === 'timedOut' || result.status === 'interrupted' ? 'FAIL' : 'SKIP';
-})(test, latestResult);
+			const status =
+				this.started.has(test) && !latestResult
+					? 'FAIL'
+					: (function qualityStatus(test: PlaywrightTestCase, result?: PlaywrightTestResult): 'PASS' | 'FAIL' | 'SKIP' {
+							if (!result || result.status === 'skipped' || test.expectedStatus === 'skipped') return 'SKIP';
+							const outcome = test.outcome?.();
+							if (outcome === 'skipped') return 'SKIP';
+							if (outcome === 'expected' || outcome === 'flaky') return 'PASS';
+							if (outcome === 'unexpected') return 'FAIL';
+							if (result.status === (test.expectedStatus ?? 'passed')) return 'PASS';
+							return result.status === 'passed' || result.status === 'failed' || result.status === 'timedOut' || result.status === 'interrupted' ? 'FAIL' : 'SKIP';
+						})(test, latestResult);
 			counts[status] += 1;
 			const msg = status === 'FAIL' ? latestResult?.error?.message?.replace(/\s+/gu, ' ').trim() : undefined;
-			if (status !== 'PASS') this.write(`  [${status}] ${(function testName(test: PlaywrightTestCase): string {
-	const titlePath = test.titlePath?.();
-	return titlePath?.length ? titlePath.join(' › ') : test.title;
-})(test)}${msg ? ` — ${msg}` : ''}\n`);
+			if (status !== 'PASS')
+				this.write(
+					`  [${status}] ${(function testName(test: PlaywrightTestCase): string {
+						const titlePath = test.titlePath?.();
+						return titlePath?.length ? titlePath.join(' › ') : test.title;
+					})(test)}${msg ? ` — ${msg}` : ''}\n`,
+				);
 			this.finish(test);
 		}
 		this.write(`Playwright ${result.status}: ${counts.PASS} passed, ${counts.FAIL} failed, ${counts.SKIP} skipped\n`);

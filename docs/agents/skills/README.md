@@ -1,6 +1,5 @@
 # Terra Skill Library
 
-
 ## What it does
 
 Not applicable.
@@ -89,13 +88,17 @@ Dependabot security alerts, trace them to affected dependencies, and implement a
 appropriate fixes. Use when asked to review or fix Dependabot alerts; does not publish, push, or
 dismiss alerts unless separately requested.
 
-[`hygiene`](../packages/quality/skills/hygiene/SKILL.md) — Audit repository environment, build, and
-security health; improve source clarity and documentation; and compact files without changing
-behavior.
+[`hygiene`](../packages/quality/skills/hygiene/SKILL.md) — Audit repository health, convert safe
+repeat fixes into package automation, author comments from source context, and compact files without
+changing behavior.
 
 [`initialisation`](../packages/quality/skills/hygiene/initialisation/SKILL.md) — Set up or reconcile
 a repository's Husky pre-commit check and Changesets semantic version tracking when commit gates or
 package versioning are missing.
+
+[`package-update`](../packages/quality/skills/package-update/SKILL.md) — Update Terra shared packages
+across Desktop consumers, verify them, and restart affected local servers already running on the
+device.
 
 [`repo-file-audit`](../packages/quality/skills/repo-file-audit/SKILL.md) — Aggressively audit
 repository files and scripts, prune dead artifacts and obsolete migrations, and enforce canonical
@@ -143,7 +146,6 @@ produce auditable Excel and PowerPoint test evidence with complete viewport and 
 [`test-writing`](../packages/reporting/skills/test/writing/SKILL.md) — Design and maintain
 exhaustive Terra tests, fixtures, contracts, and browser coverage without duplicating or weakening
 behavior.
-
 
 ### Skills owned by other repositories
 

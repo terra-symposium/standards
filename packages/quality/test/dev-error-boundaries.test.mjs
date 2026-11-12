@@ -24,6 +24,13 @@ test('development startup applies React and Astro boundaries before launching th
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-dev-boundaries-'));
 	const src = join(root, 'src');
 	mkdirSync(src);
+	mkdirSync(join(root, 'node_modules/@terra-symposium/standards-error-boundaries/dist/lib'), { recursive: true });
+	writeFileSync(join(root, 'package.json'), JSON.stringify({ dependencies: { '@terra-symposium/standards-error-boundaries': '^0.1.2' } }));
+	writeFileSync(
+		join(root, 'node_modules/@terra-symposium/standards-error-boundaries/package.json'),
+		JSON.stringify({ name: '@terra-symposium/standards-error-boundaries', exports: { './astro-integration': './dist/lib/error-boundaries-astro.js' } }),
+	);
+	writeFileSync(join(root, 'node_modules/@terra-symposium/standards-error-boundaries/dist/lib/error-boundaries-astro.js'), 'export default {}');
 	const app = join(src, 'main.tsx');
 	writeFileSync(app, "import { createRoot } from 'react-dom/client';\nconst root = createRoot(document.getElementById('root')!);\nroot.render(<App />);\n");
 	const astroConfig = join(root, 'astro.config.mjs');

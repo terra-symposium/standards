@@ -11,6 +11,10 @@ coverage/
 tests/results/
 
 # Local environment and credentials
+**/.venv/
+**/__pycache__/
+**/.ruff_cache/
+**/.mypy_cache/
 **/.env
 **/.env.local
 

@@ -16,6 +16,11 @@ REGEX
 //////////////////////////////////////////////////*/
 
 const PPT_SLIDES_SLIDE2_XML_REGEX = /ppt\/slides\/slide2\.xml/;
+/**
+ * Creates a fresh global matcher for picture elements in exported slide XML.
+ *
+ * @return Global matcher for exported `p:pic` elements.
+ */
 const P_PIC_G_REGEX = () => /<p:pic>/g;
 const CURRENT_RUN_REGEX = /CURRENT RUN/;
 const HISTORICAL_CAPTURE_REGEX = /HISTORICAL CAPTURE/;
@@ -134,8 +139,7 @@ test('captures page navigation for tests that do not destructure the load fixtur
 			const details = err instanceof Error && 'stderr' in err ? `\nstdout: ${String(err.stdout || '')}\nstderr: ${String(err.stderr || '')}` : '';
 			throw new Error(`${err instanceof Error ? err.message : String(err)}${details}`, { cause: err });
 		}
-		const report = JSON.parse(await fs.readFile(reportFile, 'utf8'));
-		const results = report.suites.flatMap((suite) => suite.specs.flatMap((spec) => spec.tests.flatMap((e) => e.results)));
+		const results = JSON.parse(await fs.readFile(reportFile, 'utf8')).suites.flatMap((suite) => suite.specs.flatMap((spec) => spec.tests.flatMap((e) => e.results)));
 		const attachment = results.flatMap((r) => r.attachments).find((e) => e.name === 'load-testing');
 		assert.ok(attachment, 'the automatic fixture should attach load measurements');
 		const payload = JSON.parse(Buffer.from(attachment.body, 'base64').toString('utf8'));

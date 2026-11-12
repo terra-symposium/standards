@@ -38,8 +38,7 @@ repo.append({ organizationId: input.organizationId, userId: input.userId, opport
 repo.assign({ organizationId: input.organizationId, userId: input.userId, opportunities: input.opportunities });
 `,
 	);
-	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
-	const findings = objectForwardingFindings(cfg);
+	const findings = objectForwardingFindings(createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] }));
 	assert.deepEqual(findings, []);
 });
 test('object forwarding accepts a shared analysis cache without reporting ambiguous projections', () => {

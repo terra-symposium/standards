@@ -17,12 +17,13 @@ Not applicable.
 ## Usage
 
 ### Packages
+
 | Package                                                                                                                    | Purpose                                                                                               | Runtime requirements                                                         |
 | -------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
 | [`@terra-symposium/standards-quality`](https://www.npmjs.com/package/@terra-symposium/standards-quality)                   | Configurable JavaScript and TypeScript quality checks, safe maintenance, and the `terra-quality` CLI. | Node.js `>=18.18`                                                            |
 | [`@terra-symposium/standards-error-boundaries`](https://www.npmjs.com/package/@terra-symposium/standards-error-boundaries) | React error boundaries plus status-copy and route-error helpers.                                      | React and React DOM `>=18`                                                   |
 | [`@terra-symposium/standards-reporting`](https://www.npmjs.com/package/@terra-symposium/standards-reporting)               | Responsive Playwright evidence, diagnostics, spreadsheets, slideshows, and load timings.              | Node.js `>=18.18`; `@playwright/test >=1.52.0 <2` for Playwright integration |
-| [`@terra-symposium/standards-testing`](packages/testing/)                                                                   | Standards-owned shared CI checks plus serial execution of repository-specific test suites.             | Node.js `>=20`                                                               |
+| [`@terra-symposium/standards-testing`](packages/testing/)                                                                  | Standards-owned shared CI checks plus serial execution of repository-specific test suites.            | Node.js `>=20`                                                               |
 
 All four packages are configured for public npm publication. Consumers install them from npm without a Terra registry token. The CI release workflow uses the repository's `NPM_TOKEN` secret to publish versions.
 
@@ -64,17 +65,23 @@ For Terra Quality, add a `quality.json` in the repository root and start with:
 }
 ```
 
-Then run `pnpm exec terra-quality`. See the [quality setup guide](https://standards-docs.netlify.app/packages/quality/setup/) for the full workflow.
+Then run `pnpm exec terra-quality`. See the [quality setup guide](https://standards-docs.netlify.app/quality/0-getting-started/setup/) for the full workflow.
 
 ### Project boundaries
+
 These packages provide reusable primitives. Each consuming repository remains responsible for its application-specific source paths, framework integration, fallback UI, credentials, services, deployment policy, and domain tests.
 
 ### Skills
+
 #### `@terra-symposium/standards-quality`
 
 [`hygiene`](docs/agents/packages/quality/skills/hygiene/SKILL.md) (`environment-hardening`) — Audit
 repository health, improve source clarity and documentation, and compact files without changing
 behavior.
+
+[`package-update`](docs/agents/packages/quality/skills/package-update/SKILL.md) — Update released
+Terra packages across Desktop consumers, verify them, and restart affected local servers already
+running on the device.
 
 [`compact-files`](docs/agents/packages/quality/skills/compact-files/SKILL.md) (`compact-files`) —
 Find and remove redundant repository folders and files, consolidate generated output, and preserve
@@ -135,7 +142,6 @@ behaviour, commit authorship, and release traceability.
 [`standards`](docs/agents/packages/quality/skills/standards/SKILL.md) (`standards`) — Apply shared
 Terra coding and review conventions.
 
-
 #### `@terra-symposium/standards-reporting`
 
 [`test/cloud`](docs/agents/packages/reporting/skills/test/cloud/SKILL.md) (`cloud-playwright`) — Run
@@ -173,7 +179,6 @@ evidence and UI screenshots when available.
 [`review/standup`](docs/agents/packages/reporting/skills/review/standup/SKILL.md) (`standup`) —
 Compare contributor activity with stated goals.
 
-
 Keep each repository's complete agent tree under `docs/agents/`. The Docs site includes this tree as its Agents section and treats each `SKILL.md` as the index page for its folder.
 
 ## Configuration and security
@@ -183,6 +188,7 @@ Not applicable.
 ## Development and structure
 
 ### Development
+
 Use Node.js `22.19.0` and pnpm `10.30.3` to match CI. From the repository root:
 
 ```sh
@@ -196,7 +202,7 @@ Work on or preview the documentation site with:
 
 ```sh
 pnpm run docs
-pnpm exec docs build
+pnpm run docs:build
 pnpm exec docs preview
 ```
 

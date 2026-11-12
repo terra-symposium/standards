@@ -11,26 +11,26 @@ Use this skill when adding or changing a local development server, reviewing por
 
 Keep every independently running local server on its assigned port. When changing a port, update the launcher, origin and callback allowlists, test base URLs, and developer documentation together. Search the repository for both `localhost:<port>` and `127.0.0.1:<port>` references.
 
-| Repo / app | Port |
-|---|---:|
-| Salesphere | 2000 |
-| RMA Sports docs | 2010 |
-| Terra Symposium Website — Astro | 2021 |
-| Terra Symposium Website — Docs routes | No separate port (served by Website Astro at 2021) |
-| Terra Symposium Website — Drizzle Studio | 2012 |
-| Terra Symposium Website — Sanity Studio | 2013 |
-| Terra Symposium Docs | 2020 |
-| Terra Symposium Styling docs | 2030 |
-| Terra Symposium Business Docs | 2040 |
-| Terra Symposium Standards docs | 2050 |
-| Ambulance Dispatch Prototype | 3000 |
-| Compression docs | 3010 |
-| Notes | 3020 |
-| Saibai Corpus | 3030 |
-| Personal Docs | 4000 |
-| Playlist Atlas | 4010 |
-| Portfolio | 4020 (no local dev server is currently configured) |
-| Strike Counter | 4030 |
+| Repo / app                               |                                               Port |
+| ---------------------------------------- | -------------------------------------------------: |
+| Salesphere                               |                                               2000 |
+| RMA Sports docs                          |                                               2010 |
+| Terra Symposium Website — Astro          |                                               2021 |
+| Terra Symposium Website — Docs routes    | No separate port (served by Website Astro at 2021) |
+| Terra Symposium Website — Drizzle Studio |                                               2012 |
+| Terra Symposium Website — Sanity Studio  |                                               2013 |
+| Terra Symposium Docs                     |                                               2020 |
+| Terra Symposium Styling docs             |                                               2030 |
+| Terra Symposium Business Docs            |                                               2040 |
+| Terra Symposium Standards docs           |                                               2050 |
+| Ambulance Dispatch Prototype             |                                               3000 |
+| Compression docs                         |                                               3010 |
+| Notes                                    |                                               3020 |
+| Saibai Corpus                            |                                               3030 |
+| Personal Docs                            |                                               4000 |
+| Playlist Atlas                           |                                               4010 |
+| Portfolio                                | 4020 (no local dev server is currently configured) |
+| Strike Counter                           |                                               4030 |
 
 The Website Docs routes share the Astro server on port 2021. Portfolio is currently a deploy-focused coordinator without a local development server. Do not create duplicate listeners solely to make either row appear independently runnable; update this table if either app later gets its own server.
 

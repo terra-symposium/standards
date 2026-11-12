@@ -1,0 +1,30 @@
+---
+title: Sanity Error Analysis dashboard
+description: Read runtime boundary reports in the Terra Website's existing Sanity Analytics dashboard.
+---
+
+The Terra Website already provides the runtime dashboard in Sanity Studio. Open **Analytics → Error Analysis**. Its reader requires an authenticated Sanity administrator and a supported `development` or `production` dataset. The Studio pane calls the Website's protected `site.errorReports.get` action; the dashboard is read-only.
+
+## What the dashboard shows
+
+The default time window is 24 hours; 7-day and 30-day windows are also available. Category, component, route, and build filters apply to the summary. The panel reports total events, unique failure groups, affected components, comparison to the previous period, a frequency chart, ranked breakdowns, and the latest metadata-only records.
+
+The report schema contains a failure category, stable component name, sanitized route family, server-derived build and environment, and timestamps. It deliberately excludes the raw error message, component stack, request data, credentials, and caller IP. See the [event pipeline and privacy contract](/error-boundaries/3-analytics/production-telemetry/).
+
+## Dashboard screenshot
+
+This image is the existing Website `sanity/plugins/error-analysis.tsx` component rendered with its Studio stylesheet by the local browser fixture in `tests/astro/error-analysis`. The deterministic fixture contains two `render` rows for `ArticleContent`, with the Render filter selected. It demonstrates the real dashboard UI; the rows are test fixtures and do not claim to be current production incidents. The fixture makes no Sanity session, remote read, or remote write.
+
+![Terra Website Sanity Error Analysis dashboard showing two local fixture render reports, the ArticleContent component breakdown, frequency chart, route and build dimensions, and latest metadata-only report rows.](/_docs/assets/error-boundaries/assets/sanity-error-analysis.png)
+
+**Figure 1.** Existing Sanity Error Analysis component with deterministic local browser-test data. The dashboard is filtered to render reports.
+
+## Reproduce the browser evidence
+
+From the Terra Website repository, run its existing local visual suite:
+
+```sh
+pnpm exec playwright test --config tests/astro/error-analysis/playwright.config.ts
+```
+
+The harness renders the production dashboard component and shared Terra boundary adapter while mocking only the Sanity client and authenticated administrator. It does not require credentials or access the remote Studio. `tests/astro/error-analysis/render-capture.spec.ts` covers the fallback, metadata redaction, and hydration-error classification. The root `sanity.analytics.error-report-live-round-trip` test covers the authenticated dashboard and a development collector round trip; that integration test writes a temporary development report and removes it during cleanup.

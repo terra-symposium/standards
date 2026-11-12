@@ -6,16 +6,17 @@ import { promisify } from 'node:util';
 import { readdir } from 'node:fs/promises';
 
 const execFileAsync = promisify(execFile);
-const PRUNED_DIRECTORIES = new Set(['.cache', '.git', '.next', '.playwright-mcp', '.pnpm-store', '.turbo', 'build', 'dist', 'node_modules', 'target', 'vendor', 'venv']);
+const PRUNED_DIRS = new Set(['.cache', '.git', '.next', '.playwright-mcp', '.pnpm-store', '.turbo', 'build', 'dist', 'node_modules', 'target', 'vendor', 'venv']);
 
+/**
+ * Parses repository scan, Cloud environment, exclusion, and submission options.
+ *
+ * @param args Command-line arguments following the script name.
+ *
+ * @return Normalized root, environment, exclusions, and run mode.
+ */
 function options(args) {
-	const values = {
-		root: join(homedir(), 'Desktop'),
-		environment: 'kai-macann-all',
-		exclude: new Set(['compression']),
-		dryRun: false,
-		push: false,
-	};
+	const values = { root: join(homedir(), 'Desktop'), environment: 'kai-macann-all', exclude: new Set(['compression']), dryRun: false, push: false };
 	for (let index = 0; index < args.length; index += 1) {
 		const argument = args[index];
 		if (argument === '--root') values.root = args[++index];
@@ -35,28 +36,48 @@ function options(args) {
 	return values;
 }
 
-async function findRepositories(directory) {
-	const entries = await readdir(directory, { withFileTypes: true });
-	if (entries.some((entry) => entry.name === '.git')) return [directory];
-	const children = entries.filter((entry) => entry.isDirectory() && !entry.name.startsWith('.') && !PRUNED_DIRECTORIES.has(entry.name.toLowerCase()));
-	const nested = await Promise.all(children.map((entry) => findRepositories(join(directory, entry.name))));
+/**
+ * Finds Git repositories recursively while pruning generated and dependency trees.
+ *
+ * @param dir Directory to inspect for a repository or child directories.
+ *
+ * @return Absolute paths for every repository discovered below the directory.
+ */
+async function findRepos(dir) {
+	const entries = await readdir(dir, { withFileTypes: true });
+	if (entries.some((entry) => entry.name === '.git')) return [dir];
+	const children = entries.filter((entry) => entry.isDirectory() && !entry.name.startsWith('.') && !PRUNED_DIRS.has(entry.name.toLowerCase()));
+	const nested = await Promise.all(children.map((entry) => findRepos(join(dir, entry.name))));
 	return nested.flat();
 }
 
-async function repositoryIdentity(root) {
-	const { stdout } = await execFileAsync('git', ['-C', root, 'remote', 'get-url', 'origin'], {
-		encoding: 'utf8',
-	});
+/**
+ * Converts the configured Git origin into a canonical remote identity.
+ *
+ * @param root Repository checkout whose `origin` remote should be read.
+ *
+ * @return Canonical host and repository path, such as `github.com/owner/name`.
+ */
+async function repoIdentity(root) {
+	const { stdout } = await execFileAsync('git', ['-C', root, 'remote', 'get-url', 'origin'], { encoding: 'utf8' });
 	const remote = stdout.trim();
 	const ssh = /^(?:[^@]+@)?([^:]+):(.+)$/u.exec(remote);
 	const parsed = remote.includes('://') ? new URL(remote) : ssh ? { hostname: ssh[1], pathname: `/${ssh[2]}` } : new URL(remote);
 	return `${parsed.hostname}${parsed.pathname.replace(/\.git$/u, '')}`;
 }
 
-function promptFor(repository, options) {
+/**
+ * Builds task instructions scoped to one discovered repository.
+ *
+ * @param repo Repository name, identity, and workspace path.
+ * @param options Environment and push policy for the requested run.
+ *
+ * @return Instructions to show or submit for this repository.
+ */
+function promptFor(repo, options) {
 	return [
-		`Run the Terra quality skill for exactly this repository: ${repository.identity}.`,
-		`Use its Cloud checkout at ${repository.cloudPath} and do not modify any other repository.`,
+		`Run the Terra quality skill for exactly this repository: ${repo.identity}.`,
+		`Use its Cloud checkout at ${repo.cloudPath} and do not modify any other repository.`,
 		'Read the repository instructions and its configured quality wrapper or check script first. Run that complete wrapper, fix every finding without waivers or skipped checks, and rerun it until green.',
 		'Review the final diff and stage only changes for this task. Commit immediately when the complete wrapper is green; do not wait for other repositories.',
 		options.push ? 'Immediately push that commit to the current task branch after it succeeds, and verify the push.' : 'Push only if the user explicitly authorizes it.',
@@ -64,38 +85,41 @@ function promptFor(repository, options) {
 	].join('\n\n');
 }
 
-function submit(repository, environment, prompt) {
+/**
+ * Starts one Cloud task and captures its process result.
+ *
+ * @param repo Repository record being submitted.
+ * @param environment Cloud environment selected by the caller.
+ * @param prompt Task instructions scoped to this repository.
+ *
+ * @return Promise resolving with the child process result.
+ */
+function submit(repo, environment, prompt) {
 	return new Promise((resolveTask) => {
-		console.log(`[${repository.name}] submitting`);
+		console.log(`[${repo.name}] submitting`);
 		const child = spawn('codex', ['cloud', 'exec', '-c', 'model="gpt-6-luna"', '--env', environment, prompt], { stdio: ['ignore', 'pipe', 'pipe'] });
 		let output = '';
 		child.stdout.setEncoding('utf8').on('data', (chunk) => (output += chunk));
 		child.stderr.setEncoding('utf8').on('data', (chunk) => (output += chunk));
-		child.on('error', (error) => resolveTask({ repository, error }));
-		child.on('close', (code) => resolveTask({ repository, code, output: output.trim() }));
+		child.on('error', (err) => resolveTask({ repository: repo, error: err }));
+		child.on('close', (code) => resolveTask({ repository: repo, code, output: output.trim() }));
 	});
 }
 
+/** Discovers repositories, validates Cloud access, and submits selected tasks. */
 async function main() {
 	const config = options(process.argv.slice(2));
-	const roots = await findRepositories(config.root);
-	const repositories = await Promise.all(
-		roots.map(async (root) => ({
-			root,
-			name: basename(root),
-			identity: await repositoryIdentity(root),
-			cloudPath: `/workspace/${basename(root)}`,
-		})),
-	);
-	const selected = repositories.filter((repository) => !config.exclude.has(repository.name.toLowerCase()) && !config.exclude.has(repository.identity.split('/').at(-1)?.toLowerCase() ?? ''));
+	const roots = await findRepos(config.root);
+	const repos = await Promise.all(roots.map(async (root) => ({ root, name: basename(root), identity: await repoIdentity(root), cloudPath: `/workspace/${basename(root)}` })));
+	const selected = repos.filter((repo) => !config.exclude.has(repo.name.toLowerCase()) && !config.exclude.has(repo.identity.split('/').at(-1)?.toLowerCase() ?? ''));
 	if (!selected.length) throw new Error(`No repositories found beneath ${config.root}.`);
-	const duplicateNames = selected.map((repository) => repository.name).filter((name, index, names) => names.indexOf(name) !== index);
+	const duplicateNames = selected.map((repo) => repo.name).filter((name, i, names) => names.indexOf(name) !== i);
 	if (duplicateNames.length) throw new Error(`Cloud checkout names are ambiguous: ${[...new Set(duplicateNames)].join(', ')}`);
 
 	if (config.dryRun) {
-		for (const repository of selected) {
-			console.log(`\n[${repository.name}] ${repository.identity} → ${repository.cloudPath}`);
-			console.log(promptFor(repository, config));
+		for (const repo of selected) {
+			console.log(`\n[${repo.name}] ${repo.identity} → ${repo.cloudPath}`);
+			console.log(promptFor(repo, config));
 		}
 		console.log(`\nDry run: ${selected.length} repository tasks; no Cloud tasks created.`);
 		return;
@@ -103,11 +127,11 @@ async function main() {
 
 	try {
 		await execFileAsync('codex', ['cloud', 'list', '--json', '--limit', '1', '--env', config.environment], { encoding: 'utf8' });
-	} catch (error) {
-		const detail = error instanceof Error ? error.message : String(error);
-		throw new Error(`Cannot use Cloud environment "${config.environment}" with the authenticated Codex CLI. No tasks were created. ${detail}`);
+	} catch (err) {
+		const detail = err instanceof Error ? err.message : String(err);
+		throw new Error(`Cannot use Cloud environment "${config.environment}" with the authenticated Codex CLI. No tasks were created. ${detail}`, { cause: err });
 	}
-	const tasks = await Promise.all(selected.map((repository) => submit(repository, config.environment, promptFor(repository, config))));
+	const tasks = await Promise.all(selected.map((repo) => submit(repo, config.environment, promptFor(repo, config))));
 	for (const task of tasks) {
 		console.log(`\n[${task.repository.name}]`);
 		if (task.output) console.log(task.output);
@@ -119,7 +143,7 @@ async function main() {
 
 try {
 	await main();
-} catch (error) {
-	console.error(error instanceof Error ? error.message : String(error));
+} catch (err) {
+	console.error(err instanceof Error ? err.message : String(err));
 	process.exitCode = 1;
 }

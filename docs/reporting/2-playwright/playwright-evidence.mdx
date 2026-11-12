@@ -1,0 +1,106 @@
+---
+title: Playwright evidence
+description: Configure responsive projects, capture browser diagnostics and visual states, and review the resulting reports.
+---
+
+Use `@terra-symposium/standards-reporting` when Playwright results need consistent responsive projects, diagnostics, spreadsheets, or visual review decks. The consuming repository still owns the tests, authentication, server setup, and data policy.
+
+## Add responsive projects
+
+Wrap the existing Playwright config with `withResponsivePlaywright`. It preserves the repository’s other settings and expands regular projects across the default viewport catalog.
+
+```ts
+import { defineConfig } from '@playwright/test';
+import { withResponsivePlaywright } from '@terra-symposium/standards-reporting/viewports';
+
+export default withResponsivePlaywright(
+	defineConfig({
+		projects: [
+			{ name: 'chromium', testMatch: '**/*.spec.ts' },
+			{ name: 'setup', testMatch: '**/*.setup.ts' },
+		],
+	}),
+	{ outputRoot: 'tests/results/visual' },
+);
+```
+
+Setup and dependency projects run once. Regular projects expand across the configured viewport set.
+
+## Choose the viewport scope
+
+||| [Full responsive matrix]
+
+Run the full default set: `mobile` (390 × 844), `sm` (640 × 800), `md` (768 × 900), `lg` (1024 × 768), `xl` (1280 × 720), and `2xl` (1536 × 864).
+|||
+
+||| [Focused viewport selection]
+
+Set a comma- or space-separated `PW_VIEWPORTS` list for a targeted run:
+
+```sh
+PW_VIEWPORTS=mobile,lg pnpm exec playwright test
+```
+
+Aliases include `phone` for `mobile`, `tablet` for `md`, `desktop` or `default` for `xl`, and `wide` for `2xl`.
+|||
+
+## Capture diagnostics and visual states
+
+The flow shows how one browser test can produce a reviewable record without custom listener plumbing in every test.
+
+<Nodes
+	direction="LR"
+	nodes={[
+		{ id: 'test', type: 'origin', data: { title: 'Run browser test' } },
+		{ id: 'capture', type: 'process', data: { title: 'Capture console and page errors' } },
+		{ id: 'visual', type: 'process', data: { title: 'Attach keyed screenshots' } },
+		{ id: 'report', type: 'process', data: { title: 'Build workbook and deck' } },
+		{ id: 'review', type: 'terminal', data: { title: 'Review evidence' } },
+	]}
+	edges={[
+		{ id: 'test-capture', source: 'test', target: 'capture' },
+		{ id: 'capture-visual', source: 'capture', target: 'visual' },
+		{ id: 'visual-report', source: 'visual', target: 'report' },
+		{ id: 'report-review', source: 'report', target: 'review' },
+	]}
+	height={230}
+/>
+
+Use `diagnosticsTest` to attach console errors and warnings, uncaught page errors, and failed requests. Use `visualTest` when one test visits several routes or states and each needs a named capture. Keep capture keys stable across viewport projects so reports can match the same state.
+
+=== [Diagnostics fixture]
+
+```ts
+import { diagnosticsTest as test, expect } from '@terra-symposium/standards-reporting/playwright';
+
+test('account page is available', async ({ page }) => {
+	await page.goto('/account');
+	await expect(page.getByRole('heading', { name: 'Account' })).toBeVisible();
+});
+```
+
+# The fixture attaches diagnostic JSON to the Playwright result. Review it for sensitive URLs or application messages before publishing CI artifacts.
+
+=== [Keyed visual captures]
+
+```ts
+import { visualTest as test } from '@terra-symposium/standards-reporting/playwright';
+
+test('captures an account state', async ({ page, visuals }) => {
+	await page.goto('/account');
+	await visuals.capture('account-overview', { title: 'Account overview' });
+});
+```
+
+# Capture keys must be unique within one test result. The default capture is a viewport JPEG; pass screenshot options to customize it.
+
+## Review outputs and matrix behavior
+
+The reporter writes each run’s workbook and copied screenshots under `tests/results/visual`. It also stores keyed screenshots and metadata in `tests/results/visual/screenshots`. The workbook includes result and diagnostics sheets and, when enabled, load timing data. The default slideshow contains responsive screenshots grouped by test.
+
+=== [Parallel viewport processes]
+An orchestrator can use the same `TERRA_SCREENSHOT_RUN_ID` in each process. Set `TERRA_SCREENSHOT_RUN_FINALIZE=0` for intermediate processes and `TERRA_SCREENSHOT_RUN_FINALIZE=1` for the final process. Intermediate processes save their workbook, captures, and run marker; the final process unions expected and completed test IDs and creates the deck.
+
+# If a run is interrupted, reuse its run ID to continue the same matrix. Repeated test and viewport captures replace matching images. Without a shared run ID, each reporter process finalizes its own run by default.
+
+For direct reporter setup, image-only slideshow regeneration, and supplementary result data, see the [package API reference](/reporting/1-packages/standards-reporting/). For artifact contents and retention, see [report artifacts](/reporting/4-artifacts/artifacts/).

@@ -13,6 +13,7 @@ Not applicable.
 ## Get started
 
 ### Install
+
 ```sh
 pnpm add @terra-symposium/standards-error-boundaries
 ```
@@ -22,7 +23,8 @@ From `standards/main/`, run `pnpm install`, then `pnpm --filter @terra-symposium
 ## Usage
 
 ### Catch React render failures
-```tsx
+
+````tsx
 import { ErrorBoundary } from '@terra-symposium/standards-error-boundaries/react';
 
 ## Structure
@@ -42,7 +44,7 @@ import AstroErrorBoundary from '@terra-symposium/standards-error-boundaries/astr
 <AstroErrorBoundary title="Workspace unavailable" description="Reload to try the workspace again.">
 	<Workspace client:load />
 </AstroErrorBoundary>
-```
+````
 
 The Astro wrapper listens for Astro's cancelable `astro:hydration-error` event and reveals its fallback without depending on the failed island's JavaScript. It complements the React `ErrorBoundary`; it cannot render a fallback if the server fails before sending HTML.
 
@@ -59,7 +61,7 @@ framework-provided route-error digests.
 
 - The package root re-exports all entry-point APIs.
 
-See the [package guide](https://standards-docs.netlify.app/packages/error-boundaries/) for prop behavior and usage details.
+See the [package guide](https://standards-docs.netlify.app/error-boundaries/1-react/react-boundaries/) for prop behavior and usage details.
 
 ## Configuration and security
 

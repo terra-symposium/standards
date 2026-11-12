@@ -29,7 +29,6 @@ The parent reviews each diff, source ownership, and executed evidence; integrate
 dependency order; then runs focused and adjacent checks from the parent checkout. Keep one
 failure-ledger record per failing test and viewport. Never call a partial run green.
 
-
 ## Cloud Repair Workflow (explicit Cloud mode)
 
 Read [Cloud Workflow Evidence](references/cloud-workflow.md) before dispatching a worker.
@@ -96,7 +95,6 @@ unchanged and continue repository review/preparation until the model gate can be
 Every worker uses an actual Cloud task configured as `gpt-6-luna`, `medium`, one attempt, on
 `codex/luna-fix-<domain>`. Verify this from task metadata, not the prompt. The foundation owner
 exclusively owns shared runtime, runner, reporter, and fixture infrastructure.
-
 
 Use the versioned `scripts/test/cloud-domains.json` manifest in the verified Terra website checkout. Collect actual test inventory before execution; reject a duplicate or unassigned test. Serialize domains sharing a mutable database, Sanity dataset, session, index, or fixed record until run-scoped isolation and cleanup are demonstrated.
 

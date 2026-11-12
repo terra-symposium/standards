@@ -75,7 +75,6 @@ Do not retain misplaced files merely to avoid editing references. Move each impl
 owner, then update imports, exports, test discovery, package manifests, documentation, generated
 indexes, and consumers in the same change.
 
-
 ### Delete-first pruning
 
 - Inventory every tracked file and relevant untracked or ignored artifact. Exclude `.git` internals and dependency trees from path-by-path review, but inspect their manifests and ignore rules. Preserve all existing user changes.

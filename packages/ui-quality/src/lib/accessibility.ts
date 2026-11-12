@@ -78,9 +78,9 @@ HELPERS
 /**
  * Selects a TypeScript parser mode for a JSX-capable source path.
  *
- * @param fileName
+ * @param fileName Source path whose extension selects JSX or TSX parsing.
  *
- * @return
+ * @return JSX parsing for JavaScript paths and TSX parsing for TypeScript paths.
  */
 function scriptKind(fileName: string): ts.ScriptKind {
 	if (/\.tsx?$/i.test(fileName)) return ts.ScriptKind.TSX;
@@ -90,9 +90,9 @@ function scriptKind(fileName: string): ts.ScriptKind {
 /**
  * Returns JSX attributes from either an element or self-closing element.
  *
- * @param element
+ * @param element JSX element or self-closing element whose attributes are requested.
  *
- * @return
+ * @return The JSX attribute collection attached to the element.
  */
 function attrsOf(element: ElementRef): ts.JsxAttributes {
 	return ts.isJsxElement(element) ? element.openingElement.attributes : element.attributes;
@@ -101,9 +101,9 @@ function attrsOf(element: ElementRef): ts.JsxAttributes {
 /**
  * Returns JSX child nodes from either an element or self-closing element.
  *
- * @param element
+ * @param element JSX element or self-closing element whose children are requested.
  *
- * @return
+ * @return Child nodes, or an empty array for a self-closing element.
  */
 function childrenOf(element: ElementRef): readonly ts.JsxChild[] {
 	return ts.isJsxElement(element) ? element.children : [];
@@ -112,9 +112,9 @@ function childrenOf(element: ElementRef): readonly ts.JsxChild[] {
 /**
  * Returns the JSX tag name as written in source.
  *
- * @param element
+ * @param element JSX element or self-closing element whose tag should be read.
  *
- * @return
+ * @return Tag name as written in the source file.
  */
 function tagOf(element: ElementRef): string {
 	return ts.isJsxElement(element) ? element.openingElement.tagName.getText() : element.tagName.getText();
@@ -123,10 +123,10 @@ function tagOf(element: ElementRef): string {
 /**
  * Finds a named JSX attribute without interpreting spreads.
  *
- * @param element
- * @param name
+ * @param element JSX element whose attributes are searched.
+ * @param name Attribute identifier to match exactly.
  *
- * @return
+ * @return Matching JSX attribute, or `undefined` when absent.
  */
 function attrOf(element: ElementRef, name: string): ts.JsxAttribute | undefined {
 	return attrsOf(element).properties.find((p): p is ts.JsxAttribute => ts.isJsxAttribute(p) && ts.isIdentifier(p.name) && p.name.text === name);
@@ -135,9 +135,9 @@ function attrOf(element: ElementRef, name: string): ts.JsxAttribute | undefined 
 /**
  * Reads a statically available string-like JSX attribute and preserves its expression source for safe copying.
  *
- * @param attr
+ * @param attr JSX attribute whose literal or expression value is inspected.
  *
- * @return
+ * @return Static value with source text when safe to copy, or an empty/unknown state.
  */
 function staticAttr(attr: ts.JsxAttribute | undefined): StaticValue {
 	if (!attr?.initializer) return { state: 'empty' };
@@ -159,9 +159,9 @@ function staticAttr(attr: ts.JsxAttribute | undefined): StaticValue {
 /**
  * Reads a title only when its source is a string literal or a template literal without substitutions.
  *
- * @param attr
+ * @param attr `title` attribute whose value is tested for a literal string.
  *
- * @return
+ * @return Literal title with copyable source text, or an empty/unknown state.
  */
 function literalTitle(attr: ts.JsxAttribute | undefined): StaticValue {
 	if (!attr?.initializer) return { state: 'empty' };
@@ -178,9 +178,9 @@ function literalTitle(attr: ts.JsxAttribute | undefined): StaticValue {
 /**
  * Checks for meaningful text after trimming whitespace and zero-width padding.
  *
- * @param value
+ * @param value Text to check for visible content after whitespace normalization.
  *
- * @return
+ * @return Whether at least one non-whitespace, non-zero-width character remains.
  */
 function meaningful(value: string): boolean {
 	return value.replace(/[\s\u00a0\u200b\ufeff]/g, '').replace(/&(?:nbsp|#0*160|#x0*a0);/gi, '').length > 0;
@@ -189,9 +189,9 @@ function meaningful(value: string): boolean {
 /**
  * Returns whether the HTML hidden attribute is present, false, or uncertain.
  *
- * @param element
+ * @param element JSX element whose `hidden` attribute is evaluated.
  *
- * @return
+ * @return `named` when hidden, `empty` when explicitly visible or absent, otherwise `unknown`.
  */
 function hiddenAttrState(element: ElementRef): NameState {
 	const attr = attrOf(element, 'hidden');
@@ -209,9 +209,9 @@ function hiddenAttrState(element: ElementRef): NameState {
 /**
  * Determines whether an element or an ancestor is hidden from the accessibility tree.
  *
- * @param element
+ * @param element JSX element whose hidden and `aria-hidden` states are combined.
  *
- * @return
+ * @return `named` when hidden from the accessibility tree, `empty` when visible, otherwise `unknown`.
  */
 function hiddenState(element: ElementRef): NameState {
 	const hidden = hiddenAttrState(element);
@@ -225,24 +225,21 @@ function hiddenState(element: ElementRef): NameState {
 /**
  * Reads the static value of an input type, using HTML's default text type.
  *
- * @param element
+ * @param element Input element whose `type` attribute is read.
  *
- * @return
+ * @return Static input type, with HTML's default `text` type when no attribute exists.
  */
 function inputType(element: ElementRef): StaticValue {
 	const type = attrOf(element, 'type');
 	return type ? staticAttr(type) : { state: 'static', value: 'text', source: '"text"' };
 }
 
-
-
-
 /**
  * Combines child text evidence; a definite name takes precedence over uncertain extra children.
  *
- * @param states
+ * @param states Child-name evidence values to combine.
  *
- * @return
+ * @return `named` if any child names the element, else `unknown` if evidence is uncertain, else `empty`.
  */
 function combine(states: NameState[]): NameState {
 	if (states.includes('named')) return 'named';
@@ -253,10 +250,10 @@ function combine(states: NameState[]): NameState {
 /**
  * Determines whether a JSX element has static text or image alternative text in its children.
  *
- * @param element
- * @param forLabel
+ * @param element JSX element whose child nodes are inspected.
+ * @param forLabel Whether interactive descendants are being interpreted inside a label.
  *
- * @return
+ * @return Combined name evidence from the element's children.
  */
 function contentState(element: ElementRef, forLabel = false): NameState {
 	const children = childrenOf(element);
@@ -267,10 +264,10 @@ function contentState(element: ElementRef, forLabel = false): NameState {
 /**
  * Examines one JSX child for visible static text without guessing about component output.
  *
- * @param child
- * @param forLabel
+ * @param child JSX child node to inspect.
+ * @param forLabel Whether interactive descendants are being interpreted inside a label.
  *
- * @return
+ * @return Evidence that the child provides static accessible-name text.
  */
 function childContentState(child: ts.JsxChild, forLabel: boolean): NameState {
 	if (ts.isJsxText(child)) return meaningful(child.text) ? 'named' : 'empty';
@@ -290,10 +287,10 @@ function childContentState(child: ts.JsxChild, forLabel: boolean): NameState {
 /**
  * Examines a nested element, honoring hidden content, image alt, SVG names, and custom components.
  *
- * @param element
- * @param forLabel
+ * @param element Nested JSX element to inspect.
+ * @param forLabel Whether interactive descendants are being interpreted inside a label.
  *
- * @return
+ * @return Name evidence after hidden, image, SVG, native-control, and component checks.
  */
 function elementContentState(element: ElementRef, forLabel: boolean): NameState {
 	const hidden = hiddenState(element);
@@ -320,9 +317,9 @@ function elementContentState(element: ElementRef, forLabel: boolean): NameState 
 /**
  * Determines whether a source element supplies a usable name through ARIA attributes.
  *
- * @param element
+ * @param element JSX element whose `aria-label` value is inspected.
  *
- * @return
+ * @return `named` for static non-empty text, `empty` when absent/empty, otherwise `unknown`.
  */
 function ariaNameState(element: ElementRef): NameState {
 	const label = staticAttr(attrOf(element, 'aria-label'));
@@ -330,41 +327,39 @@ function ariaNameState(element: ElementRef): NameState {
 	return 'empty';
 }
 
-
-
-
 /**
  * Builds conservative source evidence for literal JSX ids and their referenced text.
  *
- * @param source
+ * @param source Parsed JSX source containing controls and candidate labels.
  *
- * @return
+ * @return Map from unique literal ids to accessible-name evidence; duplicate ids are `unknown`.
  */
 function idContentStates(source: ts.SourceFile): Map<string, NameState> {
 	const ids = new Map<string, NameState>();
 	const duplicates = new Set<string>();
-	/**
-	 *
-	 * @param node
-	 */
+
 	const visit = (node: ts.Node): void => {
 		if (ts.isJsxElement(node) || ts.isJsxSelfClosingElement(node)) {
 			const id = staticAttr(attrOf(node, 'id'));
 			if (id.state === 'static') {
 				if (ids.has(id.value)) duplicates.add(id.value);
-				else ids.set(id.value, (function referencedContentState(element: ElementRef): NameState {
-	const tag = tagOf(element);
-	if (!A_Z_A_Z_D_REGEX.test(tag) || tag.includes('-')) return 'unknown';
-	const label = staticAttr(attrOf(element, 'aria-label'));
-	if (label.state === 'static') return 'named';
-	if (label.state === 'unknown') return 'unknown';
-	if (tag === 'img') {
-		const alt = staticAttr(attrOf(element, 'alt'));
-		return alt.state === 'static' ? 'named' : alt.state === 'unknown' ? 'unknown' : 'empty';
-	}
-	if (staticAttr(attrOf(element, 'aria-labelledby')).state !== 'empty') return 'unknown';
-	return combine(childrenOf(element).map((c) => childContentState(c, false)));
-})(node));
+				else
+					ids.set(
+						id.value,
+						(function referencedContentState(element: ElementRef): NameState {
+							const tag = tagOf(element);
+							if (!A_Z_A_Z_D_REGEX.test(tag) || tag.includes('-')) return 'unknown';
+							const label = staticAttr(attrOf(element, 'aria-label'));
+							if (label.state === 'static') return 'named';
+							if (label.state === 'unknown') return 'unknown';
+							if (tag === 'img') {
+								const alt = staticAttr(attrOf(element, 'alt'));
+								return alt.state === 'static' ? 'named' : alt.state === 'unknown' ? 'unknown' : 'empty';
+							}
+							if (staticAttr(attrOf(element, 'aria-labelledby')).state !== 'empty') return 'unknown';
+							return combine(childrenOf(element).map((c) => childContentState(c, false)));
+						})(node),
+					);
 			}
 		}
 		ts.forEachChild(node, visit);
@@ -374,23 +369,16 @@ function idContentStates(source: ts.SourceFile): Map<string, NameState> {
 	return ids;
 }
 
-
-
-
 /**
  * Finds labels associated by a literal id and records whether each label has meaningful text.
  *
- * @param source
+ * @param source Parsed JSX source containing label elements and their controls.
  *
- * @return
+ * @return Map from literal `for`/`htmlFor` targets to their label-content evidence.
  */
 function associatedLabels(source: ts.SourceFile): Map<string, NameState> {
 	const labels = new Map<string, NameState>();
-	/**
-	 *
-	 * @param node
-	 * @param hidden
-	 */
+
 	const visit = (node: ts.Node, hidden: boolean): void => {
 		if (ts.isJsxElement(node) || ts.isJsxSelfClosingElement(node)) {
 			const state = hiddenState(node);
@@ -413,12 +401,12 @@ function associatedLabels(source: ts.SourceFile): Map<string, NameState> {
 /**
  * Returns accessible-name evidence for one control, including nested and id-associated labels.
  *
- * @param element
- * @param kind
- * @param labels
- * @param nestedLabel
+ * @param element Interactive JSX element whose accessible name is evaluated.
+ * @param kind Element role and whether native label association applies.
+ * @param labels Literal id-to-label evidence collected from the source file.
+ * @param nestedLabel Label evidence inherited from a wrapping `<label>` element.
  *
- * @return
+ * @return Accessible-name state plus any safe title repair candidate and icon-only classification.
  */
 function elementNameState(
 	element: ElementRef,
@@ -467,16 +455,13 @@ function elementNameState(
 /**
  * Finds unnamed, non-focusable inline SVG images inside a named native control.
  *
- * @param element
+ * @param element Named control whose descendants are searched for decorative SVGs.
  *
- * @return
+ * @return SVG descendants that have no name, hidden state, focusability, or uncertain spread attributes.
  */
 function decorativeIcons(element: ElementRef): ElementRef[] {
 	const icons: ElementRef[] = [];
-	/**
-	 *
-	 * @param node
-	 */
+
 	const visit = (node: ts.Node): void => {
 		if (!ts.isJsxElement(node) && !ts.isJsxSelfClosingElement(node)) {
 			ts.forEachChild(node, visit);
@@ -502,26 +487,20 @@ function decorativeIcons(element: ElementRef): ElementRef[] {
 /**
  * Collects findings and candidate source edits for one parsed source file.
  *
- * @param cfg
- * @param file
- * @param parsed
+ * @param cfg Quality configuration used to report repository-relative locations.
+ * @param file Absolute source path being analyzed.
+ * @param parsed Parsed JSX source tree for the file.
  *
- * @return
+ * @return Accessibility findings and the source edits that can safely repair them.
  */
 function inspectFile(cfg: QualityCfg, file: string, parsed: ts.SourceFile): { findings: AccessibilityFinding[]; candidates: NameCandidate[]; decorativeCandidates: DecorativeIconCandidate[] } {
-	const parseDiagnostics = (parsed as ts.SourceFile & { parseDiagnostics?: readonly ts.Diagnostic[] }).parseDiagnostics;
-	if (parseDiagnostics?.length) return { findings: [], candidates: [], decorativeCandidates: [] };
+	if ((parsed as ts.SourceFile & { parseDiagnostics?: readonly ts.Diagnostic[] }).parseDiagnostics?.length) return { findings: [], candidates: [], decorativeCandidates: [] };
 	const labels = associatedLabels(parsed);
 	const ids = idContentStates(parsed);
 	const findings: AccessibilityFinding[] = [];
 	const candidates: NameCandidate[] = [];
 	const decorativeCandidates: DecorativeIconCandidate[] = [];
-	/**
-	 *
-	 * @param node
-	 * @param hidden
-	 * @param nestedLabel
-	 */
+
 	const visit = (node: ts.Node, hidden: boolean, nestedLabel: NameState): void => {
 		if (ts.isJsxElement(node) || ts.isJsxSelfClosingElement(node)) {
 			const elementHidden = hiddenState(node);
@@ -530,29 +509,32 @@ function inspectFile(cfg: QualityCfg, file: string, parsed: ts.SourceFile): { fi
 			let childLabel = nestedLabel;
 			if (tag === 'label') childLabel = contentState(node, true);
 			const kind = (function targetKind(element: ElementRef): { element: string; labelable: boolean } | undefined {
-	const tag = tagOf(element);
-	if (A_Z_A_Z_D_REGEX.test(tag) && (INTERACTIVE_NATIVE.has(tag) || tag === 'progress')) {
-		if (tag === 'input') {
-			const type = inputType(element);
-			if (type.state === 'unknown' || (type.state === 'static' && type.value.toLowerCase() === 'hidden')) return undefined;
-		}
-		return { element: `<${tag}>`, labelable: NATIVE_LABELABLE.has(tag) };
-	}
-	if (A_Z_A_Z_D_REGEX.test(tag) && tag === 'a' && attrOf(element, 'href')) return { element: '<a>', labelable: false };
-	if (A_Z_A_Z_D_REGEX.test(tag) && tag === 'area' && attrOf(element, 'href')) return { element: '<area>', labelable: false };
-	const role = staticAttr(attrOf(element, 'role'));
-	if (role.state === 'static' && INTERACTIVE_ROLES.has(role.value.toLowerCase())) return { element: `<${tag}>[role="${role.value}"]`, labelable: false };
-	return undefined;
-})(node);
+				const tag = tagOf(element);
+				if (A_Z_A_Z_D_REGEX.test(tag) && (INTERACTIVE_NATIVE.has(tag) || tag === 'progress')) {
+					if (tag === 'input') {
+						const type = inputType(element);
+						if (type.state === 'unknown' || (type.state === 'static' && type.value.toLowerCase() === 'hidden')) return undefined;
+					}
+					return { element: `<${tag}>`, labelable: NATIVE_LABELABLE.has(tag) };
+				}
+				if (A_Z_A_Z_D_REGEX.test(tag) && tag === 'a' && attrOf(element, 'href')) return { element: '<a>', labelable: false };
+				if (A_Z_A_Z_D_REGEX.test(tag) && tag === 'area' && attrOf(element, 'href')) return { element: '<area>', labelable: false };
+				const role = staticAttr(attrOf(element, 'role'));
+				if (role.state === 'static' && INTERACTIVE_ROLES.has(role.value.toLowerCase())) return { element: `<${tag}>[role="${role.value}"]`, labelable: false };
+				return undefined;
+			})(node);
 			if (!currentHidden && kind) {
 				const ariaLabel = ariaNameState(node);
-				const ariaName = ariaLabel === 'empty' ? (function labelledByState(element: ElementRef, ids: Map<string, NameState>): NameState {
-	const value = staticAttr(attrOf(element, 'aria-labelledby'));
-	if (value.state !== 'static') return value.state;
-	const references = value.value.trim().split(/\s+/).filter(Boolean);
-	if (!references.length) return 'empty';
-	return combine(references.map((i) => ids.get(i) ?? 'empty'));
-})(node, ids) : ariaLabel;
+				const ariaName =
+					ariaLabel === 'empty'
+						? (function labelledByState(element: ElementRef, ids: Map<string, NameState>): NameState {
+								const value = staticAttr(attrOf(element, 'aria-labelledby'));
+								if (value.state !== 'static') return value.state;
+								const references = value.value.trim().split(/\s+/).filter(Boolean);
+								if (!references.length) return 'empty';
+								return combine(references.map((i) => ids.get(i) ?? 'empty'));
+							})(node, ids)
+						: ariaLabel;
 				const name = ariaName === 'empty' ? elementNameState(node, kind, labels, nestedLabel) : { state: ariaName, iconOnly: false };
 				if (name.state === 'empty') {
 					const titleCanFix = name.title?.state === 'static' && name.iconOnly;
@@ -593,10 +575,10 @@ function inspectFile(cfg: QualityCfg, file: string, parsed: ts.SourceFile): { fi
 /**
  * Returns configured files that contain JSX syntax supported by this check.
  *
- * @param cfg
- * @param analysis
+ * @param cfg Quality configuration defining source roots and extensions.
+ * @param analysis Optional shared analysis context containing discovered source files.
  *
- * @return
+ * @return Configured source files whose extensions support JSX parsing.
  */
 function sourceFiles(cfg: QualityCfg, analysis?: QualityAnalysis): string[] {
 	return (analysis?.files ?? srcFiles(cfg)).filter((f) => JSX_EXTS.test(f));
@@ -605,10 +587,10 @@ function sourceFiles(cfg: QualityCfg, analysis?: QualityAnalysis): string[] {
 /**
  * Loads the source and parsed AST from the shared analysis cache when available.
  *
- * @param file
- * @param analysis
+ * @param file Absolute source path to load and parse.
+ * @param analysis Optional shared analysis cache for file text and parsed sources.
  *
- * @return
+ * @return Source text and its parsed JSX tree.
  */
 function sourceFor(file: string, analysis?: QualityAnalysis): { text: string; parsed: ts.SourceFile } {
 	const text = analysis?.texts.get(file) ?? readFileSync(file, 'utf8');
@@ -663,12 +645,8 @@ export function fixAccessibleNames(cfg: QualityCfg): { fixed: number } {
 		}
 		let updated = text;
 		for (const edit of edits.sort((a, b) => b.start - a.start)) updated = `${updated.slice(0, edit.start)}${edit.text}${updated.slice(edit.end)}`;
-		const diagnostics = ts.transpileModule(updated, {
-			fileName: file,
-			reportDiagnostics: true,
-			compilerOptions: { allowJs: true, jsx: ts.JsxEmit.Preserve, target: ts.ScriptTarget.ESNext },
-		}).diagnostics;
-		if (diagnostics?.length) continue;
+		if (ts.transpileModule(updated, { fileName: file, reportDiagnostics: true, compilerOptions: { allowJs: true, jsx: ts.JsxEmit.Preserve, target: ts.ScriptTarget.ESNext } }).diagnostics?.length)
+			continue;
 		writeFileSync(file, updated);
 		fixed += edits.length;
 	}

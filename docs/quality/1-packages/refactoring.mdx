@@ -1,0 +1,25 @@
+---
+title: standards-refactoring
+description: Analyze forwarding, single-use declarations, and dead code with conservative fixes.
+---
+
+`@terra-symposium/standards-refactoring` contains source analysis for object forwarding and declarations that may be unused or have one consumer. It is designed to separate high-confidence edits from review-only suggestions.
+
+## Install and run
+
+```sh
+pnpm add -D @terra-symposium/standards-refactoring
+pnpm exec terra-refactoring --all --warn
+```
+
+The CLI reads the shared Quality config and scope. `--warn` performs a read-only analysis; default fix mode can apply supported safe fixes. A finding may remain even when no automatic edit is offered.
+
+## API and safety model
+
+```ts
+import { objectForwardingFindings, singleUseFindings, fixSingleUseDeclarations } from '@terra-symposium/standards-refactoring';
+```
+
+The package exports forwarding analysis, single-use type/declaration findings, fix helpers, and dead-code TypeScript-program utilities. Candidate dead-code edits are type-checked before write. Knip and ESLint consumers are also coordinated by the aggregate runner. A declaration marked `// terra-quality-ignore single-use -- <reason>` remains a review-only exception and its marker is itself validated; safe inline candidates are not suppressed by this directive.
+
+Review edit diffs and run focused type checks after fixes. See the [aggregate dead-code workflow](/quality/1-packages/quality/) and [Quality troubleshooting](/quality/5-operations/troubleshooting/).

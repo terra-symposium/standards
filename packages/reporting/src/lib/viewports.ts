@@ -20,6 +20,11 @@ import type { PlaywrightTestConfig } from '@playwright/test';
 REGEX
 //////////////////////////////////////////////////*/
 
+/**
+ * Creates a fresh matcher for characters excluded from Playwright project names.
+ *
+ * @return Global matcher for characters outside the viewport-name alphabet.
+ */
 const A_Z0_9_GI_REGEX = () => /[^a-z0-9-]/gi;
 
 /** The default responsive viewport catalog used by the shared reporter. */

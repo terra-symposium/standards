@@ -5,6 +5,7 @@ Vendored braces source preserved for repository use.
 ## What it does
 
 ### Why use braces?
+
 Brace patterns make globs more powerful by adding the ability to match specific ranges and sequences of characters.
 
 **Accurate** - complete support for the [Bash 4.3 Brace Expansion](www.gnu.org/software/bash/)
@@ -31,6 +32,7 @@ backtracking](https://www.regular-expressions.info/catastrophic.html)).
 - [Supports escaping](#escaping) - To prevent evaluation of special characters.
 
 ### About
+
 <details>
 <summary><strong>Contributing</strong></summary>
 
@@ -96,6 +98,7 @@ Not applicable.
 ## Get started
 
 ### Install
+
 Install with [npm](https://www.npmjs.com/):
 
 ## Security and Limitations
@@ -105,6 +108,7 @@ Install with [npm](https://www.npmjs.com/):
 Please consider following this project's author, [Jon Schlinkert](https://github.com/jonschlinkert), and consider starring the project to show your :heart: and support.
 
 ### v3.0.0 Released!!
+
 See the [changelog](CHANGELOG.md) for details.
 
 The main export is a function that takes one or more brace `patterns` and `options`.
@@ -116,7 +120,8 @@ console.log(braces(['{01..05}', '{a..e}']));
 
 console.log(braces(['{01..05}', '{a..e}'], { expand: true }));
 //=> ['01', '02', '03', '04', '05', 'a', 'b', 'c', 'd', 'e']
-```
+
+````
 
 ### Brace Expansion vs. Compilation
 
@@ -129,7 +134,7 @@ console.log(braces('a/{x,y,z}/b'));
 //=> ['a/(x|y|z)/b']
 console.log(braces(['a/{01..20}/b', 'a/{1..5}/b']));
 //=> [ 'a/(0[1-9]|1[0-9]|20)/b', 'a/([1-5])/b' ]
-```
+````
 
 **Expanded**
 
@@ -246,6 +251,7 @@ console.log(braces.expand('a{b}c'));
 ```
 
 ### Options
+
 #### options.maxLength
 
 **Type**: `Number`
@@ -368,6 +374,7 @@ console.log(braces('a/b{1,3}/{x,y,z}', { quantifiers: true, expand: true }));
 **Description**: Do not strip backslashes that were used for escaping from the result.
 
 ### What is "brace expansion"?
+
 Brace expansion is a type of parameter expansion that was made popular by unix shells for generating lists of strings, as well as regex-like matching when used alongside wildcards (globs).
 
 In addition to "expansion", braces are also used for matching. In other words:
@@ -415,6 +422,7 @@ foo/{a,b,c}/bar => foo/a/bar foo/b/bar foo/c/bar
 The fact that braces can be "expanded" from relatively simple patterns makes them ideal for quickly generating test fixtures, file paths, and similar use cases.
 
 ### Brace matching
+
 In addition to _expansion_, brace patterns are also useful for performing regular-expression-like matching.
 
 For example, the pattern `foo/{1..3}/bar` would match any of following strings:
@@ -445,6 +453,7 @@ baz/3/qux
 ```
 
 ### Brace matching pitfalls
+
 Although brace patterns offer a user-friendly way of matching ranges or sets of strings, there are also some major disadvantages and potential risks you should be aware of.
 
 #### tldr
@@ -458,7 +467,6 @@ increase exponentially
 
 users can accidentally (or intentially) exhaust your system's resources resulting in the equivalent
 of a DoS attack (bonus: no programming knowledge is required!)
-
 
 For a more detailed explanation with examples, see the [geometric complexity](#geometric-complexity) section.
 
@@ -505,6 +513,7 @@ Interested in learning more about brace expansion?
 </details>
 
 ### Benchmarks
+
 #### Running benchmarks
 
 Install dev dependencies:
@@ -555,6 +564,7 @@ Not applicable.
 ## Validation
 
 ### Performance
+
 Braces is not only screaming fast, it's also more accurate the other brace expansion libraries.
 
 #### Better algorithms

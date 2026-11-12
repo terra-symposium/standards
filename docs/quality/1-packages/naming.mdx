@@ -1,0 +1,25 @@
+---
+title: standards-naming
+description: Find nonconforming identifiers and aliases, with scope-aware rename fixes.
+---
+
+`@terra-symposium/standards-naming` reports identifier names that do not match Terra's source conventions and configured alias declarations that can be updated safely. Its rename service follows TypeScript references and resolves callback-local collisions.
+
+## Install and run
+
+```sh
+pnpm add -D @terra-symposium/standards-naming
+pnpm exec terra-naming --config config/quality.json --all --warn
+```
+
+Normal runs select changed and untracked files. `--all` covers all configured roots and `--warn` is read-only. Set `protectedIdentifiers`, `renameExports`, and applicable source scope in `quality.json` to control policy. Framework-reserved filenames and protected source paths are excluded according to the implementation's conventions.
+
+## API
+
+```ts
+import { namingFindings, aliasFindings, fixNaming, renameId } from '@terra-symposium/standards-naming';
+```
+
+The package also exports identifier token and callback alias helpers, protected-name sets, and rename utilities. `fixNaming()` applies eligible TypeScript language-service edits; it does not guess when a binding is protected or its references cannot be safely renamed. Review public API and serialized identifiers before accepting any suggested rename.
+
+The root API and `./cli` export ship TypeScript declarations. See [Quality autofix policy](/quality/2-configuration/quality-json/) and [review a full run](/quality/4-workflows/cli-and-ci/).

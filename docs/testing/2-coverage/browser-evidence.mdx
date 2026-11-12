@@ -1,0 +1,20 @@
+---
+title: Browser test evidence
+description: Choose responsive browser coverage and capture diagnostics for user-visible flows.
+---
+
+Use browser tests for behavior that depends on rendering, navigation, keyboard input, hydration, responsive layout, or browser APIs. Keep the scenario and assertion with the feature it proves; keep responsive project setup and report generation shared where possible.
+
+||| [Prove a failure state]
+
+Trigger a deterministic render failure, assert the accessible fallback, and verify independent UI remains available. For hydration, exercise the Astro fallback in the Website browser harness.
+|||
+
+||| [Prove a layout state]
+
+Capture the same meaningful route or interaction at agreed viewports. Use stable keys so the reporter can compare the same state across a responsive matrix.
+|||
+
+For Playwright reporting and responsive viewport projects, install `@terra-symposium/standards-reporting`. See [responsive Playwright](/reporting/2-playwright/playwright-evidence/) for project setup, [artifacts](/reporting/4-artifacts/artifacts/) for screenshot-backed reports, and [load testing](/reporting/3-load-testing/load-testing/) for named operation timings.
+
+For error-boundary behavior, trigger a descendant render error in the Website's existing browser regression harness and assert that the fallback appears while surrounding UI remains. The [Sanity Error Analysis reference](/error-boundaries/3-analytics/sanity-error-analysis/) shows the real dashboard component with clearly labeled local fixture data; it is not a substitute for application-owned regression tests or a view of current production incidents.

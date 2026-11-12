@@ -7,32 +7,35 @@ CONFIG
 //////////////////////////////////////////////////*/
 
 /** Check switches accepted by the shared quality.json schema. */
-export type QualityCheckName =
-	| 'document'
-	| 'format'
-	| 'import'
-	| 'name'
-	| 'forward'
-	| 'accessibility'
-	| 'display-name'
-	| 'performance-patterns'
-	| 'documented-commands'
-	| 'lint'
-	| 'knip'
-	| 'dead-code'
-	| 'type'
-	| 'recommend'
-	| 'command'
-	| 'diff'
-	| 'alias'
-	| 'security'
-	| 'repeated-classes'
-	| 'tailwind-canonical'
-	| 'regex-dedup'
-	| 'ui-patterns'
-	| 'ui-recommendations'
-	| 'error-boundaries'
-	| 'github';
+export const QUALITY_CHECK_NAMES = [
+	'document',
+	'format',
+	'import',
+	'name',
+	'forward',
+	'accessibility',
+	'display-name',
+	'performance-patterns',
+	'documented-commands',
+	'lint',
+	'knip',
+	'dead-code',
+	'type',
+	'recommend',
+	'command',
+	'diff',
+	'alias',
+	'security',
+	'repeated-classes',
+	'tailwind-canonical',
+	'regex-dedup',
+	'ui-patterns',
+	'ui-recommendations',
+	'error-boundaries',
+	'github',
+] as const;
+/** A supported identifier for an enabled quality check. */
+export type QualityCheckName = (typeof QUALITY_CHECK_NAMES)[number];
 /** Autofix switches accepted by the shared quality.json schema. */
 export type QualityAutofixName =
 	| 'document'
@@ -49,7 +52,8 @@ export type QualityAutofixName =
 	| 'accessibility'
 	| 'displayName'
 	| 'documentedCommands'
-	| 'errorBoundaries';
+	| 'errorBoundaries'
+	| 'duplicateImports';
 /** Options shared by an independently runnable quality capability API and CLI. */
 export type CapabilityOptions = { fix: boolean; all: boolean; files?: string[]; configPath?: string; args?: string[] };
 /** Shared normalized configuration shape retained by the aggregate quality runner. */
@@ -66,43 +70,13 @@ export type QualityCfg = {
 	externalPrefixes?: string[];
 	protectedIdentifiers?: string[];
 	frameworkEntryExports?: Record<string, string[]>;
+	knipPackageMappings?: { sourceRoots: string[]; packageRoot: string }[];
 	renameExports?: boolean;
 	qualityCommands?: { name: string; command: string; args?: string[] }[];
 	languageProfiles?: ('c' | 'java' | 'python')[];
-	excludeTests?: boolean;
-	enabledChecks?: Partial<
-		Record<
-			| 'document'
-			| 'format'
-			| 'import'
-			| 'name'
-			| 'forward'
-			| 'accessibility'
-			| 'display-name'
-			| 'performance-patterns'
-			| 'documented-commands'
-			| 'lint'
-			| 'knip'
-			| 'dead-code'
-			| 'type'
-			| 'recommend'
-			| 'command'
-			| 'diff'
-			| 'alias'
-			| 'security'
-			| 'repeated-classes'
-			| 'tailwind-canonical'
-			| 'regex-dedup'
-			| 'ui-patterns'
-			| 'ui-recommendations'
-			| 'error-boundaries'
-			| 'github',
-			boolean
-		>
-	>;
+	enabledChecks?: Partial<Record<QualityCheckName, boolean>>;
 	autofix?: Partial<
 		Record<
-			| 'document'
 			| 'format'
 			| 'name'
 			| 'lint'
@@ -116,16 +90,17 @@ export type QualityCfg = {
 			| 'accessibility'
 			| 'displayName'
 			| 'documentedCommands'
+			| 'duplicateImports'
 			| 'errorBoundaries',
 			boolean
 		>
-	>;
+	> & { document?: false };
 	documentation?: { required?: { types?: boolean; functions?: boolean; exportedFunctions?: boolean; noInlineFunctions?: boolean }; commandRoots?: string[]; cAuthors?: Record<string, string> };
 	enabledCommands?: Record<string, boolean>;
 	recommendationCommands?: { name: string; command: string; args?: string[] }[];
 	enabledRecommendations?: Record<string, boolean>;
 	tailwindCanonical?: { stylesheet: string; sourceRoots?: string[] };
-	security?: { forbiddenTerms?: string[]; forbiddenImports?: string[]; clientRoots?: string[]; allowProcessEnvRoots?: string[] };
+	security?: { forbiddenTerms?: string[]; forbiddenImports?: string[]; clientRoots?: string[]; runtimeRoots?: string[]; allowProcessEnvRoots?: string[] };
 	repeatedClasses?: { minimumCount?: number; extensions?: string[] };
 	regexDedup?: { extensions?: string[]; minimumCount?: number; sharedModule?: string; skippedDirectories?: string[] };
 	uiPatterns?: { forbidden?: string[]; extensions?: string[] };
@@ -147,7 +122,7 @@ export type QualityCfg = {
 	typecheckRoots?: string[];
 	typecheckExtensions?: string[];
 	typecheckCommand?: { command: string; args?: string[] };
-	tools?: { prettier?: string; tsc?: string; eslint?: string; knip?: string };
+	tools?: { prettier?: string; tsc?: string; eslint?: string; knip?: string; clang?: string };
 	loadTesting?: {
 		enabled?: boolean;
 		defaultBudget?: { warnMs?: number; failMs?: number };

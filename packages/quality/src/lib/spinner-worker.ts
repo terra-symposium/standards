@@ -19,7 +19,8 @@ const { label, sharedBuffer } = workerData as { label: string; sharedBuffer: Sha
 const state = new Int32Array(sharedBuffer);
 const frames = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
 let frame = 0;
-(function draw(): void {
+/** Draws spinner frames until the parent worker signals completion. */
+function draw(): void {
 	if (Atomics.load(state, 0)) {
 		writeSync(2, '\r\u001b[2K');
 		Atomics.store(state, 2, 1);
@@ -30,4 +31,6 @@ let frame = 0;
 	Atomics.store(state, 1, 1);
 	Atomics.notify(state, 1);
 	setTimeout(draw, 90);
-})();
+}
+
+draw();

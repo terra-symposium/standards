@@ -23,7 +23,7 @@ With no file arguments, the CLI checks changed and untracked source files in the
 ## API
 
 ```ts
-import { checkImports, duplicateImportFindings } from '@terra-symposium/standards-imports';
+import { checkImports, duplicateImportFindings, fixDuplicateImports } from '@terra-symposium/standards-imports';
 ```
 
 The package root is the supported API surface and ships TypeScript declarations. The CLI is also available from the `./cli` export.

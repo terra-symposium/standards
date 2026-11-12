@@ -1,0 +1,26 @@
+---
+title: standards-quality-core
+description: Shared source scope, configuration, analysis, CLI flags, types, and progress utilities.
+---
+
+`@terra-symposium/standards-quality-core` is the API-only foundation shared by the standalone Quality capabilities. It owns contracts and common analysis behavior, not individual findings or aggregate phase orchestration.
+
+## Install and imports
+
+```sh
+pnpm add @terra-symposium/standards-quality-core
+```
+
+```ts
+import { loadQualityConfig, qualityScope, createQualityAnalysis, srcFiles, workingSrcFiles } from '@terra-symposium/standards-quality-core';
+```
+
+## Public surface
+
+The root export ships JavaScript and TypeScript declarations for `QualityCfg`, `QualityScope`, `QualityOptions`, `CapabilityOptions`, check and autofix names, config toggle helpers, source-kind helpers, progress utilities, and file-scope functions.
+
+`loadQualityConfig()` reads the existing root `quality.json` or its `config/quality.json` fallback and resolves project roots and scope. `createQualityAnalysis()` builds a shared TypeScript program and file cache. `srcFiles()` selects the configured source set; `workingSrcFiles()` applies the normal changed/untracked worktree scope.
+
+## Package boundary
+
+This package has no CLI. Install a capability package to run a focused check. A feature package should depend on Core for its shared contract and must not import its check implementation from the aggregate runner. Install [standards-quality](/quality/1-packages/quality/) when you need ordered phases, the full schema, repository commands, or combined output.

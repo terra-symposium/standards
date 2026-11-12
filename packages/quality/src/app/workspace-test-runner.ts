@@ -32,11 +32,7 @@ for (const [idx, name] of suites.entries()) {
 	const result = spawnSync('pnpm', ['--filter', name, 'test'], {
 		cwd: resolve(dirname(fileURLToPath(import.meta.url)), '../../../..'),
 		stdio: 'inherit',
-		env: {
-			...process.env,
-			NODE_OPTIONS: qualityNodeReporterOptions(process.env.NODE_OPTIONS, new URL('../lib/node-reporter.js', import.meta.url).href),
-			TERRA_QUALITY_NODE_REPORTER_OWNER: '1',
-		},
+		env: { ...process.env, NODE_OPTIONS: qualityNodeReporterOptions(process.env.NODE_OPTIONS, new URL('../lib/node-reporter.js', import.meta.url).href), TERRA_QUALITY_NODE_REPORTER_OWNER: '1' },
 	});
 	if (result.error) {
 		console.error(`  ${name} failed to start: ${result.error.message}`);

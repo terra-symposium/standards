@@ -1,6 +1,6 @@
 /**
  * packages/documentation/src/lib/documentation.ts
- * Create comments documenting the file, grouping imports, and sectioning code.
+ * Reports source-documentation findings and checks Markdown command fences.
  */
 
 /*//////////////////////////////////////////////////
@@ -35,9 +35,16 @@ REGEX
 //////////////////////////////////////////////////*/
 
 const R_N_REGEX = /\r?\n/;
+
+/*//////////////////////////////////////////////////
+REGEX
+//////////////////////////////////////////////////*/
+
+const S_ONLY_REGEX = /^\s*$/;
 /**
+ * Creates a fresh matcher for complete TSDoc comment blocks.
  *
- * @return
+ * @return Global regular expression that matches TSDoc comment blocks.
  */
 const S_S_G_REGEX = () => /\/\*\*[\s\S]*?\*\//g;
 
@@ -45,24 +52,13 @@ const S_S_G_REGEX = () => /\/\*\*[\s\S]*?\*\//g;
 REGEX
 //////////////////////////////////////////////////*/
 
-const T_R_N_S_S_R_N_T_T_R_N_REGEX = /^\/\*\*[ \t]*\r?\n([\s\S]*?)\r?\n[ \t]*\*\/[ \t]*(?:\r?\n)*/;
-const T_T_REGEX = /^[ \t]*\*[ \t]?/;
 const S_REGEX = /^\s*/;
-const S_CLASS_2 = /^\s*(?:\/\/|\/\*|\*\/|\*)/;
 const S_CLASS_3 = /^\s*\* ?/;
-const S_W_REGEX = /^\s*@\w+/;
-const RETURNS_B_REGEX = /^@returns?\b/;
 const UFEFF_REGEX = /^\uFEFF/;
-const S_CLASS_4 = /\s*$/;
 const C_M_JS_JSX_TS_TSX_REGEX = /(?:^|[\\/])[^\\/]+\.(?:c|m)?(?:js|jsx|ts|tsx)$/;
 const S_CLASS_5 = /^\{[^}]+\}\s*/;
-const OPEN = `/*${'/'.repeat(50)}`;
-const CLOSE = `${'/'.repeat(50)}*/`;
 const SUPPORTED = new Set(['.cjs', '.cts', '.js', '.jsx', '.mjs', '.mts', '.ts', '.tsx']);
-/** Canonical groups used to order and label source imports. */
-type ImportGroup = 'API' | 'COMPONENTS' | 'DATA' | 'TYPES';
-/** Source-code sections maintained by the documentation formatter. */
-type SrcGroup = 'CONFIG' | 'HELPERS';
+const IMPORT_SUPPORTED = new Set([...SUPPORTED, '.astro']);
 
 /** Documentation requirements that select which declarations need source comments. */
 export type DocumentationRequirements = NonNullable<NonNullable<QualityCfg['documentation']>['required']>;
@@ -178,12 +174,11 @@ function writeValidatedSrc(fileName: string, src: string): boolean {
 		if (/\.d\.[cm]?ts$/.test(fileName)) {
 			if ((ts.createSourceFile(fileName, src, ts.ScriptTarget.Latest, true, srcKind(fileName)) as ts.SourceFile & { parseDiagnostics: readonly ts.Diagnostic[] }).parseDiagnostics.length) return false;
 		} else {
-			const result = ts.transpileModule(src, {
-				fileName,
-				reportDiagnostics: true,
-				compilerOptions: { allowJs: true, jsx: ts.JsxEmit.Preserve, module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ESNext },
-			});
-			if (result.diagnostics?.length) return false;
+			if (
+				ts.transpileModule(src, { fileName, reportDiagnostics: true, compilerOptions: { allowJs: true, jsx: ts.JsxEmit.Preserve, module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ESNext } })
+					.diagnostics?.length
+			)
+				return false;
 		}
 	} catch {
 		return false;
@@ -202,9 +197,6 @@ function writeValidatedSrc(fileName: string, src: string): boolean {
 	return true;
 }
 
-
-
-
 /**
  * Selects the TypeScript parser mode for a JavaScript or TypeScript filename.
  *
@@ -217,45 +209,29 @@ function srcKind(fileName: string): ts.ScriptKind {
 }
 
 /**
- * Reads the module specifier text from an import declaration.
+ * Selects import source text, extracting Astro frontmatter without parsing its template markup.
  *
- * @param n Import declaration to inspect.
+ * @param fileName Source path whose extension determines whether frontmatter extraction is needed.
+ * @param text Complete source text read from the file.
  *
- * @return Module specifier text, or an empty string for a non-string specifier.
+ * @return Parseable import text, its source offset and line offset, or `undefined` for malformed Astro frontmatter.
  */
-function importSrc(n: ts.ImportDeclaration): string {
-	return ts.isStringLiteral(n.moduleSpecifier) ? n.moduleSpecifier.text : '';
+function duplicateImportSource(fileName: string, text: string): { text: string; offset: number; lineOffset: number } | undefined {
+	if (extname(fileName) !== '.astro') return { text, offset: 0, lineOffset: 0 };
+	const match = text.match(/^---[ \t]*\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)/u);
+	if (!match || match.index === undefined) return undefined;
+	const offset = match.index + match[0].indexOf(match[1]);
+	return { text: match[1], offset, lineOffset: text.slice(0, offset).split(/\r?\n/u).length - 1 };
 }
 
 /**
- * Returns whether an import would collide with a declaration in the file.
- * This also handles self-imports and duplicate local component declarations.
- *
- * @param parsed Parsed source file whose top-level declarations define local names.
- * @param n Import declaration to test.
- *
- * @return `true` when the import would collide with a local declaration.
- */
-function selfImportConflicts(parsed: ts.SourceFile, n: ts.ImportDeclaration): boolean {
-	const localNames = new Set<string>();
-	for (const s of parsed.statements) {
-		if (ts.isFunctionDeclaration(s) || ts.isClassDeclaration(s) || ts.isInterfaceDeclaration(s) || ts.isTypeAliasDeclaration(s) || ts.isEnumDeclaration(s)) if (s.name) localNames.add(s.name.text);
-		if (ts.isVariableStatement(s)) for (const dec of s.declarationList.declarations) if (ts.isIdentifier(dec.name)) localNames.add(dec.name.text);
-	}
-	if (!n.importClause) return false;
-	if (n.importClause.name && localNames.has(n.importClause.name.text)) return true;
-	if (n.importClause.namedBindings && ts.isNamespaceImport(n.importClause.namedBindings) && localNames.has(n.importClause.namedBindings.name.text)) return true;
-	return Boolean(n.importClause.namedBindings && ts.isNamedImports(n.importClause.namedBindings) && n.importClause.namedBindings.elements.some((e) => localNames.has(e.name.text)));
-}
-
-/**
- * Assigns an import to the canonical group used by the source-maintenance layout.
+ * Canonical groups used to order and label source imports.
  *
  * @param name Local import name whose casing indicates its category.
  *
  * @return Import group for API, component, or uppercase data names.
  */
-function importGroup(name: string): ImportGroup {
+function importGroup(name: string): 'API' | 'COMPONENTS' | 'DATA' | 'TYPES' {
 	if (/^[A-Z][A-Z0-9_]*$/.test(name)) return 'DATA';
 	if (/^[A-Z]/.test(name)) return 'COMPONENTS';
 	return 'API';
@@ -272,9 +248,11 @@ function importGroup(name: string): ImportGroup {
 export function duplicateImportFindings(files: string[]): DuplicateImportFinding[] {
 	const findings: DuplicateImportFinding[] = [];
 	for (const file of files) {
-		if (!SUPPORTED.has(extname(file))) continue;
+		if (!IMPORT_SUPPORTED.has(extname(file))) continue;
 		const text = readFileSync(file, 'utf8');
-		const parsed = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, srcKind(file));
+		const source = duplicateImportSource(file, text);
+		if (!source) continue;
+		const parsed = ts.createSourceFile(file, source.text, ts.ScriptTarget.Latest, true, srcKind(file));
 		const seen = new Set<string>();
 		for (const declaration of parsed.statements.filter(ts.isImportDeclaration)) {
 			if (!declaration.importClause || !ts.isStringLiteral(declaration.moduleSpecifier)) continue;
@@ -297,7 +275,7 @@ export function duplicateImportFindings(files: string[]): DuplicateImportFinding
 			}
 			if (keys.some((k) => seen.has(k))) {
 				const { line } = parsed.getLineAndCharacterOfPosition(declaration.getStart(parsed));
-				findings.push({ file, line: line + 1, module: declaration.moduleSpecifier.text });
+				findings.push({ file, line: line + source.lineOffset + 1, module: declaration.moduleSpecifier.text });
 			}
 			for (const key of keys) seen.add(key);
 		}
@@ -306,621 +284,69 @@ export function duplicateImportFindings(files: string[]): DuplicateImportFinding
 }
 
 /**
- * Merges and renders imports into deterministic groups while preserving type-only imports.
+ * Removes repeated, identical import declarations when their standalone lines carry no comments.
  *
- * @param parsed Parsed source file used to recover exact module-specifier text.
- * @param imports Import declarations selected for maintenance.
+ * @param files Configured source files to inspect and update.
  *
- * @return Renderable import entries grouped by their canonical section.
+ * @return Number of duplicate declarations removed.
  */
-function groupedImports(parsed: ts.SourceFile, imports: ts.ImportDeclaration[]): Record<ImportGroup, { source: string; text: string }[]> {
-	const groups: Record<ImportGroup, { source: string; text: string }[]> = { API: [], COMPONENTS: [], DATA: [], TYPES: [] };
-	/** Information preserved while import declarations are merged and re-emitted. */
-	type MergedImport = { group: ImportGroup; source: string; module: string; typeOnly: boolean; defaultName?: string; namespace?: string; named: Set<string> };
-	const merged = new Map<string, MergedImport>();
-	/**
-	 *
-	 * @param group
-	 * @param n
-	 * @param typeOnly
-	 *
-	 * @return
-	 */
-	const get = (group: ImportGroup, n: ts.ImportDeclaration, typeOnly: boolean) => {
-		const src = importSrc(n);
-		const key = `${group}|${typeOnly ? 'type|' : ''}${src}`;
-		const existing = merged.get(key);
-		if (existing) return existing;
-		const created: MergedImport = { group, source: src, module: n.moduleSpecifier.getText(parsed), typeOnly, named: new Set<string>() };
-		merged.set(key, created);
-		return created;
-	};
-	for (const n of imports) {
-		if (!n.importClause) {
-			get('API', n, false).named.add('');
-			continue;
-		}
-		if (n.importClause.name) get(n.importClause.isTypeOnly ? 'TYPES' : importGroup(n.importClause.name.text), n, n.importClause.isTypeOnly).defaultName = n.importClause.name.text;
-		if (n.importClause.namedBindings && ts.isNamespaceImport(n.importClause.namedBindings))
-			get(n.importClause.isTypeOnly ? 'TYPES' : importGroup(n.importClause.namedBindings.name.text), n, n.importClause.isTypeOnly).namespace = n.importClause.namedBindings.name.text;
-		if (n.importClause.namedBindings && ts.isNamedImports(n.importClause.namedBindings)) {
-			for (const el of n.importClause.namedBindings.elements) {
-				const elTypeOnly = n.importClause.isTypeOnly || el.isTypeOnly;
-				get(elTypeOnly ? 'TYPES' : importGroup(el.name.text), n, elTypeOnly).named.add(el.getText(parsed).replace(TYPE_S_REGEX, ''));
+export function fixDuplicateImports(files: string[]): number {
+	let removed = 0;
+	for (const file of files) {
+		if (!IMPORT_SUPPORTED.has(extname(file))) continue;
+		const text = readFileSync(file, 'utf8');
+		const source = duplicateImportSource(file, text);
+		if (!source) continue;
+		const parsed = ts.createSourceFile(file, source.text, ts.ScriptTarget.Latest, true, srcKind(file));
+		const seen = new Set<string>();
+		const edits: { start: number; end: number }[] = [];
+		for (const declaration of parsed.statements.filter(ts.isImportDeclaration)) {
+			if (!declaration.importClause || !ts.isStringLiteral(declaration.moduleSpecifier) || declaration.attributes) continue;
+			const signature = declaration.getText(parsed);
+			if (!seen.has(signature)) {
+				seen.add(signature);
+				continue;
 			}
+			if (ts.getLeadingCommentRanges(source.text, declaration.getFullStart())?.length || ts.getTrailingCommentRanges(source.text, declaration.end)?.length) continue;
+			const lineStart = source.text.lastIndexOf('\n', declaration.getStart(parsed) - 1) + 1;
+			const newlineStart = source.text.indexOf('\n', declaration.end);
+			const lineEnd = newlineStart < 0 ? source.text.length : newlineStart + 1;
+			if (source.text.slice(lineStart, declaration.getStart(parsed)).trim() || source.text.slice(declaration.end, newlineStart < 0 ? source.text.length : newlineStart).trim()) continue;
+			edits.push({ start: source.offset + lineStart, end: source.offset + lineEnd });
 		}
+		if (!edits.length) continue;
+		const updated = edits.sort((left, right) => right.start - left.start).reduce((source, edit) => `${source.slice(0, edit.start)}${source.slice(edit.end)}`, text);
+		if (updated === text) continue;
+		writeFileSync(file, updated);
+		removed += edits.length;
 	}
-	for (const v of merged.values()) {
-		const prefix = v.typeOnly ? 'import type ' : 'import ';
-		if (v.named.has('')) {
-			groups[v.group].push({ source: v.source, text: `import ${v.module};` });
-			continue;
-		}
-		if (v.namespace) {
-			const namespaceParts = [v.defaultName, `* as ${v.namespace}`].filter(Boolean);
-			groups[v.group].push({ source: v.source, text: `${prefix}${namespaceParts.join(', ')} from ${v.module};` });
-			if (!v.named.size) continue;
-		}
-		const named = v.named.size ? `{ ${[...v.named].sort().join(', ')} }` : undefined;
-		const clause = v.namespace ? named : [v.defaultName, named].filter(Boolean).join(', ');
-		if (v.typeOnly && v.defaultName && named) {
-			groups[v.group].push({ source: v.source, text: `${prefix}${v.defaultName} from ${v.module};` });
-			groups[v.group].push({ source: v.source, text: `${prefix}${named} from ${v.module};` });
-		} else if (clause) groups[v.group].push({ source: v.source, text: `${prefix}${clause} from ${v.module};` });
-	}
-	return groups;
+	return removed;
 }
 
 /**
- * Classifies a top-level statement for source-section organization.
+ * Retains the historical API without changing source comments or section labels.
  *
- * @param n Top-level statement to classify.
+ * @param root Repository root retained for compatibility with existing callers.
+ * @param fileName Source file retained for compatibility with existing callers.
  *
- * @return `CONFIG` for declarations/constants, `HELPERS` for functions, or `undefined` otherwise.
- */
-function srcGroup(n: ts.Statement): SrcGroup | undefined {
-	if (ts.isTypeAliasDeclaration(n) || ts.isInterfaceDeclaration(n) || ts.isEnumDeclaration(n) || (ts.isVariableStatement(n) && (n.declarationList.flags & ts.NodeFlags.Const) !== 0)) return 'CONFIG';
-	if (ts.isFunctionDeclaration(n)) return 'HELPERS';
-	return undefined;
-}
-
-
-
-
-/**
- * Returns source spans whose whitespace is content rather than layout.
- *
- * @param src Source text to parse for literals.
- * @param fileName Filename used to choose the parser mode.
- *
- * @return Sorted source spans occupied by literals or JSX text.
- */
-function literalSpans(src: string, fileName: string): { start: number; end: number }[] {
-	const parsed = ts.createSourceFile(fileName, src, ts.ScriptTarget.Latest, true, srcKind(fileName));
-	const spans: { start: number; end: number }[] = [];
-	/**
-	 *
-	 * @param n
-	 */
-	const visit = (n: ts.Node): void => {
-		if (ts.isStringLiteral(n) || ts.isRegularExpressionLiteral(n) || ts.isNoSubstitutionTemplateLiteral(n) || ts.isTemplateExpression(n) || ts.isJsxText(n)) {
-			spans.push({ start: n.getStart(parsed), end: n.end });
-			return;
-		}
-		ts.forEachChild(n, visit);
-	};
-	visit(parsed);
-	return spans.sort((a, b) => a.start - b.start);
-}
-
-
-
-
-/**
- * Removes managed CONFIG and HELPERS fences without touching matching text inside literals.
- *
- * @param src Source text containing possible managed sections.
- * @param fileName Filename used to identify literal spans.
- *
- * @return Source text with existing managed sections removed.
- */
-function removeManagedSects(src: string, fileName: string): string {
-	const parsed = ts.createSourceFile(fileName, src, ts.ScriptTarget.Latest, true, srcKind(fileName));
-	const literals: { start: number; end: number }[] = [];
-	/**
-	 *
-	 * @param n
-	 */
-	const visit = (n: ts.Node): void => {
-		if (
-			ts.isStringLiteral(n) ||
-			ts.isRegularExpressionLiteral(n) ||
-			ts.isNoSubstitutionTemplateLiteral(n) ||
-			ts.isTemplateHead(n) ||
-			ts.isTemplateMiddle(n) ||
-			ts.isTemplateTail(n) ||
-			ts.isJsxText(n)
-		) {
-			literals.push({ start: n.getStart(parsed), end: n.end });
-			return;
-		}
-		ts.forEachChild(n, visit);
-	};
-	visit(parsed);
-	return [...src.matchAll(/^[ \t]*\/\*\/{10,}[ \t]*\r?\n[ \t]*(?:CONFIG|HELPERS)[ \t]*\r?\n[ \t]*\/{10,}\*\/[ \t]*(?:\r?\n)*/gm)]
-		.filter((m) => !literals.some((l) => m.index! >= l.start && m.index! < l.end))
-		.sort((a, b) => b.index! - a.index!)
-		.reduce((t, m) => `${t.slice(0, m.index!)}${t.slice(m.index! + m[0].length)}`, src);
-}
-
-/**
- * Extracts individual identifiers from a parameter binding pattern.
- *
- * @param name Parameter binding name to inspect.
- *
- * @return Bound identifier names in source order.
- */
-function bindingParamNames(name: ts.BindingName): string[] {
-	if (ts.isIdentifier(name)) return [name.text];
-	return name.elements.flatMap((e) => (ts.isOmittedExpression(e) ? [] : bindingParamNames(e.name)));
-}
-
-/**
- * Chooses the individual TSDoc parameter-tag names for a declared parameter.
- *
- * @param p Parameter declaration whose binding names should be documented.
- * @param i Zero-based parameter position used when the binding has no identifiers.
- *
- * @return Bound identifier names, or a positional fallback for an empty pattern.
- */
-function fnParamNames(p: ts.ParameterDeclaration, i: number): string[] {
-	if (ts.isIdentifier(p.name)) return [p.name.text];
-	const names = [...new Set(bindingParamNames(p.name))];
-	return names.length ? names : [`param${i + 1}`];
-}
-/**
- * Rebuilds a function's TSDoc layout while preserving existing summary and tag prose.
- *
- * @param n Function declaration whose signature controls required parameter and return tags.
- * @param parsed Source file containing the declaration.
- * @param eol Line-ending sequence to emit.
- * @param existing Existing TSDoc block, when one is present.
- *
- * @return Normalized TSDoc text; missing prose remains blank for later authoring.
- */
-function genFnDoc(n: ts.SignatureDeclaration, parsed: ts.SourceFile, eol: string, existing = ''): string {
-	const params = n.parameters.flatMap(fnParamNames);
-	const body = existing
-		.slice(3, -2)
-		.split(R_N_REGEX)
-		.map((l) => l.replace(S_CLASS_3, '').trim());
-	while (body.length && !body.at(0)?.trim()) body.shift();
-	while (body.length && !body.at(-1)?.trim()) body.pop();
-	const firstTag = body.findIndex((l) => S_W_REGEX.test(l));
-	const summary = (firstTag < 0 ? body : body.slice(0, firstTag)).map((l) => l.trim());
-	while (summary.length && !summary.at(-1)?.trim()) summary.pop();
-	const tagLines = firstTag < 0 ? [] : body.slice(firstTag).filter((l) => l.trim());
-	const blocks: string[][] = [];
-	for (const line of tagLines) {
-		if (S_W_REGEX.test(line) || !blocks.length) blocks.push([line.trim()]);
-		else blocks.at(-1)!.push(line);
-	}
-	const paramBlocks = new Map<string, string[]>();
-	let returnBlock: string[] | undefined;
-	const otherBlocks: string[][] = [];
-	for (const block of blocks) {
-		const param = block[0]?.match(/^@param\s+(?:\{[^}]*\}\s*)?(\S+)/);
-		if (param) {
-			paramBlocks.set(param[1]!.replace(/^\[|\]$/g, '').split('=')[0]!, block);
-			continue;
-		}
-		if (RETURNS_B_REGEX.test(block[0] ?? '')) {
-			returnBlock = [`${block[0]!.replace(RETURNS_B_REGEX, '@return')}`, ...block.slice(1)];
-			continue;
-		}
-		otherBlocks.push(block);
-	}
-	const content = [...summary];
-	if (!content.length || content.at(-1) !== '') content.push('');
-	for (const name of params) content.push(...(paramBlocks.get(name) ?? [`@param ${name}`]));
-	for (const [name, block] of paramBlocks) if (!params.includes(name)) content.push(...block);
-	if (returnBlock || returnsVal(n)) {
-		if (content.at(-1) !== '') content.push('');
-		content.push(...(returnBlock ?? ['@return']));
-	}
-	for (const block of otherBlocks) content.push('', ...block);
-	const norm = ['/**', ...content.map((l) => (l ? ` * ${l}` : ' *')), ' */'].join(eol);
-	return existing === norm ? existing : norm;
-}
-
-/**
- * Adds missing parameter and return tags to existing function TSDoc without inventing prose.
- *
- * @param src Source text whose function documentation should be normalized.
- * @param fileName Filename used to select the source parser mode.
- * @param eol Line-ending sequence to emit.
- *
- * @return Updated source text with the required parameter and return tags.
- */
-function maintainFnDocs(src: string, fileName: string, eol: string): string {
-	const parsed = ts.createSourceFile(fileName, src, ts.ScriptTarget.Latest, true, srcKind(fileName));
-	const updates: { start: number; end: number; text: string }[] = [];
-	const fns: ts.SignatureDeclaration[] = [];
-	/**
-	 *
-	 * @param node
-	 */
-	const visit = (node: ts.Node): void => {
-		if (isNamedDocumentationFn(node)) fns.push(node);
-		ts.forEachChild(node, visit);
-	};
-	visit(parsed);
-	for (const node of fns) {
-		const target = documentationTarget(node);
-		const doc = [...src.slice(target.getFullStart(), target.getStart(parsed)).matchAll(S_S_G_REGEX())].at(-1);
-		if (!doc || doc.index === undefined) continue;
-		const start = target.getFullStart() + doc.index;
-		const indentation = src.slice(src.lastIndexOf('\n', start - 1) + 1, start);
-		const text = genFnDoc(node, parsed, eol, doc[0]).replace(/\r?\n/g, `${eol}${indentation}`);
-		if (text !== doc[0]) updates.push({ start, end: start + doc[0].length, text });
-	}
-	return updates.sort((a, b) => b.start - a.start).reduce((c, u) => `${c.slice(0, u.start)}${u.text}${c.slice(u.end)}`, src);
-}
-
-/**
- * Renders a top-level statement with its existing comments and normalized function documentation.
- *
- * @param n Statement being rendered.
- * @param parsed Source file containing the statement.
- * @param src Original source text used to recover leading comments.
- * @param eol Line-ending sequence to emit.
- *
- * @return Statement text with preserved leading comments and normalized TSDoc.
- */
-function statementText(n: ts.Statement, parsed: ts.SourceFile, src: string, eol: string): string {
-	const leading = src.slice(n.getFullStart(), n.getStart(parsed)).trim();
-	const text = src.slice(n.getStart(parsed), n.end);
-	if (!ts.isFunctionDeclaration(n)) return [leading, text].filter(Boolean).join(eol);
-	const doc = [...leading.matchAll(S_S_G_REGEX())].at(-1);
-	const gen = genFnDoc(n, parsed, eol, doc?.[0]);
-	if (doc?.index !== undefined) return [`${leading.slice(0, doc.index)}${gen}${leading.slice(doc.index + doc[0].length)}`.trim(), text].filter(Boolean).join(eol);
-	return [leading, gen, text].filter(Boolean).join(eol);
-}
-
-/**
- * Moves top-level configuration and helper declarations into canonical sections after imports.
- *
- * @param src Source text whose managed sections should be rebuilt.
- * @param fileName Filename used for parsing and literal protection.
- * @param eol Line-ending sequence to emit.
- *
- * @return Source text with canonical CONFIG and HELPERS sections.
- */
-function organizeSrcSects(src: string, fileName: string, eol: string): string {
-	src = maintainFnDocs(src, fileName, eol);
-	if ([...src.matchAll(/\/\*\/{10,}\s*\n\s*([A-Z][A-Z _-]*)\s*\n\s*\/{10,}\*\//g)].some((m) => !['IMPORTS', 'CONFIG', 'HELPERS'].includes(m[1]!.trim()))) return src;
-	const withoutManagedSections = removeManagedSects(src, fileName);
-	const parsed = ts.createSourceFile(fileName, withoutManagedSections, ts.ScriptTarget.Latest, true, srcKind(fileName));
-	const imports = parsed.statements.filter(ts.isImportDeclaration);
-	if (!imports.length) return src;
-	const lastImport = imports.at(-1) as ts.ImportDeclaration;
-	const statements = parsed.statements.filter((n) => !ts.isImportDeclaration(n) && n.getStart(parsed) >= lastImport.end);
-	const groups: Record<SrcGroup, string[]> = { CONFIG: [], HELPERS: [] };
-	const remaining: string[] = [];
-	for (const n of statements) {
-		const text = statementText(n, parsed, withoutManagedSections, eol);
-		const group = srcGroup(n);
-		if (group) groups[group].push(text);
-		else remaining.push(text);
-	}
-	if (!groups.CONFIG.length && !groups.HELPERS.length) return withoutManagedSections;
-	const tail = statements.length ? withoutManagedSections.slice(statements.at(-1)!.end).trim() : withoutManagedSections.slice(lastImport.end).trim();
-	const sections = (['CONFIG', 'HELPERS'] as SrcGroup[]).flatMap((l) => (groups[l].length ? [(function srcSection(label: SrcGroup, statements: string[], eol: string): string {
-	return `${OPEN}${eol}${label}${eol}${CLOSE}${eol}${statements.join(label === 'CONFIG' ? eol : `${eol}${eol}`)}`;
-})(l, groups[l], eol)] : []));
-	if (remaining.length) sections.push(remaining.join(`${eol}${eol}`));
-	if (tail) sections.push(tail);
-	return `${withoutManagedSections.slice(0, lastImport.end).trimEnd()}${eol}${eol}${sections.join(`${eol}${eol}`)}${eol}`;
-}
-
-/**
- * Adds the canonical header, grouped imports, and top-level source sections.
- *
- * @param root Repository root used to create the file header path.
- * @param fileName Absolute path to the source file to maintain.
- *
- * @return `true` when the file was rewritten; otherwise `false`.
+ * @return Always `false`; source documentation remains agent-authored.
  */
 export function maintainSrcFile(root: string, fileName: string): boolean {
-	if (!SUPPORTED.has(extname(fileName))) return false;
-	const original = readFileSync(fileName, 'utf8');
-	const eol = original.includes('\r\n') ? '\r\n' : '\n';
-	let src = original.replace(UFEFF_REGEX, '').replace(/^\s+/, '');
-	const path = relative(root, fileName).split(sep).join('/');
-	src = src.replace(/^\/\*\*[ \t]+([^\r\n]*?)\s*\*\/[ \t]*(?:\r?\n)*/, (_match, d: string) => `/**${eol} * ${d}${eol} */${eol}`);
-	src = (function healHeaderFragments(src: string, path: string, eol: string): string {
-	const header = src.match(T_R_N_S_S_R_N_T_T_R_N_REGEX);
-	if (!header) return src;
-	const lines = header[1]!
-		.split(R_N_REGEX)
-		.map((l) => l.replace(T_T_REGEX, '').trim())
-		.filter(Boolean);
-	if (lines[0] !== path && lines[0] !== path.replace(/^.*\//, '')) return src;
-	const descriptions = lines.slice(1);
-	let cursor = header[0].length;
-	let rest = src.slice(cursor);
-	const orphanPattern = /^(?:[ \t]*\*[ \t]?[^\r\n]*\r?\n)+[ \t]*\*\/[ \t]*(?:\r?\n)*/;
-	const docPattern = /^\/\*\*(?:[ \t]*([^\r\n]*?)[ \t]*\*\/[ \t]*(?:\r?\n)*|[ \t]*\r?\n([\s\S]*?)\r?\n[ \t]*\*\/[ \t]*(?:\r?\n)*)/;
-	let changed = false;
-	while (true) {
-		const whitespace = rest.match(/^(?:\s*)/);
-		const prefix = whitespace?.[0] ?? '';
-		const orphan = rest.slice(prefix.length).match(orphanPattern);
-		if (orphan) {
-			const orphanLines = orphan[0]
-				.split(R_N_REGEX)
-				.map((l) =>
-					l
-						.replace(T_T_REGEX, '')
-						.replace(/[ \t]*\*\/?[ \t]*$/, '')
-						.trim(),
-				)
-				.map((l) => (l === '/' ? '' : l))
-				.filter(Boolean);
-			for (const line of orphanLines) if (line !== path && !descriptions.includes(line)) descriptions.push(line);
-			cursor += prefix.length + orphan[0].length;
-			rest = rest.slice(prefix.length + orphan[0].length);
-			changed = true;
-			continue;
-		}
-		const doc = rest.slice(prefix.length).match(docPattern);
-		if (!doc) break;
-		const docLines = (doc[1] ?? doc[2] ?? '')
-			.split(R_N_REGEX)
-			.map((l) => l.replace(T_T_REGEX, '').trim())
-			.filter(Boolean);
-		for (const line of docLines) if (line !== path && !descriptions.includes(line)) descriptions.push(line);
-		cursor += prefix.length + doc[0].length;
-		rest = rest.slice(prefix.length + doc[0].length);
-		changed = true;
-	}
-	if (!changed) return src;
-	return `${['/**', path, ...descriptions, ' */'].map((l, i, a) => (i === 0 || i === a.length - 1 ? l : ` * ${l}`)).join(eol)}${eol}${eol}${rest.replace(S_REGEX, '')}`;
-})(src, path, eol);
-	const existingHeader = src.match(T_R_N_S_S_R_N_T_T_R_N_REGEX);
-	const headerLines =
-		existingHeader?.[1]
-			.split(R_N_REGEX)
-			.map((l) => l.replace(T_T_REGEX, '').trim())
-			.filter(Boolean) ?? [];
-	const headerDescription = headerLines[0]?.includes('/') || /\.(?:c|m)?(?:js|ts)x?$/.test(headerLines[0] ?? '') ? headerLines.slice(1) : headerLines;
-	const header = ['/**', path, ...headerDescription, ' */'].map((l, i) => (i === 0 ? l : i === headerDescription.length + 2 ? l : ` * ${l}`)).join(eol);
-	if (existingHeader) {
-		src = src.replace(T_R_N_S_S_R_N_T_T_R_N_REGEX, `${header}${eol}${eol}`);
-		const duplicateHeader = new RegExp(`^(\\/\\*\\*\\r?\\n \\* ${path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\r?\\n \\*\\/)(?:\\r?\\n)+\\1(?:\\r?\\n)+`);
-		src = src.replace(duplicateHeader, `$1${eol}${eol}`);
-	} else if (!src.startsWith('#!') && !src.startsWith('/**')) src = `${header}${eol}${eol}${src}`;
-	const parsed = ts.createSourceFile(fileName, src, ts.ScriptTarget.Latest, true, srcKind(fileName));
-	const imports = parsed.statements.filter((n): n is ts.ImportDeclaration => ts.isImportDeclaration(n) && !selfImportConflicts(parsed, n));
-	if (imports.length) {
-		const first = imports[0];
-		const last = imports.at(-1) as ts.ImportDeclaration;
-		const groups = groupedImports(parsed, imports);
-		/**
-		 *
-		 * @param a
-		 * @param b
-		 *
-		 * @return
-		 */
-		const comp = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
-		/**
-		 *
-		 * @param label
-		 *
-		 * @return
-		 */
-		const render = (label: ImportGroup): string[] => {
-			const entries = groups[label].sort((a, b) => comp(a.text, b.text) || comp(a.source, b.source));
-			const seen = new Set<string>();
-			const uniqueEntries = entries.filter((e) => {
-				if (seen.has(e.text)) return false;
-				seen.add(e.text);
-				return true;
-			});
-			return uniqueEntries.length ? [`// ${label}`, ...uniqueEntries.map((e) => e.text), ''] : [];
-		};
-		const block = `${OPEN}${eol}IMPORTS${eol}${CLOSE}${eol}${(Object.keys(groups) as ImportGroup[]).sort(comp).flatMap(render).join(eol)}`;
-		const fenceStart = src.slice(0, first.getStart(parsed)).search(/\/\*\/{10,}[ \t]*\r?\n[ \t]*IMPORTS[ \t]*\r?\n[ \t]*\/{10,}\*\//);
-		const start = fenceStart >= 0 ? fenceStart : first.getStart(parsed);
-		src = `${src.slice(0, start).replace(S_CLASS_4, `${eol}${eol}`)}${block}${src.slice(last.end).replace(S_REGEX, eol)}`;
-	}
-	src = organizeSrcSects(src, fileName, eol);
-	const norm = src
-		.replace(/^([ \t]*)\/\*\/{10,}[ \t]*$/gm, `$1${OPEN}`)
-		.replace(/^([ \t]*)\/{10,}\*\/[ \t]*$/gm, `$1${CLOSE}`)
-		.replace(S_CLASS_4, eol);
-	const laidOut = (function normCommentLayout(src: string, fileName: string, eol: string): string {
-	const spans = literalSpans(src, fileName);
-	const rawLines = src.split(R_N_REGEX);
-	const nlineSize = src.includes('\r\n') ? 2 : 1;
-	let offset = 0;
-	const lines = rawLines.map((t) => {
-		const line = { text: t, start: offset };
-		offset += t.length + nlineSize;
-		return line;
-	});
-	/**
-	 *
-	 * @param line
-	 *
-	 * @return
-	 */
-	const protectedLine = (line: { start: number }): boolean => {
-		let low = 0;
-		let high = spans.length - 1;
-		while (low <= high) {
-			const mid = (low + high) >> 1;
-			const span = spans[mid];
-			if (line.start < span.start) high = mid - 1;
-			else if (line.start >= span.end) low = mid + 1;
-			else return true;
-		}
-		return false;
-	};
-	/**
-	 *
-	 * @param i
-	 *
-	 * @return
-	 */
-	const sectionOpen = (i: number): boolean => !protectedLine(lines[i]) && /^\s*\/\*\/{10,}\s*$/.test(lines[i].text);
-	/**
-	 *
-	 * @param i
-	 *
-	 * @return
-	 */
-	const sectionClose = (i: number): boolean => !protectedLine(lines[i]) && /^\s*\/{10,}\*\/\s*$/.test(lines[i].text);
-	/**
-	 *
-	 * @param i
-	 *
-	 * @return
-	 */
-	const lineGroup = (i: number): boolean => !protectedLine(lines[i]) && /^\s*\/\/ [A-Z][A-Z0-9 _-]*\s*$/.test(lines[i].text);
-
-	// Remove an empty section immediately followed by another section.
-	for (let i = 0; i + 5 < lines.length; i++) {
-		if (!sectionOpen(i) || !sectionClose(i + 2)) continue;
-		let n = i + 3;
-		while (n < lines.length && !lines[n].text.trim()) n++;
-		if (n < lines.length && sectionOpen(n)) {
-			lines.splice(i, n - i);
-			i = Math.max(-1, i - 2);
-		}
-	}
-	const out: string[] = [];
-	/**
-	 *
-	 */
-	const pushBlank = (): void => {
-		if (out.length && out.at(-1) !== '') out.push('');
-	};
-	for (let i = 0; i < lines.length; i++) {
-		const text = lines[i].text.replace(/[ \t]+$/, '');
-		const closesSect = sectionClose(i);
-		if (!text && !protectedLine(lines[i])) {
-			const prev = out.at(-1) ?? '';
-			let next = i + 1;
-			while (next < lines.length && !lines[next].text.trim() && !protectedLine(lines[next])) next++;
-			if ((S_CLASS_2.test(prev) || (next < lines.length && S_CLASS_2.test(lines[next].text))) && out.length && out.at(-1) !== '') out.push('');
-			continue;
-		}
-		if (sectionOpen(i)) pushBlank();
-		if (lineGroup(i)) pushBlank();
-		out.push(text);
-		if (closesSect || lineGroup(i)) {
-			while (i + 1 < lines.length && !lines[i + 1].text.trim() && !protectedLine(lines[i + 1])) i++;
-			if (closesSect && i + 1 < lines.length) pushBlank();
-		}
-	}
-	while (out.at(-1) === '') out.pop();
-	// Keep blank lines only when they explicitly separate comments/groups.
-	// This also removes stale whitespace inside function bodies while preserving
-	// spacing around TSDoc, line groups, and section fences.
-	const compact = out.filter((l, i) => {
-		if (l !== '') return true;
-		const prev = out[i - 1] ?? '';
-		const following = out[i + 1] ?? '';
-		/**
-		 *
-		 * @param textVal
-		 *
-		 * @return
-		 */
-		const comment = (textVal: string): boolean => S_CLASS_2.test(textVal);
-		return comment(prev) || comment(following);
-	});
-	return `${compact.join(eol)}${eol}`;
-})(norm, fileName, eol);
-	const n = original.startsWith('\uFEFF') ? `\uFEFF${laidOut}` : laidOut;
-	if (n === original) return false;
-	return writeValidatedSrc(fileName, n);
+	void root;
+	void fileName;
+	return false;
 }
 
 /**
- * Removes generated section scaffolding and empty or detached TSDoc after source edits.
+ * Retains the historical cleanup API without deleting source comments or section labels.
  *
- * @param fileName Source filename whose generated or detached comments should be removed.
+ * @param fileName Source file retained for compatibility with existing callers.
  *
- * @return Whether the file was changed after a validated write.
+ * @return Always `false`; comment cleanup requires an agent review.
  */
 export function removeNonCodeComments(fileName: string): boolean {
-	if (!SUPPORTED.has(extname(fileName))) return false;
-	const src = readFileSync(fileName, 'utf8');
-	const original = src.replace(/(^|\n)([ \t]*(?:CONFIG|TESTS|HELPERS|IMPORTS)[ \t]*\r?\n[ \t]*\/{10,}\*\/[ \t]*(?=\r?\n|$))/g, (m, p: string, _fragment: string, o: number) => {
-		const precedingLine = src
-			.slice(0, o + p.length)
-			.trimEnd()
-			.split(R_N_REGEX)
-			.at(-1)
-			?.trim();
-		return precedingLine && /^\/\*\/{10,}$/.test(precedingLine) ? m : p;
-	});
-	if (original !== src) writeValidatedSrc(fileName, original);
-	const parsed = ts.createSourceFile(fileName, original, ts.ScriptTarget.Latest, true, srcKind(fileName));
-	const removals: { start: number; end: number }[] = [];
-	const nodeStarts: number[] = [];
-	const codeStarts: number[] = [];
-	/**
-	 *
-	 * @param node
-	 */
-	const inspect = (node: ts.Node): void => {
-		codeStarts.push(node.getStart(parsed));
-		if (ts.isVariableStatement(node)) nodeStarts.push(node.getStart(parsed));
-		if (
-			ts.isClassLike(node) ||
-			ts.isFunctionLike(node) ||
-			ts.isVariableDeclaration(node) ||
-			ts.isTypeAliasDeclaration(node) ||
-			ts.isInterfaceDeclaration(node) ||
-			ts.isEnumDeclaration(node) ||
-			ts.isModuleDeclaration(node) ||
-			ts.isPropertyDeclaration(node) ||
-			ts.isMethodDeclaration(node) ||
-			ts.isParameter(node)
-		)
-			nodeStarts.push(node.getStart(parsed));
-		ts.forEachChild(node, inspect);
-	};
-	inspect(parsed);
-	const comments: { start: number; end: number; text: string }[] = [];
-	const scanner = ts.createScanner(ts.ScriptTarget.Latest, false, parsed.languageVariant, original);
-	for (let token = scanner.scan(); token !== ts.SyntaxKind.EndOfFileToken; token = scanner.scan())
-		if (token === ts.SyntaxKind.SingleLineCommentTrivia || token === ts.SyntaxKind.MultiLineCommentTrivia)
-			comments.push({ start: scanner.getTokenPos(), end: scanner.getTextPos(), text: scanner.getTokenText() });
-	for (const block of tsdocBlocks(original, parsed)) {
-		const followingDeclaration = nodeStarts.filter((s) => s >= block.end).sort((a, b) => a - b)[0];
-		const detached = followingDeclaration === undefined || !S_REGEX.test(original.slice(block.end, followingDeclaration));
-		const empty = !block.text
-			.replace(/^\/\*\*|\*\/$/g, '')
-			.replace(/^\s*\* ?/gm, '')
-			.trim();
-		if ((detached || empty) && !fileHeaderBlock(original, [block])) removals.push({ start: block.start, end: block.end });
-	}
-	const headings = comments.filter(({ text: t }) => /^\/\*\/{10,}/.test(t) || /^\/\/\s*[A-Z][A-Z _-]*\s*$/.test(t));
-	for (const [idx, heading] of headings.entries()) {
-		const section = heading.text.startsWith('/*');
-		const n = headings.slice(idx + 1).find((c) => c.text.startsWith('/*') === section)?.start ?? original.length;
-		if (!codeStarts.some((s) => s >= heading.end && s < n)) removals.push({ start: heading.start, end: heading.end });
-	}
-	if (!removals.length) return false;
-	let updated = original;
-	for (const { start, end } of removals.sort((a, b) => b.start - a.start)) updated = `${updated.slice(0, start)}${updated.slice(end)}`;
-	updated = updated.replace(/\n{3,}/g, '\n\n');
-	return updated === original ? false : writeValidatedSrc(fileName, updated);
+	void fileName;
+	return false;
 }
 
 /**
@@ -998,20 +424,20 @@ function documentationSourceIncluded(cfg: QualityCfg, file: string): boolean {
 /**
  * Audits Doxygen blocks on C prototypes and definitions using Clang's declaration AST.
  *
- * @param cfg
- * @param file
- * @param source
- * @param documentedSignatures
- * @param missingTargets
+ * @param cfg Quality configuration used to render repository-relative diagnostics.
+ * @param file C or header source path passed to Clang for declaration parsing.
+ * @param source Source text whose documentation declarations are audited.
+ * @param documentedSignatures Signatures already documented by matching source/header blocks.
+ * @param missingTargets Map populated with missing declaration locations for duplicate suppression.
  *
- * @return
+ * @return Findings for missing, malformed, or misordered Doxygen documentation.
  */
 function cDocumentationFindings(cfg: QualityCfg, file: string, source: string, documentedSignatures = new Set<string>(), missingTargets = new Map<string, string>()): DocumentationFinding[] {
-	const parsed = spawnSync('clang', ['-x', 'c', '-std=c11', '-fsyntax-only', '-Wno-everything', '-Wno-unknown-pragmas', '-Wno-ignored-attributes', '-Xclang', '-ast-dump=json', file], {
-		cwd: cfg.root,
-		encoding: 'utf8',
-		maxBuffer: 32 * 1024 * 1024,
-	});
+	const parsed = spawnSync(
+		cfg.tools?.clang ?? 'clang',
+		['-x', 'c', '-std=c11', '-fsyntax-only', '-Wno-everything', '-Wno-unknown-pragmas', '-Wno-ignored-attributes', '-Xclang', '-ast-dump=json', file],
+		{ cwd: cfg.root, encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 },
+	);
 	if (parsed.error || !parsed.stdout)
 		return [
 			{
@@ -1052,21 +478,23 @@ function cDocumentationFindings(cfg: QualityCfg, file: string, source: string, d
 		if (!previous || (!previous.comment && declaration.comment)) deduplicated.set(declaration.signature, declaration);
 	}
 	for (const declaration of deduplicated.values()) {
-		const comment = declaration.comment ? (function parseCComment(node: CNode): { summary: string; params: { name: string; description: string }[]; returns?: string; authors: string[] } {
-	const result = { summary: '', params: [] as { name: string; description: string }[], authors: [] as string[], returns: undefined as string | undefined };
-	const text = (current: CNode): string => (current.text ?? '') + (current.inner ?? []).map(text).join('');
-	for (const child of node.inner ?? []) {
-		if (child.kind === 'ParagraphComment') result.summary += text(child);
-		if (child.kind === 'ParamCommandComment') result.params.push({ name: child.param ?? '', description: text(child).trim() });
-		if (child.kind === 'BlockCommandComment') {
-			const value = text(child).trim();
-			if (/^brief$/i.test(child.name ?? '')) result.summary += value;
-			if (/^returns?$/i.test(child.name ?? '')) result.returns = value;
-			if (/^author$/i.test(child.name ?? '')) result.authors.push(value);
-		}
-	}
-	return result;
-})(declaration.comment) : undefined;
+		const comment = declaration.comment
+			? (function parseCComment(node: CNode): { summary: string; params: { name: string; description: string }[]; returns?: string; authors: string[] } {
+					const result = { summary: '', params: [] as { name: string; description: string }[], authors: [] as string[], returns: undefined as string | undefined };
+					const text = (current: CNode): string => (current.text ?? '') + (current.inner ?? []).map(text).join('');
+					for (const child of node.inner ?? []) {
+						if (child.kind === 'ParagraphComment') result.summary += text(child);
+						if (child.kind === 'ParamCommandComment') result.params.push({ name: child.param ?? '', description: text(child).trim() });
+						if (child.kind === 'BlockCommandComment') {
+							const value = text(child).trim();
+							if (/^brief$/i.test(child.name ?? '')) result.summary += value;
+							if (/^returns?$/i.test(child.name ?? '')) result.returns = value;
+							if (/^author$/i.test(child.name ?? '')) result.authors.push(value);
+						}
+					}
+					return result;
+				})(declaration.comment)
+			: undefined;
 		const report = (name: string, kind: DocumentationFinding['kind'], reason: string): void => {
 			findings.push({ file: displayPath(cfg, file), line: declaration.line, column: 1, name, kind, reason, severity: 'error' });
 		};
@@ -1097,7 +525,6 @@ type CNode = {
 	type?: { qualType?: string };
 	inner?: CNode[];
 };
-
 
 /**
  * Checks whether a node has a JSDoc or TSDoc block in its leading trivia.
@@ -1135,6 +562,32 @@ function documented(node: ts.Node, src: string): boolean {
 function exported(node: ts.Node): boolean {
 	const target = documentationTarget(node);
 	return !!(ts.canHaveModifiers(target) && ts.getModifiers(target)?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword));
+}
+
+/**
+ * Extracts identifiers from a parameter's object or array binding pattern.
+ *
+ * @param name Parameter binding to inspect.
+ *
+ * @return Bound identifier names in source order.
+ */
+function bindingParamNames(name: ts.BindingName): string[] {
+	if (ts.isIdentifier(name)) return [name.text];
+	return name.elements.flatMap((element) => (ts.isOmittedExpression(element) ? [] : bindingParamNames(element.name)));
+}
+
+/**
+ * Chooses the TSDoc parameter-tag names for a declared function parameter.
+ *
+ * @param parameter Parameter declaration whose binding names should be documented.
+ * @param index Zero-based parameter position used when the binding has no identifiers.
+ *
+ * @return Bound identifier names, or a positional fallback for an empty pattern.
+ */
+function fnParamNames(parameter: ts.ParameterDeclaration, index: number): string[] {
+	if (ts.isIdentifier(parameter.name)) return [parameter.name.text];
+	const names = [...new Set(bindingParamNames(parameter.name))];
+	return names.length ? names : [`param${index + 1}`];
 }
 
 /**
@@ -1182,6 +635,7 @@ function documentationTarget(node: ts.Node): ts.Node {
  */
 function isNamedDocumentationFn(node: ts.Node): node is ts.SignatureDeclaration {
 	if (!ts.isFunctionLike(node)) return false;
+	for (let parent = node.parent; parent; parent = parent.parent) if (ts.isFunctionLike(parent)) return false;
 	if (
 		ts.isFunctionDeclaration(node) ||
 		ts.isMethodDeclaration(node) ||
@@ -1219,20 +673,14 @@ function containsNode(parent: ts.Node, target: ts.Node): boolean {
  */
 function tsdocBlocks(src: string, parsed: ts.SourceFile): TSDocBlock[] {
 	const blocks = new Map<number, TSDocBlock>();
-	/**
-	 *
-	 * @param ranges
-	 */
+
 	const add = (ranges: ts.CommentRange[] | undefined): void => {
 		for (const range of ranges ?? []) {
 			const text = src.slice(range.pos, range.end);
 			if (text.startsWith('/**')) blocks.set(range.pos, { start: range.pos, end: range.end, text });
 		}
 	};
-	/**
-	 *
-	 * @param node
-	 */
+
 	const visit = (node: ts.Node): void => {
 		add(ts.getLeadingCommentRanges(src, node.getFullStart()));
 		add(ts.getTrailingCommentRanges(src, node.end));
@@ -1276,9 +724,6 @@ function fileHeaderBlock(src: string, blocks: TSDocBlock[]): TSDocBlock | undefi
 	});
 }
 
-
-
-
 /**
  * Parses TSDoc tags and joins continuation lines with their leading tag line.
  *
@@ -1301,11 +746,16 @@ function tsdocTagEntries(lines: TSDocLine[]): { tag: string; subject: string; de
 		const rawContent = content.join(' ').trim();
 		const paramText = rawContent.replace(/^\{[^}]*\}\s*/, '').split(/\s+/)[0] ?? '';
 		const subject = tag.toLowerCase() === 'param' ? paramText.replace(/^\[/, '').replace(/\]$/, '').split('=')[0]! : tag.toLowerCase() === 'typeparam' ? paramText : '';
-		entries.push({ tag, subject, description: (function tagDescription(tag: string, content: string): string {
-	let description = content.trim().replace(S_CLASS_5, '');
-	if (tag.toLowerCase() === 'param' || tag.toLowerCase() === 'typeparam') description = description.replace(/^\[[^\]]+\]\s*/, '').replace(/^\S+\s*/, '');
-	return description.replace(/^[-:]\s*/, '').trim();
-})(tag, rawContent), offset: lines[idx]!.offset });
+		entries.push({
+			tag,
+			subject,
+			description: (function tagDescription(tag: string, content: string): string {
+				let description = content.trim().replace(S_CLASS_5, '');
+				if (tag.toLowerCase() === 'param' || tag.toLowerCase() === 'typeparam') description = description.replace(/^\[[^\]]+\]\s*/, '').replace(/^\S+\s*/, '');
+				return description.replace(/^[-:]\s*/, '').trim();
+			})(tag, rawContent),
+			offset: lines[idx]!.offset,
+		});
 		idx = n - 1;
 	}
 	return entries;
@@ -1325,10 +775,7 @@ function returnsVal(node: ts.SignatureDeclaration): boolean {
 	if (returnType === 'void' || returnType === 'Promise<void>') return false;
 	if (node.type) return true;
 	let valReturn = false;
-	/**
-	 *
-	 * @param child
-	 */
+
 	const visit = (child: ts.Node): void => {
 		if (valReturn) return;
 		if (ts.isReturnStatement(child) && child.expression) valReturn = true;
@@ -1361,7 +808,6 @@ function documentationBlockFor(src: string, node: ts.Node): TSDocBlock | undefin
  * @param file Absolute source path being inspected.
  * @param src Source text containing the documentation blocks.
  * @param parsed Parsed source file used for locations and comment scanning.
- *
  * @return Warning findings for missing file, summary, or tag descriptions.
  */
 function descriptionFindingsForFile(cfg: QualityCfg, file: string, src: string, parsed: ts.SourceFile): DocumentationFinding[] {
@@ -1371,11 +817,9 @@ function descriptionFindingsForFile(cfg: QualityCfg, file: string, src: string, 
 	const attached = new Set<number>();
 	const requiredAttached = new Set<number>();
 	const requirements = { functions: true, ...cfg.documentation?.required };
-	/**
-	 *
-	 * @param node
-	 */
+
 	const markAttached = (node: ts.Node): void => {
+		const target = documentationTarget(node);
 		const requiresDocumentation =
 			((ts.isClassDeclaration(node) || ts.isEnumDeclaration(node) || ts.isInterfaceDeclaration(node) || ts.isTypeAliasDeclaration(node)) && requirements.types) ||
 			(isNamedDocumentationFn(node) && (requirements.functions || (requirements.exportedFunctions && exported(node)))) ||
@@ -1394,14 +838,19 @@ function descriptionFindingsForFile(cfg: QualityCfg, file: string, src: string, 
 			ts.isTypeParameterDeclaration(node) ||
 			ts.isVariableStatement(node)
 		)
-			for (const range of ts.getLeadingCommentRanges(src, node.getFullStart()) ?? [])
-				if (src.slice(range.pos, range.end).startsWith('/**') && S_REGEX.test(src.slice(range.end, node.getStart(parsed)))) {
+			for (const range of ts.getLeadingCommentRanges(src, target.getFullStart()) ?? [])
+				if (src.slice(range.pos, range.end).startsWith('/**') && S_ONLY_REGEX.test(src.slice(range.end, target.getStart(parsed)))) {
 					attached.add(range.pos);
 					if (requiresDocumentation) requiredAttached.add(range.pos);
 				}
 		ts.forEachChild(node, markAttached);
 	};
 	markAttached(parsed);
+	for (const block of blocks) {
+		if (!tsdocTagEntries(tsdocLines(block)).some((entry) => entry.tag.toLowerCase() === 'typedef')) continue;
+		attached.add(block.start);
+		if (requirements.types) requiredAttached.add(block.start);
+	}
 	for (const block of blocks) {
 		if (block === header) continue;
 		if (!attached.has(block.start)) {
@@ -1490,10 +939,7 @@ function documentationFindingsForFile(
 	const src = analysis?.texts.get(file) ?? readFileSync(file, 'utf8');
 	const parsed = analysis?.sources.get(file) ?? ts.createSourceFile(file, src, ts.ScriptTarget.Latest, true, documentationScriptKind(file));
 	const findings = descriptionFindingsForFile(cfg, file, src, parsed);
-	/**
-	 *
-	 * @param node
-	 */
+
 	const visit = (node: ts.Node): void => {
 		const isType = ts.isClassDeclaration(node) || ts.isEnumDeclaration(node) || ts.isInterfaceDeclaration(node) || ts.isTypeAliasDeclaration(node);
 		if (requirements.types && isType && !documented(node, src)) findings.push(documentationReport(file, parsed, node, documentationNodeName(node), 'type', 'add TSDoc for this type', cfg));
@@ -1506,9 +952,17 @@ function documentationFindingsForFile(
 					if (block) {
 						const entries = tsdocTagEntries(tsdocLines(block));
 						const documentedParams = new Set(entries.filter((e) => e.tag.toLowerCase() === 'param').map((e) => e.subject));
+						const declaredParams = new Set(node.parameters.flatMap((param, i) => fnParamNames(param, i)));
 						for (const [idx, param] of node.parameters.entries()) {
 							for (const name of fnParamNames(param, idx))
 								if (!documentedParams.has(name)) findings.push(documentationReport(file, parsed, node, `@param ${name}`, 'param', `document the ${name} parameter`, cfg));
+						}
+						for (const entry of entries.filter((item) => {
+							if (item.tag.toLowerCase() !== 'param' || !item.subject || declaredParams.has(item.subject)) return false;
+							return !declaredParams.has(item.subject.split('.')[0]!);
+						})) {
+							const destructuredProps = entry.subject === 'props' && node.parameters.some((parameter) => ts.isObjectBindingPattern(parameter.name));
+							if (!destructuredProps) findings.push(documentationCommentReport(file, parsed, entry.offset, `@param ${entry.subject}`, 'param', `remove stale @param ${entry.subject}`, cfg));
 						}
 						const hasReturnTag = entries.some((e) => ['return', 'returns'].includes(e.tag.toLowerCase()));
 						if (returnsVal(node) && !hasReturnTag) findings.push(documentationReport(file, parsed, node, '@return', 'return', 'document the value returned by this function', cfg));
@@ -1534,14 +988,15 @@ function documentationFindingsForFile(
  */
 export function documentationFindings(cfg: QualityCfg, analysis?: QualityAnalysis): DocumentationFinding[] {
 	const requirements = { functions: true, ...cfg.documentation?.required };
+	const sharedAnalysis = analysis;
 	const cFiles = srcFiles({ ...cfg, extensions: ['.c', '.h'] }).filter((f) => documentationSourceIncluded(cfg, f));
 	const documentedSignatures = new Set<string>();
 	const missingTargets = new Map<string, string>();
 	const cFindings = cFiles.flatMap((f) => cDocumentationFindings(cfg, f, readFileSync(f, 'utf8'), documentedSignatures, missingTargets));
-	const otherFiles = analysis?.files
-		? analysis.files.filter((f) => documentationSourceIncluded(cfg, f) && documentationSupported(f))
+	const otherFiles = sharedAnalysis?.files
+		? sharedAnalysis.files.filter((f) => documentationSourceIncluded(cfg, f) && documentationSupported(f))
 		: srcFiles(cfg).filter((f) => documentationSourceIncluded(cfg, f) && documentationSupported(f));
-	const otherFindings = otherFiles.flatMap((f) => documentationFindingsForFile(cfg, f, requirements, analysis));
+	const otherFindings = otherFiles.flatMap((f) => documentationFindingsForFile(cfg, f, requirements, sharedAnalysis));
 	const primaryMissing = new Map<string, string>();
 	for (const [target, signature] of missingTargets) if (!primaryMissing.has(signature)) primaryMissing.set(signature, target);
 	return [...cFindings, ...otherFindings].filter((f) => {
@@ -1553,35 +1008,16 @@ export function documentationFindings(cfg: QualityCfg, analysis?: QualityAnalysi
 }
 
 /**
- * Inserts an empty TSDoc scaffold before declarations required to be documented.
- * The scaffold never invents a description; prose must be authored after understanding the declaration.
+ * Retains the historical API without generating placeholder documentation.
+ * Missing prose is reported for an author to write after reviewing the source.
  *
  * @param cfg Quality configuration containing documentation requirements.
- * @param file Absolute source path to update.
+ * @param file Absolute source path to inspect.
  *
- * @return `true` when one or more scaffolds were inserted.
+ * @return Always `false`; the documentation workflow is read-only.
  */
 export function documentSrcFile(cfg: QualityCfg, file: string): boolean {
-	if (!documentationSupported(file) || !documentationSourceIncluded(cfg, file)) return false;
-	const requirements = { functions: true, ...cfg.documentation?.required };
-	const src = readFileSync(file, 'utf8');
-	const parsed = ts.createSourceFile(file, src, ts.ScriptTarget.Latest, true, documentationScriptKind(file));
-	const insertions: number[] = [];
-	/**
-	 *
-	 * @param node
-	 */
-	const visit = (node: ts.Node): void => {
-		const isType = ts.isClassDeclaration(node) || ts.isEnumDeclaration(node) || ts.isInterfaceDeclaration(node) || ts.isTypeAliasDeclaration(node);
-		const needsFn = isNamedDocumentationFn(node) && (requirements.functions || (requirements.exportedFunctions && exported(node)));
-		if (((requirements.types && isType) || needsFn) && !documented(node, src)) insertions.push(documentationTarget(node).getStart(parsed));
-		ts.forEachChild(node, visit);
-	};
-	visit(parsed);
-	if (!insertions.length) return false;
-	const eol = src.includes('\r\n') ? '\r\n' : '\n';
-	return writeValidatedSrc(
-		file,
-		insertions.sort((a, b) => b - a).reduce((t, p) => `${t.slice(0, p)}/**${eol} *${eol} */${eol}${t.slice(p)}`, src),
-	);
+	void cfg;
+	void file;
+	return false;
 }

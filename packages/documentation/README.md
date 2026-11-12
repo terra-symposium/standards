@@ -1,6 +1,6 @@
 # @terra-symposium/standards-documentation
 
-TSDoc/JSDoc and Doxygen analysis, empty scaffolding, and documented shell-command checks.
+TSDoc/JSDoc and Doxygen analysis, plus documented shell-command checks.
 
 ## Install
 
@@ -23,10 +23,14 @@ With no file arguments, the CLI checks changed and untracked source files in the
 ## API
 
 ```ts
-import { documentationFindings, documentSrcFile, documentedCommandFindings, fixDocumentedCommands } from '@terra-symposium/standards-documentation';
+import { documentationFindings, documentedCommandFindings, fixDocumentedCommands } from '@terra-symposium/standards-documentation';
 ```
 
 The package root is the supported API surface and ships TypeScript declarations. The CLI is also available from the `./cli` export.
+
+Documentation findings are diagnostics only. Fix mode never creates or rewrites comments, TSDoc, file headers, section labels, or placeholder tags. The historical `documentSrcFile` and `maintainSrcFile` APIs remain as compatibility no-ops and return `false`. Missing or incomplete comments must be authored after reviewing the implementation and its callers.
+
+Named object-literal methods are checked for their own TSDoc even when a contextual interface declares the same operation. This keeps implementation details and mock behavior visible at their call site.
 
 ## Aggregate runner
 

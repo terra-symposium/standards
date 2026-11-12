@@ -1,0 +1,177 @@
+---
+title: CLI workflows
+description: Choose safe local and CI run modes and invoke focused Terra Quality checks.
+---
+
+Run the executable installed by `@terra-symposium/standards-quality`:
+
+```sh
+pnpm exec terra-quality [command] [options]
+```
+
+The CLI reads `quality.json` from the current working directory. Use `pnpm exec terra-quality --help` to see the current usage summary.
+
+The phase diagram makes the aggregate contract visible: select scope and checks, run in fixed phase order, then report all findings and the final status.
+
+<Nodes
+	direction="LR"
+	nodes={[
+		{ id: 'scope', type: 'origin', data: { title: 'Select changed files or --all' } },
+		{ id: 'format', type: 'process', data: { title: 'Format and static checks' } },
+		{ id: 'tests', type: 'process', data: { title: 'Tests and type checks' } },
+		{ id: 'build', type: 'process', data: { title: 'Build and repository health' } },
+		{ id: 'report', type: 'terminal', data: { title: 'Findings and exit status' } },
+	]}
+	edges={[
+		{ id: 'scope-format', source: 'scope', target: 'format' },
+		{ id: 'format-tests', source: 'format', target: 'tests' },
+		{ id: 'tests-build', source: 'tests', target: 'build' },
+		{ id: 'build-report', source: 'build', target: 'report' },
+	]}
+	height={230}
+/>
+
+## Choose a run mode
+
+File scope and write behavior are independent. The default scope is changed and untracked source files in the current Git worktree. `--all` expands the scope to every configured source file. Fixes are enabled by default; `--warn` disables them for that run.
+
+| Invocation                                                                            | Scope                       | Applies autofixes? | Runs configured commands? |
+| ------------------------------------------------------------------------------------- | --------------------------- | ------------------ | ------------------------- |
+| `pnpm exec terra-quality`                                                             | Changed and untracked files | Yes, when enabled  | Yes                       |
+| `pnpm exec terra-quality quality --warn`                                              | Changed and untracked files | No                 | Yes                       |
+| `pnpm exec terra-quality quality --all`                                               | All configured source files | Yes, when enabled  | Yes                       |
+| `pnpm exec terra-quality quality --all --warn`                                        | All configured source files | No                 | Yes                       |
+| `pnpm exec terra-quality quality --all --warn --skip-commands --skip-recommendations` | All configured source files | No                 | No                        |
+
+Every naming finding fails the run. To disable one fixer for every run, set its entry under `autofix` to `false`. Commands and recommendations can also be selected by name in `quality.json`.
+
+Changed-file mode requires a Git worktree. Use `--all` when running from a source archive or when you need a complete scan. `--warn` is review-only for Terra Quality's source and tool autofixes. Dead-code analysis runs once and reports rule-level autofix candidates from that scan; fix mode type-checks proposed edits before writing and can reject a candidate. Configured commands still run and follow their own behavior.
+
+## Run, repair, and report findings
+
+Before working through findings in a consuming repository, read its `quality.json`, package scripts, and installed Quality README. Record the branch, worktree status, selected source scope, and existing changes so unrelated work stays intact.
+
+Run the configured quality command and keep its complete output, warnings, and exit status. If you omit configured commands, state that in the report and run the required checks separately. Treat unavailable access or inputs as unknown rather than as zero findings, and do not include secret values in output or reports.
+
+Group findings by root cause and owning package, then fix the smallest complete set at its canonical source. Shared runner behavior belongs in `packages/quality`; consumer policy belongs in that repository's `quality.json`.
+
+Review autofixes and the full diff. A successful exit status means the configured checks passed; it does not establish runtime correctness, application security, or visual quality. Rerun affected checks and the required repository command after fixing findings.
+
+Report the commands and scope, exit status, finding counts, warnings, fixes, and any remaining blockers.
+
+## Propose reusable automation
+
+Move repeated, deterministic maintenance into the shared package only when repository evidence shows a recurring pattern. Separate repeated symptoms from one-off work, then choose a conservative autofix for exact transformations, a diagnostic for context-sensitive patterns, or manual review when intent cannot be established from source.
+
+Before adding a rule, inspect the existing runner, schema, parsers, analysis caches, focused tests, and documentation. Extend the current analysis and test family instead of introducing a competing tool. Parse source syntax where needed, preserve comments and formatting, make fixes idempotent, fail closed on ambiguous input, and add negative fixtures for similar cases that must remain unchanged.
+
+Measure the existing check and test runtime, then estimate the new rule's incremental cost. Keep fast deterministic contract coverage in the default suite; put browser, broad integration, and benchmark checks behind explicit or scheduled commands unless their measured value justifies default execution. Reuse a parse or setup when tests share the same behavior boundary.
+
+Update package documentation and schema, identify consumer configuration and release steps, and state that consumers need a published version before they can adopt the change. Report recurrence evidence, the selected automation level, expected benefit, runtime impact, validation run or skipped, and remaining manual cases.
+
+## Fixed check and test order
+
+Terra Quality owns the full-run order: **Format → Static quality → Tests → Framework / type checks → Build → Repository health**. `quality.json` continues to select checks and commands but does not set their order or test grouping. Test commands are grouped as **Unit / Contract**, **Integration**, **Browser / Cloud**, and **Other tests**. Every selected suite gets an overall progress bar; Node and Playwright also report per-case progress, while unknown runners show only suite progress. Commands keep their configured order within ordinary phases, and tests keep their configured order within each category.
+
+In interactive terminals, each full-run check shows an animated spinner while work is in progress. After completion, its findings appear as a bullet list directly beneath its status.
+
+=== [Dead-code safety details]
+The dead-code phase keeps edits and verification separate. Safe fixes scan Knip import consumers, ESLint unused declarations, and single-use declarations/references, classify candidates, and apply only proven changes. Verification checks unused-file/export/dependency reachability, final ESLint and single-use findings, and TypeScript safety.
+
+# All findings are listed in stable order and fail quality; later configured checks still run before the command returns failure.
+
+## Local GitHub analytics
+
+The optional `github` stage uses authenticated GitHub CLI access and runs locally as part of the same quality report. Configure `github.repositories` to add it to every normal quality run, or pass repositories directly for a focused report:
+
+```sh
+pnpm exec terra-quality github \
+	--repository salesphere-vh/salesphere \
+	--repository Terra-Symposium/terra-symposium-website \
+	--repository Terra-Symposium/standards \
+	--repository kaimacann/portfolio \
+	--report-json github-report.json
+```
+
+Run `gh auth login` first, or provide `GH_TOKEN` with read access to repository metadata, issues, Dependabot alerts, and security alerts. Each finding includes an issue link and agent instructions. Alert text is untrusted input, secret values are never included, and the report does not change settings, dismiss alerts, post comments, or depend on a GitHub Actions workflow. See [GitHub report configuration](/quality/2-configuration/quality-json/#github-analytics).
+
+## CI
+
+Use one of these patterns:
+
+```sh
+# Terra Quality owns the complete command set.
+pnpm exec terra-quality quality --all --warn
+
+# Build and tests run in separate workflow steps.
+pnpm exec terra-quality quality --all --warn --skip-commands --skip-recommendations
+```
+
+Keep the package's source scope and native tool configuration consistent with the CI checkout. Do not rely on changed-file mode for a complete CI check.
+
+### Publish hygiene artifacts
+
+`--report-json <path>` writes a versioned report with each executed check's status and finding count. It preserves the command's normal exit status. Use the full, read-only scope in CI and upload both reports even when quality or tests fail. The dashboard expects a GitHub Actions artifact named `terra-hygiene` containing `terra-quality.json` and one or more JUnit files named `junit*.xml` or `test-results*.xml`.
+
+```yaml
+- name: Terra Quality
+  run: pnpm exec terra-quality quality --all --warn --skip-commands --skip-recommendations --report-json terra-quality.json
+
+- name: Tests
+  if: always()
+  run: pnpm run test
+
+- name: Local Git history
+  if: always() && github.event_name != 'pull_request'
+  run: pnpm exec terra-quality history --report-json terra-history.json
+
+- name: Upload hygiene reports
+  if: always()
+  uses: actions/upload-artifact@v4
+  with:
+    name: terra-hygiene
+    path: |
+      terra-quality.json
+      terra-history*.json
+      junit*.xml
+      test-results*.xml
+    if-no-files-found: warn
+```
+
+Adapt the test step to the consumer's test runner. When the artifact requires JUnit, configure that runner to emit JUnit in the same test invocation; do not run the suite again to create a second report. The Standards workspace's `pnpm run test` uses the shared terminal progress reporter and does not emit JUnit XML. Generate history reports from a full Git checkout (`actions/checkout` with `fetch-depth: 0`). The CLI emits a full snapshot for manual or scheduled runs. Keep the workflow on the repository's default branch because GitHub only schedules and manually dispatches workflows from that branch. For a GitHub push event it emits the commits from `before` through the checked-out head when that base is reachable; force-pushes and new branches become snapshots. A weekly full snapshot can reconcile several branches by checking each one out and passing its report to the same artifact. Configure `workflow_dispatch` for first imports and extra branches, and upload only `terra-history*.json` files from non-PR runs. The dashboard accepts a report only when its repository and branch are connected and enabled. PR runs remain excluded. The report schema starts at version `1`; an absent test or quality report leaves the composite score unavailable while any present raw metrics remain visible.
+
+## Focused commands
+
+| Command               | Purpose                                                                               |
+| --------------------- | ------------------------------------------------------------------------------------- |
+| `document`            | Check declaration documentation and maintain supported source layout.                 |
+| `maintain`            | Alias for `document`.                                                                 |
+| `format`              | Apply or check structural formatting and configured Prettier formatting.              |
+| `lint`                | Run the configured ESLint executable.                                                 |
+| `knip` or `dead-code` | Run the coordinated unused-file, export, declaration, and single-use analysis.        |
+| `types`               | Run the configured TypeScript project or source type check.                           |
+| `imports`             | Run the import, naming, alias, forwarding, and documentation checks.                  |
+| `naming`              | Apply eligible naming fixes, then run the quality checks.                             |
+| `security`            | Run configured security checks.                                                       |
+| `repeated-classes`    | Find or extract supported repeated static class strings.                              |
+| `regex-dedup`         | Find or consolidate supported duplicate regular expressions.                          |
+| `ui-patterns`         | Report configured UI patterns.                                                        |
+| `github`              | Read configured GitHub issues, security alerts, and settings into the quality report. |
+| `domain <name>`       | Run one configured command by its name.                                               |
+| `quality:baseline`    | Run a normal quality pass with the default changed-file scope.                        |
+
+Focused commands respect the relevant check and autofix settings. For config-driven checks, provide the matching policy block in `quality.json`. The `maintain` command remains an alias for `document`.
+
+## Add workspace scripts
+
+A repository should expose one canonical quality script and pass scope or reporting options to it:
+
+```json
+{
+	"scripts": {
+		"quality": "terra-quality quality"
+	}
+}
+```
+
+Use `pnpm run quality` for the changed-file pass, `pnpm run quality -- --all` for the full scope, and add `-- --warn` for read-only review or CI. Keep build and test commands explicit in `qualityCommands` or in separate workflow steps.

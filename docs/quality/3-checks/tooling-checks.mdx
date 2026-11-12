@@ -1,0 +1,160 @@
+---
+title: Tool and command checks
+description: Configure optional lint, reachability, type, diff, build, and recommendation checks.
+---
+
+Use this reference for optional external tools and repository commands. Install and configure each native tool in the consuming repository before enabling it.
+
+## External tools
+
+### Lint
+
+Invoke repository-configured ESLint on selected files.
+
+**Toggle:** `enabledChecks.lint` · **Fix:** `autofix.lint`
+
+Runs ESLint and propagates its exit status; fix mode passes ESLint's fix option. The package coordinates ESLint but does not define or install lint rules.
+
+Set `tools.eslint` and optional `lintRoots`; use native ESLint configuration for project plugins and rules. Avoid broad automatic fixes when product or security judgment is required.
+
+**Before** — if the repository enables ESLint's `no-console` rule:
+
+```ts
+function saveRecord(record: RecordData) {
+	console.log('saving');
+	return persist(record);
+}
+```
+
+**After** — remove or replace the disallowed logging according to repository policy:
+
+```ts
+function saveRecord(record: RecordData) {
+	return persist(record);
+}
+```
+
+The exact diagnostic and fix depend on the consuming repository's ESLint rules.
+
+### Knip
+
+Find unused files, exports, dependencies, and unreachable code with Knip.
+
+**Toggle:** `enabledChecks.knip` · **Fix:** `autofix.knip` · **Command:** `knip`
+
+Runs Knip for unused files, exports, dependencies, and reachability. A finding means an item is unreachable from its configured entry points/project model, which may omit dynamic imports, plugins, or framework conventions.
+
+Set `tools.knip` and use its native config as needed. If entry-point metadata is incomplete, disable or scope the check; review deletion suggestions.
+
+**Before** — a dependency is declared but never imported:
+
+```json
+{ "dependencies": { "unused-helper": "^1.0.0", "zod": "^4.0.0" } }
+```
+
+**After** — after verifying it is not used through dynamic loading or a plugin, remove the unused entry:
+
+```json
+{ "dependencies": { "zod": "^4.0.0" } }
+```
+
+Knip reports reachability; review the finding before removing code or dependencies.
+
+### Type
+
+Run selected-source or project-wide TypeScript checks.
+
+**Toggle:** `enabledChecks.type` · **Fix:** none · **Command:** `types`
+
+Type checking targets selected source files or the configured TypeScript project, which may inspect files beyond the changed-file set.
+
+Configure `tools.tsc`, `tsconfig`, `typecheckRoots`, and `typecheckExtensions`; `typecheckCommand` runs a repository-owned executable and args. Types help make invalid states harder to represent, but do not replace runtime validation at untrusted boundaries.
+
+**Before** — a string status is passed where the API requires a number:
+
+```ts
+function setStatus(code: number) {}
+const status = '404';
+setStatus(status);
+```
+
+**After** — use a number or parse validated external input at the boundary:
+
+```ts
+function setStatus(code: number) {}
+const status = 404;
+setStatus(status);
+```
+
+### Diff
+
+Catch whitespace errors in the current Git worktree.
+
+**Toggle:** `enabledChecks.diff` · **Fix:** none
+
+Runs `git diff --check` for whitespace and patch errors. It requires Git and checks worktree hygiene, not semantics or generated artifacts; disable it for source archives or environments without a Git worktree.
+
+**Before** — `name: "Terra",␠` has a trailing space after the comma (`␠` marks the invisible space).
+
+**After** — remove the trailing whitespace:
+
+```js
+name: "Terra",
+```
+
+## Repository commands
+
+### Command
+
+Run explicit repository-owned quality commands such as build and test.
+
+**Toggle:** `enabledChecks.command` and `enabledCommands.<name>` · **Fix:** none
+
+Runs subprocesses in `qualityCommands` from `root` and propagates their status; it does not infer changed-file limits. Each item has a unique `name`, executable `command`, and optional string-array `args`.
+
+Use `enabledCommands` for per-command switches, `--skip-commands` to skip once, or `enabledChecks.command: false` to disable the category. Document required services and credentials in your workflow.
+
+**Before** — only static checks run because no repository commands are declared:
+
+```json
+{ "qualityCommands": [] }
+```
+
+**After** — add explicit build and test commands so a normal quality run includes them:
+
+```json
+{
+	"qualityCommands": [
+		{ "name": "build", "command": "pnpm", "args": ["run", "build"] },
+		{ "name": "test", "command": "pnpm", "args": ["run", "test"] }
+	]
+}
+```
+
+Run one configured command with `pnpm exec terra-quality domain test`.
+
+### Recommend
+
+Run optional repository commands as part of quality validation.
+
+**Toggle:** `enabledChecks.recommend` and `enabledRecommendations.<name>` · **Fix:** none
+
+Runs `recommendationCommands` after primary checks and shows output. A nonzero subprocess status fails the quality run.
+
+Items use `name`, `command`, and optional `args`; changes they make follow the command's own contract. Use `--skip-recommendations` to skip once.
+
+**Before** — a cleanup report is not part of the quality workflow:
+
+```json
+{ "recommendationCommands": [] }
+```
+
+**After** — add an optional validation command:
+
+```json
+{
+	"recommendationCommands": [{ "name": "dependency-report", "command": "pnpm", "args": ["run", "dependency-report"] }]
+}
+```
+
+The command output is shown and a nonzero status fails the quality run.

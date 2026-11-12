@@ -36,7 +36,6 @@ Read [`provider-modes.md`](references/provider-modes.md) before selecting a prov
 updates use the Gemini web UI; OpenAI uses `OpenAI.chat()` and `OPENAI_API_KEY`, has no Gem or
 browser knowledge list, and currently does not upload the shared `files` input.
 
-
 ## Safety contract
 
 Reuse the authenticated Gemini browser profile. When the user specifies the in-app browser, keep all
@@ -66,13 +65,13 @@ during local iteration.
 
 The configured updater command is currently broken and is shown only to identify the stale entry point:
 
-   ```sh
-   GEMINI_STORAGE_STATE=/absolute/path/to/playwright/.auth/user.json \
-   GEMINI_CHROME_PATH=/absolute/path/to/Google\ Chrome \
-   pnpm run generation:gem:update
-   ```
+```sh
+GEMINI_STORAGE_STATE=/absolute/path/to/playwright/.auth/user.json \
+GEMINI_CHROME_PATH=/absolute/path/to/Google\ Chrome \
+pnpm run generation:gem:update
+```
 
-   This command currently points to a missing `document-gem.spec.ts` test target, so it is not a working updater in this checkout. Repair and verify that implementation before invoking it. Do not treat the command's presence as evidence of a successful update.
+This command currently points to a missing `document-gem.spec.ts` test target, so it is not a working updater in this checkout. Repair and verify that implementation before invoking it. Do not treat the command's presence as evidence of a successful update.
 
 8. If state is invalid, stop and refresh it through the shared `authenticate()` helper in the website checkout's `scripts/generation/_auth.ts` only when that workflow is authorized. Do not put credentials in files or use a native file picker.
 9. Use a locally saved Canvas capture obtained through the approved in-app browser workflow. The Canvas exporter now lives in the private Uni Notes repository and only prepares local source files; it is not a Terra Docs generation harness. Keep the source capture and provider output under Downloads for review.

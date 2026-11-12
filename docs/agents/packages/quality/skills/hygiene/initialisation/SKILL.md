@@ -29,7 +29,6 @@ dependency together.
 Do not add commit-message policy, test suites, format-on-commit, or release automation unless the
 user asks for those behaviors.
 
-
 ## Changesets version tracking
 
 If the repository has no established versioning convention in its package versions, release tags,
@@ -50,7 +49,6 @@ or an established sibling package. Ask before guessing when no reliable baseline
 
 Do not add a publish command or release workflow as part of versioning setup. Do not run `changeset
 publish`, package publication, or any remote release action.
-
 
 ## Validate
 

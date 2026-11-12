@@ -29,23 +29,22 @@ test('capability package does not depend on the aggregate runner', () => {
 	const manifest = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
 	assert.equal(Object.hasOwn(manifest.dependencies ?? {}, '@terra-symposium/standards-quality'), false);
 });
-test('warn is read-only and documentation scaffolding adds no prose', () => {
+test('documentation checks stay read-only in warn and fix modes', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-documentation-cli-'));
 	try {
 		mkdirSync(join(root, 'src'));
 		const source = join(root, 'src/main.ts');
-		writeFileSync(source, 'export function value(input: string): string { return input; }\n');
+		const original = `/**\n *\n */\nexport function value(input: string): string { return input; }\n`;
+		writeFileSync(source, original);
 		const config = join(root, 'quality.json');
 		writeFileSync(config, JSON.stringify({ sourceRoots: ['src'], extensions: ['.ts'] }));
 		const script = new URL('../dist/cli.js', import.meta.url);
 		const warn = spawnSync(process.execPath, [script.pathname, '--config', config, '--all', '--warn'], { cwd: root, encoding: 'utf8' });
 		assert.equal(warn.status, 1, warn.stderr);
-		assert.equal(readFileSync(source, 'utf8'), 'export function value(input: string): string { return input; }\n');
+		assert.equal(readFileSync(source, 'utf8'), original);
 		const fix = spawnSync(process.execPath, [script.pathname, '--config', config, '--all'], { cwd: root, encoding: 'utf8' });
 		assert.equal(fix.status, 1, fix.stderr);
-		const updated = readFileSync(source, 'utf8');
-		assert.match(updated, /\/\*\*\s+\*\s+\*\//u);
-		assert.doesNotMatch(updated, /\* [A-Z][^\n]*/u);
+		assert.equal(readFileSync(source, 'utf8'), original);
 	} finally {
 		rmSync(root, { recursive: true, force: true });
 	}

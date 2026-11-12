@@ -3,35 +3,24 @@
  */
 
 'use strict';
-exports.isInteger = (num) => {
+/**
+ * Validates integers represented as numbers or non-empty numeric strings.
+ *
+ * @param num Value supplied by a parsed range endpoint.
+ * @return Whether the input can be interpreted as an integer.
+ */
+const isInteger = (num) => {
 	if (typeof num === 'number') return Number.isInteger(num);
 	if (typeof num === 'string' && num.trim() !== '') return Number.isInteger(Number(num));
 	return false;
 };
 
-// Returns the first child node that matches the requested type.
-
-exports.find = (node, type) => node.nodes.find((node) => node.type === type);
-
 // Reports whether the range from min to max reaches the supplied limit.
 
 exports.exceedsLimit = (min, max, step = 1, limit) => {
 	if (limit === false) return false;
-	if (!exports.isInteger(min) || !exports.isInteger(max)) return false;
+	if (!isInteger(min) || !isInteger(max)) return false;
 	return (Number(max) - Number(min)) / Number(step) >= limit;
-};
-
-// Escapes a selected brace delimiter by prefixing its value with a backslash.
-
-exports.escapeNode = (block, n = 0, type) => {
-	const node = block.nodes[n];
-	if (!node) return;
-	if ((type && node.type === type) || node.type === 'open' || node.type === 'close') {
-		if (node.escaped !== true) {
-			node.value = '\\' + node.value;
-			node.escaped = true;
-		}
-	}
 };
 
 // Reports whether a brace node should be treated as literal text.

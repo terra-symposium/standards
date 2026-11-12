@@ -52,7 +52,8 @@
 		"sh"
 	],
 	"scripts": {
-		"build": "node scripts/build.mjs"
+		"build": "node scripts/build.mjs",
+		"test": "node --test"
 	},
 	"private": true
 }

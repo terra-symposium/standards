@@ -52,7 +52,6 @@ components normally.
 Describe all contributing commits' observable outcomes in `Features`; describe intent,
 compatibility, attribution, or grouping in `Reasoning`. Do not invent motivation.
 
-
 ## Workflow
 
 1. Snapshot status, refs, baseline, source tip, and target. Protect unrelated work before checkout, fetch, or rewrite.

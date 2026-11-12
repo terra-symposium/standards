@@ -2,16 +2,16 @@
 
 This reference explains the boundary used by the generation code. It is not a provider tutorial; it records which repository path owns each operation.
 
-| Concern | Gemini Document Gem | OpenAI API |
-| --- | --- | --- |
-| Saved configuration | Gemini web-app Gem instruction and knowledge attachments | No saved Gem in this repository |
-| Repository entry point | `scripts/generation/_gemini.ts` → `Gemini` browser driver and `geminiPrompt()` | `scripts/generation/_openai.ts` → `OpenAI.chat()` |
-| Authentication | Playwright storage state for `gemini.google.com` | `OPENAI_API_KEY` |
-| Browser | Required for Gem maintenance and Gemini chat; use isolated Chrome | Not used for text generation |
-| Model selection | `Gemini.mode()` selects the configured Fast/Pro/Thinking UI mode | `model` is sent in the `/v1/chat/completions` request |
-| Knowledge files | Uploaded through Gemini's hidden `input[type="file"]` and verified after reload | Current `_openai.ts` does not upload `files`; put source in prompt/context or implement that intentionally |
-| External mutation | Updating the Gem changes Gemini account state and must be explicit | A chat completion is a request, not a saved instruction mutation |
-| Local verification | Use a saved local source capture and inspect the Gemini response against the document contract | Call `OpenAI.chat()` and validate its returned text with the same document contract |
+| Concern                | Gemini Document Gem                                                                            | OpenAI API                                                                                                 |
+| ---------------------- | ---------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| Saved configuration    | Gemini web-app Gem instruction and knowledge attachments                                       | No saved Gem in this repository                                                                            |
+| Repository entry point | `scripts/generation/_gemini.ts` → `Gemini` browser driver and `geminiPrompt()`                 | `scripts/generation/_openai.ts` → `OpenAI.chat()`                                                          |
+| Authentication         | Playwright storage state for `gemini.google.com`                                               | `OPENAI_API_KEY`                                                                                           |
+| Browser                | Required for Gem maintenance and Gemini chat; use isolated Chrome                              | Not used for text generation                                                                               |
+| Model selection        | `Gemini.mode()` selects the configured Fast/Pro/Thinking UI mode                               | `model` is sent in the `/v1/chat/completions` request                                                      |
+| Knowledge files        | Uploaded through Gemini's hidden `input[type="file"]` and verified after reload                | Current `_openai.ts` does not upload `files`; put source in prompt/context or implement that intentionally |
+| External mutation      | Updating the Gem changes Gemini account state and must be explicit                             | A chat completion is a request, not a saved instruction mutation                                           |
+| Local verification     | Use a saved local source capture and inspect the Gemini response against the document contract | Call `OpenAI.chat()` and validate its returned text with the same document contract                        |
 
 ## Headed versus non-headed Gemini
 

@@ -10,7 +10,7 @@ These notes were gathered from the local `standards` quality package and the `te
 - Top-level types, interfaces, enums, and constants are managed under `CONFIG`; top-level functions under `HELPERS`; other declarations retain source order.
 - Maintenance removes trailing whitespace, normalizes blank lines around fences/groups/labels, and avoids interpreting strings, templates, regex literals, or JSX text as source layout.
 - Maintenance is intended to be idempotent: a second run over its output produces no changes.
-- Function documentation is reconciled with the current signature: stale parameter tags are removed, missing parameter tags are added in signature order, and one return tag is maintained. Existing summaries and useful tag descriptions are preserved.
+- Function documentation is authored and reconciled against the current signature by an agent: stale parameter tags are removed, missing tags are written in signature order, and a return tag is added when its contract matters. Quality reports gaps but never generates or rewrites comment text.
 
 ## Terra Symposium website
 

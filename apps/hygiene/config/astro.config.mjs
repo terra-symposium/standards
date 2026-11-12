@@ -1,7 +1,4 @@
 import { terraErrorBoundaryIntegration as __terraErrorBoundaryIntegration } from '@terra-symposium/standards-error-boundaries/astro-integration';
-/**
- * apps/hygiene/astro.config.mjs
- */
 
 /*//////////////////////////////////////////////////
 IMPORTS

@@ -83,9 +83,6 @@ function jsxAttr(element: ts.JsxOpeningLikeElement, name: string): ts.JsxAttribu
 	return element.attributes.properties.find((p): p is ts.JsxAttribute => ts.isJsxAttribute(p) && ts.isIdentifier(p.name) && p.name.text === name);
 }
 
-
-
-
 /**
  * Resolves the shared text-link variant represented by static anchor classes.
  *
@@ -120,12 +117,6 @@ function staticClasses(element: ts.JsxOpeningLikeElement): string | undefined {
 	return staticAttrValue(jsxAttr(element, 'className')) ?? staticAttrValue(jsxAttr(element, 'class'));
 }
 
-
-
-
-
-
-
 /*//////////////////////////////////////////////////
 RECOMMENDATIONS
 //////////////////////////////////////////////////*/
@@ -148,46 +139,51 @@ export function uiComponentRecommendations(cfg: QualityCfg): UiComponentRecommen
 	const findings: UiComponentRecommendation[] = [];
 	for (const file of srcFiles({ ...cfg, extensions: exts })) {
 		const relativeFile = displayPath(cfg, file).replaceAll('\\', '/');
-		if ((function isIgnoredFile(file: string, ignoredDirs: string[], ignoredFiles: Set<string>): boolean {
-	const norm = file.replaceAll('\\', '/');
-	const segments = norm.split('/');
-	return (
-		segments.some((s, i) => s === 'components' && segments[i + 1] === 'ui') ||
-		ignoredFiles.has(norm) ||
-		ignoredDirs.some((d) => {
-			const prefix = d.replaceAll('\\', '/').replace(/^\/+|\/+$/gu, '');
-			return prefix && (norm === prefix || norm.startsWith(`${prefix}/`));
-		})
-	);
-})(relativeFile, settings?.ignoredDirectories ?? [], ignoredFiles)) continue;
+		if (
+			(function isIgnoredFile(file: string, ignoredDirs: string[], ignoredFiles: Set<string>): boolean {
+				const norm = file.replaceAll('\\', '/');
+				const segments = norm.split('/');
+				return (
+					segments.some((s, i) => s === 'components' && segments[i + 1] === 'ui') ||
+					ignoredFiles.has(norm) ||
+					ignoredDirs.some((d) => {
+						const prefix = d.replaceAll('\\', '/').replace(/^\/+|\/+$/gu, '');
+						return prefix && (norm === prefix || norm.startsWith(`${prefix}/`));
+					})
+				);
+			})(relativeFile, settings?.ignoredDirectories ?? [], ignoredFiles)
+		)
+			continue;
 		const source = readFileSync(file, 'utf8');
 		const scriptKind = file.endsWith('.jsx') ? ts.ScriptKind.JSX : ts.ScriptKind.TSX;
 		const parsed = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, scriptKind);
-		/**
-		 *
-		 * @param node
-		 */
+
 		const visit = (node: ts.Node): void => {
 			if ((ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) && ts.isIdentifier(node.tagName)) {
 				const element = node.tagName.text;
 				if (element === element.toLowerCase()) {
-					const rule = rules.find((c) => c.element === element && (function ruleMatches(rule: UiRecommendationRule, element: ts.JsxOpeningLikeElement): boolean {
-	const type = jsxAttr(element, 'type');
-	if (rule.types) {
-		const typeValue = type ? staticAttrValue(type) : 'text';
-		if (typeValue === undefined || !rule.types.includes(typeValue.toLowerCase())) return false;
-	}
-	if (rule.when === 'button-like') return (function isButtonLike(value: string | undefined): boolean {
-	const classes = new Set((value ?? '').split(S_U_REGEX).filter(Boolean));
-	const hasHorizontalPadding = [...classes].some((c) => /^px-/u.test(c));
-	const hasVerticalPadding = [...classes].some((c) => /^py-/u.test(c));
-	const hasShape = [...classes].some((c) => c === 'border' || c === 'inline-flex' || c === 'flex' || c.startsWith('rounded'));
-	const hasActionStyle = [...classes].some((c) => c === 'font-medium' || c === 'no-underline' || c.startsWith('bg-'));
-	return hasHorizontalPadding && hasVerticalPadding && hasShape && hasActionStyle;
-})(staticClasses(element));
-	if (rule.when === 'text-link') return Boolean(textLinkVariant(staticClasses(element)));
-	return true;
-})(c, node));
+					const rule = rules.find(
+						(c) =>
+							c.element === element &&
+							(function ruleMatches(rule: UiRecommendationRule, element: ts.JsxOpeningLikeElement): boolean {
+								const type = jsxAttr(element, 'type');
+								if (rule.types) {
+									const typeValue = type ? staticAttrValue(type) : 'text';
+									if (typeValue === undefined || !rule.types.includes(typeValue.toLowerCase())) return false;
+								}
+								if (rule.when === 'button-like')
+									return (function isButtonLike(value: string | undefined): boolean {
+										const classes = new Set((value ?? '').split(S_U_REGEX).filter(Boolean));
+										const hasHorizontalPadding = [...classes].some((c) => /^px-/u.test(c));
+										const hasVerticalPadding = [...classes].some((c) => /^py-/u.test(c));
+										const hasShape = [...classes].some((c) => c === 'border' || c === 'inline-flex' || c === 'flex' || c.startsWith('rounded'));
+										const hasActionStyle = [...classes].some((c) => c === 'font-medium' || c === 'no-underline' || c.startsWith('bg-'));
+										return hasHorizontalPadding && hasVerticalPadding && hasShape && hasActionStyle;
+									})(staticClasses(element));
+								if (rule.when === 'text-link') return Boolean(textLinkVariant(staticClasses(element)));
+								return true;
+							})(c, node),
+					);
 					if (rule) {
 						const { line, character } = parsed.getLineAndCharacterOfPosition(node.getStart(parsed));
 						const variant = rule.variant ?? (element === 'a' && rule.when === 'text-link' ? textLinkVariant(staticClasses(node)) : undefined);

@@ -1,52 +1,53 @@
 {
-  "name": "@terra-symposium/standards-quality-reports",
-  "version": "0.2.0",
-  "description": "GitHub, history, and test-runner reporting APIs.",
-  "type": "module",
-  "engines": {
-    "node": ">=18.18"
-  },
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
-  "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
-    },
-    "./github": "./dist/lib/github-report.js",
-    "./history": "./dist/lib/history-report.js",
-    "./node-reporter": "./dist/lib/node-reporter.js",
-    "./playwright-reporter": "./dist/lib/playwright-reporter.js",
-    "./cli": {
-      "types": "./dist/cli.d.ts",
-      "import": "./dist/cli.js"
-    }
-  },
-  "files": [
-    "dist",
-    "README.md"
-  ],
-  "publishConfig": {
-    "registry": "https://registry.npmjs.org",
-    "access": "public"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/Terra-Symposium/standards.git"
-  },
-  "scripts": {
-    "build": "tsc -p config/tsconfig.json",
-    "test": "npm run build && node --test",
-    "prepare": "npm run build"
-  },
-  "dependencies": {
-    "@terra-symposium/standards-quality-core": "workspace:*"
-  },
-  "devDependencies": {
-    "@types/node": "^26.6.5",
-    "typescript": "^5.0.0"
-  },
-  "bin": {
-    "terra-quality-reports": "dist/cli.js"
-  }
+	"name": "@terra-symposium/standards-quality-reports",
+	"version": "0.2.0",
+	"description": "GitHub, history, and test-runner reporting APIs.",
+	"type": "module",
+	"engines": {
+		"node": ">=18.18"
+	},
+	"main": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js"
+		},
+		"./github": "./dist/lib/github-report.js",
+		"./history": "./dist/lib/history-report.js",
+		"./node-reporter": "./dist/lib/node-reporter.js",
+		"./playwright-reporter": "./dist/lib/playwright-reporter.js",
+		"./cli": {
+			"types": "./dist/cli.d.ts",
+			"import": "./dist/cli.js"
+		}
+	},
+	"files": [
+		"dist",
+		"README.md"
+	],
+	"publishConfig": {
+		"registry": "https://registry.npmjs.org",
+		"access": "public"
+	},
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/Terra-Symposium/standards.git"
+	},
+	"scripts": {
+		"build": "tsc -p config/tsconfig.json",
+		"test": "npm run build && node --test",
+		"prepare": "npm run build",
+		"typecheck": "tsc --noEmit -p config/tsconfig.json"
+	},
+	"dependencies": {
+		"@terra-symposium/standards-quality-core": "workspace:*"
+	},
+	"devDependencies": {
+		"@types/node": "^26.6.5",
+		"typescript": "^5.0.0"
+	},
+	"bin": {
+		"terra-quality-reports": "dist/cli.js"
+	}
 }

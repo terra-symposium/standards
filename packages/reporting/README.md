@@ -13,6 +13,7 @@ Not applicable.
 ## Get started
 
 ### Install
+
 ```sh
 pnpm add -D @terra-symposium/standards-reporting @playwright/test
 ```
@@ -22,6 +23,7 @@ From `standards/main/`, run `pnpm install`, then `pnpm --filter @terra-symposium
 ## Usage
 
 ### Configure responsive projects
+
 ```ts
 import { defineConfig } from '@playwright/test';
 import { withResponsivePlaywright } from '@terra-symposium/standards-reporting/viewports';
@@ -55,7 +57,7 @@ Playwright reporter.
 
 - Use `/core`, `/viewports`, and `/load-testing` for shared types and helpers.
 
-The repository remains responsible for test scenarios, authentication, browser setup, CI uploads, and retention. See the [reporting guide](https://standards-docs.netlify.app/packages/reporting/) for complete options and output details.
+The repository remains responsible for test scenarios, authentication, browser setup, CI uploads, and retention. See the [reporting guide](https://standards-docs.netlify.app/reporting/0-getting-started/overview/) for complete options and output details.
 
 ## Configuration and security
 
@@ -88,3 +90,4 @@ Not applicable.
 ## Credits and license
 
 Not applicable.
+```

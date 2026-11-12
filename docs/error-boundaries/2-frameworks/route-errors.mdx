@@ -1,0 +1,48 @@
+---
+title: Astro and Next.js route helpers
+description: Use the Astro status-copy or Next.js error-digest helper in the framework that owns the route.
+---
+
+The package includes small helpers for framework error routes. These helpers provide copy or an identifier; they do not register a route, set a response status, retry work, or send telemetry.
+
+||| [Astro status page]
+
+## Status copy
+
+Import `errorStatusCopy` from the `/astro` entry point:
+
+```astro
+---
+import { errorStatusCopy } from '@terra-symposium/standards-error-boundaries/astro';
+
+const { title, description } = errorStatusCopy(Astro.response.status);
+---
+<main>
+	<h1>{title}</h1>
+	<p>{description}</p>
+</main>
+```
+
+Built-in copy covers 400, 401, 403, 404, 500, 502, and 503 statuses. Unknown values receive generic “Unknown Error” copy. The component or endpoint still has to choose and set the actual status and render any retry/navigation actions.
+
+The same entry point exports `ErrorStatus`, `ErrorStatusCopy`, and `ERROR_STATUS_COPY` for typed or custom presentation.
+
+|||
+
+||| [Next.js route error]
+
+## Error digest
+
+```tsx
+import { errorDigest } from '@terra-symposium/standards-error-boundaries/next';
+import type { NextRouteErrorProps } from '@terra-symposium/standards-error-boundaries/next';
+
+export default function ErrorPage({ error }: NextRouteErrorProps) {
+	const digest = errorDigest(error);
+	return <p role="alert">Reference: {digest ?? 'unavailable'}</p>;
+}
+```
+
+`errorDigest(error)` returns the framework-provided `digest` when present. Displaying the digest can help support correlate a report without exposing the raw message. The host application owns route reset semantics, telemetry, and the actual error page.
+
+|||

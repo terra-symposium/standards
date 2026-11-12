@@ -40,7 +40,6 @@ those separately.
 Prefer the Codex worktree archive action for managed worktrees when available and allowed. If
 unavailable, use Git only after verifying that changes are clean or safely preserved.
 
-
 ## Remove eligible refs
 
 1. A review alone does not authorize deletion. For an explicit merge-and-prune request, delete each requested source ref only after its useful changes are verified as integrated, preserved elsewhere, intentionally superseded, or explicitly abandoned. Do not leave eligible refs behind just because the inventory is long; report each exception by name and reason.

@@ -1,6 +1,6 @@
 # @terra-symposium/standards-formatting
 
-Terra source headers, import and section layout, safe syntax transforms, and repository Prettier integration.
+Safe syntax transforms and repository Prettier integration for source files.
 
 ## Install
 
@@ -23,10 +23,10 @@ With no file arguments, the CLI checks changed and untracked source files in the
 ## API
 
 ```ts
-import { runFormatting, maintainSrcFile, collapseInlineIfs, collapseTypesAndObjects, protectLongImports } from '@terra-symposium/standards-formatting';
+import { runFormatting, collapseInlineIfs, collapseTypesAndObjects, protectLongImports } from '@terra-symposium/standards-formatting';
 ```
 
-The package root is the supported API surface and ships TypeScript declarations. The CLI is also available from the `./cli` export.
+The package root is the supported API surface and ships TypeScript declarations. The CLI is also available from the `./cli` export. Documentation comments, file headers, and section labels remain author-written. The legacy `maintainSrcFile` export remains available for compatibility and does not edit source.
 
 ## Aggregate runner
 

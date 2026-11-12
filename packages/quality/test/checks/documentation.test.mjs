@@ -1,9 +1,9 @@
 /**
  * packages/quality/test/checks/documentation.test.mjs
  * Exercises documentation policy reporting, human-authored description audits,
- * source maintenance, scaffold insertion, and Prettier import protection.
- * The fixtures distinguish structural automation from prose authorship: the
- * package may insert an empty scaffold, but it must never invent a description.
+ * read-only compatibility APIs, and documented shell command checks.
+ * Fixtures ensure missing prose remains an agent-authored diagnostic and that
+ * mechanical import cleanup preserves comments.
  */
 
 /*//////////////////////////////////////////////////
@@ -14,7 +14,7 @@ IMPORTS
 import assert from 'node:assert/strict';
 import test from 'node:test';
 // prettier-ignore
-import { createQualityCfg, documentSrcFile, documentationFindings, documentedCommandFindings, duplicateImportFindings, fixDocumentedCommands, maintainSrcFile, protectLongImports, removeNonCodeComments } from '../../dist/index.js';
+import { createQualityAnalysis, createQualityCfg, documentSrcFile, documentationFindings, documentedCommandFindings, duplicateImportFindings, fixDocumentedCommands, fixDuplicateImports, maintainSrcFile, removeNonCodeComments } from '../../dist/index.js';
 import { fixtureFile, fixtureRoot, fixtureText } from '../../support/fixtures.mjs';
 
 /*//////////////////////////////////////////////////
@@ -98,8 +98,9 @@ int empty_result(void);
 `,
 	);
 	fixtureFile(root, 'src/c/login/session.c', `/** Starts a login session.\n * @author kai\n */\nvoid login_session(void);\n`);
-	const cfg = createQualityCfg({ root, sourceRoots: ['src/c'], extensions: [], documentation: { cAuthors: { 'src/c/encryption': 'marceline', 'src/c/login': 'marceline' } } });
-	const findings = documentationFindings(cfg);
+	const findings = documentationFindings(
+		createQualityCfg({ root, sourceRoots: ['src/c'], extensions: [], documentation: { cAuthors: { 'src/c/encryption': 'marceline', 'src/c/login': 'marceline' } } }),
+	);
 	assert.ok(findings.some(({ name: n, reason: r }) => n === '<summary>' && r.includes('summary')));
 	assert.ok(findings.some(({ name: n, reason: r }) => n === '@param order' && r.includes('order')));
 	assert.ok(findings.some(({ name: n, reason: r }) => n === '@param output' && r.includes('description')));
@@ -226,8 +227,9 @@ function documented(value: string) { return value; }
 void [privateHelper, publicHelper, arrowHelper, expressionHelper, documented];
 `,
 	);
-	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], documentation: { required: { types: true, functions: false, exportedFunctions: true, noInlineFunctions: true } } });
-	const findings = documentationFindings(cfg);
+	const findings = documentationFindings(
+		createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], documentation: { required: { types: true, functions: false, exportedFunctions: true, noInlineFunctions: true } } }),
+	);
 	assert.deepEqual(
 		findings.map((f) => [f.kind, f.name, f.severity]),
 		[
@@ -269,6 +271,47 @@ const namedArrow = (flag: boolean) => flag;
 			['function', 'helper'],
 			['function', 'namedArrow'],
 		],
+	);
+});
+test('documentation policy relies on the owning algorithm for local helpers and callbacks', () => {
+	const root = fixtureRoot('terra-quality-local-helper-docs-');
+	fixtureFile(
+		root,
+		'src/main.ts',
+		`/** Processes a value with one local calculation step.\n * @param value - Input value.\n * @returns Processed value.\n */
+export function processValue(value: number): number {
+	function calculate(): number { return value + 1; }
+	const doubled = (item: number) => item * 2;
+	return doubled(calculate());
+}
+`,
+	);
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
+	assert.deepEqual(documentationFindings(cfg), []);
+});
+test('local object methods need their own documentation despite a documented interface', () => {
+	const root = fixtureRoot('terra-quality-object-contract-docs-');
+	fixtureFile(
+		root,
+		'src/repository.ts',
+		`/** Describes the repository contract used by callers. */
+interface CourseRepository {
+  /** Loads one course by its stable key.
+   * @param key - Stable identifier for the requested course.
+   * @returns The matching course record.
+   */
+  loadCourse(key: string): string;
+}
+const fakeRepository: CourseRepository = {
+  loadCourse(key) { return key; },
+};
+void fakeRepository;
+`,
+	);
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
+	assert.deepEqual(
+		documentationFindings(cfg, createQualityAnalysis(cfg)).map(({ kind: findingKind, name }) => [findingKind, name]),
+		[['function', 'loadCourse']],
 	);
 });
 test('description audits respect the configured function and exported-function documentation scope', () => {
@@ -318,22 +361,61 @@ export function useDashboardConfigurationDialog(initialConfigure: string | undef
 		],
 	);
 });
-test('documentation errors identify detached TSDoc and accept declaration and file-header comments', () => {
+test('documentation errors identify detached TSDoc without rewriting it', () => {
 	const root = fixtureRoot('terra-quality-detached-tsdoc-');
-	fixtureFile(
-		root,
-		'src/main.ts',
-		`/** src/main.ts */
+	const original = `/** src/main.ts */
 /** Describes a declaration that was removed. */
-`,
-	);
+`;
+	const file = fixtureFile(root, 'src/main.ts', original);
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
 	assert.deepEqual(
 		documentationFindings(cfg).map(({ kind: k, name: n, severity: s }) => [k, n, s]),
 		[['orphan', '<detached TSDoc>', 'error']],
 	);
-	assert.equal(removeNonCodeComments(`${root}/src/main.ts`), true);
-	assert.doesNotMatch(fixtureText(root, 'src/main.ts'), /Describes a declaration that was removed/);
+	assert.equal(removeNonCodeComments(file), false);
+	assert.equal(fixtureText(root, 'src/main.ts'), original);
+});
+test('documentation recognizes standalone JSDoc typedef declarations and audits their summaries', () => {
+	const root = fixtureRoot('terra-quality-jsdoc-typedef-');
+	fixtureFile(
+		root,
+		'src/transcripts.mjs',
+		`/** src/transcripts.mjs */
+/** Metadata allowlist supported by one explicit transcript source mapping.
+ * @typedef {Record<string, unknown> & {week?: number|string, recordingUrl?: string}} MappingRecord
+ */
+/** One expected transcript source used by the coverage report.
+ * @typedef {{id: string, week: number|string, title?: string}} ExpectedMeeting
+ */
+/**
+ * @typedef {{source: string, sha256: string, bytes: number}} MissingSummary
+ */
+`,
+	);
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.mjs'], documentation: { required: { types: true } } });
+	assert.deepEqual(
+		documentationFindings(cfg).map(({ kind: findingKind, name }) => [findingKind, name]),
+		[['summary', '<TSDoc summary>']],
+	);
+});
+test('documentation errors identify an earlier TSDoc block left before a declaration', () => {
+	const root = fixtureRoot('terra-quality-duplicate-tsdoc-');
+	fixtureFile(
+		root,
+		'src/main.ts',
+		`/** This description belongs to a removed declaration. */
+/** Converts a title to its normalized form.
+ * @param title Authored title text to normalize.
+ * @return The normalized title.
+ */
+export function normalizeTitle(title: string): string { return title.trim(); }
+`,
+	);
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], documentation: { required: { exportedFunctions: true } } });
+	assert.deepEqual(
+		documentationFindings(cfg).map(({ kind: findingKind, name, severity }) => [findingKind, name, severity]),
+		[['orphan', '<detached TSDoc>', 'error']],
+	);
 });
 test('documentation description audit accepts TSDoc attached to a type member', () => {
 	const root = fixtureRoot('terra-quality-property-tsdoc-');
@@ -397,8 +479,7 @@ const commentText = '/** @param fake */';
 void [read, incomplete, commentText];
 `,
 	);
-	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
-	const findings = documentationFindings(cfg);
+	const findings = documentationFindings(createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] }));
 	assert.deepEqual(
 		findings.map((f) => [f.kind, f.name, f.reason]),
 		[
@@ -409,6 +490,65 @@ void [read, incomplete, commentText];
 		],
 	);
 	assert.ok(findings.every((f) => f.severity === 'error'));
+});
+test('documentation diagnostics report empty parameter and return descriptions', () => {
+	const root = fixtureRoot('terra-quality-empty-doc-tags-');
+	fixtureFile(
+		root,
+		'src/main.ts',
+		`/** Performs one check.\n * @param value\n * @return\n */
+export function check(value: string): string { return value; }
+`,
+	);
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], documentation: { required: { exportedFunctions: true } } });
+	assert.deepEqual(
+		documentationFindings(cfg).map(({ kind: checkKind, name }) => [checkKind, name]),
+		[
+			['param', '@param value'],
+			['return', '@return'],
+		],
+	);
+});
+test('documentation audits validate arrow-function tags and reject stale parameter names', () => {
+	const root = fixtureRoot('terra-quality-arrow-function-tsdoc-');
+	fixtureFile(
+		root,
+		'src/main.ts',
+		`/** Keeps the active route when the proposed path is its ancestor.
+ * @param curr
+ * @param n Proposed path selected by the user.
+ * @param current Previous path before navigation.
+ * @param next Path proposed by the navigation event.
+ * @return
+ */
+export const keepDeepPath = (curr: string, n: string): string => n;
+`,
+	);
+	const findings = documentationFindings(createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], documentation: { required: { exportedFunctions: true } } })).map(
+		({ kind: findingKind, name, reason }) => [findingKind, name, reason],
+	);
+	assert.deepEqual(findings, [
+		['param', '@param curr', 'add a meaningful description for @param curr'],
+		['return', '@return', 'add a meaningful description for @return'],
+		['param', '@param current', 'remove stale @param current'],
+		['param', '@param next', 'remove stale @param next'],
+	]);
+});
+test('documentation accepts tags for properties of an object parameter', () => {
+	const root = fixtureRoot('terra-quality-nested-parameter-tsdoc-');
+	fixtureFile(
+		root,
+		'src/main.ts',
+		`/** Resolves a workspace using its configured project.
+ * @param options Host configuration for the workspace.
+ * @param options.project Project identifier used to resolve the workspace.
+ * @return The resolved workspace path.
+ */
+export function resolveWorkspace(options: { project: string }): string { return options.project; }
+`,
+	);
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], documentation: { required: { exportedFunctions: true } } });
+	assert.deepEqual(documentationFindings(cfg), []);
 });
 test('documentation description audit continues after nested template expressions and ignores comment-shaped string content', () => {
 	const root = fixtureRoot('terra-quality-documentation-after-template-');
@@ -438,6 +578,7 @@ test('documentation description audit continues after nested template expression
 			['param', '@param value'],
 			['return', '@return'],
 			['param', '@param input'],
+			['param', '@param value'],
 		],
 	);
 });
@@ -447,7 +588,7 @@ test('documentation audits recognize a BOM and shebang before a generated file h
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
 	assert.deepEqual(documentationFindings(cfg), []);
 });
-test('documentSrcFile inserts empty scaffolds only for missing required declarations and is idempotent', () => {
+test('documentSrcFile leaves missing documentation for an author to write', () => {
 	const root = fixtureRoot('terra-quality-document-scaffold-');
 	const file = fixtureFile(
 		root,
@@ -464,12 +605,10 @@ void [existing, missing, publicMissing, inline];
 `,
 	);
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], documentation: { required: { types: true, functions: true, exportedFunctions: true, noInlineFunctions: true } } });
-	assert.equal(documentSrcFile(cfg, file), true);
+	const original = fixtureText(root, 'src/main.ts');
+	assert.equal(documentSrcFile(cfg, file), false);
 	const first = fixtureText(root, 'src/main.ts');
-	assert.equal((first.match(/\/\*\*\n \*\n \*\//g) ?? []).length, 4);
-	assert.equal(first.includes('Existing description.'), true);
-	assert.equal(first.includes('function missing'), true);
-	assert.equal(first.includes('export function publicMissing'), true);
+	assert.equal(first, original);
 	assert.equal(documentSrcFile(cfg, file), false);
 	assert.equal(fixtureText(root, 'src/main.ts'), first);
 	const unsupported = fixtureFile(root, 'src/notes.json', '{"value": true}\n');
@@ -477,110 +616,17 @@ void [existing, missing, publicMissing, inline];
 	assert.equal(fixtureText(root, 'src/notes.json'), '{"value": true}\n');
 	assert.equal(documentSrcFile(createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] }), file), false);
 });
-test('maintainSrcFile leaves unsupported files untouched and protectLongImports is selective and idempotent', () => {
-	const root = fixtureRoot('terra-quality-document-maintenance-');
-	const unsupported = fixtureFile(root, 'README.md', 'plain text\n');
-	assert.equal(maintainSrcFile(root, unsupported), false);
-	assert.equal(fixtureText(root, 'README.md'), 'plain text\n');
-	const file = fixtureFile(
-		root,
-		'src/main.ts',
-		`// prettier-ignore
-import { ${'LongName, '.repeat(20)} result } from 'ignored';
-import { ${'LongName, '.repeat(20)} result } from 'protected';
-import { short } from 'short';
-`,
-	);
-	assert.equal(protectLongImports(file, 80), true);
-	const protectedSrc = fixtureText(root, 'src/main.ts');
-	assert.equal((protectedSrc.match(/prettier-ignore/g) ?? []).length, 2);
-	assert.equal(protectLongImports(file, 80), false);
-	assert.equal(fixtureText(root, 'src/main.ts'), protectedSrc);
-});
-test('maintainSrcFile keeps the path and human description in one valid header block', () => {
-	const root = fixtureRoot('terra-quality-document-header-description-');
-	const file = fixtureFile(root, 'src/main.ts', `/**\n * src/main.ts\n * Reads the configured value for the calling workflow.\n */\nconst value = true;\nvoid value;\n`);
-	assert.equal(maintainSrcFile(root, file), true);
-	assert.equal(fixtureText(root, 'src/main.ts'), `/**\n * src/main.ts\n * Reads the configured value for the calling workflow.\n */\n\nconst value = true;\nvoid value;\n`);
-});
-test('maintainSrcFile prefixes a prose-only leading header with the canonical path', () => {
-	const root = fixtureRoot('terra-quality-document-header-prose-only-');
-	const file = fixtureFile(root, 'src/main.ts', `/** Dashboard surface loaders and primary intelligence refresh workflows. */\nconst value = true;\nvoid value;\n`);
-	assert.equal(maintainSrcFile(root, file), true);
-	assert.equal(fixtureText(root, 'src/main.ts'), `/**\n * src/main.ts\n * Dashboard surface loaders and primary intelligence refresh workflows.\n */\n\nconst value = true;\nvoid value;\n`);
-});
-test('final comment cleanup removes detached TSDoc and generated grouping comments only', () => {
-	const root = fixtureRoot('terra-quality-non-code-comments-');
-	const file = fixtureFile(
-		root,
-		'src/main.ts',
-		`/** src/main.ts */
+test('legacy source maintenance preserves authored comments and section labels', () => {
+	const root = fixtureRoot('terra-quality-documentation-maintenance-no-op-');
+	const original = `/** Purpose belongs to the source author. */
 /*//////////////////////////////////////////////////
-IMPORTS
+CUSTOM SECTION
 //////////////////////////////////////////////////*/
-// API
-/${'** */'}
-import { readFileSync } from 'node:fs';
-/*//////////////////////////////////////////////////
-CONFIG
-//////////////////////////////////////////////////*/
-/** Reads the configured file from disk. */
-export function readConfig(path: string): string {
-	return readFileSync(path, 'utf8');
-}
-// preserves the caller's original destination
-const destination = '/home';
-void [readConfig, destination];
-// EMPTY GROUP
-`,
-	);
-	assert.equal(removeNonCodeComments(file), true);
-	const c = fixtureText(root, 'src/main.ts');
-	assert.match(c, /IMPORTS|CONFIG|\/\/ API/);
-	assert.doesNotMatch(c, /\/\*\* \*\/|EMPTY GROUP/);
-	assert.match(c, /Reads the configured file from disk/);
-	assert.match(c, /preserves the caller's original destination/);
-});
-test('maintenance preserves custom populated sections and cleanup removes only empty headings', () => {
-	const root = fixtureRoot('terra-quality-custom-sections-');
-	const file = fixtureFile(
-		root,
-		'src/main.ts',
-		`/** src/main.ts */
-import { readFileSync } from 'node:fs';
-/*//////////////////////////////////////////////////
-REGRESSIONS CONTRACTS
-//////////////////////////////////////////////////*/
-// TESTS
-export const contract = readFileSync('fixture', 'utf8');
-// EMPTY GROUP
-`,
-	);
-	maintainSrcFile(root, file);
-	assert.match(fixtureText(root, 'src/main.ts'), /REGRESSIONS CONTRACTS/);
-	assert.equal(removeNonCodeComments(file), true);
-	const result = fixtureText(root, 'src/main.ts');
-	assert.match(result, /REGRESSIONS CONTRACTS|\/\/ TESTS/);
-	assert.doesNotMatch(result, /EMPTY GROUP/);
-});
-test('maintainSrcFile deduplicates repeated type imports across maintenance runs', () => {
-	const root = fixtureRoot('terra-quality-import-deduplication-');
-	const file = fixtureFile(
-		root,
-		'src/main.ts',
-		`import { createAdminClient } from '@/lib/auth.server';
-import type { createAdminClient } from '../../lib/auth.server';
-import type { createAdminClient } from '../../lib/auth.server';
-import type { createAdminClient } from '../../lib/auth.server';
-const admin = createAdminClient();
-void admin;
-`,
-	);
-	assert.equal(maintainSrcFile(root, file), true);
-	const first = fixtureText(root, 'src/main.ts');
-	assert.equal((first.match(/import type \{ createAdminClient \}/g) ?? []).length, 1);
+export const value = true;
+`;
+	const file = fixtureFile(root, 'src/main.ts', original);
 	assert.equal(maintainSrcFile(root, file), false);
-	assert.equal(fixtureText(root, 'src/main.ts'), first);
+	assert.equal(fixtureText(root, 'src/main.ts'), original);
 });
 test('duplicate import audit reports repeated type bindings with their later source location', () => {
 	const root = fixtureRoot('terra-quality-import-audit-');
@@ -593,18 +639,27 @@ export type Result = RecordData;
 `,
 	);
 	assert.deepEqual(duplicateImportFindings([file]), [{ file, line: 2, module: './types' }]);
+	assert.equal(fixDuplicateImports([file]), 1);
+	assert.equal(fixtureText(root, 'src/main.ts'), "import type { RecordData } from './types';\nexport type Result = RecordData;\n");
+	assert.deepEqual(duplicateImportFindings([file]), []);
 });
-test('maintainSrcFile heals orphaned duplicate header fragments and merges adjacent descriptions', () => {
-	const root = fixtureRoot('terra-quality-document-header-healing-');
-	const file = fixtureFile(
-		root,
-		'src/main.ts',
-		`/**\n * src/main.ts\n */\n\n* src/main.ts\n*/\n/** Meaningful coverage description. */\n\n/**\n * Explains the current architecture under test.\n */\n\nconst value = true;\nvoid value;\n`,
-	);
-	assert.equal(maintainSrcFile(root, file), true);
-	assert.equal(
-		fixtureText(root, 'src/main.ts'),
-		`/**\n * src/main.ts\n * Meaningful coverage description.\n * Explains the current architecture under test.\n */\n\nconst value = true;\nvoid value;\n`,
-	);
-	assert.equal(maintainSrcFile(root, file), false);
+test('duplicate import autofix leaves declarations with attached comments unchanged', () => {
+	const root = fixtureRoot('terra-quality-import-audit-comment-');
+	const original =
+		"import type { RecordData } from './types';\n// Keep this explanation beside the repeated declaration.\nimport type { RecordData } from './types';\nexport type Result = RecordData;\n";
+	const file = fixtureFile(root, 'src/main.ts', original);
+	assert.equal(fixDuplicateImports([file]), 0);
+	assert.equal(fixtureText(root, 'src/main.ts'), original);
+	assert.deepEqual(duplicateImportFindings([file]), [{ file, line: 3, module: './types' }]);
+});
+test('duplicate import audit and autofix inspect only Astro frontmatter', () => {
+	const root = fixtureRoot('terra-quality-astro-import-audit-');
+	const original = `---\nimport { pageForSlug } from '../lib/catalog.js';\nimport { pageForSlug } from '../lib/catalog.js';\nconst page = pageForSlug('');\n---\n<p>{page.title}</p>\n`;
+	const file = fixtureFile(root, 'src/page.astro', original);
+	assert.deepEqual(duplicateImportFindings([file]), [{ file, line: 3, module: '../lib/catalog.js' }]);
+	assert.equal(fixDuplicateImports([file]), 1);
+	assert.equal(fixtureText(root, 'src/page.astro'), `---\nimport { pageForSlug } from '../lib/catalog.js';\nconst page = pageForSlug('');\n---\n<p>{page.title}</p>\n`);
+	assert.deepEqual(duplicateImportFindings([file]), []);
+	const malformed = fixtureFile(root, 'src/malformed.astro', `---\nimport { pageForSlug } from '../lib/catalog.js';\n<p>frontmatter has no closing delimiter</p>\n`);
+	assert.deepEqual(duplicateImportFindings([malformed]), []);
 });

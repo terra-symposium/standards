@@ -17,15 +17,15 @@ The current `docs/agents/index.md` includes a snapshot from an older commit and 
 
 Use this as a map of the current layout, then verify paths in the checkout:
 
-| Path | Purpose |
-| --- | --- |
-| `docs/agents/index.md` | Repository-wide agent rules and links to the current source of guidance. |
-| `docs/agents/architecture/` | Agent-facing architecture maps, such as `layers.md`. |
-| `docs/agents/decisions/` | Existing historical decision records and their format guide. New consequential decisions belong in `docs/decisions/` as directed by `docs/agents/index.md`. |
-| `docs/agents/plans/` | Active agent plans and supporting inventories. |
-| `docs/agents/personas/` | Scheduled role prompts and their journals; `README.md` defines the shared schedule contract and role profiles. |
-| `docs/architecture/`, `docs/decisions/`, `docs/implementation-plans/`, `docs/quality/`, `docs/migrations/`, `docs/releases/` | Technical documentation organized by audience and lifecycle. Reuse the closest existing document or folder. |
-| Root and package `README.md` files | Setup, package ownership, and maintained instructions for that part of the repository. |
+| Path                                                                                                                         | Purpose                                                                                                                                                     |
+| ---------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `docs/agents/index.md`                                                                                                       | Repository-wide agent rules and links to the current source of guidance.                                                                                    |
+| `docs/agents/architecture/`                                                                                                  | Agent-facing architecture maps, such as `layers.md`.                                                                                                        |
+| `docs/agents/decisions/`                                                                                                     | Existing historical decision records and their format guide. New consequential decisions belong in `docs/decisions/` as directed by `docs/agents/index.md`. |
+| `docs/agents/plans/`                                                                                                         | Active agent plans and supporting inventories.                                                                                                              |
+| `docs/agents/personas/`                                                                                                      | Scheduled role prompts and their journals; `README.md` defines the shared schedule contract and role profiles.                                              |
+| `docs/architecture/`, `docs/decisions/`, `docs/implementation-plans/`, `docs/quality/`, `docs/migrations/`, `docs/releases/` | Technical documentation organized by audience and lifecycle. Reuse the closest existing document or folder.                                                 |
+| Root and package `README.md` files                                                                                           | Setup, package ownership, and maintained instructions for that part of the repository.                                                                      |
 
 The index also mentions `docs/agents/debt/`, but that directory is not currently present. Create it only when the repository needs a maintained known-issues register; do not add empty placeholder folders. The website keeps repository-specific skills, including Sanity workflows, in its local `docs/agents/skills/` directory.
 

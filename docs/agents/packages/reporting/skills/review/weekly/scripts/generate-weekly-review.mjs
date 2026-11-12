@@ -29,10 +29,22 @@ const LIGHT = '#E6F0E8';
 HELPERS
 //////////////////////////////////////////////////*/
 
+/**
+ * Runs a Git command in the report's repository and trims its standard output.
+ *
+ * @param args Git subcommand and arguments to execute.
+ *
+ * @return Command output without trailing whitespace.
+ */
 function git(args) {
 	return execFileSync('git', args, { cwd: report.repo, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }).trimEnd();
 }
 
+/**
+ * Selects a hue that stays visually distinct from the colors already assigned.
+ *
+ * @return A hue in degrees on the color wheel.
+ */
 function hue() {
 	for (let attempt = 0; attempt < 100; attempt += 1) {
 		let value = randomInt(0, 360);
@@ -45,10 +57,24 @@ function hue() {
 	return (usedHues.at(-1) ?? 0) + 37;
 }
 
+/**
+ * Converts an OKLCH color into an sRGB hex value.
+ *
+ * @param value Hue angle in degrees.
+ * @param lightness Perceptual lightness from zero through one.
+ * @param chroma Perceptual chroma for the generated color.
+ *
+ * @return Hex color string in the sRGB gamut.
+ */
 function hex(value, lightness, chroma) {
 	return new Color('oklch', [lightness, chroma, value]).to('srgb').toString({ format: 'hex' });
 }
 
+/**
+ * Creates a coordinated set of colors for one report section.
+ *
+ * @return Surface, text, rule, and accent colors for the section.
+ */
 function theme() {
 	const primaryHue = hue();
 	return {
@@ -61,6 +87,17 @@ function theme() {
 	};
 }
 
+/**
+ * Adds a text box after checking that every line fits its chosen width.
+ *
+ * @param slide Presentation slide receiving the text box.
+ * @param value Text content to render.
+ * @param position Text-box geometry in slide coordinates.
+ * @param style Text appearance and optional maximum line length.
+ * @param name Stable shape name used to identify overflow errors.
+ *
+ * @return The created text shape.
+ */
 function addText(slide, value, position, style = {}, name = 'text') {
 	const maxChars = style.maxChars ?? Math.floor(position.width / Math.max(7, (style.fontSize ?? 16) * 0.52));
 	for (const line of String(value).split('\n')) {
@@ -83,23 +120,71 @@ function addText(slide, value, position, style = {}, name = 'text') {
 	return shape;
 }
 
+/**
+ * Adds a rectangular panel or rule to a presentation slide.
+ *
+ * @param slide Presentation slide receiving the shape.
+ * @param position Shape geometry in slide coordinates.
+ * @param fill Shape fill color.
+ * @param line Border color, or `none` for no border.
+ * @param name Stable shape name for the exported slide.
+ *
+ * @return The created rectangle shape.
+ */
 function rect(slide, position, fill, line = 'none', name = 'panel') {
 	return slide.shapes.add({ geometry: 'rect', name, position, fill, line: { style: 'solid', fill: line, width: line === 'none' ? 0 : 1 } });
 }
 
+/**
+ * Adds a rounded card using the current section palette.
+ *
+ * @param slide Presentation slide receiving the card.
+ * @param position Card geometry in slide coordinates.
+ * @param colors Section palette supplying the default fill and border.
+ * @param name Stable shape name for the exported slide.
+ * @param fill Optional card fill override.
+ *
+ * @return The created rounded-rectangle shape.
+ */
 function card(slide, position, colors, name, fill = colors.tone) {
 	return slide.shapes.add({ geometry: 'roundRect', name, position, fill, line: { style: 'solid', fill: colors.rule, width: 1 } });
 }
 
+/**
+ * Draws a one-pixel horizontal rule.
+ *
+ * @param slide Presentation slide receiving the rule.
+ * @param left Rule's horizontal start position.
+ * @param top Rule's vertical position.
+ * @param width Rule length in slide units.
+ * @param color Rule color.
+ * @param name Stable shape name for the exported slide.
+ *
+ * @return The created rule shape.
+ */
 function rule(slide, left, top, width, color, name) {
 	return rect(slide, { left, top, width, height: 1 }, color, 'none', name);
 }
 
+/**
+ * Adds a visible speaker-notes section containing evidence sources.
+ *
+ * @param slide Presentation slide whose notes should be populated.
+ * @param lines Source references to record in the notes.
+ */
 function notes(slide, lines) {
 	slide.speakerNotes.textFrame.setText(`[Sources]\n${lines.map((line) => `- ${line}`).join('\n')}`);
 	slide.speakerNotes.setVisible(true);
 }
 
+/**
+ * Wraps prose at word boundaries without exceeding a chosen line width.
+ *
+ * @param value Text to wrap, including any explicit newlines.
+ * @param maxChars Maximum characters in each output line.
+ *
+ * @return Wrapped text with original paragraph boundaries retained.
+ */
 function wrapLines(value, maxChars) {
 	return String(value)
 		.split('\n')
@@ -119,17 +204,43 @@ function wrapLines(value, maxChars) {
 		.join('\n');
 }
 
+/**
+ * Adds the title, page number, and top rule shared by content slides.
+ *
+ * @param slide Presentation slide receiving the header.
+ * @param title Slide heading.
+ * @param page One-based slide number.
+ * @param colors Section palette.
+ */
 function header(slide, title, page, colors) {
 	addText(slide, title, { left: 48, top: 42, width: 1136, height: 42 }, { fontSize: 30, color: colors.text, maxChars: 62 }, `title-${page}`);
 	addText(slide, String(page).padStart(2, '0'), { left: 1180, top: 44, width: 52, height: 20 }, { fontSize: 14, color: colors.muted, alignment: 'right', maxChars: 2 }, `page-${page}`);
 	rule(slide, 48, 108, 1184, colors.rule, `rule-${page}`);
 }
 
+/**
+ * Adds a bottom rule and factual footer to a content slide.
+ *
+ * @param slide Presentation slide receiving the footer.
+ * @param value Footer text.
+ * @param page One-based slide number.
+ * @param colors Section palette.
+ */
 function footer(slide, value, page, colors) {
 	rule(slide, 48, 674, 1184, colors.rule, `footer-rule-${page}`);
 	addText(slide, value, { left: 48, top: 682, width: 1160, height: 18 }, { fontSize: 12, color: colors.muted, maxChars: 165 }, `footer-${page}`);
 }
 
+/**
+ * Adds a syntax-colored Git excerpt and returns its source reference.
+ *
+ * @param slide Presentation slide receiving the code excerpt.
+ * @param codeInput Repository commit, file, and line range to display.
+ * @param position Code-panel geometry in slide coordinates.
+ * @param colors Section palette.
+ *
+ * @return Source reference for the displayed excerpt.
+ */
 function addCode(slide, codeInput, position, colors) {
 	const lines = git(['show', `${codeInput.sha}:${codeInput.path}`])
 		.split('\n')
@@ -187,14 +298,15 @@ function addCode(slide, codeInput, position, colors) {
 }
 
 /**
+ * Adds a screenshot and its route/source reference to a content slide.
  *
- * @param slide
- * @param img
- * @param position
- * @param colors
- * @param page
+ * @param slide Presentation slide receiving the screenshot.
+ * @param img Screenshot path, alt text, and route metadata.
+ * @param position Image geometry in slide coordinates.
+ * @param colors Section palette used for the screenshot frame.
+ * @param page One-based slide number used in the stable frame name.
  *
- * @return
+ * @return Source reference for the displayed screenshot.
  */
 async function addScreenshot(slide, img, position, colors, page) {
 	card(slide, position, colors, `screenshot-frame-${page}`, colors.tone);
@@ -211,6 +323,14 @@ async function addScreenshot(slide, img, position, colors, page) {
 	return `${img.route} · ${img.path}`;
 }
 
+/**
+ * Converts a plan date into its rounded day offset inside a 90-day window.
+ *
+ * @param date ISO calendar date to position on the timeline.
+ * @param plan Plan window containing its start and end dates.
+ *
+ * @return Day number from the plan start, scaled to a 90-day span.
+ */
 function planDay(date, plan) {
 	const start = new Date(`${plan.start}T00:00:00Z`).getTime();
 	const end = new Date(`${plan.end}T00:00:00Z`).getTime();
@@ -218,6 +338,16 @@ function planDay(date, plan) {
 	return Math.round(((value - start) / (end - start)) * 90);
 }
 
+/**
+ * Validates plan metadata, milestone windows, and evidence-backed progress.
+ *
+ * @param plan Contributor plan object to validate.
+ * @param contributor Contributor whose name appears in validation errors.
+ * @param requirePreviousObjective Whether a prior-week objective is required.
+ * @param allowUnknownProgress Whether an unverified milestone may use `null` progress.
+ *
+ * @return Whether a plan object was supplied and passed validation.
+ */
 function validPlan(plan, contributor, { requirePreviousObjective = true, allowUnknownProgress = false } = {}) {
 	if (!plan) return false;
 	if (![plan.source, plan.start, plan.end, plan.asOf, plan.outcome, ...(requirePreviousObjective ? [plan.previousObjective] : [])].every((value) => typeof value === 'string' && value.length))
@@ -241,6 +371,14 @@ function validPlan(plan, contributor, { requirePreviousObjective = true, allowUn
 	return true;
 }
 
+/**
+ * Validates five objectives against complete Git history and computes their evidence scores.
+ *
+ * @param plan Big Five source and objective assessments supplied by the review.
+ * @param historyCommits Non-merge commits reachable on the selected report refs.
+ *
+ * @return Timeline data with validated commit evidence and per-objective progress.
+ */
 function assessBigFiveTimeline(plan, historyCommits) {
 	if (typeof plan?.source !== 'string' || !plan.source.trim() || !Array.isArray(plan.objectives) || plan.objectives.length !== 5)
 		throw new Error('Big Five timeline requires a source and five objectives, each assessed against the complete history of the requested refs.');
@@ -292,102 +430,14 @@ function assessBigFiveTimeline(plan, historyCommits) {
 }
 
 /**
+ * Adds a contributor overview with recorded outcomes, goal evidence, and sources.
  *
- * @param deck
- * @param section
- * @param colors
- * @param page
- * @param sources
- */
-function addPlanSlide(deck, section, colors, page, sources) {
-	const plan = section.plan;
-	const slide = deck.slides.add();
-	slide.background.fill = colors.surface;
-	header(slide, `${section.name} · 90-day action plan`, page, colors);
-	const elapsed = planDay(plan.asOf, plan);
-	addText(slide, plan.outcome, { left: 58, top: 140, width: 1120, height: 46 }, { fontSize: 20, color: colors.muted, maxChars: 120 }, `plan-outcome-${page}`);
-	addText(slide, `Last week said: ${plan.previousObjective}`, { left: 58, top: 202, width: 1120, height: 20 }, { fontSize: 15, color: colors.muted, maxChars: 112 }, `plan-previous-objective-${page}`);
-	addText(
-		slide,
-		`${plan.scheduleLabel ?? 'Indicative weeks 1–12'} · ${plan.start} → ${plan.end} · as of ${plan.asOf} · day ${elapsed} of 90`,
-		{ left: 58, top: 230, width: 760, height: 20 },
-		{ fontSize: 15, color: colors.text, maxChars: 100 },
-		`plan-window-${page}`,
-	);
-	if (plan.progressBasis) addText(slide, plan.progressBasis, { left: 58, top: 258, width: 1120, height: 20 }, { fontSize: 13, color: colors.muted, maxChars: 120 }, `plan-basis-${page}`);
-	const labelLeft = 58;
-	const chartLeft = 404;
-	const chartWidth = 790;
-	const chartTop = 290;
-	const laneHeight = 48;
-	const marker = chartLeft + (elapsed / 90) * chartWidth;
-	['DAY 1', 'DAY 30', 'DAY 60', 'DAY 90'].forEach((label, i) => {
-		const x = chartLeft + (i / 3) * chartWidth;
-		rule(slide, x, chartTop - 12, 1, colors.rule, `plan-grid-${page}-${i}`);
-		addText(
-			slide,
-			label,
-			{ left: x - (i === 3 ? 38 : 0), top: chartTop - 38, width: 44, height: 16 },
-			{ fontSize: 11, color: colors.muted, maxChars: 6, alignment: i === 3 ? 'right' : 'left' },
-			`plan-axis-${page}-${i}`,
-		);
-	});
-	plan.milestones.forEach((milestone, i) => {
-		const top = chartTop + i * laneHeight;
-		const start = planDay(milestone.start, plan);
-		const end = planDay(milestone.end, plan);
-		const left = chartLeft + (start / 90) * chartWidth;
-		const width = Math.max(12, ((end - start) / 90) * chartWidth);
-		addText(slide, milestone.name, { left: labelLeft, top: top + 7, width: 320, height: 20 }, { fontSize: 16, color: colors.text, maxChars: 40 }, `plan-name-${page}-${i}`);
-		addText(slide, `${milestone.progress}%`, { left: 338, top: top + 7, width: 48, height: 20 }, { fontSize: 14, color: colors.muted, alignment: 'right', maxChars: 4 }, `plan-progress-${page}-${i}`);
-		rect(slide, { left, top: top + 6, width, height: 20 }, colors.tone, colors.rule, `plan-track-${page}-${i}`);
-		rect(slide, { left, top: top + 6, width: Math.max(2, width * (milestone.progress / 100)), height: 20 }, colors.secondary, 'none', `plan-complete-${page}-${i}`);
-	});
-	rule(slide, marker, chartTop - 52, 2, colors.secondary, `plan-asof-${page}`);
-	addText(slide, 'AS OF', { left: marker - 24, top: chartTop - 66, width: 50, height: 14 }, { fontSize: 10, color: colors.text, alignment: 'center', maxChars: 6 }, `plan-asof-label-${page}`);
-	addText(
-		slide,
-		plan.progressBasis ?? 'Progress key: 100 = complete in notes or closed PR · 50 = in progress or open PR · 0 = no verified completion',
-		{ left: 58, top: 610, width: 820, height: 18 },
-		{ fontSize: 13, color: colors.muted, maxChars: 120 },
-		`plan-legend-${page}`,
-	);
-	footer(slide, `Planning context only · ${plan.source.split(' · https://')[0]}`, page, colors);
-	notes(slide, [...sources, plan.source, ...plan.milestones.map((milestone) => `${milestone.name}: ${milestone.evidence}`)]);
-}
-
-/**
- *
- * @param deck
- * @param section
- * @param colors
- * @param page
- * @param sources
- */
-function addMeetingSlide(deck, section, colors, page, sources) {
-	const meeting = section.meeting;
-	const slide = deck.slides.add();
-	slide.background.fill = colors.surface;
-	header(slide, meeting.title ?? `${section.name} · meeting notes`, page, colors);
-	meeting.columns.forEach((col, i) => {
-		const left = 58 + (i % 2) * 582;
-		const top = 164 + Math.floor(i / 2) * 226;
-		card(slide, { left, top, width: 556, height: 192 }, colors, `meeting-${page}-${i}`, i === 0 ? colors.tone : colors.surface);
-		addText(slide, col.title, { left: left + 24, top: top + 20, width: 500, height: 22 }, { fontSize: 20, color: colors.text, maxChars: 34 }, `meeting-title-${page}-${i}`);
-		addText(slide, col.body.join('\n'), { left: left + 24, top: top + 58, width: 500, height: 112 }, { fontSize: 16, color: colors.muted, maxChars: 58 }, `meeting-body-${page}-${i}`);
-	});
-	footer(slide, meeting.footer ?? 'Meeting notes provide context; GitHub and Git remain the delivery evidence.', page, colors);
-	notes(slide, [...sources, ...(meeting.sources ?? [])]);
-}
-
-/**
- *
- * @param deck
- * @param section
- * @param goal
- * @param colors
- * @param page
- * @param sources
+ * @param deck Presentation receiving the contributor slide.
+ * @param section Contributor identity and weekly Git evidence.
+ * @param goal Optional goal matching this contributor's recorded identity.
+ * @param colors Section palette for the overview slide.
+ * @param page One-based slide number.
+ * @param sources Repository and reporting-window source notes.
  */
 function addContributorSummary(deck, section, goal, colors, page, sources) {
 	const slide = deck.slides.add();
@@ -426,6 +476,11 @@ function addContributorSummary(deck, section, goal, colors, page, sources) {
 	notes(slide, [...sources, ...(goal ? [`${goal.source} · ${goal.status}`] : []), ...section.slides.flatMap((i) => i.sources ?? [])]);
 }
 
+/**
+ * Builds the weekly review deck from a validated report and its Git evidence.
+ *
+ * @return Resolves after writing the PowerPoint review deck.
+ */
 async function main() {
 	if (git(['rev-parse', '--is-shallow-repository']) === 'true') throw new Error('A complete Big Five assessment requires full Git history; fetch or unshallow the authoritative refs first.');
 	const historyCommits = git(['log', ...refs, `--until=${report.until}`, '--no-merges', `--format=${'%H%x09%h%x09%aN%x09%aI%x09%s'}`])
@@ -668,12 +723,12 @@ async function main() {
 			const slide = deck.slides.add();
 			slide.background.fill = colors.surface;
 			header(slide, meeting.title ?? `${section.name} · meeting notes`, page, colors);
-			meeting.columns.forEach((column, i) => {
+			meeting.columns.forEach((col, i) => {
 				const left = 58 + (i % 2) * 582;
 				const top = 164 + Math.floor(i / 2) * 226;
 				card(slide, { left, top, width: 556, height: 192 }, colors, `meeting-${page}-${i}`, i === 0 ? colors.tone : colors.surface);
-				addText(slide, column.title, { left: left + 24, top: top + 20, width: 500, height: 22 }, { fontSize: 20, color: colors.text, maxChars: 34 }, `meeting-title-${page}-${i}`);
-				addText(slide, column.body.join('\n'), { left: left + 24, top: top + 58, width: 500, height: 112 }, { fontSize: 16, color: colors.muted, maxChars: 58 }, `meeting-body-${page}-${i}`);
+				addText(slide, col.title, { left: left + 24, top: top + 20, width: 500, height: 22 }, { fontSize: 20, color: colors.text, maxChars: 34 }, `meeting-title-${page}-${i}`);
+				addText(slide, col.body.join('\n'), { left: left + 24, top: top + 58, width: 500, height: 112 }, { fontSize: 16, color: colors.muted, maxChars: 58 }, `meeting-body-${page}-${i}`);
 			});
 			footer(slide, meeting.footer ?? 'Meeting notes provide context; GitHub and Git remain the delivery evidence.', page, colors);
 			notes(slide, [...sources, ...(meeting.sources ?? [])]);

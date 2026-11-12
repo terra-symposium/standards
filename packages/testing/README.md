@@ -8,15 +8,15 @@ Add `config/terra-tests.json` as the canonical ordered test plan. The runner als
 
 ```json
 {
-  "version": 1,
-  "suites": [
-    {
-      "name": "unit",
-      "command": "pnpm",
-      "args": ["run", "test"],
-      "owns": ["tests/unit/**/*.test.ts"]
-    }
-  ]
+	"version": 1,
+	"suites": [
+		{
+			"name": "unit",
+			"command": "pnpm",
+			"args": ["run", "test"],
+			"owns": ["tests/unit/**/*.test.ts"]
+		}
+	]
 }
 ```
 

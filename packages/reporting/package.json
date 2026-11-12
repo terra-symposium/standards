@@ -31,7 +31,8 @@
 	"scripts": {
 		"build": "tsc -p config/tsconfig.json",
 		"test": "npm run build && node --test test/*.test.mjs",
-		"prepare": "npm run build"
+		"prepare": "npm run build",
+		"typecheck": "tsc --noEmit -p config/tsconfig.json"
 	},
 	"dependencies": {
 		"exceljs": "^4.4.0",

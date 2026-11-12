@@ -6,8 +6,6 @@
 HELPERS
 //////////////////////////////////////////////////*/
 
-
-
 /**
  * Checks whether a GitHub account has administrator permission on a repository.
  *
@@ -23,10 +21,12 @@ HELPERS
 export async function repositoryAdmin(owner: string, name: string, login: string, token: string): Promise<boolean> {
 	try {
 		const result = await (async function github<T>(path: string, token: string): Promise<T> {
-	const response = await fetch(`${'https://api.github.com'}${path}`, { headers: { Accept: 'application/vnd.github+json', Authorization: `Bearer ${token}`, 'X-GitHub-Api-Version': '2022-11-28' } });
-	if (!response.ok) throw new Error(`GitHub ${response.status}: ${path}`);
-	return (await response.json()) as T;
-})<{ permission: string }>(`/repos/${encodeURIComponent(owner)}/${encodeURIComponent(name)}/collaborators/${encodeURIComponent(login)}/permission`, token);
+			const response = await fetch(`${'https://api.github.com'}${path}`, {
+				headers: { Accept: 'application/vnd.github+json', Authorization: `Bearer ${token}`, 'X-GitHub-Api-Version': '2022-11-28' },
+			});
+			if (!response.ok) throw new Error(`GitHub ${response.status}: ${path}`);
+			return (await response.json()) as T;
+		})<{ permission: string }>(`/repos/${encodeURIComponent(owner)}/${encodeURIComponent(name)}/collaborators/${encodeURIComponent(login)}/permission`, token);
 		return result.permission === 'admin';
 	} catch (err) {
 		if (String(err).includes('GitHub 404:')) return false;

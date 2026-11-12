@@ -108,7 +108,6 @@ export function capabilityCheckEnabled(
 export function capabilityAutofixEnabled(
 	cfg: QualityCfg,
 	fix:
-		| 'document'
 		| 'format'
 		| 'name'
 		| 'lint'
@@ -122,6 +121,7 @@ export function capabilityAutofixEnabled(
 		| 'accessibility'
 		| 'displayName'
 		| 'documentedCommands'
+		| 'duplicateImports'
 		| 'errorBoundaries',
 	cliFix = true,
 ): boolean {
