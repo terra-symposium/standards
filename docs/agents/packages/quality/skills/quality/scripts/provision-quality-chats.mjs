@@ -67,22 +67,15 @@ async function repoIdentity(root) {
 }
 
 /**
- * Builds task instructions scoped to one discovered repository.
+ * Builds the one-line skill trigger scoped to one discovered repository.
  *
  * @param repo Repository name, identity, and workspace path.
- * @param options Environment and push policy for the requested run.
- *
+ * @param options Explicit push authorization for the requested run.
  * @return Instructions to show or submit for this repository.
  */
 function promptFor(repo, options) {
-	return [
-		`Run the Terra quality skill for exactly this repository: ${repo.identity}.`,
-		`Use its Cloud checkout at ${repo.cloudPath} and do not modify any other repository.`,
-		'Read the repository instructions and its configured quality wrapper or check script first. Run that complete wrapper, fix every finding without waivers or skipped checks, and rerun it until green.',
-		'Review the final diff and stage only changes for this task. Commit immediately when the complete wrapper is green; do not wait for other repositories.',
-		options.push ? 'Immediately push that commit to the current task branch after it succeeds, and verify the push.' : 'Push only if the user explicitly authorizes it.',
-		'Return only a Markdown table with one row for this repository and one column for each configured check, plus Commit and Push. Every cell must be exactly ✓ or ✗. Use ✗ for a failure, blocker, or check that did not run; use ✓ only for a passed or verified not-applicable check.',
-	].join('\n\n');
+	const pushAuthorization = options.push ? 'granted' : 'not granted';
+	return `Read and follow the Terra Standards Quality skill for this repository: ${repo.identity}; push authorization: ${pushAuthorization}.`;
 }
 
 /**
