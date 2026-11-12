@@ -5,7 +5,7 @@ description: Run and repair a repository's exact full quality gate until it is g
 
 # Quality
 
-Trigger: **Read and follow the Terra Standards Quality skill for `<owner/repository>`.** Resolve this file from the Standards repository's current `origin/development` when the Cloud skill catalog does not expose it. Respect the requested repository, exclusions, and execution environment.
+Trigger: **Read and follow the Terra Standards Quality skill for `<owner/repository>`.** If the Cloud skill catalog does not expose this file, resolve it from the Standards repository's current default branch. Respect the requested repository, exclusions, and execution environment.
 
 ## Coordinator mode
 
