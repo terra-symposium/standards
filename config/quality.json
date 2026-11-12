@@ -50,7 +50,9 @@
 		"requiredFeatures": ["dependencyGraph", "dependabotAlerts", "malwareAlerts", "securityUpdates", "versionUpdates", "groupedUpdates"]
 	},
 	"qualityCommands": [],
-	"autofix": { "document": false },
+	"autofix": {
+		"document": false
+	},
 	"documentation": {
 		"commandRoots": ["docs"],
 		"required": {
@@ -64,7 +66,7 @@
 	},
 	"security": {
 		"clientRoots": ["apps/hygiene/src/components"],
-		"runtimeRoots": ["apps/hygiene/netlify/functions", "apps/hygiene/scripts", "apps/hygiene/src/lib/server", "config", "packages", "scripts"]
+		"runtimeRoots": [".agents/skills/all-repos/scripts", "apps/hygiene/netlify/functions", "apps/hygiene/scripts", "apps/hygiene/src/lib/server", "config", "packages", "scripts"]
 	},
 	"enabledChecks": {
 		"error-boundaries": true,
