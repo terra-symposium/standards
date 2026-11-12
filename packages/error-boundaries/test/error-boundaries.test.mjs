@@ -27,8 +27,7 @@ test('exports the shared boundary lifecycle and HOC', () => {
 });
 test('Astro integration injects a pre-hydration page boundary', () => {
 	let injected;
-	const integration = terraErrorBoundaryIntegration();
-	integration.hooks['astro:config:setup']({
+	terraErrorBoundaryIntegration().hooks['astro:config:setup']({
 		injectScript: (stage, content) => {
 			injected = { stage, content };
 		},

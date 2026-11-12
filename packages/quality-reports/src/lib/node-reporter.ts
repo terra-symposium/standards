@@ -65,9 +65,6 @@ export function qualityNodeReporterOptions(curr: string | undefined, reporterUrl
 HELPERS
 //////////////////////////////////////////////////*/
 
-
-
-
 /*//////////////////////////////////////////////////
 REPORTER
 //////////////////////////////////////////////////*/
@@ -103,11 +100,12 @@ export async function* qualityNodeReporter(src: AsyncIterable<NodeTestE>, opts?:
 	const pendingByIdentity = new Map<string, Pending[]>();
 	const seenTerminal = new Set<string>();
 	/**
+	 * Builds a stable key shared by matching enqueue and terminal test events.
 	 *
-	 * @param data
-	 * @param terminal
+	 * @param data Event metadata used to identify the test.
+	 * @param terminal Whether terminal-only event numbers may identify the test.
 	 *
-	 * @return
+	 * @return Serialized identity key for the pending event queues.
 	 */
 	const identity = (data: NodeTestE['data'], terminal = false): string => {
 		const file = data?.file ?? '';
@@ -116,52 +114,50 @@ export async function* qualityNodeReporter(src: AsyncIterable<NodeTestE>, opts?:
 		return JSON.stringify([file, 'source', data?.line ?? null, data?.nesting ?? 0, data?.name ?? 'unnamed test']) ?? '';
 	};
 	/**
+	 * Recognizes top-level test-file suite events that must not count as cases.
 	 *
-	 * @param data
+	 * @param data Event metadata to classify.
 	 *
-	 * @return
+	 * @return Whether the event describes a test file rather than an individual case.
 	 */
 	const isFileSuite = (data: NodeTestE['data']): boolean => {
 		if (data?.nesting !== 0 || !data.name) return false;
 		/**
+		 * Normalizes file URLs and path separators for event identity comparisons.
 		 *
-		 * @param path
+		 * @param path File path or URL from test-runner metadata.
 		 *
-		 * @return
+		 * @return Comparable slash-separated path text.
 		 */
 		const normPath = (path: string): string => path.replace(/^file:\/\//u, '').replace(/\\/gu, '/');
 		/**
+		 * Extracts the last path segment after path normalization.
 		 *
-		 * @param path
+		 * @param path File path or URL from test-runner metadata.
 		 *
-		 * @return
+		 * @return Final path component, or an empty string for an empty path.
 		 */
 		const basename = (path: string): string => normPath(path).split('/').at(-1) ?? '';
 		const fileLikeName = /(?:^|[/\\])[^/\\]+\.(?:test|spec)\.(?:[cm]?js|tsx?)$/u.test(data.name);
 		return data.name === data.file || (data.file !== undefined && basename(data.name) === basename(data.file)) || (fileLikeName && (data.file === undefined || data.line === 1));
 	};
-	/**
-	 *
-	 */
+	/** Updates displayed test progress from the current event counts. */
 	const liveProgress = (): void => {
 		lastProgressCompleted = completed;
 		lastProgressTotal = Math.max(completed, enqueued);
 		qualityProgress('Cases', lastProgressCompleted, lastProgressTotal, reportProgress, { finalize: false });
 	};
-	/**
-	 *
-	 * @param data
-	 * @param counted
-	 */
+
 	const rememberPending = (data: NodeTestE['data'], counted: boolean): void => {
 		const key = identity(data);
 		pendingByIdentity.set(key, [...(pendingByIdentity.get(key) ?? []), { counted }]);
 	};
 	/**
+	 * Removes and returns the oldest enqueue record matching a terminal event.
 	 *
-	 * @param data
+	 * @param data Event metadata used to build the matching identity key.
 	 *
-	 * @return
+	 * @return Pending enqueue record, or `undefined` when none is waiting.
 	 */
 	const takePending = (data: NodeTestE['data']): Pending | undefined => {
 		const key = identity(data);
@@ -212,13 +208,14 @@ export async function* qualityNodeReporter(src: AsyncIterable<NodeTestE>, opts?:
 		const todo = details?.todo ?? data?.todo;
 		const status = skip || (todo && failed) ? 'SKIP' : failed ? 'FAIL' : 'PASS';
 		counts[status] += 1;
-		if (status !== 'PASS') yield (function fmtNodeResult(e: NodeTestE, status: 'PASS' | 'FAIL' | 'SKIP'): string {
-	const data = e.data;
-	const nesting = Math.max(0, data?.nesting ?? 0);
-	const err = data?.details?.error;
-	const msg = typeof err === 'string' ? err : err?.message;
-	return `${'  '.repeat(nesting)}[${status}] ${data?.name ?? 'unnamed test'}${status === 'FAIL' && msg ? ` — ${msg.replace(/\s+/gu, ' ').trim()}` : ''}\n`;
-})(e, status);
+		if (status !== 'PASS')
+			yield (function fmtNodeResult(e: NodeTestE, status: 'PASS' | 'FAIL' | 'SKIP'): string {
+				const data = e.data;
+				const nesting = Math.max(0, data?.nesting ?? 0);
+				const err = data?.details?.error;
+				const msg = typeof err === 'string' ? err : err?.message;
+				return `${'  '.repeat(nesting)}[${status}] ${data?.name ?? 'unnamed test'}${status === 'FAIL' && msg ? ` — ${msg.replace(/\s+/gu, ' ').trim()}` : ''}\n`;
+			})(e, status);
 	}
 	const total = summaryCounts?.tests ?? enqueued;
 	const finalCompleted = summaryCounts?.tests ?? completed;

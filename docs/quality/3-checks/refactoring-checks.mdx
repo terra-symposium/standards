@@ -1,0 +1,98 @@
+---
+title: Refactoring checks
+description: Reference conservative forwarding, naming alias, single-use, and dead-code analysis.
+---
+
+These checks identify narrow source transformations and reachability findings. Review each candidate at the public or persistence boundary; ambiguous changes remain findings.
+
+## Refactoring and maintenance
+
+### Object forwarding
+
+Identify repeated property forwarding and distinguish it from intentional projections.
+
+**Toggle:** `enabledChecks.forward` · **Fix:** `autofix.forward`
+
+Finds object literals forwarding at least three properties from one source (for example, `userId: input.userId`). Safe fixes remove exact redundant properties after an existing spread. Whole-object replacement and projections are excluded because they can change object shape.
+
+“Forwarding” is syntactic repetition, not proof of equal object contracts; a “projection” intentionally selects a subset. Keep projections explicit at persistence, authorization, redaction, schema, versioning, and API boundaries. Common mutation names (`insert`, `update`, `upsert`, `set`, `assign`) are ignored.
+
+**Before** — the explicit value repeats the same source property after the spread:
+
+```ts
+sendUser({ ...input, userId: input.userId });
+```
+
+**After** — remove only the exact redundant property:
+
+```ts
+sendUser({ ...input });
+```
+
+### Alias
+
+Find unnecessary compatibility aliases and repair supported references.
+
+**Toggle:** `enabledChecks.alias` · **Fix:** `autofix.alias`
+
+Reports aliases where the original identifier works directly. Fixes update references and imports when collision and public-contract checks allow; ambiguous cases remain findings.
+
+Use it to retire temporary internal indirection; review exported names and compatibility guarantees before enabling export-affecting cleanup.
+
+**Before** — a private constant only forwards another local value:
+
+```ts
+const displayName = user.name;
+return displayName;
+```
+
+**After** — use the value directly where the alias adds no useful meaning:
+
+```ts
+return user.name;
+```
+
+### Single-use declarations
+
+Find declarations with one in-scope consumer and optionally inline them.
+
+**Focused command:** `single-use` · **Fix:** included in the fixing quality pass
+
+Counts in-scope consumers of types, interfaces, functions, and variables. The fixing run can inline declarations with exactly one; rewrites are syntax-checked before writing, generated grouping comments/detached TSDoc are cleaned, and declaration docs/meaningful inline comments are preserved.
+
+Single-use analysis covers all matching files under configured roots. `--warn` checks without edits. One consumer does not prove conceptual privacy; review API and framework conventions.
+
+**Before** — a local value has exactly one consumer:
+
+```ts
+const title = `Hello, ${name}`;
+return <h1>{title}</h1>;
+```
+
+**After** — inline it at the only use:
+
+```tsx
+return <h1>{`Hello, ${name}`}</h1>;
+```
+
+### Dead code
+
+Identify private unused function declarations.
+
+**Focused command:** `dead-code`
+
+Inspects private unused function declarations. It is narrower than general reachability analysis and never removes code automatically. Before acting, review dynamic invocation, framework conventions, and reflection.
+
+**Before** — no in-scope call sites use this private function:
+
+```ts
+function legacyLabel(value: string): string {
+	return value.trim();
+}
+```
+
+**After** — after confirming there are no dynamic or framework-driven callers, remove it:
+
+```ts
+// (no declaration)
+```

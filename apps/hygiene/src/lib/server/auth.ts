@@ -147,9 +147,9 @@ export async function session(request: Request): Promise<Session | null> {
 	const raw = sessionToken(request);
 	if (!raw) return null;
 	const sql = db();
-	const rows =
-		await sql`SELECT github_user_id, github_login, access_token_ciphertext, refresh_token_ciphertext, token_expires_at FROM sessions WHERE token_hash = ${digest(raw)} AND expires_at > now()`;
-	const row = rows[0] as { github_user_id: number; github_login: string; access_token_ciphertext: string; refresh_token_ciphertext: string | null; token_expires_at: string | null } | undefined;
+	const row = (
+		await sql`SELECT github_user_id, github_login, access_token_ciphertext, refresh_token_ciphertext, token_expires_at FROM sessions WHERE token_hash = ${digest(raw)} AND expires_at > now()`
+	)[0] as { github_user_id: number; github_login: string; access_token_ciphertext: string; refresh_token_ciphertext: string | null; token_expires_at: string | null } | undefined;
 	if (!row) return null;
 	let accessToken = decrypt(row.access_token_ciphertext);
 	if (row.token_expires_at && new Date(row.token_expires_at).getTime() < Date.now() + 60_000) {

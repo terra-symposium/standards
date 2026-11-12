@@ -9,15 +9,13 @@ IMPORTS
 // API
 import { spawnSync as spawnSyncImpl } from 'node:child_process';
 
-/**
- * packages/quality/src/lib/github-report.ts
- * Read-only GitHub issue, dependency, and security reporting for quality runs.
- */
+// Read-only GitHub issue, dependency, and security reporting for quality runs.
 
 /*//////////////////////////////////////////////////
 TYPES
 //////////////////////////////////////////////////*/
 
+/** GitHub security or dependency-management feature recorded in a repository report. */
 export type GitHubFeature = 'dependencyGraph' | 'dependabotAlerts' | 'malwareAlerts' | 'securityUpdates' | 'versionUpdates' | 'groupedUpdates' | 'secretScanning' | 'pushProtection' | 'codeScanning';
 /** Whether the authenticated GitHub view confirms a feature is available. */
 export type GitHubFeatureState = 'enabled' | 'disabled' | 'unknown';
@@ -107,9 +105,6 @@ function text(val: unknown): string | undefined {
 	return (typeof val === 'string' ? val.replace(/\p{Cc}/gu, ' ').trim() : '') || undefined;
 }
 
-
-
-
 /**
  * Use GitHub CLI authentication without printing or persisting its token.
  *
@@ -130,12 +125,16 @@ function ghApi(path: string, paginate = false): ApiResult {
 					: path.includes('/secret-scanning/alerts') && /Secret scanning is disabled/i.test(result.stderr)
 						? 'Secret scanning is disabled for this repository.'
 						: undefined;
-		const state = disabledMsg ? 'disabled' : status ? (function apiState(status: number): GitHubResourceState {
-	if (status === 401) return 'unauthenticated';
-	if (status === 403) return 'permission-denied';
-	if (status === 404) return 'not-configured';
-	return 'unavailable';
-})(Number(status)) : 'unavailable';
+		const state = disabledMsg
+			? 'disabled'
+			: status
+				? (function apiState(status: number): GitHubResourceState {
+						if (status === 401) return 'unauthenticated';
+						if (status === 403) return 'permission-denied';
+						if (status === 404) return 'not-configured';
+						return 'unavailable';
+					})(Number(status))
+				: 'unavailable';
 		const detail =
 			disabledMsg ??
 			(status
@@ -178,9 +177,6 @@ function awaitlessSpawnSync(cmd: string, args: string[]): { status: number | nul
 REPORT
 //////////////////////////////////////////////////*/
 
-
-
-
 /**
  * Convert a request result into typed count and item data.
  *
@@ -191,9 +187,9 @@ REPORT
 function resultItems(result: ApiResult): { items: unknown[]; resource: GitHubResourceReport } {
 	if (!result.ok) return { items: [], resource: { state: result.state, count: null, detail: result.detail } };
 	const items = (function flattenPages(val: unknown): unknown[] {
-	if (!Array.isArray(val)) return [];
-	return val.flatMap((p) => (Array.isArray(p) ? p : [p]));
-})(result.value);
+		if (!Array.isArray(val)) return [];
+		return val.flatMap((p) => (Array.isArray(p) ? p : [p]));
+	})(result.value);
 	return { items, resource: { state: 'available', count: items.length } };
 }
 
@@ -330,8 +326,7 @@ function codeScanningFindings(repo: string, vals: unknown[]): GitHubFinding[] {
 	return vals.flatMap((v): GitHubFinding[] => {
 		const alert = rec(v);
 		const rule = rec(alert?.rule);
-		const instance = rec(alert?.most_recent_instance);
-		const location = rec(instance?.location);
+		const location = rec(rec(alert?.most_recent_instance)?.location);
 		if (!alert || !Number.isSafeInteger(alert.number)) return [];
 		const number = Number(alert.number);
 		const path = text(location?.path);
@@ -386,12 +381,6 @@ function secretScanningFindings(repo: string, vals: unknown[]): GitHubFinding[] 
 	});
 }
 
-
-
-
-
-
-
 /**
  * Collect open issues and GitHub security analytics without changing repository state.
  *
@@ -418,23 +407,23 @@ export function buildGitHubReport(repos: readonly string[], requiredFeatures: re
 		const vulnerabilitySetting = api(repoPath(repo, 'vulnerability-alerts'));
 		const securityUpdateSetting = api(repoPath(repo, 'automated-security-fixes'));
 		const dependabotCfg = (function dependabotCfgState(api: GitHubApi, repo: string, branch: string): { versionUpdates: GitHubFeatureState; groupedUpdates: GitHubFeatureState } {
-	for (const file of ['.github/dependabot.yml', '.github/dependabot.yaml']) {
-		const result = api(`${repoPath(repo, `contents/${file}`)}?ref=${encodeURIComponent(branch)}`);
-		if (!result.ok) {
-			if (result.state === 'not-configured') continue;
-			return { versionUpdates: 'unknown', groupedUpdates: 'unknown' };
-		}
-		const data = rec(result.value);
-		if (text(data?.encoding) !== 'base64' || typeof data?.content !== 'string') return { versionUpdates: 'unknown', groupedUpdates: 'unknown' };
-		const src = Buffer.from(data.content.replace(/\s/g, ''), 'base64').toString('utf8');
-		const updates = /^\s*updates\s*:\s*(?:#.*)?$/m.test(src) && /^\s*-\s*package-ecosystem\s*:/m.test(src) && /^\s+schedule\s*:/m.test(src) && /^\s+interval\s*:/m.test(src);
-		return {
-			versionUpdates: updates ? 'enabled' : 'disabled',
-			groupedUpdates: updates && /^\s+groups\s*:/m.test(src) && /^\s+applies-to\s*:\s*security-updates\s*$/m.test(src) ? 'enabled' : 'unknown',
-		};
-	}
-	return { versionUpdates: 'disabled', groupedUpdates: 'unknown' };
-})(api, repo, defaultBranch);
+			for (const file of ['.github/dependabot.yml', '.github/dependabot.yaml']) {
+				const result = api(`${repoPath(repo, `contents/${file}`)}?ref=${encodeURIComponent(branch)}`);
+				if (!result.ok) {
+					if (result.state === 'not-configured') continue;
+					return { versionUpdates: 'unknown', groupedUpdates: 'unknown' };
+				}
+				const data = rec(result.value);
+				if (text(data?.encoding) !== 'base64' || typeof data?.content !== 'string') return { versionUpdates: 'unknown', groupedUpdates: 'unknown' };
+				const src = Buffer.from(data.content.replace(/\s/g, ''), 'base64').toString('utf8');
+				const updates = /^\s*updates\s*:\s*(?:#.*)?$/m.test(src) && /^\s*-\s*package-ecosystem\s*:/m.test(src) && /^\s+schedule\s*:/m.test(src) && /^\s+interval\s*:/m.test(src);
+				return {
+					versionUpdates: updates ? 'enabled' : 'disabled',
+					groupedUpdates: updates && /^\s+groups\s*:/m.test(src) && /^\s+applies-to\s*:\s*security-updates\s*$/m.test(src) ? 'enabled' : 'unknown',
+				};
+			}
+			return { versionUpdates: 'disabled', groupedUpdates: 'unknown' };
+		})(api, repo, defaultBranch);
 		const security = rec(metadata?.security_and_analysis);
 		const dependabotAlerts = apiSetting(vulnerabilitySetting, true);
 		const dependencyGraph = featureState(security?.dependency_graph);
@@ -469,23 +458,27 @@ export function buildGitHubReport(repos: readonly string[], requiredFeatures: re
 		};
 		if (Object.values(resources).some((r) => !['available', 'disabled', 'not-configured'].includes(r.state))) partial = true;
 		const findings = [...issues.findings, ...dependencyFindings, ...malwareFindings, ...codeFindings, ...secretFindings];
-		for (const feature of requiredFeatures) if (features[feature] !== 'enabled') findings.push((function settingsFinding(repo: string, feature: GitHubFeature): GitHubFinding {
-	const enabled = REQUIRED_FEATURE_LABELS[feature];
-	const agentInstructions =
-		feature === 'versionUpdates'
-			? 'Inspect the repository manifests and package managers, then add a minimal .github/dependabot.yml entry for each appropriate ecosystem with its repository directory and update schedule. Add version-update groups when they will reduce pull request noise. Validate the configuration and run the focused quality checks; do not change repository settings through an API.'
-			: feature === 'groupedUpdates'
-				? 'Confirm the Grouped security updates toggle in the GitHub repository settings UI. If grouping version updates is also desired, add suitable groups to .github/dependabot.yml. Explicit security-update group rules can override the UI toggle; do not change settings through an API.'
-				: `Check the ${enabled} setting in GitHub repository settings. If disabled, enable it with a repository administrator; if the read-only API could not verify it, confirm the actual state in the UI. Do not use a write API or change unrelated security settings.`;
-	return {
-		repository: repo,
-		category: 'setting',
-		severity: 'medium',
-		title: `${enabled} is disabled or could not be verified`,
-		url: `https://github.com/${repo}/settings/security_analysis`,
-		agentInstructions,
-	};
-})(repo, feature));
+		for (const feature of requiredFeatures)
+			if (features[feature] !== 'enabled')
+				findings.push(
+					(function settingsFinding(repo: string, feature: GitHubFeature): GitHubFinding {
+						const enabled = REQUIRED_FEATURE_LABELS[feature];
+						const agentInstructions =
+							feature === 'versionUpdates'
+								? 'Inspect the repository manifests and package managers, then add a minimal .github/dependabot.yml entry for each appropriate ecosystem with its repository directory and update schedule. Add version-update groups when they will reduce pull request noise. Validate the configuration and run the focused quality checks; do not change repository settings through an API.'
+								: feature === 'groupedUpdates'
+									? 'Confirm the Grouped security updates toggle in the GitHub repository settings UI. If grouping version updates is also desired, add suitable groups to .github/dependabot.yml. Explicit security-update group rules can override the UI toggle; do not change settings through an API.'
+									: `Check the ${enabled} setting in GitHub repository settings. If disabled, enable it with a repository administrator; if the read-only API could not verify it, confirm the actual state in the UI. Do not use a write API or change unrelated security settings.`;
+						return {
+							repository: repo,
+							category: 'setting',
+							severity: 'medium',
+							title: `${enabled} is disabled or could not be verified`,
+							url: `https://github.com/${repo}/settings/security_analysis`,
+							agentInstructions,
+						};
+					})(repo, feature),
+				);
 		for (const [name, resource] of Object.entries(resources)) {
 			if (resource.state === 'permission-denied' || resource.state === 'unauthenticated' || resource.state === 'unavailable') {
 				findings.push({

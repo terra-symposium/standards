@@ -3,4 +3,4 @@
  */
 
 export * from './lib/imports.js';
-export { duplicateImportFindings } from '@terra-symposium/standards-documentation';
+export { duplicateImportFindings, fixDuplicateImports } from '@terra-symposium/standards-documentation';

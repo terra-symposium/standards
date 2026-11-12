@@ -25,6 +25,29 @@ Use this skill for npm registry authentication, package installs, package access
 - Open `error.authUrl` in the browser the user requested and hand off any passkey/security-key step. After approval, the `doneUrl` returns a short-lived publishing code; keep it in memory and pass it to the single publish retry through `npm_config_otp`, never as a logged argument or saved credential.
 - npm may offer “Do not challenge npm publish/trust operations from this IP for the next 5 minutes.” This reduces publish prompts temporarily. Ask for action-time confirmation before selecting it; do not infer permission from approval of a token's separate 2FA-bypass setting.
 
+## GitHub Actions trusted publishing
+
+Prefer one trusted publisher for a package when releases run from one repository. A trusted publisher is scoped to a package, GitHub repository, and workflow file; it is not an organization-wide credential that can publish every package. Reuse the existing publisher for its configured workflow instead of creating another publisher or token for each release.
+
+For a GitHub Actions publisher, verify all of the following against the package and workflow before troubleshooting:
+
+- npm package settings name the exact GitHub owner, repository, and workflow filename (including case).
+- Copy the owner and repository from GitHub's canonical repository identity (for example, `gh api repos/OWNER/REPO --jq .full_name`). GitHub URLs may display a mixed-case alias even though the canonical name is lowercase; npm compares these fields case-sensitively.
+- The release job grants `id-token: write`, uses a supported Node/npm toolchain, and runs `npm publish` against `https://registry.npmjs.org/` without an npm token.
+- The workflow's package name and version match the package being released, and the package is already present in the npm registry.
+
+An OIDC token-exchange `E404` can mean npm did not find a matching trusted publisher, even if the package exists. Check the exact repository/workflow identity and npm's publisher-validation status. Do not create another publisher or add a long-lived publish token to Actions to work around an unexplained mismatch. Keep the failed run URL, package/version, publisher fields, and response summary for diagnosis; never include a challenge URL or credential.
+
+If npm reports that the package is missing, verify the registry package metadata and initial package-claim/ownership state before treating it as a publisher configuration error. A publisher shown as pending validation is not proof that a release can exchange an OIDC token. Record the exact observed status and error, and do not describe a likely cause as confirmed until a publish succeeds.
+
+Use the existing granular **Publish** credential as a temporary/manual fallback only when the release is authorized and the trusted publisher is demonstrably unavailable. Follow the WebAuth handoff above. After the package is published, restore releases to the trusted publisher rather than adding or retaining per-workflow secrets.
+
+### Staged release approval
+
+`npm stage publish` creates a release that is not yet installable. `npm stage list <package>` shows pending versions; inspect the listed stage and its contents before approving it with `npm stage approve <stage-id>`. Approval is a separate publish operation and requires the maintainer's 2FA. Do not treat a successful staging command as a completed release; verify the approved version with `npm view <package> versions --json` and on the public package page.
+
+If `npm publish` reports `E409` because a version was previously staged, do not retry the same version or publish a different version to work around it. First find the stage in `npm stage list` and npm's Staged Packages page. If the CLI reports a staged version that neither surface displays, preserve the exact package/version, command response, and timestamp; refresh the registry and package page before retrying, since registry visibility may lag. If the mismatch persists, resolve the state with npm support. Keep consumers pinned to the last publicly available version until `npm view <package> versions --json` and the package page show the new version as published.
+
 ## Registry operations
 
 - Use `https://registry.npmjs.org/` explicitly when checking or publishing Terra packages.

@@ -14,9 +14,7 @@
 		"conversationMode": "Thinking",
 		"note": "Conversation model mode is separate from saved Gem metadata."
 	},
-	"unverifiedFields": [
-		"exact saved instruction text (the accessibility capture truncates long text fields)"
-	],
+	"unverifiedFields": ["exact saved instruction text (the accessibility capture truncates long text fields)"],
 	"repositoryReferences": {
 		"localGenerationPrompt": "scripts/generation/_gemini.ts#geminiPrompt",
 		"generationConfig": "scripts/generation/_config.json",

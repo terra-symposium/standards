@@ -22,9 +22,6 @@ const MAX_REPORT_BYTES = 5_500_000;
 HELPERS
 //////////////////////////////////////////////////*/
 
-
-
-
 /**
  * Finds an active repository only when its stored report-token hash matches.
  *
@@ -34,9 +31,10 @@ HELPERS
  * @return The matching repository row, or `null` when no active authorized repository exists.
  */
 async function authorizedRepo(repoName: string, token: string) {
-	const rows = await db()`SELECT id, owner, name, report_token_hash FROM repositories
-		WHERE active AND lower(owner || '/' || name) = lower(${repoName})`;
-	const repo = rows[0] as { id: number; owner: string; name: string; report_token_hash: string | null } | undefined;
+	const repo = (
+		await db()`SELECT id, owner, name, report_token_hash FROM repositories
+		WHERE active AND lower(owner || '/' || name) = lower(${repoName})`
+	)[0] as { id: number; owner: string; name: string; report_token_hash: string | null } | undefined;
 	return repo && matchesReportToken(token, repo.report_token_hash) ? repo : null;
 }
 
@@ -49,8 +47,8 @@ async function authorizedRepo(repoName: string, token: string) {
  */
 async function handle(request: Request): Promise<Response> {
 	const token = (function bearer(request: Request): string {
-	return /^Bearer (\S+)$/i.exec(request.headers.get('authorization') ?? '')?.[1] ?? '';
-})(request);
+		return /^Bearer (\S+)$/i.exec(request.headers.get('authorization') ?? '')?.[1] ?? '';
+	})(request);
 	if (!token) return new Response('Unauthorized', { status: 401 });
 	if (request.method === 'GET') {
 		const url = new URL(request.url);
@@ -58,11 +56,12 @@ async function handle(request: Request): Promise<Response> {
 		const branch = url.searchParams.get('branch') ?? '';
 		const repo = await authorizedRepo(repoName, token);
 		if (!repo) return new Response('Not found', { status: 404 });
-		const rows = await db()`SELECT b.history_status, b.history_head, MAX(h.imported_at) FILTER (WHERE h.mode = 'snapshot') AS snapshot_at
+		const state = (
+			await db()`SELECT b.history_status, b.history_head, MAX(h.imported_at) FILTER (WHERE h.mode = 'snapshot') AS snapshot_at
 			FROM branches b LEFT JOIN history_reports h ON h.repository_id = b.repository_id AND h.branch = b.name
 			WHERE b.repository_id = ${repo.id} AND b.name = ${branch} AND b.enabled
-			GROUP BY b.history_status, b.history_head`;
-		const state = rows[0] as { history_status: string; history_head: string | null; snapshot_at: string | null } | undefined;
+			GROUP BY b.history_status, b.history_head`
+		)[0] as { history_status: string; history_head: string | null; snapshot_at: string | null } | undefined;
 		if (!state) return new Response('Branch is not enabled', { status: 404 });
 		const snapshotAt = state.snapshot_at ? Date.parse(state.snapshot_at) : 0;
 		const snapshotRequired = state.history_status !== 'complete' || !snapshotAt || Date.now() - snapshotAt >= 7 * 24 * 60 * 60 * 1000;

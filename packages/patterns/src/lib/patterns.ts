@@ -11,13 +11,22 @@ IMPORTS
 // API
 import ts from 'typescript';
 import { createRequire } from 'node:module';
-import { dirname, isAbsolute, relative, resolve } from 'node:path';
-import { displayPath, srcFiles } from '@terra-symposium/standards-quality-core';
+import { dirname, extname, isAbsolute, relative, resolve } from 'node:path';
+import { createQualityAnalysis, displayPath, srcFiles } from '@terra-symposium/standards-quality-core';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 
 // TYPES
 import type { QualityAnalysis, QualityCfg } from '@terra-symposium/standards-quality-core';
+
+/**
+ * Matches TSDoc blocks so generated declarations can preserve authored comments.
+ *
+ * @return A fresh global regular expression for TSDoc block comments.
+ */
+const S_S_G_REGEX = () => /\/\*\*[\s\S]*?\*\//g;
+
+const SHARED_REGEX = /[\\/]/;
 
 /**
  * Matches non-alphanumeric runs when deriving concise identifiers.
@@ -77,6 +86,21 @@ function stableReceiver(node: ts.Expression): string | undefined {
 }
 
 /**
+ * Confirms that a lookup receiver is statically an array or tuple.
+ *
+ * @param checker TypeScript checker used to resolve the receiver's value type.
+ * @param expr Receiver expression of the lookup call.
+ *
+ * @return Whether the receiver supports the array lookup semantics this rule targets.
+ */
+function isArrayLookupReceiver(checker: ts.TypeChecker, expr: ts.Expression): boolean {
+	const type = checker.getTypeAtLocation(expr);
+	if (type.flags & (ts.TypeFlags.Any | ts.TypeFlags.Unknown)) return false;
+	const members = type.isUnionOrIntersection() ? type.types : [type];
+	return members.length > 0 && members.every((member) => checker.isArrayType(member) || checker.isTupleType(member));
+}
+
+/**
  * Finds the nearest enclosing function passed directly to a collection method.
  *
  * @param node AST node whose enclosing collection callback is being sought.
@@ -108,6 +132,7 @@ export function performancePatternFindings(cfg: QualityCfg, analysis?: QualityAn
 	const exts = new Set(settings.extensions ?? ['.js', '.jsx', '.ts', '.tsx']);
 	const ignoredFiles = new Set(settings.ignoredFiles ?? []);
 	const files = (analysis?.files ?? srcFiles({ ...cfg, extensions: [...exts] })).filter((f) => exts.has(f.slice(f.lastIndexOf('.'))));
+	const checker = analysis?.checker ?? createQualityAnalysis({ ...cfg, extensions: [...exts] }).checker;
 	const findings: PerformancePatternFinding[] = [];
 	for (const file of files) {
 		const display = displayPath(cfg, file);
@@ -123,7 +148,7 @@ export function performancePatternFindings(cfg: QualityCfg, analysis?: QualityAn
 		const visit = (node: ts.Node): void => {
 			if (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression) && REPEATED_LOOKUPS.has(node.expression.name.text) && collectionCallback(node)) {
 				const receiver = stableReceiver(node.expression.expression);
-				if (receiver) {
+				if (receiver && isArrayLookupReceiver(checker, node.expression.expression)) {
 					const position = source.getLineAndCharacterOfPosition(node.getStart(source));
 					findings.push({
 						file: display,
@@ -161,17 +186,35 @@ export function repeatedClassFindings(cfg: QualityCfg, analysis?: QualityAnalysi
 	const vals = new Map<string, string[]>();
 	for (const file of (analysis?.files ?? srcFiles({ ...cfg, extensions: [...exts] })).filter((f) => exts.has(f.slice(f.lastIndexOf('.'))))) {
 		const src = analysis?.texts.get(file) ?? readFileSync(file, 'utf8');
-		// Markup embedded in a template literal is generated data, not a live
-		// attribute. The text-only inventory cannot safely rewrite it.
-		if (src.includes('`')) continue;
-		for (const match of src.matchAll(/\b(?:class|className)\s*=\s*(['"])([^'"\n]+)\1/g)) {
-			const val = match[2].replace(S_G_REGEX(), ' ').trim();
+		for (const { value, offset } of repeatedClassAttrs(src, file)) {
+			const val = value.replace(S_G_REGEX(), ' ').trim();
 			if (val.includes('{') || val.split(' ').length < 2) continue;
-			const location = `${displayPath(cfg, file)}:${src.slice(0, match.index ?? 0).split('\n').length}`;
+			const location = `${displayPath(cfg, file)}:${src.slice(0, offset).split('\n').length}`;
 			vals.set(val, [...(vals.get(val) ?? []), location]);
 		}
 	}
 	return [...vals.entries()].filter(([, l]) => l.length >= minimum).map(([v, l]) => ({ value: v, count: l.length, locations: l.sort((l, r) => l.localeCompare(r, undefined, { numeric: true })) }));
+}
+
+/**
+ * Finds static class attributes in JSX/HTML syntax while excluding ordinary JavaScript strings.
+ *
+ * @param src Source text to inspect.
+ * @param file Filename used to select the source syntax.
+ *
+ * @return Static class values with their source offsets.
+ */
+function repeatedClassAttrs(src: string, file: string): { value: string; offset: number; text: string }[] {
+	if (file.endsWith('.html')) return [...src.matchAll(/\b(class|className)(\s*=\s*)(['"])([^'"\n]+)\3/g)].map((match) => ({ value: match[4]!, offset: match.index!, text: match[0] }));
+	const source = ts.createSourceFile(file, src, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+	const attrs: { value: string; offset: number; text: string }[] = [];
+	const visit = (node: ts.Node): void => {
+		if (ts.isJsxAttribute(node) && ts.isIdentifier(node.name) && (node.name.text === 'class' || node.name.text === 'className') && node.initializer && ts.isStringLiteral(node.initializer))
+			attrs.push({ value: node.initializer.text, offset: node.getStart(source), text: node.getText(source) });
+		ts.forEachChild(node, visit);
+	};
+	visit(source);
+	return attrs;
 }
 
 /**
@@ -221,16 +264,15 @@ function isInsideTemplateLiteral(src: string, offset: number): boolean {
 }
 
 /**
- * Adds generated declarations to the existing CONFIG boundary without changing imports or prose.
+ * Inserts generated declarations at a CONFIG boundary or after the import group.
  *
  * @param src Source text to update.
- * @param label Generated subgroup label.
  * @param declarations Constant declarations to insert.
  * @param file Optional source filename used to preserve its syntax and formatting conventions.
  *
- * @return Source text containing the generated subgroup, or the original source when no CONFIG group exists.
+ * @return Source text containing the declarations, or the original source when insertion is unsupported.
  */
-function insertCfgGroup(src: string, label: string, declarations: string[], file?: string): string {
+function insertGenDeclarations(src: string, declarations: string[], file?: string): string {
 	if (!declarations.length) return src;
 	const cfgPattern = /\/\*\/{10,}\r?\n[ \t]*CONFIG[ \t]*\r?\n[ \t]*\/{10,}\*\//g;
 	let cfg: RegExpExecArray | null = null;
@@ -241,10 +283,10 @@ function insertCfgGroup(src: string, label: string, declarations: string[], file
 		}
 	}
 	const eol = src.includes('\r\n') ? '\r\n' : '\n';
-	const group = [`/*${'/'.repeat(50)}`, label, `${'/'.repeat(50)}*/`, ...declarations].join(eol);
+	const gen = declarations.join(eol);
 	if (cfg) {
 		const at = cfg.index + cfg[0].length;
-		return `${src.slice(0, at)}${eol}${group}${eol}${src.slice(at)}`;
+		return `${src.slice(0, at)}${eol}${gen}${eol}${src.slice(at)}`;
 	}
 	// Add generated constants only to JavaScript-family sources, after imports
 	// and directive prologues so module and directive semantics remain unchanged.
@@ -253,9 +295,9 @@ function insertCfgGroup(src: string, label: string, declarations: string[], file
 		const frontmatter = /^---\r?\n([\s\S]*?)\r?\n---/.exec(src);
 		if (frontmatter) {
 			const at = frontmatter[0].lastIndexOf('---');
-			return `${src.slice(0, at)}${group}${eol}${src.slice(at)}`;
+			return `${src.slice(0, at)}${gen}${eol}${src.slice(at)}`;
 		}
-		return `---${eol}${group}${eol}---${eol}${src}`;
+		return `---${eol}${gen}${eol}---${eol}${src}`;
 	}
 	const ast = ts.createSourceFile(file, src, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
 	let at = 0;
@@ -263,7 +305,7 @@ function insertCfgGroup(src: string, label: string, declarations: string[], file
 		if (ts.isImportDeclaration(statement) || (ts.isExpressionStatement(statement) && ts.isStringLiteral(statement.expression))) at = statement.end;
 		else break;
 	}
-	return `${src.slice(0, at)}${at ? eol : ''}${group}${eol}${src.slice(at)}`;
+	return `${src.slice(0, at)}${at ? eol : ''}${gen}${eol}${src.slice(at)}`;
 }
 
 /**
@@ -303,17 +345,11 @@ export function fixRepeatedClasses(cfg: QualityCfg, analysis?: QualityAnalysis):
 		if (!exts.has(file.slice(file.lastIndexOf('.')))) continue;
 		if (file.endsWith('.html')) continue;
 		const src = analysis?.texts.get(file) ?? readFileSync(file, 'utf8');
-		// A text matcher cannot safely distinguish live JSX/HTML attributes from
-		// markup nested in template literals (including nested interpolations).
-		// Leave those files unchanged rather than risking a literal `{CONST}` being
-		// written into generated output.
-		if (src.includes('`')) {
-			skipped += 1;
-			continue;
-		}
-		const matches = [...src.matchAll(/\b(class|className)(\s*=\s*)(['"])([^'"\n]+)\3/g)]
-			.filter((m) => !isInsideTemplateLiteral(src, m.index ?? 0))
-			.map((m) => ({ match: m, value: m[4]!.replace(S_G_REGEX(), ' ').trim() }));
+		const matches = repeatedClassAttrs(src, file).flatMap(({ value, offset, text }) => {
+			const match = /^(class|className)(\s*=\s*)(['"])([^\n]*)\3$/.exec(text);
+			if (!match || match[4] !== value) return [];
+			return [{ match: Object.assign(match, { index: offset }), value: value.replace(S_G_REGEX(), ' ').trim() }];
+		});
 		const groups = new Map<string, typeof matches>();
 		for (const entry of matches) if (!entry.value.includes('{') && entry.value.split(' ').length >= 2) groups.set(entry.value, [...(groups.get(entry.value) ?? []), entry]);
 		const candidates = [...groups.entries()].filter(([, e]) => e.length >= minimum);
@@ -333,7 +369,7 @@ export function fixRepeatedClasses(cfg: QualityCfg, analysis?: QualityAnalysis):
 		}
 		let updated = src;
 		for (const edit of edits.sort((a, b) => b.start - a.start)) updated = `${updated.slice(0, edit.start)}${edit.replacement}${updated.slice(edit.end)}`;
-		const withGroup = insertCfgGroup(updated, 'CLASSES', declarations, file);
+		const withGroup = insertGenDeclarations(updated, declarations, file);
 		const candidateCount = candidates.reduce((n, [, e]) => n + e.length, 0);
 		if (withGroup === updated) {
 			fixed -= candidateCount;
@@ -402,12 +438,6 @@ function resolveTailwindNodeImport(consumerRequire: NodeRequire, root: string, s
 	}
 	throw new Error('Tailwind v4 Node runtime could not be resolved from the consumer repository.');
 }
-
-
-
-
-
-
 
 /**
  * Runs the Tailwind v4 canonical-class diagnostic used by the quality CLI.
@@ -517,42 +547,49 @@ export async function runTailwindCanonical(cfg: QualityCfg, fix = false, output:
 	for (const file of files) {
 		const source = readFileSync(file, 'utf8');
 		for (const val of (function classVals(src: string): Array<{ start: number; value: string }> {
-	const vals: Array<{ start: number; value: string }> = [];
-	const attrPattern = /\b(?:class|className)\s*=\s*(?:(['"])([\s\S]*?)\1|\{\s*`([\s\S]*?)`\s*\})/g;
-	for (const match of src.matchAll(attrPattern)) {
-		const value = match[2] ?? match[3] ?? '';
-		const valStart = match.index! + match[0].indexOf(value);
-		let segmentStart = 0;
-		for (const interpolation of value.matchAll(/\$\{[\s\S]*?\}/g)) {
-			if (interpolation.index! > segmentStart) vals.push({ start: valStart + segmentStart, value: value.slice(segmentStart, interpolation.index) });
-			segmentStart = interpolation.index! + interpolation[0].length;
-		}
-		if (segmentStart < value.length) vals.push({ start: valStart + segmentStart, value: value.slice(segmentStart) });
-	}
-	const callPattern = /\b(?:cn|clsx|classnames|cva)\s*\(/g;
-	for (const call of src.matchAll(callPattern)) {
-		let depth = 1;
-		let cursor = call.index! + call[0].length;
-		while (cursor < src.length && depth > 0) {
-			if (src[cursor] === '(') depth += 1;
-			if (src[cursor] === ')') depth -= 1;
-			cursor += 1;
-		}
-		const bodyStart = call.index! + call[0].length;
-		for (const value of src.slice(bodyStart, cursor - 1).matchAll(/(['"`])([\s\S]*?)\1/g)) if (!value[2]!.includes('${')) vals.push({ start: bodyStart + value.index! + 1, value: value[2]! });
-	}
-	return vals;
-})(source)) {
+			const vals: Array<{ start: number; value: string }> = [];
+			const attrPattern = /\b(?:class|className)\s*=\s*(?:(['"])([\s\S]*?)\1|\{\s*`([\s\S]*?)`\s*\})/g;
+			for (const match of src.matchAll(attrPattern)) {
+				const value = match[2] ?? match[3] ?? '';
+				const valStart = match.index! + match[0].indexOf(value);
+				let segmentStart = 0;
+				for (const interpolation of value.matchAll(/\$\{[\s\S]*?\}/g)) {
+					if (interpolation.index! > segmentStart) vals.push({ start: valStart + segmentStart, value: value.slice(segmentStart, interpolation.index) });
+					segmentStart = interpolation.index! + interpolation[0].length;
+				}
+				if (segmentStart < value.length) vals.push({ start: valStart + segmentStart, value: value.slice(segmentStart) });
+			}
+			const callPattern = /\b(?:cn|clsx|classnames|cva)\s*\(/g;
+			for (const call of src.matchAll(callPattern)) {
+				let depth = 1;
+				let cursor = call.index! + call[0].length;
+				while (cursor < src.length && depth > 0) {
+					if (src[cursor] === '(') depth += 1;
+					if (src[cursor] === ')') depth -= 1;
+					cursor += 1;
+				}
+				const bodyStart = call.index! + call[0].length;
+				for (const value of src.slice(bodyStart, cursor - 1).matchAll(/(['"`])([\s\S]*?)\1/g)) if (!value[2]!.includes('${')) vals.push({ start: bodyStart + value.index! + 1, value: value[2]! });
+			}
+			return vals;
+		})(source)) {
 			for (const token of val.value.matchAll(/\S+/g)) {
 				const original = token[0]!;
 				const canonical = designSystem.canonicalizeCandidates([original])[0];
 				const replacement = canonical && canonical !== original ? canonical : spacingSuggestion(original);
 				if (!replacement || replacement === original || replacement.includes(' ')) continue;
 				const start = val.start + token.index!;
-				findings.push({ file, start, end: start + original.length, original, replacement, ...(function locationAt(src: string, offset: number): { line: number; column: number } {
-	const before = src.slice(0, offset);
-	return { line: before.split('\n').length, column: offset - before.lastIndexOf('\n') };
-})(source, start) });
+				findings.push({
+					file,
+					start,
+					end: start + original.length,
+					original,
+					replacement,
+					...(function locationAt(src: string, offset: number): { line: number; column: number } {
+						const before = src.slice(0, offset);
+						return { line: before.split('\n').length, column: offset - before.lastIndexOf('\n') };
+					})(source, start),
+				});
 			}
 		}
 	}
@@ -578,6 +615,43 @@ export async function runTailwindCanonical(cfg: QualityCfg, fix = false, output:
 }
 const REGEX_REGISTRY_MARKER = '// Generated by @terra-symposium/standards-quality regex-dedup. Do not edit.';
 const REGEX_DECLARATION_MARKER = '// Generated by @terra-symposium/standards-quality regex-dedup. Do not edit.';
+
+/**
+ * Checks whether a generated-file marker appears before any source content.
+ *
+ * @param source File contents to inspect.
+ * @param marker Expected generated-file marker.
+ *
+ * @return Whether only leading comments and whitespace precede the marker.
+ */
+function hasLeadingGenMarker(source: string, marker: string): boolean {
+	let cursor = source.startsWith('\uFEFF') ? 1 : 0;
+	while (cursor < source.length) {
+		while (/\s/u.test(source[cursor] ?? '')) cursor++;
+		if (source.startsWith(marker, cursor)) return true;
+		if (!source.startsWith('/*', cursor) && !source.startsWith('//', cursor)) return false;
+		const block = source.startsWith('/*', cursor);
+		const end = block ? source.indexOf('*/', cursor + 2) : source.indexOf('\n', cursor + 2);
+		if (end < 0) return false;
+		cursor = block ? end + 2 : end + 1;
+	}
+	return false;
+}
+
+/**
+ * Preserves the generated marker and any leading file documentation.
+ *
+ * @param source Existing generated-file contents.
+ * @param marker Expected generated-file marker.
+ *
+ * @return The preserved leading documentation and marker as a newline-terminated prefix.
+ */
+function genFilePrefix(source: string, marker: string): string {
+	const markerIndex = source.indexOf(marker);
+	if (markerIndex < 0) return `${marker}\n`;
+	const leadingDocumentation = source.slice(0, markerIndex);
+	return `${leadingDocumentation}${leadingDocumentation && !leadingDocumentation.endsWith('\n') ? '\n' : ''}${marker}\n`;
+}
 /** Parsed regular-expression candidate and the source context needed to rewrite it safely. */
 type RegexCandidate = { file: string; source: string; expression: string; node: ts.Node; ast: ts.SourceFile; rewritable: boolean };
 
@@ -608,20 +682,20 @@ function regexCandidates(cfg: QualityCfg, analysis?: QualityAnalysis): RegexCand
 	const registryPath = settings.sharedModule ? resolve(cfg.root, settings.sharedModule) : '';
 	const skippedDirs = (settings.skippedDirectories ?? []).map((d) => resolve(cfg.root, d));
 	const candidates: RegexCandidate[] = [];
-	for (const file of analysis?.files ?? srcFiles({ ...cfg, extensions: [...exts] })) {
-		const absoluteFile = resolve(file);
+	for (const discoveredFile of analysis?.files ?? srcFiles({ ...cfg, extensions: [...exts] })) {
+		const file = resolve(discoveredFile);
 		if (
 			!exts.has(file.slice(file.lastIndexOf('.'))) ||
 			file.endsWith('.d.mts') ||
-			(registryPath && absoluteFile === registryPath) ||
+			(registryPath && file === registryPath) ||
 			skippedDirs.some((d) => {
-				const relativePath = relative(d, absoluteFile);
+				const relativePath = relative(d, file);
 				return relativePath === '' || (!relativePath.startsWith('..') && !isAbsolute(relativePath));
 			})
 		)
 			continue;
-		const src = analysis?.texts.get(file) ?? readFileSync(file, 'utf8');
-		const ast = analysis?.sources.get(file) ?? ts.createSourceFile(file, src, ts.ScriptTarget.Latest, true, regexScriptKind(file));
+		const src = analysis?.texts.get(discoveredFile) ?? analysis?.texts.get(file) ?? readFileSync(file, 'utf8');
+		const ast = analysis?.sources.get(discoveredFile) ?? analysis?.sources.get(file) ?? ts.createSourceFile(file, src, ts.ScriptTarget.Latest, true, regexScriptKind(file));
 		const shadowedRegExp = hasRegExpBinding(ast);
 		/**
 		 * Collects regex literals and supported `RegExp` constructions from the file.
@@ -629,7 +703,7 @@ function regexCandidates(cfg: QualityCfg, analysis?: QualityAnalysis): RegexCand
 		 * @param node Current AST node being inspected.
 		 */
 		const visit = (node: ts.Node): void => {
-			if (ts.isRegularExpressionLiteral(node) && !isGenLocalRegex(node, ast) && !isInlineTestRegex(cfg, file, node)) {
+			if (ts.isRegularExpressionLiteral(node) && !isGenLocalRegex(node) && !isInlineTestRegex(cfg, file, node)) {
 				const literal = node.getText(ast);
 				const end = literal.lastIndexOf('/');
 				const pattern = literal.slice(1, end);
@@ -671,11 +745,10 @@ function isInlineTestRegex(cfg: QualityCfg, file: string, node: ts.RegularExpres
  * Checks whether a regex literal belongs to a generated local `_REGEX` declaration.
  *
  * @param node Regular-expression literal to classify.
- * @param ast Parsed source file containing the literal.
  *
- * @return Whether the declaration is in the generated `REGEX` section.
+ * @return Whether the literal initializes a generated local regex constant.
  */
-function isGenLocalRegex(node: ts.RegularExpressionLiteral, ast: ts.SourceFile): boolean {
+function isGenLocalRegex(node: ts.RegularExpressionLiteral): boolean {
 	let declaration: ts.VariableDeclaration | undefined;
 	for (let curr: ts.Node | undefined = node; curr && !ts.isSourceFile(curr); curr = curr.parent) {
 		if (ts.isVariableDeclaration(curr)) {
@@ -683,9 +756,8 @@ function isGenLocalRegex(node: ts.RegularExpressionLiteral, ast: ts.SourceFile):
 			break;
 		}
 	}
-	if (!declaration || !ts.isIdentifier(declaration.name) || !declaration.name.text.endsWith('_REGEX')) return false;
-	const sections = [...ast.text.slice(0, declaration.getStart(ast)).matchAll(/\/\*\/{10,}\r?\n[ \t]*([A-Z][A-Z _-]*)[ \t]*\r?\n[ \t]*\/{10,}\*\//g)];
-	return sections.at(-1)?.[1] === 'REGEX';
+	if (!declaration || !declaration.initializer || !ts.isIdentifier(declaration.name) || !declaration.name.text.endsWith('_REGEX')) return false;
+	return declaration.initializer === node || (ts.isArrowFunction(declaration.initializer) && declaration.initializer.body === node);
 }
 /**
  * Detects bindings that shadow the global `RegExp` constructor.
@@ -789,7 +861,6 @@ function isEsmConsumer(cfg: QualityCfg, file: string): boolean {
 	return false;
 }
 
-
 /**
  * Reads the generated shared-regex registry when both files are owned by this tool.
  *
@@ -803,20 +874,315 @@ function readRegexRegistry(modulePath: string, declarationPath: string): { modul
 	const declarationExists = existsSync(declarationPath);
 	const module = moduleExists ? readFileSync(modulePath, 'utf8') : `${REGEX_REGISTRY_MARKER}\n`;
 	const declaration = declarationExists ? readFileSync(declarationPath, 'utf8') : `${REGEX_DECLARATION_MARKER}\n`;
-	const owned = module.startsWith(REGEX_REGISTRY_MARKER) && declaration.startsWith(REGEX_DECLARATION_MARKER);
+	const owned = hasLeadingGenMarker(module, REGEX_REGISTRY_MARKER) && hasLeadingGenMarker(declaration, REGEX_DECLARATION_MARKER);
 	if ((moduleExists || declarationExists) && !owned) return null;
 	const names = new Set([...module.matchAll(EXPORT_CONST_A_ZA_Z_W_B_GM_REGEX())].map((m) => m[1]!));
 	const keys = new Map<string, string>();
-	for (const match of module.matchAll(/^\/\/ @terra-quality-regex-key (.+)\r?\n(?:\/\*\*[\s\S]*?\*\/\r?\n)?export const ([A-Za-z_$][\w$]*)\b/gm)) {
-		try {
-			keys.set(JSON.parse(match[1]!) as string, match[2]!);
-		} catch {
-			// An invalid generated annotation is not used as a key; the export remains collision-protected.
-		}
+	const ast = ts.createSourceFile(modulePath, module, ts.ScriptTarget.Latest, true, ts.ScriptKind.JS);
+	for (const statement of ast.statements) {
+		const entry = regexRegistryEntry(module, statement);
+		if (entry) keys.set(entry.key, entry.name);
 	}
 	return { module, declaration, names, keys, owned };
 }
 
+/**
+ * Returns the key and export name attached to one generated registry declaration.
+ *
+ * @param source Registry module source.
+ * @param s Export statement to inspect.
+ *
+ * @return Generated metadata when the statement has a valid registry key.
+ */
+function regexRegistryEntry(source: string, s: ts.Statement): { key: string; name: string; annotationStart: number } | undefined {
+	if (!ts.isVariableStatement(s) || !s.modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword) || s.declarationList.declarations.length !== 1) return;
+	const declaration = s.declarationList.declarations[0]!;
+	if (!ts.isIdentifier(declaration.name)) return;
+	const annotation = [...source.slice(s.getFullStart(), s.getStart()).matchAll(/^\/\/ @terra-quality-regex-key (.+)$/gm)].at(-1);
+	if (annotation?.index === undefined) return;
+	try {
+		const key = JSON.parse(annotation[1]!) as unknown;
+		return typeof key === 'string' ? { key, name: declaration.name.text, annotationStart: s.getFullStart() + annotation.index } : undefined;
+	} catch {
+		return;
+	}
+}
+
+/**
+ * Resolves a local or configured alias import to the shared regex module path.
+ *
+ * @param cfg Quality configuration containing the alias map and repository root.
+ * @param importer Absolute path of the file containing the import.
+ * @param specifier Import specifier to resolve.
+ * @param modulePath Absolute path of the shared regex module.
+ *
+ * @return Whether the import resolves to the shared regex module.
+ */
+function resolvesRegexModule(cfg: QualityCfg, importer: string, specifier: string, modulePath: string): boolean {
+	const alias = Object.entries(cfg.aliases ?? {})
+		.sort(([left], [right]) => right.length - left.length)
+		.find(([prefix]) => specifier.startsWith(prefix));
+	const importedPath = alias ? resolve(cfg.root, alias[1], specifier.slice(alias[0].length)) : specifier.startsWith('.') ? resolve(dirname(importer), specifier) : undefined;
+	if (!importedPath) return false;
+	const normImport = resolve(importedPath);
+	const normModule = resolve(modulePath);
+	return normImport === normModule || (!extname(normImport) && `${normImport}.mjs` === normModule);
+}
+
+/**
+ * Finds keyed registry exports that source files reference, conservatively retaining dynamic uses.
+ *
+ * @param cfg Quality configuration defining the source scope and regex extensions.
+ * @param modulePath Absolute shared-registry path.
+ * @param names Registry export names eligible for pruning.
+ * @param analysis Optional parsed-source context to reuse.
+ *
+ * @return Names that are referenced or may be used dynamically.
+ */
+function referencedRegexExports(cfg: QualityCfg, modulePath: string, names: Set<string>, analysis?: QualityAnalysis): Set<string> {
+	const referenced = new Set<string>();
+	const exts = cfg.regexDedup?.extensions ?? ['.js', '.jsx', '.mjs', '.ts', '.tsx', '.mts', '.cts'];
+	for (const discoveredFile of analysis?.files ?? srcFiles({ ...cfg, extensions: exts })) {
+		const file = resolve(discoveredFile);
+		if (file === modulePath || file.endsWith('.d.mts')) continue;
+		const text = analysis?.texts.get(discoveredFile) ?? analysis?.texts.get(file) ?? readFileSync(file, 'utf8');
+		const ast = analysis?.sources.get(discoveredFile) ?? analysis?.sources.get(file) ?? ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, regexScriptKind(file));
+		const namespaces = new Set<string>();
+		for (const s of ast.statements) {
+			if (
+				!(ts.isImportDeclaration(s) || ts.isExportDeclaration(s)) ||
+				!s.moduleSpecifier ||
+				!ts.isStringLiteral(s.moduleSpecifier) ||
+				!resolvesRegexModule(cfg, file, s.moduleSpecifier.text, modulePath)
+			)
+				continue;
+			if (ts.isExportDeclaration(s)) for (const name of names) referenced.add(name);
+			else if (s.importClause?.namedBindings && ts.isNamespaceImport(s.importClause.namedBindings)) namespaces.add(s.importClause.namedBindings.name.text);
+			else if (s.importClause?.namedBindings && ts.isNamedImports(s.importClause.namedBindings))
+				for (const specifier of s.importClause.namedBindings.elements) {
+					const imported = (specifier.propertyName ?? specifier.name).text;
+					if (names.has(imported)) referenced.add(imported);
+				}
+		}
+		const visit = (node: ts.Node): void => {
+			if (
+				ts.isCallExpression(node) &&
+				(node.expression.kind === ts.SyntaxKind.ImportKeyword || (ts.isIdentifier(node.expression) && node.expression.text === 'require')) &&
+				node.arguments[0] &&
+				ts.isStringLiteralLike(node.arguments[0]) &&
+				resolvesRegexModule(cfg, file, node.arguments[0].text, modulePath)
+			)
+				for (const name of names) referenced.add(name);
+			if (ts.isIdentifier(node) && namespaces.has(node.text) && !ts.isImportClause(node.parent) && !ts.isNamespaceImport(node.parent)) {
+				const parent = node.parent;
+				if (ts.isPropertyAccessExpression(parent) && parent.expression === node) {
+					if (names.has(parent.name.text)) referenced.add(parent.name.text);
+				} else if (ts.isElementAccessExpression(parent) && parent.expression === node) {
+					const argument = parent.argumentExpression;
+					if (argument && ts.isStringLiteralLike(argument) && names.has(argument.text)) referenced.add(argument.text);
+					else for (const name of names) referenced.add(name);
+				} else for (const name of names) referenced.add(name);
+			}
+			ts.forEachChild(node, visit);
+		};
+		visit(ast);
+	}
+	return referenced;
+}
+
+/**
+ * Removes only keyed generated declarations with no source references.
+ *
+ * @param source Generated registry module source.
+ * @param unusedNames Keyed export names proven to have no references.
+ *
+ * @return Updated registry module source.
+ */
+function pruneUnusedRegexExports(source: string, unusedNames: Set<string>): string {
+	if (!unusedNames.size) return source;
+	const removals = ts.createSourceFile('regex.mjs', source, ts.ScriptTarget.Latest, true, ts.ScriptKind.JS).statements.flatMap((s) => {
+		const entry = regexRegistryEntry(source, s);
+		return entry && unusedNames.has(entry.name) ? [{ start: entry.annotationStart, end: s.end }] : [];
+	});
+	let updated = source;
+	for (const removal of removals.sort((l, r) => r.start - l.start)) updated = `${updated.slice(0, removal.start)}${updated.slice(removal.end)}`;
+	return updated;
+}
+
+/**
+ * Removes unreferenced declarations left by earlier generated-registry formats.
+ *
+ * @param source Generated registry module source.
+ * @param referencedNames Export names used by consumers or new replacements.
+ *
+ * @return Registry source containing only live generated regular-expression factories.
+ */
+function pruneUnusedRegexBindings(source: string, referencedNames: Set<string>): string {
+	const ast = ts.createSourceFile('regex.mjs', source, ts.ScriptTarget.Latest, true, ts.ScriptKind.JS);
+	const declarations = new Map<string, { statement: ts.VariableStatement; initializer: ts.Expression; start: number; exported: boolean }[]>();
+	for (const statement of ast.statements) {
+		if (!ts.isVariableStatement(statement)) continue;
+		for (const declaration of statement.declarationList.declarations) {
+			if (!ts.isIdentifier(declaration.name) || !/^REGEX_.*_REGEX(?:_\d+)?$/u.test(declaration.name.text) || !declaration.initializer) continue;
+			const leading = source.slice(statement.getFullStart(), statement.getStart(ast));
+			const annotation = [...leading.matchAll(/^\/\/ @terra-quality-regex-key .+$/gm)].at(-1);
+			const documentation = [...leading.matchAll(S_S_G_REGEX())].at(-1);
+			const metadataStart = annotation?.index;
+			const documentationStart = documentation?.index;
+			const markerIndex = leading.indexOf(REGEX_REGISTRY_MARKER);
+			const markerEnd = markerIndex < 0 ? -1 : markerIndex + REGEX_REGISTRY_MARKER.length;
+			const start =
+				metadataStart !== undefined
+					? statement.getFullStart() + metadataStart
+					: documentationStart !== undefined && statement.getFullStart() + documentationStart >= markerEnd
+						? statement.getFullStart() + documentationStart
+						: statement.getStart(ast);
+			const entry = { statement, initializer: declaration.initializer, start, exported: Boolean(statement.modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword)) };
+			declarations.set(declaration.name.text, [...(declarations.get(declaration.name.text) ?? []), entry]);
+		}
+	}
+	if (!declarations.size) return source;
+	const live = new Set([...referencedNames].filter((name) => declarations.has(name)));
+	const dependencies = new Map<string, Set<string>>();
+	for (const [name, entries] of declarations) {
+		const used = new Set<string>();
+		const visit = (node: ts.Node): void => {
+			if (ts.isIdentifier(node) && declarations.has(node.text)) used.add(node.text);
+			ts.forEachChild(node, visit);
+		};
+		for (const { initializer: init } of entries) visit(init);
+		dependencies.set(name, used);
+	}
+	for (const statement of ast.statements) {
+		if (ts.isVariableStatement(statement) && statement.declarationList.declarations.every((declaration) => ts.isIdentifier(declaration.name) && declarations.has(declaration.name.text))) continue;
+		const visit = (node: ts.Node): void => {
+			if (ts.isIdentifier(node) && declarations.has(node.text)) live.add(node.text);
+			ts.forEachChild(node, visit);
+		};
+		visit(statement);
+	}
+	const pending = [...live];
+	while (pending.length) {
+		const name = pending.pop()!;
+		for (const dependency of dependencies.get(name) ?? []) {
+			if (live.has(dependency)) continue;
+			live.add(dependency);
+			pending.push(dependency);
+		}
+	}
+	const removals = [...declarations].flatMap(([name, entries]) =>
+		entries.flatMap((entry) => ((entries.some((candidate) => candidate.exported) && !entry.exported) || !live.has(name) ? [{ start: entry.start, end: entry.statement.end }] : [])),
+	);
+	let updated = source;
+	for (const removal of removals.sort((left, right) => right.start - left.start)) updated = `${updated.slice(0, removal.start)}${updated.slice(removal.end)}`;
+	return updated;
+}
+
+/**
+ * Removes the stock return sentence used by older regex-registry generators.
+ *
+ * @param source Generated TSDoc or registry source.
+ *
+ * @return Source without templated return documentation.
+ */
+function removeTemplateRegexReturnDocs(source: string): string {
+	return source.replace(/^[ \t]*\* @return A fresh RegExp instance so each caller owns its match state\.\r?\n/gm, '').replace(/\r?\n[ \t]*\*[ \t]*\r?\n([ \t]*\*\/)/g, '\n$1');
+}
+
+/**
+ * Removes empty TSDoc blocks emitted by older regex-registry generators.
+ *
+ * @param source Generated registry or declaration source.
+ *
+ * @return Source without empty documentation comments.
+ */
+function removeEmptyRegexDocs(source: string): string {
+	return source.replace(/\/\*\*(?:\r?\n[ \t]*\*[ \t]*)*\r?\n[ \t]*\*\//g, '');
+}
+
+/**
+ * Carries an agent-authored comment directly attached to a regex declaration into the shared registry.
+ *
+ * @param candidate Regex source expression and its parsed source file.
+ *
+ * @return The nearest directly attached variable or property TSDoc, if the source provides one.
+ */
+function regexCandidateDocumentation(candidate: RegexCandidate): string | undefined {
+	let statement: ts.VariableStatement | ts.PropertyDeclaration | undefined;
+	for (let node: ts.Node | undefined = candidate.node.parent; node && !ts.isSourceFile(node); node = node.parent) {
+		if (ts.isVariableStatement(node) || ts.isPropertyDeclaration(node)) {
+			statement = node;
+			break;
+		}
+	}
+	const sourceText = candidate.ast.text;
+	const directlyAttached = (node: ts.Node): string | undefined => {
+		const start = node.getStart(candidate.ast);
+		const match = [...(ts.getLeadingCommentRanges(sourceText, node.getFullStart()) ?? [])]
+			.reverse()
+			.find((range) => sourceText.slice(range.pos, range.end).startsWith('/**') && sourceText.slice(range.end, start).trim() === '');
+		return match ? sourceText.slice(match.pos, match.end) : undefined;
+	};
+	return (statement ? directlyAttached(statement) : undefined) ?? directlyAttached(candidate.node);
+}
+
+/**
+ * Preserves existing declaration statements and their meaningful TSDoc.
+ *
+ * @param source Existing declaration-file source.
+ *
+ * @return Original declaration statements, including their leading comments.
+ */
+function regexExportDeclarations(source: string): Map<string, string> {
+	const ast = ts.createSourceFile('regex.d.mts', source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+	const declarations = new Map<string, string>();
+	for (const s of ast.statements) {
+		if (!ts.isVariableStatement(s) || !s.modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword) || s.declarationList.declarations.length !== 1) continue;
+		const declaration = s.declarationList.declarations[0]!;
+		if (!ts.isIdentifier(declaration.name)) continue;
+		const headerDocumentation = [...source.slice(0, source.indexOf(REGEX_DECLARATION_MARKER)).matchAll(S_S_G_REGEX())].map((match) => match[0]);
+		let statement = source.slice(s.getFullStart(), s.end).replace(REGEX_DECLARATION_MARKER, '');
+		for (const comment of headerDocumentation) statement = statement.replaceAll(comment, '');
+		declarations.set(declaration.name.text, removeEmptyRegexDocs(removeTemplateRegexReturnDocs(statement.trim())));
+	}
+	return declarations;
+}
+
+/**
+ * Reads authored TSDoc attached to generated regex exports, keyed by export name.
+ *
+ * @param source Generated registry module source.
+ *
+ * @return Exact TSDoc blocks already present in the registry.
+ */
+function regexExportDocumentation(source: string): Map<string, string> {
+	const documentation = new Map<string, string>();
+	const ast = ts.createSourceFile('regex.mjs', source, ts.ScriptTarget.Latest, true, ts.ScriptKind.JS);
+	for (const statement of ast.statements) {
+		const entry = regexRegistryEntry(source, statement);
+		if (!entry) continue;
+		const leading = source.slice(statement.getFullStart(), statement.getStart(ast));
+		for (const match of [...leading.matchAll(S_S_G_REGEX())].reverse()) {
+			const comment = removeEmptyRegexDocs(removeTemplateRegexReturnDocs(match[0]));
+			if (!comment) continue;
+			documentation.set(entry.name, comment);
+			break;
+		}
+	}
+	return documentation;
+}
+
+/**
+ * Uses runtime TSDoc as the declaration source of truth, preserving declaration-only docs when absent at runtime.
+ *
+ * @param declarationDocumentation Existing declaration TSDoc, if present.
+ * @param moduleDocumentation TSDoc attached to the corresponding runtime factory.
+ *
+ * @return Existing declaration TSDoc or the runtime TSDoc when the declaration has none.
+ */
+function regexDeclarationDocumentation(declarationDocumentation: string | undefined, moduleDocumentation: string | undefined): string | undefined {
+	return moduleDocumentation ?? declarationDocumentation;
+}
 
 /**
  * Creates the module specifier from a consumer file to the shared registry module.
@@ -827,10 +1193,66 @@ function readRegexRegistry(modulePath: string, declarationPath: string): { modul
  * @return A normalized relative module specifier.
  */
 function moduleSpecifier(file: string, modulePath: string): string {
-	let specifier = relative(dirname(file), modulePath).replace(G_CLASS_2(), '/');
+	let specifier = relative(dirname(resolve(file)), resolve(modulePath)).replace(G_CLASS_2(), '/');
 	if (!specifier.startsWith('.')) specifier = `./${specifier}`;
 	return specifier;
 }
+
+/**
+ * Finds the nearest package boundary for a file without leaving the configured repository root.
+ *
+ * @param file Absolute source or registry path.
+ * @param repoRoot Configured repository root that bounds the package.json search.
+ *
+ * @return The nearest ancestor containing package.json, or the repository root when none exists.
+ */
+function packageRootFor(file: string, repoRoot: string): string | undefined {
+	const absoluteFile = resolve(file);
+	const root = resolve(repoRoot);
+	const relativePath = relative(root, absoluteFile);
+	if (relativePath.split(SHARED_REGEX)[0] === '..' || isAbsolute(relativePath)) return;
+	let dir = dirname(absoluteFile);
+	while (true) {
+		if (existsSync(resolve(dir, 'package.json'))) return dir;
+		if (dir === root) return root;
+		const relativeDir = relative(root, dir);
+		if (relativeDir.split(SHARED_REGEX)[0] === '..' || isAbsolute(relativeDir)) return;
+		dir = dirname(dir);
+	}
+}
+
+/**
+ * Finds the nearest Git worktree boundary for a source or registry path.
+ *
+ * @param file Source or shared-registry path; the file itself may not exist yet.
+ *
+ * @return The Git worktree root, or `undefined` when no repository boundary is present.
+ */
+function gitRootFor(file: string): string | undefined {
+	let dir = dirname(resolve(file));
+	while (true) {
+		if (existsSync(resolve(dir, '.git'))) return dir;
+		const parent = dirname(dir);
+		if (parent === dir) return;
+		dir = parent;
+	}
+}
+
+/**
+ * Checks whether a consumer and shared registry belong to the same package boundary.
+ *
+ * @param file Absolute consumer source path.
+ * @param modulePath Absolute shared registry path.
+ * @param repoRoot Configured repository root used as the package-boundary fallback.
+ *
+ * @return Whether both paths resolve inside the same package.
+ */
+function sharesPackageBoundary(file: string, modulePath: string, repoRoot: string): boolean {
+	const consumerRoot = gitRootFor(file) ?? packageRootFor(file, repoRoot);
+	const registryRoot = gitRootFor(modulePath) ?? packageRootFor(modulePath, repoRoot);
+	return consumerRoot !== undefined && consumerRoot === registryRoot;
+}
+
 /**
  * Finds an existing namespace import for the shared registry module.
  *
@@ -843,7 +1265,7 @@ function moduleSpecifier(file: string, modulePath: string): string {
 function namespaceImport(ast: ts.SourceFile, file: string, modulePath: string): string | undefined {
 	for (const statement of ast.statements) {
 		if (!ts.isImportDeclaration(statement) || !ts.isStringLiteral(statement.moduleSpecifier)) continue;
-		if (resolve(dirname(file), statement.moduleSpecifier.text) !== modulePath) continue;
+		if (resolve(dirname(resolve(file)), statement.moduleSpecifier.text) !== resolve(modulePath)) continue;
 		if (!statement.importClause || statement.importClause.isTypeOnly || !statement.importClause.namedBindings || !ts.isNamespaceImport(statement.importClause.namedBindings)) continue;
 		return statement.importClause.namedBindings.name.text;
 	}
@@ -910,10 +1332,8 @@ function identifierNames(ast: ts.SourceFile): Set<string> {
  * @return Whether the candidate has no parse diagnostics.
  */
 function validRegexOutput(file: string, src: string): boolean {
-	if (file.endsWith('.d.mts')) {
-		const parsed = ts.createSourceFile(file, src, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS) as ts.SourceFile & { parseDiagnostics: readonly ts.Diagnostic[] };
-		return parsed.parseDiagnostics.length === 0;
-	}
+	if (file.endsWith('.d.mts'))
+		return (ts.createSourceFile(file, src, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS) as ts.SourceFile & { parseDiagnostics: readonly ts.Diagnostic[] }).parseDiagnostics.length === 0;
 	if (
 		ts.transpileModule(src, { fileName: file, reportDiagnostics: true, compilerOptions: { allowJs: true, jsx: ts.JsxEmit.Preserve, target: ts.ScriptTarget.ESNext, module: ts.ModuleKind.ESNext } })
 			.diagnostics?.length
@@ -962,7 +1382,7 @@ export function fixRegexDedup(cfg: QualityCfg, analysis?: QualityAnalysis): Patt
 		if (!edits.length) continue;
 		let updated = src;
 		for (const edit of edits.sort((l, r) => r.start - l.start)) updated = `${updated.slice(0, edit.start)}${edit.replacement}${updated.slice(edit.end)}`;
-		const withGroup = insertCfgGroup(updated, 'REGEX', declarations, file);
+		const withGroup = insertGenDeclarations(updated, declarations, file);
 		if (withGroup === updated || !writePatternSrc(file, withGroup)) {
 			fixed -= matchingCount;
 			skipped += matchingCount;
@@ -987,47 +1407,72 @@ function fixRegexDedupShared(cfg: QualityCfg, analysis?: QualityAnalysis): Patte
 	const declarationPath = modulePath.replace(/\.mjs$/, '.d.mts');
 	const minimum = cfg.regexDedup?.minimumCount ?? 2;
 	const groups = [...regexGroups(cfg, analysis)].filter(([, c]) => c.length >= minimum);
-	if (!groups.length) return { fixed: 0, skipped: 0 };
 	const registry = readRegexRegistry(modulePath, declarationPath);
 	if (!registry) return { fixed: 0, skipped: groups.reduce((c, [, v]) => c + v.length, 0) };
-	const rewritable = groups.filter(([, c]) => c.every((c) => c.rewritable && isEsmConsumer(cfg, c.file)));
-	let skipped = groups.filter(([, c]) => !c.every((c) => c.rewritable && isEsmConsumer(cfg, c.file))).reduce((c, [, v]) => c + v.length, 0);
-	if (!rewritable.length) return { fixed: 0, skipped };
+	const rewritable = groups.filter(([, candidates]) =>
+		candidates.every((candidate) => candidate.rewritable && isEsmConsumer(cfg, candidate.file) && sharesPackageBoundary(candidate.file, modulePath, cfg.root)),
+	);
+	let skipped = groups
+		.filter(([, candidates]) => !candidates.every((candidate) => candidate.rewritable && isEsmConsumer(cfg, candidate.file) && sharesPackageBoundary(candidate.file, modulePath, cfg.root)))
+		.reduce((count, [, candidates]) => count + candidates.length, 0);
 	const usedExports = new Set(registry.names);
 	const namesByKey = new Map(registry.keys);
-	const newEntries: Array<{ key: string; name: string; expression: string }> = [];
+	const newEntries: Array<{ key: string; name: string; expression: string; documentation?: string }> = [];
 	const groupNames = new Map<string, string>();
 	for (const [key, candidates] of rewritable.sort(([l], [r]) => l.localeCompare(r))) {
 		let name = namesByKey.get(key);
 		if (!name) {
 			name = (function regexExportName(src: string, used: Set<string>): string {
-	const base = `REGEX_${src.replace(A_ZA_Z0_9_G_REGEX(), '_').replace(G_REGEX(), '').slice(0, 60).toUpperCase() || 'PATTERN'}_REGEX`;
-	let name = base;
-	let suffix = 2;
-	while (used.has(name)) name = `${base}_${suffix++}`;
-	used.add(name);
-	return name;
-})(key, usedExports);
+				const base = `REGEX_${src.replace(A_ZA_Z0_9_G_REGEX(), '_').replace(G_REGEX(), '').slice(0, 60).toUpperCase() || 'PATTERN'}_REGEX`;
+				let name = base;
+				let suffix = 2;
+				while (used.has(name)) name = `${base}_${suffix++}`;
+				used.add(name);
+				return name;
+			})(key, usedExports);
 			namesByKey.set(key, name);
-			newEntries.push({ key, name, expression: candidates[0]!.expression });
+			const documentation = candidates.map(regexCandidateDocumentation).find((comment) => Boolean(comment));
+			newEntries.push({ key, name, expression: candidates[0]!.expression, documentation });
 		}
 		groupNames.set(key, name);
 	}
 	const eol = '\n';
+	let moduleBase = removeEmptyRegexDocs(removeTemplateRegexReturnDocs(registry.module));
+	const referenced = referencedRegexExports(cfg, modulePath, registry.names, analysis);
+	for (const n of groupNames.values()) referenced.add(n);
+	const unusedNames = new Set([...registry.keys.values()].filter((n) => !referenced.has(n)));
+	moduleBase = pruneUnusedRegexExports(moduleBase, unusedNames);
+	moduleBase = pruneUnusedRegexBindings(moduleBase, referenced);
+	moduleBase = moduleBase.replace(/\n{3,}/gu, '\n\n');
 	const moduleAdditions = newEntries
 		.map(
-			({ key: k, name: n, expression: e }) =>
-				`// @terra-quality-regex-key ${JSON.stringify(k)}\n/**\n * Creates a fresh regular expression instance for the shared pattern.\n *\n * @returns A new RegExp instance.\n */\nexport const ${n} = () => (\n${e
+			({ key: k, name: n, expression: e, documentation }) =>
+				`// @terra-quality-regex-key ${JSON.stringify(k)}\n${documentation ? `${documentation}\n` : ''}export const ${n} = () => (\n${e
 					.split('\n')
 					.map((l) => `\t${l}`)
 					.join('\n')}\n);`,
 		)
 		.join(`${eol}${eol}`);
-	const moduleSrc = `${registry.module.replace(/\s*$/, '')}${moduleAdditions ? `${eol}${eol}${moduleAdditions}${eol}` : `${eol}`}`;
+	const moduleSrc = moduleAdditions ? `${moduleBase.replace(/\s*$/, '')}${eol}${eol}${moduleAdditions}${eol}` : moduleBase;
 	const declarationSrc = (function declarationFor(module: string): string {
-	const names = [...new Set([...module.matchAll(EXPORT_CONST_A_ZA_Z_W_B_GM_REGEX())].map((m) => m[1]!))].sort();
-	return `${REGEX_DECLARATION_MARKER}\n${names.map((n) => `export declare const ${n}: () => RegExp;`).join('\n')}${names.length ? '\n' : ''}`;
-})(moduleSrc);
+		const names = [...new Set([...module.matchAll(EXPORT_CONST_A_ZA_Z_W_B_GM_REGEX())].map((m) => m[1]!))].sort();
+		const existingDeclarations = regexExportDeclarations(registry.declaration);
+		const moduleDocumentation = regexExportDocumentation(module);
+		return `${genFilePrefix(registry.declaration, REGEX_DECLARATION_MARKER)}${names
+			.map((n) => {
+				const existing = existingDeclarations.get(n);
+				if (existing) {
+					const existingDocumentation = /^\/\*\*[\s\S]*?\*\//.exec(existing)?.[0];
+					const completedDocumentation = regexDeclarationDocumentation(existingDocumentation, moduleDocumentation.get(n));
+					if (existingDocumentation && completedDocumentation !== existingDocumentation) return `${existing.replace(existingDocumentation, completedDocumentation!)}`;
+					if (!existingDocumentation && completedDocumentation) return `${completedDocumentation}\n${existing}`;
+					return existing;
+				}
+				const documentation = moduleDocumentation.get(n);
+				return `${documentation ? `${documentation}\n` : ''}export declare const ${n}: () => RegExp;`;
+			})
+			.join('\n')}${names.length ? '\n' : ''}`;
+	})(moduleSrc);
 	const srcEdits = new Map<string, { source: string; ast: ts.SourceFile; edits: Array<{ start: number; end: number; replacement: string }>; alias: string; specifier: string }>();
 	let fixed = 0;
 	for (const [key, candidates] of rewritable) {
@@ -1063,9 +1508,10 @@ function fixRegexDedupShared(cfg: QualityCfg, analysis?: QualityAnalysis): Patte
 	}
 	if ([...updatedSrcs].length !== srcEdits.size || !validRegexOutput(modulePath, moduleSrc) || !validRegexOutput(declarationPath, declarationSrc))
 		return { fixed: 0, skipped: groups.filter(([, c]) => c.every((c) => c.rewritable && isEsmConsumer(cfg, c.file))).reduce((c, [, v]) => c + v.length, 0) + skipped };
+	if (!(moduleSrc !== registry.module || declarationSrc !== registry.declaration || newEntries.length > 0) && !srcEdits.size) return { fixed, skipped };
 	mkdirSync(dirname(modulePath), { recursive: true });
-	writeFileSync(modulePath, moduleSrc);
-	writeFileSync(declarationPath, declarationSrc);
+	if (moduleSrc !== registry.module || newEntries.length) writeFileSync(modulePath, moduleSrc);
+	if (declarationSrc !== registry.declaration || newEntries.length) writeFileSync(declarationPath, declarationSrc);
 	for (const [file, source] of updatedSrcs) writeFileSync(file, source);
 	return { fixed, skipped };
 }

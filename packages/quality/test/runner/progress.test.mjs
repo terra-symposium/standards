@@ -18,12 +18,6 @@ TESTS
 
 test('progress updates always include a bar and rewrite one line even without a TTY', () => {
 	const writes = [];
-	/**
-	 *
-	 * @param chunk
-	 *
-	 * @return
-	 */
 	const capture = (chunk) => writes.push(chunk);
 	const stderr = process.stderr;
 	const hadTTY = Object.hasOwn(stderr, 'isTTY');

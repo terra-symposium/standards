@@ -43,7 +43,6 @@ Check consuming repositories' package manifests, lockfiles, and `quality.json` f
 published change affects them. Keep consumer configuration and domain-specific rules in the
 consuming repository.
 
-
 ## Terra Symposium website
 
 When working in `terra-symposium-website`, read the root `README.md` and `docs/agents/index.md` before editing. Also read `astro/README.md`, `sanity/README.md`, or `db/README.md` when the work touches those packages.
@@ -59,7 +58,6 @@ When working in `terra-symposium-website`, read the root `README.md` and `docs/a
 Use complete, minimal names and Terra filename conventions: underscore private files, uppercase
 components, and lowercase structural files. Follow the local comment hierarchy and section fences;
 document exported declarations as repository rules require.
-
 
 ### UI and content contracts
 
@@ -82,7 +80,6 @@ simulations from live services, and preserve routes and content notices.
 When a user reports that a specific editor, route, or file still fails, verify that exact target in
 its real context when available. A synthetic fixture or correct-looking config alone does not prove
 the workflow works.
-
 
 ### Local runtime boundaries
 

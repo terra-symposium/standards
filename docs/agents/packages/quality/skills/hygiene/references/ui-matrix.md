@@ -57,7 +57,7 @@ className={cn(ACTION_VARIANTS({ variant, size, className }))}
 Build the missing shared action component and variant function before migrating callers. Keep `SubmitButton`'s `useFormStatus` and pending label, but delegate the rendered control to `Button`:
 
 ```tsx
-<Button type='submit' variant={variant} size={size} disabled={pending || disabled}>
+<Button type="submit" variant={variant} size={size} disabled={pending || disabled}>
 	{pending ? <SalespherePendingLabel>{pendingText}</SalespherePendingLabel> : children}
 </Button>
 ```
@@ -73,7 +73,7 @@ Callers choose a shared component, its canonical `variant`, and `size` inline at
 Salesphere's current `WinTodayAskDrawer.tsx` call:
 
 ```tsx
-<button type='submit' className='salesphere-button-signal min-h-11 px-5 py-2.5 text-sm sm:col-span-2'>
+<button type="submit" className="salesphere-button-signal min-h-11 px-5 py-2.5 text-sm sm:col-span-2">
 	Add to today and reprioritise
 </button>
 ```
@@ -81,7 +81,7 @@ Salesphere's current `WinTodayAskDrawer.tsx` call:
 After the shared API exists, migrate it to:
 
 ```tsx
-<Button type='submit' variant='primary' size='lg' className='sm:col-span-2'>
+<Button type="submit" variant="primary" size="lg" className="sm:col-span-2">
 	Add to today and reprioritise
 </Button>
 ```

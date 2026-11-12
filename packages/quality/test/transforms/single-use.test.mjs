@@ -15,7 +15,7 @@ IMPORTS
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import ts from 'typescript';
-import { createQualityCfg, fixSingleUseDeclarations, fixSingleUseTypes, singleUseFindings } from '../../dist/index.js';
+import { createQualityCfg, fixSingleUseDeclarations, fixSingleUseTypes, singleUseFindings, srcFiles } from '../../dist/index.js';
 import { fixtureFile, fixtureRoot, fixtureText } from '../../support/fixtures.mjs';
 
 /*//////////////////////////////////////////////////
@@ -24,6 +24,21 @@ REGEX
 
 const EXPORT_TYPE_PAYLOAD_REGEX = /export type Payload/;
 const EXPORT_FN_PARSEREPORT_REGEX = /export function parseReport/;
+test('root-wide single-use fixes ignore dependency files loaded by TypeScript', () => {
+	const root = fixtureRoot('terra-quality-single-use-node-modules-');
+	const dependencyPath = 'node_modules/.pnpm/sample-package@1.0.0/node_modules/sample-package/index.ts';
+	const dependencyText = 'const internalValue = 1;\nconst derivedValue = internalValue + 1;\nexport const exportedValue = derivedValue;\n';
+	fixtureFile(root, dependencyPath, dependencyText);
+	const mainPath = fixtureFile(root, 'src/main.ts', "import { exportedValue } from '../node_modules/.pnpm/sample-package@1.0.0/node_modules/sample-package/index';\nvoid exportedValue;\n");
+	const cfg = createQualityCfg({
+		root,
+		sourceRoots: ['.'],
+		extensions: ['.ts'],
+	});
+	assert.deepEqual(srcFiles(cfg), [mainPath]);
+	assert.equal(fixSingleUseDeclarations(cfg), 0);
+	assert.equal(fixtureText(root, dependencyPath), dependencyText);
+});
 test('single-use functions with attached prose require review and remain unchanged', () => {
 	const root = fixtureRoot('terra-quality-single-use-comments-');
 	fixtureFile(
@@ -57,29 +72,24 @@ describe('fixture', () => {
 	assert.equal((result.match(/Walks configured source roots/g) ?? []).length, 1);
 	assert.equal(ts.createSourceFile('main.ts', result, ts.ScriptTarget.Latest, true).parseDiagnostics.length, 0);
 });
-test('inlining keeps attached comments for constants and types', () => {
+test('single-use fixing preserves attached TSDoc for constants and types', () => {
 	const root = fixtureRoot('terra-quality-single-use-comment-kinds-');
-	fixtureFile(
-		root,
-		'src/main.ts',
-		`/** Explains the displayed value. */
+	const original = `/** Explains the displayed value. */
 const greeting = 'hello';
 /** Defines the wire payload. */
 type Payload = { value: string };
 const result: Payload = { value: greeting };
 void result;
-`,
-	);
+`;
+	fixtureFile(root, 'src/main.ts', original);
 	const cfg = createQualityCfg({
 		root,
 		sourceRoots: ['src'],
 		extensions: ['.ts'],
 	});
-	assert.equal(fixSingleUseDeclarations(cfg), 1);
-	const result = fixtureText(root, 'src/main.ts');
-	assert.doesNotMatch(result, /Explains the displayed value/);
-	assert.doesNotMatch(result, /Defines the wire payload/);
-	assert.equal(ts.createSourceFile('main.ts', result, ts.ScriptTarget.Latest, true).parseDiagnostics.length, 0);
+	assert.equal(fixSingleUseDeclarations(cfg), 0);
+	assert.equal(fixtureText(root, 'src/main.ts'), original);
+	assert.equal(ts.createSourceFile('main.ts', original, ts.ScriptTarget.Latest, true).parseDiagnostics.length, 0);
 });
 test('single-use analysis blocks function inlining and preserves attached TSDoc', () => {
 	const root = fixtureRoot('terra-quality-single-use-callable-tsdoc-');
@@ -141,6 +151,43 @@ test('single-use analysis counts recursive function and arrow references', () =>
 		[],
 	);
 });
+test('single-use analysis excludes callback-captured and loop-repeated runtime references', () => {
+	const root = fixtureRoot('terra-quality-single-use-repeated-runtime-');
+	fixtureFile(
+		root,
+		'src/main.ts',
+		`const callbackRoot = '/callbacks';
+const renderFile = (name: string): string => \`\${callbackRoot}/\${name}\`;
+void ['one', 'two'].map(renderFile);
+const loopRoot = '/loop';
+for (const name of ['one', 'two']) {
+  const suffix = '.md';
+  void \`\${loopRoot}/\${name}\${suffix}\`;
+}
+const requireFromAstro = (specifier: string) => ({ specifier });
+void ['astro', 'vite'].flatMap((dependency) => requireFromAstro(dependency));
+const output = '/dist';
+function copyRuntime(dir: string): string {
+  if (dir.length > 1) copyRuntime(dir.slice(1));
+  return \`\${output}/\${dir}\`;
+}
+void copyRuntime('/src');
+`,
+	);
+	const cfg = createQualityCfg({
+		root,
+		sourceRoots: ['src'],
+		extensions: ['.ts'],
+	});
+	const findings = singleUseFindings(cfg);
+	assert.deepEqual(
+		findings.map(({ name }) => name),
+		['suffix'],
+	);
+	assert.equal(findings[0]?.autofixable, true);
+	assert.equal(fixSingleUseDeclarations(cfg), 1);
+	assert.doesNotMatch(fixtureText(root, 'src/main.ts'), /const suffix/);
+});
 test('single-use analysis blocks hook calls and other effectful initializers', () => {
 	const root = fixtureRoot('terra-quality-single-use-effects-');
 	fixtureFile(
@@ -170,12 +217,13 @@ test('single-use agent actions name the actual unsafe boundary without irrelevan
 	fixtureFile(root, 'src/script.mjs', `const setting = process.env.SETTING;\nconsole.log(setting);\n`);
 	fixtureFile(root, 'src/helpers.ts', `const offset = 1;\nexport function addOffset(value: number) { return value + offset; }\n`);
 	fixtureFile(root, 'src/consumer.ts', `import { addOffset } from './helpers';\nconsole.log(addOffset(1));\n`);
-	const cfg = createQualityCfg({
-		root,
-		sourceRoots: ['src'],
-		extensions: ['.mjs', '.ts'],
-	});
-	const findings = singleUseFindings(cfg);
+	const findings = singleUseFindings(
+		createQualityCfg({
+			root,
+			sourceRoots: ['src'],
+			extensions: ['.mjs', '.ts'],
+		}),
+	);
 	const scriptAction = findings.find((finding) => finding.name === 'setting')?.agentAction ?? '';
 	const crossFileAction = findings.find((finding) => finding.name === 'addOffset')?.agentAction ?? '';
 	assert.doesNotMatch(scriptAction, /hook order/i);
@@ -239,20 +287,83 @@ void twice;
 	assert.equal(findings.has('twice'), false);
 	assert.equal(findings.has('unused'), false);
 });
+test('single-use fixes inline literals nested in exported functions', () => {
+	const root = fixtureRoot('terra-quality-single-use-nested-public-function-');
+	const original = `export function createDocument() {
+	const tableWidth = 9706;
+	return tableWidth;
+}
+export const documentWidth = createDocument();
+`;
+	fixtureFile(root, 'src/document.ts', original);
+	const cfg = createQualityCfg({
+		root,
+		sourceRoots: ['src'],
+		extensions: ['.ts'],
+	});
+	const findings = singleUseFindings(cfg);
+	assert.equal(findings.find(({ name: n }) => n === 'tableWidth')?.autofixable, true);
+	assert.equal(findings.find(({ name: n }) => n === 'createDocument')?.autofixable, false);
+	assert.equal(fixSingleUseDeclarations(cfg), 1);
+	const updated = fixtureText(root, 'src/document.ts');
+	assert.match(updated, /export function createDocument/);
+	assert.doesNotMatch(updated, /const tableWidth/);
+	assert.match(updated, /return \(9706\);/);
+});
+test('single-use analysis marks generated declarations for generator review', () => {
+	const root = fixtureRoot('terra-quality-single-use-generated-source-');
+	const original = `/**\n * This file has been generated by FixtureBuilder.\n */
+export type Payload = { value: string };
+const payload: Payload = { value: 'ready' };
+void payload;
+`;
+	fixtureFile(root, 'src/generated.ts', original);
+	const cfg = createQualityCfg({
+		root,
+		sourceRoots: ['src'],
+		extensions: ['.ts'],
+	});
+	const finding = singleUseFindings(cfg).find(({ name: n }) => n === 'Payload');
+	assert.equal(finding?.autofixable, false);
+	assert.match(finding?.reason ?? '', /generated source/);
+	assert.match(finding?.agentAction ?? '', /generator/);
+	assert.equal(fixSingleUseDeclarations(cfg), 0);
+	assert.equal(fixtureText(root, 'src/generated.ts'), original);
+});
+test('single-use analysis marks module exports for contract review', () => {
+	const root = fixtureRoot('terra-quality-single-use-module-export-');
+	const original = `export type PublicPayload = { value: string };
+const payload: PublicPayload = { value: 'ready' };
+void payload;
+`;
+	fixtureFile(root, 'src/public.ts', original);
+	const cfg = createQualityCfg({
+		root,
+		sourceRoots: ['src'],
+		extensions: ['.ts'],
+	});
+	const finding = singleUseFindings(cfg).find(({ name: n }) => n === 'PublicPayload');
+	assert.equal(finding?.autofixable, false);
+	assert.match(finding?.reason ?? '', /external contract/);
+	assert.match(finding?.agentAction ?? '', /external consumers/);
+	assert.equal(fixSingleUseDeclarations(cfg), 0);
+	assert.equal(fixtureText(root, 'src/public.ts'), original);
+});
 test('single-use analysis counts cross-file consumers but ignores import syntax itself and honors include roots', () => {
 	const root = fixtureRoot('terra-quality-single-use-scope-');
 	fixtureFile(root, 'src/types.ts', 'export type Payload = { value: string };\nexport const data = { value: true };\n');
 	fixtureFile(root, 'src/consumer.ts', `import type { Payload } from '@/types';\nimport { data } from '@/types';\nconst payload: Payload = { value: 'ok' };\nvoid [payload, data];\n`);
 	fixtureFile(root, 'src/ambient.d.ts', 'declare global { var API_KEY: string; }\nexport {};\n');
 	fixtureFile(root, 'included/consumer.ts', 'const included = true;\nvoid included;\n');
-	const cfg = createQualityCfg({
-		root,
-		sourceRoots: ['src'],
-		includeRoots: ['included'],
-		extensions: ['.ts'],
-		aliases: { '@/': 'src/' },
-	});
-	const findings = singleUseFindings(cfg);
+	const findings = singleUseFindings(
+		createQualityCfg({
+			root,
+			sourceRoots: ['src'],
+			includeRoots: ['included'],
+			extensions: ['.ts'],
+			aliases: { '@/': 'src/' },
+		}),
+	);
 	assert.deepEqual(
 		findings.map((f) => f.name),
 		['included', 'Payload', 'data', 'payload'],
@@ -262,7 +373,7 @@ test('single-use analysis counts cross-file consumers but ignores import syntax 
 		false,
 	);
 });
-test('single-use type fixing inlines exported aliases and interfaces with one consumer', () => {
+test('single-use type fixing preserves exported aliases and interfaces with one consumer', () => {
 	const root = fixtureRoot('terra-quality-single-use-fix-');
 	fixtureFile(root, 'src/types.ts', `export type Payload = { value: string };\nexport interface Result { ok: boolean; }\n`);
 	fixtureFile(
@@ -281,18 +392,68 @@ void [payload, result];
 		extensions: ['.ts'],
 	});
 	const changedFiles = new Set();
-	assert.equal(fixSingleUseDeclarations(cfg, changedFiles), 2);
-	assert.deepEqual([...changedFiles].sort(), [`${root}/src/consumer.ts`, `${root}/src/types.ts`]);
-	assert.doesNotMatch(fixtureText(root, 'src/types.ts'), /export type Payload|export interface Result/);
+	assert.equal(fixSingleUseDeclarations(cfg, changedFiles), 0);
+	assert.deepEqual([...changedFiles], []);
+	assert.match(fixtureText(root, 'src/types.ts'), /export type Payload/);
+	assert.match(fixtureText(root, 'src/types.ts'), /export interface Result/);
 	const consumer = fixtureText(root, 'src/consumer.ts');
-	assert.match(consumer, /import type \{ Extra \} from '\.\/types';/);
-	assert.doesNotMatch(consumer, /import type \{ Result \}/);
-	assert.doesNotMatch(consumer, /: Payload|: Result/);
+	assert.match(consumer, /import type \{ Payload, Extra \} from '\.\/types';/);
+	assert.match(consumer, /import type \{ Result \}/);
+	assert.match(consumer, /: Payload|: Result/);
 	assert.match(consumer, /void \[payload, result\]/);
 	assert.equal(ts.createSourceFile('consumer.ts', consumer, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS).parseDiagnostics.length, 0);
 	assert.equal(fixSingleUseTypes(cfg), 0);
 });
-test('single-use type fixing preserves grouped imports when several bindings are inlined', () => {
+for (const [fixerName, fixer] of [
+	['fixSingleUseDeclarations', fixSingleUseDeclarations],
+	['fixSingleUseTypes', fixSingleUseTypes],
+]) {
+	test(`${fixerName} preserves exported application and UI contracts`, () => {
+		const root = fixtureRoot(`terra-quality-single-use-public-types-${fixerName}-`);
+		const publicTypes = `export type MoveGroup = { id: string };
+export type QualityFilter = 'all' | 'saved';
+export type ActionVariant = 'primary' | 'secondary';
+export type SurfaceVariant = 'default' | 'subtle';
+export interface SpotifyUser { id: string; displayName: string; }
+export type ButtonProps = { variant: 'primary' | 'secondary' };
+export type ButtonVariant = 'primary' | 'secondary';
+export type CardVariant = 'compact' | 'expanded';
+`;
+		fixtureFile(root, 'src/public-types.ts', publicTypes);
+		fixtureFile(
+			root,
+			'src/consumer.ts',
+			`import type { MoveGroup, QualityFilter, ActionVariant, SurfaceVariant, SpotifyUser, ButtonProps, ButtonVariant, CardVariant } from './public-types';
+export function consumeContracts(
+	group: MoveGroup,
+	filter: QualityFilter,
+	action: ActionVariant,
+	surface: SurfaceVariant,
+	user: SpotifyUser,
+	button: ButtonProps,
+	buttonVariant: ButtonVariant,
+	cardVariant: CardVariant,
+) {
+	return [group.id, filter, action, surface, user.displayName, button.variant, buttonVariant, cardVariant];
+}
+`,
+		);
+		const cfg = createQualityCfg({
+			root,
+			sourceRoots: ['src'],
+			extensions: ['.ts'],
+		});
+		const originalConsumer = fixtureText(root, 'src/consumer.ts');
+		fixer(cfg);
+		assert.equal(fixtureText(root, 'src/public-types.ts'), publicTypes);
+		const consumer = fixtureText(root, 'src/consumer.ts');
+		for (const name of ['MoveGroup', 'QualityFilter', 'ActionVariant', 'SurfaceVariant', 'SpotifyUser', 'ButtonProps', 'ButtonVariant', 'CardVariant'])
+			assert.match(consumer, new RegExp(`\\b${name}\\b`));
+		assert.equal(consumer, originalConsumer);
+		assert.equal(ts.createSourceFile('consumer.ts', consumer, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS).parseDiagnostics.length, 0);
+	});
+}
+test('single-use type fixing preserves exported declarations in grouped imports', () => {
 	const root = fixtureRoot('terra-quality-single-use-grouped-types-');
 	fixtureFile(root, 'src/types.ts', `export type First = { first: string };\nexport type Second = { second: number };\nexport interface Third { third: boolean; }\nexport type Retained = string;\n`);
 	fixtureFile(
@@ -305,10 +466,10 @@ test('single-use type fixing preserves grouped imports when several bindings are
 		sourceRoots: ['src'],
 		extensions: ['.ts'],
 	});
-	assert.equal(fixSingleUseDeclarations(cfg), 2);
+	assert.equal(fixSingleUseDeclarations(cfg), 0);
 	const consumer = fixtureText(root, 'src/consumer.ts');
-	assert.match(consumer, /import type \{ Retained \} from '\.\/types';/);
-	assert.doesNotMatch(consumer, /: (?:First|Second|Third)\b/);
+	assert.match(consumer, /import type \{ First, Second, Third, Retained \} from '\.\/types';/);
+	assert.match(consumer, /: (?:First|Second|Third)\b/);
 	assert.equal(ts.createSourceFile('consumer.ts', consumer, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS).parseDiagnostics.length, 0);
 	const diagnostics = ts.getPreEmitDiagnostics(
 		ts.createProgram([`${root}/src/types.ts`, `${root}/src/consumer.ts`], {
@@ -338,9 +499,10 @@ test('single-use type analysis distinguishes same-named declarations by resolved
 		findings.map(({ file: f }) => f),
 		['src/second.ts'],
 	);
-	assert.equal(fixSingleUseDeclarations(cfg), 2);
+	assert.equal(fixSingleUseDeclarations(cfg), 0);
 	assert.match(fixtureText(root, 'src/first.ts'), EXPORT_TYPE_PAYLOAD_REGEX);
-	assert.doesNotMatch(fixtureText(root, 'src/second.ts'), EXPORT_TYPE_PAYLOAD_REGEX);
+	assert.match(fixtureText(root, 'src/second.ts'), EXPORT_TYPE_PAYLOAD_REGEX);
+	assert.match(fixtureText(root, 'src/consumer.ts'), /: Payload/);
 });
 test('single-use type fixing substitutes generic alias and interface arguments', () => {
 	const root = fixtureRoot('terra-quality-single-use-generic-');
@@ -355,9 +517,10 @@ test('single-use type fixing substitutes generic alias and interface arguments',
 		sourceRoots: ['src'],
 		extensions: ['.ts'],
 	});
-	assert.equal(fixSingleUseDeclarations(cfg), 2);
+	assert.equal(fixSingleUseDeclarations(cfg), 0);
 	const consumer = fixtureText(root, 'src/consumer.ts');
-	assert.doesNotMatch(consumer, /Prepared<string>|Wrapped<number>/);
+	assert.match(consumer, /Prepared<string>/);
+	assert.match(consumer, /Wrapped<number>/);
 	const parsed = ts.createSourceFile('consumer.ts', consumer, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
 	assert.equal(parsed.parseDiagnostics.length, 0);
 });
@@ -370,9 +533,9 @@ test('single-use type fixing expands generic references through namespace import
 		sourceRoots: ['src'],
 		extensions: ['.ts'],
 	});
-	assert.equal(fixSingleUseDeclarations(cfg), 2);
+	assert.equal(fixSingleUseDeclarations(cfg), 0);
 	const consumer = fixtureText(root, 'src/consumer.ts');
-	assert.doesNotMatch(consumer, /Types\.Prepared<string>/);
+	assert.match(consumer, /Types\.Prepared<string>/);
 	const parsed = ts.createSourceFile('consumer.ts', consumer, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
 	assert.equal(parsed.parseDiagnostics.length, 0);
 });
@@ -405,6 +568,372 @@ void { sharedItem, nested: { ...sharedItem } };
 	assert.equal(singleUseFindings(cfg).find((finding) => finding.name === 'pureArray')?.decision, 'REVIEW');
 	assert.equal(fixSingleUseTypes(cfg), 0);
 	assert.equal(file.endsWith('src/main.ts'), true);
+});
+test('single-use fixing moves initializers only to an immediate first-evaluation use', () => {
+	const root = fixtureRoot('terra-quality-single-use-immediate-value-');
+	fixtureFile(
+		root,
+		'src/direct.ts',
+		`function readSnapshot() { return { ready: true }; }
+function build() {
+  const snapshot = readSnapshot();
+  return snapshot;
+}
+`,
+	);
+	fixtureFile(
+		root,
+		'src/nested.ts',
+		`function readSnapshot() { return { ready: true }; }
+function otherValue() { return { ready: false }; }
+function merge(first: unknown, second: unknown) { return [first, second]; }
+function build() {
+  const nestedValue = readSnapshot();
+  return merge(otherValue(), nestedValue);
+}
+`,
+	);
+	fixtureFile(
+		root,
+		'src/separated.ts',
+		`function readSnapshot() { return { ready: true }; }
+function recordBoundary() {}
+function build() {
+  const separatedValue = readSnapshot();
+  recordBoundary();
+  return separatedValue;
+}
+`,
+	);
+	fixtureFile(
+		root,
+		'src/deferred.ts',
+		`function readSnapshot() { return { ready: true }; }
+function build() {
+  const deferredValue = readSnapshot();
+  return () => deferredValue;
+}
+`,
+	);
+	fixtureFile(
+		root,
+		'src/awaited.ts',
+		`async function readSnapshot() { return { ready: true }; }
+async function build() {
+  const awaitedValue = await readSnapshot();
+  return awaitedValue.ready;
+}
+`,
+	);
+	fixtureFile(
+		root,
+		'src/member.ts',
+		`async function readRows() { return [{ ready: true }]; }
+async function build() {
+  const rows = await readRows();
+  return rows[0].ready;
+}
+`,
+	);
+	fixtureFile(
+		root,
+		'src/first-operand.ts',
+		`function loadFirst() { return { value: 1 }; }
+function loadSecond() { return 2; }
+function build() {
+  const first = loadFirst();
+  return first.value + loadSecond();
+}
+`,
+	);
+	fixtureFile(
+		root,
+		'src/later-operand.ts',
+		`function loadValue() { return 1; }
+function prepare() { return 2; }
+function build() {
+  const later = loadValue();
+  return prepare() + later;
+}
+`,
+	);
+	fixtureFile(
+		root,
+		'src/argument.ts',
+		`function loadValue() { return 1; }
+function combine(value: number) { return value; }
+function build() {
+  const argument = loadValue();
+  return combine(argument);
+}
+`,
+	);
+	fixtureFile(
+		root,
+		'src/conditional.ts',
+		`function loadValue() { return 1; }
+function build(condition: boolean) {
+  const branch = loadValue();
+  return condition ? branch : 0;
+}
+`,
+	);
+	fixtureFile(
+		root,
+		'src/method-binding.ts',
+		`const service = { read() { return true; } };
+function build() {
+  const callback = service.read;
+  return callback();
+}
+`,
+	);
+	fixtureFile(
+		root,
+		'src/dynamic.ts',
+		`function readSnapshot() { return { ready: true }; }
+function build() {
+  const dynamicValue = readSnapshot();
+  eval('dynamicValue');
+  return dynamicValue;
+}
+`,
+	);
+	fixtureFile(
+		root,
+		'src/commented.ts',
+		`function readSnapshot() { return { ready: true }; }
+function build() {
+  const commentedValue = readSnapshot(); // Keep this declaration boundary visible.
+  return commentedValue;
+}
+`,
+	);
+	const cfg = createQualityCfg({
+		root,
+		sourceRoots: ['src'],
+		extensions: ['.ts'],
+	});
+	const findings = new Map(singleUseFindings(cfg).map(({ file, name, autofixable }) => [`${file}:${name}`, autofixable]));
+	assert.equal(findings.get('src/direct.ts:snapshot'), true);
+	assert.equal(findings.get('src/nested.ts:nestedValue'), false);
+	assert.equal(findings.get('src/separated.ts:separatedValue'), false);
+	assert.equal(findings.get('src/deferred.ts:deferredValue'), false);
+	assert.equal(findings.get('src/awaited.ts:awaitedValue'), true);
+	assert.equal(findings.get('src/member.ts:rows'), true);
+	assert.equal(findings.get('src/first-operand.ts:first'), true);
+	assert.equal(findings.get('src/later-operand.ts:later'), false);
+	assert.equal(findings.get('src/argument.ts:argument'), false);
+	assert.equal(findings.get('src/conditional.ts:branch'), false);
+	assert.equal(findings.get('src/method-binding.ts:callback'), false);
+	assert.equal(findings.get('src/dynamic.ts:dynamicValue'), false);
+	assert.equal(findings.get('src/commented.ts:commentedValue'), false);
+	assert.equal(fixSingleUseDeclarations(cfg), 4);
+	assert.match(fixtureText(root, 'src/direct.ts'), /return \(readSnapshot\(\)\);/u);
+	assert.match(fixtureText(root, 'src/nested.ts'), /const nestedValue = readSnapshot\(\)/u);
+	assert.match(fixtureText(root, 'src/awaited.ts'), /return \(await readSnapshot\(\)\)\.ready;/u);
+	assert.match(fixtureText(root, 'src/member.ts'), /return \(await readRows\(\)\)\[0\]\.ready;/u);
+	assert.match(fixtureText(root, 'src/first-operand.ts'), /return \(loadFirst\(\)\)\.value \+ loadSecond\(\);/u);
+	assert.match(fixtureText(root, 'src/later-operand.ts'), /const later = loadValue\(\)/u);
+	assert.match(fixtureText(root, 'src/argument.ts'), /const argument = loadValue\(\)/u);
+	assert.match(fixtureText(root, 'src/conditional.ts'), /const branch = loadValue\(\)/u);
+	assert.match(fixtureText(root, 'src/method-binding.ts'), /const callback = service\.read/u);
+	assert.match(fixtureText(root, 'src/commented.ts'), /Keep this declaration boundary visible/u);
+	assert.equal(ts.createSourceFile('direct.ts', fixtureText(root, 'src/direct.ts'), ts.ScriptTarget.Latest, true).parseDiagnostics.length, 0);
+});
+test('single-use fixing inlines data-only object arguments only at module call boundaries', () => {
+	const root = fixtureRoot('terra-quality-single-use-call-literal-');
+	fixtureFile(
+		root,
+		'src/main.ts',
+		`const viewportOptions = {
+  tag: "@viewport:xl",
+  annotation: { type: "viewport-reason", description: "Desktop editor." },
+} as const;
+registerTest("desktop", viewportOptions, () => {});
+const deferredOptions = { tag: "@viewport:xl" } as const;
+const typedOptions: { tag: string } = { tag: "@viewport:typed" };
+registerTest("typed", typedOptions, () => {});
+function registerLater() {
+  registerTest("deferred", deferredOptions, () => {});
+}
+`,
+	);
+	const cfg = createQualityCfg({
+		root,
+		sourceRoots: ['src'],
+		extensions: ['.ts'],
+	});
+	const findings = singleUseFindings(cfg);
+	assert.equal(findings.find(({ name }) => name === 'viewportOptions')?.autofixable, true);
+	assert.equal(findings.find(({ name }) => name === 'deferredOptions')?.decision, 'REVIEW');
+	assert.equal(findings.find(({ name }) => name === 'typedOptions')?.decision, 'REVIEW');
+	assert.equal(fixSingleUseDeclarations(cfg), 1);
+	const updated = fixtureText(root, 'src/main.ts');
+	assert.doesNotMatch(updated, /const viewportOptions/u);
+	assert.match(updated, /registerTest\("desktop", \(\{/u);
+	assert.match(updated, /description: "Desktop editor\."\s*\},\s*\} as const\),/u);
+	assert.match(updated, /const deferredOptions =/u);
+	assert.match(updated, /registerTest\("deferred", deferredOptions/u);
+	assert.match(updated, /const typedOptions: \{ tag: string \}/u);
+	assert.match(updated, /registerTest\("typed", typedOptions/u);
+	assert.equal(fixSingleUseDeclarations(cfg), 0);
+	assert.equal(fixtureText(root, 'src/main.ts'), updated);
+});
+for (const [fixerName, fixer] of [
+	['fixSingleUseDeclarations', fixSingleUseDeclarations],
+	['fixSingleUseTypes', fixSingleUseTypes],
+]) {
+	test(`${fixerName} inlines adjacent static configuration at a default export`, () => {
+		const root = fixtureRoot(`terra-quality-single-use-default-config-${fixerName}-`);
+		fixtureFile(
+			root,
+			'src/config.mjs',
+			`import * as prettierPluginAstro from 'prettier-plugin-astro';
+/* CONFIG */
+const cfg = {
+	$schema: 'http://json.schemastore.org/prettierrc',
+	plugins: [prettierPluginAstro],
+	overrides: [{ files: ['*.ts'], options: { parser: 'typescript' } }],
+};
+export default cfg;
+`,
+		);
+		const cfg = createQualityCfg({
+			root,
+			sourceRoots: ['src'],
+			extensions: ['.mjs'],
+		});
+		assert.equal(singleUseFindings(cfg).find(({ name }) => name === 'cfg')?.autofixable, true);
+		assert.equal(fixer(cfg), 1);
+		const updated = fixtureText(root, 'src/config.mjs');
+		assert.doesNotMatch(updated, /const cfg\b/u);
+		assert.match(updated, /\/\* CONFIG \*\/\s*export default \{/u);
+		assert.match(updated, /plugins: \[prettierPluginAstro\]/u);
+		assert.match(updated, /files: \['\*\.ts'\]/u);
+		assert.equal(ts.createSourceFile('config.mjs', updated, ts.ScriptTarget.Latest, true, ts.ScriptKind.JS).parseDiagnostics.length, 0);
+		assert.equal(fixer(cfg), 0);
+		assert.equal(fixtureText(root, 'src/config.mjs'), updated);
+	});
+}
+test('single-use analysis rejects default-export inlining across execution or comment boundaries', () => {
+	const root = fixtureRoot('terra-quality-single-use-default-config-boundaries-');
+	fixtureFile(root, 'src/dynamic.mjs', `const cfg = buildConfig();\nexport default cfg;\n`);
+	fixtureFile(root, 'src/separated.mjs', `const cfg = { enabled: true };\nrunSetup();\nexport default cfg;\n`);
+	fixtureFile(root, 'src/commented.mjs', `const cfg = { /* preserve authored note */ enabled: true };\nexport default cfg;\n`);
+	fixtureFile(root, 'src/gapped-comment.mjs', `const cfg = { enabled: true }; // preserve boundary note\nexport default cfg;\n`);
+	fixtureFile(root, 'src/named-and-default.mjs', `export const cfg = { enabled: true };\nexport default cfg;\n`);
+	const cfg = createQualityCfg({
+		root,
+		sourceRoots: ['src'],
+		extensions: ['.mjs'],
+	});
+	const findings = new Map(singleUseFindings(cfg).map(({ file, name, autofixable }) => [`${file}:${name}`, autofixable]));
+	assert.equal(findings.size, 5);
+	for (const file of ['src/dynamic.mjs', 'src/separated.mjs', 'src/commented.mjs', 'src/gapped-comment.mjs', 'src/named-and-default.mjs']) {
+		assert.equal(findings.get(`${file}:cfg`), false, file);
+	}
+	assert.equal(fixSingleUseDeclarations(cfg), 0);
+	assert.match(fixtureText(root, 'src/dynamic.mjs'), /const cfg = buildConfig\(\)/u);
+	assert.match(fixtureText(root, 'src/separated.mjs'), /const cfg = \{ enabled: true \}/u);
+	assert.match(fixtureText(root, 'src/commented.mjs'), /preserve authored note/u);
+	assert.match(fixtureText(root, 'src/gapped-comment.mjs'), /preserve boundary note/u);
+});
+test('single-use autofix batches every independent safe declaration in one pass', () => {
+	const root = fixtureRoot('terra-quality-single-use-batch-');
+	fixtureFile(
+		root,
+		'src/main.ts',
+		`const label = 'ready';
+const retryCount = 3;
+const available = true;
+export const status = [label, retryCount, available];
+`,
+	);
+	const cfg = createQualityCfg({
+		root,
+		sourceRoots: ['src'],
+		extensions: ['.ts'],
+	});
+	assert.equal(singleUseFindings(cfg).filter((finding) => finding.autofixable).length, 3);
+	assert.equal(fixSingleUseDeclarations(cfg), 1);
+	const updated = fixtureText(root, 'src/main.ts');
+	assert.doesNotMatch(updated, /const (?:label|retryCount|available)\b/u);
+	assert.match(updated, /export const status = \[\('ready'\), \(3\), \(true\)\]/u);
+	assert.deepEqual(singleUseFindings(cfg), []);
+	assert.equal(fixSingleUseDeclarations(cfg), 0);
+	assert.equal(fixtureText(root, 'src/main.ts'), updated);
+});
+test('single-use fixing inlines static queries from actual Playwright receiver types', () => {
+	const root = fixtureRoot('terra-quality-single-use-playwright-query-');
+	fixtureFile(root, 'node_modules/playwright-core/package.json', JSON.stringify({ name: 'playwright-core', types: 'types.d.ts' }));
+	fixtureFile(
+		root,
+		'node_modules/playwright-core/types.d.ts',
+		`export interface Locator {
+  getByRole(role: string, options?: { name?: string | RegExp }): Locator;
+  locator(selector: string): Locator;
+  first(): Locator;
+  click(): Promise<void>;
+}
+export interface Page extends Locator {}
+`,
+	);
+	fixtureFile(
+		root,
+		'src/main.spec.ts',
+		`import type { Page } from 'playwright-core';
+async function inspect(page: Page, selector: string) {
+  const saveButton = page.getByRole('button', { name: 'Save' });
+  await saveButton.click();
+  const dynamic = page.locator(selector).first();
+  await dynamic.click();
+}
+async function inspectLocal(page: { getByRole(role: string, options?: { name?: string }): { click(): Promise<void> } }) {
+  const localButton = page.getByRole('button', { name: 'Save' });
+  await localButton.click();
+}
+async function runInspection(page: Page) {
+  await inspect(page, 'dynamic');
+}
+`,
+	);
+	const cfg = createQualityCfg({
+		root,
+		sourceRoots: ['src'],
+		extensions: ['.ts'],
+	});
+	const findings = singleUseFindings(cfg);
+	assert.equal(findings.find((finding) => finding.name === 'saveButton')?.autofixable, true);
+	assert.equal(findings.find((finding) => finding.name === 'dynamic')?.autofixable, false);
+	assert.equal(findings.find((finding) => finding.name === 'localButton')?.autofixable, false);
+	assert.equal(fixSingleUseDeclarations(cfg), 1);
+	const updated = fixtureText(root, 'src/main.spec.ts');
+	assert.match(updated, /await \(?page\.getByRole\('button', \{ name: 'Save' \}\)\)?\.click\(\)/u);
+	assert.match(updated, /const dynamic = page\.locator\(selector\)\.first\(\)/u);
+	assert.match(updated, /const localButton = page\.getByRole\('button', \{ name: 'Save' \}\)/u);
+});
+test('single-use inlining removes the declaration line without leaving indentation whitespace', () => {
+	const root = fixtureRoot('terra-quality-single-use-line-removal-');
+	fixtureFile(
+		root,
+		'src/main.ts',
+		`function write(value: string) { return value; }
+function run() {
+	const label = 'ready';
+	write(label);
+}
+`,
+	);
+	const cfg = createQualityCfg({
+		root,
+		sourceRoots: ['src'],
+		extensions: ['.ts'],
+	});
+	assert.equal(fixSingleUseDeclarations(cfg), 1);
+	const updated = fixtureText(root, 'src/main.ts');
+	assert.match(updated, /function run\(\) \{\n\twrite\(\('ready'\)\);\n\}/u);
+	assert.doesNotMatch(updated, /^[\t ]+$/mu);
 });
 test('single-use fixing leaves typed variables that depend on imported types intact', () => {
 	const root = fixtureRoot('terra-quality-single-use-imported-type-');
@@ -671,12 +1200,13 @@ test('single-use scope includes every configured directory and reports manual ca
 	fixtureFile(root, 'src/domain.ts', 'export const value = { ok: true };\nvoid value;\n');
 	fixtureFile(root, 'src/types.ts', 'export type SharedByComponents = { value: string };\n');
 	fixtureFile(root, 'src/components/consumer.ts', `import type { SharedByComponents } from '../types';\nconst value: SharedByComponents = { value: 'ok' };\nvoid value;\n`);
-	const cfg = createQualityCfg({
-		root,
-		sourceRoots: ['src'],
-		extensions: ['.ts', '.tsx'],
-	});
-	const findings = singleUseFindings(cfg);
+	const findings = singleUseFindings(
+		createQualityCfg({
+			root,
+			sourceRoots: ['src'],
+			extensions: ['.ts', '.tsx'],
+		}),
+	);
 	assert.ok(findings.some((f) => f.file.startsWith('src/components/')));
 	assert.ok(findings.some((f) => f.name === 'value'));
 	assert.ok(findings.some((f) => f.name === 'SharedByComponents'));
@@ -703,12 +1233,7 @@ test('single-use analysis includes candidates in every configured directory', ()
 	fixtureFile(root, 'src/quality/internal.ts', 'const internalOnly = 1;\nvoid internalOnly;\n');
 	fixtureFile(root, 'src/shared.ts', 'export const sharedValue = 1;\n');
 	fixtureFile(root, 'src/quality/consumer.ts', "import { sharedValue } from '../shared.js';\nvoid sharedValue;\n");
-	const cfg = createQualityCfg({
-		root,
-		sourceRoots: ['src'],
-		extensions: ['.ts'],
-	});
-	const names = singleUseFindings(cfg).map((finding) => finding.name);
+	const names = singleUseFindings(createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] })).map((finding) => finding.name);
 	assert.ok(names.includes('internalOnly'));
 	assert.ok(names.includes('sharedValue'));
 });
@@ -852,6 +1377,26 @@ test('single-use fixing retains object values referenced through typeof', () => 
 	const parsed = ts.createSourceFile('main.ts', updated, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
 	assert.equal(parsed.parseDiagnostics.length, 0);
 });
+test('single-use fixing leaves documented type declarations and their comments intact', () => {
+	const root = fixtureRoot('terra-quality-single-use-documented-type-');
+	const original = `/** Canonical groups used to order and label source imports. */\ntype ImportGroup = 'API' | 'COMPONENTS' | 'DATA' | 'TYPES';\nexport const selected: ImportGroup = 'API';\n/** Context-menu target and its optional node or edge identifier. */\ntype FlowMenuContext = { type: 'pane' | '_node' | 'e'; id: string | null };\nfunction selectMenu(context: FlowMenuContext) { return context; }\nconst selectedMenu = selectMenu({ type: 'pane', id: null });\nvoid selectedMenu;\n`;
+	fixtureFile(root, 'src/main.ts', original);
+	const cfg = createQualityCfg({
+		root,
+		sourceRoots: ['src'],
+		extensions: ['.ts'],
+	});
+	assert.equal(fixSingleUseDeclarations(cfg), 0);
+	assert.equal(fixtureText(root, 'src/main.ts'), original);
+	const finding = singleUseFindings(cfg).find((candidate) => candidate.name === 'ImportGroup');
+	assert.equal(finding?.decision, 'REVIEW');
+	assert.equal(finding?.autofixable, false);
+	assert.match(finding?.reason ?? '', /authored documentation and requires agent review/);
+	const contextFinding = singleUseFindings(cfg).find((candidate) => candidate.name === 'FlowMenuContext');
+	assert.equal(contextFinding?.decision, 'REVIEW');
+	assert.equal(contextFinding?.autofixable, false);
+	assert.match(contextFinding?.reason ?? '', /authored documentation and requires agent review/);
+});
 test('single-use fixer reports functions in call, JSX, and type-query positions for review', () => {
 	const root = fixtureRoot('terra-quality-single-use-context-');
 	fixtureFile(
@@ -882,12 +1427,18 @@ void built;
 	const parsed = ts.createSourceFile('main.tsx', updated, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
 	assert.equal(parsed.parseDiagnostics.length, 0);
 });
-test('single-use inline markers suppress only a reasoned review boundary and keep autofix from rewriting it', () => {
+test('single-use inline markers never suppress review findings or allow autofix to rewrite them', () => {
 	const root = fixtureRoot('terra-quality-single-use-inline-ignore-');
 	const original = `function keepBoundary() { return 'ready'; } // terra-quality-ignore single-use -- The named boundary preserves a stable stack frame for the caller.\nexport const result = keepBoundary();\n`;
 	fixtureFile(root, 'src/main.ts', original);
-	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
-	assert.deepEqual(singleUseFindings(cfg), []);
+	const cfg = createQualityCfg({
+		root,
+		sourceRoots: ['src'],
+		extensions: ['.ts'],
+	});
+	const findings = singleUseFindings(cfg);
+	assert.ok(findings.some((f) => f.name === 'keepBoundary' && f.decision === 'REVIEW'));
+	assert.ok(findings.some((f) => f.name === 'single-use-ignore'));
 	assert.equal(fixSingleUseDeclarations(cfg), 0);
 	assert.equal(fixtureText(root, 'src/main.ts'), original);
 });
@@ -895,27 +1446,29 @@ test('single-use inline markers remain discoverable after template literals', ()
 	const root = fixtureRoot('terra-quality-single-use-inline-ignore-template-');
 	const original = `const route = \`/resource/${'${id}'}\`;\nfunction keepBoundary() { return route; } // terra-quality-ignore single-use -- Preserve the named boundary after the preceding template expression.\nexport const result = keepBoundary();\n`;
 	fixtureFile(root, 'src/main.ts', original);
-	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
-	assert.deepEqual(
-		singleUseFindings(cfg).map(({ name: n }) => n),
-		['route'],
-	);
+	const cfg = createQualityCfg({
+		root,
+		sourceRoots: ['src'],
+		extensions: ['.ts'],
+	});
+	const findings = singleUseFindings(cfg);
+	assert.ok(findings.some((f) => f.name === 'route' && f.decision === 'REVIEW'));
+	assert.ok(findings.some((f) => f.name === 'keepBoundary' && f.decision === 'REVIEW'));
+	assert.ok(findings.some((f) => f.name === 'single-use-ignore'));
 	assert.equal(fixSingleUseDeclarations(cfg), 0);
 	assert.equal(fixtureText(root, 'src/main.ts'), original);
 });
-test('single-use inline markers are reported when malformed, unattached, or stale', () => {
+test('single-use inline markers are always reported and never suppress candidates', () => {
 	const root = fixtureRoot('terra-quality-single-use-inline-ignore-stale-');
 	fixtureFile(
 		root,
 		'src/main.ts',
 		`function malformed() { return 1; } // terra-quality-ignore single-use --\nexport const malformedResult = malformed();\n// terra-quality-ignore single-use -- This marker is detached from the declaration.\nfunction detached() { return 2; }\nexport const first = detached();\nfunction stale() { return 3; } // terra-quality-ignore single-use -- This declaration now has multiple consumers.\nexport const third = stale();\nexport const fourth = stale();\n`,
 	);
-	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
-	const findings = singleUseFindings(cfg);
+	const findings = singleUseFindings(createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] }));
 	const directiveFindings = findings.filter((f) => f.name === 'single-use-ignore');
 	assert.equal(directiveFindings.length, 3);
-	assert.ok(directiveFindings.some((f) => f.reason.includes('non-empty reason')));
-	assert.equal(directiveFindings.filter((f) => f.reason.includes('stale')).length, 2);
+	assert.ok(directiveFindings.every((f) => f.reason.includes('cannot suppress Quality findings')));
 	assert.ok(
 		findings.some((f) => f.name === 'malformed'),
 		'malformed markers do not hide the candidate',
@@ -925,17 +1478,19 @@ test('single-use inline markers are reported when malformed, unattached, or stal
 		'detached markers do not hide the candidate',
 	);
 });
-test('malformed inline markers do not block safe inlining and are removed with the declaration', () => {
+test('inline markers remain agent-owned and block automatic declaration edits', () => {
 	const root = fixtureRoot('terra-quality-single-use-malformed-inline-');
 	const original = `const safe = 3; // terra-quality-ignore single-use --\nexport const result = safe;\n`;
 	fixtureFile(root, 'src/main.ts', original);
-	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
+	const cfg = createQualityCfg({
+		root,
+		sourceRoots: ['src'],
+		extensions: ['.ts'],
+	});
 	const initial = singleUseFindings(cfg);
 	assert.ok(initial.some((f) => f.name === 'single-use-ignore'));
-	assert.ok(initial.some((f) => f.name === 'safe' && f.decision === 'INLINE'));
-	assert.equal(fixSingleUseDeclarations(cfg), 1);
-	const updated = fixtureText(root, 'src/main.ts');
-	assert.doesNotMatch(updated, /terra-quality-ignore/);
-	assert.match(updated, /export const result = \(?3\)?/);
-	assert.deepEqual(singleUseFindings(cfg), []);
+	assert.ok(initial.some((f) => f.name === 'safe' && f.decision === 'REVIEW'));
+	assert.equal(fixSingleUseDeclarations(cfg), 0);
+	assert.equal(fixtureText(root, 'src/main.ts'), original);
+	assert.ok(singleUseFindings(cfg).some((f) => f.name === 'single-use-ignore'));
 });

@@ -9,8 +9,9 @@ IMPORTS
 
 // API
 import ts from 'typescript';
-import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { srcFiles } from '@terra-symposium/standards-quality-core';
+import { dirname, resolve } from 'node:path';
 
 // TYPES
 import type { QualityCfg } from '@terra-symposium/standards-quality-core';
@@ -149,8 +150,8 @@ function reactRootRenders(source: ts.SourceFile): RenderSite[] {
 			if (isFactory(node.expression, 'hydrateRoot') && node.arguments.length > 1) sites.push({ call: node, expression: node.arguments[1]!, index: 1 });
 			if (ts.isPropertyAccessExpression(node.expression) && node.expression.name.text === 'render' && node.arguments.length > 0) {
 				const receiver = unwrap(node.expression.expression);
-				const rootRender = ts.isIdentifier(receiver) ? roots.has(receiver.text) : ts.isCallExpression(receiver) && isFactory(receiver.expression, 'createRoot');
-				if (rootRender) sites.push({ call: node, expression: node.arguments[0]!, index: 0 });
+				if (ts.isIdentifier(receiver) ? roots.has(receiver.text) : ts.isCallExpression(receiver) && isFactory(receiver.expression, 'createRoot'))
+					sites.push({ call: node, expression: node.arguments[0]!, index: 0 });
 			}
 		}
 		ts.forEachChild(node, visit);
@@ -202,12 +203,15 @@ export function errorBoundaryFindings(cfg: QualityCfg): ErrorBoundaryFinding[] {
 	}
 	for (const file of astroConfigFiles(cfg.root)) {
 		if (hasAstroBoundaryIntegration(readFileSync(file, 'utf8'))) continue;
+		const integration = astroIntegrationSpecifier(file, cfg.root);
 		findings.push({
 			file,
 			line: 1,
 			column: 1,
-			message: 'Astro configs must install the shared hydration error-boundary integration so failed islands leave the rest of the page available.',
-			fixable: true,
+			message: integration
+				? 'Astro configs must install the shared hydration error-boundary integration so failed islands leave the rest of the page available.'
+				: 'Declare and install a shared error-boundary package that exports the Astro integration before adding it to this config.',
+			fixable: Boolean(integration),
 		});
 	}
 	return findings;
@@ -309,6 +313,55 @@ function hasAstroBoundaryIntegration(text: string): boolean {
 }
 
 /**
+ * Selects an installed Astro integration exported by the package owning the config.
+ *
+ * @param configFile Astro config whose nearest package manifest owns dependencies.
+ * @param root Repository boundary for manifest and node_modules discovery.
+ *
+ * @return Import specifier when the declared dependency exports an installed entry.
+ */
+function astroIntegrationSpecifier(configFile: string, root: string): string | undefined {
+	let packageRoot = dirname(configFile);
+	let packageJson: Record<string, unknown> | undefined;
+	while (packageRoot === root || packageRoot.startsWith(`${root}/`)) {
+		const manifestPath = resolve(packageRoot, 'package.json');
+		if (existsSync(manifestPath)) {
+			try {
+				packageJson = JSON.parse(readFileSync(manifestPath, 'utf8')) as Record<string, unknown>;
+				break;
+			} catch {
+				return;
+			}
+		}
+		if (packageRoot === root) break;
+		packageRoot = dirname(packageRoot);
+	}
+	if (!packageJson) return;
+	const dependencies = [packageJson.dependencies, packageJson.devDependencies, packageJson.peerDependencies].filter((value): value is Record<string, unknown> => !!value && typeof value === 'object');
+	for (const name of ['@terra-symposium/standards-error-boundaries', '@terra-symposium/standards-quality']) {
+		if (!dependencies.some((group) => typeof group[name] === 'string')) continue;
+		const parts = name.split('/');
+		let installedPath: string | undefined;
+		for (let dir = packageRoot; dir === root || dir.startsWith(`${root}/`); dir = dirname(dir)) {
+			const candidate = resolve(dir, 'node_modules', ...parts, 'package.json');
+			if (existsSync(candidate)) {
+				installedPath = dirname(candidate);
+				break;
+			}
+			if (dir === root) break;
+		}
+		if (!installedPath) continue;
+		try {
+			const exportEntry = (JSON.parse(readFileSync(resolve(installedPath, 'package.json'), 'utf8')) as { exports?: Record<string, unknown> }).exports?.['./astro-integration'];
+			const target = typeof exportEntry === 'string' ? exportEntry : undefined;
+			if (target && existsSync(resolve(installedPath, target))) return `${name}/astro-integration`;
+		} catch {
+			continue;
+		}
+	}
+}
+
+/**
  * Adds the shared Astro integration to every local config that does not have it.
  *
  * @param root Repository root to update.
@@ -320,8 +373,10 @@ function fixAstroBoundaryIntegrations(root: string): number {
 	for (const file of astroConfigFiles(root)) {
 		let text = readFileSync(file, 'utf8');
 		if (hasAstroBoundaryIntegration(text)) continue;
+		const specifier = astroIntegrationSpecifier(file, root);
+		if (!specifier) continue;
 		const alias = '__terraErrorBoundaryIntegration';
-		const importLine = `import { terraErrorBoundaryIntegration as ${alias} } from '${'@terra-symposium/standards-error-boundaries/astro-integration'}';`;
+		const importLine = `import { terraErrorBoundaryIntegration as ${alias} } from '${specifier}';`;
 		if (BINTEGRATIONS_S_S_U_REGEX.test(text)) text = text.replace(BINTEGRATIONS_S_S_U_REGEX, (m) => `${m}${alias}(), `);
 		else {
 			const objectStart = /(?:defineConfig\s*\(\s*|export\s+default\s*)\{/u;

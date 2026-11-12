@@ -35,8 +35,8 @@ For each recommendation, state its bottleneck, change, benefit, confidence, effo
 
 Report results in this shape:
 
-| Command and scope | Baseline (runs, spread, inputs) | After (runs, spread, inputs) | Findings and warnings |
-| --- | --- | --- | --- |
-| Exact command | Duration and input count | Duration and input count, or not measured | Result counts, failures, and warnings |
+| Command and scope | Baseline (runs, spread, inputs) | After (runs, spread, inputs)              | Findings and warnings                 |
+| ----------------- | ------------------------------- | ----------------------------------------- | ------------------------------------- |
+| Exact command     | Duration and input count        | Duration and input count, or not measured | Result counts, failures, and warnings |
 
 Then list measured bottlenecks and ranked recommendations or changes. For each, state benefit, confidence, effort, and risk. Report material regressions and unmeasured assumptions.

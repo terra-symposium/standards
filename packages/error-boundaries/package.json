@@ -27,7 +27,8 @@
 	"scripts": {
 		"build": "tsc -p config/tsconfig.json && mkdir -p dist/components && cp src/components/AstroErrorBoundary.astro dist/components/AstroErrorBoundary.astro",
 		"test": "npm run build && node --test test/*.test.mjs",
-		"prepare": "npm run build"
+		"prepare": "npm run build",
+		"typecheck": "tsc --noEmit -p config/tsconfig.json"
 	},
 	"peerDependencies": {
 		"react": ">=18",
@@ -35,9 +36,7 @@
 	},
 	"devDependencies": {
 		"@types/react": "^19.3.0",
-		"@types/react-dom": "^19.3.0",
 		"react": "^19.3.1",
-		"react-dom": "^19.3.1",
 		"typescript": "^6.0.3"
 	}
 }

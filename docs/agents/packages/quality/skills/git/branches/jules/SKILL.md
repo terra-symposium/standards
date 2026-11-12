@@ -20,7 +20,7 @@ creation marker, not branch-name prefixes alone.
 Record each PR's source branch, target, status, changed files, commits, checks, reviews, and
 unresolved threads.
 
-   - Check local and linked worktrees; preserve unrelated staged, unstaged, and untracked work.
+- Check local and linked worktrees; preserve unrelated staged, unstaged, and untracked work.
 
 2. **Plan the smallest coherent bundle set.**
    - Group PRs by feature area, shared files, dependencies, and review context.
@@ -29,7 +29,7 @@ unresolved threads.
 Map every source PR and unique change to a proposed bundle. Flag overlaps, conflicts, and changes
 that do not fit cleanly.
 
-   - Keep source PRs and refs available until bundle coverage is verified.
+- Keep source PRs and refs available until bundle coverage is verified.
 
 3. **Build and commit each bundle.**
 
@@ -51,7 +51,6 @@ requested or already authorized.
 Run the requested or required checks when available. Report skipped, blocked, or rate-limited checks
 accurately; never describe them as passing.
 
-
 4. **Review bundle coverage and PR feedback.**
 
 Compare each bundle with its source map and confirm every unique source change is present exactly
@@ -64,7 +63,6 @@ when the fix is present.
 
 When requested or authorized, open one PR per bundle against the requested base. Link the source PRs
 and summarize included changes and validation.
-
 
 5. **Merge and complete branch cleanup as part of the merge.**
 
@@ -96,7 +94,6 @@ substitute for deletion.
 Branch cleanup is part of completing an authorized PR merge; do not leave it as a follow-up task. Do
 not remove a local branch checked out by a worktree or carrying uncommitted work. Preserve its files
 and report the remaining local ref if it cannot be retired safely.
-
 
 ## Completion Report
 

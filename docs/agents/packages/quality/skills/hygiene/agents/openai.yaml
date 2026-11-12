@@ -1,7 +1,7 @@
 interface:
   display_name: 'Hygiene'
-  short_description: 'Audit repo health, improve source clarity, and compact files safely'
-  default_prompt: 'Use $hygiene to audit build, deployment, and security health; improve source readability with useful comments; or compact documents and code without changing behavior.'
+  short_description: 'Audit health, automate safe repeat fixes, and author source docs'
+  default_prompt: 'Use $hygiene to audit repository health, author comments from source context, automate safe repeat fixes in their owning Terra packages, or compact code without changing behavior.'
 
 policy:
   allow_implicit_invocation: true

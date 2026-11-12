@@ -41,9 +41,6 @@ function option(name: string): string {
 	return value;
 }
 
-
-
-
 /**
  * Runs Git in a selected checkout and trims its textual output.
  *
@@ -55,9 +52,6 @@ function option(name: string): string {
 function git(root: string, args: string[]): string {
 	return execFileSync('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
 }
-
-
-
 
 /**
  * Runs a child command quietly with CI mode enabled.
@@ -73,26 +67,33 @@ function run(cmd: string, cmdArgs: string[], cwd: string): number {
 	if (result.error) throw result.error;
 	return result.status ?? 1;
 }
-(async function main(): Promise<void> {
+/**
+ * Imports verified local test and Quality reports into the Hygiene dashboard.
+ *
+ * @return Resolves after importing the report and cleaning up its temporary worktree.
+ */
+async function main(): Promise<void> {
 	const localEnv = resolve(appRoot, '.env.local');
 	if (existsSync(localEnv)) process.loadEnvFile(localEnv);
 	const repo = option('--repository');
 	const checkout = resolve(option('--checkout'));
 	const branch = option('--branch');
 	const requestedCompletedAt = (function optionalOption(name: string): string | undefined {
-	const index = args.indexOf(name);
-	if (index < 0) return undefined;
-	const value = args[index + 1];
-	if (!value || value.startsWith('--') || args.lastIndexOf(name) !== index) throw new Error(`Pass ${name} <value>.`);
-	return value;
-})('--completed-at');
+		const index = args.indexOf(name);
+		if (index < 0) return undefined;
+		const value = args[index + 1];
+		if (!value || value.startsWith('--') || args.lastIndexOf(name) !== index) throw new Error(`Pass ${name} <value>.`);
+		return value;
+	})('--completed-at');
 	if (!/^[^/\s]+\/[^/\s]+$/.test(repo)) throw new Error('Repository must use owner/name format.');
 	if (!/^[A-Za-z0-9._/-]{1,100}$/.test(branch) || branch.includes('..') || branch.startsWith('/')) throw new Error('Invalid branch name.');
 	if (requestedCompletedAt && !Number.isFinite(Date.parse(requestedCompletedAt))) throw new Error('Invalid report timestamp.');
-	if ((function githubRepo(remote: string): string | null {
-	const match = /(?:github\.com[:/])([^/]+\/[^/]+?)(?:\.git)?$/i.exec(remote);
-	return match?.[1]?.toLowerCase() ?? null;
-})(git(checkout, ['remote', 'get-url', 'origin'])) !== repo.toLowerCase()) throw new Error('Checkout origin does not match the requested GitHub repository.');
+	if (
+		(function githubRepo(remote: string): string | null {
+			return /(?:github\.com[:/])([^/]+\/[^/]+?)(?:\.git)?$/i.exec(remote)?.[1]?.toLowerCase() ?? null;
+		})(git(checkout, ['remote', 'get-url', 'origin'])) !== repo.toLowerCase()
+	)
+		throw new Error('Checkout origin does not match the requested GitHub repository.');
 	const sql = db();
 	const repoRow = (await sql`SELECT id FROM repositories WHERE active AND lower(owner || '/' || name) = lower(${repo})`)[0] as { id: number } | undefined;
 	if (!repoRow) throw new Error('Repository is not connected to this dashboard database.');
@@ -178,7 +179,9 @@ function run(cmd: string, cmdArgs: string[], cwd: string): number {
 		}
 		rmSync(temporaryRoot, { recursive: true, force: true });
 	}
-})().catch((e: unknown) => {
+}
+
+main().catch((e: unknown) => {
 	console.error(e instanceof Error ? e.message : 'Local report import failed.');
 	process.exitCode = 1;
 });

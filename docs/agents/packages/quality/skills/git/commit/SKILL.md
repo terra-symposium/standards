@@ -14,7 +14,8 @@ Use only when the user explicitly authorizes commits. Otherwise, propose the gro
 Read `git status --short`, staged and unstaged diffs, current branch, and divergence from its
 upstream.
 
-   - Treat staged, unstaged, and untracked files as separate evidence; preserve unrelated work.
+- Treat staged, unstaged, and untracked files as separate evidence; preserve unrelated work.
+
 2. **Update safely**
 
 Never make task changes directly on `main` or `development`; use a dedicated
@@ -23,15 +24,17 @@ Never make task changes directly on `main` or `development`; use a dedicated
 If behind, protect local work including untracked files, then fast-forward. If diverged, protect
 work before merging and resolve against current architecture.
 
-   - Restore and verify protected work before dropping the temporary stash.
-   - Do not discard, reset, or overwrite local changes.
+- Restore and verify protected work before dropping the temporary stash.
+- Do not discard, reset, or overwrite local changes.
+
 3. **Plan groups**
    - Group independently reviewable behavior in dependency order.
 
 Keep implementation, direct tests, and required documentation together. Keep unrelated cleanup
 separate.
 
-   - Check each group with `git diff --check` and the narrowest relevant validation.
+- Check each group with `git diff --check` and the narrowest relevant validation.
+
 4. **Commit deliberately**
    - Stage exact files or hunks; never use `git add -A` or reset unrelated changes.
    - Review the staged diff before each commit.

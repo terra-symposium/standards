@@ -47,8 +47,7 @@ function parseArgs(args) {
 	return options;
 }
 try {
-	const result = runTestPlan(parseArgs(process.argv.slice(2)));
-	if (result.failed) process.exitCode = 1;
+	if (runTestPlan(parseArgs(process.argv.slice(2))).failed) process.exitCode = 1;
 } catch (err) {
 	console.error(err instanceof Error ? err.message : String(err));
 	process.exitCode = 1;

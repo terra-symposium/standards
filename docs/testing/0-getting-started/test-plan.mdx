@@ -1,0 +1,93 @@
+---
+title: Test plans and ownership
+description: Define ordered test suites, assign discovered files once, and run the Standards test plan.
+---
+
+`@terra-symposium/standards-testing` runs Standards-owned shared checks first, then the repository suites declared by its manifest. The plan makes suite order and file ownership explicit.
+
+## Install and run
+
+```sh
+pnpm add -D @terra-symposium/standards-testing
+pnpm exec terra-test run --manifest config/terra-tests.json
+```
+
+Use Node.js `>=20`. The diagram shows why the manifest is validated before repository suites run.
+
+<Nodes
+	direction="LR"
+	nodes={[
+		{ id: 'discover', type: 'origin', data: { title: 'Discover test files' } },
+		{ id: 'manifest', type: 'process', data: { title: 'Validate manifest ownership' } },
+		{ id: 'shared', type: 'process', data: { title: 'Run shared checks' } },
+		{ id: 'suites', type: 'process', data: { title: 'Run ordered suites' } },
+		{ id: 'exit', type: 'terminal', data: { title: 'Return status' } },
+	]}
+	edges={[
+		{ id: 'discover-manifest', source: 'discover', target: 'manifest' },
+		{ id: 'manifest-shared', source: 'manifest', target: 'shared' },
+		{ id: 'shared-suites', source: 'shared', target: 'suites' },
+		{ id: 'suites-exit', source: 'suites', target: 'exit' },
+	]}
+	height={230}
+/>
+
+## Define the manifest
+
+Use `config/terra-tests.json` for new repositories. A suite has a stable name, one executable, optional argument strings, and repository-relative globs for the files it owns.
+
+```json
+{
+	"version": 1,
+	"suites": [
+		{
+			"name": "unit",
+			"command": "pnpm",
+			"args": ["run", "test:unit"],
+			"owns": ["tests/unit/**/*.test.ts"]
+		}
+	]
+}
+```
+
+The runner discovers test files in `test/` and `tests/` directories and names matching `*.test.*` or `*.spec.*`. It rejects invalid globs, duplicate suite invocations, overlapping ownership, and discovered test files that no suite owns.
+
+## Select a run
+
+||| [Full plan]
+
+```sh
+pnpm exec terra-test run --manifest config/terra-tests.json
+```
+
+Runs shared checks followed by the ordered repository suites.
+|||
+
+||| [Shared checks only]
+
+```sh
+pnpm exec terra-test run --manifest config/terra-tests.json --shared-only
+```
+
+Use this when a workflow intentionally separates test execution from plan validation.
+|||
+
+||| [Selected suites]
+
+```sh
+pnpm exec terra-test run --manifest config/terra-tests.json --suites unit,contracts
+```
+
+Select named custom suites while retaining the shared checks.
+|||
+
+## Discovery and compatibility
+
+The canonical path is `config/terra-tests.json`. If it is absent, the runner recognizes `tests/terra-tests.json` and the legacy root `.terra-tests.json`. Pass `--manifest PATH` to select another location.
+
+=== [When tests move]
+Map each moved or retired test to its new owner. Update the `owns` globs in the same change. Keep a retired assertion only when its behavior is covered elsewhere or the coverage gap is explicitly accepted.
+
+# Place tests near the module or route they prove. Use unit/contract suites for isolated behavior, integration suites for composed services, and browser suites for visible interactions. Exclude fixture-only files from ownership globs when they are not test cases.
+
+The [CI integration guide](/testing/1-ci/ci-integration/) documents shared checks and the public Action. For browser-focused evidence, see [browser testing guidance](/testing/2-coverage/browser-evidence/).

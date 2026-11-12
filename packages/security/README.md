@@ -8,7 +8,7 @@ Built-in repository source security findings.
 pnpm add -D @terra-symposium/standards-security
 ```
 
-The package requires Node.js `>=18.18`. It reads the repository's existing `quality.json`, falling back to `config/quality.json`; it does not introduce another configuration file. The root or config file may be selected with `--config PATH`.
+The package requires Node.js `>=18.18`. It reads the repository's existing `quality.json`, falling back to `config/quality.json`; it does not introduce another configuration file. The root or config file may be selected with `--config PATH`. Configure Node-only paths in `security.runtimeRoots` so `process.env` access stays in declared server, tooling, or test code.
 
 ## CLI
 

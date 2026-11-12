@@ -5,13 +5,22 @@
 'use strict';
 const fill = require('fill-range');
 const stringify = require('./stringify');
-const utils = require('./utils');
+const { encloseBrace, exceedsLimit, flatten, reduce } = require('./utils');
+/**
+ * Combines queued prefixes with brace alternatives while preserving nested arrays.
+ *
+ * @param queue Existing prefixes to combine with the next alternatives.
+ * @param stash Alternatives to append to each prefix.
+ * @param enclose Whether string alternatives need brace delimiters restored.
+ *
+ * @return Flattened combinations in source order.
+ */
 const append = (queue = '', stash = '', enclose = false) => {
 	const result = [];
 	queue = [].concat(queue);
 	stash = [].concat(stash);
 	if (!stash.length) return queue;
-	if (!queue.length) return enclose ? utils.flatten(stash).map((ele) => `{${ele}}`) : stash;
+	if (!queue.length) return enclose ? flatten(stash).map((ele) => `{${ele}}`) : stash;
 	for (const item of queue) {
 		if (Array.isArray(item)) {
 			for (const value of item) {
@@ -24,10 +33,18 @@ const append = (queue = '', stash = '', enclose = false) => {
 			}
 		}
 	}
-	return utils.flatten(result);
+	return flatten(result);
 };
+/**
+ * Expands a parsed brace-expression tree into its concrete string alternatives.
+ *
+ * @param ast Root node produced by the braces parser.
+ * @param options Expansion options, including the maximum allowed range size.
+ *
+ * @return Every expanded alternative in source order.
+ */
 const expand = (ast, options = {}) => {
-	const walk = (node, parent = {}, rangeLimit = options.rangeLimit === undefined ? 1000 : options.rangeLimit, enclose = utils.encloseBrace(node)) => {
+	const walk = (node, parent = {}, rangeLimit = options.rangeLimit === undefined ? 1000 : options.rangeLimit) => {
 		node.queue = [];
 		let p = parent;
 		let q = parent.queue;
@@ -44,8 +61,8 @@ const expand = (ast, options = {}) => {
 			return;
 		}
 		if (node.nodes && node.ranges > 0) {
-			const args = utils.reduce(node.nodes);
-			if (utils.exceedsLimit(...args, options.step, rangeLimit)) {
+			const args = reduce(node.nodes);
+			if (exceedsLimit(...args, options.step, rangeLimit)) {
 				throw new RangeError('expanded array length exceeds range limit. Use options.rangeLimit to increase or disable the limit.');
 			}
 			let range = fill(...args, options);
@@ -56,6 +73,7 @@ const expand = (ast, options = {}) => {
 			node.nodes = [];
 			return;
 		}
+		const enclose = encloseBrace(node);
 		let queue = node.queue;
 		let block = node;
 		while (block.type !== 'brace' && block.type !== 'root' && block.parent) {
@@ -81,6 +99,6 @@ const expand = (ast, options = {}) => {
 		}
 		return queue;
 	};
-	return utils.flatten(walk(ast));
+	return flatten(walk(ast));
 };
 module.exports = expand;

@@ -22,6 +22,8 @@ import { VISUAL_VIEWPORTS } from './viewports.js';
 // TYPES
 import type { VisualResult } from './core.js';
 
+const require = createRequire(import.meta.url);
+
 /*//////////////////////////////////////////////////
 TYPES
 //////////////////////////////////////////////////*/
@@ -104,7 +106,21 @@ type LoadRow = { result: VisualResult; measurement: NonNullable<VisualResult['lo
 HELPERS
 //////////////////////////////////////////////////*/
 
+/**
+ * Normalizes a CSS hex color for the Office presentation API.
+ *
+ * @param value CSS hex color, with or without its leading `#`.
+ *
+ * @return Uppercase hexadecimal digits without the leading `#`.
+ */
 const officeColor = (value: string): string => value.replace(/^#/, '').toUpperCase();
+/**
+ * Converts space-separated RGB channels into a padded CSS hex color.
+ *
+ * @param channels RGB channel values separated by spaces.
+ *
+ * @return Hex color including its leading `#`.
+ */
 const hexColor = (channels: string): string =>
 	`#${channels
 		.split(' ')
@@ -133,6 +149,13 @@ const createDocumentBrand = (): TerraDocumentBrand => {
 		fonts: { body: 'Authentic Sans' },
 	};
 };
+/**
+ * Maps the shared Terra document brand colors to slideshow palette names.
+ *
+ * @param brand Styling colors and fonts selected for the generated document.
+ *
+ * @return Palette entries normalized for the Office presentation API.
+ */
 const reportColors = (brand: TerraDocumentBrand): ReportColors => ({
 	accent: officeColor(brand.colors.primaryStrong),
 	ink: officeColor(brand.colors.ink),
@@ -474,9 +497,7 @@ export const writeSlideshow = async (file: string, results: readonly VisualResul
 	const loadEnabled = opts.loadTestingEnabled ?? results.some((r) => !!r.loadMeasurements?.length);
 	const brand = createDocumentBrand();
 	const colors = reportColors(brand);
-	const presentation = new /* The runtime package is CommonJS while NodeNext exposes its constructor through a namespace type. */ (
-		createRequire(import.meta.url)('pptxgenjs') as new () => Presentation
-	)();
+	const presentation = new /* The runtime package is CommonJS while NodeNext exposes its constructor through a namespace type. */ (require('pptxgenjs') as new () => Presentation)();
 	presentation.layout = 'LAYOUT_WIDE';
 	presentation.theme = { headFontFace: brand.fonts.body, bodyFontFace: brand.fonts.body, lang: 'en-AU' };
 	presentation.author = opts.author || 'Test evidence reporter';
@@ -535,9 +556,7 @@ export const writeScreenshotSlideshow = async (file: string, captures: readonly 
 	if (!captures.length) throw new Error('No keyed Playwright screenshots were captured for the screenshot slideshow.');
 	const brand = createDocumentBrand();
 	const colors = reportColors(brand);
-	const presentation = new /* The runtime package is CommonJS while NodeNext exposes its constructor through a namespace type. */ (
-		createRequire(import.meta.url)('pptxgenjs') as new () => Presentation
-	)();
+	const presentation = new /* The runtime package is CommonJS while NodeNext exposes its constructor through a namespace type. */ (require('pptxgenjs') as new () => Presentation)();
 	presentation.layout = 'LAYOUT_WIDE';
 	presentation.theme = { headFontFace: brand.fonts.body, bodyFontFace: brand.fonts.body, lang: 'en-AU' };
 	presentation.author = opts.author || 'Test evidence reporter';

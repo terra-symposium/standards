@@ -83,9 +83,6 @@ function gitBuffer(root: string, args: string[], input: string): Buffer {
 	return execFileSync('git', args, { cwd: root, input, maxBuffer: GIT_OUTPUT_LIMIT, stdio: ['pipe', 'pipe', 'pipe'] });
 }
 
-
-
-
 /**
  * Read the before SHA from a GitHub push event when it is available.
  *
@@ -184,15 +181,6 @@ function parseTree(root: string, sha: string): string[] {
 	return blobs;
 }
 
-
-
-
-
-
-
-
-
-
 /**
  * Check whether a push base is reachable from the checked-out head.
  *
@@ -227,16 +215,16 @@ export function createHistoryReport(root: string, opts: { repository?: string; b
 	const delta = !!base && isAncestor(root, base, headSha);
 	const range = delta ? `${base}..${headSha}` : headSha;
 	const commits = (function commitMetadata(root: string, range: string): { sha: string; authorDate: string; parents: string[] }[] {
-	return git(root, ['log', '--format=%H%x00%aI%x00%P', '--reverse', '--topo-order', range])
-		.trim()
-		.split('\n')
-		.filter(Boolean)
-		.map((l) => {
-			const [sha, authorDate, parents = ''] = l.split('\x00');
-			if (!A_F_D_40_I_REGEX.test(sha) || !Number.isFinite(Date.parse(authorDate))) throw new Error('Git returned invalid commit metadata.');
-			return { sha, authorDate, parents: parents.trim().split(S_REGEX).filter(Boolean) };
-		});
-})(root, range);
+		return git(root, ['log', '--format=%H%x00%aI%x00%P', '--reverse', '--topo-order', range])
+			.trim()
+			.split('\n')
+			.filter(Boolean)
+			.map((l) => {
+				const [sha, authorDate, parents = ''] = l.split('\x00');
+				if (!A_F_D_40_I_REGEX.test(sha) || !Number.isFinite(Date.parse(authorDate))) throw new Error('Git returned invalid commit metadata.');
+				return { sha, authorDate, parents: parents.trim().split(S_REGEX).filter(Boolean) };
+			});
+	})(root, range);
 	const changes = new Map<string, { additions: number; deletions: number }>();
 	const merges = readNumstatLog(root, range, changes);
 	for (const commit of commits) if (merges.has(commit.sha)) srcChanges(root, commit.sha, commit.parents, changes);
@@ -245,29 +233,32 @@ export function createHistoryReport(root: string, opts: { repository?: string; b
 	for (let start = 0; start < commits.length; start += HISTORY_BATCH_SIZE) {
 		const batch = commits.slice(start, start + HISTORY_BATCH_SIZE).map((c) => ({ commit: c, blobs: parseTree(root, c.sha) }));
 		(function blobLineCounts(root: string, blobs: string[], cache: Map<string, number>): void {
-	const unknown = [...new Set(blobs)].filter((s) => !cache.has(s));
-	for (let start = 0; start < unknown.length; start += BLOB_BATCH_SIZE) {
-		const batch = unknown.slice(start, start + BLOB_BATCH_SIZE);
-		const output = gitBuffer(root, ['cat-file', '--batch'], `${batch.join('\n')}\n`);
-		let offset = 0;
-		for (const sha of batch) {
-			const headerEnd = output.indexOf(10, offset);
-			if (headerEnd < 0) throw new Error(`Git did not return blob ${sha}.`);
-			const header = output.toString('utf8', offset, headerEnd).split(' ');
-			if (header[0] !== sha || header[1] !== 'blob') throw new Error(`Git returned an invalid object for ${sha}.`);
-			const size = Number(header[2]);
-			const contentStart = headerEnd + 1;
-			const contentEnd = contentStart + size;
-			cache.set(sha, (function lineCount(content: Uint8Array): number {
-	if (!content.length) return 0;
-	let lines = 0;
-	for (const byte of content) if (byte === 10) lines++;
-	return content.at(-1) === 10 ? lines : lines + 1;
-})(output.subarray(contentStart, contentEnd)));
-			offset = contentEnd + 1;
-		}
-	}
-})(
+			const unknown = [...new Set(blobs)].filter((s) => !cache.has(s));
+			for (let start = 0; start < unknown.length; start += BLOB_BATCH_SIZE) {
+				const batch = unknown.slice(start, start + BLOB_BATCH_SIZE);
+				const output = gitBuffer(root, ['cat-file', '--batch'], `${batch.join('\n')}\n`);
+				let offset = 0;
+				for (const sha of batch) {
+					const headerEnd = output.indexOf(10, offset);
+					if (headerEnd < 0) throw new Error(`Git did not return blob ${sha}.`);
+					const header = output.toString('utf8', offset, headerEnd).split(' ');
+					if (header[0] !== sha || header[1] !== 'blob') throw new Error(`Git returned an invalid object for ${sha}.`);
+					const size = Number(header[2]);
+					const contentStart = headerEnd + 1;
+					const contentEnd = contentStart + size;
+					cache.set(
+						sha,
+						(function lineCount(content: Uint8Array): number {
+							if (!content.length) return 0;
+							let lines = 0;
+							for (const byte of content) if (byte === 10) lines++;
+							return content.at(-1) === 10 ? lines : lines + 1;
+						})(output.subarray(contentStart, contentEnd)),
+					);
+					offset = contentEnd + 1;
+				}
+			}
+		})(
 			root,
 			batch.flatMap((i) => i.blobs),
 			lineCounts,
@@ -286,15 +277,17 @@ export function createHistoryReport(root: string, opts: { repository?: string; b
 	return {
 		schemaVersion: 1,
 		mode: delta ? 'delta' : 'snapshot',
-		repository: opts.repository ?? (function repoName(root: string): string {
-	const fromEnvironment = process.env.GITHUB_REPOSITORY;
-	if (fromEnvironment && /^[^/]+\/[^/]+$/.test(fromEnvironment)) return fromEnvironment.replace(GIT_I_REGEX, '');
-	const match = git(root, ['config', '--get', 'remote.origin.url'])
-		.trim()
-		.match(/(?:github\.com[:/])([^/]+\/[^/]+?)(?:\.git)?$/i);
-	if (!match) throw new Error('Set GITHUB_REPOSITORY or use a GitHub origin remote to generate a history report.');
-	return match[1].replace(GIT_I_REGEX, '');
-})(root),
+		repository:
+			opts.repository ??
+			(function repoName(root: string): string {
+				const fromEnvironment = process.env.GITHUB_REPOSITORY;
+				if (fromEnvironment && /^[^/]+\/[^/]+$/.test(fromEnvironment)) return fromEnvironment.replace(GIT_I_REGEX, '');
+				const match = git(root, ['config', '--get', 'remote.origin.url'])
+					.trim()
+					.match(/(?:github\.com[:/])([^/]+\/[^/]+?)(?:\.git)?$/i);
+				if (!match) throw new Error('Set GITHUB_REPOSITORY or use a GitHub origin remote to generate a history report.');
+				return match[1].replace(GIT_I_REGEX, '');
+			})(root),
 		branch,
 		headSha,
 		baseSha: delta ? base : null,

@@ -8,6 +8,7 @@ description: Audit repository environment, build, and security health; improve s
 Use for repository hygiene across environment and security health, source readability, and behavior-preserving compaction. Apply the sections that match the requested scope and keep each change within the repository's ownership and validation rules.
 
 For first-time Husky and Changesets setup, use [Initialisation](initialisation/SKILL.md).
+For rolling a released Terra package through Desktop consumers and restarting their existing local servers, use [Package Update](../package-update/SKILL.md).
 
 ## Repository and environment health
 
@@ -36,7 +37,6 @@ public config, mocks, or approved remote endpoints.
 If a failure is pre-application, repair install/config/toolchain first. If it reaches app build,
 reproduce the same workspace and command before editing code.
 
-
 ### Review GitHub findings
 
 1. Confirm `gh auth status` and repository identity without exposing tokens. Retrieve Dependabot, code-scanning, secret-scanning, and workflow findings only with suitable access.
@@ -48,6 +48,10 @@ reproduce the same workspace and command before editing code.
 ### Repair and close
 
 For each actionable issue, identify its owner, make the smallest complete fix, run the narrowest proof, then rerun the affected workspace or provider check. Inspect lockfile/package changes and avoid unrelated refactors or dependency churn. Record external blockers and required sign-in.
+
+When a task calls for the repository's deterministic Quality transformations, run them across the complete configured source scope with `quality --all --safe-fix` (or `quality --all --fix`), preserve and inspect the resulting diff, then run `quality --all --warn` as the read-only verification pass. Quality commands are read-only by default; `--all` selects every configured source file but never enables writes, and `--warn` forces read-only behavior even if a fix flag is present. Do not treat a diagnostic invocation as the safe-fixer step.
+
+After making an agent-authored repair, inspect the final diff for any repeatable syntax- or structure-based transformation that could have been detected and applied safely by the owning Quality package. Implement that transformation in its owning package, with focused regression coverage for the original pattern and safety boundaries, so later repositories can fix it automatically. Keep semantic judgments and all comments, TSDoc, and other prose agent-authored; do not generate wording from names or signatures. Re-run the package tests, then apply its safe fixer across the full configured source scope and inspect every changed hunk.
 
 Do not end an authorized remediation after producing a diagnosis or findings list. Apply safe fixes in the owning worktree, rerun the same checks, and iterate until they pass with no actionable findings. If credentials, permissions, upstream patches, or a live provider prevent completion, report that precise blocker and leave the remediation explicitly incomplete.
 
@@ -94,6 +98,8 @@ Treat a monolith as a readability and responsibility problem, not merely a line-
 For a large component or test, make the flow discoverable in order: inputs/configuration, derived state, event or mutation handlers, rendering/assertion phases, then deferred helpers. Keep helpers above declarations only when registration-time evaluation needs them. Move runtime-only helpers below the final test/component section when the repository convention requires it.
 
 ### TSDoc and JSDoc
+
+Quality documentation findings are diagnostics only. Do not use a formatter or scaffold tool to create or rewrite comments, TSDoc, file headers, section labels, or placeholder tags. Read the implementation and callers, then author and review each necessary description yourself.
 
 Document public functions, exported components, exported types/interfaces/enums, non-obvious helpers, and test structures according to the repository's lint rules. A useful summary states the responsibility and intended outcome. For a type, explain the data it models, where it is used, or the invariant it preserves; read the implementation and call sites before writing the comment. Add `@param` only when the parameter's role, constraints, or source is not obvious; describe the value rather than repeating its name. Add `@returns`/`@return` when the result contract matters. Include errors, side effects, lifecycle assumptions, authorization boundaries, or data-flow relationships when they affect callers.
 
@@ -145,7 +151,6 @@ For a long test, add uppercase phase comments only where execution crosses a mea
 CONTRACT`. Keep code in each phase together with no blank lines inside the phase. Do not label every
 assertion or narrate obvious fixture setup.
 
-
 ```ts
 /*//////////////////////////////////////////////////
 TESTS
@@ -162,9 +167,13 @@ test.describe('authenticated dashboard header', () => {
 	// HEADER CONTAINMENT
 	test('keeps navigation inside the visible header', async ({ page }) => {
 		// MEASURE RENDERED STATE
-		const bounds = await page.locator('header').evaluate(element => {
+		const bounds = await page.locator('header').evaluate((element) => {
 			const rect = element.getBoundingClientRect();
-			return { left: rect.left, right: rect.right, viewport: window.innerWidth };
+			return {
+				left: rect.left,
+				right: rect.right,
+				viewport: window.innerWidth,
+			};
 		});
 		// ASSERT THE CONTRACT
 		expect(bounds.left).toBeGreaterThanOrEqual(0);
@@ -230,8 +239,52 @@ Do not mass-generate documentation from names or signatures. Never emit formulai
 requires function-by-function or type-by-type review and a final search for generic, blank,
 duplicated, orphaned, or stale tags.
 
-
 See [Terra conventions](references/conventions.md) for the repository-derived rules and quality-tool behavior used to shape this skill.
+
+## Prevent recurring manual fixes
+
+Make a package-automation retrospective a required part of every code repair.
+Before closing the task, inspect the complete working diff and each resulting
+commit, when one was made. When reviewing an existing commit, apply the same
+retrospective to its complete diff; do not postpone an automatable correction
+until a later cleanup. For every correction made agentically, ask whether
+its owning Terra package could find and apply that correction safely from source
+syntax, repository configuration, or another explicit invariant. If it can,
+implement the rule in that package, connect it to the package's normal automatic
+workflow, and apply it to the full eligible scope in the same task. Do not leave
+deterministic one-offs in a follow-up list, backlog, or later run, and do not
+wait for the finding to recur before automating it.
+
+- If a correction is deterministic and behavior-preserving, implement it in the
+  owning package even when it was found in only one repository. Put rules for
+  multiple consumers in their shared Terra package. Prefer an idempotent fixer
+  invoked by the normal quality workflow, so eligible files are repaired
+  automatically without relying on someone to remember a separate command.
+  When reviewing a commit, convert every safely automatable manual correction
+  from that commit into the package rule and regression coverage before
+  considering the work complete.
+- Apply the fixer to all current eligible files and add focused regression
+  coverage for its rule and behavior. Check the full intended scope, preservation
+  of literals and generated content, and idempotence by running it twice. Run
+  the package's quality workflow and inspect every changed file.
+- Do not replace mechanical fixes with broad text substitutions, ignored paths,
+  or exemptions. Use syntax-aware transformations when an edit touches source
+  structure, and preserve public names or serialized values unless the requested
+  migration explicitly changes them.
+- Keep authorial work agentic. The agent must write and review comments,
+  docstrings, TSDoc, documentation prose, and other explanations by inspecting
+  their implementation and context. Package automation must not add, rewrite,
+  delete, or relocate comments or documentation text, including placeholders;
+  Quality tooling may diagnose them, but the agent must make each correction
+  with implementation-specific evidence. Never generate or rewrite prose from
+  names, signatures, or templates to satisfy a rule.
+- If correctness depends on intent or domain judgment, retain the agentic repair
+  and state why it cannot be made into a safe shared rule. Do not leave an
+  otherwise mechanical fix as a one-off when the package can own it.
+- Record the retrospective outcome before closing: identify each correction
+  automated in the owning package, its regression coverage and applied scope,
+  and each correction kept agentic with the reason it needs contextual judgment.
+  Do not leave safe automation candidates as untracked follow-up work.
 
 ## Behavior-preserving compaction
 
@@ -270,8 +323,14 @@ For a sufficiently long, regular list whose entries have a clear visual correspo
 ```css
 :root {
 	/* prettier-ignore */
-	--primary-1: 43 22 13;    --primary-2: 58 27 13;      --primary-3: 84 37 14;       --primary-4: 109 45 13;
-	--primary-5: 133 55 13;   --primary-6: 163 65 13;     --primary-7: 195 79 14;      --primary-8: 225 91 17;
+	--primary-1: 43 22 13;
+	--primary-2: 58 27 13;
+	--primary-3: 84 37 14;
+	--primary-4: 109 45 13;
+	--primary-5: 133 55 13;
+	--primary-6: 163 65 13;
+	--primary-7: 195 79 14;
+	--primary-8: 225 91 17;
 }
 ```
 

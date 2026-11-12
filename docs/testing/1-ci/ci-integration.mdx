@@ -1,0 +1,56 @@
+---
+title: CI integration
+description: Run shared plan checks before repository suites, locally or through the public GitHub Action.
+---
+
+Every `terra-test run` validates the test plan and file ownership before it runs the selected repository suites. A shared-check or suite failure returns a nonzero process status.
+
+## Local command in CI
+
+Use the npm package command in a Node workflow. Shared checks do not replace repository unit, integration, browser, build, or production health coverage.
+
+<Nodes
+	direction="LR"
+	nodes={[
+		{ id: 'checkout', type: 'origin', data: { title: 'Checkout repository' } },
+		{ id: 'validate', type: 'process', data: { title: 'Shared plan checks' } },
+		{ id: 'suite', type: 'process', data: { title: 'Repository suites' } },
+		{ id: 'result', type: 'terminal', data: { title: 'CI result' } },
+	]}
+	edges={[
+		{ id: 'checkout-validate', source: 'checkout', target: 'validate' },
+		{ id: 'validate-suite', source: 'validate', target: 'suite' },
+		{ id: 'suite-result', source: 'suite', target: 'result' },
+	]}
+	height={220}
+/>
+
+||| [Run the npm CLI]
+
+```sh
+pnpm exec terra-test run --manifest config/terra-tests.json
+```
+
+The shared stage runs first; selected custom suites run afterward.
+|||
+
+||| [Use the public Action]
+
+Pin the mirror to an immutable commit and pass the manifest path:
+
+```yaml
+- uses: Terra-Symposium/standards/packages/testing@3f9b31323d3617d6b565770880865ec7cf1a9704
+  with:
+    manifest: config/terra-tests.json
+```
+
+The package source in this repository is canonical. A published Action change must update the public mirror as well.
+|||
+
+## Split CI stages deliberately
+
+Use `--shared-only` when the workflow runs the repository suites in a separate job or command. Otherwise, the normal command executes selected repository suites after shared checks. Keep the manifest as the source of truth for suite order and ownership.
+
+Do not pass credentials in the manifest. Suite commands inherit the job environment; provision secrets through the repository’s approved secret manager with least-privilege scope.
+
+For exact flags and manifest paths, see [test plans and ownership](/testing/0-getting-started/test-plan/).

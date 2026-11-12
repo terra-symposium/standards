@@ -20,17 +20,51 @@ import { tmpdir } from 'node:os';
 HELPERS
 //////////////////////////////////////////////////*/
 
+/**
+ * Creates a unique temporary directory for one test fixture.
+ *
+ * @return Absolute path to the new fixture directory.
+ */
 function fixtureRoot() {
 	return mkdtempSync(join(tmpdir(), 'standards-testing-'));
 }
+
+/**
+ * Runs Git in a fixture repository and returns trimmed standard output.
+ *
+ * @param root Fixture repository root.
+ * @param args Git subcommand and arguments.
+ *
+ * @return Trimmed output from the Git command.
+ */
 function git(root, ...args) {
 	return execFileSync('git', args, { cwd: root, encoding: 'utf8' }).trim();
 }
+
+/**
+ * Stages fixture changes, commits them, and returns the new commit SHA.
+ *
+ * @param root Fixture repository root.
+ * @param message Commit subject used by the test.
+ *
+ * @return Full SHA of the fixture commit.
+ */
 function commit(root, message) {
 	git(root, 'add', '.');
 	git(root, '-c', 'user.name=Standards Tests', '-c', 'user.email=standards-tests@example.invalid', 'commit', '-m', message);
 	return git(root, 'rev-parse', 'HEAD');
 }
+
+/**
+ * Sets GitHub event variables for one callback and restores the prior environment.
+ *
+ * @param root Fixture root used to store the event JSON file.
+ * @param eventName GitHub event name for the callback.
+ * @param event Event payload to serialize.
+ * @param run Callback invoked while the event environment is active.
+ *
+ * @return Value returned by the callback.
+ */
 function withGitHubEvent(root, eventName, event, run) {
 	const eventPath = join(root, 'event.json');
 	writeFileSync(eventPath, JSON.stringify(event));
@@ -47,6 +81,12 @@ function withGitHubEvent(root, eventName, event, run) {
 		else process.env.GITHUB_EVENT_NAME = previousName;
 	}
 }
+
+/**
+ * Creates a temporary development-branch repository with one base commit.
+ *
+ * @return Fixture root and base commit SHA.
+ */
 function initGitFixture() {
 	const root = fixtureRoot();
 	git(root, '-c', 'init.defaultBranch=development', 'init', '-q');
@@ -127,6 +167,12 @@ test('manifest validation rejects duplicate commands, overlapping file ownership
 		rmSync(root, { recursive: true, force: true });
 	}
 });
+/**
+ * Creates an empty test file and any parent directories it needs.
+ *
+ * @param root Fixture repository root.
+ * @param path Repository-relative test file path.
+ */
 function mkdirTest(root, path) {
 	mkdirSync(join(root, path, '..'), { recursive: true });
 	writeFileSync(join(root, path), '');

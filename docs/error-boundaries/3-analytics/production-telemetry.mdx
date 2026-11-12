@@ -1,0 +1,38 @@
+---
+title: Production boundary telemetry
+description: Trace the Terra Website event pipeline and its privacy, retention, and operational limits.
+---
+
+The shared error-boundary package calls an application callback; it does not send or persist events. The Terra Website owns the collector and already has a Sanity Error Analysis dashboard. Other applications should adapt the callback to their own approved monitoring stack.
+
+![Flow from the Terra Website React boundary through the metadata-only Astro collector and 30-day Blob retention to the Sanity Error Analysis dashboard.](/_docs/assets/error-boundaries/assets/website-error-analysis-flow.svg)
+
+**Figure 1.** Runtime reports move as sanitized metadata; raw messages and component stacks do not enter the persisted dashboard data.
+
+The application adapter sends a deliberately small event. The distinction between client input, server-derived values, and excluded content is the privacy boundary.
+
+| Data                                                     | Source                         | Persisted?                  |
+| -------------------------------------------------------- | ------------------------------ | --------------------------- |
+| Category, stable component label, sanitized route family | Website boundary adapter       | Yes, after validation.      |
+| Build ID, environment, received timestamp                | Collector                      | Yes; derived by the server. |
+| Raw error message and component stack                    | React callback                 | No.                         |
+| Request body, credentials, user state, caller IP         | Request or application context | No.                         |
+
+## Website event path
+
+The adapter in `astro/src/components/ErrorBoundary.tsx` handles React render failures by showing the product fallback, logging through the Website logger, and sending a `text/plain` JSON beacon without cookies. Its payload is limited to `{ category, component, route }`; the normal boundary event uses `category: "render"`. The Astro collector at `astro/src/pages/api/error-report.ts` enforces the origin allowlist and a 2 KB payload limit, rejects unknown fields, and applies a per-client rate limit. It derives build and environment on the server rather than trusting caller values.
+
+The collector keeps only the category, validated component label, allowlisted route family, build ID, environment, and timestamps in the `error-reports` Netlify Blob store. It expires events after 30 days. The error-analysis action in `netlify/lib/error-analysis.ts` groups the retained records into the dashboard's time series and breakdowns. Sanity restricts the view to administrators on supported datasets.
+
+=== [Operational checklist]
+
+- Keep `onError` synchronous, nonthrowing, and small. Do not block recovery on telemetry delivery.
+- Send stable labels and route templates. Do not attach raw error text, React stacks, user state, request bodies, email addresses, or credentials unless a separate reviewed design explicitly requires them.
+- Apply origin checks, payload limits, rate limits, retention, access control, and redaction at the collector boundary; client-side filtering alone is not a privacy control.
+- Group by category, component, route family, and build. Compare rates across releases and time windows; raw counts alone do not establish user impact.
+- Verify that boundary and global error handlers do not double-count the same failure. Test collector unavailability and keep the UI fallback usable when telemetry fails.
+- Treat `sanity-query` events separately from React `render` failures. The dashboard supports both, but only render events describe a caught UI exception.
+
+===
+
+See the [Sanity dashboard reference](/error-boundaries/3-analytics/sanity-error-analysis/) for the existing UI and its local fixture screenshot, [callback guidance](/error-boundaries/1-react/error-reporting/) for package-level behavior, and [the React boundary API](/error-boundaries/1-react/react-boundaries/) for the component contract.

@@ -13,17 +13,38 @@ IMPORTS
 import ts from 'typescript';
 // prettier-ignore
 import { accessibilityFindings, displayNameFindings, errorBoundaryFindings, fixAccessibleNames, fixDisplayNames, fixErrorBoundaries, uiComponentRecommendations } from '@terra-symposium/standards-ui-quality';
-import { aliasFindings, declarationScope, isCallbackDeclaration, isProtectedPath, isRenamableDeclaration, namingFindings, renameDeclaration, renameId } from '@terra-symposium/standards-naming';
-import { basename, dirname, isAbsolute, relative, resolve, sep } from 'node:path';
+import {
+	aliasFindings,
+	declarationScope,
+	isCallbackDeclaration,
+	isProtectedPath,
+	isRenamableDeclaration,
+	namingFindings,
+	parameterRenameCapturesDefault,
+	renameDeclaration,
+	renameId,
+} from '@terra-symposium/standards-naming';
+import { basename, dirname, extname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { buildGitHubReport, formatGitHubReport, hasGitHubAuth, qualityNodeReporterOptions, writeHistoryReport } from '@terra-symposium/standards-quality-reports';
-import { checkImports, duplicateImportFindings } from '@terra-symposium/standards-imports';
-import { collapseInlineIfs, collapseTypesAndObjects, maintainSrcFile, protectLongImports } from '@terra-symposium/standards-formatting';
-import { createQualityAnalysis, qualityProgress, setQualityProgressSuppressed, srcFiles, workingSrcFiles } from '@terra-symposium/standards-quality-core';
+import { checkImports, duplicateImportFindings, fixDuplicateImports } from '@terra-symposium/standards-imports';
+import { collapseInlineIfs, collapseTypesAndObjects } from '@terra-symposium/standards-formatting';
+import {
+	createQualityAnalysis,
+	hasGeneratedSourceHeader,
+	nonProgramSrcFiles,
+	QUALITY_CHECK_NAMES,
+	qualityProgress,
+	setQualityProgressSuppressed,
+	srcFiles,
+	workingSrcFiles,
+} from '@terra-symposium/standards-quality-core';
 // prettier-ignore
 import { deadCodeEditsIntroduceTypeErrors, deadCodeTypeProgram, fixObjectForwarding, fixSingleUseDeclarations, objectForwardingFindings, singleUseFindings } from '@terra-symposium/standards-refactoring';
-import { documentSrcFile, documentationFindings, documentedCommandFindings, fixDocumentedCommands } from '@terra-symposium/standards-documentation';
-import { existsSync, readFileSync, readdirSync, realpathSync, statSync, writeFileSync } from 'node:fs';
+import { documentationFindings, documentedCommandFindings, fixDocumentedCommands } from '@terra-symposium/standards-documentation';
+import { existsSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { isBuiltin } from 'node:module';
+import { tmpdir } from 'node:os';
 import { fixRegexDedup, fixRepeatedClasses, performancePatternFindings, regexFindings, repeatedClassFindings, runTailwindCanonical, uiPatternFindings } from '@terra-symposium/standards-patterns';
 import { inspectLanguageProfileTool, isLanguageProfileId, resolveLanguageProfiles } from '@terra-symposium/standards-language-checks';
 import { securityFindings } from '@terra-symposium/standards-security';
@@ -48,7 +69,7 @@ REGEX
 
 const BPLAYWRIGHT_B_U_REGEX = /\bplaywright\b/u;
 const BWORKSPACE_TEST_RUNNER_JS_B_U_REGEX = /\bworkspace-test-runner\.js\b/u;
-const NON_WORKSPACE_DIRS = new Set(['.git', '.next', '.nuxt', '.turbo', '.vercel', '.vite', '.astro', 'build', 'coverage', 'dist', 'node_modules', 'out', 'vendor']);
+const NON_WORKSPACE_DIRS = new Set(['.git', '.next', '.nuxt', '.turbo', '.vercel', '.vite', '.astro', 'build', 'coverage', 'dist', 'node_modules', 'out', 'target', 'vendor']);
 
 /*//////////////////////////////////////////////////
 REGEX
@@ -97,7 +118,23 @@ const CLI_CMDS = new Set([
 	'knip',
 	'types',
 ]);
-const CLI_FLAGS = new Set(['--all', '--warn', '--strict', '--skip-commands', '--skip-recommendations', '--help', '-h', '--version', '-v', '--report-json', '--branch', '--base-sha', '--repository']);
+const CLI_FLAGS = new Set([
+	'--all',
+	'--warn',
+	'--fix',
+	'--safe-fix',
+	'--strict',
+	'--skip-commands',
+	'--skip-recommendations',
+	'--help',
+	'-h',
+	'--version',
+	'-v',
+	'--report-json',
+	'--branch',
+	'--base-sha',
+	'--repository',
+]);
 const TOOL_OUTPUT_MAX_BUFFER = 64 * 1024 * 1024;
 const ESLINT_CONFIG_NAMES = ['eslint.config.js', 'eslint.config.mjs', 'eslint.config.cjs', 'eslint.config.ts', 'eslint.config.mts', 'eslint.config.cts'];
 
@@ -113,6 +150,42 @@ function findEslintConfig(root: string, configRoot = resolve(root, 'config')): s
 	const configDirConfigs = ESLINT_CONFIG_NAMES.map((n) => resolve(configRoot, n));
 	const rootConfigs = ESLINT_CONFIG_NAMES.map((n) => resolve(root, n));
 	return [...configDirConfigs, ...rootConfigs].find((p) => existsSync(p));
+}
+
+/**
+ * Resolves Node's source type from an explicit extension or the nearest package boundary.
+ *
+ * @param root Repository root containing the source file.
+ * @param file Absolute source path.
+ *
+ * @return Whether the file uses CommonJS semantics.
+ */
+function isCommonJsSource(root: string, file: string): boolean {
+	const ext = extname(file);
+	if (ext === '.cjs' || ext === '.cts') return true;
+	if (ext === '.mjs' || ext === '.mts') return false;
+	let scope = dirname(file);
+	while (true) {
+		const relativeScope = relative(root, scope);
+		if (isAbsolute(relativeScope) || relativeScope === '..' || relativeScope.startsWith(`..${sep}`)) break;
+		const manifest = join(scope, 'package.json');
+		if (existsSync(manifest)) return (JSON.parse(readFileSync(manifest, 'utf8')) as { type?: unknown }).type !== 'module';
+		if (scope === root) break;
+		scope = dirname(scope);
+	}
+	return true;
+}
+
+/**
+ * Escapes one repository-relative source path for a flat ESLint files pattern.
+ *
+ * @param root Repository root used to produce the pattern.
+ * @param file Absolute source path.
+ *
+ * @return Exact escaped ESLint pattern for the source file.
+ */
+function eslintFilePattern(root: string, file: string): string {
+	return [...relative(root, file).split(sep).join('/')].map((character) => (ESLINT_GLOB_SPECIALS.has(character) ? `\\${character}` : character)).join('');
 }
 
 /**
@@ -268,6 +341,8 @@ export function loadQualityCfg(file?: string): QualityCfg {
 export function createQualityCfg(cfg: QualityCfg): QualityCfg {
 	const root = resolve(cfg.root);
 	const configRoot = resolve(root, cfg.configRoot ?? 'config');
+	const unknownChecks = Object.keys(cfg.enabledChecks ?? {}).filter((check) => !QUALITY_CHECK_NAMES.includes(check as QualityCheckName));
+	if (unknownChecks.length) throw new Error(`Unknown quality check${unknownChecks.length === 1 ? '' : 's'}: ${unknownChecks.join(', ')}. Available checks: ${QUALITY_CHECK_NAMES.join(', ')}.`);
 	const langProfiles = cfg.languageProfiles ?? [];
 	if (!Array.isArray(langProfiles)) throw new Error('languageProfiles must be an array of profile names.');
 	for (const profile of langProfiles) {
@@ -303,10 +378,25 @@ export function createQualityCfg(cfg: QualityCfg): QualityCfg {
  * @return Executable path or name suitable for spawning.
  */
 function toolPath(cfg: QualityCfg, cfgd: string | undefined, fallback: string): string {
-	if (cfgd && (cfgd.includes('/') || cfgd.includes('\\'))) return cfgd;
+	if (cfgd && (cfgd.includes('/') || cfgd.includes('\\'))) return isAbsolute(cfgd) ? cfgd : resolve(cfg.root, cfgd);
 	const executable = cfgd ?? fallback;
 	const local = resolve(cfg.root, 'node_modules', '.bin', executable);
 	return existsSync(local) ? local : executable;
+}
+
+/**
+ * Checks whether a configured ESLint executable resolves to the repository's package installation.
+ *
+ * @param cfg Quality configuration containing the repository and tool roots.
+ *
+ * @return Whether the local ESLint API can preserve the configured tool.
+ */
+function canUseLocalEslintApi(cfg: QualityCfg): boolean {
+	const configured = cfg.tools?.eslint;
+	if (configured === undefined || configured === 'eslint') return true;
+	const configuredPath = resolve(cfg.root, configured);
+	const configRoot = cfg.configRoot ?? resolve(cfg.root, 'config');
+	return [resolve(cfg.root, 'node_modules', '.bin', 'eslint'), resolve(configRoot, 'node_modules', '.bin', 'eslint')].includes(configuredPath);
 }
 
 /**
@@ -578,12 +668,6 @@ function scriptNameForInvocation(check: QualityInvocation): string {
 	return '';
 }
 
-
-
-
-
-
-
 /**
  * Matches an exact workspace name or a simple repository-relative package filter.
  *
@@ -614,27 +698,24 @@ function matchesWorkspaceFilter(root: string, selector: string, manifest: Worksp
  */
 function invocationText(cfg: QualityCfg, check: QualityInvocation): string {
 	return `${check.name} ${check.command} ${scriptNameForInvocation(check)} ${(function scriptsForInvocation(cfg: QualityCfg, check: QualityInvocation): string[] {
-	const scriptName = scriptNameForInvocation(check);
-	if (!scriptName) return [];
-	const selectors = (function workspaceFilters(check: QualityInvocation): string[] {
-	const args = check.args ?? [];
-	const selectors: string[] = [];
-	for (let idx = 0; idx < args.length; idx++) {
-		const arg = args[idx]!;
-		if (arg === '--filter' && args[idx + 1]) selectors.push(args[++idx]!);
-		else if (arg.startsWith('--filter=')) selectors.push(arg.slice('--filter='.length));
-	}
-	return selectors;
-})(check);
-	const packages = selectors.length
-		? workspaceManifests(cfg.root).filter((m) => selectors.some((s) => matchesWorkspaceFilter(cfg.root, s, m)))
-		: workspaceManifests(cfg.root).filter((m) => m.directory === cfg.root);
-	return packages.map((m) => m.scripts[scriptName]).filter((s): s is string => typeof s === 'string');
-})(cfg, check).join(' ')}`.toLowerCase();
+		const scriptName = scriptNameForInvocation(check);
+		if (!scriptName) return [];
+		const selectors = (function workspaceFilters(check: QualityInvocation): string[] {
+			const args = check.args ?? [];
+			const selectors: string[] = [];
+			for (let idx = 0; idx < args.length; idx++) {
+				const arg = args[idx]!;
+				if (arg === '--filter' && args[idx + 1]) selectors.push(args[++idx]!);
+				else if (arg.startsWith('--filter=')) selectors.push(arg.slice('--filter='.length));
+			}
+			return selectors;
+		})(check);
+		const packages = selectors.length
+			? workspaceManifests(cfg.root).filter((m) => selectors.some((s) => matchesWorkspaceFilter(cfg.root, s, m)))
+			: workspaceManifests(cfg.root).filter((m) => m.directory === cfg.root);
+		return packages.map((m) => m.scripts[scriptName]).filter((s): s is string => typeof s === 'string');
+	})(cfg, check).join(' ')}`.toLowerCase();
 }
-
-
-
 
 /**
  * Assigns a configured command to the fixed runner phase order.
@@ -647,13 +728,16 @@ function invocationText(cfg: QualityCfg, check: QualityInvocation): string {
 function phaseForInvocation(cfg: QualityCfg, check: QualityInvocation): QualityPhase {
 	if (check.phase) return check.phase;
 	const text = invocationText(cfg, check);
-	if ((function isTestInvocation(cfg: QualityCfg, check: QualityInvocation): boolean {
-	return (
-		testRunner(cfg, check) !== 'unknown' ||
-		/\b(?:test|tests|spec|specs|playwright|vitest|jest|mocha|e2e|contract|integration)\b/u.test(invocationText(cfg, check)) ||
-		(check.args ?? []).some((a) => a === '--test' || a.startsWith('--test='))
-	);
-})(cfg, check)) return 'Tests';
+	if (
+		(function isTestInvocation(cfg: QualityCfg, check: QualityInvocation): boolean {
+			return (
+				testRunner(cfg, check) !== 'unknown' ||
+				/\b(?:test|tests|spec|specs|playwright|vitest|jest|mocha|e2e|contract|integration)\b/u.test(invocationText(cfg, check)) ||
+				(check.args ?? []).some((a) => a === '--test' || a.startsWith('--test='))
+			);
+		})(cfg, check)
+	)
+		return 'Tests';
 	if (/\b(?:format|prettier)\b/u.test(text)) return 'Format';
 	if (/\b(?:typecheck|type-check|types|tsc|astro\s+check)\b/u.test(text)) return 'Framework / type checks';
 	if (/\b(?:build|compile|bundle)\b/u.test(text)) return 'Build';
@@ -661,14 +745,6 @@ function phaseForInvocation(cfg: QualityCfg, check: QualityInvocation): QualityP
 	return 'Static quality';
 }
 
-/**
- * Groups selected tests by the kind of boundary they exercise.
- *
- * @param cfg Quality configuration containing repository commands.
- * @param check Configured test command to classify.
- *
- * @return Stable display category for the test suite.
- */
 /**
  * Identifies the runner family for configured test-command reporting.
  *
@@ -686,12 +762,6 @@ function testRunner(cfg: QualityCfg, check: QualityInvocation): 'node' | 'playwr
 	if ((nodeCmd && nodeTestArgs) || BWORKSPACE_TEST_RUNNER_JS_B_U_REGEX.test(text) || /\bnode\s+[^\n]*--test\b/u.test(text) || /\bpnpm\s+-r\s+test\b/u.test(text)) return 'node';
 	return 'unknown';
 }
-
-
-
-
-
-
 
 /**
  * Converts tool output into compact single-line messages without terminal control codes.
@@ -758,8 +828,6 @@ function run(cfg: QualityCfg, cmd: string, args: string[], opts: { quietSuccess?
  *
  * @param cfg Quality configuration defining the repository root.
  * @param check Test command selected by quality.json.
- * @param completed One-based completed-suite count.
- * @param total Number of selected, deduplicated suites.
  *
  * @return Exit status and captured output for this check's detail list.
  */
@@ -768,22 +836,26 @@ function runTestSuite(cfg: QualityCfg, check: QualityInvocation): { status: numb
 	const args = [...(check.args ?? [])];
 	const env = { ...process.env };
 	if (runner === 'node') {
-		const reporterUrl = new URL('@terra-symposium/standards-quality-reports', import.meta.url).href;
+		const reporterUrl = new URL('./node-reporter.js', import.meta.url).href;
 		env.NODE_OPTIONS = qualityNodeReporterOptions(env.NODE_OPTIONS, reporterUrl);
 		env.TERRA_QUALITY_NODE_REPORTER_OWNER = '1';
-		args.splice(0, args.length, ...(function withoutNodeReporterArgs(args: string[]): string[] {
-	const retained: string[] = [];
-	for (let idx = 0; idx < args.length; idx++) {
-		const arg = args[idx]!;
-		if (arg === '--test-reporter' || arg === '--test-reporter-destination') {
-			idx++;
-			continue;
-		}
-		if (arg.startsWith('--test-reporter=') || arg.startsWith('--test-reporter-destination=')) continue;
-		retained.push(arg);
-	}
-	return retained;
-})(args));
+		args.splice(
+			0,
+			args.length,
+			...(function withoutNodeReporterArgs(args: string[]): string[] {
+				const retained: string[] = [];
+				for (let idx = 0; idx < args.length; idx++) {
+					const arg = args[idx]!;
+					if (arg === '--test-reporter' || arg === '--test-reporter-destination') {
+						idx++;
+						continue;
+					}
+					if (arg.startsWith('--test-reporter=') || arg.startsWith('--test-reporter-destination=')) continue;
+					retained.push(arg);
+				}
+				return retained;
+			})(args),
+		);
 	} else if (runner === 'playwright') {
 		const reporterArg = `--reporter=${resolve(dirname(fileURLToPath(import.meta.url)), 'playwright-reporter.js')}`;
 		const selectedArgs: string[] = [];
@@ -831,9 +903,6 @@ function runTestSuite(cfg: QualityCfg, check: QualityInvocation): { status: numb
 	return { status, output };
 }
 
-
-
-
 /**
  * Runs configured and profile-provided checks assigned to one fixed phase.
  *
@@ -846,17 +915,17 @@ function runTestSuite(cfg: QualityCfg, check: QualityInvocation): { status: numb
  */
 function runQualityPhase(cfg: QualityCfg, phase: QualityPhase, profileChecks: ResolvedLanguageCheck[], toolResults: Map<string, ReturnType<typeof inspectLanguageProfileTool>>): number {
 	const cmds = (function qualityInvocations(cfg: QualityCfg, profileChecks: ResolvedLanguageCheck[]): QualityInvocation[] {
-	const configured = cfg.qualityCommands ?? [];
-	const profileNames = new Set(profileChecks.map((c) => c.name));
-	const configuredByName = new Map(configured.map((c) => [c.name, c]));
-	const profileInvocations = profileChecks.map((c): QualityInvocation => {
-		const override = configuredByName.get(c.name);
-		return override
-			? { ...override, phase: c.phase, profileId: c.profileId, qualityChecks: c.qualityChecks }
-			: { name: c.name, command: c.command, args: c.args, phase: c.phase, profileId: c.profileId, profileTool: c.tool, qualityChecks: c.qualityChecks };
-	});
-	return [...profileInvocations, ...configured.filter((c) => !profileNames.has(c.name))];
-})(cfg, profileChecks).filter((c) => qualityCmdEnabled(cfg, c.name) && phaseForInvocation(cfg, c) === phase);
+		const configured = cfg.qualityCommands ?? [];
+		const profileNames = new Set(profileChecks.map((c) => c.name));
+		const configuredByName = new Map(configured.map((c) => [c.name, c]));
+		const profileInvocations = profileChecks.map((c): QualityInvocation => {
+			const override = configuredByName.get(c.name);
+			return override
+				? { ...override, phase: c.phase, profileId: c.profileId, qualityChecks: c.qualityChecks }
+				: { name: c.name, command: c.command, args: c.args, phase: c.phase, profileId: c.profileId, profileTool: c.tool, qualityChecks: c.qualityChecks };
+		});
+		return [...profileInvocations, ...configured.filter((c) => !profileNames.has(c.name))];
+	})(cfg, profileChecks).filter((c) => qualityCmdEnabled(cfg, c.name) && phaseForInvocation(cfg, c) === phase);
 	/**
 	 * Checks and caches the required tool for a configured language profile.
 	 *
@@ -875,29 +944,29 @@ function runQualityPhase(cfg: QualityCfg, phase: QualityPhase, profileChecks: Re
 	let failures = 0;
 	if (phase === 'Tests') {
 		const suites = (function uniqueTestSuites(checks: QualityInvocation[]): QualityInvocation[] {
-	const seen = new Set<string>();
-	const unique = checks.filter((c) => {
-		const key = JSON.stringify([c.command, c.args ?? []]);
-		if (seen.has(key)) return false;
-		seen.add(key);
-		return true;
-	});
-	/**
-	 * Orders test commands so unit and integration checks run before broader suites.
-	 *
-	 * @param check Quality invocation or check being evaluated.
-	 *
-	 * @return Priority rank used to order the selected test commands.
-	 */
-	const rank = (check: QualityInvocation): number => {
-		const name = check.name.toLowerCase();
-		if (/\bunit\b/u.test(name)) return 0;
-		if (/\bintegration\b/u.test(name)) return 1;
-		if (/\b(?:browser|e2e|playwright)\b/u.test(name) || /\bplaywright\b/u.test([check.command, ...(check.args ?? [])].join(' '))) return 2;
-		return 3;
-	};
-	return unique.sort((l, r) => rank(l) - rank(r));
-})(cmds);
+			const seen = new Set<string>();
+			const unique = checks.filter((c) => {
+				const key = JSON.stringify([c.command, c.args ?? []]);
+				if (seen.has(key)) return false;
+				seen.add(key);
+				return true;
+			});
+			/**
+			 * Orders test commands so unit and integration checks run before broader suites.
+			 *
+			 * @param check Quality invocation or check being evaluated.
+			 *
+			 * @return Priority rank used to order the selected test commands.
+			 */
+			const rank = (check: QualityInvocation): number => {
+				const name = check.name.toLowerCase();
+				if (/\bunit\b/u.test(name)) return 0;
+				if (/\bintegration\b/u.test(name)) return 1;
+				if (/\b(?:browser|e2e|playwright)\b/u.test(name) || /\bplaywright\b/u.test([check.command, ...(check.args ?? [])].join(' '))) return 2;
+				return 3;
+			};
+			return unique.sort((l, r) => rank(l) - rank(r));
+		})(cmds);
 		for (const check of suites) {
 			try {
 				requireProfileTool(check);
@@ -1066,9 +1135,6 @@ function argumentBatches(files: string[]): string[][] {
 	return result;
 }
 
-
-
-
 /**
  * Selects either the complete configured scope or the changed working-tree scope.
  *
@@ -1093,9 +1159,6 @@ function scopedCfg(cfg: QualityCfg, all: boolean): QualityCfg {
 	return all ? cfg : { ...cfg, sourceRoots: filesFor(cfg, false) };
 }
 
-
-
-
 /**
  * Runs ESLint over the selected files in one API pass.
  *
@@ -1107,7 +1170,7 @@ function scopedCfg(cfg: QualityCfg, all: boolean): QualityCfg {
  * @return Nothing; failures are reflected in the process exit code.
  */
 function runLint(cfg: QualityCfg, opts: QualityOptions, exhaustive = false, deadCodeCoordinated = false): void {
-	const files = filesFor(cfg, opts.all).filter((f) => /\.(?:astro|cjs|js|jsx|mjs|ts|tsx)$/.test(f));
+	const files = filesFor(cfg, opts.all).filter((file) => /\.(?:astro|cjs|js|jsx|mjs|ts|tsx)$/.test(file) && !hasGeneratedSourceHeader(readFileSync(file, 'utf8')));
 	if (!files.length) return;
 	qualityHeader('lint', `${opts.fix ? 'Fixing' : 'Checking'} ${files.length} source files with ESLint`);
 	const flags = [
@@ -1125,25 +1188,32 @@ function runLint(cfg: QualityCfg, opts: QualityOptions, exhaustive = false, dead
 	const before = opts.fix ? snapshotFiles(cfg, files) : undefined;
 	let completed = 0;
 	qualityProgress('ESLint', completed, files.length);
-	let apiUnavailable = cfg.tools?.eslint !== undefined && cfg.tools.eslint !== 'eslint';
+	let apiUnavailable = !canUseLocalEslintApi(cfg);
 	if (!apiUnavailable) {
 		const result = spawnSync(process.execPath, ['--input-type=module'], {
 			cwd: cfg.root,
 			stdio: ['pipe', 'pipe', 'inherit'],
 			input: (function eslintApiSource(cfg: QualityCfg, files: string[], opts: QualityOptions, exhaustive: boolean, deadCodeCoordinated: boolean): string {
-	const payload = JSON.stringify({ root: cfg.root, files, fix: opts.fix, exhaustive, deadCodeCoordinated, eslintConfig: findEslintConfig(cfg.root, cfg.configRoot) });
-	const progressUrl = new URL('../../node_modules/@terra-symposium/standards-quality-core/dist/index.js', import.meta.url).href;
-	return `
+				const commonJsFiles = files.filter((file) => isCommonJsSource(cfg.root, file)).map((file) => ({ file, pattern: eslintFilePattern(cfg.root, file) }));
+				const payload = JSON.stringify({ root: cfg.root, files, commonJsFiles, fix: opts.fix, exhaustive, deadCodeCoordinated, eslintConfig: findEslintConfig(cfg.root, cfg.configRoot) });
+				return `
 import { createRequire } from 'node:module';
 import { resolve } from 'node:path';
 const options = ${payload};
-const { qualityProgress } = await import(${JSON.stringify(progressUrl)});
+const qualityProgress = () => {};
 let ESLint;
 let engine;
 try {
-	({ ESLint } = createRequire(resolve(options.root, 'package.json'))('eslint'));
+	const resolveEslint = (location) => {
+		try {
+			return createRequire(location)('eslint');
+		} catch {
+			return undefined;
+		}
+	};
+	({ ESLint } = resolveEslint(resolve(options.root, 'package.json')) ?? (options.eslintConfig ? resolveEslint(options.eslintConfig) : undefined) ?? {});
 	if (!ESLint) throw new Error('The installed ESLint package does not expose its API.');
-	engine = new ESLint({
+	const baseOptions = {
 		cwd: options.root,
 		cache: true,
 		cacheLocation: 'node_modules/.cache/eslint',
@@ -1151,8 +1221,28 @@ try {
 		warnIgnored: false,
 		fix: options.fix,
 		...(options.eslintConfig ? { overrideConfigFile: options.eslintConfig } : {}),
-		...(options.deadCodeCoordinated ? { overrideConfig: { rules: { 'unused-imports/no-unused-vars': 'off' } } } : {}),
-	});
+	};
+	const baseEngine = new ESLint(baseOptions);
+	const overrides = [];
+	if (options.deadCodeCoordinated) overrides.push({ rules: { 'unused-imports/no-unused-vars': 'off' } });
+	if (options.commonJsFiles.length) {
+		overrides.push({ files: options.commonJsFiles.map(({ pattern }) => pattern), languageOptions: { sourceType: 'commonjs' } });
+		const groups = new Map();
+		for (const { file, pattern } of options.commonJsFiles) {
+			const configuredRule = (await baseEngine.calculateConfigForFile(file))?.rules?.['@typescript-eslint/no-require-imports'];
+			const severity = Array.isArray(configuredRule) ? configuredRule[0] : configuredRule;
+			if (configuredRule === undefined || severity === 0 || severity === 'off') continue;
+			const configuredOptions = Array.isArray(configuredRule) && configuredRule[1] && typeof configuredRule[1] === 'object' ? configuredRule[1] : {};
+			const allow = Array.isArray(configuredOptions.allow) ? configuredOptions.allow : [];
+			const rule = [severity, { ...configuredOptions, allow: [...new Set([...allow, '^.+$'])] }];
+			const signature = JSON.stringify(rule);
+			const group = groups.get(signature) ?? { rule, patterns: [] };
+			group.patterns.push(pattern);
+			groups.set(signature, group);
+		}
+		for (const { rule, patterns } of groups.values()) overrides.push({ files: patterns, rules: { '@typescript-eslint/no-require-imports': rule } });
+	}
+	engine = overrides.length ? new ESLint({ ...baseOptions, overrideConfig: overrides }) : baseEngine;
 } catch {
 	process.exit(${ESLINT_API_FALLBACK});
 }
@@ -1171,7 +1261,7 @@ try {
 	process.exitCode = 2;
 }
 `;
-})(cfg, files, opts, exhaustive, deadCodeCoordinated),
+			})(cfg, files, opts, exhaustive, deadCodeCoordinated),
 			env: process.env,
 			maxBuffer: TOOL_OUTPUT_MAX_BUFFER,
 		});
@@ -1231,6 +1321,7 @@ function fixUnusedDeclarations(cfg: QualityCfg, reports: EslintReport[], changed
 		const unusedMsgs = report.messages.filter((m) => m.ruleId === 'unused-imports/no-unused-vars');
 		if (!unusedMsgs.length) continue;
 		const src = readFileSync(report.filePath, 'utf8');
+		if (hasGeneratedSourceHeader(src)) continue;
 		const ast = ts.createSourceFile(
 			report.filePath,
 			src,
@@ -1255,7 +1346,7 @@ function fixUnusedDeclarations(cfg: QualityCfg, reports: EslintReport[], changed
 					: ts.isVariableDeclaration(node) && ts.isIdentifier(node.name)
 						? node.name.text
 						: undefined;
-			const externallyConsumed = name ? importedConsumers.get(resolve(report.filePath))?.has(name) : false;
+			const externallyConsumed = name ? hasImportedExportConsumer(importedConsumers, report.filePath, name) : false;
 			/**
 			 * Determines whether a declaration is directly owned by the source file.
 			 *
@@ -1305,10 +1396,13 @@ function fixUnusedDeclarations(cfg: QualityCfg, reports: EslintReport[], changed
 		if (!edits.length) continue;
 		let updated = src;
 		for (const edit of edits.sort((a, b) => b.start - a.start)) updated = `${updated.slice(0, edit.start)}${updated.slice(edit.end)}`;
-		const diagnostics =
-			ts.transpileModule(updated, { fileName: report.filePath, reportDiagnostics: true, compilerOptions: { allowJs: true, jsx: ts.JsxEmit.Preserve, target: ts.ScriptTarget.ESNext } }).diagnostics ??
-			[];
-		if (diagnostics.some((d) => d.category === ts.DiagnosticCategory.Error)) continue;
+		if (
+			(
+				ts.transpileModule(updated, { fileName: report.filePath, reportDiagnostics: true, compilerOptions: { allowJs: true, jsx: ts.JsxEmit.Preserve, target: ts.ScriptTarget.ESNext } }).diagnostics ??
+				[]
+			).some((d) => d.category === ts.DiagnosticCategory.Error)
+		)
+			continue;
 		writeFileSync(report.filePath, updated);
 		changedFiles.add(report.filePath);
 		fixed += edits.length;
@@ -1389,9 +1483,8 @@ function canUseFocusedEslint(cfg: QualityCfg, flatCfg: string | undefined): bool
  * @return JavaScript module source for ESLint's temporary config loader.
  */
 function focusedEslintCfgSrc(cfg: QualityCfg, flatCfg: string, files: string[]): string {
-	const patterns = files.map((f) => (function eslintFilePattern(path: string): string {
-	return [...path].map((c) => (ESLINT_GLOB_SPECIALS.has(c) ? `\\${c}` : c)).join('');
-})(relative(cfg.root, f).split(sep).join('/')));
+	const patterns = files.map((f) => eslintFilePattern(cfg.root, f));
+	const commonJsFiles = files.filter((file) => isCommonJsSource(cfg.root, file));
 	return `
 import { createRequire } from 'node:module';
 import { resolve } from 'node:path';
@@ -1399,6 +1492,7 @@ const root = ${JSON.stringify(cfg.root)};
 const configPath = ${JSON.stringify(flatCfg)};
 const sourceFiles = ${JSON.stringify(files)};
 const filePatterns = ${JSON.stringify(patterns)};
+const commonJsFiles = new Set(${JSON.stringify(commonJsFiles)});
 try {
 	const requireFromRepo = createRequire(resolve(root, 'package.json'));
 	const { ESLint } = requireFromRepo('eslint');
@@ -1417,7 +1511,7 @@ try {
 		if (!languageOptions?.parser) throw new Error('ESLint did not resolve a parser for ' + file);
 		const parserOptions = { ...(languageOptions.parserOptions ?? {}) };
 		for (const key of ['project', 'projectService', 'program', 'tsconfigRootDir']) delete parserOptions[key];
-		const focusedLanguageOptions = { ...languageOptions, parserOptions };
+		const focusedLanguageOptions = { ...languageOptions, parserOptions, ...(commonJsFiles.has(file) ? { sourceType: 'commonjs' } : {}) };
 		const rule = effective.rules?.['unused-imports/no-unused-vars'];
 		const severity = Array.isArray(rule) ? rule[0] : rule;
 		const active = rule !== undefined && severity !== 0 && severity !== 'off';
@@ -1590,8 +1684,7 @@ function unusedDeclarationFindings(cfg: QualityCfg, reports: EslintReport[]): De
 		if ((ast as ts.SourceFile & { parseDiagnostics: readonly ts.Diagnostic[] }).parseDiagnostics.length)
 			throw new Error(`ESLint reported unused declarations in unparsable source: ${report.filePath}`);
 		for (const msg of report.messages.filter((e) => e.ruleId === 'unused-imports/no-unused-vars')) {
-			const text = lines[msg.line - 1]?.slice(Math.max(0, msg.column - 1)) ?? '';
-			const name = text.match(/^[A-Za-z_$][\w$]*/)?.[0] ?? msg.message?.match(/^'([^']+)'/)?.[1] ?? '<unknown>';
+			const name = (lines[msg.line - 1]?.slice(Math.max(0, msg.column - 1)) ?? '').match(/^[A-Za-z_$][\w$]*/)?.[0] ?? msg.message?.match(/^'([^']+)'/)?.[1] ?? '<unknown>';
 			const pos = ast.getPositionOfLineAndCharacter(msg.line - 1, msg.column - 1);
 			let declaration: ts.Node | undefined;
 			/**
@@ -1638,6 +1731,10 @@ function unusedDeclarationFindings(cfg: QualityCfg, reports: EslintReport[]): De
 				}
 			} else if (declaration && !declarationExported) {
 				reason = 'This unused binding is nested inside another declaration; removing its enclosing function or component would change behavior.';
+			}
+			if (autofixable && hasGeneratedSourceHeader(src)) {
+				autofixable = false;
+				reason = 'This declaration is in generator-owned source; update its schema or generator input and regenerate the file instead of editing it here.';
 			}
 			findings.push({
 				rule: 'eslint/unused-private-declaration',
@@ -1747,8 +1844,14 @@ function runProjectTypecheck(cfg: QualityCfg): void {
  */
 function repairMissingImports(cfg: QualityCfg, program: ts.Program, checker: ts.TypeChecker): void {
 	const candidates = new Map<string, ts.SourceFile[]>();
+	const scopedSources = new Set(
+		srcFiles(cfg)
+			.filter((file) => C_M_JS_TS_X_REGEX.test(file))
+			.map((file) => resolve(file)),
+	);
 	for (const source of program.getSourceFiles()) {
-		if (!source.fileName.startsWith(`${cfg.root}${sep}`) || !C_M_JS_TS_X_REGEX.test(source.fileName)) continue;
+		if (!scopedSources.has(resolve(source.fileName)) || !C_M_JS_TS_X_REGEX.test(source.fileName)) continue;
+		if (hasGeneratedSourceHeader(source.text)) continue;
 		const module = checker.getSymbolAtLocation(source);
 		for (const exported of module ? checker.getExportsOfModule(module) : []) {
 			const list = candidates.get(exported.name) ?? [];
@@ -1788,7 +1891,7 @@ function repairMissingImports(cfg: QualityCfg, program: ts.Program, checker: ts.
 
 	// WALKTHROUGH
 	for (const src of program.getSourceFiles()) {
-		if (!src.fileName.startsWith(`${cfg.root}${sep}`) || !C_M_JS_TS_X_REGEX.test(src.fileName)) continue;
+		if (!scopedSources.has(resolve(src.fileName)) || !C_M_JS_TS_X_REGEX.test(src.fileName)) continue;
 		const missing = new Map<string, { source: ts.SourceFile; typeOnly: boolean }>();
 		const importedNames = new Set<string>();
 		for (const statement of src.statements.filter(ts.isImportDeclaration)) {
@@ -1859,12 +1962,38 @@ function repairMissingImports(cfg: QualityCfg, program: ts.Program, checker: ts.
 function readKnipIssues(cfg: QualityCfg): KnipIssue[] {
 	const knip = toolPath(cfg, cfg.tools?.knip, 'knip');
 	const knipConfig = [resolve(cfg.configRoot ?? resolve(cfg.root, 'config'), 'knip.json'), resolve(cfg.root, 'knip.json')].find((p) => existsSync(p));
-	const result = spawnSync(knip, [...(knipConfig ? ['--config', knipConfig] : []), '--reporter', 'json', '--no-config-hints'], {
-		cwd: cfg.root,
-		encoding: 'utf8',
-		env: process.env,
-		maxBuffer: TOOL_OUTPUT_MAX_BUFFER,
-	});
+	const config = loadKnipConfig(cfg, knipConfig);
+	const knipRoot = knipWorkingDir(cfg, knipConfig, config);
+	const configuredToolUsage = addConfiguredToolsToKnipConfig(cfg, config);
+	const mappedDependencyUsage = mappedKnipDependencyUsage(cfg);
+	if (mappedDependencyUsage.length) config.ignoreDependencies = mergeKnipNames(config.ignoreDependencies, new Set(mappedDependencyUsage));
+	const excludedContent = nonProgramSrcFiles(cfg)
+		.map((path) => relative(knipRoot, path).split(sep).join('/'))
+		.filter((path) => path !== '..' && !path.startsWith('../') && !isAbsolute(path));
+	const temporaryConfigRoot = excludedContent.length || configuredToolUsage || mappedDependencyUsage.length ? mkdtempSync(join(tmpdir(), 'terra-quality-knip-')) : undefined;
+	let effectiveConfig = knipConfig;
+	if (temporaryConfigRoot) {
+		const existingIgnores = Array.isArray(config.ignoreFiles)
+			? config.ignoreFiles.filter((item): item is string => typeof item === 'string')
+			: typeof config.ignoreFiles === 'string'
+				? [config.ignoreFiles]
+				: [];
+		config.ignoreFiles = [...new Set([...existingIgnores, ...excludedContent])];
+		const genConfig = join(temporaryConfigRoot, 'knip.json');
+		effectiveConfig = genConfig;
+		writeFileSync(genConfig, JSON.stringify(config, null, '\t') + '\n');
+	}
+	let result: { error?: Error; status: number | null; stderr: string; stdout: string };
+	try {
+		result = spawnSync(knip, [...(effectiveConfig ? ['--config', effectiveConfig] : []), '--reporter', 'json', '--no-config-hints'], {
+			cwd: knipRoot,
+			encoding: 'utf8' as const,
+			env: process.env,
+			maxBuffer: TOOL_OUTPUT_MAX_BUFFER,
+		});
+	} finally {
+		if (temporaryConfigRoot) rmSync(temporaryConfigRoot, { recursive: true, force: true });
+	}
 	if (result.error || (result.status !== 0 && result.status !== 1)) throw new Error(`Knip failed: ${result.error?.message ?? result.stderr ?? result.status}`);
 	let issues: KnipIssue[];
 	try {
@@ -1873,6 +2002,7 @@ function readKnipIssues(cfg: QualityCfg): KnipIssue[] {
 		issues = parsed.issues;
 		for (const issue of issues) {
 			if (!issue || typeof issue.file !== 'string' || !issue.file) throw new Error('finding without a source file');
+			issue.file = knipRepoPath(cfg, knipRoot, issue.file);
 			assertKnipPath(cfg, issue.file, 'finding source');
 			for (const [kind, val] of Object.entries(issue)) {
 				if (kind === 'file') continue;
@@ -1887,7 +2017,8 @@ function readKnipIssues(cfg: QualityCfg): KnipIssue[] {
 					const named = i as { name?: unknown; line?: unknown };
 					if (typeof named.name !== 'string' || !named.name || (named.line !== undefined && (typeof named.line !== 'number' || !Number.isInteger(named.line) || named.line < 1)))
 						throw new Error(`malformed ${kind} finding for ${issue.file}`);
-					if (kind === 'files') assertKnipPath(cfg, named.name, 'unreachable file');
+					if (kind === 'files') named.name = knipRepoPath(cfg, knipRoot, named.name);
+					if (kind === 'files') assertKnipPath(cfg, named.name as string, 'unreachable file');
 				}
 			}
 		}
@@ -1896,6 +2027,344 @@ function readKnipIssues(cfg: QualityCfg): KnipIssue[] {
 	}
 	if (result.status === 1 && issues.length === 0) throw new Error('Knip reported failure without findings');
 	return issues;
+}
+
+/**
+ * Finds declared dependencies actually imported by a source tree owned by a nested package.
+ *
+ * @param cfg Quality configuration containing source-to-package ownership mappings.
+ *
+ * @return Sorted package names whose imports and manifest declarations both exist.
+ */
+function mappedKnipDependencyUsage(cfg: QualityCfg): string[] {
+	const usedDependencies = new Set<string>();
+	const sourceFiles = srcFiles(cfg);
+	for (const mapping of cfg.knipPackageMappings ?? []) {
+		const packageRoot = resolve(cfg.root, mapping.packageRoot);
+		const packageRelative = relative(cfg.root, packageRoot);
+		if (packageRelative === '..' || packageRelative.startsWith(`..${sep}`) || isAbsolute(packageRelative)) throw new Error(`Knip package root is outside the repository: ${mapping.packageRoot}`);
+		const manifestPath = join(packageRoot, 'package.json');
+		if (!existsSync(manifestPath)) throw new Error(`Knip package root has no package.json: ${mapping.packageRoot}`);
+		const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as Record<string, unknown>;
+		const declaredDependencies = new Set<string>();
+		for (const section of ['dependencies', 'devDependencies', 'optionalDependencies', 'peerDependencies']) {
+			const dependencies = manifest[section];
+			if (dependencies && typeof dependencies === 'object' && !Array.isArray(dependencies)) {
+				for (const name of Object.keys(dependencies)) declaredDependencies.add(name);
+			}
+		}
+		const sourceRoots = mapping.sourceRoots.map((sourceRoot) => resolve(cfg.root, sourceRoot));
+		for (const sourceRoot of sourceRoots) {
+			const sourceRelative = relative(cfg.root, sourceRoot);
+			if (sourceRelative === '..' || sourceRelative.startsWith(`..${sep}`) || isAbsolute(sourceRelative)) throw new Error(`Knip source root is outside the repository: ${sourceRoot}`);
+		}
+		const mappedFiles = new Set(sourceFiles.filter((file) => sourceRoots.some((sourceRoot) => file === sourceRoot || file.startsWith(`${sourceRoot}${sep}`))));
+		for (const sourceRoot of sourceRoots) {
+			if (existsSync(sourceRoot) && statSync(sourceRoot).isDirectory()) {
+				for (const stylesheet of stylesheetFiles(sourceRoot, cfg.skippedDirectories ?? [])) mappedFiles.add(stylesheet);
+			}
+		}
+		for (const file of mappedFiles) {
+			for (const specifier of sourcePackageSpecifiers(file)) {
+				const packageName = packageNameFromSpecifier(specifier);
+				if (packageName && declaredDependencies.has(packageName)) usedDependencies.add(packageName);
+			}
+		}
+	}
+	return [...usedDependencies].sort();
+}
+
+/**
+ * Finds stylesheet source files under mapped roots, excluding dependency and build trees.
+ *
+ * @param root Mapped source directory.
+ * @param additionalSkips Repository-specific directory names excluded from authored sources.
+ *
+ * @return Sorted stylesheet paths under the source root.
+ */
+function stylesheetFiles(root: string, additionalSkips: string[]): string[] {
+	const stylesheetExts = new Set(['.css', '.less', '.sass', '.scss']);
+	const skipped = new Set([...NON_WORKSPACE_DIRS, ...additionalSkips]);
+	const files: string[] = [];
+	const pending = [root];
+	while (pending.length) {
+		const current = pending.pop()!;
+		for (const entry of readdirSync(current, { withFileTypes: true })) {
+			const path = join(current, entry.name);
+			if (entry.isDirectory()) {
+				if (!skipped.has(entry.name)) pending.push(path);
+			} else if (entry.isFile() && stylesheetExts.has(extname(entry.name).toLowerCase())) files.push(path);
+		}
+	}
+	return files.sort();
+}
+
+/**
+ * Extracts module specifiers from source imports and stylesheet directives.
+ *
+ * @param file Source file to inspect.
+ *
+ * @return Package and relative module specifiers found in the file.
+ */
+function sourcePackageSpecifiers(file: string): string[] {
+	const text = readFileSync(file, 'utf8');
+	const ext = extname(file).toLowerCase();
+	const codeText = ext === '.astro' ? (text.match(/^---\s*\r?\n([\s\S]*?)\r?\n---/u)?.[1] ?? '') : text;
+	const scriptKind = ext === '.tsx' || ext === '.jsx' || ext === '.astro' ? ts.ScriptKind.TSX : ext === '.ts' || ext === '.mts' || ext === '.cts' ? ts.ScriptKind.TS : ts.ScriptKind.JS;
+	const parsed = ts.createSourceFile(file, codeText, ts.ScriptTarget.Latest, true, scriptKind);
+	const specifiers: string[] = [];
+	const addLiteral = (node: ts.Node | undefined): void => {
+		if (node && (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node))) specifiers.push(node.text);
+	};
+	const visit = (node: ts.Node): void => {
+		if (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) addLiteral(node.moduleSpecifier);
+		if (ts.isImportTypeNode(node) && ts.isLiteralTypeNode(node.argument)) addLiteral(node.argument.literal);
+		if (ts.isCallExpression(node)) {
+			if (node.expression.kind === ts.SyntaxKind.ImportKeyword) addLiteral(node.arguments[0]);
+			if (ts.isIdentifier(node.expression) && node.expression.text === 'require') addLiteral(node.arguments[0]);
+			if (ts.isPropertyAccessExpression(node.expression) && node.expression.name.text === 'resolve') {
+				const resolver = node.expression.expression;
+				const isRequireResolve = ts.isIdentifier(resolver) && resolver.text === 'require';
+				const isImportMetaResolve = ts.isMetaProperty(resolver) && resolver.keywordToken === ts.SyntaxKind.ImportKeyword && resolver.name.text === 'meta';
+				if (isRequireResolve || isImportMetaResolve) addLiteral(node.arguments[0]);
+			}
+		}
+		ts.forEachChild(node, visit);
+	};
+	visit(parsed);
+	if (['.css', '.scss', '.sass', '.less', '.astro'].includes(ext)) {
+		for (const match of text.matchAll(/(?:@import|@use|@forward|@plugin)\s+(?:url\()?\s*["']([^"']+)["']/gu)) {
+			if (match[1]) specifiers.push(match[1]);
+		}
+	}
+	return specifiers;
+}
+
+/**
+ * Reduces a module specifier to its external package name.
+ *
+ * @param specifier Source import specifier.
+ *
+ * @return External package name, or undefined for relative, absolute, or built-in imports.
+ */
+function packageNameFromSpecifier(specifier: string): string | undefined {
+	if (!specifier || specifier.startsWith('.') || specifier.startsWith('/') || isBuiltin(specifier)) return undefined;
+	const parts = specifier.split('/');
+	return specifier.startsWith('@') ? (parts.length > 1 ? `${parts[0]}/${parts[1]}` : undefined) : parts[0];
+}
+
+/**
+ * Loads Knip settings for the shared source-classification overlay.
+ *
+ * @param cfg Quality configuration defining the repository root.
+ * @param knipConfig Existing Knip configuration file, when present.
+ *
+ * @return Mutable Knip settings used for cwd selection and content-artifact patterns.
+ */
+function loadKnipConfig(cfg: QualityCfg, knipConfig: string | undefined): Record<string, unknown> {
+	if (!knipConfig) {
+		const configPackage = resolve(cfg.configRoot ?? resolve(cfg.root, 'config'), 'package.json');
+		const packagePath = existsSync(configPackage) ? configPackage : resolve(cfg.root, 'package.json');
+		if (!existsSync(packagePath)) return {};
+		const manifest = JSON.parse(readFileSync(packagePath, 'utf8')) as { knip?: unknown };
+		return manifest.knip && typeof manifest.knip === 'object' && !Array.isArray(manifest.knip) ? (manifest.knip as Record<string, unknown>) : {};
+	}
+	if (/\.jsonc?$/iu.test(knipConfig)) {
+		const parsed = ts.parseConfigFileTextToJson(knipConfig, readFileSync(knipConfig, 'utf8'));
+		if (parsed.error) throw new Error(`Could not parse Knip configuration ${knipConfig}: ${ts.flattenDiagnosticMessageText(parsed.error.messageText, '\n')}`);
+		if (!parsed.config || typeof parsed.config !== 'object' || Array.isArray(parsed.config)) throw new Error(`Knip configuration must contain an object: ${knipConfig}`);
+		return parsed.config as Record<string, unknown>;
+	}
+	if (/\.[cm]?js$/iu.test(knipConfig)) {
+		const loadModule =
+			"import { pathToFileURL } from 'node:url'; const loaded = await import(pathToFileURL(process.argv[1]).href); const config = loaded.default ?? loaded; process.stdout.write(JSON.stringify(config));";
+		const loaded = spawnSync(process.execPath, ['--input-type=module', '-e', loadModule, knipConfig], { cwd: cfg.root, encoding: 'utf8' as const, maxBuffer: TOOL_OUTPUT_MAX_BUFFER });
+		if (loaded.error || loaded.status !== 0) throw new Error(`Could not load Knip configuration ${knipConfig}: ${loaded.error?.message ?? loaded.stderr ?? loaded.status}`);
+		try {
+			const parsed = JSON.parse(loaded.stdout) as unknown;
+			if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('configuration must export an object');
+			return parsed as Record<string, unknown>;
+		} catch (err) {
+			throw new Error(`Could not read Knip configuration ${knipConfig}: ${err instanceof Error ? err.message : String(err)}`, { cause: err });
+		}
+	}
+	throw new Error(`Cannot apply shared source classification to Knip configuration ${knipConfig}; use a JSON, JSONC, or JavaScript config.`);
+}
+
+/**
+ * Adds configured executable usage to the temporary Knip settings.
+ *
+ * @param cfg Quality configuration that declares executable paths.
+ * @param config Knip settings loaded for this run.
+ *
+ * @return Whether configured tool usage was added to the settings.
+ */
+function addConfiguredToolsToKnipConfig(cfg: QualityCfg, config: Record<string, unknown>): boolean {
+	const dependencyNames = new Set<string>();
+	const binaryNames = new Set<string>();
+	for (const configuredPath of Object.values(cfg.tools ?? {})) {
+		if (!configuredPath) continue;
+		const executableName = basename(configuredPath).replace(/\.exe$/iu, '');
+		const dependencyName = executableName === 'tsc' ? 'typescript' : executableName;
+		const executablePath = configuredToolPath(cfg, configuredPath);
+		if (executablePath && toolDependencyOwner(cfg, executablePath, dependencyName)) dependencyNames.add(dependencyName);
+		else binaryNames.add(executableName);
+	}
+	if (!dependencyNames.size && !binaryNames.size) return false;
+	if (dependencyNames.size) config.ignoreDependencies = mergeKnipNames(config.ignoreDependencies, dependencyNames);
+	if (binaryNames.size) config.ignoreBinaries = mergeKnipNames(config.ignoreBinaries, binaryNames);
+	return true;
+}
+
+/**
+ * Resolves a configured executable path from the repository or configuration package.
+ *
+ * @param cfg Quality configuration defining the repository and tool-config roots.
+ * @param configuredPath Executable path or command name from quality.json.
+ *
+ * @return Resolved executable path when it exists locally.
+ */
+function configuredToolPath(cfg: QualityCfg, configuredPath: string): string | undefined {
+	if (configuredPath.includes('/') || configuredPath.includes('\\')) {
+		const path = isAbsolute(configuredPath) ? configuredPath : resolve(cfg.root, configuredPath);
+		return existsSync(path) ? path : undefined;
+	}
+	const configRoot = cfg.configRoot ?? resolve(cfg.root, 'config');
+	return [resolve(cfg.root, 'node_modules', '.bin', configuredPath), resolve(configRoot, 'node_modules', '.bin', configuredPath)].find(existsSync);
+}
+
+/**
+ * Finds the nearest package manifest that declares a configured executable dependency.
+ *
+ * @param cfg Quality configuration defining the repository boundary.
+ * @param executablePath Resolved executable path.
+ * @param dependencyName Package name inferred from the executable name.
+ *
+ * @return Owning package root when the dependency is declared.
+ */
+function toolDependencyOwner(cfg: QualityCfg, executablePath: string, dependencyName: string): string | undefined {
+	let dir = dirname(executablePath);
+	while (dir === cfg.root || dir.startsWith(`${cfg.root}${sep}`)) {
+		const manifestPath = join(dir, 'package.json');
+		if (existsSync(manifestPath)) {
+			const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as Record<string, unknown>;
+			if (
+				['dependencies', 'devDependencies', 'optionalDependencies', 'peerDependencies'].some((field) => {
+					const deps = manifest[field];
+					return !!deps && typeof deps === 'object' && dependencyName in deps;
+				})
+			)
+				return dir;
+		}
+		if (dir === cfg.root) break;
+		const parent = dirname(dir);
+		if (parent === dir) break;
+		dir = parent;
+	}
+	return undefined;
+}
+
+/**
+ * Merges configured tool names into one Knip setting without duplicating existing entries.
+ *
+ * @param existing Existing Knip setting value.
+ * @param additions Configured package or binary names used by Quality.
+ *
+ * @return Sorted unique names for the temporary Knip configuration.
+ */
+function mergeKnipNames(existing: unknown, additions: Set<string>): string[] {
+	const names = new Set(Array.isArray(existing) ? existing.filter((name): name is string => typeof name === 'string') : typeof existing === 'string' ? [existing] : []);
+	for (const name of additions) names.add(name);
+	return [...names].sort();
+}
+
+/**
+ * Selects the package root for Knip while preserving explicit repository workspaces.
+ *
+ * @param cfg Quality configuration defining the repository and optional config root.
+ * @param knipConfig Existing Knip configuration file, when present.
+ * @param knipSettings Parsed Knip configuration used to detect root-relative workspaces.
+ *
+ * @return The directory Knip should use as its working root.
+ */
+function knipWorkingDir(cfg: QualityCfg, knipConfig: string | undefined, knipSettings: Record<string, unknown>): string {
+	const configRoot = resolve(cfg.configRoot ?? resolve(cfg.root, 'config'));
+	const configPath = knipConfig ? relative(configRoot, knipConfig) : existsSync(join(configRoot, 'package.json')) ? '' : '..';
+	const workspaces = knipSettings.workspaces;
+	if (!!workspaces && typeof workspaces === 'object' && Object.keys(workspaces).length > 0) {
+		const candidates = [...new Set([configRoot, cfg.root])];
+		const scored = candidates.map((root) => ({ root, score: knipWorkspaceRootScore(cfg.root, root, workspaces as Record<string, unknown>) }));
+		scored.sort((left, right) => right.score - left.score);
+		if (scored[0]!.score >= 0 && (scored.length === 1 || scored[0]!.score > scored[1]!.score)) return scored[0]!.root;
+		if (existsSync(join(configRoot, 'package.json'))) return configRoot;
+		return cfg.root;
+	}
+	if (configPath !== '..' && !configPath.startsWith(`..${sep}`) && !isAbsolute(configPath) && existsSync(join(configRoot, 'package.json'))) return configRoot;
+	return cfg.root;
+}
+
+/**
+ * Scores a candidate Knip working root against explicit workspace paths and source globs.
+ *
+ * @param repoRoot Quality repository boundary that candidate workspace paths must remain inside.
+ * @param workingRoot Candidate directory Knip would interpret workspace paths from.
+ * @param workspaces Knip workspace configuration keyed by relative package paths.
+ *
+ * @return A nonnegative score for in-repository workspace layouts, or `-1` when a workspace escapes.
+ */
+function knipWorkspaceRootScore(repoRoot: string, workingRoot: string, workspaces: Record<string, unknown>): number {
+	const repo = resolve(repoRoot);
+	const root = resolve(workingRoot);
+	let score = 0;
+	for (const [workspace, rawSettings] of Object.entries(workspaces)) {
+		const workspacePrefix = knipLiteralPrefix(workspace);
+		const hasWorkspaceGlob = workspacePrefix !== workspace;
+		const workspacePath = resolve(root, workspacePrefix || '.');
+		const workspaceRelative = relative(repo, workspacePath);
+		if (workspaceRelative === '..' || workspaceRelative.startsWith(`..${sep}`) || isAbsolute(workspaceRelative)) return -1;
+		if (existsSync(workspacePath)) score += 1;
+		if (existsSync(join(workspacePath, 'package.json'))) score += 3;
+		else if (existsSync(workspacePath) && readdirSync(workspacePath, { withFileTypes: true }).some((entry) => entry.isDirectory() && existsSync(join(workspacePath, entry.name, 'package.json'))))
+			score += 2;
+		if (hasWorkspaceGlob || !rawSettings || typeof rawSettings !== 'object' || Array.isArray(rawSettings)) continue;
+		const settings = rawSettings as { entry?: unknown; project?: unknown };
+		for (const pattern of [...(Array.isArray(settings.entry) ? settings.entry : []), ...(Array.isArray(settings.project) ? settings.project : [])]) {
+			if (typeof pattern !== 'string' || !pattern) continue;
+			const literalPrefix = knipLiteralPrefix(pattern);
+			const hasPatternGlob = literalPrefix !== pattern;
+			const target = resolve(workspacePath, literalPrefix || '.');
+			const targetRelative = relative(repo, target);
+			if (targetRelative === '..' || targetRelative.startsWith(`..${sep}`) || isAbsolute(targetRelative)) return -1;
+			if (existsSync(target)) score += hasPatternGlob ? 1 : 2;
+		}
+	}
+	return score;
+}
+
+/**
+ * Returns the non-glob path prefix of a Knip workspace or source pattern.
+ *
+ * @param pattern Knip-relative path that may contain glob syntax.
+ *
+ * @return The path before its first wildcard token.
+ */
+function knipLiteralPrefix(pattern: string): string {
+	const wildcardIndexes = ['*', '?', '{', '['].map((token) => pattern.indexOf(token)).filter((i) => i >= 0);
+	const wildcardAt = wildcardIndexes.length ? Math.min(...wildcardIndexes) : pattern.length;
+	return pattern.slice(0, wildcardAt).replace(/[\\/]+$/u, '');
+}
+
+/**
+ * Resolves a Knip-relative path to the repository-relative path used by Quality diagnostics.
+ *
+ * @param cfg Quality configuration defining the repository root.
+ * @param knipRoot Directory from which Knip ran.
+ * @param path Path reported by Knip.
+ *
+ * @return Normalized repository-relative path.
+ */
+function knipRepoPath(cfg: QualityCfg, knipRoot: string, path: string): string {
+	return relative(cfg.root, resolve(knipRoot, path)).split(sep).join('/');
 }
 
 /**
@@ -1917,7 +2386,6 @@ function assertKnipPath(cfg: QualityCfg, path: string, label: string): string {
 	return absolute;
 }
 
-
 /**
  * Checks whether a name is a configured framework-discovered route export.
  *
@@ -1930,11 +2398,12 @@ function assertKnipPath(cfg: QualityCfg, path: string, label: string): string {
 function isFrameworkEntryExport(cfg: QualityCfg, file: string, name: string): boolean {
 	const publicRoute = !basename(file).startsWith('_');
 	return Object.entries(cfg.frameworkEntryExports ?? {}).some(([p, n]) => {
-		const pathMatches =
-			p === file ||
-			(publicRoute && p.endsWith('/**/*.ts') && file.startsWith(p.slice(0, -8)) && file.endsWith('.ts')) ||
-			(publicRoute && p.endsWith('/**/*.tsx') && file.startsWith(p.slice(0, -9)) && file.endsWith('.tsx'));
-		return pathMatches && n.includes(name);
+		return (
+			(p === file ||
+				(publicRoute && p.endsWith('/**/*.ts') && file.startsWith(p.slice(0, -8)) && file.endsWith('.ts')) ||
+				(publicRoute && p.endsWith('/**/*.tsx') && file.startsWith(p.slice(0, -9)) && file.endsWith('.tsx'))) &&
+			n.includes(name)
+		);
 	});
 }
 /**
@@ -1961,6 +2430,7 @@ function deadCodeScriptKind(file: string): ts.ScriptKind {
 function knipExportCanBeMadePrivate(file: string, name: string): boolean {
 	if (!existsSync(file) || file.endsWith('.astro')) return false;
 	const srcText = readFileSync(file, 'utf8');
+	if (hasGeneratedSourceHeader(srcText)) return false;
 	const src = ts.createSourceFile(file, srcText, ts.ScriptTarget.Latest, true, deadCodeScriptKind(file));
 	if ((src as ts.SourceFile & { parseDiagnostics: readonly ts.Diagnostic[] }).parseDiagnostics.length) throw new Error(`Cannot safely classify Knip export in unparsable source: ${file}`);
 	for (const statement of src.statements) {
@@ -1990,11 +2460,13 @@ function fixKnipExports(cfg: QualityCfg, changedFiles: Set<string>): void {
 		if (!exports.length || issue.file.endsWith('.astro')) continue;
 		const file = assertKnipPath(cfg, issue.file, 'finding source');
 		const src = readFileSync(file, 'utf8');
+		if (hasGeneratedSourceHeader(src)) continue;
 		const ast = ts.createSourceFile(file, src, ts.ScriptTarget.Latest, true, deadCodeScriptKind(file));
 		if ((ast as ts.SourceFile & { parseDiagnostics: readonly ts.Diagnostic[] }).parseDiagnostics.length) throw new Error(`Cannot safely fix Knip exports in unparsable source: ${issue.file}`);
 		const edits: Array<{ start: number; end: number; text?: string }> = [];
-		const externalConsumers = importedConsumers.get(resolve(file));
-		const removableNames = new Set(exports.filter((f) => f && typeof f.name === 'string' && !isFrameworkEntryExport(cfg, issue.file, f.name) && !externalConsumers?.has(f.name)).map((f) => f.name));
+		const removableNames = new Set(
+			exports.filter((f) => f && typeof f.name === 'string' && !isFrameworkEntryExport(cfg, issue.file, f.name) && !hasImportedExportConsumer(importedConsumers, file, f.name)).map((f) => f.name),
+		);
 		const handledNames = new Set<string>();
 		for (const statement of ast.statements) {
 			if (!ts.isExportDeclaration(statement) || !statement.exportClause || !ts.isNamedExports(statement.exportClause)) continue;
@@ -2088,6 +2560,7 @@ function importedExportConsumers(cfg: QualityCfg): Map<string, Set<string>> {
 		const markupUses = (name: string): boolean => Boolean(markup) && markup.includes(name);
 		const referencedIdentifiers = new Set<string>();
 		const namespaceProperties = new Map<string, Set<string>>();
+		const importTypeReferences: { specifier: string; name: string }[] = [];
 		/**
 		 * Collects value identifiers and namespace properties referenced by a source file.
 		 *
@@ -2095,6 +2568,11 @@ function importedExportConsumers(cfg: QualityCfg): Map<string, Set<string>> {
 		 */
 		const collectReferences = (node: ts.Node): void => {
 			if (ts.isImportDeclaration(node)) return;
+			if (ts.isImportTypeNode(node) && ts.isLiteralTypeNode(node.argument) && ts.isStringLiteral(node.argument.literal)) {
+				const qualifier = node.qualifier;
+				const name = qualifier ? (ts.isIdentifier(qualifier) ? qualifier.text : qualifier.right.text) : '*';
+				importTypeReferences.push({ specifier: node.argument.literal.text, name });
+			}
 			if (ts.isIdentifier(node)) referencedIdentifiers.add(node.text);
 			if (ts.isPropertyAccessExpression(node) && ts.isIdentifier(node.expression)) {
 				const properties = namespaceProperties.get(node.expression.text) ?? new Set<string>();
@@ -2130,9 +2608,30 @@ function importedExportConsumers(cfg: QualityCfg): Map<string, Set<string>> {
 			}
 			if (names.size) consumers.set(owner, names);
 		}
+		for (const { specifier, name } of importTypeReferences) {
+			const resolved = ts.resolveModuleName(specifier, file, compilerOpts, ts.sys, moduleResolutionCache).resolvedModule?.resolvedFileName;
+			if (!resolved) continue;
+			const owner = resolve(resolved);
+			const names = consumers.get(owner) ?? new Set<string>();
+			names.add(name);
+			consumers.set(owner, names);
+		}
 	}
 	importedExportConsumerCache.set(cfg, { signature, consumers });
 	return consumers;
+}
+/**
+ * Checks direct, namespace, and import-type references to one exported name.
+ *
+ * @param importedConsumers Exported names found in importing source files.
+ * @param file Absolute path of the module that declares the export.
+ * @param name Export name to check.
+ *
+ * @return Whether an importing file references the name or the module namespace.
+ */
+function hasImportedExportConsumer(importedConsumers: Map<string, Set<string>>, file: string, name: string): boolean {
+	const names = importedConsumers.get(resolve(file));
+	return Boolean(names?.has(name) || names?.has('*'));
 }
 /**
  * Accepts proposed edits only when they add no TypeScript errors to changed files.
@@ -2184,8 +2683,6 @@ function acceptTypeSafeEdits(
 	};
 }
 
-
-
 /**
  * Runs every dead-code detector through one fix-and-verify boundary.
  *
@@ -2194,11 +2691,11 @@ function acceptTypeSafeEdits(
  * @param all Whether to inspect all configured source files.
  * @param verify Whether to rerun the detectors after applying fixes.
  * @param emit Whether to print stage headings and findings.
- * @param includeReviewSingleUse
+ * @param changedFileNames Optional caller-owned set updated with files changed by safe fixes.
  *
  * @return Remaining findings after any eligible fixes and verification.
  */
-function runDeadCode(cfg: QualityCfg, fix: boolean, all: boolean, verify = true, emit = true, includeReviewSingleUse = true): DeadCodeFinding[] {
+function runDeadCode(cfg: QualityCfg, fix: boolean, all: boolean, verify = true, emit = true, changedFileNames?: Set<string>): DeadCodeFinding[] {
 	if (emit) qualityHeader('dead-code', `${fix ? 'Fixing safe cases and checking' : 'Read-only check of'} unused files, exports, declarations, and single-use code`);
 	let verificationStarted = false;
 	/**
@@ -2310,49 +2807,46 @@ function runDeadCode(cfg: QualityCfg, fix: boolean, all: boolean, verify = true,
 	const findings: DeadCodeFinding[] = [];
 	if (qualityCheckEnabled(cfg, 'knip')) {
 		if (emit) qualityHeader('dead-code/knip', 'Checking unused files, exports, dependencies, and reachability');
-		findings.push(...(function collectKnipFindings(cfg: QualityCfg, importedConsumers = importedExportConsumers(cfg)): DeadCodeFinding[] {
-	const issues = readKnipIssues(cfg);
-	const findings: DeadCodeFinding[] = [];
-	for (const issue of issues) {
-		const filePath = assertKnipPath(cfg, issue.file, 'finding source');
-		for (const [kind, val] of Object.entries(issue)) {
-			if (kind === 'file') continue;
-			for (const i of flattenKnipItems(val) as { name: string; line?: number }[]) {
-				if (kind === 'exports' && isFrameworkEntryExport(cfg, issue.file, i.name)) continue;
-				const location = kind === 'files' ? i.name : issue.file;
-				const autoFixable = (kind === 'exports' || kind === 'types') && !importedConsumers.get(filePath)?.has(i.name) && knipExportCanBeMadePrivate(filePath, i.name);
-				const reason = autoFixable
-					? 'Knip identifies an unconsumed named export with a direct, unambiguous declaration.'
-					: kind === 'files'
-						? 'Knip considers this file unreachable; file deletion can affect dynamic, generated, or framework references.'
-						: importedConsumers.get(filePath)?.has(i.name)
-							? 'Knip reports this export as unused, but a configured source consumer was found.'
-							: `Knip reports an unused ${kind} that the safe export rewrite cannot identify unambiguously.`;
-				const agentAction = autoFixable
-					? 'Run the canonical dead-code autofix; it should remove only this export modifier, then verify the declaration and its local uses remain intact.'
-					: kind === 'files'
-						? 'Inspect imports, dynamic loading, framework discovery, generated inventories, and tests. Delete this file only if those checks prove it unreachable; otherwise correct the explicit entry-point or source-discovery model.'
-						: importedConsumers.get(filePath)?.has(i.name)
-							? 'Reconcile the reported consumer with Knip configuration and module resolution. Preserve the export while it has a real consumer; do not add a broad ignore.'
-							: `Inspect the exact ${kind} and its consumers. Remove it only if it is truly unused; otherwise add the concrete framework/public contract to the explicit entry model.`;
-				findings.push({ rule: `knip/${kind}`, file: location, line: i.line ?? 1, name: i.name, severity: 'error', autofixable: autoFixable, reason, agentAction });
-			}
-		}
-	}
-	return findings;
-})(cfg, importedConsumersForRun));
+		findings.push(
+			...(function collectKnipFindings(cfg: QualityCfg, importedConsumers = importedExportConsumers(cfg)): DeadCodeFinding[] {
+				const issues = readKnipIssues(cfg);
+				const findings: DeadCodeFinding[] = [];
+				for (const issue of issues) {
+					const filePath = assertKnipPath(cfg, issue.file, 'finding source');
+					for (const [kind, val] of Object.entries(issue)) {
+						if (kind === 'file') continue;
+						for (const i of flattenKnipItems(val) as { name: string; line?: number }[]) {
+							if (kind === 'exports' && isFrameworkEntryExport(cfg, issue.file, i.name)) continue;
+							const location = kind === 'files' ? i.name : issue.file;
+							const autoFixable = (kind === 'exports' || kind === 'types') && !hasImportedExportConsumer(importedConsumers, filePath, i.name) && knipExportCanBeMadePrivate(filePath, i.name);
+							const reason = autoFixable
+								? 'Knip identifies an unconsumed named export with a direct, unambiguous declaration.'
+								: kind === 'files'
+									? 'Knip considers this file unreachable; file deletion can affect dynamic, generated, or framework references.'
+									: hasImportedExportConsumer(importedConsumers, filePath, i.name)
+										? 'Knip reports this export as unused, but a configured source consumer was found.'
+										: `Knip reports an unused ${kind} that the safe export rewrite cannot identify unambiguously.`;
+							const agentAction = autoFixable
+								? 'Run the canonical dead-code autofix; it should remove only this export modifier, then verify the declaration and its local uses remain intact.'
+								: kind === 'files'
+									? 'Inspect imports, dynamic loading, framework discovery, generated inventories, and tests. Delete this file only if those checks prove it unreachable; otherwise correct the explicit entry-point or source-discovery model.'
+									: hasImportedExportConsumer(importedConsumers, filePath, i.name)
+										? 'Reconcile the reported consumer with Knip configuration and module resolution. Preserve the export while it has a real consumer; do not add a broad ignore.'
+										: `Inspect the exact ${kind} and its consumers. Remove it only if it is truly unused; otherwise add the concrete framework/public contract to the explicit entry model.`;
+							findings.push({ rule: `knip/${kind}`, file: location, line: i.line ?? 1, name: i.name, severity: 'error', autofixable: autoFixable, reason, agentAction });
+						}
+					}
+				}
+				return findings;
+			})(cfg, importedConsumersForRun),
+		);
 	}
 	if (qualityCheckEnabled(cfg, 'lint')) {
 		if (!fix) scanEslint();
 		findings.push(...unusedDeclarationFindings(cfg, [...eslintReportsByPath.values()]));
 	}
 	const finalSingleUseFindings = fix && !typeRejectedFiles.size ? singleUseVerificationFindings : singleUseFindings(cfg);
-	let advisorySingleUseCount = 0;
 	for (const single of finalSingleUseFindings) {
-		if (!includeReviewSingleUse) {
-			advisorySingleUseCount++;
-			continue;
-		}
 		findings.push({
 			rule: 'typescript/single-use',
 			file: single.file,
@@ -2364,7 +2858,6 @@ function runDeadCode(cfg: QualityCfg, fix: boolean, all: boolean, verify = true,
 			agentAction: single.agentAction,
 		});
 	}
-	if (emit && advisorySingleUseCount) console.info(`  ${advisorySingleUseCount} single-use findings remain as non-blocking inlining suggestions.`);
 	for (const finding of documentationFindings(scopedCfg(cfg, true)).filter((i) => i.kind === 'orphan'))
 		findings.push({
 			rule: 'tsdoc/detached',
@@ -2388,37 +2881,41 @@ function runDeadCode(cfg: QualityCfg, fix: boolean, all: boolean, verify = true,
 				}
 			: f,
 	);
-	if (emit) (function printDeadCodeFindings(findings: DeadCodeFinding[], typeSafetyVerified = true): void {
-	if (reportStages) {
-		const stage = reportStages.get('dead-code');
-		if (stage) {
-			stage.findings = findings.length;
-			if (findings.length) stage.status = 'findings';
+	if (emit)
+		(function printDeadCodeFindings(findings: DeadCodeFinding[], typeSafetyVerified = true): void {
+			if (reportStages) {
+				const stage = reportStages.get('dead-code');
+				if (stage) {
+					stage.findings = findings.length;
+					if (findings.length) stage.status = 'findings';
+				}
+			}
+			if (!findings.length) {
+				if (!outputPhase) console.error('  ✓ dead-code checks passed; no findings remain');
+				return;
+			}
+			const errs = findings;
+			const lines: string[] = [];
+			for (const finding of [...findings].sort((l, r) => l.file.localeCompare(r.file) || l.line - r.line || l.rule.localeCompare(r.rule) || l.name.localeCompare(r.name))) {
+				lines.push(`  - [ERROR] ${finding.rule}: ${finding.file}:${finding.line} ${finding.name}`);
+				lines.push(`      Reason: ${finding.reason}`);
+				const autofix = !finding.autofixable ? 'not safe or not supported' : typeSafetyVerified ? 'available' : 'candidate; fix mode checks TypeScript before writing';
+				lines.push(`      Autofix: ${autofix}`);
+				lines.push(`      Agent action: ${finding.agentAction}`);
+			}
+			lines.push(`  ${errs.length} error${errs.length === 1 ? '' : 's'}.`);
+			if (outputPhase) {
+				for (const line of lines.slice(0, -1)) recordQualityDetail(line.replace(/^\s*-\s*/u, ''));
+			} else for (const line of lines) console.error(line);
+			if (errs.length) process.exitCode = 1;
+		})(finalFindings, fix);
+	if (fix && changedFileNames)
+		for (const file of changedFiles) {
+			const original = srcSnapshot.get(file);
+			if (original !== undefined && existsSync(file) && readFileSync(file, 'utf8') !== original) changedFileNames.add(file);
 		}
-	}
-	if (!findings.length) {
-		if (!outputPhase) console.error('  ✓ dead-code checks passed; no findings remain');
-		return;
-	}
-	const errs = findings;
-	const lines: string[] = [];
-	for (const finding of [...findings].sort((l, r) => l.file.localeCompare(r.file) || l.line - r.line || l.rule.localeCompare(r.rule) || l.name.localeCompare(r.name))) {
-		lines.push(`  - [ERROR] ${finding.rule}: ${finding.file}:${finding.line} ${finding.name}`);
-		lines.push(`      Reason: ${finding.reason}`);
-		const autofix = !finding.autofixable ? 'not safe or not supported' : typeSafetyVerified ? 'available' : 'candidate; fix mode checks TypeScript before writing';
-		lines.push(`      Autofix: ${autofix}`);
-		lines.push(`      Agent action: ${finding.agentAction}`);
-	}
-	lines.push(`  ${errs.length} error${errs.length === 1 ? '' : 's'}.`);
-	if (outputPhase) {
-		for (const line of lines.slice(0, -1)) recordQualityDetail(line.replace(/^\s*-\s*/u, ''));
-	} else for (const line of lines) console.error(line);
-	if (errs.length) process.exitCode = 1;
-})(finalFindings, fix);
 	return finalFindings;
 }
-
-
 
 /**
  * Dispatches the dead-code coordinator in fix or read-only mode.
@@ -2426,28 +2923,27 @@ function runDeadCode(cfg: QualityCfg, fix: boolean, all: boolean, verify = true,
  * @param cfg Quality configuration defining source scope and tools.
  * @param fix Whether eligible changes may be applied to source files.
  * @param all Whether to inspect all configured source files.
- * @param includeReviewSingleUse
+ *
+ * @return Source files changed by the safe autofix pass.
  */
-function runDeadCodeCmd(cfg: QualityCfg, fix: boolean, all: boolean, includeReviewSingleUse = true): void {
-	const findings = fix ? runDeadCode(cfg, true, all, true, true, includeReviewSingleUse) : (function runDeadCodeReadOnly(cfg: QualityCfg, all: boolean, includeReviewSingleUse = true): DeadCodeFinding[] {
-	return runDeadCode(cfg, false, all, true, true, includeReviewSingleUse);
-})(cfg, all, includeReviewSingleUse);
+function runDeadCodeCmd(cfg: QualityCfg, fix: boolean, all: boolean): string[] {
+	const changedFiles = new Set<string>();
+	const findings = runDeadCode(cfg, fix, all, true, true, fix ? changedFiles : undefined);
 	printCheckStatus('dead-code', findings.length);
+	return [...changedFiles];
 }
-
-
-
 
 /**
  * Prints a grouped set of findings with one normalized line per issue.
  *
  * @param findings Findings produced by one quality stage.
  * @param fmt Converts one finding into a human-readable message.
+ * @param advisory Whether the findings are informational and should not fail the stage.
  *
  * @return Nothing; findings are printed under the active check or directly to the console.
  */
-function printFindings<T>(findings: readonly T[], fmt: (finding: T) => string): void {
-	if (reportStages && reportStageName && findings.length) {
+function printFindings<T>(findings: readonly T[], fmt: (finding: T) => string, advisory = false): void {
+	if (reportStages && reportStageName && findings.length && !advisory) {
 		const stage = reportStages.get(reportStageName);
 		if (stage) {
 			stage.findings += findings.length;
@@ -2462,7 +2958,7 @@ function printFindings<T>(findings: readonly T[], fmt: (finding: T) => string): 
 		for (const finding of findings) recordQualityDetail(fmt(finding));
 	} else {
 		const lines = findings.map((f) => `  - ${compactOutput(fmt(f)).join(' ')}`);
-		console.error(`  ${findings.length} error${findings.length === 1 ? '' : 's'}:`);
+		console.error(`  ${findings.length} ${advisory ? 'advisory finding' : 'error'}${findings.length === 1 ? '' : 's'}:`);
 		for (const line of lines) console.error(line);
 	}
 }
@@ -2569,8 +3065,9 @@ function updateGitHubStage(status: QualityJsonReport['checks'][number]['status']
  * @return The owner/name slug, or undefined for a non-GitHub remote.
  */
 function inferGitHubRepo(root: string): string | undefined {
-	const remote = spawnSync('git', ['config', '--get', 'remote.origin.url'], { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).stdout.trim();
-	return remote.match(/(?:github\.com[:/])([^/]+\/[^/]+?)(?:\.git)?$/i)?.[1];
+	return spawnSync('git', ['config', '--get', 'remote.origin.url'], { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] })
+		.stdout.trim()
+		.match(/(?:github\.com[:/])([^/]+\/[^/]+?)(?:\.git)?$/i)?.[1];
 }
 
 /**
@@ -2596,13 +3093,15 @@ function runGenericChecks(cfg: QualityCfg, analysis?: QualityAnalysis): void {
 		qualityHeader(name, `Checking ${name.replace(G_REGEX(), ' ')}`);
 		try {
 			const findings = check();
+			const advisory = name === 'performance-patterns';
 			printFindings(
 				findings,
 				(f) =>
 					`${'file' in f ? `${f.file}: ` : ''}${'message' in f ? `${'line' in f ? `${f.line}:${f.column} ` : ''}${f.message}` : 'component' in f ? `${f.line}:${f.column} ${f.component}: ${f.recommendation}` : 'method' in f ? `${f.line}:${f.column} ${f.method}(${f.receiver}): ${f.recommendation}` : 'command' in f ? `${f.line}: ${f.recommendation} (${f.command})` : 'value' in f ? `${f.count}x ${f.value} (${f.locations.join(', ')})` : 'source' in f ? `${f.count}x ${f.source} (${f.locations.join(', ')})` : f.pattern}`,
+				advisory,
 			);
-			printCheckStatus(name, findings.length);
-			if (findings.length) process.exitCode = 1;
+			printCheckStatus(name, advisory ? 0 : findings.length);
+			if (findings.length && !advisory) process.exitCode = 1;
 		} catch (err) {
 			recordQualityFailure(name, err);
 			printCheckStatus(name, 1);
@@ -2651,7 +3150,7 @@ function runTailwindCanonicalCheck(cfg: QualityCfg, fix: boolean): Promise<void>
 function fixNames(cfg: QualityCfg, all: boolean): void {
 	// TypeScript's parser does not understand Astro frontmatter. Keep Astro in
 	// reporting/import scope, but never apply symbol renames to it.
-	const allowed = new Set(filesFor(cfg, all).filter((f) => !isProtectedPath(f) && !f.endsWith('.astro')));
+	const allowed = new Set(filesFor(cfg, all).filter((file) => !isProtectedPath(file) && !file.endsWith('.astro') && !hasGeneratedSourceHeader(readFileSync(file, 'utf8'))));
 	let program = ts.createProgram({
 		rootNames: srcFiles(cfg).filter((f) => C_M_JS_TS_X_CLASS_2.test(f)),
 		options: {
@@ -2868,6 +3367,7 @@ function fixNames(cfg: QualityCfg, all: boolean): void {
 				if (
 					!n.text.startsWith('_') &&
 					!protectedNames.has(n.text) &&
+					!parameterRenameCapturesDefault(n, suggestion, checker) &&
 					!hasInitShadow(n) &&
 					!hasInitReferenceToOtherSymbol(n) &&
 					!hasInitRenameCollision(n, suggestion) &&
@@ -2891,6 +3391,7 @@ function fixNames(cfg: QualityCfg, all: boolean): void {
 		const inspect = (n: ts.Node): void => {
 			if (ts.isIdentifier(n) && isRenamableDeclaration(n) && !n.text.startsWith('_') && !protectedNames.has(n.text) && !hasInitShadow(n) && !hasInitReferenceToOtherSymbol(n)) {
 				const suggestion = renameDeclaration(n);
+				if (parameterRenameCapturesDefault(n, suggestion, checker)) return;
 				// Reject collisions in this declaration scope below, while allowing
 				// the same concise name in an unrelated sibling function scope.
 				if (hasInitRenameCollision(n, suggestion) || hasInitConsumerCollision(n, suggestion)) return;
@@ -3056,7 +3557,7 @@ export function runQuality(
 			'naming',
 			'Checking concise, consistent symbol names',
 			() => namingFindings(scoped, ctx),
-			(f) => `Naming error: ${f.file}: ${f.name} -> ${f.suggestion}`,
+			(f) => `Naming error: ${f.file}: ${f.name} -> ${f.suggestion}${f.reason ? `; ${f.reason}` : ''}`,
 		);
 	if (qualityCheckEnabled(cfg, 'alias'))
 		result.aliases = runFindingCheck(
@@ -3088,25 +3589,13 @@ export function runQuality(
  *
  * @param cfg Normalized quality configuration for the current repository.
  * @param opts CLI options controlling scope and writes.
- * @param args Command arguments used to select explicit files.
  * @param quiet Whether the helper should omit the follow-up core quality pass.
  *
  * @return Nothing; maintenance and formatter failures are reflected in the process exit code.
  */
-function runDocumentation(cfg: QualityCfg, opts: QualityOptions, args: string[], quiet: boolean): void {
+function runDocumentation(cfg: QualityCfg, opts: QualityOptions, quiet: boolean): void {
 	if (!qualityCheckEnabled(cfg, 'document')) return;
-	qualityHeader('documentation', `${opts.fix ? 'Fixing and checking' : 'Checking'} documentation structure and meaningful descriptions`);
-	const cmdOpts = { ...opts, fix: qualityAutofixEnabled(cfg, 'document', opts.fix) };
-	const files = filesFor(cfg, opts.all);
-	const reqFiles = args.slice(1).filter((a) => !a.startsWith('-'));
-	const tgts = (reqFiles.length ? reqFiles : files).filter((f) => !f.endsWith('.astro'));
-	if (cmdOpts.fix) for (const file of tgts) if (C_M_JS_TS_REGEX.test(file)) collapseInlineIfs(file);
-	if (cmdOpts.fix)
-		for (const file of tgts) {
-			maintainSrcFile(cfg.root, file);
-			documentSrcFile(cfg, file);
-			if (cfg.oneLineImports) protectLongImports(file, cfg.prettierPrintWidth);
-		}
+	qualityHeader('documentation', 'Checking documentation structure and meaningful descriptions');
 	if (!quiet) runQuality(cfg, opts.strict, opts.all);
 }
 
@@ -3244,6 +3733,11 @@ function runFullQuality(cfg: QualityCfg, args: string[], opts: QualityOptions): 
 	const sFix = (name: string, action: () => void): void => {
 		if (!continueAfterFailure(name, action)) sFixFailed = true;
 	};
+	if (fix('duplicateImports') && qualityCheckEnabled(cfg, 'import'))
+		sFix('duplicate imports', () => {
+			const removed = fixDuplicateImports(filesFor(cfg, opts.all));
+			if (removed && !outputPhase) console.info(`Import fixer: ${removed} repeated declaration${removed === 1 ? '' : 's'} removed.`);
+		});
 	if (opts.fix && qualityCheckEnabled(cfg, 'name') && fix('name'))
 		sFix('naming', () => {
 			if (namingFindings(scopedCfg(cfg, opts.all)).length) fixNames(cfg, opts.all);
@@ -3272,22 +3766,16 @@ function runFullQuality(cfg: QualityCfg, args: string[], opts: QualityOptions): 
 	if (qualityCheckEnabled(cfg, 'document'))
 		sFix('documentation', () => {
 			if (opts.fix && qualityAutofixEnabled(cfg, 'document', opts.fix)) {
-				const files = filesFor(cfg, opts.all);
-				if (files.length) runDocumentation(cfg, opts, ['document', ...files, '--quiet'], true);
+				if (filesFor(cfg, opts.all).length) runDocumentation(cfg, opts, true);
 			} else {
 				const documentationIssues = documentationFindings(scopedCfg(cfg, opts.all)).filter((f) => f.severity === 'error');
-				if (documentationIssues.length) runDocumentation(cfg, opts, ['document', ...new Set(documentationIssues.map((f) => resolve(cfg.root, f.file))), '--quiet'], true);
+				if (documentationIssues.length) runDocumentation(cfg, opts, true);
 			}
 		});
 	if (fix('errorBoundaries'))
 		sFix('error-boundaries', () => {
 			const fixed = fixErrorBoundaries(scopedCfg(cfg, opts.all));
 			if (fixed) console.info(`Error-boundary autofix: guarded React roots in ${fixed} file${fixed === 1 ? '' : 's'}.`);
-		});
-	if (opts.fix && qualityCheckEnabled(cfg, 'import') && qualityAutofixEnabled(cfg, 'document', opts.fix))
-		sFix('imports', () => {
-			const repeated = duplicateImportFindings(filesFor(cfg, opts.all));
-			for (const file of new Set(repeated.map((f) => f.file))) maintainSrcFile(cfg.root, file);
 		});
 	if (opts.fix && !opts.skipCommands && profileResolution.checks.some((c) => c.autofix)) sFix('native language fixes', () => runLangProfileFixes(cfg, profileResolution.checks, profileToolResults));
 	if (opts.fix) {
@@ -3305,7 +3793,20 @@ function runFullQuality(cfg: QualityCfg, args: string[], opts: QualityOptions): 
 	 *
 	 */
 	const continueStaticAndLater = (): void => {
-		if (qualityCheckEnabled(cfg, 'dead-code')) continueAfterFailure('dead-code', () => runDeadCodeCmd(cfg, qualityAutofixEnabled(cfg, 'dead-code', opts.fix), opts.all, false));
+		if (qualityCheckEnabled(cfg, 'dead-code')) {
+			let deadCodeChangedFiles: string[] = [];
+			continueAfterFailure('dead-code', () => {
+				deadCodeChangedFiles = runDeadCodeCmd(cfg, qualityAutofixEnabled(cfg, 'dead-code', opts.fix), opts.all);
+			});
+			if (deadCodeChangedFiles.length && qualityCheckEnabled(cfg, 'format')) {
+				const fmtFailedBeforeDeadCode = reportStages?.get('format')?.status === 'failed';
+				continueAfterFailure('format', () => runFormatter(cfg, { ...opts, fix: true }, deadCodeChangedFiles));
+				if (fmtFailedBeforeDeadCode) {
+					const fmtStage = reportStages?.get('format');
+					if (fmtStage) fmtStage.status = 'failed';
+				}
+			}
+		}
 		if (qualityCheckEnabled(cfg, 'lint')) continueAfterFailure('lint', () => runLint(cfg, { ...opts, fix: false }, true, true));
 		qualityHeader('source-analysis', '');
 		let analysis: QualityAnalysis | undefined;
@@ -3333,12 +3834,15 @@ function runFullQuality(cfg: QualityCfg, args: string[], opts: QualityOptions): 
 		if (!opts.skipCommands) continueAfterFailure('build', () => void runConfiguredCmds('Build'));
 		beginQualityPhase('Repository health');
 		if (!opts.skipCommands) continueAfterFailure('repository health', () => void runConfiguredCmds('Repository health'));
-		if (qualityCheckEnabled(cfg, 'diff') && !hasCfgdGitDiffCheck(cfg)) continueAfterFailure('diff', () => (function runDiffCheck(cfg: QualityCfg): void {
-	qualityHeader('diff', 'Checking Git whitespace and patch errors');
-	const status = run(cfg, 'git', ['-c', 'core.pager=cat', 'diff', '--check']);
-	if (status) process.exitCode = status;
-	printCheckStatus('diff', status ? 1 : 0);
-})(cfg));
+		if (qualityCheckEnabled(cfg, 'diff') && !hasCfgdGitDiffCheck(cfg))
+			continueAfterFailure('diff', () =>
+				(function runDiffCheck(cfg: QualityCfg): void {
+					qualityHeader('diff', 'Checking Git whitespace and patch errors');
+					const status = run(cfg, 'git', ['-c', 'core.pager=cat', 'diff', '--check']);
+					if (status) process.exitCode = status;
+					printCheckStatus('diff', status ? 1 : 0);
+				})(cfg),
+			);
 		if (qualityCheckEnabled(cfg, 'github') && cfg.github?.repositories?.length) continueAfterFailure('github', () => runGitHubCheck(cfg, [], false, args.includes('--warn')));
 		console.error(`\n${process.exitCode ? '✗' : '✓'} Quality complete`);
 		outputPhase = undefined;
@@ -3374,13 +3878,13 @@ function dispatchQualityCli(cfg: QualityCfg, args: string[]): void | Promise<voi
 			'Commands include quality, history, github, document, format, lint, knip, types, single-use, dead-code, tailwind-canonical, security, error-boundaries, ui-recommendations, and domain.',
 		);
 		console.info(
-			'Options: --all, --warn, --strict, --skip-commands, --skip-recommendations, --report-json <path>, --repository owner/name; history also accepts --branch <name> and --base-sha <sha>.',
+			'Options: --all, --warn, --fix, --safe-fix, --strict, --skip-commands, --skip-recommendations, --report-json <path>, --repository owner/name; history also accepts --branch <name> and --base-sha <sha>.',
 		);
 		return;
 	}
 	const cmd = args.find((a) => !a.startsWith('-')) ?? 'quality';
 	const opts: QualityOptions = {
-		fix: !args.includes('--warn'),
+		fix: !args.includes('--warn') && (args.includes('--fix') || args.includes('--safe-fix')),
 		all: args.includes('--all') || cmd === 'quality:all',
 		strict: args.includes('--strict'),
 		skipCommands: args.includes('--skip-commands'),
@@ -3404,27 +3908,24 @@ function dispatchQualityCli(cfg: QualityCfg, args: string[]): void | Promise<voi
 			return dispatchQualityCli({ ...cfg, enabledChecks: { ...cfg.enabledChecks, 'tailwind-canonical': false } }, args);
 		});
 	if (cmd === 'github') {
-		runGitHubCheck(cfg, (function optVals(args: string[], flag: string): string[] {
-	return args.flatMap((a, i) => (a === flag && args[i + 1] ? [args[i + 1]!] : []));
-})(args, '--repository'), true, args.includes('--warn'));
+		runGitHubCheck(
+			cfg,
+			(function optVals(args: string[], flag: string): string[] {
+				return args.flatMap((a, i) => (a === flag && args[i + 1] ? [args[i + 1]!] : []));
+			})(args, '--repository'),
+			true,
+			args.includes('--warn'),
+		);
 		return;
 	}
 	if (cmd === 'document' || cmd === 'maintain') {
-		runDocumentation(cfg, opts, args, args.includes('--quiet'));
+		runDocumentation(cfg, opts, args.includes('--quiet'));
 		if (qualityCheckEnabled(cfg, 'format')) runFormatter(cfg, { ...opts, fix: fix('format') }, args.slice(1));
 		return;
 	}
 	if (cmd === 'format') {
 		if (!qualityCheckEnabled(cfg, 'format')) return;
-		const files = filesFor(cfg, opts.all);
 		const cmdOpts = { ...opts, fix: fix('format') };
-		const tgts = files.filter((f) => !f.endsWith('.astro'));
-		if (cmdOpts.fix) for (const file of tgts) if (C_M_JS_TS_REGEX.test(file)) collapseInlineIfs(file);
-		if (cmdOpts.fix)
-			for (const file of tgts) {
-				maintainSrcFile(cfg.root, file);
-				if (cfg.oneLineImports) protectLongImports(file, cfg.prettierPrintWidth);
-			}
 		if (qualityCheckEnabled(cfg, 'format')) runFormatter(cfg, cmdOpts, args.slice(1));
 		return;
 	}
@@ -3549,8 +4050,7 @@ export function runQualityFromCfg(file?: string, args = process.argv.slice(2)): 
 		return;
 	}
 	const cfg = loadQualityCfg(file);
-	const lintCmds = new Set(['quality', 'quality:all', 'quality:baseline', 'document', 'maintain', 'dead-code', 'knip', 'lint', 'naming', 'single-use']);
-	if (lintCmds.has(cmd) && qualityCheckEnabled(cfg, 'lint')) {
+	if (new Set(['quality', 'quality:all', 'quality:baseline', 'document', 'maintain', 'dead-code', 'knip', 'lint', 'naming', 'single-use']).has(cmd) && qualityCheckEnabled(cfg, 'lint')) {
 		if (!findEslintConfig(cfg.root, cfg.configRoot))
 			throw new Error(
 				`ESLint flat config is required for ${cmd}. Add eslint.config.js, eslint.config.mjs, or eslint.config.ts at ${cfg.root} or ${cfg.configRoot ?? resolve(cfg.root, 'config')} before running Terra Quality.`,
@@ -3594,9 +4094,6 @@ function optVal(args: string[], flag: string): string | undefined {
 	return idx < 0 ? undefined : args[idx + 1];
 }
 
-
-
-
 /**
  * Runs Prettier after applying the quality package's safe structural formatting pass.
  *
@@ -3609,31 +4106,55 @@ function optVal(args: string[], flag: string): string | undefined {
 export function runFormatter(cfg: QualityCfg, optsOrArgs: QualityOptions | string[] = { fix: true, all: false, strict: false }, args: string[] = []): void {
 	const legacyArgs = Array.isArray(optsOrArgs);
 	const opts = legacyArgs ? { fix: optsOrArgs.includes('--write') || !optsOrArgs.includes('--check'), all: optsOrArgs.includes('--all'), strict: false } : optsOrArgs;
-	const suppliedArgs = (legacyArgs ? optsOrArgs : args).filter((a) => !['--all', '--warn', '--strict'].includes(a));
+	const suppliedArgs = (legacyArgs ? optsOrArgs : args).filter((a) => !['--all', '--warn', '--fix', '--safe-fix', '--strict'].includes(a));
 	const hasMode = suppliedArgs.includes('--write') || suppliedArgs.includes('--check');
 	const hasIgnoreMode = suppliedArgs.some((a) => a.startsWith('--ignore-unknown'));
 	const hasLogLevel = suppliedArgs.includes('--log-level') || suppliedArgs.some((a) => a.startsWith('--log-level='));
-	const suppliedTgts = suppliedArgs.filter((a, i) => a !== 'warn' || suppliedArgs[i - 1] !== '--log-level').filter((a) => !a.startsWith('-') && !a.endsWith('.astro'));
-	const discoveredTgts = suppliedTgts.length ? [] : filesFor(cfg, opts.all).filter((f) => !f.endsWith('.astro'));
+	const suppliedTgts = suppliedArgs.filter((a, i) => a !== 'warn' || suppliedArgs[i - 1] !== '--log-level').filter((a) => !a.startsWith('-'));
+	const authoredTargets = (targets: string[]): string[] =>
+		targets.filter((target) => {
+			const file = resolve(cfg.root, target);
+			return !existsSync(file) || !statSync(file).isFile() || !hasGeneratedSourceHeader(readFileSync(file, 'utf8'));
+		});
+	const fmtSuppliedTgts = suppliedTgts.flatMap((target) => {
+		if (/[?*{}[\]!]/u.test(target)) return [target];
+		const absolute = resolve(cfg.root, target);
+		if (existsSync(absolute) && statSync(absolute).isDirectory()) return authoredTargets(filesFor(cfg, opts.all).filter((file) => resolve(file).startsWith(`${absolute}${sep}`)));
+		return authoredTargets([target]);
+	});
+	const fmtSuppliedArgs = suppliedArgs.filter((arg) => !suppliedTgts.includes(arg));
+	const discoveredTgts = suppliedTgts.length ? [] : authoredTargets(filesFor(cfg, opts.all));
+	const tgts = authoredTargets(fmtSuppliedTgts.length > 0 || suppliedTgts.length > 0 ? fmtSuppliedTgts : discoveredTgts);
+	if (!tgts.length) return;
 	const fmtArgs = [
 		...(hasMode ? [] : [opts.fix ? '--write' : '--check']),
 		...(hasIgnoreMode ? [] : ['--ignore-unknown']),
 		...(opts.fix && !hasLogLevel ? ['--log-level=warn'] : []),
-		...suppliedArgs,
-		...(suppliedTgts.length ? [] : discoveredTgts),
+		...fmtSuppliedArgs,
+		...tgts,
 	];
 	const flags = fmtArgs.filter((a) => a.startsWith('-'));
-	const tgts = suppliedTgts.length ? suppliedTgts : discoveredTgts;
 	qualityHeader('format', `${opts.fix ? 'Fixing' : 'Checking'} formatting in ${tgts.length} source files`);
 	const before = opts.fix ? snapshotFiles(cfg, tgts) : undefined;
-	if (opts.fix) {
+	const fmt = toolPath(cfg, cfg.tools?.prettier, 'prettier');
+	const fmtAvailable = !opts.fix || spawnSync(fmt, ['--version'], { cwd: cfg.root, stdio: 'ignore', env: process.env }).status === 0;
+	if (opts.fix && fmtAvailable) {
 		// Explicit formatter targets are already the authoritative scope. Avoid
 		// querying Git for a temporary/non-repository fixture when collapsing its
 		// structural sources before Prettier.
-		const knownFiles = suppliedTgts.length ? srcFiles(cfg) : filesFor(cfg, opts.all);
-		const directTgts = suppliedTgts.map((t) => resolve(cfg.root, t));
+		// Generated files stay out of Prettier and its structural rewrites.
+		const knownFiles = (fmtSuppliedTgts.length ? srcFiles(cfg) : filesFor(cfg, opts.all)).filter((file) => !hasGeneratedSourceHeader(readFileSync(file, 'utf8')));
+		const directTgts = fmtSuppliedTgts.map((t) => resolve(cfg.root, t));
 		const collapseTgts = directTgts.length ? knownFiles.filter((f) => directTgts.some((t) => resolve(f) === t || resolve(f).startsWith(`${t}${sep}`))) : knownFiles;
-		for (const file of collapseTgts) if (C_M_JS_TS_REGEX.test(file)) collapseTypesAndObjects(file);
+		for (const file of collapseTgts) {
+			if (!C_M_JS_TS_REGEX.test(file)) continue;
+			collapseInlineIfs(file);
+			collapseTypesAndObjects(file);
+		}
+	} else if (opts.fix) {
+		const message = 'Prettier is unavailable; skipped object and type compaction.';
+		if (outputPhase) recordQualityDetail(message);
+		else console.error(`  ${message}`);
 	}
 	let failed = false;
 	let completed = 0;
@@ -3655,14 +4176,44 @@ export function runFormatter(cfg: QualityCfg, optsOrArgs: QualityOptions | strin
 	const explicitConfig = flags.some((f) => f === '--config' || f.startsWith('--config='));
 	const explicitIgnore = flags.some((f) => f === '--ignore-path' || f.startsWith('--ignore-path='));
 	const configArgs = [...(!explicitConfig && prettierConfig ? ['--config', prettierConfig] : []), ...(!explicitIgnore && prettierIgnore ? ['--ignore-path', prettierIgnore] : [])];
-	for (const tgtBatch of argumentBatches(tgts)) {
-		const status = run(cfg, toolPath(cfg, cfg.tools?.prettier, 'prettier'), [...flags, ...configArgs, ...tgtBatch], { quietSuccess: true });
+	const targetBatches = argumentBatches(tgts);
+	for (const tgtBatch of targetBatches) {
+		const status = run(cfg, fmt, [...flags, ...configArgs, ...tgtBatch], { quietSuccess: true });
 		completed += tgtBatch.length;
 		qualityProgress('Prettier', completed, tgts.length);
 		if (status) {
 			failed = true;
 			process.exitCode = status;
 		}
+	}
+	if (opts.fix && !failed && !flags.includes('--check')) {
+		const checkFlags = [...flags.filter((flag) => flag !== '--write'), '--check'];
+		for (const tgtBatch of targetBatches) {
+			const checkArgs = [...checkFlags, ...configArgs, ...tgtBatch];
+			const check = spawnSync(fmt, checkArgs, { cwd: cfg.root, stdio: 'ignore', env: process.env, maxBuffer: TOOL_OUTPUT_MAX_BUFFER });
+			if (!check.error && check.status === 0) continue;
+			// Some Prettier plugins need a second write after structural transforms before output is stable.
+			const retryStatus = run(cfg, fmt, [...flags, ...configArgs, ...tgtBatch], { quietSuccess: true });
+			if (retryStatus) {
+				failed = true;
+				process.exitCode = retryStatus;
+				continue;
+			}
+			const verifiedStatus = run(cfg, fmt, checkArgs, { quietSuccess: true });
+			if (verifiedStatus) {
+				failed = true;
+				process.exitCode = verifiedStatus;
+			}
+		}
+	}
+	if (failed && before) {
+		for (const [file, original] of before) {
+			const path = resolve(cfg.root, file);
+			if (existsSync(path) && readFileSync(path, 'utf8') !== original) writeFileSync(path, original);
+		}
+		const message = 'Prettier failed; restored source files because formatting did not complete.';
+		if (outputPhase) recordQualityDetail(message);
+		else console.error(`  ${message}`);
 	}
 	if (before && !outputPhase) console.error(`  fixed ${changedFileCount(cfg, tgts, before)} files`);
 	printCheckStatus('format', failed ? 1 : 0);
@@ -3699,7 +4250,7 @@ export function runTypecheck(cfg: QualityCfg, args: string[] = []): void {
         'ESNext', '--allowImportingTsExtensions',
         ...(args.length ? suppliedFiles : typecheckFiles),
 			]
-		: ['--noEmit', '-p', projectTsconfig(cfg), ...suppliedFiles];
+		: ['--noEmit', '-p', projectTsconfig(cfg)];
 	qualityHeader('typecheck', `Checking ${args.length ? 'the selected source files' : 'the configured TypeScript project'}`);
 	const result = spawnSync(toolPath(cfg, tsc, 'tsc'), compilerArgs, { cwd: cfg.root, stdio: ['inherit', 'pipe', 'pipe'], maxBuffer: TOOL_OUTPUT_MAX_BUFFER });
 	const status = result.status ?? 1;

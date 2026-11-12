@@ -1,0 +1,32 @@
+---
+title: standards-reporting package
+description: Map the reporting APIs, peer requirements, outputs, and consumer-owned responsibilities.
+---
+
+`@terra-symposium/standards-reporting` collects Playwright diagnostics and responsive visual evidence, and writes spreadsheet and slideshow artifacts from normalized results. It complements the `standards-quality-reports` package, which handles Quality run reporters and GitHub/history reports.
+
+## Install and runtime requirements
+
+```sh
+pnpm add -D @terra-symposium/standards-reporting @playwright/test
+```
+
+The package requires Node.js `>=18.18` and peer dependency `@playwright/test >=1.52.0 <2`. Spreadsheet, slideshow, and image-processing dependencies install with the package. Playwright browser installation and configuration remain the consuming repository's responsibility.
+
+## Public entry points
+
+| Entry point                  | Main APIs                                                                          |
+| ---------------------------- | ---------------------------------------------------------------------------------- |
+| root and `/core`             | Normalized types and common result helpers.                                        |
+| `/playwright`                | `diagnosticsTest`, `loadTest`, `visualTest`, reporter options, progress reporting. |
+| `/viewports`                 | `withResponsivePlaywright`, viewport catalog, and project-name helpers.            |
+| `/load-testing`              | `loadTest`, timing config validation, aggregation, and grading helpers.            |
+| `/spreadsheet`               | Workbook writer for a normalized `ReportRun`.                                      |
+| `/slideshow`                 | Review decks and screenshot-only responsive decks.                                 |
+| `/spreadsheet`, `/slideshow` | Direct artifact builders for another runner's results.                             |
+
+## Ownership boundary
+
+The reporter records test evidence. Applications own test scenarios, authentication, server setup, secrets, artifact upload destination, access policy, and retention. By default, outputs are files in the repository's results directory; the package does not upload or publish them.
+
+See [responsive Playwright](/reporting/2-playwright/playwright-evidence/), [artifact formats](/reporting/4-artifacts/artifacts/), and [data retention](/reporting/4-artifacts/artifacts/).

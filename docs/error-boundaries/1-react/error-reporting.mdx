@@ -1,0 +1,62 @@
+---
+title: Report React boundary errors
+description: Connect the callback to safe application telemetry without making fallback recovery depend on delivery.
+---
+
+The boundary callback is an application-owned extension point. The shared package does not choose an analytics provider, send events, or persist error details.
+
+## Handle the callback
+
+Keep the callback synchronous, bounded, and nonthrowing. Map the captured failure to an application event shape and let the transport own delivery retries and access policy.
+
+```tsx
+<ErrorBoundary
+	name="Search results"
+	onError={(error, { name, componentStack }) => {
+		telemetry.captureException(error, {
+			boundary: name,
+			componentStack,
+			release: applicationRelease,
+		});
+	}}
+	fallback={() => <SearchFailure />}
+>
+	<SearchResults />
+</ErrorBoundary>
+```
+
+Treat both the Error and component stack as untrusted values. Depending on source code and application data, they can expose URLs, identifiers, or user-generated strings.
+
+## Select the reporting boundary
+
+||| [Package callback]
+
+For a consumer application, apply consent, redaction, sampling, access control, and retention before sending error content to a provider. Group incidents by stable fingerprints or boundary plus release, not by raw message alone.
+|||
+
+||| [Terra Website adapter]
+
+The Website logs locally and sends only category, component, and sanitized route to its Astro collector. Server code validates the payload and derives build and environment metadata; raw message and component stack are not persisted in Error Analysis.
+|||
+
+The event path below is specific to the Terra Website, not behavior implemented by the shared boundary package.
+
+<Nodes
+	direction="LR"
+	nodes={[
+		{ id: 'boundary', type: 'origin', data: { title: 'React boundary' } },
+		{ id: 'callback', type: 'process', data: { title: 'Application onError' } },
+		{ id: 'sanitize', type: 'process', data: { title: 'Map and sanitize event' } },
+		{ id: 'collector', type: 'process', data: { title: 'Validate and rate-limit' } },
+		{ id: 'dashboard', type: 'terminal', data: { title: 'Review metadata' } },
+	]}
+	edges={[
+		{ id: 'boundary-callback', source: 'boundary', target: 'callback' },
+		{ id: 'callback-sanitize', source: 'callback', target: 'sanitize' },
+		{ id: 'sanitize-collector', source: 'sanitize', target: 'collector' },
+		{ id: 'collector-dashboard', source: 'collector', target: 'dashboard' },
+	]}
+	height={230}
+/>
+
+The existing [Sanity Error Analysis dashboard](/error-boundaries/3-analytics/sanity-error-analysis/) uses deterministic local fixture rows in its screenshot. See the [Website event contract](/error-boundaries/3-analytics/production-telemetry/) for payload fields, retention, and access limits.

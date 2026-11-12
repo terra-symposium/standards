@@ -4,10 +4,18 @@
 
 'use strict';
 const fill = require('fill-range');
-const utils = require('./utils');
+const { isInvalidBrace, reduce } = require('./utils');
+/**
+ * Compiles a parsed brace-expression tree into a regular-expression fragment.
+ *
+ * @param ast Root node produced by the braces parser.
+ * @param options Compilation options controlling invalid-brace escaping and ranges.
+ *
+ * @return Regular-expression source for the parsed brace expression.
+ */
 const compile = (ast, options = {}) => {
 	const walk = (node, parent = {}) => {
-		const invalid = utils.isInvalidBrace(parent) === true || (node.invalid === true && options.escapeInvalid === true);
+		const invalid = isInvalidBrace(parent) === true || (node.invalid === true && options.escapeInvalid === true);
 		const prefix = options.escapeInvalid === true ? '\\' : '';
 		let output = '';
 		if (node.isOpen === true) return prefix + node.value;
@@ -20,7 +28,7 @@ const compile = (ast, options = {}) => {
 		if (node.type === 'comma') return node.prev.type === 'comma' ? '' : invalid ? node.value : '|';
 		if (node.value) return node.value;
 		if (node.nodes && node.ranges > 0) {
-			const args = utils.reduce(node.nodes);
+			const args = reduce(node.nodes);
 			const range = fill(...args, { ...options, wrap: false, toRegex: true, strictZeros: true });
 			if (range.length !== 0) {
 				return args.length > 1 && range.length > 1 ? `(${range})` : range;

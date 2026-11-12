@@ -1,0 +1,76 @@
+---
+title: Contribute to Standards
+description: Prepare the workspace, make a package or documentation change, and validate it before review.
+---
+
+The Standards repository contains published packages, repository tools, the local Hygiene dashboard, and this documentation site. Identify the owner before editing: packages own reusable behavior, consuming applications own product policy, and the Docs site explains supported contracts.
+
+## Prepare the workspace
+
+Use Node.js 22.19.0 and pnpm 10.30.3 to match the repository workflows and Corepack declaration. Install from the repository root.
+
+```sh
+pnpm install --frozen-lockfile
+```
+
+## Make and validate a change
+
+The diagram shows the normal contribution path. A package change should reach its public API and shipped documentation, not just its source file.
+
+<Nodes
+	direction="LR"
+	nodes={[
+		{ id: 'owner', type: 'origin', data: { title: 'Identify owner' } },
+		{ id: 'change', type: 'process', data: { title: 'Make focused change' } },
+		{ id: 'verify', type: 'process', data: { title: 'Build, test, quality' } },
+		{ id: 'review', type: 'process', data: { title: 'Review diff and outputs' } },
+		{ id: 'release', type: 'terminal', data: { title: 'Changeset if published' } },
+	]}
+	edges={[
+		{ id: 'owner-change', source: 'owner', target: 'change' },
+		{ id: 'change-verify', source: 'change', target: 'verify' },
+		{ id: 'verify-review', source: 'verify', target: 'review' },
+		{ id: 'review-release', source: 'review', target: 'release' },
+	]}
+	height={230}
+/>
+
+||| [Workspace validation]
+
+Run from the repository root:
+
+```sh
+pnpm run build
+pnpm run test
+pnpm run quality -- --all
+```
+
+The build compiles workspace packages. The test command runs the ordered plan in `config/terra-tests.json`. The full quality command scans the configured source scope; repository build and test commands remain explicit in this sequence.
+|||
+
+||| [Documentation-only change]
+
+Build and serve the current static Docs output:
+
+```sh
+pnpm run docs:build
+pnpm exec docs preview --port 2050
+```
+
+The preview serves the built pages and does not hot-reload source edits. Rebuild after changing content, routes, or assets, then inspect the affected page in a browser.
+|||
+
+## Keep repository boundaries clear
+
+`packages/` contains public libraries and CLIs. `apps/hygiene/` is the existing quality dashboard. `docs/` contains the public site, and `docs/agents/` contains agent skills and package instructions.
+
+The aggregate `@terra-symposium/standards-quality` package owns ordered orchestration and compatibility entry points. Focused capabilities own reusable check APIs. The [Quality package map](/quality/1-packages/package-map/) documents those boundaries.
+
+## Before review
+
+- Update the public declarations, README, and docs when a package contract changes.
+- Add or update focused coverage for behavior changes, then run the package and workspace checks.
+- Review the full diff, generated artifacts, links, image paths, and autofix output.
+- Add a Changeset only when a published package’s implementation, API, or metadata changes.
+
+The [change validation guide](/contributing/1-quality/change-validation/) gives the verification sequence. For public package publication, see [release a package](/contributing/3-releases/package-release/). For page structure and block syntax, see [documentation authoring](/contributing/2-authoring/authoring/).

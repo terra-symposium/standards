@@ -61,6 +61,11 @@ test('automatically wraps JavaScript createElement roots without breaking direct
 test('automatically installs the shared hydration boundary in Astro configs', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-astro-boundary-'));
 	const config = join(root, 'astro.config.mjs');
+	writeFileSync(join(root, 'package.json'), JSON.stringify({ devDependencies: { '@terra-symposium/standards-error-boundaries': '0.1.0' } }));
+	const packageRoot = join(root, 'node_modules/@terra-symposium/standards-error-boundaries');
+	mkdirSync(join(packageRoot, 'dist/lib'), { recursive: true });
+	writeFileSync(join(packageRoot, 'package.json'), JSON.stringify({ exports: { './astro-integration': './dist/lib/astro-integration.js' } }));
+	writeFileSync(join(packageRoot, 'dist/lib/astro-integration.js'), 'export const terraErrorBoundaryIntegration = () => ({});\n');
 	writeFileSync(config, "import { defineConfig } from 'astro/config';\nexport default defineConfig({ integrations: [] });\n");
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts', '.tsx'] });
 	assert.equal(errorBoundaryFindings(cfg).length, 1);
@@ -70,6 +75,18 @@ test('automatically installs the shared hydration boundary in Astro configs', ()
 	assert.match(output, /integrations: \[__terraErrorBoundaryIntegration\(\), \]/u);
 	assert.deepEqual(errorBoundaryFindings(cfg), []);
 	assert.equal(fixErrorBoundaries(cfg), 0);
+});
+test('Astro integration autofix stays read-only when no installed dependency exports the integration', () => {
+	const root = mkdtempSync(join(tmpdir(), 'terra-quality-astro-boundary-missing-dependency-'));
+	const config = join(root, 'astro.config.mjs');
+	const original = "import { defineConfig } from 'astro/config';\nexport default defineConfig({ integrations: [] });\n";
+	writeFileSync(join(root, 'package.json'), JSON.stringify({ devDependencies: { astro: '^5.0.0' } }));
+	writeFileSync(config, original);
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts', '.tsx'] });
+	assert.equal(errorBoundaryFindings(cfg).length, 1);
+	assert.equal(errorBoundaryFindings(cfg)[0]?.fixable, false);
+	assert.equal(fixErrorBoundaries(cfg), 0);
+	assert.equal(readFileSync(config, 'utf8'), original);
 });
 test('accepts an existing top-level boundary, including a local alias', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-error-boundary-existing-'));
@@ -83,8 +100,10 @@ test('accepts an existing top-level boundary, including a local alias', () => {
 });
 test('recognizes the Quality compatibility re-export for existing Astro configs', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-astro-boundary-compat-'));
-	const config = join(root, 'astro.config.mjs');
-	writeFileSync(config, "import { terraErrorBoundaryIntegration } from '@terra-symposium/standards-quality/astro-integration';\nexport default { integrations: [terraErrorBoundaryIntegration()] };\n");
+	writeFileSync(
+		join(root, 'astro.config.mjs'),
+		"import { terraErrorBoundaryIntegration } from '@terra-symposium/standards-quality/astro-integration';\nexport default { integrations: [terraErrorBoundaryIntegration()] };\n",
+	);
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts', '.tsx'] });
 	assert.deepEqual(errorBoundaryFindings(cfg), []);
 	assert.equal(fixErrorBoundaries(cfg), 0);

@@ -42,9 +42,9 @@
 
 ## Configuration and security
 
-| Name | Required | Purpose | Source |
-| --- | --- | --- | --- |
-| `<VARIABLE_NAME>` | Yes/No | <What it controls> | <Where to configure it; never put secret values here> |
+| Name              | Required | Purpose            | Source                                                |
+| ----------------- | -------- | ------------------ | ----------------------------------------------------- |
+| `<VARIABLE_NAME>` | Yes/No   | <What it controls> | <Where to configure it; never put secret values here> |
 
 <!-- Document authentication, permissions, safe storage, and environment differences as applicable. -->
 
@@ -58,8 +58,8 @@
 
 ## Validation
 
-| Check | Command | Notes |
-| --- | --- | --- |
+| Check                              | Command     | Notes                                  |
+| ---------------------------------- | ----------- | -------------------------------------- |
 | <Format/lint/typecheck/test/build> | `<command>` | <Scope, prerequisites, or limitations> |
 
 <!-- Document test ownership, order, fixtures, and coverage limits when relevant. -->

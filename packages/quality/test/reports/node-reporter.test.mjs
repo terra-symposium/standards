@@ -17,8 +17,9 @@ REGEX
 //////////////////////////////////////////////////*/
 
 /**
+ * Creates a fresh global matcher for test-count progress counters.
  *
- * @return
+ * @return Global regular expression for extracting a passed/total count.
  */
 const D_D_GU_REGEX = () => /(\d+\/\d+)/gu;
 

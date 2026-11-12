@@ -20,10 +20,11 @@ CONFIG
 
 const repo = 'acme/project';
 /**
+ * Builds a repository API route with an optional endpoint suffix.
  *
- * @param endpoint
+ * @param endpoint API path appended after the repository route, when present.
  *
- * @return
+ * @return GitHub REST API path for the test repository and endpoint.
  */
 const apiPath = (endpoint) => `repos/acme/project${endpoint ? `/${endpoint}` : ''}`;
 test('GitHub report classifies open issues and security alerts without exposing secret values', () => {
@@ -131,12 +132,6 @@ test('GitHub report classifies open issues and security alerts without exposing 
 	assert.match(result.findings.find((finding) => finding.category === 'secret-scanning').agentInstructions, /Never read, copy, print/);
 });
 test('GitHub report keeps unavailable alert counts unknown instead of reporting zero', () => {
-	/**
-	 *
-	 * @param path
-	 *
-	 * @return
-	 */
 	const api = (path) => {
 		if (path === apiPath('')) return { ok: true, value: { default_branch: 'main' } };
 		if (path.includes('/issues?')) return { ok: true, value: [[]] };

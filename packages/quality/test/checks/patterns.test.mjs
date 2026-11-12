@@ -15,7 +15,7 @@ import ts from 'typescript';
 import { createQualityCfg, fixRegexDedup, fixRepeatedClasses, performancePatternFindings, regexFindings, repeatedClassFindings, runTailwindCanonical, uiPatternFindings } from '../../dist/index.js';
 import { fixtureFile, fixtureRoot, fixtureText } from '../../support/fixtures.mjs';
 import { pathToFileURL } from 'node:url';
-import { resolve } from 'node:path';
+import { dirname, relative, resolve } from 'node:path';
 
 /*//////////////////////////////////////////////////
 TESTS
@@ -34,12 +34,25 @@ test('repeated-class detection normalizes whitespace and ignores dynamic and one
 		{ value: 'rounded border bg-card', count: 6, locations: ['src/generated/fixture.tsx:1', 'src/one.tsx:1', 'src/one.tsx:2', 'src/test/fixture.tsx:1', 'src/two.tsx:1', 'src/two.tsx:2'] },
 	]);
 });
+test('repeated-class analysis and fixing ignore markup inside JavaScript strings but process JSX', () => {
+	const root = fixtureRoot('terra-quality-classes-string-data-');
+	const genMarkup = '<div class="rounded border bg-card"></div> <div class="rounded border bg-card"></div> <div class="rounded border bg-card"></div>';
+	const genSource = `export const courseHtml = ${JSON.stringify(genMarkup)};\n`;
+	fixtureFile(root, 'src/course-data.js', genSource);
+	fixtureFile(root, 'src/view.tsx', '<><div className="rounded border bg-card" /><div className="rounded border bg-card" /><div class="rounded border bg-card" /></>;\n');
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.js', '.tsx'], repeatedClasses: {} });
+	assert.deepEqual(repeatedClassFindings(cfg), [{ value: 'rounded border bg-card', count: 3, locations: ['src/view.tsx:1', 'src/view.tsx:1', 'src/view.tsx:1'] }]);
+	assert.deepEqual(fixRepeatedClasses(cfg), { fixed: 3, skipped: 0 });
+	assert.equal(fixtureText(root, 'src/course-data.js'), genSource);
+	assert.match(fixtureText(root, 'src/view.tsx'), /const ROUNDED_BORDER_BG_CARD_CLASS = 'rounded border bg-card';/);
+	assert.deepEqual(repeatedClassFindings(cfg), []);
+});
 test('performance patterns are opt-in and report linear lookups nested in collection callbacks', () => {
 	const root = fixtureRoot('terra-quality-performance-patterns-');
 	fixtureFile(
 		root,
 		'src/view.ts',
-		`const result = items.map((item) => records.find((record) => record.id === item.id));\nconst filtered = items.map((item) => records.filter((record) => record.group === item.group));\nconst direct = items.find((item) => item.active);\nconst computed = items.map((item) => createRecords().find((record) => record.id === item.id));\n`,
+		`type Item = { id: number; name: string; group: number; active: boolean };\ntype CourseRecord = { id: number; group: number };\nconst items: Item[] = [];\nconst records: CourseRecord[] = [];\nconst labels: string[] = [];\nconst result = items.map((item) => records.find((record) => record.id === item.id));\nconst filtered = items.map((item) => records.filter((record) => record.group === item.group));\nconst stringMatch = items.map((item) => item.name.includes(item.id.toString()));\nconst arrayMatch = items.map((item) => labels.includes(item.name));\nconst direct = items.find((item) => item.active);\nconst computed = items.map((item) => createRecords().find((record) => record.id === item.id));\n`,
 	);
 	const base = { root, sourceRoots: ['src'], extensions: ['.ts'] };
 	const cfg = createQualityCfg(base);
@@ -48,8 +61,9 @@ test('performance patterns are opt-in and report linear lookups nested in collec
 	assert.deepEqual(
 		performancePatternFindings(enabled).map(({ method: m, receiver: r, line: l }) => ({ method: m, receiver: r, line: l })),
 		[
-			{ method: 'find', receiver: 'records', line: 1 },
-			{ method: 'filter', receiver: 'records', line: 2 },
+			{ method: 'find', receiver: 'records', line: 6 },
+			{ method: 'filter', receiver: 'records', line: 7 },
+			{ method: 'includes', receiver: 'labels', line: 9 },
 		],
 	);
 });
@@ -59,8 +73,7 @@ test('UI pattern detection applies configured extensions to all matching files',
 	fixtureFile(root, 'src/ignored.tsx', '<button className="legacy">Ignore</button>\n');
 	fixtureFile(root, 'src/notes.html', '<button class="legacy">HTML</button>\n');
 	fixtureFile(root, 'src/no-match.tsx', '<Button>Shared primitive</Button>\n');
-	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.tsx', '.html'], uiPatterns: { forbidden: ['<button\\b'], extensions: ['.tsx', '.html'] } });
-	const findings = uiPatternFindings(cfg);
+	const findings = uiPatternFindings(createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.tsx', '.html'], uiPatterns: { forbidden: ['<button\\b'], extensions: ['.tsx', '.html'] } }));
 	assert.equal(findings.length, 3);
 	assert.deepEqual(
 		findings.map((f) => f.file),
@@ -114,7 +127,7 @@ test('repeated-class fixer creates deterministic file-local CLASSES constants an
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.tsx', '.html'], repeatedClasses: {} });
 	assert.deepEqual(fixRepeatedClasses(cfg), { fixed: 3, skipped: 0 });
 	const src = fixtureText(root, 'src/view.tsx');
-	assert.match(src, /CLASSES/);
+	assert.doesNotMatch(src, /\/\*\/{10,}\r?\n[ \t]*(?:CLASSES|REGEX)[ \t]*\r?\n/u);
 	assert.match(src, /const ROUNDED_BORDER_BG_CARD_CLASS = 'rounded border bg-card';/);
 	assert.equal((src.match(/ROUNDED_BORDER_BG_CARD_CLASS/g) ?? []).length, 4);
 	assert.deepEqual(repeatedClassFindings(createQualityCfg({ root, sourceRoots: ['src/view.tsx'], extensions: ['.tsx'], repeatedClasses: {} })), []);
@@ -131,7 +144,7 @@ test('regex fixer deduplicates stateless literals and preserves fresh stateful i
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], regexDedup: {} });
 	assert.deepEqual(fixRegexDedup(cfg), { fixed: 4, skipped: 0 });
 	const src = fixtureText(root, 'src/view.ts');
-	assert.match(src, /REGEX/);
+	assert.doesNotMatch(src, /\/\*\/{10,}\r?\n[ \t]*(?:CLASSES|REGEX)[ \t]*\r?\n/u);
 	assert.match(src, /const ALPHA_REGEX = \/alpha\//);
 	assert.equal((src.match(/ALPHA_REGEX/g) ?? []).length, 3);
 	assert.match(src, /const BETA_G_REGEX = \(\) => \/beta\/g/);
@@ -147,11 +160,24 @@ test('regex fixer inserts declarations after a real CONFIG section, not one insi
 	const src = fixtureText(root, 'src/view.ts');
 	const genSection = src.indexOf('const generated');
 	const cfgSection = src.indexOf(configText, genSection + 1);
-	const regexSection = src.indexOf('REGEX', cfgSection);
+	const genDeclaration = src.indexOf('const ALPHA_REGEX');
 	const firstUse = src.indexOf('const first');
-	assert.ok(genSection < cfgSection && cfgSection < regexSection && regexSection < firstUse);
+	assert.ok(genSection < cfgSection && cfgSection < genDeclaration && genDeclaration < firstUse);
+	assert.doesNotMatch(src, /\/\*\/{10,}\r?\n[ \t]*REGEX[ \t]*\r?\n/u);
 	assert.match(src, /const first = ALPHA_REGEX;/);
 	assert.match(src, /const second = ALPHA_REGEX;/);
+});
+test('regex fixer keeps authored comments and does not generate a section label', () => {
+	const root = fixtureRoot('terra-quality-regex-comments-');
+
+	fixtureFile(root, 'src/view.ts', `// Keep this authored note.\nconst first = /alpha/;\nconst second = /alpha/;\nvoid [first, second];\n`);
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], regexDedup: {} });
+	assert.deepEqual(fixRegexDedup(cfg), { fixed: 2, skipped: 0 });
+	const updated = fixtureText(root, 'src/view.ts');
+	assert.match(updated, /\/\/ Keep this authored note\./u);
+	assert.doesNotMatch(updated, /\/\*\/{10,}\r?\n[ \t]*REGEX[ \t]*\r?\n/u);
+	assert.equal((updated.match(/\/\*|\/\//gu) ?? []).length, 1);
+	assert.match(updated, /const ALPHA_REGEX = \/alpha\//u);
 });
 test('shared regex registry rewrites TypeScript and MJS literals and constructors with relative namespace imports', async () => {
 	const root = fixtureRoot('terra-quality-regex-shared-');
@@ -177,11 +203,14 @@ test('shared regex registry rewrites TypeScript and MJS literals and constructor
 	assert.match(mjsSrc, /TerraQualityRegex\.REGEX_CONSTRUCTOR_GY_REGEX\(\)/);
 	const registrySrc = fixtureText(root, 'shared/regex.mjs');
 	const registryTypes = fixtureText(root, 'shared/regex.d.mts');
-	assert.match(registrySrc, /\/\/ @terra-quality-regex-key "alpha\/g"\n\/\*\*\n \* Creates a fresh regular expression instance for the shared pattern\./);
+	assert.match(registrySrc, /\/\/ @terra-quality-regex-key "alpha\/g"\n(?:\/\*\*[\s\S]*?\*\/\n)?export const REGEX_ALPHA_G_REGEX/);
+	assert.doesNotMatch(registrySrc, /Creates a fresh regular expression instance|Generated by regex-dedup from key/u);
 	assert.match(registrySrc, /export const REGEX_ALPHA_G_REGEX = \(\) => \(/);
 	assert.match(registrySrc, /new RegExp\('constructor', 'gy'\)/);
 	assert.match(registryTypes, /export declare const REGEX_ALPHA_G_REGEX: \(\) => RegExp;/);
 	assert.match(registryTypes, /export declare const REGEX_CONSTRUCTOR_GY_REGEX: \(\) => RegExp;/);
+	assert.doesNotMatch(registrySrc, /@returns?\s/u);
+	assert.doesNotMatch(registryTypes, /@returns?\s/u);
 	const program = ts.createProgram([resolve(root, 'src/nested/use.ts')], {
 		allowJs: true,
 		module: ts.ModuleKind.ESNext,
@@ -205,6 +234,226 @@ test('shared regex registry rewrites TypeScript and MJS literals and constructor
 	assert.notEqual(constructorFactory(), constructorFactory());
 	assert.deepEqual(fixRegexDedup(cfg), { fixed: 0, skipped: 0 });
 	assert.equal(fixtureText(root, 'shared/regex.mjs'), registrySrc);
+});
+test('shared regex pruning preserves exports referenced through a configured namespace alias', () => {
+	const root = fixtureRoot('terra-quality-regex-shared-alias-');
+	const marker = '// Generated by @terra-symposium/standards-quality regex-dedup. Do not edit.\n';
+	fixtureFile(root, 'package.json', '{"type":"module"}\n');
+	fixtureFile(
+		root,
+		'src/regex.mjs',
+		`${marker}// @terra-quality-regex-key "timezone/i"\nexport const REGEX_TIMEZONE_I_REGEX = () => /timezone/i;\n// @terra-quality-regex-key "city/i"\nexport const REGEX_CITY_I_REGEX = () => /city/i;\n`,
+	);
+	fixtureFile(root, 'src/regex.d.mts', `${marker}export declare const REGEX_TIMEZONE_I_REGEX: () => RegExp;\nexport declare const REGEX_CITY_I_REGEX: () => RegExp;\n`);
+	fixtureFile(
+		root,
+		'src/consumer.ts',
+		`import * as Regex from "@/regex.mjs";\nexport const timezone = Regex.REGEX_TIMEZONE_I_REGEX().test("UTC");\nexport const city = Regex.REGEX_CITY_I_REGEX().test("Sydney");\n`,
+	);
+	fixtureFile(root, 'src/one.ts', 'export const first = /alpha/g;\n');
+	fixtureFile(root, 'src/two.ts', 'export const second = /alpha/g;\n');
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts', '.mjs'], aliases: { '@/': 'src/' }, regexDedup: { extensions: ['.ts', '.mjs'], sharedModule: 'src/regex.mjs' } });
+	assert.deepEqual(fixRegexDedup(cfg), { fixed: 2, skipped: 0 });
+	const registry = fixtureText(root, 'src/regex.mjs');
+	const declarations = fixtureText(root, 'src/regex.d.mts');
+	assert.match(registry, /export const REGEX_TIMEZONE_I_REGEX/u);
+	assert.match(registry, /export const REGEX_CITY_I_REGEX/u);
+	assert.match(declarations, /REGEX_TIMEZONE_I_REGEX/u);
+	assert.match(declarations, /REGEX_CITY_I_REGEX/u);
+	assert.deepEqual(fixRegexDedup(cfg), { fixed: 0, skipped: 0 });
+});
+test('shared regex regeneration preserves authored registry TSDoc and carries it to declarations', () => {
+	const root = fixtureRoot('terra-quality-regex-doc-preservation-');
+	const documentation = '/**\n * Matches an ASCII word boundary for course identifiers.\n *\n * @returns A matcher for ASCII word boundaries in course identifiers.\n */';
+	const staleDeclarationDocumentation = '/**\n * Older declaration description that no longer matches the registry.\n *\n * @returns A stale matcher description.\n */';
+	fixtureFile(root, 'package.json', '{"type":"module"}\n');
+	fixtureFile(root, 'src/one.ts', 'export const first = /course\\b/g;\n');
+	fixtureFile(root, 'src/two.ts', 'export const second = /course\\b/g;\n');
+	fixtureFile(
+		root,
+		'shared/regex.mjs',
+		`// Generated by @terra-symposium/standards-quality regex-dedup. Do not edit.\n// @terra-quality-regex-key "course\\\\b/g"\n\n${documentation}\nexport const REGEX_COURSE_G_REGEX = () => /course\\b/g;\n`,
+	);
+	fixtureFile(
+		root,
+		'shared/regex.d.mts',
+		`// Generated by @terra-symposium/standards-quality regex-dedup. Do not edit.\n${staleDeclarationDocumentation}\nexport declare const REGEX_COURSE_G_REGEX: () => RegExp;\n`,
+	);
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], regexDedup: { extensions: ['.ts'], sharedModule: 'shared/regex.mjs' } });
+	assert.deepEqual(fixRegexDedup(cfg), { fixed: 2, skipped: 0 });
+	const registry = fixtureText(root, 'shared/regex.mjs');
+	const declarations = fixtureText(root, 'shared/regex.d.mts');
+	assert.equal((registry.match(/Matches an ASCII word boundary for course identifiers\./gu) ?? []).length, 1);
+	assert.equal((declarations.match(/Matches an ASCII word boundary for course identifiers\./gu) ?? []).length, 1);
+	assert.equal((registry.match(/@returns A matcher for ASCII word boundaries in course identifiers\./gu) ?? []).length, 1);
+	assert.equal((declarations.match(/@returns A matcher for ASCII word boundaries in course identifiers\./gu) ?? []).length, 1);
+	assert.ok(registry.includes(`${documentation}\nexport const REGEX_COURSE_G_REGEX`));
+	assert.ok(declarations.includes(`${documentation}\nexport declare const REGEX_COURSE_G_REGEX`));
+	assert.doesNotMatch(declarations, /Older declaration description|A stale matcher description/u);
+	assert.deepEqual(fixRegexDedup(cfg), { fixed: 0, skipped: 0 });
+	assert.equal(fixtureText(root, 'shared/regex.mjs'), registry);
+	assert.equal(fixtureText(root, 'shared/regex.d.mts'), declarations);
+});
+test('shared regex generation carries authored use-site TSDoc without generating return prose', () => {
+	const root = fixtureRoot('terra-quality-regex-source-docs-');
+	fixtureFile(root, 'package.json', '{"type":"module"}\n');
+	fixtureFile(root, 'src/one.ts', `${'/**\n * Matches course identifiers at an ASCII word boundary.\n */'}\nexport const first = /course\\b/g;\n`);
+	fixtureFile(root, 'src/two.ts', 'export const second = /course\\b/g;\n');
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], regexDedup: { extensions: ['.ts'], sharedModule: 'shared/regex.mjs' } });
+	assert.deepEqual(fixRegexDedup(cfg), { fixed: 2, skipped: 0 });
+	const registry = fixtureText(root, 'shared/regex.mjs');
+	const declarations = fixtureText(root, 'shared/regex.d.mts');
+	for (const gen of [registry, declarations]) {
+		assert.match(gen, /Matches course identifiers at an ASCII word boundary\./u);
+		assert.doesNotMatch(gen, /Generated by regex-dedup from key|fresh RegExp instance so each caller owns its match state/u);
+		assert.doesNotMatch(gen, /@returns?\s/u);
+	}
+	assert.deepEqual(fixRegexDedup(cfg), { fixed: 0, skipped: 0 });
+	assert.equal(fixtureText(root, 'shared/regex.mjs'), registry);
+	assert.equal(fixtureText(root, 'shared/regex.d.mts'), declarations);
+});
+test('shared regex regeneration removes obsolete local factories and templated return comments', () => {
+	const root = fixtureRoot('terra-quality-regex-generated-hygiene-');
+	const oldReturn = 'A fresh RegExp instance so each caller owns its match state.';
+	const coursePattern = String.raw`course\b`;
+	const courseKey = `${coursePattern}/g`;
+	fixtureFile(root, 'package.json', '{"type":"module"}\n');
+	fixtureFile(root, 'src/one.ts', `export const firstCourse = /${coursePattern}/g;\nexport const firstFresh = /fresh\\b/g;\n`);
+	fixtureFile(root, 'src/two.ts', `export const secondCourse = /${coursePattern}/g;\nexport const secondFresh = /fresh\\b/g;\n`);
+	fixtureFile(
+		root,
+		'shared/regex.mjs',
+		`// Generated by @terra-symposium/standards-quality regex-dedup. Do not edit.\n// @terra-quality-regex-key ${JSON.stringify(courseKey)}\n/**\n * Matches a course identifier at a word boundary.\n *\n * @return ${oldReturn}\n */\nexport const REGEX_COURSE_G_REGEX = () => /${coursePattern}/g;\n// @terra-quality-regex-key "stale/g"\nconst REGEX_STALE_LOCAL_REGEX = () => /stale/g;\n/**\n * Obsolete private factory.\n */\nconst REGEX_UNUSED_LOCAL_REGEX = () => /unused/g;\n`,
+	);
+	fixtureFile(
+		root,
+		'shared/regex.d.mts',
+		`// Generated by @terra-symposium/standards-quality regex-dedup. Do not edit.\n/**\n * Matches a course identifier at a word boundary.\n *\n * @return ${oldReturn}\n */\nexport declare const REGEX_COURSE_G_REGEX: () => RegExp;\n`,
+	);
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], regexDedup: { extensions: ['.ts'], sharedModule: 'shared/regex.mjs' } });
+	assert.deepEqual(fixRegexDedup(cfg), { fixed: 4, skipped: 0 });
+	const registry = fixtureText(root, 'shared/regex.mjs');
+	const declarations = fixtureText(root, 'shared/regex.d.mts');
+	assert.match(registry, /Matches a course identifier at a word boundary\./u);
+	assert.match(declarations, /Matches a course identifier at a word boundary\./u);
+	assert.doesNotMatch(registry, new RegExp(oldReturn, 'u'));
+	assert.doesNotMatch(declarations, new RegExp(oldReturn, 'u'));
+	assert.doesNotMatch(registry, /@returns?\s/u);
+	assert.doesNotMatch(declarations, /@returns?\s/u);
+	assert.doesNotMatch(registry, /REGEX_STALE_LOCAL_REGEX|REGEX_UNUSED_LOCAL_REGEX/u);
+});
+test('shared regex regeneration cleans stale registry entries when no duplicate source expressions remain', () => {
+	const root = fixtureRoot('terra-quality-regex-registry-cleanup-');
+	const oldReturn = 'A fresh RegExp instance so each caller owns its match state.';
+	fixtureFile(root, 'package.json', '{"type":"module"}\n');
+	fixtureFile(root, 'src/only.ts', `import * as Regex from '../shared/regex.mjs';\nexport const matches = Regex.REGEX_KEEP_REGEX().test('keep');\n`);
+	fixtureFile(
+		root,
+		'shared/regex.mjs',
+		`// Generated by @terra-symposium/standards-quality regex-dedup. Do not edit.\n// @terra-quality-regex-key "keep/g"\n/**\n *\n */\n/**\n * Matches the retained source token.\n *\n * @return ${oldReturn}\n */\nexport const REGEX_KEEP_REGEX = () => /keep/g;\n// @terra-quality-regex-key "stale/g"\nconst REGEX_KEEP_REGEX = () => /stale/g;\nconst REGEX_UNUSED_LOCAL_REGEX_2 = () => /unused/g;\n`,
+	);
+	fixtureFile(
+		root,
+		'shared/regex.d.mts',
+		`// Generated by @terra-symposium/standards-quality regex-dedup. Do not edit.\n/**\n *\n */\n/**\n * Matches the retained source token.\n *\n * @return ${oldReturn}\n */\nexport declare const REGEX_KEEP_REGEX: () => RegExp;\n`,
+	);
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], regexDedup: { extensions: ['.ts'], sharedModule: 'shared/regex.mjs' } });
+	assert.deepEqual(fixRegexDedup(cfg), { fixed: 0, skipped: 0 });
+	const registry = fixtureText(root, 'shared/regex.mjs');
+	assert.match(registry, /REGEX_KEEP_REGEX/u);
+	assert.doesNotMatch(registry, new RegExp(oldReturn, 'u'));
+	assert.doesNotMatch(registry, /\/\*\*\r?\n\s*\*\r?\n\s*\*\//u);
+	assert.doesNotMatch(fixtureText(root, 'shared/regex.d.mts'), new RegExp(oldReturn, 'u'));
+	assert.doesNotMatch(fixtureText(root, 'shared/regex.d.mts'), /\/\*\*\r?\n\s*\*\r?\n\s*\*\//u);
+	assert.doesNotMatch(fixtureText(root, 'shared/regex.d.mts'), /@returns?\s/u);
+	assert.doesNotMatch(registry, /REGEX_UNUSED_LOCAL_REGEX_2/u);
+	assert.equal((registry.match(/(?:export )?const REGEX_KEEP_REGEX =/gu) ?? []).length, 1);
+});
+test('shared regex regeneration preserves a leading source header before the generated marker', () => {
+	const root = fixtureRoot('terra-quality-regex-header-');
+	fixtureFile(root, 'package.json', '{"type":"module"}\n');
+	fixtureFile(root, 'src/one.ts', 'export const first = /header/g;\n');
+	fixtureFile(root, 'src/two.ts', 'export const second = /header/g;\n');
+	fixtureFile(root, 'shared/regex.mjs', '/**\n * shared/regex.mjs\n */\n\n// Generated by @terra-symposium/standards-quality regex-dedup. Do not edit.\n');
+	fixtureFile(root, 'shared/regex.d.mts', '/**\n * shared/regex.d.mts\n */\n\n// Generated by @terra-symposium/standards-quality regex-dedup. Do not edit.\n');
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], regexDedup: { extensions: ['.ts'], sharedModule: 'shared/regex.mjs' } });
+	assert.deepEqual(fixRegexDedup(cfg), { fixed: 2, skipped: 0 });
+	assert.match(fixtureText(root, 'shared/regex.mjs'), /^\/\*\*[\s\S]*?\*\/\n\n\/\/ Generated by/u);
+	assert.match(fixtureText(root, 'shared/regex.d.mts'), /^\/\*\*[\s\S]*?\*\/\n\n\/\/ Generated by/u);
+	assert.equal((fixtureText(root, 'shared/regex.mjs').match(/shared\/regex\.mjs/gu) ?? []).length, 1);
+	assert.equal((fixtureText(root, 'shared/regex.d.mts').match(/shared\/regex\.d\.mts/gu) ?? []).length, 1);
+	assert.match(fixtureText(root, 'shared/regex.d.mts'), /REGEX_HEADER_G_REGEX/u);
+});
+test('shared regex allocation keeps distinct line-ending expressions distinct from colliding export names', async () => {
+	const root = fixtureRoot('terra-quality-regex-line-endings-');
+	const crlfSource = String.raw`/\r\n?/g`;
+	const lineEndSource = String.raw`/\n+$/`;
+	const existingKey = String.raw`\r\n/g`;
+	fixtureFile(root, 'package.json', '{"type":"module"}\n');
+	fixtureFile(root, 'src/one.mjs', `export const firstCrLf = ${crlfSource};\nexport const firstLineEnd = ${lineEndSource};\n`);
+	fixtureFile(root, 'src/two.mjs', `export const secondCrLf = ${crlfSource};\nexport const secondLineEnd = ${lineEndSource};\n`);
+	fixtureFile(
+		root,
+		'shared/regex.mjs',
+		`// Generated by @terra-symposium/standards-quality regex-dedup. Do not edit.\n// @terra-quality-regex-key ${JSON.stringify(existingKey)}\nexport const REGEX_R_N_G_REGEX = () => /\\r\\n/g;\n`,
+	);
+	fixtureFile(root, 'shared/regex.d.mts', '// Generated by @terra-symposium/standards-quality regex-dedup. Do not edit.\nexport declare const REGEX_R_N_G_REGEX: () => RegExp;\n');
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.mjs'], regexDedup: { extensions: ['.mjs'], sharedModule: 'shared/regex.mjs' } });
+	assert.deepEqual(fixRegexDedup(cfg), { fixed: 4, skipped: 0 });
+	const registrySource = fixtureText(root, 'shared/regex.mjs');
+	const genEntries = new Map([...registrySource.matchAll(/export const (\w+) = \(\) => \(\n\t([^\n]+)\n\);/gu)].map(([, name, expression]) => [expression, name]));
+	const crlfName = genEntries.get(crlfSource);
+	const lineEndName = genEntries.get(lineEndSource);
+	assert.equal(crlfName, 'REGEX_R_N_G_REGEX_2');
+	assert.ok(lineEndName);
+	assert.match(fixtureText(root, 'src/one.mjs'), new RegExp(`\\.${crlfName}\\(\\)`));
+	assert.match(fixtureText(root, 'src/one.mjs'), new RegExp(`\\.${lineEndName}\\(\\)`));
+	const runtime = await import(`${pathToFileURL(resolve(root, 'shared/regex.mjs')).href}?line-endings=1`);
+	assert.equal(runtime[crlfName]().test('\r'), true);
+	assert.equal(runtime[crlfName]().test('\r\n'), true);
+	assert.equal(runtime[lineEndName]().test('text\n\n'), true);
+});
+test('shared regex imports resolve inside the owning package from shallow and deeply nested sources', () => {
+	const root = fixtureRoot('terra-quality-regex-package-paths-');
+	fixtureFile(root, '.git/HEAD', 'ref: refs/heads/test\n');
+	fixtureFile(root, 'package.json', '{"type":"module"}\n');
+	fixtureFile(root, 'site/package.json', '{"name":"site","type":"module"}\n');
+	fixtureFile(root, 'src/lib/terra/regex.mjs', '// Generated by @terra-symposium/standards-quality regex-dedup. Do not edit.\n');
+	fixtureFile(root, 'src/lib/terra/regex.d.mts', '// Generated by @terra-symposium/standards-quality regex-dedup. Do not edit.\n');
+	const files = [
+		['src/lib/markdown-model.ts', `import * as TerraQualityRegex from './terra/regex.mjs';\nexport const first = /shared/g;\nvoid TerraQualityRegex;\n`],
+		['src/components/StaticWorkspace.tsx', `import * as TerraQualityRegex from '../lib/terra/regex.mjs';\nexport const second = /shared/g;\nvoid TerraQualityRegex;\n`],
+		['src/components/terra/editor/docs/_Embed.tsx', `export const third = /shared/g;\n`],
+		['site/config/astro.config.mjs', `export const fourth = /shared/g;\n`],
+		['site/src/lib/catalog.ts', `import * as TerraQualityRegex from '../../../src/lib/terra/regex.mjs';\nexport const fifth = /shared/g;\nvoid TerraQualityRegex;\n`],
+	];
+	for (const [file, source] of files) fixtureFile(root, file, source);
+	const cfg = createQualityCfg({ root, sourceRoots: ['.'], extensions: ['.ts', '.tsx', '.mjs'], regexDedup: { extensions: ['.ts', '.tsx', '.mjs'], sharedModule: 'src/lib/terra/regex.mjs' } });
+	assert.deepEqual(fixRegexDedup(cfg), { fixed: files.length, skipped: 0 });
+	const registry = resolve(root, 'src/lib/terra/regex.mjs');
+	for (const [file] of files) {
+		const sourcePath = resolve(root, file);
+		const imports = [...fixtureText(root, file).matchAll(/^import \* as \w+ from ['"]([^'"]+)['"];?$/gm)];
+		assert.equal(imports.length, 1, `${file} should keep exactly one namespace import`);
+		const resolvedImport = resolve(dirname(sourcePath), imports[0][1]);
+		assert.equal(resolvedImport, registry, `${file} should resolve to the registry in its package`);
+		const pathFromRoot = relative(root, resolvedImport);
+		assert.notEqual(pathFromRoot, '..');
+		assert.ok(!pathFromRoot.startsWith(`..${process.platform === 'win32' ? '\\\\' : '/'}`));
+	}
+});
+test('shared regex fixer skips a registry outside the consumer package boundary', () => {
+	const workspaceRoot = fixtureRoot('terra-quality-regex-package-boundary-');
+	fixtureFile(workspaceRoot, 'src/lib/terra/regex.mjs', '// Generated by @terra-symposium/standards-quality regex-dedup. Do not edit.\n');
+	fixtureFile(workspaceRoot, 'src/lib/terra/regex.d.mts', '// Generated by @terra-symposium/standards-quality regex-dedup. Do not edit.\n');
+	fixtureFile(workspaceRoot, 'docs/package.json', '{"name":"docs","type":"module"}\n');
+	fixtureFile(workspaceRoot, 'docs/src/one.ts', 'export const first = /shared/g;\n');
+	fixtureFile(workspaceRoot, 'docs/src/two.ts', 'export const second = /shared/g;\n');
+	const cfg = createQualityCfg({ root: workspaceRoot, sourceRoots: ['docs/src'], extensions: ['.ts'], regexDedup: { extensions: ['.ts'], sharedModule: 'src/lib/terra/regex.mjs' } });
+	assert.deepEqual(fixRegexDedup(cfg), { fixed: 0, skipped: 2 });
+	assert.equal(fixtureText(workspaceRoot, 'docs/src/one.ts'), 'export const first = /shared/g;\n');
+	assert.equal(fixtureText(workspaceRoot, 'docs/src/two.ts'), 'export const second = /shared/g;\n');
+	assert.equal(fixtureText(workspaceRoot, 'src/lib/terra/regex.mjs'), '// Generated by @terra-symposium/standards-quality regex-dedup. Do not edit.\n');
 });
 test('shared regex export allocation avoids names already owned by the registry', () => {
 	const root = fixtureRoot('terra-quality-regex-name-collision-');

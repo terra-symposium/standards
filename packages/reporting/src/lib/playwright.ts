@@ -22,7 +22,7 @@ import { writeSpreadsheet } from './spreadsheet.js';
 import { VISUAL_VIEWPORTS } from './viewports.js';
 
 // TYPES
-import type { LoadBudgetOverride, LoadMeasurement, LoadMeasurementInput, LoadTestingConfig, ProjectDefinition, ReportRun, VisualResult } from './core.js';
+import type { LoadBudgetOverride, LoadMeasurement, LoadMeasurementInput, LoadTestingConfig, ProjectDefinition, VisualResult } from './core.js';
 import type { Page } from '@playwright/test';
 import type { ScreenshotCapture } from './slideshow.js';
 import type { ViewportCatalog } from './viewports.js';
@@ -31,6 +31,11 @@ import type { ViewportCatalog } from './viewports.js';
 REGEX
 //////////////////////////////////////////////////*/
 
+/**
+ * Creates a fresh matcher for characters that cannot appear in artifact names.
+ *
+ * @return Global matcher for characters outside the test-id filename alphabet.
+ */
 const A_Z0_9_GI_REGEX = () => /[^a-z0-9_-]/gi;
 
 /*//////////////////////////////////////////////////
@@ -122,22 +127,6 @@ export const loadTest = diagnosticsTest.extend<{ load: LoadTestController }>({
 			};
 			observe(page);
 			ctx.on('page', observe);
-			const controller: LoadTestController = {
-				setTestBudget: (b) => {
-					testBudget = validateLoadBudgetOverride(b);
-				},
-				measure: async <T>(n: string, o: () => T | Promise<T>, b?: LoadBudgetOverride): Promise<T> => {
-					if (!enabled) return o();
-					return timeLoadOperation(
-						n,
-						o,
-						(measurement) => {
-							measurements.push(measurement);
-						},
-						b,
-					);
-				},
-			};
 			try {
 				await use({
 					setTestBudget: (budget) => {

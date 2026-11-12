@@ -34,10 +34,7 @@ HELPERS
 function candidateSpan(n: ts.Node, src: string): { start: number; end: number } | undefined {
 	if (ts.isObjectLiteralExpression(n)) {
 		let containsJsx = false;
-		/**
-		 *
-		 * @param c
-		 */
+
 		const findJsx = (c: ts.Node): void => {
 			if (ts.isJsxElement(c) || ts.isJsxSelfClosingElement(c) || ts.isJsxFragment(c)) {
 				containsJsx = true;
@@ -78,20 +75,18 @@ export function collapseTypesAndObjects(fileName: string): boolean {
 
 	// HELPERS
 	/**
+	 * Compacts one multiline node while preserving literal spans and refusing comments.
 	 *
-	 * @param n
-	 * @param start
-	 * @param text
+	 * @param n Parsed syntax node whose text may be collapsed.
+	 * @param start Offset of the node text within the containing source file.
+	 * @param text Exact source text covered by the node.
 	 *
-	 * @return
+	 * @return Collapsed node text, or `undefined` when no safe rewrite is available.
 	 */
 	const collapse = (n: ts.Node, start: number, text: string): string | undefined => {
 		if (!/[\r\n]/.test(text)) return undefined;
 		const protectedRanges: { start: number; end: number }[] = [];
-		/**
-		 *
-		 * @param c
-		 */
+
 		const protectLiterals = (c: ts.Node): void => {
 			if (
 				ts.isStringLiteral(c) ||
@@ -109,10 +104,11 @@ export function collapseTypesAndObjects(fileName: string): boolean {
 		};
 		protectLiterals(n);
 		/**
+		 * Checks whether a source offset falls within a protected literal.
 		 *
-		 * @param pos
+		 * @param pos Offset relative to the candidate node text.
 		 *
-		 * @return
+		 * @return Whether the offset belongs to a string, template, regex, or JSX text span.
 		 */
 		const isProtected = (pos: number): boolean => protectedRanges.some((r) => pos >= r.start && pos < r.end);
 		const scanner = ts.createScanner(ts.ScriptTarget.Latest, false, parsed.languageVariant, text);
@@ -139,10 +135,7 @@ export function collapseTypesAndObjects(fileName: string): boolean {
 	};
 
 	// ANALYSE
-	/**
-	 *
-	 * @param n
-	 */
+
 	const visit = (n: ts.Node): void => {
 		const span = candidateSpan(n, original);
 		if (span) {

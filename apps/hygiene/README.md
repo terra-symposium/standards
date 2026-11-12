@@ -38,12 +38,14 @@ For UI-only work, `pnpm --filter @terra-symposium/hygiene-dashboard dev` starts 
 ## Usage
 
 ### Provision
+
 1. Connect a dedicated Neon database to this Netlify site or set `DATABASE_URL`. The app also reads `NETLIFY_DATABASE_URL` from Netlify's Neon integration. The build applies the idempotent SQL migrations before compiling.
 2. Create a GitHub App with callback URL `https://<site>/api/callback`, webhook URL `https://<site>/api/webhook`, and read-only repository permissions. Subscribe to Installation and Installation repositories events. Enable user authorization and set the webhook secret.
 3. Create a Netlify site for this repository with the repository root as its base directory and `apps/hygiene` as its package directory. Set the variables listed in `config/.env.example` for the production Functions context.
 4. Install the GitHub App on selected repositories. Signed-in users see a repository only when GitHub confirms their current admin permission.
 
 ### Collect reports
+
 The connected repository workflow generates JUnit XML and a Terra Quality JSON report when GitHub Actions starts. Pull request runs are excluded. If Actions are unavailable, use the local importer below; it runs the same test and quality commands on a clean snapshot of a tracked branch and saves normalized counts to Neon. Local runs are marked as **Local analysis** in the dashboard, so they are distinguishable from GitHub Actions data.
 
 The `main` and `development` branches are tracked by default. Full history can be imported locally at any time, and reports can be refreshed by rerunning the local importer. No scheduled function, Netlify deployment, or GitHub Actions usage is needed for local imports.
@@ -58,6 +60,7 @@ pnpm exec terra-quality history --branch main --base-sha <previous-head> --repor
 Reports use schema version 1. The history report includes commit author dates, source and test line additions/deletions, and source-line totals using the dashboard exclusions. The test rate excludes skipped cases. The quality rate uses enabled checks with no findings. The 0–100 score equally weights those component rates and stays unavailable when either report is missing.
 
 ### Authorization and storage
+
 The dashboard checks the signed-in GitHub user's current admin permission for every repository query. Report tokens are stored as hashes, scoped to one repository, and compared in constant time. Sessions are opaque tokens stored by hash; GitHub OAuth tokens are encrypted at rest. Report payloads are validated before normalized values are persisted.
 
 ## Configuration and security

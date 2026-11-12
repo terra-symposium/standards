@@ -12,6 +12,7 @@ jobs:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
+      - uses: astral-sh/setup-uv@v7
       - uses: pnpm/action-setup@v6
         with:
           version: 10.30.3
@@ -20,9 +21,9 @@ jobs:
           node-version: 22.23.4
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - run: uv sync --locked --group dev
       - name: Capture full-repository quality findings
-        run: pnpm run quality --report-json standards-quality.json
-        continue-on-error: true
+        run: pnpm run quality --all --warn --report-json standards-quality.json
       - name: Check formatting
         run: node packages/quality/dist/lib/runner.js format --all --warn
       - name: Check lint

@@ -16,6 +16,14 @@ CONFIG
 //////////////////////////////////////////////////*/
 
 const emptyTestPlan = { version: 1, suites: [] };
+/**
+ * Checks whether one resolved path is the repository root or one of its descendants.
+ *
+ * @param root Absolute repository root.
+ * @param path Absolute or root-relative path to check.
+ *
+ * @return Whether the path remains inside the repository boundary.
+ */
 const isInside = (root, path) => {
 	const rel = relative(root, path);
 	return rel === '' || (rel !== '..' && !rel.startsWith(`..${sep}`) && !isAbsolute(rel));
@@ -230,26 +238,18 @@ export function validateTestPlan(value, root) {
 }
 
 /**
- * Settings for selecting the repository manifest and requested test suites.
- *
- * @typedef {object} TestPlanOptions
- * @property {string} root - Absolute repository root where the test plan is loaded.
- * @property {string} [manifest] - Repository-relative test manifest path.
- * @property {string[]} [suites] - Optional suite names to run from the manifest.
- * @property {boolean} [sharedOnly] - Run only shared checks without custom suites.
- */
-
-/**
  * Runs the requested suites serially and aggregates failures into one process result.
  *
- * @param {TestPlanOptions} props - Repository root and optional test-plan selections.
+ * @param {string} root - Absolute repository root.
+ * @param {string} [manifest] - Repository-relative test manifest path.
+ * @param {string[]} [requested] - Optional suite names to run from the manifest.
+ * @param {boolean} [sharedOnly] - Run only shared checks without custom suites.
  *
  * @return {{passed: number, failed: number, selected: string[]}}
  */
 export function runTestPlan({ root, manifest, suites: requested = [], sharedOnly = false }) {
 	const absoluteRoot = resolve(root);
-	const plan = sharedOnly ? emptyTestPlan : readTestPlan(absoluteRoot, manifest);
-	const allSuites = /** @type {Array<{name: string, command: string, args?: string[], cwd?: string}>} */ (plan.suites);
+	const allSuites = /** @type {Array<{name: string, command: string, args?: string[], cwd?: string}>} */ ((sharedOnly ? emptyTestPlan : readTestPlan(absoluteRoot, manifest)).suites);
 	const selected = sharedOnly ? [] : requested.length ? allSuites.filter((suite) => requested.includes(suite.name)) : allSuites;
 	const known = new Set(allSuites.map((suite) => suite.name));
 	const unknown = requested.filter((name) => !known.has(name));
