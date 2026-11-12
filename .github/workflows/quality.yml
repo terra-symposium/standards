@@ -55,6 +55,10 @@ jobs:
   tests:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+    container:
+      image: mcr.microsoft.com/playwright:v1.64.1-resolute
+      options: --ipc=host
     steps:
       - uses: actions/checkout@v7
         with:
@@ -68,7 +72,6 @@ jobs:
           cache: pnpm
           cache-dependency-path: config/pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter @terra-symposium/standards-reporting exec playwright install --with-deps chromium
       - uses: ./packages/testing
         with:
           manifest: config/terra-tests.json
