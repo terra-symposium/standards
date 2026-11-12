@@ -18,6 +18,7 @@ Track each task independently. Keep fixing repositories with actionable failures
 Work on the named repository only. Do not start additional chats from a worker task.
 
 1. Read the repository's `AGENTS.md`, README guidance, and quality configuration. Confirm the checkout, remote, branch, and working-tree state before editing.
+   Confirm the repository-pinned Node and pnpm versions, installed dependencies, and any required Rust toolchain or components; repair missing environment prerequisites without changing project checks or weakening dependency build approvals.
 2. Run the exact command `pnpm run quality:all` in the repository root, capturing its entire stdout and stderr with its exit code. If the script is missing, add a safe root wrapper for the repository's full configured Terra Quality gate, then rerun the exact command.
 3. Fix findings in their owning source files. Preserve behavior, public contracts, existing work, checker rules, thresholds, and waivers. Do not hide, disable, or weaken checks.
 4. Re-run `pnpm run quality:all` after each coherent fix batch. Then run any additional required tests, type checks, builds, or validation steps named by the repository's instructions.
