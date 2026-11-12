@@ -75,7 +75,8 @@ async function repoIdentity(root) {
  */
 function promptFor(repo, options) {
 	const pushAuthorization = options.push ? 'granted' : 'not granted';
-	return `Read and follow the Terra Standards Quality skill for this repository: ${repo.identity}; push authorization: ${pushAuthorization}.`;
+	const repository = repo.identity.split('/').slice(-2).join('/');
+	return `Read and follow the Terra Standards Quality skill for this repository: ${repository}; push authorization: ${pushAuthorization}.`;
 }
 
 /**

@@ -5,7 +5,7 @@ description: Run and remediate configured quality checks across one or more Terr
 
 # Quality
 
-Use this skill for any request to run or coordinate a repository quality sweep. The complete Cloud task prompt is the trigger sentence `Read and follow the Terra Standards Quality skill for this repository: <owner/repo>; push authorization: <granted|not granted>.` Replace the placeholders with the target GitHub identity and the user's explicit push authorization; add no workflow instructions to the prompt. The task must locate and read this skill before acting; the trigger means follow every requirement below for that repository only.
+Use this skill for any request to run or coordinate a repository quality sweep. The complete Cloud task prompt is the trigger sentence `Read and follow the Terra Standards Quality skill for this repository: <owner/repo>; push authorization: <granted|not granted>.` Replace the placeholders with the target GitHub repository and the user's explicit push authorization; add no workflow instructions to the prompt. The task must locate and read this skill before acting; the trigger means follow every requirement below for that repository only.
 
 ## Single-repository Cloud run
 
