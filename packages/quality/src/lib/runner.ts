@@ -2330,6 +2330,17 @@ function knipWorkingDir(cfg: QualityCfg, knipConfig: string | undefined, knipSet
 		if (existsSync(join(configRoot, 'package.json'))) return configRoot;
 		return cfg.root;
 	}
+	let configMatches = 0;
+	let repoMatches = 0;
+	for (const pattern of [...(Array.isArray(knipSettings.entry) ? knipSettings.entry : []), ...(Array.isArray(knipSettings.project) ? knipSettings.project : [])]) {
+		if (typeof pattern !== 'string') continue;
+		const prefix = knipLiteralPrefix(pattern);
+		if (!prefix) continue;
+		if (existsSync(resolve(configRoot, prefix))) configMatches++;
+		if (existsSync(resolve(cfg.root, prefix))) repoMatches++;
+	}
+	if (repoMatches > configMatches) return cfg.root;
+	if (configMatches > repoMatches) return configRoot;
 	if (configPath !== '..' && !configPath.startsWith(`..${sep}`) && !isAbsolute(configPath) && existsSync(join(configRoot, 'package.json'))) return configRoot;
 	return cfg.root;
 }

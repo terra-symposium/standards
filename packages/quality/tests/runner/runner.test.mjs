@@ -1336,6 +1336,26 @@ test('Knip selects the config root when explicit workspaces target both config a
 	]);
 	assert.equal(JSON.parse(fixtureText(root, 'knip-cwd.jsonl')).cwd, realpathSync(join(root, 'config')));
 });
+test('Knip selects the repository root when a nested flat config names repository files', () => {
+	const root = fixtureRoot('terra-quality-knip-flat-repo-root-');
+	fixtureFile(root, 'package.json', JSON.stringify({ name: 'repository-app', private: true }));
+	fixtureFile(root, 'config/package.json', JSON.stringify({ name: 'nested-config', private: true }));
+	fixtureFile(root, 'src/pages/index.astro', '<h1>Home</h1>');
+	fixtureFile(root, 'config/knip.json', JSON.stringify({ entry: ['src/pages/**/*.astro'], project: ['src/**/*.{astro,ts,tsx}'] }));
+	// terra-quality-ignore single-use -- Keep the fixture executable path so the Knip invocation targets this stub.
+	const executable = fixtureFile(
+		root,
+		'config/node_modules/.bin/knip',
+		`#!/usr/bin/env node\nimport { appendFileSync } from 'node:fs';\nappendFileSync(${JSON.stringify(join(root, 'knip-cwd.jsonl'))}, JSON.stringify({ cwd: process.cwd() }) + '\\n');\nprocess.stdout.write(JSON.stringify({ issues: [] }));\n`,
+		0o755,
+	);
+	runQualityCli(createQualityCfg({ root, configRoot: 'config', sourceRoots: ['src'], extensions: ['.astro'], tools: { knip: executable }, enabledChecks: { lint: false } }), [
+		'knip',
+		'--all',
+		'--warn',
+	]);
+	assert.equal(JSON.parse(fixtureText(root, 'knip-cwd.jsonl')).cwd, realpathSync(root));
+});
 test('Knip selects the repository root for explicit package workspaces defined from the repository', () => {
 	const root = fixtureRoot('terra-quality-knip-explicit-repo-root-');
 	fixtureFile(root, 'package.json', JSON.stringify({ name: 'workspace-shell', private: true }));
