@@ -1,5 +1,24 @@
 # @terra-symposium/standards-reporting
 
+## 0.7.0
+
+### Minor Changes
+
+- bb23d8e: Allow browser suites to collect only explicitly tagged viewport scenarios from a custom viewport catalog.
+- d00b64a: Persist Playwright screenshots across runs and rebuild the default PowerPoint from the accumulated evidence folder.
+
+### Patch Changes
+
+- dba6980: Aggregate expected and completed screenshot coverage across sequential viewport processes that share one logical run ID.
+- c88abb6: Combine repository Reporting workbooks into one workbook while preserving each repository's detailed sheets and screenshot evidence.
+- f7eb164: Keep current screenshot decks aligned with the test and viewport inventory while labeling retired captures as historical.
+- dba6980: Build finalized screenshot decks from the current logical run while preserving full-folder regeneration for historical and subset captures.
+- 2e1bf7f: Select multiple active Playwright runs per repository when rebuilding a screenshot deck, preserving older captures as historical.
+- 69891cf: Rebuild screenshot-only PowerPoints from nested repository capture folders and keep the newest screenshot for repeated scenario/viewport runs.
+- 9e726b3: Select the latest captured Playwright run independently for each repository when building a multi-repository screenshot deck.
+- dba6980: Defer screenshot-only slideshow rebuilds until the final viewport process in a shared matrix run.
+- dba6980: Mark screenshots from prior Playwright runs as historical in regenerated slideshow decks.
+
 ## 0.6.2
 
 ### Patch Changes

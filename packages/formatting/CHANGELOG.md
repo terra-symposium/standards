@@ -1,5 +1,11 @@
 # @terra-symposium/standards-formatting
 
+## 0.2.1
+
+### Patch Changes
+
+- 38157d8: Prevent overlapping Quality fix runs and restore files if an autofix introduces syntax errors. Reject token-changing object layout rewrites. Support reasoned, declaration-specific single-use exceptions.
+
 ## 0.2.0
 
 ### Minor Changes

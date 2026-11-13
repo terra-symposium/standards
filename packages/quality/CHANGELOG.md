@@ -1,5 +1,22 @@
 # @terra-symposium/standards-quality
 
+## 2.3.0
+
+### Minor Changes
+
+- 6cdc7c1: Add explicit `configRoot` support for discovering centralized ESLint, Prettier, Knip, and TypeScript configuration while keeping source paths and subprocesses rooted at the repository.
+
+### Patch Changes
+
+- 51eac04: Discover ESLint flat configs from `config/` after all conventional root config filenames.
+- c35b7f2: Discover quality configuration and tool configs from the repository config directory.
+- 38157d8: Prevent overlapping Quality fix runs and restore files if an autofix introduces syntax errors. Reject token-changing object layout rewrites. Support reasoned, declaration-specific single-use exceptions.
+- c435ddf: Discover `config/tsconfig.json` when a repository has no root TypeScript project config.
+- 62b2b08: Order test suites by scope, preserve recommendation command exit codes, and clarify malformed ESLint report errors.
+- Updated dependencies [38157d8]
+  - @terra-symposium/standards-formatting@0.2.1
+  - @terra-symposium/standards-refactoring@0.2.1
+
 ## 2.2.0
 
 ### Minor Changes

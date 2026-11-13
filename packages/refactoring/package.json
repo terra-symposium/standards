@@ -1,6 +1,6 @@
 {
 	"name": "@terra-symposium/standards-refactoring",
-	"version": "0.2.0",
+	"version": "0.2.1",
 	"description": "Safe source refactoring and single-use analysis.",
 	"type": "module",
 	"engines": {
