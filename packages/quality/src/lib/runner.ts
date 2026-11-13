@@ -253,6 +253,7 @@ type GenericFinding =
 	| { value: string; count: number; locations: string[] }
 	| { source: string; count: number; locations: string[] }
 	| { file: string; pattern: string };
+// terra-quality-ignore single-use -- Compile the ANSI escape matcher once for repeated process output cleanup.
 const ANSI_ESCAPE = new RegExp(`${String.fromCharCode(27)}\\[[0-?]*[ -/]*[@-~]`, 'g');
 
 /*//////////////////////////////////////////////////
@@ -392,9 +393,7 @@ function toolPath(cfg: QualityCfg, cfgd: string | undefined, fallback: string): 
 function canUseLocalEslintApi(cfg: QualityCfg): boolean {
 	const configured = cfg.tools?.eslint;
 	if (configured === undefined || configured === 'eslint') return true;
-	const configuredPath = resolve(cfg.root, configured);
-	const configRoot = cfg.configRoot ?? resolve(cfg.root, 'config');
-	return [resolve(cfg.root, 'node_modules', '.bin', 'eslint'), resolve(configRoot, 'node_modules', '.bin', 'eslint')].includes(configuredPath);
+	return [resolve(cfg.root, 'node_modules', '.bin', 'eslint'), resolve(cfg.configRoot ?? resolve(cfg.root, 'config'), 'node_modules', '.bin', 'eslint')].includes(resolve(cfg.root, configured));
 }
 
 /**
@@ -756,9 +755,13 @@ function testRunner(cfg: QualityCfg, check: QualityInvocation): 'node' | 'playwr
 	const text = invocationText(cfg, check);
 	const args = check.args ?? [];
 	if (BPLAYWRIGHT_B_U_REGEX.test(text) || /\bplaywright\b/iu.test(args.join(' '))) return 'playwright';
-	const nodeCmd = /^(?:node|node\.exe)$/iu.test(basename(check.command));
-	const nodeTestArgs = args.some(a => a === '--test' || a.startsWith('--test=')) || args.some(a => /\.(?:mjs|cjs)$/iu.test(a));
-	if ((nodeCmd && nodeTestArgs) || /\bworkspace-test-runner\.js\b/u.test(text) || /\bnode\s+[^\n]*--test\b/u.test(text) || /\bpnpm\s+-r\s+test\b/u.test(text)) return 'node';
+	if (
+		(/^(?:node|node\.exe)$/iu.test(basename(check.command)) && (args.some(a => a === '--test' || a.startsWith('--test=')) || args.some(a => /\.(?:mjs|cjs)$/iu.test(a)))) ||
+		/\bworkspace-test-runner\.js\b/u.test(text) ||
+		/\bnode\s+[^\n]*--test\b/u.test(text) ||
+		/\bpnpm\s+-r\s+test\b/u.test(text)
+	)
+		return 'node';
 	return 'unknown';
 }
 
@@ -835,8 +838,7 @@ function runTestSuite(cfg: QualityCfg, check: QualityInvocation): { status: numb
 	const args = [...(check.args ?? [])];
 	const env = { ...process.env };
 	if (runner === 'node') {
-		const reporterUrl = new URL('./node-reporter.js', import.meta.url).href;
-		env.NODE_OPTIONS = qualityNodeReporterOptions(env.NODE_OPTIONS, reporterUrl);
+		env.NODE_OPTIONS = qualityNodeReporterOptions(env.NODE_OPTIONS, new URL('./node-reporter.js', import.meta.url).href);
 		env.TERRA_QUALITY_NODE_REPORTER_OWNER = '1';
 		args.splice(
 			0,
@@ -1060,8 +1062,11 @@ function runLangProfileFixes(cfg: QualityCfg, checks: ResolvedLanguageCheck[], t
 			}
 			if (toolResult.error) throw new Error(toolResult.error);
 		}
-		const args = check.autofix.args.flatMap(a => (a === '{files}' ? check.files : [a]));
-		const result = spawnSync(check.autofix.command, args, { cwd: cfg.root, stdio: 'inherit' });
+		const result = spawnSync(
+			check.autofix.command,
+			check.autofix.args.flatMap(a => (a === '{files}' ? check.files : [a])),
+			{ cwd: cfg.root, stdio: 'inherit' },
+		);
 		if (result.error) throw result.error;
 		if (result.status !== 0) throw new Error(`${check.autofix.command} exited with status ${result.status ?? 1}`);
 	}
@@ -1475,8 +1480,7 @@ function flattenKnipItems(value: unknown): unknown[] {
 function canUseFocusedEslint(cfg: QualityCfg, flatCfg: string | undefined): boolean {
 	if (!flatCfg) return false;
 	const cfgdTool = cfg.tools?.eslint;
-	const localExecutable = resolve(cfg.root, 'node_modules', '.bin', 'eslint');
-	if (cfgdTool && cfgdTool !== 'eslint' && resolve(cfg.root, cfgdTool) !== localExecutable) return false;
+	if (cfgdTool && cfgdTool !== 'eslint' && resolve(cfg.root, cfgdTool) !== resolve(cfg.root, 'node_modules', '.bin', 'eslint')) return false;
 	return existsSync(resolve(cfg.root, 'node_modules', 'eslint', 'package.json'));
 }
 
