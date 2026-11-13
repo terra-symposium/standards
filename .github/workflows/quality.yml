@@ -71,7 +71,7 @@ jobs:
           cache-dependency-path: config/pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
       - name: Install native test tools
-        run: apt-get update && apt-get install -y clang lsof
+        run: apt-get update && apt-get install -y clang lsof unzip
       - uses: ./packages/testing
         with:
           manifest: config/terra-tests.json
