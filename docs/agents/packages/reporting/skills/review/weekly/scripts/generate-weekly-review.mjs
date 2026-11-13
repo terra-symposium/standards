@@ -40,6 +40,7 @@ function git(args) {
 	return execFileSync('git', args, { cwd: report.repo, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }).trimEnd();
 }
 
+// terra-quality-ignore single-use -- Keep the documented hue declaration so its parameter and return contract remains attached.
 /**
  * Selects a hue that stays visually distinct from the colors already assigned.
  *
@@ -371,6 +372,7 @@ function validPlan(plan, contributor, { requirePreviousObjective = true, allowUn
 	return true;
 }
 
+// terra-quality-ignore single-use -- Keep the documented assessBigFiveTimeline declaration so its parameter and return contract remains attached.
 /**
  * Validates five objectives against complete Git history and computes their evidence scores.
  *
@@ -476,6 +478,7 @@ function addContributorSummary(deck, section, goal, colors, page, sources) {
 	notes(slide, [...sources, ...(goal ? [`${goal.source} · ${goal.status}`] : []), ...section.slides.flatMap(i => i.sources ?? [])]);
 }
 
+// terra-quality-ignore single-use -- Keep the documented main declaration so its parameter and return contract remains attached.
 /**
  * Builds the weekly review deck from a validated report and its Git evidence.
  *

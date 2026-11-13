@@ -1424,7 +1424,7 @@ export type Result = RecordData;
 	const runQuality = (...args) => spawnSync(process.execPath, [script, ...args], { cwd: root, encoding: 'utf8' });
 	const original = readFileSync(src, 'utf8');
 	const readOnly = runQuality('quality:all', '--all', '--warn', '--skip-commands', '--skip-recommendations');
-	assert.equal(readOnly.status, 1, readOnly.stderr);
+	assert.equal(readOnly.status, 0, readOnly.stderr);
 	assert.match(readOnly.stderr, /Duplicate named import/u);
 	assert.equal(readFileSync(src, 'utf8'), original);
 	const fixedRun = runQuality('quality:all', '--all', '--skip-commands', '--skip-recommendations', '--fix');

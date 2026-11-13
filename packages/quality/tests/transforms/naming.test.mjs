@@ -32,6 +32,7 @@ test('naming checks ignore archived Markdown prose while keeping Markdown in the
 HELPERS
 //////////////////////////////////////////////////*/
 
+// terra-quality-ignore single-use -- Keep the documented identifiers declaration so its parameter and return contract remains attached.
 /**
  * Returns every identifier in a small in-memory TypeScript source file.
  *

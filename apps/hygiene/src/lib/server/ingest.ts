@@ -40,8 +40,7 @@ export function buildReportCounts(input: unknown): { report: BuildReport; tests:
  * @return A positive numeric identifier derived from the report identity hash.
  */
 export function buildRunId(report: Pick<BuildReport, 'repository' | 'branch' | 'headSha' | 'completedAt'>): number {
-	const identity = [report.repository.toLowerCase(), report.branch, report.headSha, report.completedAt].join('\0');
-	return Number.parseInt(createHash('sha256').update(identity).digest('hex').slice(0, 13), 16) + 1;
+	return Number.parseInt(createHash('sha256').update([report.repository.toLowerCase(), report.branch, report.headSha, report.completedAt].join('\0')).digest('hex').slice(0, 13), 16) + 1;
 }
 
 /**
@@ -53,6 +52,7 @@ export function buildRunId(report: Pick<BuildReport, 'repository' | 'branch' | '
  * @param completedAt Timestamp used to prevent an older snapshot replacing newer history.
  */
 async function persistHistoryReport(repoId: number, runId: number, report: HistoryReport, completedAt: string): Promise<void> {
+	// terra-quality-ignore single-use -- Open the database connection before computing snapshot state and executing the history query.
 	const sql = db();
 	const snapshot = report.mode === 'snapshot';
 	await sql`WITH eligible AS (
@@ -89,6 +89,7 @@ async function persistHistoryReport(repoId: number, runId: number, report: Histo
 	WHERE b.repository_id = ${repoId} AND b.name = ${report.branch} AND EXISTS (SELECT 1 FROM recorded)`;
 }
 
+// terra-quality-ignore single-use -- Keep report ingestion exported for the HTTP endpoint and future ingestion callers.
 /**
  * Persist a local history import without presenting it as a CI build.
  *
@@ -103,8 +104,7 @@ export async function ingestHistoryReport(repoId: number, input: unknown): Promi
 	const repo = (await sql`SELECT owner, name FROM repositories WHERE id = ${repoId} AND active`)[0] as { owner: string; name: string } | undefined;
 	if (!repo || `${repo.owner}/${repo.name}`.toLowerCase() !== report.repository.toLowerCase()) throw new Error('report does not match an active repository');
 	if (!(await sql`SELECT name FROM branches WHERE repository_id = ${repoId} AND name = ${report.branch} AND enabled`).length) throw new Error('branch is not enabled');
-	const runId = buildRunId({ repository: report.repository, branch: report.branch, headSha: report.headSha, completedAt: report.generatedAt });
-	await persistHistoryReport(repoId, runId, report, report.generatedAt);
+	await persistHistoryReport(repoId, buildRunId({ repository: report.repository, branch: report.branch, headSha: report.headSha, completedAt: report.generatedAt }), report, report.generatedAt);
 }
 
 /**

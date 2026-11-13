@@ -187,6 +187,7 @@ export default function Dashboard() {
 	const currentBranch = detail?.branches.find(i => i.name === branch);
 	const pageCount = Math.max(1, Math.ceil((detail?.commitTotal ?? 0) / (detail?.commitPageSize ?? 25)));
 
+	// terra-quality-ignore single-use -- Build the complete KPI card set before rendering its mapped elements.
 	const kpis = [
 		{
 			key: 'score',

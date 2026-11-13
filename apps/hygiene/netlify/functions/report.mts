@@ -38,6 +38,7 @@ async function authorizedRepo(repoName: string, token: string) {
 	return repo && matchesReportToken(token, repo.report_token_hash) ? repo : null;
 }
 
+// terra-quality-ignore single-use -- Keep the documented request handler separate from the outer error boundary.
 /**
  * Handles report status lookups and authenticated build-report ingestion.
  *
@@ -52,7 +53,9 @@ async function handle(request: Request): Promise<Response> {
 	if (!token) return new Response('Unauthorized', { status: 401 });
 	if (request.method === 'GET') {
 		const url = new URL(request.url);
+		// terra-quality-ignore single-use -- Snapshot the repository parameter before the authorization request.
 		const repoName = url.searchParams.get('repository') ?? '';
+		// terra-quality-ignore single-use -- Snapshot the branch parameter before the authorization request and database query.
 		const branch = url.searchParams.get('branch') ?? '';
 		const repo = await authorizedRepo(repoName, token);
 		if (!repo) return new Response('Not found', { status: 404 });
@@ -104,6 +107,7 @@ export default async function handler(request: Request): Promise<Response> {
 	try {
 		return await handle(request);
 	} catch (err) {
+		// terra-quality-ignore single-use -- Read the error code before evaluating the error name for logging.
 		const code = err && typeof err === 'object' && 'code' in err && typeof err.code === 'string' ? err.code : 'no-code';
 		console.error('Terra Hygiene report request failed', err instanceof Error ? err.name : 'UnknownError', code);
 		return Response.json({ error: 'Report request failed' }, { status: 500 });

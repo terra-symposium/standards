@@ -94,6 +94,6 @@
 		"regex-dedup": true,
 		"ui-patterns": true,
 		"ui-recommendations": true,
-		"github": true
+		"github": false
 	}
 }

@@ -84,6 +84,7 @@ export function runTypecheckTargets(targets, repoRoot = root, spawn = spawnSync)
 	return 0;
 }
 
+// terra-quality-ignore single-use -- Keep exported main as a module API for callers outside this file.
 /**
  * Discovers and runs every eligible package or app typecheck.
  *

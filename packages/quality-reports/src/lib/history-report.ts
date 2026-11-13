@@ -83,6 +83,7 @@ function gitBuffer(root: string, args: string[], input: string): Buffer {
 	return execFileSync('git', args, { cwd: root, input, maxBuffer: GIT_OUTPUT_LIMIT, stdio: ['pipe', 'pipe', 'pipe'] });
 }
 
+// terra-quality-ignore single-use -- Keep the documented pushBase declaration so its parameter and return contract remains attached.
 /**
  * Read the before SHA from a GitHub push event when it is available.
  *
@@ -124,6 +125,7 @@ function srcChanges(root: string, head: string, parents: string[], stats: Map<st
 	}
 }
 
+// terra-quality-ignore single-use -- Keep the documented readNumstatLog declaration so its parameter and return contract remains attached.
 /**
  * Read source-line stats for each commit and return merge commits for first-parent handling.
  *
@@ -180,6 +182,7 @@ function parseTree(root: string, sha: string): string[] {
 	return blobs;
 }
 
+// terra-quality-ignore single-use -- Keep the documented isAncestor declaration so its parameter and return contract remains attached.
 /**
  * Check whether a push base is reachable from the checked-out head.
  *

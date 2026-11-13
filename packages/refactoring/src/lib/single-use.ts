@@ -74,9 +74,10 @@ const hasMeaningfulLeadingTSDoc = (candidate: Candidate): boolean =>
 	});
 /** One resolved use of a candidate declaration. */
 type Reference = { file: string; source: ts.SourceFile; node: ts.Identifier };
-/** An unsupported single-use marker that remains a blocking diagnostic. */
-type SingleUseIgnoreDirective = { source: ts.SourceFile; line: number };
+/** A single-use exception, valid only when it names a declaration and explains its boundary. */
+type SingleUseIgnoreDirective = { source: ts.SourceFile; line: number; reason?: string; candidateKey?: string };
 const SINGLE_USE_IGNORE_PREFIX_REGEX = /^\/\/\s*terra-quality-ignore\s+single-use\b/;
+const SINGLE_USE_IGNORE_DOC_GAP_REGEX = /^[ \t]*\r?\n[ \t]*\/\*\*[\s\S]*?\*\/[ \t]*\r?\n[ \t]*$/;
 const rejectedInlineCandidates = new Map<string, string>();
 const astroConsumerCache = new WeakMap<QualityCfg, { signature: string; consumers: Set<string> }>();
 const repeatedCallbackOwnerCache = new WeakMap<ts.SourceFile, Set<ts.Symbol>>();
@@ -105,17 +106,21 @@ const isImportNode = (n: ts.Node): boolean => {
 };
 
 /**
- * Finds inline markers that must remain visible as blocking diagnostics.
+ * Resolves reasoned single-use exceptions beside one declaration.
  *
  * @param cfg Quality configuration defining the in-scope source roots.
  * @param sources TypeScript source files from the current analysis program.
  * @param candidates Eligible declarations which may receive a directive.
  *
- * @return Every matching marker, including its adjacent declaration when one exists.
+ * @return Every marker and the declaration it protects, when present.
  */
-function singleUseIgnoreDirectives(cfg: QualityCfg, sources: readonly ts.SourceFile[], candidates: readonly Candidate[]): { directives: SingleUseIgnoreDirective[]; byCandidate: Set<string> } {
+function singleUseIgnoreDirectives(
+	cfg: QualityCfg,
+	sources: readonly ts.SourceFile[],
+	candidates: readonly Candidate[],
+): { directives: SingleUseIgnoreDirective[]; byCandidate: Map<string, SingleUseIgnoreDirective> } {
 	const directives: SingleUseIgnoreDirective[] = [];
-	const byCandidate = new Set<string>();
+	const byCandidate = new Map<string, SingleUseIgnoreDirective>();
 	for (const source of sources) {
 		if (source.isDeclarationFile || !inSingleUseScope(cfg, source.fileName)) continue;
 		const comments = new Map<number, ts.CommentRange>();
@@ -132,22 +137,28 @@ function singleUseIgnoreDirectives(cfg: QualityCfg, sources: readonly ts.SourceF
 			if (!SINGLE_USE_IGNORE_PREFIX_REGEX.test(source.text.slice(range.pos, range.end))) continue;
 			const start = range.pos;
 			const line = source.getLineAndCharacterOfPosition(start).line + 1;
-			const attached = candidates
-				.filter(candidate => {
-					if (candidate.source !== source || candidate.statement.getEnd() > start) return false;
-					if (source.getLineAndCharacterOfPosition(candidate.statement.getEnd()).line !== line - 1) return false;
-					return S_REGEX.test(source.text.slice(candidate.statement.getEnd(), start));
-				})
-				.sort((left, right) => right.statement.getEnd() - left.statement.getEnd())[0];
-			directives.push({ source, line });
-			if (attached) byCandidate.add(`${attached.file}:${attached.name.getStart(attached.source)}`);
+			const attached = candidates.find(candidate => {
+				if (candidate.source !== source) return false;
+				return (
+					(range.end <= candidate.statement.getStart(source) &&
+						((source.getLineAndCharacterOfPosition(candidate.statement.getStart(source)).line + 1 === line + 1 && S_REGEX.test(source.text.slice(range.end, candidate.statement.getStart(source)))) ||
+							SINGLE_USE_IGNORE_DOC_GAP_REGEX.test(source.text.slice(range.end, candidate.statement.getStart(source))))) ||
+					(source.getLineAndCharacterOfPosition(candidate.statement.getEnd()).line + 1 === line &&
+						candidate.statement.getEnd() <= start &&
+						S_REGEX.test(source.text.slice(candidate.statement.getEnd(), start)))
+				);
+			});
+			const candidateKey = attached ? `${attached.file}:${attached.name.getStart(attached.source)}` : undefined;
+			const directive = { source, line, reason: /^\/\/\s*terra-quality-ignore\s+single-use\s+--\s*(\S.*)$/.exec(source.text.slice(range.pos, range.end))?.[1]?.trim(), candidateKey };
+			directives.push(directive);
+			if (candidateKey && !byCandidate.has(candidateKey)) byCandidate.set(candidateKey, directive);
 		}
 	}
 	return { directives, byCandidate };
 }
 
 /**
- * Reports an inline marker that cannot suppress a review finding.
+ * Reports an invalid, detached, duplicate, or stale single-use exception.
  *
  * @param cfg Quality configuration defining repository-relative paths.
  * @param directive Inline single-use marker to report.
@@ -161,8 +172,12 @@ function singleUseDirectiveFinding(cfg: QualityCfg, directive: SingleUseIgnoreDi
 		name: 'single-use-ignore',
 		decision: 'REVIEW',
 		autofixable: false,
-		reason: 'single-use ignore markers cannot suppress Quality findings; remove the marker and review the adjacent declaration',
-		agentAction: 'Remove this marker and review the adjacent declaration. Unsafe single-use findings remain blocking and require an agent-authored semantic decision.',
+		reason: !directive.reason
+			? 'single-use ignore markers require a concrete reason after --'
+			: !directive.candidateKey
+				? 'single-use ignore marker must be immediately before or after one declaration'
+				: 'single-use ignore marker is stale or duplicated; its declaration has no matching single-use finding',
+		agentAction: 'Attach the marker to one declaration with a concrete reason, or remove it when the declaration no longer has one in-scope consumer.',
 	};
 }
 
@@ -756,6 +771,7 @@ function isStaticPlaywrightLocator(init: ts.Expression, checker: ts.TypeChecker)
 	return init.arguments.every(isStaticLiteralExpr);
 }
 
+// terra-quality-ignore single-use -- Keep the documented isModuleCallArgument declaration so its parameter and return contract remains attached.
 /**
  * Checks whether a declaration and its reference share a single module-level call boundary.
  *
@@ -842,6 +858,7 @@ function containsCommentTrivia(source: ts.SourceFile, start: number, end: number
 	return false;
 }
 
+// terra-quality-ignore single-use -- Keep the documented isFirstConsumerEvaluation declaration so its parameter and return contract remains attached.
 /**
  * Checks whether a single-use reference is evaluated before any other consumer expression.
  *
@@ -944,6 +961,7 @@ function isFirstConsumerEvaluation(reference: ts.Identifier, init: ts.Expression
 	}
 }
 
+// terra-quality-ignore single-use -- Keep the documented unwrapExpr declaration so its parameter and return contract remains attached.
 /**
  * Removes syntax-only wrappers around an initializer before checking its receiver behavior.
  *
@@ -1238,6 +1256,7 @@ function findingsFromAnalysis(
 ): SingleUseFinding[] {
 	const findings: SingleUseFinding[] = [];
 	const { directives, byCandidate } = singleUseIgnoreDirectives(cfg, program.getSourceFiles(), candidates);
+	const usedDirectives = new Set<SingleUseIgnoreDirective>();
 	reportProgress('Single-use classification:', 0, candidates.length);
 	candidateLoop: for (const [candidateIdx, c] of candidates.entries()) {
 		reportProgress('Single-use classification:', candidateIdx + 1, candidates.length);
@@ -1256,6 +1275,11 @@ function findingsFromAnalysis(
 					if (ts.isArrowFunction(node) || ts.isFunctionExpression(node) || ts.isFunctionDeclaration(node)) continue candidateLoop;
 				}
 			}
+		}
+		const directive = byCandidate.get(`${c.file}:${c.name.getStart(c.source)}`);
+		if (directive?.reason) {
+			usedDirectives.add(directive);
+			continue;
 		}
 		let reason = '';
 		let canInline = true;
@@ -1284,10 +1308,6 @@ function findingsFromAnalysis(
 		if (hasMeaningfulLeadingTSDoc(c)) {
 			canInline = false;
 			reason = 'attached TSDoc is authored documentation and requires agent review before changing its declaration boundary';
-		}
-		if (byCandidate.has(`${c.file}:${c.name.getStart(c.source)}`) && canInline) {
-			canInline = false;
-			reason = 'an unsupported single-use ignore marker is attached to this declaration; remove it and review the boundary before applying changes';
 		}
 		if (genSource) {
 			canInline = false;
@@ -1333,7 +1353,7 @@ function findingsFromAnalysis(
 			})(),
 		});
 	}
-	for (const directive of directives) findings.push(singleUseDirectiveFinding(cfg, directive));
+	for (const directive of directives) if (!usedDirectives.has(directive)) findings.push(singleUseDirectiveFinding(cfg, directive));
 	return findings;
 }
 

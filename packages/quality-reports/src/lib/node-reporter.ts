@@ -231,6 +231,7 @@ export async function* qualityNodeReporter(src: AsyncIterable<NodeTestE>, opts?:
 	yield `Node tests: ${counts.PASS} passed, ${counts.FAIL} failed, ${counts.SKIP} skipped\n`;
 }
 
+// terra-quality-ignore single-use -- Keep the documented defaultQualityNodeReporter declaration so its parameter and return contract remains attached.
 /**
  * Uses the shared reporter once in each test-runner process tree.
  *

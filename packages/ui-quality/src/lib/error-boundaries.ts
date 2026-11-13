@@ -100,6 +100,7 @@ function isBoundaryTag(tag: ts.JsxTagNameExpression, boundaries: Set<string>): b
 	return ts.isPropertyAccessExpression(tag) && ERR_BOUNDARY_IU_REGEX.test(tag.name.text);
 }
 
+// terra-quality-ignore single-use -- Keep the documented isBoundaryReference declaration so its parameter and return contract remains attached.
 /**
  * Checks whether a JavaScript expression references a recognized boundary.
  *
@@ -362,6 +363,7 @@ function astroIntegrationSpecifier(configFile: string, root: string): string | u
 	}
 }
 
+// terra-quality-ignore single-use -- Keep the documented fixAstroBoundaryIntegrations declaration so its parameter and return contract remains attached.
 /**
  * Adds the shared Astro integration to every local config that does not have it.
  *

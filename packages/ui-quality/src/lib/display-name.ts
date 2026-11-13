@@ -63,6 +63,7 @@ function isForwardRef(init: ts.Expression | undefined): init is ts.CallExpressio
 	return ts.isPropertyAccessExpression(callee) && !callee.questionDotToken && ts.isIdentifier(callee.expression) && callee.expression.text === 'React' && callee.name.text === 'forwardRef';
 }
 
+// terra-quality-ignore single-use -- Keep the documented assignedComponent declaration so its parameter and return contract remains attached.
 /**
  * Returns the component name targeted by a displayName assignment expression.
  *
@@ -123,6 +124,7 @@ function declarationScope(declaration: ts.VariableDeclaration): ts.Node {
 	return declaration.getSourceFile();
 }
 
+// terra-quality-ignore single-use -- Keep the documented candidatesForAssignment declaration so its parameter and return contract remains attached.
 /**
  * Resolves a component property assignment to the nearest same-named candidate binding.
  *

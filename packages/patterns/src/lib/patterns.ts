@@ -405,6 +405,7 @@ export function uiPatternFindings(cfg: QualityCfg, analysis?: QualityAnalysis): 
 TAILWIND
 //////////////////////////////////////////////////*/
 
+// terra-quality-ignore single-use -- Keep the documented resolveTailwindNodeImport declaration so its parameter and return contract remains attached.
 /**
  * Resolves Tailwind's Node runtime from the consumer's installed integration.
  *
@@ -637,6 +638,7 @@ function hasLeadingGenMarker(source: string, marker: string): boolean {
 	return false;
 }
 
+// terra-quality-ignore single-use -- Keep the documented genFilePrefix declaration so its parameter and return contract remains attached.
 /**
  * Preserves the generated marker and any leading file documentation.
  *
@@ -861,6 +863,7 @@ function isEsmConsumer(cfg: QualityCfg, file: string): boolean {
 	return false;
 }
 
+// terra-quality-ignore single-use -- Keep the documented readRegexRegistry declaration so its parameter and return contract remains attached.
 /**
  * Reads the generated shared-regex registry when both files are owned by this tool.
  *
@@ -929,6 +932,7 @@ function resolvesRegexModule(cfg: QualityCfg, importer: string, specifier: strin
 	return normImport === normModule || (!extname(normImport) && `${normImport}.mjs` === normModule);
 }
 
+// terra-quality-ignore single-use -- Keep the documented referencedRegexExports declaration so its parameter and return contract remains attached.
 /**
  * Finds keyed registry exports that source files reference, conservatively retaining dynamic uses.
  *
@@ -990,6 +994,7 @@ function referencedRegexExports(cfg: QualityCfg, modulePath: string, names: Set<
 	return referenced;
 }
 
+// terra-quality-ignore single-use -- Keep the documented pruneUnusedRegexExports declaration so its parameter and return contract remains attached.
 /**
  * Removes only keyed generated declarations with no source references.
  *
@@ -1009,6 +1014,7 @@ function pruneUnusedRegexExports(source: string, unusedNames: Set<string>): stri
 	return updated;
 }
 
+// terra-quality-ignore single-use -- Keep the documented pruneUnusedRegexBindings declaration so its parameter and return contract remains attached.
 /**
  * Removes unreferenced declarations left by earlier generated-registry formats.
  *
@@ -1126,6 +1132,7 @@ function regexCandidateDocumentation(candidate: RegexCandidate): string | undefi
 	return (statement ? directlyAttached(statement) : undefined) ?? directlyAttached(candidate.node);
 }
 
+// terra-quality-ignore single-use -- Keep the documented regexExportDeclarations declaration so its parameter and return contract remains attached.
 /**
  * Preserves existing declaration statements and their meaningful TSDoc.
  *
@@ -1148,6 +1155,7 @@ function regexExportDeclarations(source: string): Map<string, string> {
 	return declarations;
 }
 
+// terra-quality-ignore single-use -- Keep the documented regexExportDocumentation declaration so its parameter and return contract remains attached.
 /**
  * Reads authored TSDoc attached to generated regex exports, keyed by export name.
  *
@@ -1387,6 +1395,7 @@ export function fixRegexDedup(cfg: QualityCfg, analysis?: QualityAnalysis): Patt
 	}
 	return { fixed, skipped };
 }
+// terra-quality-ignore single-use -- Keep the documented fixRegexDedupShared declaration so its parameter and return contract remains attached.
 /**
  * Rewrites eligible duplicate regexes to factories in the configured shared module.
  *

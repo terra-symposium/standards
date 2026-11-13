@@ -1190,40 +1190,60 @@ void built;
 	assert.doesNotMatch(updated, /__terraQualityCreateElement/);
 	assert.equal(ts.createSourceFile('main.tsx', updated, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX).parseDiagnostics.length, 0);
 });
-test('single-use inline markers never suppress review findings or allow autofix to rewrite them', () => {
+test('reasoned trailing single-use exceptions suppress one finding and prevent autofix', () => {
 	const root = fixtureRoot('terra-quality-single-use-inline-ignore-');
 	const original = `function keepBoundary() { return 'ready'; } // terra-quality-ignore single-use -- The named boundary preserves a stable stack frame for the caller.\nexport const result = keepBoundary();\n`;
 	fixtureFile(root, 'src/main.ts', original);
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
 	const findings = singleUseFindings(cfg);
-	assert.ok(findings.some(f => f.name === 'keepBoundary' && f.decision === 'REVIEW'));
-	assert.ok(findings.some(f => f.name === 'single-use-ignore'));
+	assert.ok(!findings.some(f => f.name === 'keepBoundary' || f.name === 'single-use-ignore'));
 	assert.equal(fixSingleUseDeclarations(cfg), 0);
 	assert.equal(fixtureText(root, 'src/main.ts'), original);
 });
-test('single-use inline markers remain discoverable after template literals', () => {
+test('reasoned preceding single-use exceptions remain discoverable after template literals', () => {
 	const root = fixtureRoot('terra-quality-single-use-inline-ignore-template-');
-	const original = `const route = \`/resource/${'${id}'}\`;\nfunction keepBoundary() { return route; } // terra-quality-ignore single-use -- Preserve the named boundary after the preceding template expression.\nexport const result = keepBoundary();\n`;
+	const original = `const route = \`/resource/${'${id}'}\`;\n// terra-quality-ignore single-use -- The named function preserves its stack frame and captures route at this point.\nfunction keepBoundary() { return route; }\nexport const result = keepBoundary();\n`;
 	fixtureFile(root, 'src/main.ts', original);
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
 	const findings = singleUseFindings(cfg);
 	assert.ok(findings.some(f => f.name === 'route' && f.decision === 'REVIEW'));
-	assert.ok(findings.some(f => f.name === 'keepBoundary' && f.decision === 'REVIEW'));
-	assert.ok(findings.some(f => f.name === 'single-use-ignore'));
+	assert.ok(!findings.some(f => f.name === 'keepBoundary' || f.name === 'single-use-ignore'));
 	assert.equal(fixSingleUseDeclarations(cfg), 0);
 	assert.equal(fixtureText(root, 'src/main.ts'), original);
 });
-test('single-use inline markers are always reported and never suppress candidates', () => {
+test('a single-use exception applies only to its adjacent declaration', () => {
+	const root = fixtureRoot('terra-quality-single-use-adjacent-ignore-');
+	fixtureFile(
+		root,
+		'src/main.ts',
+		`// terra-quality-ignore single-use -- Keep this function name for its stable stack frame.\nfunction keep() { return 1; }\nfunction inline() { return 2; }\nexport const first = keep();\nexport const second = inline();\n`,
+	);
+	const findings = singleUseFindings(createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] }));
+	assert.ok(!findings.some(f => f.name === 'keep' || f.name === 'single-use-ignore'));
+	assert.ok(findings.some(f => f.name === 'inline'));
+});
+test('a single-use exception before TSDoc preserves the documented declaration', () => {
+	const root = fixtureRoot('terra-quality-single-use-tsdoc-ignore-');
+	const original = `// terra-quality-ignore single-use -- Keep the named helper and its documented parameter contract.\n/** Reads the value.\n * @param value Input value.\n * @return The same value.\n */\nfunction readValue(value: number): number { return value; }\nexport const result = readValue(1);\n`;
+	fixtureFile(root, 'src/main.ts', original);
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
+	assert.ok(!singleUseFindings(cfg).some(f => f.name === 'readValue' || f.name === 'single-use-ignore'));
+	assert.equal(fixSingleUseDeclarations(cfg), 0);
+	assert.equal(fixtureText(root, 'src/main.ts'), original);
+});
+test('malformed, detached, and stale single-use exceptions remain findings', () => {
 	const root = fixtureRoot('terra-quality-single-use-inline-ignore-stale-');
 	fixtureFile(
 		root,
 		'src/main.ts',
-		`function malformed() { return 1; } // terra-quality-ignore single-use --\nexport const malformedResult = malformed();\n// terra-quality-ignore single-use -- This marker is detached from the declaration.\nfunction detached() { return 2; }\nexport const first = detached();\nfunction stale() { return 3; } // terra-quality-ignore single-use -- This declaration now has multiple consumers.\nexport const third = stale();\nexport const fourth = stale();\n`,
+		`function malformed() { return 1; } // terra-quality-ignore single-use --\nexport const malformedResult = malformed();\n// terra-quality-ignore single-use -- This marker is detached from the declaration.\n\nfunction detached() { return 2; }\nexport const first = detached();\nfunction stale() { return 3; } // terra-quality-ignore single-use -- This declaration now has multiple consumers.\nexport const third = stale();\nexport const fourth = stale();\n`,
 	);
 	const findings = singleUseFindings(createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] }));
 	const directiveFindings = findings.filter(f => f.name === 'single-use-ignore');
 	assert.equal(directiveFindings.length, 3);
-	assert.ok(directiveFindings.every(f => f.reason.includes('cannot suppress Quality findings')));
+	assert.ok(directiveFindings.some(f => f.reason.includes('require a concrete reason')));
+	assert.ok(directiveFindings.some(f => f.reason.includes('immediately before or after')));
+	assert.ok(directiveFindings.some(f => f.reason.includes('stale')));
 	assert.ok(
 		findings.some(f => f.name === 'malformed'),
 		'malformed markers do not hide the candidate',
@@ -1240,7 +1260,7 @@ test('inline markers remain agent-owned and block automatic declaration edits', 
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
 	const initial = singleUseFindings(cfg);
 	assert.ok(initial.some(f => f.name === 'single-use-ignore'));
-	assert.ok(initial.some(f => f.name === 'safe' && f.decision === 'REVIEW'));
+	assert.ok(initial.some(f => f.name === 'safe'));
 	assert.equal(fixSingleUseDeclarations(cfg), 0);
 	assert.equal(fixtureText(root, 'src/main.ts'), original);
 	assert.ok(singleUseFindings(cfg).some(f => f.name === 'single-use-ignore'));

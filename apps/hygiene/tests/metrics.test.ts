@@ -28,9 +28,12 @@ TESTS
 
 // TEST AND QUALITY METRICS
 test('JUnit counts failures, errors and skipped cases without suite double counting', () => {
-	const xml =
-		'<testsuites><testsuite tests="4"><testcase name="a"/><testcase name="b"><failure/></testcase><testcase name="c"><error/></testcase><testcase name="d"><skipped/></testcase></testsuite></testsuites>';
-	assert.deepEqual(parseJUnit(xml), { passed: 1, failed: 2, skipped: 1 });
+	assert.deepEqual(
+		parseJUnit(
+			'<testsuites><testsuite tests="4"><testcase name="a"/><testcase name="b"><failure/></testcase><testcase name="c"><error/></testcase><testcase name="d"><skipped/></testcase></testsuite></testsuites>',
+		),
+		{ passed: 1, failed: 2, skipped: 1 },
+	);
 });
 test('quality contract rejects unknown versions and counts clean checks', () => {
 	assert.deepEqual(
@@ -220,6 +223,7 @@ test('concurrent duplicate webhook deliveries are claimed once', async () => {
 			finishProcessing = resolve;
 		});
 	};
+	// terra-quality-ignore single-use -- Start the first delivery before asserting that a concurrent duplicate is rejected.
 	const first = acceptDelivery('delivery-1', claim, process, async () => {
 		claimed = false;
 	});
@@ -272,6 +276,7 @@ test('repository build tokens are stored and compared as repository-scoped hashe
 	assert.equal(matchesReportToken(token, null), false);
 });
 test('repository admin check denies another repository administrator', async () => {
+	// terra-quality-ignore single-use -- Save the original fetch function so the test restores the exact global binding.
 	const previous = globalThis.fetch;
 	globalThis.fetch = async input => new Response(JSON.stringify({ permission: String(input).includes('/repos/owner/own/') ? 'admin' : 'read' }), { status: 200 });
 	try {

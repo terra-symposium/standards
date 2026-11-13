@@ -34,6 +34,7 @@ function fixtureConfig(source) {
 	return { root, cfg: createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.tsx'] }) };
 }
 
+// terra-quality-ignore single-use -- Keep the documented verifySafeFixSourceOwnership declaration so its parameter and return contract remains attached.
 /**
  * Confirms the explicit quality fix command preserves workflow behavior and generated assets.
  *

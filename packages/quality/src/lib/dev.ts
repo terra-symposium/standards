@@ -17,6 +17,7 @@ import { spawn, spawnSync } from 'node:child_process';
 HELPERS
 //////////////////////////////////////////////////*/
 
+// terra-quality-ignore single-use -- Keep the documented applyErrBoundaries declaration so its parameter and return contract remains attached.
 /**
  * Applies mandatory React and Astro boundaries before a configured JS/TS app starts.
  *
@@ -50,6 +51,7 @@ function readPortOption(values: string[]): number | undefined {
 	return undefined;
 }
 
+// terra-quality-ignore single-use -- Keep the documented defaultPort declaration so its parameter and return contract remains attached.
 /**
  * Selects the conventional local port for the configured development server.
  *
@@ -62,6 +64,7 @@ function defaultPort(cmdName: string): number {
 	return executable === 'vite' || executable.startsWith('vite.') ? 5173 : 4321;
 }
 
+// terra-quality-ignore single-use -- Keep the documented run declaration so its parameter and return contract remains attached.
 /**
  * Runs the development server while forwarding termination signals to its child process.
  *
@@ -91,6 +94,7 @@ function run(executable: string, executableArgs: string[]): Promise<void> {
 		child.once('exit', finish);
 	});
 }
+// terra-quality-ignore single-use -- Keep the documented main declaration so its parameter and return contract remains attached.
 /**
  * Parses wrapper and child ports, acquires the requested port, and starts the dev server.
  *

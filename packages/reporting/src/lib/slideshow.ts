@@ -414,6 +414,7 @@ export const readScreenshotCapturesFromDirectory = (dir: string, currentRunId?: 
 		}
 	});
 };
+// terra-quality-ignore single-use -- Keep the documented addLoadSummarySlide declaration so its parameter and return contract remains attached.
 /**
  * Adds a run-level load summary slide and names the slowest measurements.
  *
@@ -445,6 +446,7 @@ const addLoadSummarySlide = (presentation: Presentation, results: readonly Visua
 		{ color: colors.ink, fontFace: 'Authentic Sans', fontSize: 13, fit: 'shrink', margin: 0.08, valign: 'mid', x: 0.58, y: 2.05, w: 12.1, h: 4.3 },
 	);
 };
+// terra-quality-ignore single-use -- Keep the documented addLoadDetailSlides declaration so its parameter and return contract remains attached.
 /**
  * Adds paginated slides containing every individual test, page, and operation measurement.
  *
@@ -624,6 +626,7 @@ export const writeScreenshotSlideshow = async (file: string, captures: readonly 
 	await presentation.writeFile({ fileName: file });
 	await neutralizeApplicationMetadata(file);
 };
+// terra-quality-ignore single-use -- Keep the documented readScreenshotCapturesFromDirTree declaration so its parameter and return contract remains attached.
 /**
  * Reads current and historical screenshots beneath a folder, with stable source names for multi-repository reports.
  *

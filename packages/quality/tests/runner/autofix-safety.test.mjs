@@ -29,6 +29,7 @@ test('autofix restores a file when a formatter introduces syntax errors', async 
 			enabledChecks: Object.fromEntries(QUALITY_CHECK_NAMES.map(name => [name, name === 'format'])),
 		}),
 	);
+	// terra-quality-ignore single-use -- Snapshot the prior process exit code before this test changes it, then restore that exact value.
 	const previousExitCode = process.exitCode;
 	try {
 		await runQualityFromCfg(config, ['quality', '--all', '--fix']);
@@ -72,6 +73,7 @@ test('explicit warn reports findings without changing files or failing', async (
 		config,
 		JSON.stringify({ root, sourceRoots: ['src'], extensions: ['.js'], tools: { prettier: fmt }, enabledChecks: Object.fromEntries(QUALITY_CHECK_NAMES.map(name => [name, name === 'format'])) }),
 	);
+	// terra-quality-ignore single-use -- Restore the exact pre-test exit code after checking warning-only behavior.
 	const previousExitCode = process.exitCode;
 	try {
 		await runQualityFromCfg(config, ['quality', '--all', '--warn']);

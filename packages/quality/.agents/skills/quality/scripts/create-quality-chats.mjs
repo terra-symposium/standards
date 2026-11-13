@@ -11,6 +11,7 @@ const defaultRoot = resolve(process.env.QUALITY_REPO_ROOT || `${homedir()}/Deskt
 const ignoredDirNames = new Set(['.git', '.next', '.nuxt', '.turbo', '.venv', '.codex', '.cache', '.pnpm-store', 'build', 'coverage', 'dist', 'node_modules', 'target', 'vendor']);
 const canonicalRemoteAliases = new Map([['github.com/terra-symposium/terra-symposium-website', 'github.com/terra-symposium/website']]);
 
+// terra-quality-ignore single-use -- Keep the documented parseArgs declaration so its parameter and return contract remains attached.
 /**
  * Parses discovery, Cloud submission, concurrency, and dry-run options.
  *
@@ -60,6 +61,7 @@ function parseArgs(args) {
 	return options;
 }
 
+// terra-quality-ignore single-use -- Keep the documented findRepos declaration so its parameter and return contract remains attached.
 /**
  * Finds Git repositories below a root without traversing dependency/build trees.
  *
@@ -114,6 +116,7 @@ function remoteIdentity(remote) {
 	return canonicalRemoteAliases.get(norm) || norm;
 }
 
+// terra-quality-ignore single-use -- Keep the documented uniqueRepos declaration so its parameter and return contract remains attached.
 /**
  * Collapses duplicate worktrees or clones that share one remote identity.
  *
@@ -185,6 +188,7 @@ function taskPrompt(repo, skillText) {
 	].join('\n');
 }
 
+// terra-quality-ignore single-use -- Keep the documented printHelp declaration so its parameter and return contract remains attached.
 /** Prints the supported command-line options. */
 function printHelp() {
 	process.stdout.write(
@@ -238,6 +242,7 @@ function submitTask(repo, env, prompt) {
 	});
 }
 
+// terra-quality-ignore single-use -- Keep the documented main declaration so its parameter and return contract remains attached.
 /**
  * Discovers the repository batch and submits tasks within the concurrency limit.
  *

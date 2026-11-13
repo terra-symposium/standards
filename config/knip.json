@@ -2,8 +2,9 @@
 	"$schema": "https://unpkg.com/knip@6/schema.json",
 	"workspaces": {
 		".": {
-			"entry": ["scripts/quality-runner.mjs"],
-			"project": ["scripts/**/*.mjs"]
+			"entry": ["scripts/quality-runner.mjs", "prettier.config.cjs"],
+			"project": ["scripts/**/*.mjs", "prettier.config.cjs"],
+			"ignoreBinaries": ["uv"]
 		},
 		"config": {
 			"entry": ["scripts/build-docs.mjs", "scripts/typecheck.mjs"],

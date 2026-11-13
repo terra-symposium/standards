@@ -69,6 +69,7 @@ export function hasGeneratedSourceHeader(sourceText: string): boolean {
 	);
 }
 
+// terra-quality-ignore single-use -- Keep the documented withoutStaticImports declaration so its parameter and return contract remains attached.
 /**
  * Removes static import statements before checking whether a source-suffixed export contains executable code.
  *

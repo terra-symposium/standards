@@ -292,6 +292,7 @@ const readAttachment = (attachment: ReporterAttachment): string => {
 	return '';
 };
 
+// terra-quality-ignore single-use -- Keep the documented diagnosticText declaration so its parameter and return contract remains attached.
 /**
  * Extracts one named JSON diagnostic attachment.
  *
@@ -307,6 +308,7 @@ const diagnosticText = (attachments: readonly ReporterAttachment[], name: string
 	return parseDiagnostics(raw);
 };
 
+// terra-quality-ignore single-use -- Keep the documented screenshotAttachment declaration so its parameter and return contract remains attached.
 /**
  * Resolves the path of a captured screenshot attachment.
  *
@@ -438,6 +440,7 @@ const visualCaptureManifest = (attachments: readonly ReporterAttachment[]): Arra
 	}
 };
 
+// terra-quality-ignore single-use -- Keep the documented loadAttachment declaration so its parameter and return contract remains attached.
 /**
  * Reads timing samples and a test override from the fixture attachment.
  *
@@ -537,6 +540,7 @@ const screenshotTestGroup = (test: { location: { file: string }; title: string; 
 	return [identity.project, path.relative(process.cwd(), test.location.file), identity.groups, identity.title].join('\u0000');
 };
 
+// terra-quality-ignore single-use -- Keep the documented testTitleParts declaration so its parameter and return contract remains attached.
 /**
  * Resolves the title path portion used by the stable test budget key.
  *

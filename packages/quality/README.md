@@ -115,7 +115,12 @@ The quality command reports hygiene checks only. It must not report or run a bui
 
 Dead-code is reported as one group. Fix mode shows **Safe fixes** (Knip import consumers, ESLint unused declarations, single-use declaration/reference scans, classification, then only proven edits) followed by **Verification** (Knip reachability, final ESLint and single-use results, and TypeScript safety for candidate edits). All findings appear in stable path/line/rule/name order and fail quality.
 
-Single-use findings cannot be suppressed with inline markers. A `// terra-quality-ignore single-use` comment is reported as a blocking `single-use-ignore` finding and does not suppress the adjacent declaration finding. Remove the marker, then retain or inline the declaration based on the specific semantic boundary reported by Quality. `--all --safe-fix` batches only mechanically proven inlines; review-only cases remain for an agent-authored decision.
+For a declaration that must keep its identity, evaluation timing, saved value, or documented API boundary, place `// terra-quality-ignore single-use -- <concrete reason>` immediately before the declaration, or immediately before its attached TSDoc. A trailing comment on the declaration line also works. The directive suppresses only that declaration's single-use finding and prevents its autofix; it does not disable other dead-code checks. A missing reason, detached marker, duplicate marker, or marker on a declaration without a single-use finding is itself a blocking `single-use-ignore` finding. Use it only after reviewing the sole consumer; otherwise refactor the declaration. `--all --safe-fix` batches only mechanically proven inlines.
+
+```ts
+// terra-quality-ignore single-use -- Snapshot the exit code before the test changes it, then restore it in finally.
+const previousExitCode = process.exitCode;
+```
 
 Regex deduplication analyzes reusable regex declarations and constructors. Inline regex expressions in test sources remain in place for readable assertions and fixtures; named regex bindings in tests remain in scope for duplicate checks.
 

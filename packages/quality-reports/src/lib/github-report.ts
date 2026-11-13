@@ -105,6 +105,7 @@ function text(val: unknown): string | undefined {
 	return (typeof val === 'string' ? val.replace(/\p{Cc}/gu, ' ').trim() : '') || undefined;
 }
 
+// terra-quality-ignore single-use -- Keep the documented ghApi declaration so its parameter and return contract remains attached.
 /**
  * Use GitHub CLI authentication without printing or persisting its token.
  *
@@ -162,6 +163,7 @@ function ghApi(path: string, paginate = false): ApiResult {
 	}
 }
 
+// terra-quality-ignore single-use -- Keep the documented awaitlessSpawnSync declaration so its parameter and return contract remains attached.
 /**
  * Keep the child-process boundary injectable for tests while capturing no token output.
  *

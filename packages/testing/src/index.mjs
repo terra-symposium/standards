@@ -33,6 +33,7 @@ const isInside = (root, path) => {
 HELPERS
 //////////////////////////////////////////////////*/
 
+// terra-quality-ignore single-use -- Keep the documented listTestFiles declaration so its parameter and return contract remains attached.
 /**
  * Recursively lists source files under test directories and test-named files.
  *
@@ -83,6 +84,7 @@ function globRegex(pattern) {
 	return new RegExp(`${source}$`, 'u');
 }
 
+// terra-quality-ignore single-use -- Keep the documented runLinearHistory declaration so its parameter and return contract remains attached.
 /**
  * Checks the current GitHub event range against the shared linear-history policy.
  *
@@ -175,6 +177,7 @@ export function readTestPlan(root, manifestPath = defaultManifestPath(root)) {
 	return plan;
 }
 
+// terra-quality-ignore single-use -- Keep the documented defaultManifestPath declaration so its parameter and return contract remains attached.
 /**
  * Prefer the centralized config location while retaining compatibility with existing consumers.
  * @param {string} root Repository root.

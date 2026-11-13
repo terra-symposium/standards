@@ -52,6 +52,7 @@ export default async function handler(request: Request): Promise<Response> {
 	const branch = url.searchParams.get('branch') ?? 'main';
 	const selectedBranch = branches.find(r => r.name === branch && r.enabled) as { history_status: string; history_count: number } | undefined;
 	if (!selectedBranch) return Response.json({ error: 'Branch not tracked' }, { status: 404 });
+	// terra-quality-ignore single-use -- Complete the runs query before calculating commit pagination and history.
 	const runs =
 		await sql`SELECT run_id, run_attempt, head_sha, completed_at, conclusion, run_source AS source, quality_policy_branch, tests_passed, tests_failed, tests_skipped, checks_enabled, checks_total, checks_clean, quality_findings FROM runs WHERE repository_id = ${id} AND branch = ${branch} ORDER BY completed_at DESC LIMIT 300`;
 	const requestedPage = Number(url.searchParams.get('commitPage') ?? '1');

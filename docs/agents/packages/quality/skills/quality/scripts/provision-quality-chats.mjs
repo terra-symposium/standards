@@ -8,6 +8,7 @@ import { readdir } from 'node:fs/promises';
 const execFileAsync = promisify(execFile);
 const PRUNED_DIRS = new Set(['.cache', '.git', '.next', '.playwright-mcp', '.pnpm-store', '.turbo', 'build', 'dist', 'node_modules', 'target', 'vendor', 'venv']);
 
+// terra-quality-ignore single-use -- Keep the documented options declaration so its parameter and return contract remains attached.
 /**
  * Parses repository scan, Cloud environment, exclusion, and submission options.
  *
@@ -106,6 +107,7 @@ function submit(repo, environment, prompt) {
 	});
 }
 
+// terra-quality-ignore single-use -- Keep the documented main declaration so its parameter and return contract remains attached.
 /** Discovers repositories, validates Cloud access, and submits selected tasks. */
 async function main() {
 	const config = options(process.argv.slice(2));

@@ -75,6 +75,7 @@ const INTERACTIVE_NATIVE = new Set(['button', 'input', 'select', 'textarea', 'su
 HELPERS
 //////////////////////////////////////////////////*/
 
+// terra-quality-ignore single-use -- Keep the documented scriptKind declaration so its parameter and return contract remains attached.
 /**
  * Selects a TypeScript parser mode for a JSX-capable source path.
  *
@@ -186,6 +187,7 @@ function meaningful(value: string): boolean {
 	return value.replace(/[\s\u00a0\u200b\ufeff]/g, '').replace(/&(?:nbsp|#0*160|#x0*a0);/gi, '').length > 0;
 }
 
+// terra-quality-ignore single-use -- Keep the documented hiddenAttrState declaration so its parameter and return contract remains attached.
 /**
  * Returns whether the HTML hidden attribute is present, false, or uncertain.
  *
@@ -327,6 +329,7 @@ function ariaNameState(element: ElementRef): NameState {
 	return 'empty';
 }
 
+// terra-quality-ignore single-use -- Keep the documented idContentStates declaration so its parameter and return contract remains attached.
 /**
  * Builds conservative source evidence for literal JSX ids and their referenced text.
  *
@@ -369,6 +372,7 @@ function idContentStates(source: ts.SourceFile): Map<string, NameState> {
 	return ids;
 }
 
+// terra-quality-ignore single-use -- Keep the documented associatedLabels declaration so its parameter and return contract remains attached.
 /**
  * Finds labels associated by a literal id and records whether each label has meaningful text.
  *
@@ -398,6 +402,7 @@ function associatedLabels(source: ts.SourceFile): Map<string, NameState> {
 	return labels;
 }
 
+// terra-quality-ignore single-use -- Keep the documented elementNameState declaration so its parameter and return contract remains attached.
 /**
  * Returns accessible-name evidence for one control, including nested and id-associated labels.
  *

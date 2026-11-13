@@ -32,6 +32,7 @@ HELPERS
  * @return Counts of individual passed, failed, and skipped testcases.
  */
 export function parseJUnit(xml: string): TestCounts {
+	// terra-quality-ignore single-use -- Parse the XML before creating counters and walking the resulting tree.
 	const root = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '@_', allowBooleanAttributes: true }).parse(xml) as XmlNode;
 	const counts: TestCounts = { passed: 0, failed: 0, skipped: 0 };
 	(function visit(value: unknown): void {

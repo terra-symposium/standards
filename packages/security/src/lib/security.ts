@@ -26,6 +26,7 @@ const PROCESS_ENV_SOURCE_REGEX = /\.(?:astro|cjs|cts|js|jsx|mjs|mts|ts|tsx)$/iu;
 /** A source or repository-boundary issue found by a configured security policy. */
 export type SecurityFinding = { file?: string; message: string };
 
+// terra-quality-ignore single-use -- Keep the documented EnvironmentAccess declaration so its parameter and return contract remains attached.
 /** Source-level environment behavior found outside comments and literal text. */
 type EnvironmentAccess = { readsProcessEnv: boolean; loadsEnvFile: boolean };
 

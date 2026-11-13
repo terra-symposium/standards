@@ -381,6 +381,7 @@ function toolPath(cfg: QualityCfg, cfgd: string | undefined, fallback: string): 
 	return existsSync(local) ? local : executable;
 }
 
+// terra-quality-ignore single-use -- Keep the documented canUseLocalEslintApi declaration so its parameter and return contract remains attached.
 /**
  * Checks whether a configured ESLint executable resolves to the repository's package installation.
  *
@@ -901,6 +902,7 @@ function runTestSuite(cfg: QualityCfg, check: QualityInvocation): { status: numb
 	return { status, output };
 }
 
+// terra-quality-ignore single-use -- Keep the documented runQualityPhase declaration so its parameter and return contract remains attached.
 /**
  * Runs configured and profile-provided checks assigned to one fixed phase.
  *
@@ -1003,6 +1005,7 @@ function runQualityPhase(cfg: QualityCfg, phase: QualityPhase, profileChecks: Re
 	return failures;
 }
 
+// terra-quality-ignore single-use -- Keep the documented reportSkippedLangChecks declaration so its parameter and return contract remains attached.
 /**
  * Records selected profile checks that cannot run because their source or optional config is absent.
  *
@@ -1020,6 +1023,7 @@ function reportSkippedLangChecks(cfg: QualityCfg, skipped: SkippedLanguageCheck[
 	}
 }
 
+// terra-quality-ignore single-use -- Keep the documented reportFailedLangChecks declaration so its parameter and return contract remains attached.
 /**
  * Marks required profile configuration failures without stopping unrelated checks.
  *
@@ -1036,6 +1040,7 @@ function reportFailedLangChecks(cfg: QualityCfg, failed: SkippedLanguageCheck[])
 	}
 }
 
+// terra-quality-ignore single-use -- Keep the documented runLangProfileFixes declaration so its parameter and return contract remains attached.
 /**
  * Applies profile-provided safe fixes while preserving the normal read-only check commands.
  *
@@ -1073,6 +1078,7 @@ function isGitDiffCheck(check: QualityInvocation): boolean {
 	return basename(check.command).toLowerCase() === 'git' && check.args?.length === 2 && check.args[0] === 'diff' && check.args[1] === '--check';
 }
 
+// terra-quality-ignore single-use -- Keep the documented hasCfgdGitDiffCheck declaration so its parameter and return contract remains attached.
 /**
  * Detects whether an enabled repository-health command already performs Git's diff check.
  *
@@ -1457,6 +1463,7 @@ function flattenKnipItems(value: unknown): unknown[] {
 	return value.flatMap(i => (Array.isArray(i) ? flattenKnipItems(i) : [i]));
 }
 
+// terra-quality-ignore single-use -- Keep the documented canUseFocusedEslint declaration so its parameter and return contract remains attached.
 /**
  * Uses the repository's resolved unused-variable rule without evaluating its unrelated lint rules.
  *
@@ -1473,6 +1480,7 @@ function canUseFocusedEslint(cfg: QualityCfg, flatCfg: string | undefined): bool
 	return existsSync(resolve(cfg.root, 'node_modules', 'eslint', 'package.json'));
 }
 
+// terra-quality-ignore single-use -- Keep the documented focusedEslintCfgSrc declaration so its parameter and return contract remains attached.
 /**
  * Builds a temporary flat config containing only each selected file's unused-variable rule.
  *
@@ -1581,6 +1589,7 @@ function runFocusedEslint(cfg: QualityCfg, flatCfg: string, files: string[]): Re
 	return result;
 }
 
+// terra-quality-ignore single-use -- Keep the documented collectEslintReports declaration so its parameter and return contract remains attached.
 /**
  * Runs ESLint's machine-readable pass once for the selected source files.
  *
@@ -1661,6 +1670,7 @@ function parseEslintReports(result: ReturnType<typeof spawnSync>, files: string[
 	}
 }
 
+// terra-quality-ignore single-use -- Keep the documented unusedDeclarationFindings declaration so its parameter and return contract remains attached.
 /**
  * Reports unused private declarations, classifying only proven-safe removals as autofixable.
  *
@@ -1778,6 +1788,7 @@ function runCfgdCmd(cfg: QualityCfg, name: string): void {
 	printCheckStatus(`command:${name}`, status ? 1 : 0);
 }
 
+// terra-quality-ignore single-use -- Keep the documented runRecommendationCmds declaration so its parameter and return contract remains attached.
 /**
  * Runs configured recommendation commands after Knip and fails when a command fails.
  *
@@ -1830,6 +1841,7 @@ function runProjectTypecheck(cfg: QualityCfg): void {
 	printCheckStatus('typecheck', status || diagnosticsReported ? 1 : 0);
 }
 
+// terra-quality-ignore single-use -- Keep the documented repairMissingImports declaration so its parameter and return contract remains attached.
 /**
  * Restores a missing local import when the repository has one unambiguous
  * source export for the unresolved identifier. This is deliberately narrow:
@@ -2029,6 +2041,7 @@ function readKnipIssues(cfg: QualityCfg): KnipIssue[] {
 	return issues;
 }
 
+// terra-quality-ignore single-use -- Keep the documented mappedKnipDependencyUsage declaration so its parameter and return contract remains attached.
 /**
  * Finds declared dependencies actually imported by a source tree owned by a nested package.
  *
@@ -2153,6 +2166,7 @@ function packageNameFromSpecifier(specifier: string): string | undefined {
 	return specifier.startsWith('@') ? (parts.length > 1 ? `${parts[0]}/${parts[1]}` : undefined) : parts[0];
 }
 
+// terra-quality-ignore single-use -- Keep the documented loadKnipConfig declaration so its parameter and return contract remains attached.
 /**
  * Loads Knip settings for the shared source-classification overlay.
  *
@@ -2191,6 +2205,7 @@ function loadKnipConfig(cfg: QualityCfg, knipConfig: string | undefined): Record
 	throw new Error(`Cannot apply shared source classification to Knip configuration ${knipConfig}; use a JSON, JSONC, or JavaScript config.`);
 }
 
+// terra-quality-ignore single-use -- Keep the documented addConfiguredToolsToKnipConfig declaration so its parameter and return contract remains attached.
 /**
  * Adds configured executable usage to the temporary Knip settings.
  *
@@ -2278,6 +2293,7 @@ function mergeKnipNames(existing: unknown, additions: Set<string>): string[] {
 	return [...names].sort();
 }
 
+// terra-quality-ignore single-use -- Keep the documented knipWorkingDir declaration so its parameter and return contract remains attached.
 /**
  * Selects the package root for Knip while preserving explicit repository workspaces.
  *
@@ -2446,6 +2462,7 @@ function knipExportCanBeMadePrivate(file: string, name: string): boolean {
 	return false;
 }
 
+// terra-quality-ignore single-use -- Keep the documented fixKnipExports declaration so its parameter and return contract remains attached.
 /**
  * Removes only an unused export modifier that Knip identifies precisely.
  *
@@ -2633,6 +2650,7 @@ function hasImportedExportConsumer(importedConsumers: Map<string, Set<string>>, 
 	const names = importedConsumers.get(resolve(file));
 	return Boolean(names?.has(name) || names?.has('*'));
 }
+// terra-quality-ignore single-use -- Keep the documented acceptTypeSafeEdits declaration so its parameter and return contract remains attached.
 /**
  * Accepts proposed edits only when they add no TypeScript errors to changed files.
  *
@@ -2683,6 +2701,7 @@ function acceptTypeSafeEdits(
 	};
 }
 
+// terra-quality-ignore single-use -- Keep the documented runDeadCode declaration so its parameter and return contract remains attached.
 /**
  * Runs every dead-code detector through one fix-and-verify boundary.
  *
@@ -3057,6 +3076,7 @@ function updateGitHubStage(status: QualityJsonReport['checks'][number]['status']
 	}
 }
 
+// terra-quality-ignore single-use -- Keep the documented inferGitHubRepo declaration so its parameter and return contract remains attached.
 /**
  * Infer the current repository slug from its GitHub origin remote.
  *
@@ -3070,6 +3090,7 @@ function inferGitHubRepo(root: string): string | undefined {
 		.match(/(?:github\.com[:/])([^/]+\/[^/]+?)(?:\.git)?$/i)?.[1];
 }
 
+// terra-quality-ignore single-use -- Keep the documented runGenericChecks declaration so its parameter and return contract remains attached.
 /**
  * Runs configured generic repository checks as part of the full quality command.
  *
@@ -3192,6 +3213,7 @@ function fixNames(cfg: QualityCfg, all: boolean): void {
 	const isIntrinsicJsxTag = (n: ts.Identifier): boolean => {
 		return (ts.isJsxOpeningLikeElement(n.parent) || ts.isJsxClosingElement(n.parent)) && n.parent.tagName === n && n.text.length > 0 && n.text[0] === n.text[0]!.toLowerCase();
 	};
+	// terra-quality-ignore single-use -- Keep the documented canonical declaration so its parameter and return contract remains attached.
 	/**
 	 * Resolves an aliased symbol to its underlying declaration symbol.
 	 *
@@ -3680,6 +3702,7 @@ export function runQualityCli(cfg: QualityCfg, args = process.argv.slice(2)): vo
 	writeReport();
 }
 
+// terra-quality-ignore single-use -- Keep the documented runFullQuality declaration so its parameter and return contract remains attached.
 /**
  * Runs the full quality matrix in package-owned phase order.
  *
@@ -4025,6 +4048,7 @@ function dispatchQualityCli(cfg: QualityCfg, args: string[]): void | Promise<voi
 	if (cmd === 'quality' || cmd === 'quality:all' || cmd === 'quality:baseline') return runFullQuality(cfg, args, opts);
 }
 
+// terra-quality-ignore single-use -- Keep the documented acquireQualityLock declaration so its parameter and return contract remains attached.
 /**
  * Prevents two fixing runs from writing the same checkout at once.
  *

@@ -41,6 +41,7 @@ function sourceTokens(text: string, variant: ts.LanguageVariant): string[] {
 HELPERS
 //////////////////////////////////////////////////*/
 
+// terra-quality-ignore single-use -- Keep the documented candidateSpan declaration so its parameter and return contract remains attached.
 /**
  * Finds the body span of an object, type literal, mapped type, or interface that can be collapsed safely.
  *
@@ -92,6 +93,7 @@ export function collapseTypesAndObjects(fileName: string): boolean {
 	const edits: { start: number; end: number; text: string }[] = [];
 
 	// HELPERS
+	// terra-quality-ignore single-use -- Keep the documented collapse declaration so its parameter and return contract remains attached.
 	/**
 	 * Compacts one multiline node while preserving literal spans and refusing comments.
 	 *
