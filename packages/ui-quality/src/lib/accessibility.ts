@@ -46,8 +46,11 @@ CONSTANTS
 //////////////////////////////////////////////////*/
 
 const JSX_EXTS = /\.(?:jsx|tsx|js|ts)$/i;
+// terra-quality-ignore single-use -- Reuse the native labelable set across every inspected JSX element.
 const NATIVE_LABELABLE = new Set(['button', 'input', 'select', 'textarea']);
+// terra-quality-ignore single-use -- Reuse the input button type set across every inspected JSX element.
 const INPUT_BUTTON_TYPES = new Set(['button', 'submit', 'reset']);
+// terra-quality-ignore single-use -- Reuse the interactive role set across every inspected JSX element.
 const INTERACTIVE_ROLES = new Set([
 	'button',
 	'checkbox',
@@ -395,6 +398,7 @@ function associatedLabels(source: ts.SourceFile): Map<string, NameState> {
 				}
 			}
 		}
+		// terra-quality-ignore single-use -- Compute inherited hidden state once before visiting each child.
 		const currentHidden = hidden || ((ts.isJsxElement(node) || ts.isJsxSelfClosingElement(node)) && hiddenState(node) !== 'empty');
 		ts.forEachChild(node, c => visit(c, currentHidden));
 	};
@@ -474,12 +478,15 @@ function decorativeIcons(element: ElementRef): ElementRef[] {
 		}
 		const tag = tagOf(node);
 		if (tag === 'svg') {
-			const role = staticAttr(attrOf(node, 'role'));
-			const ownName = ariaNameState(node);
-			const title = literalTitle(attrOf(node, 'title'));
-			const hidden = hiddenState(node);
-			const hasUncertainAttrs = attrsOf(node).properties.some(ts.isJsxSpreadAttribute) || ['focusable', 'tabIndex'].some(n => attrOf(node, n));
-			if (role.state === 'empty' && ownName === 'empty' && title.state === 'empty' && contentState(node) === 'empty' && hidden === 'empty' && !hasUncertainAttrs) icons.push(node);
+			if (
+				staticAttr(attrOf(node, 'role')).state === 'empty' &&
+				ariaNameState(node) === 'empty' &&
+				literalTitle(attrOf(node, 'title')).state === 'empty' &&
+				contentState(node) === 'empty' &&
+				hiddenState(node) === 'empty' &&
+				!(attrsOf(node).properties.some(ts.isJsxSpreadAttribute) || ['focusable', 'tabIndex'].some(n => attrOf(node, n)))
+			)
+				icons.push(node);
 			return;
 		}
 		if (!A_Z_A_Z_D_REGEX.test(tag) || hiddenState(node) !== 'empty') return;
@@ -500,7 +507,9 @@ function decorativeIcons(element: ElementRef): ElementRef[] {
  */
 function inspectFile(cfg: QualityCfg, file: string, parsed: ts.SourceFile): { findings: AccessibilityFinding[]; candidates: NameCandidate[]; decorativeCandidates: DecorativeIconCandidate[] } {
 	if ((parsed as ts.SourceFile & { parseDiagnostics?: readonly ts.Diagnostic[] }).parseDiagnostics?.length) return { findings: [], candidates: [], decorativeCandidates: [] };
+	// terra-quality-ignore single-use -- Build the label map once before the JSX visitor looks up each element.
 	const labels = associatedLabels(parsed);
+	// terra-quality-ignore single-use -- Build the ID map once before the JSX visitor resolves labelled-by references.
 	const ids = idContentStates(parsed);
 	const findings: AccessibilityFinding[] = [];
 	const candidates: NameCandidate[] = [];
@@ -508,11 +517,11 @@ function inspectFile(cfg: QualityCfg, file: string, parsed: ts.SourceFile): { fi
 
 	const visit = (node: ts.Node, hidden: boolean, nestedLabel: NameState): void => {
 		if (ts.isJsxElement(node) || ts.isJsxSelfClosingElement(node)) {
+			// terra-quality-ignore single-use -- Inspect this element even when an ancestor is already hidden.
 			const elementHidden = hiddenState(node);
 			const currentHidden = hidden || elementHidden !== 'empty';
-			const tag = tagOf(node);
 			let childLabel = nestedLabel;
-			if (tag === 'label') childLabel = contentState(node, true);
+			if (tagOf(node) === 'label') childLabel = contentState(node, true);
 			const kind = (function targetKind(element: ElementRef): { element: string; labelable: boolean } | undefined {
 				const tag = tagOf(element);
 				if (A_Z_A_Z_D_REGEX.test(tag) && (INTERACTIVE_NATIVE.has(tag) || tag === 'progress')) {

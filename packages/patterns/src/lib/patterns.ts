@@ -472,19 +472,21 @@ export async function runTailwindCanonical(cfg: QualityCfg, fix = false, output:
 		if (!output.quiet) console.info('Tailwind canonical check skipped: installed Tailwind does not expose v4 canonical-class diagnostics.');
 		return 0;
 	}
-	const stylesheet = readFileSync(stylesheetPath, 'utf8');
-	const loadStylesheet = async (id: string, base: string): Promise<{ base: string; content: string; path: string }> => {
-		let importedPath = resolve(base, id);
-		if (!existsSync(importedPath)) {
-			try {
-				importedPath = consumerRequire.resolve(id, { paths: [base, cfg.root, resolve(cfg.root, 'astro'), dirname(stylesheetPath), resolve(dirname(stylesheetPath), '..')] });
-			} catch {
-				throw new Error(`Tailwind stylesheet import not found: ${id}`);
+	const designSystem = await tailwind.__unstable__loadDesignSystem(readFileSync(stylesheetPath, 'utf8'), {
+		base: dirname(stylesheetPath),
+		from: stylesheetPath,
+		loadStylesheet: async (id: string, base: string): Promise<{ base: string; content: string; path: string }> => {
+			let importedPath = resolve(base, id);
+			if (!existsSync(importedPath)) {
+				try {
+					importedPath = consumerRequire.resolve(id, { paths: [base, cfg.root, resolve(cfg.root, 'astro'), dirname(stylesheetPath), resolve(dirname(stylesheetPath), '..')] });
+				} catch {
+					throw new Error(`Tailwind stylesheet import not found: ${id}`);
+				}
 			}
-		}
-		return { base: dirname(importedPath), content: readFileSync(importedPath, 'utf8'), path: importedPath };
-	};
-	const designSystem = await tailwind.__unstable__loadDesignSystem(stylesheet, { base: dirname(stylesheetPath), from: stylesheetPath, loadStylesheet });
+			return { base: dirname(importedPath), content: readFileSync(importedPath, 'utf8'), path: importedPath };
+		},
+	});
 	const lengthInPixels = (value: string): number | undefined => {
 		const match = /^(-?\d+(?:\.\d+)?)(px|rem)$/.exec(value);
 		if (!match) return undefined;
@@ -699,6 +701,7 @@ function regexCandidates(cfg: QualityCfg, analysis?: QualityAnalysis): RegexCand
 			analysis?.sources.get(discoveredFile) ??
 			analysis?.sources.get(file) ??
 			ts.createSourceFile(file, analysis?.texts.get(discoveredFile) ?? analysis?.texts.get(file) ?? readFileSync(file, 'utf8'), ts.ScriptTarget.Latest, true, regexScriptKind(file));
+		// terra-quality-ignore single-use -- Analyze RegExp shadowing once before the AST visitor checks each candidate.
 		const shadowedRegExp = hasRegExpBinding(ast);
 		/**
 		 * Collects regex literals and supported `RegExp` constructions from the file.
@@ -879,14 +882,13 @@ function readRegexRegistry(modulePath: string, declarationPath: string): { modul
 	const declaration = declarationExists ? readFileSync(declarationPath, 'utf8') : `${REGEX_DECLARATION_MARKER}\n`;
 	const owned = hasLeadingGenMarker(module, REGEX_REGISTRY_MARKER) && hasLeadingGenMarker(declaration, REGEX_DECLARATION_MARKER);
 	if ((moduleExists || declarationExists) && !owned) return null;
-	const names = new Set([...module.matchAll(EXPORT_CONST_A_ZA_Z_W_B_GM_REGEX())].map(m => m[1]!));
 	const keys = new Map<string, string>();
 	const ast = ts.createSourceFile(modulePath, module, ts.ScriptTarget.Latest, true, ts.ScriptKind.JS);
 	for (const statement of ast.statements) {
 		const entry = regexRegistryEntry(module, statement);
 		if (entry) keys.set(entry.key, entry.name);
 	}
-	return { module, declaration, names, keys, owned };
+	return { module, declaration, names: new Set([...module.matchAll(EXPORT_CONST_A_ZA_Z_W_B_GM_REGEX())].map(m => m[1]!)), keys, owned };
 }
 
 /**
@@ -949,8 +951,10 @@ function referencedRegexExports(cfg: QualityCfg, modulePath: string, names: Set<
 	for (const discoveredFile of analysis?.files ?? srcFiles({ ...cfg, extensions: exts })) {
 		const file = resolve(discoveredFile);
 		if (file === modulePath || file.endsWith('.d.mts')) continue;
-		const text = analysis?.texts.get(discoveredFile) ?? analysis?.texts.get(file) ?? readFileSync(file, 'utf8');
-		const ast = analysis?.sources.get(discoveredFile) ?? analysis?.sources.get(file) ?? ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, regexScriptKind(file));
+		const ast =
+			analysis?.sources.get(discoveredFile) ??
+			analysis?.sources.get(file) ??
+			ts.createSourceFile(file, analysis?.texts.get(discoveredFile) ?? analysis?.texts.get(file) ?? readFileSync(file, 'utf8'), ts.ScriptTarget.Latest, true, regexScriptKind(file));
 		const namespaces = new Set<string>();
 		for (const s of ast.statements) {
 			if (
@@ -1031,20 +1035,23 @@ function pruneUnusedRegexBindings(source: string, referencedNames: Set<string>):
 		for (const declaration of statement.declarationList.declarations) {
 			if (!ts.isIdentifier(declaration.name) || !/^REGEX_.*_REGEX(?:_\d+)?$/u.test(declaration.name.text) || !declaration.initializer) continue;
 			const leading = source.slice(statement.getFullStart(), statement.getStart(ast));
-			const annotation = [...leading.matchAll(/^\/\/ @terra-quality-regex-key .+$/gm)].at(-1);
-			const documentation = [...leading.matchAll(S_S_G_REGEX())].at(-1);
-			const metadataStart = annotation?.index;
-			const documentationStart = documentation?.index;
+			const metadataStart = [...leading.matchAll(/^\/\/ @terra-quality-regex-key .+$/gm)].at(-1)?.index;
+			const documentationStart = [...leading.matchAll(S_S_G_REGEX())].at(-1)?.index;
 			const markerIndex = leading.indexOf(REGEX_REGISTRY_MARKER);
-			const markerEnd = markerIndex < 0 ? -1 : markerIndex + REGEX_REGISTRY_MARKER.length;
-			const start =
-				metadataStart !== undefined
-					? statement.getFullStart() + metadataStart
-					: documentationStart !== undefined && statement.getFullStart() + documentationStart >= markerEnd
-						? statement.getFullStart() + documentationStart
-						: statement.getStart(ast);
-			const entry = { statement, initializer: declaration.initializer, start, exported: Boolean(statement.modifiers?.some(modifier => modifier.kind === ts.SyntaxKind.ExportKeyword)) };
-			declarations.set(declaration.name.text, [...(declarations.get(declaration.name.text) ?? []), entry]);
+			declarations.set(declaration.name.text, [
+				...(declarations.get(declaration.name.text) ?? []),
+				{
+					statement,
+					initializer: declaration.initializer,
+					start:
+						metadataStart !== undefined
+							? statement.getFullStart() + metadataStart
+							: documentationStart !== undefined && statement.getFullStart() + documentationStart >= (markerIndex < 0 ? -1 : markerIndex + REGEX_REGISTRY_MARKER.length)
+								? statement.getFullStart() + documentationStart
+								: statement.getStart(ast),
+					exported: Boolean(statement.modifiers?.some(modifier => modifier.kind === ts.SyntaxKind.ExportKeyword)),
+				},
+			]);
 		}
 	}
 	if (!declarations.size) return source;
@@ -1437,8 +1444,7 @@ function fixRegexDedupShared(cfg: QualityCfg, analysis?: QualityAnalysis): Patte
 				return name;
 			})(key, usedExports);
 			namesByKey.set(key, name);
-			const documentation = candidates.map(regexCandidateDocumentation).find(comment => Boolean(comment));
-			newEntries.push({ key, name, expression: candidates[0]!.expression, documentation });
+			newEntries.push({ key, name, expression: candidates[0]!.expression, documentation: candidates.map(regexCandidateDocumentation).find(comment => Boolean(comment)) });
 		}
 		groupNames.set(key, name);
 	}
@@ -1485,6 +1491,7 @@ function fixRegexDedupShared(cfg: QualityCfg, analysis?: QualityAnalysis): Patte
 		for (const candidate of candidates) {
 			let fileEdits = srcEdits.get(candidate.file);
 			if (!fileEdits) {
+				// terra-quality-ignore single-use -- Capture source bytes before resolving imports and choosing a collision-free alias.
 				const source = analysis?.texts.get(candidate.file) ?? readFileSync(candidate.file, 'utf8');
 				const existingAlias = namespaceImport(candidate.ast, candidate.file, modulePath);
 				const names = identifierNames(candidate.ast);
