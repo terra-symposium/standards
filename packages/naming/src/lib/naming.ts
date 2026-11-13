@@ -274,14 +274,22 @@ function callbackKind(n: ts.Identifier): RenameKind | undefined {
 			if (isNamedCallback) return;
 			const jsxAttr = ts.isJsxAttribute(n) ? n : undefined;
 			const jsxExpr = jsxAttr?.initializer && ts.isJsxExpression(jsxAttr.initializer) ? jsxAttr.initializer.expression : undefined;
-			const isJsxHandler =
-				!!jsxAttr &&
+			if (
+				ts.isCallExpression(n) &&
+				ts.isPropertyAccessExpression(n.expression) &&
+				CALLBACK_METHODS.has(n.expression.name.text) &&
+				n.arguments.some(a => ts.isIdentifier(a) && a.text === callback.name?.text)
+			) {
+				isNamedCallback = true;
+				return;
+			}
+			if (
+				jsxAttr &&
 				ts.isIdentifier(jsxAttr.name) &&
 				/^on[A-Z]/.test(jsxAttr.name.text) &&
-				!!jsxExpr &&
+				jsxExpr &&
 				(() => {
 					let refs = false;
-
 					const findRef = (c: ts.Node): void => {
 						if (refs) return;
 						if (ts.isIdentifier(c) && c.text === callback.name?.text) {
@@ -292,17 +300,8 @@ function callbackKind(n: ts.Identifier): RenameKind | undefined {
 					};
 					findRef(jsxExpr);
 					return refs;
-				})();
-			if (
-				ts.isCallExpression(n) &&
-				ts.isPropertyAccessExpression(n.expression) &&
-				CALLBACK_METHODS.has(n.expression.name.text) &&
-				n.arguments.some(a => ts.isIdentifier(a) && a.text === callback.name?.text)
+				})()
 			) {
-				isNamedCallback = true;
-				return;
-			}
-			if (isJsxHandler) {
 				isNamedCallback = true;
 				return;
 			}
@@ -333,6 +332,7 @@ function callbackKind(n: ts.Identifier): RenameKind | undefined {
 		else for (const element of name.elements) if (ts.isBindingElement(element)) collectBinding(element.name);
 	};
 	for (const p of callback.parameters) collectBinding(p.name);
+	// terra-quality-ignore single-use -- Build declaration names once before the recursive reserved-name visitor runs.
 	const declarationNames = new Set(declarations.map(d => d.text));
 	const reserved = new Set<string>();
 
@@ -402,6 +402,7 @@ export function parameterRenameCapturesDefault(declaration: ts.Identifier, sugge
 		}
 		return false;
 	};
+	// terra-quality-ignore single-use -- Reuse the property-name classifier across every identifier visited below.
 	const isPropertyName = (node: ts.Identifier): boolean =>
 		(ts.isPropertyAccessExpression(node.parent) && node.parent.name === node) ||
 		(ts.isQualifiedName(node.parent) && node.parent.right === node) ||
@@ -567,6 +568,7 @@ export function namingFindings(cfg: QualityCfg, analysis?: QualityAnalysis): Nam
 			? ts.createSourceFile(f, frontmatter.source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS)
 			: (analysis?.sources.get(f) ?? program.getSourceFile(f) ?? ts.createSourceFile(f, sourceText, ts.ScriptTarget.Latest, true, f.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS));
 		const sourceOffset = frontmatter?.offset ?? 0;
+		// terra-quality-ignore single-use -- Build the exported-name set once before visiting each declaration in this file.
 		const exportedNames = new Set(
 			file.statements.flatMap(s => (ts.isExportDeclaration(s) && s.exportClause && ts.isNamedExports(s.exportClause) ? s.exportClause.elements.map(e => (e.propertyName ?? e.name).text) : [])),
 		);
@@ -591,8 +593,7 @@ export function namingFindings(cfg: QualityCfg, analysis?: QualityAnalysis): Nam
 			if (ts.isIdentifier(n) && isRenamableDeclaration(n) && !n.text.startsWith('_') && !protectedNames.has(n.text) && !exportedNames.has(n.text)) {
 				const suggestion = renameDeclaration(n);
 				const safety = safetyByScope.get(declarationScope(n));
-				const collision = parameterRenameCapturesDefault(n, suggestion, checker);
-				if (suggestion !== n.text && collision) {
+				if (suggestion !== n.text && parameterRenameCapturesDefault(n, suggestion, checker)) {
 					findings.push({
 						file: displayPath(cfg, f),
 						name: n.text,
@@ -689,6 +690,7 @@ export function fixNaming(cfg: QualityCfg): number {
 			return astroByFile.get(absoluteFile)?.virtualFile ?? absoluteFile;
 		}),
 	);
+	// terra-quality-ignore single-use -- Keep one compiler-options object for every language-service host callback.
 	const options: ts.CompilerOptions = {
 		allowJs: true,
 		checkJs: false,
@@ -698,21 +700,23 @@ export function fixNaming(cfg: QualityCfg): number {
 		skipLibCheck: true,
 		target: ts.ScriptTarget.ESNext,
 	};
-	const host: ts.LanguageServiceHost = {
-		getCompilationSettings: () => options,
-		getScriptFileNames: () => [...fileNames],
-		getScriptVersion: () => '0',
-		getScriptSnapshot: f => {
-			const text = virtualSources.get(resolve(f)) ?? ts.sys.readFile(f);
-			return text === undefined ? undefined : ts.ScriptSnapshot.fromString(text);
-		},
-		getCurrentDirectory: () => cfg.root,
-		getDefaultLibFileName: ts.getDefaultLibFilePath,
-		fileExists: f => virtualSources.has(resolve(f)) || ts.sys.fileExists(f),
-		readFile: f => virtualSources.get(resolve(f)) ?? ts.sys.readFile(f),
-		readDirectory: ts.sys.readDirectory,
-	};
-	const service = ts.createLanguageService(host, ts.createDocumentRegistry());
+	const service = ts.createLanguageService(
+		{
+			getCompilationSettings: () => options,
+			getScriptFileNames: () => [...fileNames],
+			getScriptVersion: () => '0',
+			getScriptSnapshot: f => {
+				const text = virtualSources.get(resolve(f)) ?? ts.sys.readFile(f);
+				return text === undefined ? undefined : ts.ScriptSnapshot.fromString(text);
+			},
+			getCurrentDirectory: () => cfg.root,
+			getDefaultLibFileName: ts.getDefaultLibFilePath,
+			fileExists: f => virtualSources.has(resolve(f)) || ts.sys.fileExists(f),
+			readFile: f => virtualSources.get(resolve(f)) ?? ts.sys.readFile(f),
+			readDirectory: ts.sys.readDirectory,
+		} satisfies ts.LanguageServiceHost,
+		ts.createDocumentRegistry(),
+	);
 	const edits = new Map<string, Map<string, { start: number; length: number; text: string }>>();
 	const identifiersByFile = new Map<string, Set<string>>();
 	for (const finding of findings) {
@@ -730,11 +734,10 @@ export function fixNaming(cfg: QualityCfg): number {
 			const file = virtual?.file ?? locationFile;
 			let identifierSpans = identifiersByFile.get(locationFile);
 			if (!identifierSpans) {
-				const sourceText = virtual?.source ?? readFileSync(file, 'utf8');
 				identifierSpans = new Set<string>();
 				const source = ts.createSourceFile(
 					locationFile,
-					sourceText,
+					virtual?.source ?? readFileSync(file, 'utf8'),
 					ts.ScriptTarget.Latest,
 					true,
 					/\.(?:tsx|jsx)$/u.test(locationFile) ? ts.ScriptKind.TSX : /\.(?:mjs|cjs|js)$/u.test(locationFile) ? ts.ScriptKind.JS : ts.ScriptKind.TS,
@@ -885,8 +888,7 @@ export function aliasFindings(cfg: QualityCfg, analysisOrFix: QualityAnalysis | 
 						: checker.getSymbolAtLocation(node)) as ts.Symbol,
 				);
 				if (alias && node !== alias.name) {
-					const visibleTgt = checker.getSymbolsInScope(node, ts.SymbolFlags.Type | ts.SymbolFlags.Value).find(c => c.name === alias.targetName);
-					if (alias.targetSymbol && visibleTgt !== alias.targetSymbol) {
+					if (alias.targetSymbol && checker.getSymbolsInScope(node, ts.SymbolFlags.Type | ts.SymbolFlags.Value).find(c => c.name === alias.targetName) !== alias.targetSymbol) {
 						shadowed.add(alias);
 						return;
 					}

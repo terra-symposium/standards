@@ -999,14 +999,6 @@ function initSafeToInline(candidate: Candidate, checker: ts.TypeChecker, referen
 			expr = expr.parent;
 		}
 		const parent = expr.parent;
-		const wholeValue =
-			(ts.isReturnStatement(parent) && parent.expression === expr) ||
-			(ts.isThrowStatement(parent) && parent.expression === expr) ||
-			(ts.isIfStatement(parent) && parent.expression === expr) ||
-			(ts.isSwitchStatement(parent) && parent.expression === expr) ||
-			(ts.isExpressionStatement(parent) && parent.expression === expr) ||
-			(ts.isVariableDeclaration(parent) && parent.initializer === expr && ts.isVariableDeclarationList(parent.parent) && parent.parent.declarations.length === 1);
-		const directUseStatement = ts.isVariableDeclaration(parent) ? parent.parent.parent : parent;
 		const statements = (() => {
 			const list = candidate.statement.parent;
 			return ts.isSourceFile(list) || ts.isBlock(list) || ts.isModuleBlock(list) || ts.isCaseClause(list) || ts.isDefaultClause(list) ? list.statements : undefined;
@@ -1020,16 +1012,6 @@ function initSafeToInline(candidate: Candidate, checker: ts.TypeChecker, referen
 			if (node.parent === candidate.statement.parent) break;
 		}
 		const candidateIndex = statements?.indexOf(candidate.statement) ?? -1;
-		const adjacent = Boolean(
-			useStatement &&
-			candidateIndex >= 0 &&
-			statements?.[candidateIndex + 1] === useStatement &&
-			((wholeValue && directUseStatement === useStatement) || isFirstConsumerEvaluation(reference.node, init, useStatement)),
-		);
-		const commentsWouldMove =
-			Boolean((ts.getLeadingCommentRanges(candidate.source.text, candidate.statement.getFullStart()) ?? []).length) ||
-			containsCommentTrivia(candidate.source, candidate.statement.getStart(candidate.source), candidate.statement.getEnd()) ||
-			Boolean(useStatement && containsCommentTrivia(candidate.source, candidate.statement.getEnd(), useStatement.getStart(candidate.source)));
 		let hasDynamicScope = dynamicScopeCache.get(candidate.source);
 		if (hasDynamicScope === undefined) {
 			hasDynamicScope = false;
@@ -1051,7 +1033,27 @@ function initSafeToInline(candidate: Candidate, checker: ts.TypeChecker, referen
 			if (!boundarySensitive) ts.forEachChild(node, inspectInit);
 		};
 		inspectInit(init);
-		if (adjacent && !commentsWouldMove && !hasDynamicScope && !boundarySensitive) return true;
+		if (
+			useStatement &&
+			candidateIndex >= 0 &&
+			statements?.[candidateIndex + 1] === useStatement &&
+			((((ts.isReturnStatement(parent) && parent.expression === expr) ||
+				(ts.isThrowStatement(parent) && parent.expression === expr) ||
+				(ts.isIfStatement(parent) && parent.expression === expr) ||
+				(ts.isSwitchStatement(parent) && parent.expression === expr) ||
+				(ts.isExpressionStatement(parent) && parent.expression === expr) ||
+				(ts.isVariableDeclaration(parent) && parent.initializer === expr && ts.isVariableDeclarationList(parent.parent) && parent.parent.declarations.length === 1)) &&
+				(ts.isVariableDeclaration(parent) ? parent.parent.parent : parent) === useStatement) ||
+				isFirstConsumerEvaluation(reference.node, init, useStatement)) &&
+			!(
+				(ts.getLeadingCommentRanges(candidate.source.text, candidate.statement.getFullStart()) ?? []).length ||
+				containsCommentTrivia(candidate.source, candidate.statement.getStart(candidate.source), candidate.statement.getEnd()) ||
+				(useStatement && containsCommentTrivia(candidate.source, candidate.statement.getEnd(), useStatement.getStart(candidate.source)))
+			) &&
+			!hasDynamicScope &&
+			!boundarySensitive
+		)
+			return true;
 	}
 	const declaration = candidate.name.parent;
 	if (reference && ts.isVariableDeclaration(declaration) && !declaration.type && isModuleCallArgument(candidate, reference) && isStaticLiteralExpr(init)) return true;
@@ -1179,12 +1181,6 @@ function isRuntimeRepeatedReference(candidate: Candidate, reference: Reference, 
 				});
 			}
 		}
-		const callbackBoundary =
-			(ts.isArrowFunction(node) || ts.isFunctionExpression(node)) &&
-			ts.isCallExpression(node.parent) &&
-			ts.isPropertyAccessExpression(node.parent.expression) &&
-			REPEATED_CALLBACK_METHODS.has(node.parent.expression.name.text) &&
-			node.parent.arguments.includes(node);
 		let callbackOwner = false;
 		if ((ts.isArrowFunction(node) || ts.isFunctionExpression(node)) && fnName?.parent && ts.isVariableDeclaration(fnName.parent)) {
 			const ownerSymbol = checker.getSymbolAtLocation(fnName);
@@ -1210,7 +1206,20 @@ function isRuntimeRepeatedReference(candidate: Candidate, reference: Reference, 
 				callbackOwner = repeatedOwners.has(ownerSymbol);
 			}
 		}
-		if (!(callbackBoundary || callbackOwner || recursive || ts.isForStatement(node) || ts.isForInStatement(node) || ts.isForOfStatement(node) || ts.isWhileStatement(node) || ts.isDoStatement(node)))
+		if (!(
+			((ts.isArrowFunction(node) || ts.isFunctionExpression(node)) &&
+				ts.isCallExpression(node.parent) &&
+				ts.isPropertyAccessExpression(node.parent.expression) &&
+				REPEATED_CALLBACK_METHODS.has(node.parent.expression.name.text) &&
+				node.parent.arguments.includes(node)) ||
+			callbackOwner ||
+			recursive ||
+			ts.isForStatement(node) ||
+			ts.isForInStatement(node) ||
+			ts.isForOfStatement(node) ||
+			ts.isWhileStatement(node) ||
+			ts.isDoStatement(node)
+		))
 			continue;
 		let containsCandidate = false;
 		for (let ancestor: ts.Node | undefined = candidate.statement; ancestor; ancestor = ancestor.parent)
@@ -1267,7 +1276,6 @@ function findingsFromAnalysis(
 		if (isRuntimeRepeatedReference(c, use, checker)) continue;
 		if (!inSingleUseScope(cfg, use.file)) continue;
 		if (isRequiredLifecycleVal(c, use)) continue;
-		const genSource = hasGeneratedSourceHeader(c.source.text) || hasGeneratedSourceHeader(use.source.text);
 		if (c.kind === 'variable' && ts.isVariableStatement(c.statement)) {
 			const init = c.statement.declarationList.declarations[0]?.initializer;
 			if (init && ts.isPropertyAccessExpression(init) && init.name.text === 'value' && ts.isPropertyAccessExpression(init.expression) && init.expression.name.text === 'currentTarget') {
@@ -1309,7 +1317,7 @@ function findingsFromAnalysis(
 			canInline = false;
 			reason = 'attached TSDoc is authored documentation and requires agent review before changing its declaration boundary';
 		}
-		if (genSource) {
+		if (hasGeneratedSourceHeader(c.source.text) || hasGeneratedSourceHeader(use.source.text)) {
 			canInline = false;
 			reason = 'declaration or consumer is in generated source and must be corrected in its generator';
 		} else if (isModuleExport(c, checker) && !isExclusiveDefaultExport(c, checker, use)) {
@@ -1675,8 +1683,7 @@ export function fixSingleUseDeclarations(cfg: QualityCfg, changedFileNames?: Set
 			const statementEnd = c.statement.getEnd();
 			const lineStart = c.source.text.lastIndexOf('\n', statementStart - 1) + 1;
 			const lineEnd = c.source.text.indexOf('\n', statementEnd);
-			const trailingEnd = lineEnd < 0 ? c.source.text.length : lineEnd;
-			const ownsLine = S_U_REGEX.test(c.source.text.slice(lineStart, statementStart)) && S_U_REGEX.test(c.source.text.slice(statementEnd, trailingEnd));
+			const ownsLine = S_U_REGEX.test(c.source.text.slice(lineStart, statementStart)) && S_U_REGEX.test(c.source.text.slice(statementEnd, lineEnd < 0 ? c.source.text.length : lineEnd));
 			candidateEdits.push({ file: c.file, start: ownsLine ? lineStart : statementStart, end: ownsLine ? (lineEnd < 0 ? statementEnd : lineEnd + 1) : statementEnd, text: '' });
 			const referenceEdit = candidateEdits.find(e => e.file === ref.file && e.end > e.start)!;
 			pending.push({

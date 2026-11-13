@@ -9,6 +9,7 @@ const WORK_WORKTREE_CLONE_I_REGEX = /(?:^|[-_])(work|worktree|clone)(?:$|[-_])/i
 
 const defaultRoot = resolve(process.env.QUALITY_REPO_ROOT || `${homedir()}/Desktop`);
 const ignoredDirNames = new Set(['.git', '.next', '.nuxt', '.turbo', '.venv', '.codex', '.cache', '.pnpm-store', 'build', 'coverage', 'dist', 'node_modules', 'target', 'vendor']);
+// terra-quality-ignore single-use -- Reuse the canonical remote alias map while deduplicating repository checkouts.
 const canonicalRemoteAliases = new Map([['github.com/terra-symposium/terra-symposium-website', 'github.com/terra-symposium/website']]);
 
 // terra-quality-ignore single-use -- Keep the documented parseArgs declaration so its parameter and return contract remains attached.
@@ -129,6 +130,7 @@ function uniqueRepos(repos) {
 	for (const repo of repos) {
 		const remote = gitValue(repo, ['remote', 'get-url', 'origin']);
 		const commonDir = resolve(repo, gitValue(repo, ['rev-parse', '--git-common-dir']) || '.git');
+		// terra-quality-ignore single-use -- Resolve the Git directory before deriving identity so Git failures keep their original order.
 		const gitDir = resolve(repo, gitValue(repo, ['rev-parse', '--git-dir']) || '.git');
 		const identity = remote ? remoteIdentity(remote) : commonDir;
 		const candidates = groups.get(identity) || [];
@@ -161,9 +163,13 @@ function uniqueRepos(repos) {
  * @return Whether the repository matches an explicit skip.
  */
 function isSkipped(repo, root, skips) {
-	const name = basename(repo).toLowerCase();
-	const path = relative(root, repo).toLowerCase().split(/[\\/]/);
-	return skips.includes(name) || path.some(segment => skips.includes(segment));
+	return (
+		skips.includes(basename(repo).toLowerCase()) ||
+		relative(root, repo)
+			.toLowerCase()
+			.split(/[\\/]/)
+			.some(segment => skips.includes(segment))
+	);
 }
 
 /**
@@ -272,14 +278,15 @@ async function main() {
 	}
 	let nextIndex = 0;
 	let failed = 0;
-	const worker = async () => {
-		while (nextIndex < repos.length) {
-			const repo = repos[nextIndex];
-			nextIndex += 1;
-			if ((await submitTask(repo, options.env, taskPrompt(repo, skillText))) !== 0) failed += 1;
-		}
-	};
-	await Promise.all(Array.from({ length: Math.min(repos.length, options.concurrency) }, worker));
+	await Promise.all(
+		Array.from({ length: Math.min(repos.length, options.concurrency) }, async () => {
+			while (nextIndex < repos.length) {
+				const repo = repos[nextIndex];
+				nextIndex += 1;
+				if ((await submitTask(repo, options.env, taskPrompt(repo, skillText))) !== 0) failed += 1;
+			}
+		}),
+	);
 	process.stdout.write(`Submitted ${repos.length - failed}/${repos.length} Cloud tasks.\n`);
 	if (failed) process.exitCode = 1;
 }

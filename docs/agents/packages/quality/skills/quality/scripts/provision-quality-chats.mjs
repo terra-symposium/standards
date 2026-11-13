@@ -54,10 +54,9 @@ function options(args) {
 async function findRepos(dir) {
 	const entries = await readdir(dir, { withFileTypes: true });
 	if (entries.some(entry => entry.name === '.git')) return [dir];
-	const nested = await Promise.all(
-		entries.filter(entry => entry.isDirectory() && !entry.name.startsWith('.') && !PRUNED_DIRS.has(entry.name.toLowerCase())).map(entry => findRepos(join(dir, entry.name))),
-	);
-	return nested.flat();
+	return (
+		await Promise.all(entries.filter(entry => entry.isDirectory() && !entry.name.startsWith('.') && !PRUNED_DIRS.has(entry.name.toLowerCase())).map(entry => findRepos(join(dir, entry.name))))
+	).flat();
 }
 
 /**
@@ -111,16 +110,16 @@ function submit(repo, environment, prompt) {
 /** Discovers repositories, validates Cloud access, and submits selected tasks. */
 async function main() {
 	const config = options(process.argv.slice(2));
-	const roots = await findRepos(config.root);
-	const repos = await Promise.all(
-		roots.map(async root => ({
-			root,
-			name: basename(root),
-			identity: await repoIdentity(root),
-			cloudPath: `/workspace/${basename(root)}`,
-		})),
-	);
-	const selected = repos.filter(repo => !config.exclude.has(repo.name.toLowerCase()) && !config.exclude.has(repo.identity.split('/').at(-1)?.toLowerCase() ?? ''));
+	const selected = (
+		await Promise.all(
+			(await findRepos(config.root)).map(async root => ({
+				root,
+				name: basename(root),
+				identity: await repoIdentity(root),
+				cloudPath: `/workspace/${basename(root)}`,
+			})),
+		)
+	).filter(repo => !config.exclude.has(repo.name.toLowerCase()) && !config.exclude.has(repo.identity.split('/').at(-1)?.toLowerCase() ?? ''));
 	if (!selected.length) throw new Error(`No repositories found beneath ${config.root}.`);
 	const duplicateNames = selected.map(repo => repo.name).filter((name, i, names) => names.indexOf(name) !== i);
 	if (duplicateNames.length) throw new Error(`Cloud checkout names are ambiguous: ${[...new Set(duplicateNames)].join(', ')}`);

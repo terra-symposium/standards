@@ -311,9 +311,8 @@ function addCode(slide, codeInput, position, colors) {
  */
 async function addScreenshot(slide, img, position, colors, page) {
 	card(slide, position, colors, `screenshot-frame-${page}`, colors.tone);
-	const bytes = await fs.readFile(img.path);
 	slide.images.add({
-		blob: bytes,
+		blob: await fs.readFile(img.path),
 		contentType: 'image/png',
 		alt: img.alt,
 		fit: 'cover',
@@ -334,9 +333,7 @@ async function addScreenshot(slide, img, position, colors, page) {
  */
 function planDay(date, plan) {
 	const start = new Date(`${plan.start}T00:00:00Z`).getTime();
-	const end = new Date(`${plan.end}T00:00:00Z`).getTime();
-	const value = new Date(`${date}T00:00:00Z`).getTime();
-	return Math.round(((value - start) / (end - start)) * 90);
+	return Math.round(((new Date(`${date}T00:00:00Z`).getTime() - start) / (new Date(`${plan.end}T00:00:00Z`).getTime() - start)) * 90);
 }
 
 /**
@@ -386,6 +383,7 @@ function assessBigFiveTimeline(plan, historyCommits) {
 		throw new Error('Big Five timeline requires a source and five objectives, each assessed against the complete history of the requested refs.');
 	const historyBySha = new Map(historyCommits.map(commit => [commit.sha, commit]));
 	const progressByStatus = { complete: 1, partial: 0.5, not_found: 0 };
+	// terra-quality-ignore single-use -- Validate objective evidence before the history-date check so invalid input keeps its existing error priority.
 	const milestones = plan.objectives.map(objective => {
 		if (typeof objective.name !== 'string' || !objective.name.trim() || !Array.isArray(objective.deliverables) || !objective.deliverables.length)
 			throw new Error('Each Big Five objective requires a name and source-backed deliverable assessments.');
@@ -454,6 +452,7 @@ function addContributorSummary(deck, section, goal, colors, page, sources) {
 		`contribution-meta-${page}`,
 	);
 	const outcomes = section.slides.flatMap(i => i.bullets ?? []).slice(0, 6);
+	// terra-quality-ignore single-use -- Prepare text before creating the card so text errors cannot leave a partial slide.
 	const body = outcomes.length ? wrapLines(outcomes.join('\n'), 64) : '• No contribution detail was supplied for this identity.';
 	card(slide, { left: 58, top: 214, width: 680, height: 332 }, colors, `contribution-outcomes-${page}`);
 	addText(slide, 'Recorded outcomes', { left: 84, top: 238, width: 600, height: 26 }, { fontSize: 20, color: colors.text, maxChars: 34 }, `contribution-heading-${page}`);
@@ -503,7 +502,6 @@ async function main() {
 		});
 	const mergeCount = Number(git(['rev-list', '--count', ...refs, `--since=${report.since}`, `--until=${report.until}`, '--merges']));
 	const counts = new Map(commits.map(commit => [commit.author, commits.filter(other => other.author === commit.author).length]));
-	const screenshotCount = report.contributors.flatMap(section => section.slides).filter(i => i.screenshot).length;
 	const sources = [
 		`Refs: ${refs.join(', ')}`,
 		`Window: ${report.since} through ${report.until} (${report.timezone})`,
@@ -587,6 +585,7 @@ async function main() {
 		const marker = timelineX(plan.asOf);
 		for (let index = 0; index <= 4; index += 1) {
 			const x = chartLeft + (index / 4) * chartWidth;
+			// terra-quality-ignore single-use -- Validate the axis date before drawing its grid line.
 			const date = new Date(rangeStart + (range * index) / 4).toISOString().slice(0, 4);
 			rule(slide, x, chartTop - 12, 1, colors.rule, `big-five-grid-${page}-${index}`);
 			addText(
@@ -640,7 +639,7 @@ async function main() {
 			[String(commits.length), 'non-merge commits'],
 			[String(counts.size), 'contributors'],
 			[String(mergeCount), 'merge commits'],
-			[String(screenshotCount), 'verified UI captures'],
+			[String(report.contributors.flatMap(section => section.slides).filter(i => i.screenshot).length), 'verified UI captures'],
 		].forEach(([value, label], i) => {
 			const left = 58 + i * 272;
 			addText(slide, value, { left, top: 168, width: 210, height: 54 }, { fontSize: 46, color: colors.text, maxChars: 5 }, `metric-${i}`);
@@ -777,9 +776,8 @@ async function main() {
 			plan.milestones.forEach((milestone, i) => {
 				const top = chartTop + i * 48;
 				const start = planDay(milestone.start, plan);
-				const end = planDay(milestone.end, plan);
 				const left = chartLeft + (start / 90) * chartWidth;
-				const width = Math.max(12, ((end - start) / 90) * chartWidth);
+				const width = Math.max(12, ((planDay(milestone.end, plan) - start) / 90) * chartWidth);
 				addText(slide, milestone.name, { left: 58, top: top + 7, width: 320, height: 20 }, { fontSize: 16, color: colors.text, maxChars: 40 }, `plan-name-${page}-${i}`);
 				addText(
 					slide,
