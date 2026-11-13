@@ -294,8 +294,7 @@ const copyWorksheet = (source: ExcelJS.Worksheet, target: ExcelJS.Worksheet, sou
 	});
 	for (const range of source.model.merges || []) target.mergeCells(range);
 	for (const { imageId: imgId, range } of source.getImages()) {
-		const img = sourceBook.getImage(Number(imgId));
-		target.addImage(targetBook.addImage(img), structuredClone(range));
+		target.addImage(targetBook.addImage(sourceBook.getImage(Number(imgId))), structuredClone(range));
 	}
 };
 /**
@@ -332,6 +331,7 @@ export const mergeSpreadsheets = async (file: string, sources: readonly Spreadsh
 		for (let rowNumber = 2; rowNumber <= sourceSummary.rowCount; rowNumber++) {
 			const row = sourceSummary.getRow(rowNumber);
 			if (!row.hasValues) continue;
+			// terra-quality-ignore single-use -- Keep this new row so each copied cell style targets the same aggregate row.
 			const aggregateRow = summary.addRow([label, ...valuesForRow(row)]);
 			row.eachCell({ includeEmpty: true }, (s, c) => {
 				aggregateRow.getCell(c + 1).style = structuredClone(s.style);

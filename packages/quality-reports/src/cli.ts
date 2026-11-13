@@ -26,9 +26,7 @@ if (cmd === 'github') process.stdout.write(`${JSON.stringify(buildGitHubReport(c
 else if (cmd === 'history') {
 	const reportIndex = args.indexOf('--report-json');
 	if (reportIndex >= 0 && !args[reportIndex + 1]) throw new Error('--report-json requires a path.');
-	const path = reportIndex >= 0 ? args[reportIndex + 1] : 'terra-history.json';
-	const report = reportIndex >= 0 ? writeHistoryReport(cfg.root, path) : createHistoryReport(cfg.root);
-	process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
+	process.stdout.write(`${JSON.stringify(reportIndex >= 0 ? writeHistoryReport(cfg.root, args[reportIndex + 1]) : createHistoryReport(cfg.root), null, 2)}\n`);
 } else {
 	process.stderr.write('Usage: terra-quality-reports <github|history> [--config PATH] [--all] [--warn] [--report-json PATH]\n');
 	process.exitCode = 2;

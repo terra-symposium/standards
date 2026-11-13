@@ -139,7 +139,9 @@ const NOT_APPLICABLE_CHECK_REASONS: Partial<Record<QualityCheckName, string>> = 
 	'ui-patterns': 'UI pattern analysis applies to JavaScript and TypeScript UI components.',
 	'ui-recommendations': 'UI recommendations analyze JavaScript and TypeScript UI components.',
 };
+// terra-quality-ignore single-use -- Resolve the Checkstyle configuration path once from this module URL.
 const CHECKSTYLE_CONFIG = fileURLToPath(new URL('../../quality-configs/checkstyle.xml', import.meta.url));
+// terra-quality-ignore single-use -- Resolve the PMD configuration path once from this module URL.
 const PMD_CONFIG = fileURLToPath(new URL('../../quality-configs/pmd-rules.xml', import.meta.url));
 const NATIVE_CHECKS: Record<LanguageProfileId, Partial<Record<QualityCheckName, string>>> = {
 	c: {
@@ -478,8 +480,11 @@ export function resolveLanguageProfiles(cfg: QualityCfg): LanguageProfileResolut
 	for (const profileId of cfg.languageProfiles ?? []) {
 		const profile = LANGUAGE_PROFILES.find(c => c.id === profileId);
 		if (!profile) continue;
-		const skippedDirs = new Set([...(cfg.skippedDirectories ?? []), '.venv', 'venv', '__pycache__', '.tox', '.ruff_cache', '.pytest_cache', '.gradle', 'target', 'vendor', 'generated', 'out']);
-		const sourceFiles = srcFiles({ ...cfg, extensions: profile.sourceExtensions, skippedDirectories: [...skippedDirs] });
+		const sourceFiles = srcFiles({
+			...cfg,
+			extensions: profile.sourceExtensions,
+			skippedDirectories: [...new Set([...(cfg.skippedDirectories ?? []), '.venv', 'venv', '__pycache__', '.tox', '.ruff_cache', '.pytest_cache', '.gradle', 'target', 'vendor', 'generated', 'out'])],
+		});
 		if (!sourceFiles.length) {
 			for (const check of profile.checks) result.skipped.push({ name: check.name, profileId, reason: `no ${profileId} source files were found` });
 			continue;
@@ -495,8 +500,7 @@ export function resolveLanguageProfiles(cfg: QualityCfg): LanguageProfileResolut
 				result.skipped.push({ name: check.name, profileId, reason: 'no files matched this check' });
 				continue;
 			}
-			const args = check.args.flatMap(a => (a === '{files}' ? files : a === '{files-comma}' ? [files.join(',')] : [a]));
-			result.checks.push({ ...check, args, profileId, files });
+			result.checks.push({ ...check, args: check.args.flatMap(a => (a === '{files}' ? files : a === '{files-comma}' ? [files.join(',')] : [a])), profileId, files });
 		}
 	}
 	// A configured source extension opts into that language's documentation checks; languageProfiles selects the full suite.
@@ -513,8 +517,7 @@ export function resolveLanguageProfiles(cfg: QualityCfg): LanguageProfileResolut
 					continue;
 				}
 				const checkFiles = check.fileExtensions ? files.filter(f => check.fileExtensions!.some(ext => f.endsWith(ext))) : files;
-				const args = check.args.flatMap(a => (a === '{files}' ? checkFiles : a === '{files-comma}' ? [checkFiles.join(',')] : [a]));
-				result.checks.push({ ...check, args, profileId: profile.id, files: checkFiles });
+				result.checks.push({ ...check, args: check.args.flatMap(a => (a === '{files}' ? checkFiles : a === '{files-comma}' ? [checkFiles.join(',')] : [a])), profileId: profile.id, files: checkFiles });
 			}
 		}
 	}

@@ -106,6 +106,7 @@ async function main(): Promise<void> {
 	if (separator < 0 || separator === args.length - 1) throw new Error('Usage: terra-quality-dev [--port PORT] -- <dev-server> [arguments...]');
 	const cmd = args[separator + 1];
 	const cmdArgs = args.slice(separator + 2);
+	// terra-quality-ignore single-use -- Parse the wrapper port before the child port so validation keeps its error order.
 	const wrapperPort = readPortOption(args.slice(0, separator));
 	const childPort = readPortOption(cmdArgs);
 	const configuredPort = process.env.DOCS_DEV_PORT ?? process.env.TERRA_DEV_PORT ?? process.env.PORT;

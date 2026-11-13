@@ -17,6 +17,7 @@ import { sourceKind } from '@terra-symposium/standards-quality-core';
 CONFIG
 //////////////////////////////////////////////////*/
 
+// terra-quality-ignore single-use -- Reuse this extension set for every collapse call instead of allocating it per file.
 const SUPPORTED = new Set(['.cjs', '.cts', '.js', '.jsx', '.mjs', '.mts', '.ts', '.tsx']);
 
 /**
@@ -172,10 +173,9 @@ export function collapseTypesAndObjects(fileName: string): boolean {
 	const n = edits.sort((a, b) => b.start - a.start).reduce((t, e) => `${t.slice(0, e.start)}${e.text}${t.slice(e.end)}`, original);
 	if (n === original) return false;
 	if (JSON.stringify(sourceTokens(original, parsed.languageVariant)) !== JSON.stringify(sourceTokens(n, parsed.languageVariant))) return false;
-	const rewritten = ts.createSourceFile(fileName, n, ts.ScriptTarget.Latest, true, sourceKind(fileName)) as ts.SourceFile & { parseDiagnostics: readonly ts.Diagnostic[] };
 	const diagnostics = (file: typeof parsed): string[] => file.parseDiagnostics.map(d => `${d.code}:${ts.flattenDiagnosticMessageText(d.messageText, ' ')}`);
 	const prior = diagnostics(parsed);
-	if (diagnostics(rewritten).some(message => !prior.includes(message))) return false;
+	if (diagnostics(ts.createSourceFile(fileName, n, ts.ScriptTarget.Latest, true, sourceKind(fileName)) as typeof parsed).some(message => !prior.includes(message))) return false;
 	writeFileSync(fileName, n);
 	return true;
 }

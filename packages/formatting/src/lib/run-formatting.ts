@@ -22,18 +22,6 @@ import type { CapabilityOptions, QualityCfg } from '@terra-symposium/standards-q
 CONFIG
 //////////////////////////////////////////////////*/
 
-const CONFIG_NAMES = [
-	'.prettierrc',
-	'.prettierrc.json',
-	'.prettierrc.yml',
-	'.prettierrc.yaml',
-	'.prettierrc.mjs',
-	'.prettierrc.cjs',
-	'prettier.config.js',
-	'prettier.config.mjs',
-	'prettier.config.cjs',
-];
-
 /*//////////////////////////////////////////////////
 HELPERS
 //////////////////////////////////////////////////*/
@@ -51,7 +39,17 @@ export function runFormatting(cfg: QualityCfg, options: Pick<CapabilityOptions, 
 	if (!files.length) return 0;
 	const fix = options.fix && cfg.autofix?.format !== false;
 	const configRoot = cfg.configRoot ?? resolve(cfg.root, 'config');
-	const prettierConfig = CONFIG_NAMES.flatMap(n => [resolve(configRoot, n), resolve(cfg.root, n)]).find(existsSync);
+	const prettierConfig = [
+		'.prettierrc',
+		'.prettierrc.json',
+		'.prettierrc.yml',
+		'.prettierrc.yaml',
+		'.prettierrc.mjs',
+		'.prettierrc.cjs',
+		'prettier.config.js',
+		'prettier.config.mjs',
+		'prettier.config.cjs',
+	].flatMap(n => [resolve(configRoot, n), resolve(cfg.root, n)]).find(existsSync);
 	const prettierIgnore = [resolve(configRoot, '.prettierignore'), resolve(cfg.root, '.prettierignore')].find(existsSync);
 	const tool = cfg.tools?.prettier;
 	const executable = tool && (tool.includes('/') || tool.includes('\\')) ? tool : resolve(cfg.root, 'node_modules/.bin', tool ?? 'prettier');
@@ -59,8 +57,7 @@ export function runFormatting(cfg: QualityCfg, options: Pick<CapabilityOptions, 
 	if (fix) {
 		const available = spawnSync(cmd, ['--version'], { cwd: cfg.root, encoding: 'utf8', stdio: 'pipe' });
 		if (available.error || available.status !== 0) {
-			const reason = available.error?.message ?? available.stderr?.trim() ?? `exited with status ${available.status ?? 'unknown'}`;
-			console.error(`Prettier unavailable: ${reason}`);
+			console.error(`Prettier unavailable: ${available.error?.message ?? available.stderr?.trim() ?? `exited with status ${available.status ?? 'unknown'}`}`);
 			return available.status || 1;
 		}
 	}

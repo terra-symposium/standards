@@ -47,13 +47,19 @@ const SCAN_PRUNED_DIRS = new Set([
 	'.husky',
 ]);
 const JAVASCRIPT_SOURCE_EXTS = /\.(?:cjs|mjs|js|jsx|cts|mts|ts|tsx)$/u;
+// terra-quality-ignore single-use -- Compile the declaration detector once for repeated file classification.
 const CODE_DECLARATION =
 	/^\s*(?:#!|\/\/|\/\*|\*|import\b|export\b|(?:async\s+)?function\b|class\b|interface\b|type\b|enum\b|namespace\b|declare\b|const\b|let\b|var\b|return\b|if\b|for\b|while\b|switch\b|try\b|throw\b|await\b|<>|<\/?[A-Za-z][\w.:-]*(?:\s|\/?>))/mu;
+// terra-quality-ignore single-use -- Compile the expression detector once for repeated file classification.
 const CODE_EXPR =
 	/(?:=>|\b(?:async\s+)?function\s*\(|\b(?:const|let|var)\s+[$\w]+\s*=|\bexport\s*\{|\bimport\s*\(|\{[^\n{}]*\}|;\s*(?:\/\/[^\n]*)?\n|^\s*(?:void|new|delete|console|window|document|process|globalThis|module|exports|require)\b)/mu;
+// terra-quality-ignore single-use -- Compile the generated-data detector once for repeated file classification.
 const GEN_DATA_ASSIGNMENT = /^(?:window|globalThis)\.[A-Z_$][\w$]*\s*=\s*(?:\{|\[)/u;
+// terra-quality-ignore single-use -- Compile the minified-bundle detector once for repeated file classification.
 const MINIFIED_BUNDLE_ENTRY = /^(?:!function\s*\(|(?:self\.)?webpackJsonp\b)/iu;
+// terra-quality-ignore single-use -- Compile the generated-bundle filename detector once for repeated file classification.
 const GEN_BUNDLE_NAME = /^(?:bundle|vendor|runtime|polyfills)(?:[.-][\w-]+)?(?:\.min)?\.(?:cjs|mjs|js)$/iu;
+// terra-quality-ignore single-use -- Compile the persona attachment path detector once for repeated file classification.
 const GEM_ATTACHMENT_PATH_REGEX = /(?:^|\/)\.agents\/personas\/gems\//u;
 
 /**

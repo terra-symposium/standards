@@ -215,11 +215,9 @@ export function validateTestPlan(value, root) {
 		names.add(suite.name);
 		if (typeof suite.command !== 'string' || suite.command.trim() === '') throw new Error(`Test suite ${suite.name} must name a command.`);
 		if (suite.args !== undefined && (!Array.isArray(suite.args) || suite.args.some(arg => typeof arg !== 'string'))) throw new Error(`Test suite ${suite.name} args must be strings.`);
-		const args = /** @type {string[]} */ (suite.args ?? []);
-		const cwd = typeof suite.cwd === 'string' ? suite.cwd : '.';
-		const absoluteCwd = resolve(root, cwd);
+		const absoluteCwd = resolve(root, typeof suite.cwd === 'string' ? suite.cwd : '.');
 		if (!isInside(resolve(root), absoluteCwd)) throw new Error(`Test suite ${suite.name} working directory must be inside the repository.`);
-		const cmdKey = JSON.stringify([suite.command, args, relative(resolve(root), absoluteCwd)]);
+		const cmdKey = JSON.stringify([suite.command, /** @type {string[]} */ (suite.args ?? []), relative(resolve(root), absoluteCwd)]);
 		if (cmds.has(cmdKey)) throw new Error(`Duplicate test command in suite ${suite.name}; each command must run once.`);
 		cmds.add(cmdKey);
 		if (!Array.isArray(suite.owns) || suite.owns.some(owner => typeof owner !== 'string' || owner.trim() === ''))

@@ -97,13 +97,6 @@ export function securityFindings(cfg: QualityCfg): SecurityFinding[] {
  */
 function environmentAccess(file: string, text: string): EnvironmentAccess {
 	const ext = file.slice(file.lastIndexOf('.')).toLowerCase();
-	const source = ts.createSourceFile(
-		file,
-		ext === '.astro' ? (text.match(/^---\s*\r?\n([\s\S]*?)\r?\n---/u)?.[1] ?? '') : text,
-		ts.ScriptTarget.Latest,
-		true,
-		['.tsx', '.jsx', '.astro'].includes(ext) ? ts.ScriptKind.TSX : ['.ts', '.mts', '.cts'].includes(ext) ? ts.ScriptKind.TS : ts.ScriptKind.JS,
-	);
 	let readsProcessEnv = false;
 	let loadsEnvFile = false;
 	const stringValue = (node: ts.Expression | undefined): string | undefined => (node && (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) ? node.text : undefined);
@@ -124,6 +117,14 @@ function environmentAccess(file: string, text: string): EnvironmentAccess {
 		}
 		ts.forEachChild(node, visit);
 	};
-	visit(source);
+	visit(
+		ts.createSourceFile(
+			file,
+			ext === '.astro' ? (text.match(/^---\s*\r?\n([\s\S]*?)\r?\n---/u)?.[1] ?? '') : text,
+			ts.ScriptTarget.Latest,
+			true,
+			['.tsx', '.jsx', '.astro'].includes(ext) ? ts.ScriptKind.TSX : ['.ts', '.mts', '.cts'].includes(ext) ? ts.ScriptKind.TS : ts.ScriptKind.JS,
+		),
+	);
 	return { readsProcessEnv, loadsEnvFile };
 }

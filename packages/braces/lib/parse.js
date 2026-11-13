@@ -191,8 +191,7 @@ const parse = (input, options = {}) => {
 		if (value === CHAR_COMMA && depth > 0) {
 			if (block.ranges > 0) {
 				block.ranges = 0;
-				const open = block.nodes.shift();
-				block.nodes = [open, { type: 'text', value: stringify(block) }];
+				block.nodes = [block.nodes.shift(), { type: 'text', value: stringify(block) }];
 			}
 			push({ type: 'comma', value });
 			block.commas++;
@@ -251,9 +250,8 @@ const parse = (input, options = {}) => {
 
 			// get the location of the block on parent.nodes (block's siblings)
 			const parent = stack[stack.length - 1];
-			const index = parent.nodes.indexOf(block);
 			// replace the (invalid) block with it's nodes
-			parent.nodes.splice(index, 1, ...block.nodes);
+			parent.nodes.splice(parent.nodes.indexOf(block), 1, ...block.nodes);
 		}
 	} while (stack.length > 0);
 	push({ type: 'eos' });

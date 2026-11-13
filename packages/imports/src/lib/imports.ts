@@ -59,8 +59,7 @@ function resolveImport(specifier: string, importer: string, cfg: QualityCfg): st
  * @return Module specifiers found in the file.
  */
 function specifiers(fileName: string): string[] {
-	const src = readFileSync(fileName, 'utf8');
-	const file = ts.createSourceFile(fileName, src, ts.ScriptTarget.Latest, true);
+	const file = ts.createSourceFile(fileName, readFileSync(fileName, 'utf8'), ts.ScriptTarget.Latest, true);
 	const vals: string[] = [];
 	ts.forEachChild(file, n => {
 		if (ts.isImportDeclaration(n) && ts.isStringLiteral(n.moduleSpecifier)) vals.push(n.moduleSpecifier.text);

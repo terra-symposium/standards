@@ -29,6 +29,7 @@ export type UiRecommendationSettings = { rules?: UiRecommendationRule[]; extensi
 
 /** A source location and the shared component that may replace its native JSX element. */
 export type UiComponentRecommendation = { file: string; line: number; column: number; element: string; component: string; import: string; variant?: string; reason: string };
+// terra-quality-ignore single-use -- Reuse this module-level rule array across scans rather than allocating it on each invocation.
 const DEFAULT_RULES: UiRecommendationRule[] = [
 	{ element: 'button', component: 'Button', import: '@/components/ui/button', reason: 'Use the shared button primitive to keep action variants and interaction states consistent.' },
 	{
@@ -48,6 +49,7 @@ const DEFAULT_RULES: UiRecommendationRule[] = [
 	{ element: 'a', component: 'ButtonLink', import: '@/components/ui/button', when: 'button-like', reason: 'This action-styled link can use ButtonLink while retaining anchor navigation semantics.' },
 	{ element: 'a', component: 'ButtonLink', import: '@/components/ui/button', when: 'text-link', reason: 'This styled text link can use ButtonLink while retaining anchor navigation semantics.' },
 ];
+// terra-quality-ignore single-use -- Reuse this module-level extension array across scans rather than allocating it on each invocation.
 const DEFAULT_EXTS = ['.astro', '.jsx', '.tsx'];
 
 /*//////////////////////////////////////////////////
