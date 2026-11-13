@@ -152,8 +152,7 @@ function candidatesForAssignment(node: ts.Node, name: string, byName: Map<string
  * @return Eligible named declarations, including whether an existing assignment is matching or conflicting.
  */
 function candidatesForFile(file: string, analysis?: QualityAnalysis): Candidate[] {
-	const src = analysis?.texts.get(file) ?? readFileSync(file, 'utf8');
-	const parsed = analysis?.sources.get(file) ?? ts.createSourceFile(file, src, ts.ScriptTarget.Latest, true, scriptKind(file));
+	const parsed = analysis?.sources.get(file) ?? ts.createSourceFile(file, analysis?.texts.get(file) ?? readFileSync(file, 'utf8'), ts.ScriptTarget.Latest, true, scriptKind(file));
 	if ((parsed as ts.SourceFile & { parseDiagnostics?: readonly ts.Diagnostic[] }).parseDiagnostics?.length) return [];
 	const candidates: Candidate[] = [];
 	const byName = new Map<string, Candidate[]>();
@@ -176,8 +175,9 @@ function candidatesForFile(file: string, analysis?: QualityAnalysis): Candidate[
 			const name = assignedComponent(node.left);
 			const targets = name ? candidatesForAssignment(node, name, byName) : undefined;
 			if (targets) {
-				const inheritsDisplayName = ts.isPropertyAccessExpression(node.right) && !node.right.questionDotToken && node.right.name.text === 'displayName';
-				const exact = node.operatorToken.kind === ts.SyntaxKind.EqualsToken && ((ts.isStringLiteralLike(node.right) && node.right.text === name) || inheritsDisplayName);
+				const exact =
+					node.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
+					((ts.isStringLiteralLike(node.right) && node.right.text === name) || (ts.isPropertyAccessExpression(node.right) && !node.right.questionDotToken && node.right.name.text === 'displayName'));
 				for (const target of targets) {
 					if (target.assignment === 'missing' || !exact) target.assignment = exact ? 'matching' : 'conflicting';
 				}
@@ -259,12 +259,10 @@ export function fixDisplayNames(cfg: QualityCfg, analysis?: QualityAnalysis): { 
 			}
 			const statement = candidate.statement;
 			const start = statement.getStart(parsed);
-			const lineStart = src.lastIndexOf('\n', start - 1) + 1;
-			const indent = src.slice(lineStart, start);
+			const indent = src.slice(src.lastIndexOf('\n', start - 1) + 1, start);
 			const lineEnd = src.indexOf('\n', statement.end);
 			const insertAt = lineEnd < 0 ? src.length : lineEnd > 0 && src[lineEnd - 1] === '\r' ? lineEnd - 1 : lineEnd;
-			const tail = src.slice(statement.end, insertAt);
-			if (!S_REGEX.test(indent) || !S_REGEX.test(tail)) {
+			if (!S_REGEX.test(indent) || !S_REGEX.test(src.slice(statement.end, insertAt))) {
 				skipped++;
 				continue;
 			}

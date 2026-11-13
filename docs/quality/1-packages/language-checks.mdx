@@ -9,7 +9,7 @@ description: Resolve optional C, Java, and Python quality profiles and run their
 
 ```sh
 pnpm add -D @terra-symposium/standards-language-checks
-pnpm exec terra-language-checks --all --warn
+pnpm exec terra-language-checks --all
 ```
 
 Select profiles in the shared `quality.json`. A profile only runs checks when matching source files are present. If a required native tool is missing or below the tested minimum, the runner reports the requirement and installation guidance. It never installs toolchains.
@@ -27,7 +27,11 @@ Pin native tools in the consumer repository or CI image for reproducible behavio
 ## API
 
 ```ts
-import { resolveLanguageProfiles, inspectLanguageProfileTool, runLanguageChecks } from '@terra-symposium/standards-language-checks';
+import {
+  resolveLanguageProfiles,
+  inspectLanguageProfileTool,
+  runLanguageChecks,
+} from "@terra-symposium/standards-language-checks";
 ```
 
 The package also exports profile IDs, capability maps, resolved check types, and profile definitions. Its `./cli` export and `terra-language-checks` bin are both public. See [profile configuration](/quality/2-configuration/quality-json/) for exact option names.

@@ -123,23 +123,23 @@ export async function* qualityNodeReporter(src: AsyncIterable<NodeTestE>, opts?:
 	const isFileSuite = (data: NodeTestE['data']): boolean => {
 		if (data?.nesting !== 0 || !data.name) return false;
 		/**
-		 * Normalizes file URLs and path separators for event identity comparisons.
-		 *
-		 * @param path File path or URL from test-runner metadata.
-		 *
-		 * @return Comparable slash-separated path text.
-		 */
-		const normPath = (path: string): string => path.replace(/^file:\/\//u, '').replace(/\\/gu, '/');
-		/**
-		 * Extracts the last path segment after path normalization.
+		 * Extracts the last path segment after file URL and separator normalization.
 		 *
 		 * @param path File path or URL from test-runner metadata.
 		 *
 		 * @return Final path component, or an empty string for an empty path.
 		 */
-		const basename = (path: string): string => normPath(path).split('/').at(-1) ?? '';
-		const fileLikeName = /(?:^|[/\\])[^/\\]+\.(?:test|spec)\.(?:[cm]?js|tsx?)$/u.test(data.name);
-		return data.name === data.file || (data.file !== undefined && basename(data.name) === basename(data.file)) || (fileLikeName && (data.file === undefined || data.line === 1));
+		const basename = (path: string): string =>
+			path
+				.replace(/^file:\/\//u, '')
+				.replace(/\\/gu, '/')
+				.split('/')
+				.at(-1) ?? '';
+		return (
+			data.name === data.file ||
+			(data.file !== undefined && basename(data.name) === basename(data.file)) ||
+			(/(?:^|[/\\])[^/\\]+\.(?:test|spec)\.(?:[cm]?js|tsx?)$/u.test(data.name) && (data.file === undefined || data.line === 1))
+		);
 	};
 	/** Updates displayed test progress from the current event counts. */
 	const liveProgress = (): void => {

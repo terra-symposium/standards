@@ -401,11 +401,12 @@ test('single-use type fixing preserves exported declarations in grouped imports'
 	assert.match(consumer, /import type \{ First, Second, Third, Retained \} from '\.\/types';/);
 	assert.match(consumer, /: (?:First|Second|Third)\b/);
 	assert.equal(ts.createSourceFile('consumer.ts', consumer, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS).parseDiagnostics.length, 0);
-	const diagnostics = ts.getPreEmitDiagnostics(
-		ts.createProgram([`${root}/src/types.ts`, `${root}/src/consumer.ts`], { module: ts.ModuleKind.ESNext, moduleResolution: ts.ModuleResolutionKind.Bundler, strict: true, noEmit: true }),
-	);
 	assert.deepEqual(
-		diagnostics.map((diagnostic) => ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n')),
+		ts
+			.getPreEmitDiagnostics(
+				ts.createProgram([`${root}/src/types.ts`, `${root}/src/consumer.ts`], { module: ts.ModuleKind.ESNext, moduleResolution: ts.ModuleResolutionKind.Bundler, strict: true, noEmit: true }),
+			)
+			.map((diagnostic) => ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n')),
 		[],
 	);
 });
@@ -438,8 +439,7 @@ test('single-use type fixing substitutes generic alias and interface arguments',
 	const consumer = fixtureText(root, 'src/consumer.ts');
 	assert.match(consumer, /Prepared<string>/);
 	assert.match(consumer, /Wrapped<number>/);
-	const parsed = ts.createSourceFile('consumer.ts', consumer, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
-	assert.equal(parsed.parseDiagnostics.length, 0);
+	assert.equal(ts.createSourceFile('consumer.ts', consumer, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS).parseDiagnostics.length, 0);
 });
 test('single-use type fixing expands generic references through namespace imports', () => {
 	const root = fixtureRoot('terra-quality-single-use-namespace-generic-');
@@ -449,8 +449,7 @@ test('single-use type fixing expands generic references through namespace import
 	assert.equal(fixSingleUseDeclarations(cfg), 0);
 	const consumer = fixtureText(root, 'src/consumer.ts');
 	assert.match(consumer, /Types\.Prepared<string>/);
-	const parsed = ts.createSourceFile('consumer.ts', consumer, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
-	assert.equal(parsed.parseDiagnostics.length, 0);
+	assert.equal(ts.createSourceFile('consumer.ts', consumer, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS).parseDiagnostics.length, 0);
 });
 test('single-use fixing inlines only primitive constants and leaves object identity intact', () => {
 	const root = fixtureRoot('terra-quality-single-use-no-fix-');
@@ -891,8 +890,7 @@ test('single-use fixing retains module values until a nested component has moved
 	assert.match(updated, /typeof LEVELS/);
 	assert.match(updated, /^function Figure/m);
 	assert.match(updated, /value: 'ready'/);
-	const parsed = ts.createSourceFile('main.tsx', updated, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
-	assert.equal(parsed.parseDiagnostics.length, 0);
+	assert.equal(ts.createSourceFile('main.tsx', updated, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX).parseDiagnostics.length, 0);
 });
 test('single-use fixing preserves exported functions consumed by Astro frontmatter', () => {
 	const root = fixtureRoot('terra-quality-single-use-astro-consumer-');
@@ -1149,8 +1147,7 @@ test('single-use fixing retains object values referenced through typeof', () => 
 	const updated = fixtureText(root, 'src/main.ts');
 	assert.match(updated, /typeof value/);
 	assert.match(updated, /const value = \{ status: 'ready' as const \}/);
-	const parsed = ts.createSourceFile('main.ts', updated, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
-	assert.equal(parsed.parseDiagnostics.length, 0);
+	assert.equal(ts.createSourceFile('main.ts', updated, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS).parseDiagnostics.length, 0);
 });
 test('single-use fixing leaves documented type declarations and their comments intact', () => {
 	const root = fixtureRoot('terra-quality-single-use-documented-type-');
@@ -1191,8 +1188,7 @@ void built;
 	assert.match(updated, /^function build</m);
 	assert.match(updated, /ReturnType/);
 	assert.doesNotMatch(updated, /__terraQualityCreateElement/);
-	const parsed = ts.createSourceFile('main.tsx', updated, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
-	assert.equal(parsed.parseDiagnostics.length, 0);
+	assert.equal(ts.createSourceFile('main.tsx', updated, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX).parseDiagnostics.length, 0);
 });
 test('single-use inline markers never suppress review findings or allow autofix to rewrite them', () => {
 	const root = fixtureRoot('terra-quality-single-use-inline-ignore-');

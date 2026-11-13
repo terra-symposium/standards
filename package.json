@@ -5,9 +5,8 @@
 	"scripts": {
 		"build": "pnpm --dir config run build",
 		"test": "pnpm --dir config run test",
+		"quality:all": "pnpm --dir config run quality:all",
 		"quality": "pnpm --dir config run quality",
-		"quality:fix": "pnpm --dir config run quality:fix",
-		"quality:check": "pnpm --dir config run quality:check",
 		"docs": "pnpm --dir config run docs",
 		"docs:build": "pnpm --dir config run docs:build",
 		"prepare": "pnpm --dir config run prepare"

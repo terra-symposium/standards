@@ -9,7 +9,7 @@ description: Detect configured forbidden source patterns, environment files, and
 
 ```sh
 pnpm add -D @terra-symposium/standards-security
-pnpm exec terra-security --all --warn
+pnpm exec terra-security --all
 ```
 
 `--all` scans configured source roots and `--warn` guarantees a read-only run. The package loads the same root `quality.json` or `config/quality.json` as the other capabilities.

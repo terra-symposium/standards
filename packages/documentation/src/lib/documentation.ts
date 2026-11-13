@@ -115,7 +115,6 @@ export function fixDocumentedCommands(cfg: QualityCfg): number {
 			.split(N_REGEX)
 			.map((s) => {
 				const line = s.replace(R_N_END_REGEX, '');
-				const lineEnding = s.slice(line.length);
 				if (!inShellFence) {
 					if (PNPM_FENCE.test(line)) inShellFence = true;
 					return s;
@@ -127,7 +126,7 @@ export function fixDocumentedCommands(cfg: QualityCfg): number {
 				const match = PNPM_DIR_FLAG.exec(line);
 				if (!match) return s;
 				fixed++;
-				return `${match[1]} --dir${match[2]}${match[3]}${match[4]}${lineEnding}`;
+				return `${match[1]} --dir${match[2]}${match[3]}${match[4]}${s.slice(line.length)}`;
 			})
 			.join('');
 		if (source !== updated) writeFileSync(file, updated);
@@ -268,9 +267,7 @@ export function duplicateImportFindings(files: string[]): DuplicateImportFinding
 			if (declaration.importClause.namedBindings && ts.isNamedImports(declaration.importClause.namedBindings)) {
 				for (const element of declaration.importClause.namedBindings.elements) {
 					const typeOnly = declaration.importClause.isTypeOnly || element.isTypeOnly;
-					const group = typeOnly ? 'TYPES' : importGroup(element.name.text);
-					const binding = element.getText(parsed).replace(TYPE_S_REGEX, '');
-					keys.push(`${declaration.moduleSpecifier.text}|${group}|${typeOnly ? 'type' : 'value'}|${binding}`);
+					keys.push(`${declaration.moduleSpecifier.text}|${typeOnly ? 'TYPES' : importGroup(element.name.text)}|${typeOnly ? 'type' : 'value'}|${element.getText(parsed).replace(TYPE_S_REGEX, '')}`);
 				}
 			}
 			if (keys.some((k) => seen.has(k))) {
@@ -310,9 +307,8 @@ export function fixDuplicateImports(files: string[]): number {
 			if (ts.getLeadingCommentRanges(source.text, declaration.getFullStart())?.length || ts.getTrailingCommentRanges(source.text, declaration.end)?.length) continue;
 			const lineStart = source.text.lastIndexOf('\n', declaration.getStart(parsed) - 1) + 1;
 			const newlineStart = source.text.indexOf('\n', declaration.end);
-			const lineEnd = newlineStart < 0 ? source.text.length : newlineStart + 1;
 			if (source.text.slice(lineStart, declaration.getStart(parsed)).trim() || source.text.slice(declaration.end, newlineStart < 0 ? source.text.length : newlineStart).trim()) continue;
-			edits.push({ start: source.offset + lineStart, end: source.offset + lineEnd });
+			edits.push({ start: source.offset + lineStart, end: source.offset + (newlineStart < 0 ? source.text.length : newlineStart + 1) });
 		}
 		if (!edits.length) continue;
 		const updated = edits.sort((left, right) => right.start - left.start).reduce((source, edit) => `${source.slice(0, edit.start)}${source.slice(edit.end)}`, text);
@@ -369,8 +365,7 @@ export function protectLongImports(fileName: string, printWidth = 200): boolean 
 		const nline = original.indexOf('\n', n.end);
 		if (original.slice(lineStart, nline < 0 ? original.length : nline).replace(/\r$/, '').length <= printWidth || original.slice(lineStart, n.getStart(parsed)).trim()) continue;
 		const prevLineEnd = lineStart > 0 ? lineStart - 1 : -1;
-		const prevLineStart = prevLineEnd >= 0 ? original.lastIndexOf('\n', prevLineEnd - 1) + 1 : 0;
-		if (original.slice(prevLineStart, prevLineEnd + 1).trim() === '// prettier-ignore') continue;
+		if (original.slice(prevLineEnd >= 0 ? original.lastIndexOf('\n', prevLineEnd - 1) + 1 : 0, prevLineEnd + 1).trim() === '// prettier-ignore') continue;
 		insertions.add(lineStart);
 	}
 	if (!insertions.size) return false;
@@ -542,8 +537,7 @@ function documented(node: ts.Node, src: string): boolean {
 	// the first declaration. Only exclude it when the block is the first
 	// path-bearing TSDoc in the file; a declaration's own later TSDoc remains
 	// valid even when the file also has a header.
-	const blockStart = target.getFullStart() + doc.index!;
-	let prefix = src.slice(0, blockStart).replace(UFEFF_REGEX, '');
+	let prefix = src.slice(0, target.getFullStart() + doc.index!).replace(UFEFF_REGEX, '');
 	if (prefix.startsWith('#!')) prefix = prefix.slice(prefix.indexOf('\n') + 1);
 	const docLines = doc[0]!
 		.slice(3, -2)
@@ -745,10 +739,9 @@ function tsdocTagEntries(lines: TSDocLine[]): { tag: string; subject: string; de
 		}
 		const rawContent = content.join(' ').trim();
 		const paramText = rawContent.replace(/^\{[^}]*\}\s*/, '').split(/\s+/)[0] ?? '';
-		const subject = tag.toLowerCase() === 'param' ? paramText.replace(/^\[/, '').replace(/\]$/, '').split('=')[0]! : tag.toLowerCase() === 'typeparam' ? paramText : '';
 		entries.push({
 			tag,
-			subject,
+			subject: tag.toLowerCase() === 'param' ? paramText.replace(/^\[/, '').replace(/\]$/, '').split('=')[0]! : tag.toLowerCase() === 'typeparam' ? paramText : '',
 			description: (function tagDescription(tag: string, content: string): string {
 				let description = content.trim().replace(S_CLASS_5, '');
 				if (tag.toLowerCase() === 'param' || tag.toLowerCase() === 'typeparam') description = description.replace(/^\[[^\]]+\]\s*/, '').replace(/^\S+\s*/, '');
@@ -854,8 +847,7 @@ function descriptionFindingsForFile(cfg: QualityCfg, file: string, src: string, 
 	for (const block of blocks) {
 		if (block === header) continue;
 		if (!attached.has(block.start)) {
-			const finding = documentationCommentReport(file, parsed, block.start, '<detached TSDoc>', 'orphan', 'remove or attach this TSDoc to a declaration', cfg);
-			findings.push(finding);
+			findings.push(documentationCommentReport(file, parsed, block.start, '<detached TSDoc>', 'orphan', 'remove or attach this TSDoc to a declaration', cfg));
 			continue;
 		}
 		if (!requiredAttached.has(block.start)) continue;
@@ -870,8 +862,9 @@ function descriptionFindingsForFile(cfg: QualityCfg, file: string, src: string, 
 			findings.push(documentationCommentReport(file, parsed, block.start, '<TSDoc summary>', 'summary', 'add a meaningful description for this TSDoc block', cfg));
 		for (const entry of tsdocTagEntries(lines)) {
 			if (entry.tag.toLowerCase() === 'param' && entry.subject.toLowerCase() === 'props') {
-				const name = `@${entry.tag} ${entry.subject}`;
-				findings.push(documentationCommentReport(file, parsed, entry.offset, name, 'param', 'replace the aggregate props tag with an individual @param tag for each binding', cfg));
+				findings.push(
+					documentationCommentReport(file, parsed, entry.offset, `@${entry.tag} ${entry.subject}`, 'param', 'replace the aggregate props tag with an individual @param tag for each binding', cfg),
+				);
 				continue;
 			}
 			if (DESCRIPTION_OPTIONAL_TAGS.has(entry.tag.toLowerCase()) || entry.description) continue;
@@ -937,6 +930,9 @@ function documentationFindingsForFile(
 ): DocumentationFinding[] {
 	if (!documentationSupported(file)) return [];
 	const src = analysis?.texts.get(file) ?? readFileSync(file, 'utf8');
+	// Regex-dedup registries are generated API plumbing marked as non-editable;
+	// their exported factories inherit documentation from the authored source use sites.
+	if (/^\/\/ Generated by @terra-symposium\/standards-quality regex-dedup\. Do not edit\.$/mu.test(src)) return [];
 	const parsed = analysis?.sources.get(file) ?? ts.createSourceFile(file, src, ts.ScriptTarget.Latest, true, documentationScriptKind(file));
 	const findings = descriptionFindingsForFile(cfg, file, src, parsed);
 

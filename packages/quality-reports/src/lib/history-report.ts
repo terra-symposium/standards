@@ -175,8 +175,7 @@ function parseTree(root: string, sha: string): string[] {
 		const tab = entry.indexOf('\t');
 		if (tab < 0) continue;
 		const [mode, type, blob] = entry.slice(0, tab).split(' ');
-		const path = entry.slice(tab + 1);
-		if (type === 'blob' && mode !== '120000' && isHistorySourcePath(path)) blobs.push(blob);
+		if (type === 'blob' && mode !== '120000' && isHistorySourcePath(entry.slice(tab + 1))) blobs.push(blob);
 	}
 	return blobs;
 }

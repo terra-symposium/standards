@@ -38,9 +38,15 @@ test('UI recommendations report native controls and shared text links with sourc
 			');',
 		].join('\n'),
 	);
-	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.tsx'] });
 	assert.deepEqual(
-		uiComponentRecommendations(cfg).map(({ file: f, line: l, element: e, component: c, import: i, variant: v }) => ({ file: f, line: l, element: e, component: c, importPath: i, variant: v })),
+		uiComponentRecommendations(createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.tsx'] })).map(({ file: f, line: l, element: e, component: c, import: i, variant: v }) => ({
+			file: f,
+			line: l,
+			element: e,
+			component: c,
+			importPath: i,
+			variant: v,
+		})),
 		[
 			{ file: 'src/view.tsx', line: 3, element: 'button', component: 'Button', importPath: '@/components/ui/button', variant: undefined },
 			{ file: 'src/view.tsx', line: 4, element: 'input', component: 'Input', importPath: '@/components/ui/input', variant: undefined },
@@ -58,9 +64,14 @@ test('UI recommendations scan Astro markup and recognize the docs sidebar Button
 		'src/DocsLayout.astro',
 		'<footer>\n\t<a href="/" class="text-xs text-primary no-underline hover:underline hover:decoration-2 hover:underline-offset-[0.2em]">\n\t\tBack to Playlist Atlas\n\t</a>\n</footer>\n',
 	);
-	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.astro'] });
 	assert.deepEqual(
-		uiComponentRecommendations(cfg).map(({ file: f, line: l, element: e, component: c, variant: v }) => ({ file: f, line: l, element: e, component: c, variant: v })),
+		uiComponentRecommendations(createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.astro'] })).map(({ file: f, line: l, element: e, component: c, variant: v }) => ({
+			file: f,
+			line: l,
+			element: e,
+			component: c,
+			variant: v,
+		})),
 		[{ file: 'src/DocsLayout.astro', line: 2, element: 'a', component: 'ButtonLink', variant: 'primary-underline' }],
 	);
 });
@@ -69,21 +80,22 @@ test('UI recommendation rules override defaults and honor input types and ignore
 	fixtureFile(root, 'src/view.tsx', '<><button>Use custom action</button><input type="checkbox" /></>\n');
 	fixtureFile(root, 'src/ignored.tsx', '<button>Ignore this file</button>\n');
 	fixtureFile(root, 'src/components/ui/button.tsx', '<button>Primitive implementation</button>\n');
-	const cfg = createQualityCfg({
-		root,
-		sourceRoots: ['src'],
-		extensions: ['.tsx'],
-		uiRecommendations: {
-			rules: [
-				{ element: 'button', component: 'ActionButton', import: '@/components/ui/action-button' },
-				{ element: 'input', component: 'Checkbox', import: '@/components/ui/checkbox', types: ['checkbox'] },
-			],
-			ignoredFiles: ['src/ignored.tsx'],
-			ignoredDirectories: ['src/components/ui'],
-		},
-	});
 	assert.deepEqual(
-		uiComponentRecommendations(cfg).map(({ element: e, component: c }) => ({ element: e, component: c })),
+		uiComponentRecommendations(
+			createQualityCfg({
+				root,
+				sourceRoots: ['src'],
+				extensions: ['.tsx'],
+				uiRecommendations: {
+					rules: [
+						{ element: 'button', component: 'ActionButton', import: '@/components/ui/action-button' },
+						{ element: 'input', component: 'Checkbox', import: '@/components/ui/checkbox', types: ['checkbox'] },
+					],
+					ignoredFiles: ['src/ignored.tsx'],
+					ignoredDirectories: ['src/components/ui'],
+				},
+			}),
+		).map(({ element: e, component: c }) => ({ element: e, component: c })),
 		[
 			{ element: 'button', component: 'ActionButton' },
 			{ element: 'input', component: 'Checkbox' },

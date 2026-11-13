@@ -227,8 +227,7 @@ const previewImg = async (file: string, viewportSize: string): Promise<{ data: s
 	const metadata = await sharp(file).metadata();
 	const width = metadata.width || 1;
 	const [viewportWidth, viewportHeight] = viewportSize.split('×').map((v) => Number.parseInt(v, 10));
-	const viewportPreviewHeight = viewportWidth && viewportHeight ? Math.round((width * viewportHeight) / viewportWidth) : Math.round(width / 0.38);
-	const height = Math.min(metadata.height || 1, Math.max(1, viewportPreviewHeight));
+	const height = Math.min(metadata.height || 1, Math.max(1, viewportWidth && viewportHeight ? Math.round((width * viewportHeight) / viewportWidth) : Math.round(width / 0.38)));
 	return { data: `data:image/png;base64,${(await sharp(file).extract({ height, left: 0, top: 0, width }).png().toBuffer()).toString('base64')}`, height, width };
 };
 /**

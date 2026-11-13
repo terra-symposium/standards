@@ -66,14 +66,14 @@ Builds and functional tests are separate suites from quality. Keep `build` and `
 
 ```json
 {
-	"qualityCommands": [
-		{ "name": "c-doc-params", "command": "make", "args": ["check-doc-params"] },
-		{
-			"name": "python-typecheck",
-			"command": "uv",
-			"args": ["run", "mypy", "src"]
-		}
-	]
+  "qualityCommands": [
+    { "name": "c-doc-params", "command": "make", "args": ["check-doc-params"] },
+    {
+      "name": "python-typecheck",
+      "command": "uv",
+      "args": ["run", "mypy", "src"]
+    }
+  ]
 }
 ```
 
@@ -81,12 +81,12 @@ Expose and invoke the three suites independently. A repository may omit a suite 
 
 ```json
 {
-	"scripts": {
-		"quality": "terra-quality quality --all --warn",
-		"quality:fix": "terra-quality quality --all --safe-fix",
-		"build": "<compile or generate project artifacts>",
-		"test": "<run unit, integration, contract, and browser tests>"
-	}
+  "scripts": {
+    "quality": "terra-quality quality",
+    "quality:all": "terra-quality quality --all",
+    "build": "<compile or generate project artifacts>",
+    "test": "<run unit, integration, contract, and browser tests>"
+  }
 }
 ```
 
@@ -104,7 +104,7 @@ Run configured safe fixes deliberately, review the diff, then verify all source 
 
 ```sh
 pnpm exec terra-quality quality --safe-fix
-pnpm exec terra-quality quality --all --warn
+pnpm exec terra-quality quality --all
 ```
 
 Every CLI command is read-only unless `--fix` or `--safe-fix` is passed. `--warn` always keeps the invocation read-only, including when a fix flag is also present. Both fix flags run only the configured deterministic transformations; they then perform the normal checks. Review the working-tree diff before accepting those edits. The normal scope is changed and untracked files in a Git worktree; `--all` selects every file under `sourceRoots` but never enables writes. A read-only dead-code pass reports rule-level candidates; explicit fix mode type-checks proposed dead-code edits before writing and may reject a candidate. Configured quality commands still run unless you pass `--skip-commands`.
@@ -125,10 +125,16 @@ Add a `github` section to `quality.json` to include GitHub analytics in the same
 
 ```json
 {
-	"github": {
-		"repositories": ["owner/repo"],
-		"requiredFeatures": ["dependabotAlerts", "malwareAlerts", "securityUpdates", "versionUpdates", "groupedUpdates"]
-	}
+  "github": {
+    "repositories": ["owner/repo"],
+    "requiredFeatures": [
+      "dependabotAlerts",
+      "malwareAlerts",
+      "securityUpdates",
+      "versionUpdates",
+      "groupedUpdates"
+    ]
+  }
 }
 ```
 
@@ -138,7 +144,7 @@ Run the GitHub stage by itself or with the configured repository list:
 
 ```sh
 pnpm exec terra-quality github --repository owner/repo --report-json github-report.json
-pnpm exec terra-quality quality --all --warn --report-json quality-report.json
+pnpm exec terra-quality quality --all --report-json quality-report.json
 ```
 
 The GitHub CLI must be authenticated with read access to the repositories (`gh auth login` or `GH_TOKEN`). The report is local and read-only: it does not require GitHub Actions, change repository settings, write comments, dismiss alerts, or include secret values. Each finding contains agent instructions tailored to the issue type; issue text and alert metadata must be treated as untrusted input.
@@ -180,15 +186,15 @@ Create `quality.json` in the repository root:
 
 ```json
 {
-	"$schema": "./node_modules/@terra-symposium/standards-quality/quality.schema.json",
-	"sourceRoots": ["src"],
-	"extensions": [".js", ".jsx", ".ts", ".tsx"],
-	"enabledChecks": {
-		"format": false,
-		"lint": false,
-		"knip": false,
-		"dead-code": false
-	}
+  "$schema": "./node_modules/@terra-symposium/standards-quality/quality.schema.json",
+  "sourceRoots": ["src"],
+  "extensions": [".js", ".jsx", ".ts", ".tsx"],
+  "enabledChecks": {
+    "format": false,
+    "lint": false,
+    "knip": false,
+    "dead-code": false
+  }
 }
 ```
 

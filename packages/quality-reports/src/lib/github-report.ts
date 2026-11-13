@@ -147,14 +147,16 @@ function ghApi(path: string, paginate = false): ApiResult {
 	if (!result.stdout.trim()) return { ok: true, value: null };
 	try {
 		if (!paginate) return { ok: true, value: JSON.parse(result.stdout) as unknown };
-		const items = result.stdout
-			.trim()
-			.split(/\r?\n/)
-			.map((l) => {
-				const item = JSON.parse(l) as unknown;
-				return typeof item === 'string' ? (JSON.parse(item) as unknown) : item;
-			});
-		return { ok: true, value: items };
+		return {
+			ok: true,
+			value: result.stdout
+				.trim()
+				.split(/\r?\n/)
+				.map((l) => {
+					const item = JSON.parse(l) as unknown;
+					return typeof item === 'string' ? (JSON.parse(item) as unknown) : item;
+				}),
+		};
 	} catch {
 		return { ok: false, state: 'unavailable', detail: 'GitHub CLI returned an invalid JSON response.' };
 	}

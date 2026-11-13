@@ -67,8 +67,6 @@ import type { QualityAnalysis, QualityAutofixName, QualityCfg, QualityCheckName,
 REGEX
 //////////////////////////////////////////////////*/
 
-const BPLAYWRIGHT_B_U_REGEX = /\bplaywright\b/u;
-const BWORKSPACE_TEST_RUNNER_JS_B_U_REGEX = /\bworkspace-test-runner\.js\b/u;
 const NON_WORKSPACE_DIRS = new Set(['.git', '.next', '.nuxt', '.turbo', '.vercel', '.vite', '.astro', 'build', 'coverage', 'dist', 'node_modules', 'out', 'target', 'vendor']);
 
 /*//////////////////////////////////////////////////
@@ -147,9 +145,7 @@ const ESLINT_CONFIG_NAMES = ['eslint.config.js', 'eslint.config.mjs', 'eslint.co
  * @return Absolute config path or undefined when no flat config exists.
  */
 function findEslintConfig(root: string, configRoot = resolve(root, 'config')): string | undefined {
-	const configDirConfigs = ESLINT_CONFIG_NAMES.map((n) => resolve(configRoot, n));
-	const rootConfigs = ESLINT_CONFIG_NAMES.map((n) => resolve(root, n));
-	return [...configDirConfigs, ...rootConfigs].find((p) => existsSync(p));
+	return [...ESLINT_CONFIG_NAMES.map((n) => resolve(configRoot, n)), ...ESLINT_CONFIG_NAMES.map((n) => resolve(root, n))].find((p) => existsSync(p));
 }
 
 /**
@@ -327,8 +323,7 @@ export function loadQualityCfg(file?: string): QualityCfg {
 	const configDir = dirname(path);
 	const implicitConfigRoot = basename(configDir) === 'config' ? dirname(configDir) : configDir;
 	const root = raw.root ? resolve(implicitConfigRoot, raw.root) : implicitConfigRoot;
-	const defaultConfigRoot = configDir === implicitConfigRoot ? resolve(root, 'config') : configDir;
-	return createQualityCfg({ ...raw, root, configRoot: raw.configRoot ? resolve(root, raw.configRoot) : defaultConfigRoot });
+	return createQualityCfg({ ...raw, root, configRoot: raw.configRoot ? resolve(root, raw.configRoot) : configDir === implicitConfigRoot ? resolve(root, 'config') : configDir });
 }
 
 /**
@@ -710,10 +705,13 @@ function invocationText(cfg: QualityCfg, check: QualityInvocation): string {
 			}
 			return selectors;
 		})(check);
-		const packages = selectors.length
-			? workspaceManifests(cfg.root).filter((m) => selectors.some((s) => matchesWorkspaceFilter(cfg.root, s, m)))
-			: workspaceManifests(cfg.root).filter((m) => m.directory === cfg.root);
-		return packages.map((m) => m.scripts[scriptName]).filter((s): s is string => typeof s === 'string');
+		return (
+			selectors.length
+				? workspaceManifests(cfg.root).filter((m) => selectors.some((s) => matchesWorkspaceFilter(cfg.root, s, m)))
+				: workspaceManifests(cfg.root).filter((m) => m.directory === cfg.root)
+		)
+			.map((m) => m.scripts[scriptName])
+			.filter((s): s is string => typeof s === 'string');
 	})(cfg, check).join(' ')}`.toLowerCase();
 }
 
@@ -756,10 +754,10 @@ function phaseForInvocation(cfg: QualityCfg, check: QualityInvocation): QualityP
 function testRunner(cfg: QualityCfg, check: QualityInvocation): 'node' | 'playwright' | 'unknown' {
 	const text = invocationText(cfg, check);
 	const args = check.args ?? [];
-	if (BPLAYWRIGHT_B_U_REGEX.test(text) || /\bplaywright\b/iu.test(args.join(' '))) return 'playwright';
+	if (/\bplaywright\b/u.test(text) || /\bplaywright\b/iu.test(args.join(' '))) return 'playwright';
 	const nodeCmd = /^(?:node|node\.exe)$/iu.test(basename(check.command));
 	const nodeTestArgs = args.some((a) => a === '--test' || a.startsWith('--test=')) || args.some((a) => /\.(?:mjs|cjs)$/iu.test(a));
-	if ((nodeCmd && nodeTestArgs) || BWORKSPACE_TEST_RUNNER_JS_B_U_REGEX.test(text) || /\bnode\s+[^\n]*--test\b/u.test(text) || /\bpnpm\s+-r\s+test\b/u.test(text)) return 'node';
+	if ((nodeCmd && nodeTestArgs) || /\bworkspace-test-runner\.js\b/u.test(text) || /\bnode\s+[^\n]*--test\b/u.test(text) || /\bpnpm\s+-r\s+test\b/u.test(text)) return 'node';
 	return 'unknown';
 }
 
@@ -918,13 +916,15 @@ function runQualityPhase(cfg: QualityCfg, phase: QualityPhase, profileChecks: Re
 		const configured = cfg.qualityCommands ?? [];
 		const profileNames = new Set(profileChecks.map((c) => c.name));
 		const configuredByName = new Map(configured.map((c) => [c.name, c]));
-		const profileInvocations = profileChecks.map((c): QualityInvocation => {
-			const override = configuredByName.get(c.name);
-			return override
-				? { ...override, phase: c.phase, profileId: c.profileId, qualityChecks: c.qualityChecks }
-				: { name: c.name, command: c.command, args: c.args, phase: c.phase, profileId: c.profileId, profileTool: c.tool, qualityChecks: c.qualityChecks };
-		});
-		return [...profileInvocations, ...configured.filter((c) => !profileNames.has(c.name))];
+		return [
+			...profileChecks.map((c): QualityInvocation => {
+				const override = configuredByName.get(c.name);
+				return override
+					? { ...override, phase: c.phase, profileId: c.profileId, qualityChecks: c.qualityChecks }
+					: { name: c.name, command: c.command, args: c.args, phase: c.phase, profileId: c.profileId, profileTool: c.tool, qualityChecks: c.qualityChecks };
+			}),
+			...configured.filter((c) => !profileNames.has(c.name)),
+		];
 	})(cfg, profileChecks).filter((c) => qualityCmdEnabled(cfg, c.name) && phaseForInvocation(cfg, c) === phase);
 	/**
 	 * Checks and caches the required tool for a configured language profile.
@@ -4137,8 +4137,7 @@ export function runFormatter(cfg: QualityCfg, optsOrArgs: QualityOptions | strin
 	qualityHeader('format', `${opts.fix ? 'Fixing' : 'Checking'} formatting in ${tgts.length} source files`);
 	const before = opts.fix ? snapshotFiles(cfg, tgts) : undefined;
 	const fmt = toolPath(cfg, cfg.tools?.prettier, 'prettier');
-	const fmtAvailable = !opts.fix || spawnSync(fmt, ['--version'], { cwd: cfg.root, stdio: 'ignore', env: process.env }).status === 0;
-	if (opts.fix && fmtAvailable) {
+	if (opts.fix && spawnSync(fmt, ['--version'], { cwd: cfg.root, stdio: 'ignore', env: process.env }).status === 0) {
 		// Explicit formatter targets are already the authoritative scope. Avoid
 		// querying Git for a temporary/non-repository fixture when collapsing its
 		// structural sources before Prettier.
@@ -4173,9 +4172,10 @@ export function runFormatter(cfg: QualityCfg, optsOrArgs: QualityOptions | strin
 		.flatMap((n) => [resolve(cfg.configRoot ?? resolve(cfg.root, 'config'), n), resolve(cfg.root, n)])
 		.find((p) => existsSync(p));
 	const prettierIgnore = [resolve(cfg.configRoot ?? resolve(cfg.root, 'config'), '.prettierignore'), resolve(cfg.root, '.prettierignore')].find((p) => existsSync(p));
-	const explicitConfig = flags.some((f) => f === '--config' || f.startsWith('--config='));
-	const explicitIgnore = flags.some((f) => f === '--ignore-path' || f.startsWith('--ignore-path='));
-	const configArgs = [...(!explicitConfig && prettierConfig ? ['--config', prettierConfig] : []), ...(!explicitIgnore && prettierIgnore ? ['--ignore-path', prettierIgnore] : [])];
+	const configArgs = [
+		...(!flags.some((f) => f === '--config' || f.startsWith('--config=')) && prettierConfig ? ['--config', prettierConfig] : []),
+		...(!flags.some((f) => f === '--ignore-path' || f.startsWith('--ignore-path=')) && prettierIgnore ? ['--ignore-path', prettierIgnore] : []),
+	];
 	const targetBatches = argumentBatches(tgts);
 	for (const tgtBatch of targetBatches) {
 		const status = run(cfg, fmt, [...flags, ...configArgs, ...tgtBatch], { quietSuccess: true });

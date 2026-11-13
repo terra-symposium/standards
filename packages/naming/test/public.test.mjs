@@ -21,14 +21,12 @@ test('public API exports the capability contract', () => {
 	assert.ok('renameId' in api, 'exports renameId');
 });
 test('standalone CLI exposes shared help', () => {
-	const script = new URL('../dist/cli.js', import.meta.url);
-	const result = spawnSync(process.execPath, [script.pathname, '--help'], { encoding: 'utf8' });
+	const result = spawnSync(process.execPath, [new URL('../dist/cli.js', import.meta.url).pathname, '--help'], { encoding: 'utf8' });
 	assert.equal(result.status, 0, result.stderr);
 	assert.match(result.stdout, /Usage:/);
 });
 test('capability package does not depend on the aggregate runner', () => {
-	const manifest = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
-	assert.equal(Object.hasOwn(manifest.dependencies ?? {}, '@terra-symposium/standards-quality'), false);
+	assert.equal(Object.hasOwn(JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).dependencies ?? {}, '@terra-symposium/standards-quality'), false);
 });
 test('naming fixes are safe and idempotent', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-naming-package-'));
@@ -51,15 +49,12 @@ test('naming checks ignore Markdown prose in a full-repository source scope', ()
 	try {
 		mkdirSync(join(root, 'src'));
 		const markdown = join(root, 'README.md');
-		const rust = join(root, 'src/constants.rs');
-		const cSource = join(root, 'src/native.c');
-		const cHeader = join(root, 'src/media.h');
 		const code = join(root, 'src/main.ts');
 		const prose = 'The repository documents expressions, extensions, and command behavior.\n';
 		writeFileSync(markdown, prose);
-		writeFileSync(rust, 'const administrator: i32 = 1;\n');
-		writeFileSync(cSource, 'int f(void) { return (size_t)((const unsigned char *)end - p); }\nint g(void) { return strtod((const char *)value, &end); }\n');
-		writeFileSync(cHeader, 'typedef struct RcImage { int width; int height; } RcImage;\n');
+		writeFileSync(join(root, 'src/constants.rs'), 'const administrator: i32 = 1;\n');
+		writeFileSync(join(root, 'src/native.c'), 'int f(void) { return (size_t)((const unsigned char *)end - p); }\nint g(void) { return strtod((const char *)value, &end); }\n');
+		writeFileSync(join(root, 'src/media.h'), 'typedef struct RcImage { int width; int height; } RcImage;\n');
 		writeFileSync(code, 'const repository = "ok";\nvoid repository;\n');
 		const cfg = { root, sourceRoots: [root], extensions: ['.c', '.h', '.md', '.json', '.rs', '.ts'] };
 		assert.deepEqual(

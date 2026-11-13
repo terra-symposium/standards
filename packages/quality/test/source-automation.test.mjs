@@ -72,13 +72,19 @@ export async function runQualityFromCfg(root, args) {
 }
 `,
 	);
-	const declaration = `/// <reference types="vite/client" />\n\ninterface ImportMetaEnv {\n\treadonly VITE_API_URL: string;\n}\n\ninterface ImportMeta {\n\treadonly env: ImportMetaEnv;\n}\n`;
-	const minified = `!function(e){${'var module={};module.exports=function(value){return value+1};'.repeat(220)}};
-//# sourceMappingURL=bundle.js.map
-`;
 	const courseDataPath = fixtureFile(root, 'content/course-data.js', `globalThis.COURSE_DATA = { title: 'Captured course', modules: [{ name: 'Week one' }] };\n`);
-	fixtureFile(root, 'src/vite-env.d.ts', declaration);
-	fixtureFile(root, 'content/viewer/bundle.js', minified);
+	fixtureFile(
+		root,
+		'src/vite-env.d.ts',
+		`/// <reference types="vite/client" />\n\ninterface ImportMetaEnv {\n\treadonly VITE_API_URL: string;\n}\n\ninterface ImportMeta {\n\treadonly env: ImportMetaEnv;\n}\n`,
+	);
+	fixtureFile(
+		root,
+		'content/viewer/bundle.js',
+		`!function(e){${'var module={};module.exports=function(value){return value+1};'.repeat(220)}};
+//# sourceMappingURL=bundle.js.map
+`,
+	);
 	const cfg = createQualityCfg({
 		root,
 		sourceRoots: ['.'],
@@ -168,8 +174,7 @@ const view = <>
 	assert.deepEqual(accessibilityFindings(cfg), []);
 });
 test('new default-path checks require an explicit rollout toggle', () => {
-	const root = fixtureRoot('terra-quality-check-rollout-');
-	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.tsx'] });
+	const cfg = createQualityCfg({ root: fixtureRoot('terra-quality-check-rollout-'), sourceRoots: ['src'], extensions: ['.tsx'] });
 	assert.equal(qualityCheckEnabled(cfg, 'accessibility'), false);
 	assert.equal(qualityCheckEnabled(cfg, 'display-name'), false);
 	assert.equal(qualityCheckEnabled(cfg, 'documented-commands'), false);
@@ -312,8 +317,7 @@ test('displayName findings report direct forwardRef components and ignore wrappe
 		'src/components.tsx',
 		`const Missing = forwardRef<HTMLButtonElement, Props>((props, ref) => <button ref={ref} {...props} />);\nconst AlsoMissing = React.forwardRef((props, ref) => <button ref={ref} {...props} />);\nconst Wrapped = memo(forwardRef((props, ref) => <button ref={ref} {...props} />));\nconst Existing = React.forwardRef(() => null);\nExisting.displayName = 'Existing';\n`,
 	);
-	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.tsx'] });
-	assert.deepEqual(displayNameFindings(cfg), [
+	assert.deepEqual(displayNameFindings(createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.tsx'] })), [
 		{ file: 'src/components.tsx', line: 1, column: 7, component: 'Missing', recommendation: "add Missing.displayName = 'Missing'" },
 		{ file: 'src/components.tsx', line: 2, column: 7, component: 'AlsoMissing', recommendation: "add AlsoMissing.displayName = 'AlsoMissing'" },
 	]);

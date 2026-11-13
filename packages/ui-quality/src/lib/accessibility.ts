@@ -539,17 +539,21 @@ function inspectFile(cfg: QualityCfg, file: string, parsed: ts.SourceFile): { fi
 				if (name.state === 'empty') {
 					const titleCanFix = name.title?.state === 'static' && name.iconOnly;
 					const position = parsed.getLineAndCharacterOfPosition(node.getStart(parsed));
-					const message = titleCanFix
-						? `${kind.element} has no accessible name; copy its non-empty title into aria-label.`
-						: `${kind.element} has no accessible name; add static text, an ARIA name, or an associated label.`;
-					findings.push({ file: displayPath(cfg, file), line: position.line + 1, column: position.character + 1, element: kind.element, message, fixable: titleCanFix });
+					findings.push({
+						file: displayPath(cfg, file),
+						line: position.line + 1,
+						column: position.character + 1,
+						element: kind.element,
+						message: titleCanFix
+							? `${kind.element} has no accessible name; copy its non-empty title into aria-label.`
+							: `${kind.element} has no accessible name; add static text, an ARIA name, or an associated label.`,
+						fixable: titleCanFix,
+					});
 					if (name.title?.state === 'static') {
-						const opening = ts.isJsxElement(node) ? node.openingElement : node;
-						candidates.push({ parsed, opening, title: name.title, emptyAriaLabel: name.emptyAriaLabel });
+						candidates.push({ parsed, opening: ts.isJsxElement(node) ? node.openingElement : node, title: name.title, emptyAriaLabel: name.emptyAriaLabel });
 					}
 				} else if (name.state === 'named') {
 					for (const icon of decorativeIcons(node)) {
-						const opening = ts.isJsxElement(icon) ? icon.openingElement : icon;
 						const position = parsed.getLineAndCharacterOfPosition(icon.getStart(parsed));
 						findings.push({
 							file: displayPath(cfg, file),
@@ -559,7 +563,7 @@ function inspectFile(cfg: QualityCfg, file: string, parsed: ts.SourceFile): { fi
 							message: 'Decorative SVG inside an already named control is exposed to assistive technology; add aria-hidden="true".',
 							fixable: true,
 						});
-						decorativeCandidates.push({ parsed, opening });
+						decorativeCandidates.push({ parsed, opening: ts.isJsxElement(icon) ? icon.openingElement : icon });
 					}
 				}
 			}

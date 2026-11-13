@@ -31,29 +31,50 @@ test('source discovery scans configured roots and include roots, handles direct 
 	fixtureFile(root, 'src/ignored/generated.ts', 'export const generated = true;\n');
 	fixtureFile(root, 'include/index.js', 'export const included = true;\n');
 	fixtureFile(root, 'include/notes.md', '# not source\n');
-	const cfg = createQualityCfg({ root, sourceRoots: ['src'], includeRoots: ['include'], extensions: ['.ts', '.js'] });
+	const cfg = createQualityCfg({
+		root,
+		sourceRoots: ['src'],
+		includeRoots: ['include'],
+		extensions: ['.ts', '.js'],
+	});
 	const discovered = [main, join(root, 'include/index.js'), join(root, 'src/ignored/generated.ts'), join(root, 'src/nested/keep.ts'), join(root, 'src/nested/skip.ts')].sort();
 	assert.deepEqual(srcFiles(cfg), discovered);
 	fixtureFile(root, 'src/new.ts', 'export const newFile = true;\n');
 	assert.deepEqual(srcFiles(cfg), [...discovered, join(root, 'src/new.ts')].sort());
 	assert.deepEqual(srcFiles(createQualityCfg({ root, sourceRoots: [main], extensions: ['.ts'] })), [main]);
-	assert.deepEqual(srcFiles(createQualityCfg({ root, sourceRoots: ['does-not-exist'], extensions: ['.ts'] })), []);
+	assert.deepEqual(
+		srcFiles(
+			createQualityCfg({
+				root,
+				sourceRoots: ['does-not-exist'],
+				extensions: ['.ts'],
+			}),
+		),
+		[],
+	);
 });
 test('source discovery includes test and spec files under configured roots', () => {
 	const root = fixtureRoot('terra-quality-exclude-tests-');
 	const implementation = fixtureFile(root, 'src/feature.ts', 'export const feature = true;\n');
 	fixtureFile(root, 'src/feature.test.ts', 'export const testFeature = true;\n');
 	fixtureFile(root, 'src/feature.spec.tsx', 'export const specFeature = true;\n');
-	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts', '.tsx'] });
-	assert.deepEqual(srcFiles(cfg), [implementation, join(root, 'src/feature.spec.tsx'), join(root, 'src/feature.test.ts')].sort());
+	assert.deepEqual(
+		srcFiles(
+			createQualityCfg({
+				root,
+				sourceRoots: ['src'],
+				extensions: ['.ts', '.tsx'],
+			}),
+		),
+		[implementation, join(root, 'src/feature.spec.tsx'), join(root, 'src/feature.test.ts')].sort(),
+	);
 });
 test('source discovery ignores symlink entries and direct symlink roots', () => {
 	const root = fixtureRoot('terra-quality-symlink-files-');
 	const target = fixtureFile(root, 'config/package.json', '{"name":"fixture"}\n');
 	const alias = join(root, 'package.json');
 	symlinkSync(target, alias);
-	const cfg = createQualityCfg({ root, sourceRoots: ['.'], extensions: ['.json'] });
-	assert.deepEqual(srcFiles(cfg), [target]);
+	assert.deepEqual(srcFiles(createQualityCfg({ root, sourceRoots: ['.'], extensions: ['.json'] })), [target]);
 	assert.deepEqual(srcFiles(createQualityCfg({ root, sourceRoots: [alias], extensions: ['.json'] })), []);
 });
 test('source discovery separates captured prose and archived Gem attachments from authored source', () => {
@@ -90,7 +111,11 @@ This captured page contains ordinary course text.
 	const fmtBundle = fixtureFile(root, 'content/viewer/formatted/bundle.js', '/* bundled module */\nconst moduleValue = 1;\n'.repeat(3_000));
 	const gemAttachment = fixtureFile(root, '.agents/personas/gems/content/blocks-mtwolpip.tsx', 'export function oldBlocks() { return []; }\n');
 	const gemTool = fixtureFile(root, '.agents/personas/scripts/check.ts', 'export function checkPersonas() { return true; }\n');
-	const cfg = createQualityCfg({ root, sourceRoots: ['.'], extensions: ['.js', '.tsx', '.ts'] });
+	const cfg = createQualityCfg({
+		root,
+		sourceRoots: ['.'],
+		extensions: ['.js', '.tsx', '.ts'],
+	});
 	assert.deepEqual(
 		srcFiles(cfg),
 		[application, authoredLongLine, gemTool, importedJsx, jsxFragment].sort((left, right) => left.localeCompare(right)),
@@ -112,16 +137,23 @@ test('root-wide source discovery excludes nested pnpm dependency sources', () =>
 	const root = fixtureRoot('terra-quality-pnpm-source-scope-');
 	const appSource = fixtureFile(root, 'src/main.ts', 'export const ready = true;\n');
 	fixtureFile(root, 'node_modules/.pnpm/toolkit@1.0.0/node_modules/toolkit/uncheckedindexed.ts', 'const index = 0;\nexport const result = index + 1;\n');
-	const cfg = createQualityCfg({ root, sourceRoots: ['.'], extensions: ['.ts'] });
-	assert.deepEqual(srcFiles(cfg), [appSource]);
+	assert.deepEqual(srcFiles(createQualityCfg({ root, sourceRoots: ['.'], extensions: ['.ts'] })), [appSource]);
 });
 test('root-wide source discovery excludes Rust target build artifacts', () => {
 	const root = fixtureRoot('terra-quality-rust-target-scope-');
 	const appSource = fixtureFile(root, 'src/main.ts', 'export const ready = true;\n');
 	fixtureFile(root, 'aussieplusplus/target/doc/search-index.js', 'var searchIndex = [];\n');
 	fixtureFile(root, 'aussieplusplus/target/debug/build/generated.rs', 'pub fn generated() {}\n');
-	const cfg = createQualityCfg({ root, sourceRoots: ['.'], extensions: ['.js', '.rs', '.ts'] });
-	assert.deepEqual(srcFiles(cfg), [appSource]);
+	assert.deepEqual(
+		srcFiles(
+			createQualityCfg({
+				root,
+				sourceRoots: ['.'],
+				extensions: ['.js', '.rs', '.ts'],
+			}),
+		),
+		[appSource],
+	);
 });
 test('source discovery excludes ignored local artifacts while retaining tracked files', () => {
 	const root = fixtureRoot('terra-quality-git-ignored-source-');
@@ -131,8 +163,7 @@ test('source discovery excludes ignored local artifacts while retaining tracked 
 	execFileSync('git', ['add', '.gitignore'], { cwd: root });
 	execFileSync('git', ['add', '-f', 'config.json'], { cwd: root });
 	fixtureFile(root, '.local-auth.json', '{"storageState":"private"}\n');
-	const cfg = createQualityCfg({ root, sourceRoots: ['.'], extensions: ['.json'] });
-	assert.deepEqual(srcFiles(cfg), [tracked]);
+	assert.deepEqual(srcFiles(createQualityCfg({ root, sourceRoots: ['.'], extensions: ['.json'] })), [tracked]);
 });
 test('root-wide source discovery excludes Python virtual-environment packages', () => {
 	const root = fixtureRoot('terra-quality-python-environment-scope-');
@@ -143,9 +174,14 @@ test('root-wide source discovery excludes Python virtual-environment packages', 
 	fixtureFile(root, 'config/.tox/py/lib/python3.13/site-packages/third_party/native.c', 'int vendored(void) { return 0; }\n');
 	fixtureFile(root, 'config/.nox/py/lib/python3.13/site-packages/third_party/native.c', 'int vendored(void) { return 0; }\n');
 	fixtureFile(root, 'config/.venv/lib/python3.13/site-packages/third_party/__pycache__/cache.py', 'def cached(): ...\n');
-	const cfg = createQualityCfg({ root, sourceRoots: ['.'], extensions: ['.c', '.py', '.pyi'] });
 	assert.deepEqual(
-		srcFiles(cfg),
+		srcFiles(
+			createQualityCfg({
+				root,
+				sourceRoots: ['.'],
+				extensions: ['.c', '.py', '.pyi'],
+			}),
+		),
 		[appC, appPython].sort((left, right) => left.localeCompare(right)),
 	);
 });
@@ -161,14 +197,17 @@ test('working-tree discovery includes modified and untracked sources but exclude
 	fixtureFile(root, 'src/new.ts', 'export const added = true;\n');
 	fixtureFile(root, 'src/ignored.ts', 'export const ignored = true;\n');
 	const deleted = join(root, 'src/deleted.ts');
-	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
 	execFileSync('git', ['rm', '-q', deleted], { cwd: root });
-	assert.deepEqual(workingSrcFiles(cfg), [join(root, 'src/changed.ts'), join(root, 'src/new.ts')]);
+	assert.deepEqual(workingSrcFiles(createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] })), [join(root, 'src/changed.ts'), join(root, 'src/new.ts')]);
 });
 test('path utilities distinguish files, directories, missing paths, and repository-relative display names', () => {
 	const root = fixtureRoot('terra-quality-paths-');
 	const file = fixtureFile(root, 'src/main.ts', 'const value = true;\n');
-	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
+	const cfg = createQualityCfg({
+		root,
+		sourceRoots: ['src'],
+		extensions: ['.ts'],
+	});
 	assert.equal(isFile(file), true);
 	assert.equal(isFile(join(root, 'src')), false);
 	assert.equal(isFile(join(root, 'missing.ts')), false);

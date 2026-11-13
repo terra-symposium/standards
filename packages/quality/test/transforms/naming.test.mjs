@@ -24,8 +24,7 @@ test('naming checks ignore archived Markdown prose while keeping Markdown in the
 	const root = fixtureRoot('terra-quality-naming-markdown-');
 	const original = '# Repository\n\nThe organization publishes documentation for every contributor.\n';
 	fixtureFile(root, 'docs/guide.md', original);
-	const cfg = createQualityCfg({ root, sourceRoots: ['.'], extensions: ['.md'] });
-	assert.deepEqual(namingFindings(cfg), []);
+	assert.deepEqual(namingFindings(createQualityCfg({ root, sourceRoots: ['.'], extensions: ['.md'] })), []);
 	assert.equal(fixtureText(root, 'docs/guide.md'), original);
 });
 
@@ -150,14 +149,15 @@ class WithProperty { constructor(readonly destination: string) {} }
 	for (const name of ['publicValue', 'publicFunction', 'PublicClass', 'PublicContract', 'PublicType']) assert.equal(isRenamableDeclaration(declaration(name)), false, name);
 	const param = declaration('parameter');
 	assert.equal(isRenamableDeclaration(param), true);
-	const dest = declaration('destination');
-	assert.equal(isRenamableDeclaration(dest), false);
+	assert.equal(isRenamableDeclaration(declaration('destination')), false);
 	assert.equal(declarationScope(param).kind, ts.SyntaxKind.FunctionDeclaration);
 	assert.equal(declarationScope(declaration('localValue')), file);
 	assert.equal(renameDeclaration(param), 'parameter');
 });
 test('callback declaration APIs classify inline helper, collection, and event-handler callbacks', () => {
-	const src = `
+	const file = ts.createSourceFile(
+		'fixture.tsx',
+		`
 const mapped = values.map((customer, index) => customer.id + index);
 const rendered = problemRendererPair('hint', (block) => <_ProblemHint block={block} />);
 const ordinary = (customer) => customer.id;
@@ -165,8 +165,11 @@ function handle(customer: string) { return customer; }
 const view = <button onClick={(event) => handle(event.type)}>Open</button>;
 const column = { render: (member) => member.signature };
 void [mapped, rendered, ordinary, handle, view, column];
-`;
-	const file = ts.createSourceFile('fixture.tsx', src, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+	`,
+		ts.ScriptTarget.Latest,
+		true,
+		ts.ScriptKind.TSX,
+	);
 	const callbacks = [];
 	/**
 	 *
@@ -190,8 +193,7 @@ void [mapped, rendered, ordinary, handle, view, column];
 test('naming keeps descriptive callback names assigned to object properties', () => {
 	const root = fixtureRoot('terra-quality-object-callback-');
 	fixtureFile(root, 'src/main.ts', 'const spec = { render: (member) => member.signature };\nvoid spec;\n');
-	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
-	assert.deepEqual(namingFindings(cfg), []);
+	assert.deepEqual(namingFindings(createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] })), []);
 });
 test('collection callback names retain domain words and shorten only numeric indexes', () => {
 	const root = fixtureRoot('terra-quality-callback-initials-');
@@ -208,13 +210,12 @@ void [mapped, collided];
 		namingFindings(cfg).map(({ name: n, suggestion: s }) => [n, s]),
 		[['index', 'i']],
 	);
-	const file = ts.createSourceFile('fixture.ts', 'values.map((member, index) => member + index)', ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
 	const params = [];
 	const visit = (node) => {
 		if (ts.isIdentifier(node) && ['member', 'index'].includes(node.text) && ts.isParameter(node.parent)) params.push(node);
 		ts.forEachChild(node, visit);
 	};
-	visit(file);
+	visit(ts.createSourceFile('fixture.ts', 'values.map((member, index) => member + index)', ts.ScriptTarget.Latest, true, ts.ScriptKind.TS));
 	assert.deepEqual(params.map(renameDeclaration), ['member', 'i']);
 });
 test('alias analysis keeps only stable local identifier and type aliases', () => {
@@ -241,9 +242,8 @@ void typedValue;
 `,
 	);
 	fixtureFile(root, 'src/consumer.ts', `import type { LocalAlias } from './main';\nconst value: LocalAlias = { value: true };\nvoid value;\n`);
-	const findings = aliasFindings(createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] }));
 	assert.deepEqual(
-		findings.map((f) => [f.kind, f.name, f.replacement]),
+		aliasFindings(createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] })).map((f) => [f.kind, f.name, f.replacement]),
 		[
 			['const', 'localAlias', 'base'],
 			['type', 'InternalAlias', 'Contract'],
@@ -264,9 +264,8 @@ void [value, shorthand, indexed];
 `,
 	);
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
-	const analysis = createQualityAnalysis(cfg);
 	assert.deepEqual(
-		aliasFindings(cfg, analysis, true).map((f) => f.name),
+		aliasFindings(cfg, createQualityAnalysis(cfg), true).map((f) => f.name),
 		['alias'],
 	);
 	const updated = fixtureText(root, 'src/main.ts');
@@ -292,8 +291,7 @@ current = { value: 3 };
 export const result = [propertySnapshot, elementSnapshot, mutableRootSnapshot, state.value, current.value];
 `,
 	);
-	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
-	assert.deepEqual(aliasFindings(cfg, true), []);
+	assert.deepEqual(aliasFindings(createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] }), true), []);
 	assert.match(fixtureText(root, 'src/main.ts'), /const propertySnapshot = state\.value;/);
 	assert.match(fixtureText(root, 'src/main.ts'), /const elementSnapshot = state\['value'\];/);
 	assert.match(fixtureText(root, 'src/main.ts'), /const mutableRootSnapshot = current;/);
@@ -311,8 +309,7 @@ function read(base: { source: string }) {
 void read;
 `,
 	);
-	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
-	assert.deepEqual(aliasFindings(cfg, true), []);
+	assert.deepEqual(aliasFindings(createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] }), true), []);
 	assert.match(fixtureText(root, 'src/main.ts'), /const alias = base;/);
 	assert.match(fixtureText(root, 'src/main.ts'), /return alias\.source \+ base\.source;/);
 });
@@ -368,9 +365,8 @@ test('naming findings use shared analysis, report severity by replacement kind, 
 	const root = fixtureRoot('terra-quality-naming-');
 	fixtureFile(root, 'src/main.ts', 'const category = true;\nconst activeValue = false;\nconst request = true;\nvoid [category, activeValue, request];\n');
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], protectedIdentifiers: ['request'] });
-	const analysis = createQualityAnalysis(cfg);
 	assert.deepEqual(
-		namingFindings(cfg, analysis).map((f) => [f.name, f.suggestion, f.severity]),
+		namingFindings(cfg, createQualityAnalysis(cfg)).map((f) => [f.name, f.suggestion, f.severity]),
 		[],
 	);
 });
@@ -386,8 +382,7 @@ test('safe naming fixes preserve serialized discriminator values and object keys
 void compareBrightness;
 `;
 	fixtureFile(root, 'src/main.ts', original);
-	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
-	assert.equal(fixNaming(cfg), 1);
+	assert.equal(fixNaming(createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] })), 1);
 	assert.equal(
 		fixtureText(root, 'src/main.ts'),
 		`const compBrightness = (normApiPitchers) => ({
@@ -410,8 +405,7 @@ test('safe naming fixes preserve authored TSDoc while renaming code identifiers'
  */`;
 	const original = `${documentation}\nconst compareBrightness = (normalizesApiPitchers) => normalizesApiPitchers;\nvoid compareBrightness;\n`;
 	fixtureFile(root, 'src/main.ts', original);
-	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
-	assert.equal(fixNaming(cfg), 1);
+	assert.equal(fixNaming(createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] })), 1);
 	const updated = fixtureText(root, 'src/main.ts');
 	assert.ok(updated.startsWith(`${documentation}\n`));
 	assert.equal(updated.slice(0, updated.indexOf('\nconst ')), documentation);

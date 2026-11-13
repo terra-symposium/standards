@@ -23,8 +23,13 @@ HELPERS
  */
 function applyErrBoundaries(): void {
 	if (!existsSync('quality.json') && !existsSync('config/quality.json')) return;
-	const runner = fileURLToPath(new URL('./runner.js', import.meta.url));
-	if (spawnSync(process.execPath, [runner, 'error-boundaries', '--all', '--safe-fix'], { cwd: process.cwd(), env: process.env, stdio: 'inherit' }).status !== 0)
+	if (
+		spawnSync(process.execPath, [fileURLToPath(new URL('./runner.js', import.meta.url)), 'error-boundaries', '--all', '--safe-fix'], {
+			cwd: process.cwd(),
+			env: process.env,
+			stdio: 'inherit',
+		}).status !== 0
+	)
 		throw new Error('Could not apply the configured application error boundaries.');
 }
 
@@ -98,10 +103,9 @@ async function main(): Promise<void> {
 	const args = process.argv.slice(2);
 	const separator = args.indexOf('--');
 	if (separator < 0 || separator === args.length - 1) throw new Error('Usage: terra-quality-dev [--port PORT] -- <dev-server> [arguments...]');
-	const wrapperArgs = args.slice(0, separator);
 	const cmd = args[separator + 1];
 	const cmdArgs = args.slice(separator + 2);
-	const wrapperPort = readPortOption(wrapperArgs);
+	const wrapperPort = readPortOption(args.slice(0, separator));
 	const childPort = readPortOption(cmdArgs);
 	const configuredPort = process.env.DOCS_DEV_PORT ?? process.env.TERRA_DEV_PORT ?? process.env.PORT;
 	const port = configuredPort !== undefined ? Number(configuredPort) : (wrapperPort ?? childPort ?? defaultPort(cmd));

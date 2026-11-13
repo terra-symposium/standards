@@ -173,8 +173,7 @@ function sourceInfos(cfg: QualityCfg): { file: string; text: string; source: ts.
 		.map((f) => {
 			const text = readFileSync(f, 'utf8');
 			const ext = f.slice(f.lastIndexOf('.')).toLowerCase();
-			const scriptKind = ext === '.tsx' || ext === '.jsx' ? ts.ScriptKind.TSX : /\.[cm]?ts$/iu.test(ext) ? ts.ScriptKind.TS : ts.ScriptKind.JS;
-			const source = ts.createSourceFile(f, text, ts.ScriptTarget.Latest, true, scriptKind);
+			const source = ts.createSourceFile(f, text, ts.ScriptTarget.Latest, true, ext === '.tsx' || ext === '.jsx' ? ts.ScriptKind.TSX : /\.[cm]?ts$/iu.test(ext) ? ts.ScriptKind.TS : ts.ScriptKind.JS);
 			return { file: f, text, source, boundaries: importedBoundaries(source), renderSites: reactRootRenders(source) };
 		});
 }
@@ -255,13 +254,15 @@ export function fixErrorBoundaries(cfg: QualityCfg): number {
 				: `${createElementName}(${boundaryName}, { name: 'Application root' }, (${info.text.slice(s.expression.getStart(info.source), s.expression.getEnd())}))`,
 		}));
 		if (needsBoundaryImport || !supportsJsx) {
-			const prefixStatements = info.source.statements.filter((s) => ts.isImportDeclaration(s) || (ts.isExpressionStatement(s) && ts.isStringLiteral(s.expression)));
-			const insertion = prefixStatements.at(-1)?.end ?? 0;
-			const imports = [
-				...(needsBoundaryImport ? [`import { ErrorBoundary as ${boundaryName} } from '${'@terra-symposium/standards-error-boundaries/react'}';`] : []),
-				...(!supportsJsx ? [`import { createElement as ${createElementName} } from 'react';`] : []),
-			].join('\n');
-			edits.push({ start: insertion, end: insertion, text: `${insertion ? '\n' : ''}${imports}\n` });
+			const insertion = info.source.statements.filter((s) => ts.isImportDeclaration(s) || (ts.isExpressionStatement(s) && ts.isStringLiteral(s.expression))).at(-1)?.end ?? 0;
+			edits.push({
+				start: insertion,
+				end: insertion,
+				text: `${insertion ? '\n' : ''}${[
+					...(needsBoundaryImport ? [`import { ErrorBoundary as ${boundaryName} } from '${'@terra-symposium/standards-error-boundaries/react'}';`] : []),
+					...(!supportsJsx ? [`import { createElement as ${createElementName} } from 'react';`] : []),
+				].join('\n')}\n`,
+			});
 		}
 		let text = info.text;
 		for (const edit of edits.sort((l, r) => r.start - l.start)) text = `${text.slice(0, edit.start)}${edit.text}${text.slice(edit.end)}`;
@@ -376,14 +377,13 @@ function fixAstroBoundaryIntegrations(root: string): number {
 		const specifier = astroIntegrationSpecifier(file, root);
 		if (!specifier) continue;
 		const alias = '__terraErrorBoundaryIntegration';
-		const importLine = `import { terraErrorBoundaryIntegration as ${alias} } from '${specifier}';`;
 		if (BINTEGRATIONS_S_S_U_REGEX.test(text)) text = text.replace(BINTEGRATIONS_S_S_U_REGEX, (m) => `${m}${alias}(), `);
 		else {
 			const objectStart = /(?:defineConfig\s*\(\s*|export\s+default\s*)\{/u;
 			if (!objectStart.test(text)) continue;
 			text = text.replace(objectStart, (m) => `${m}\n\tintegrations: [${alias}()],`);
 		}
-		text = `${importLine}\n${text}`;
+		text = `import { terraErrorBoundaryIntegration as ${alias} } from '${specifier}';\n${text}`;
 		writeFileSync(file, text);
 		fixed += 1;
 	}

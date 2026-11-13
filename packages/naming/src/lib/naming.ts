@@ -268,8 +268,6 @@ function callbackKind(n: ts.Identifier): RenameKind | undefined {
 		(n): n is ts.ArrowFunction | ts.FunctionExpression | ts.FunctionDeclaration => ts.isArrowFunction(n) || ts.isFunctionExpression(n) || ts.isFunctionDeclaration(n),
 	);
 	if (!callback) return undefined;
-	const isInlineCallback = !ts.isFunctionDeclaration(callback) && ts.isCallExpression(callback.parent) && callback.parent.arguments.includes(callback as ts.Expression);
-	const isObjectPropertyCallback = !ts.isFunctionDeclaration(callback) && ts.isPropertyAssignment(callback.parent) && callback.parent.initializer === callback;
 	let isNamedCallback = false;
 	if (ts.isFunctionDeclaration(callback) && callback.name) {
 		const scan = (n: ts.Node): void => {
@@ -312,14 +310,21 @@ function callbackKind(n: ts.Identifier): RenameKind | undefined {
 		};
 		scan(callback.parent);
 	}
-	const isJsxCallback = ts.isJsxExpression(callback.parent) && callback.parent.expression === callback && ts.isJsxAttribute(callback.parent.parent);
-	if (!isInlineCallback && !isNamedCallback && !isJsxCallback && !isObjectPropertyCallback) return undefined;
+	if (
+		!(!ts.isFunctionDeclaration(callback) && ts.isCallExpression(callback.parent) && callback.parent.arguments.includes(callback as ts.Expression)) &&
+		!isNamedCallback &&
+		!(ts.isJsxExpression(callback.parent) && callback.parent.expression === callback && ts.isJsxAttribute(callback.parent.parent)) &&
+		!(!ts.isFunctionDeclaration(callback) && ts.isPropertyAssignment(callback.parent) && callback.parent.initializer === callback)
+	)
+		return undefined;
 	for (let parent = callback.parent; parent; parent = parent.parent) {
 		if (!ts.isArrowFunction(parent) && !ts.isFunctionExpression(parent)) continue;
-		const parentIsInline = ts.isCallExpression(parent.parent) && parent.parent.arguments.includes(parent);
-		const parentIsProperty = ts.isPropertyAssignment(parent.parent) && parent.parent.initializer === parent;
-		const parentIsJsx = ts.isJsxExpression(parent.parent) && parent.parent.expression === parent && ts.isJsxAttribute(parent.parent.parent);
-		if (parentIsInline || parentIsProperty || parentIsJsx) return { disabled: true };
+		if (
+			(ts.isCallExpression(parent.parent) && parent.parent.arguments.includes(parent)) ||
+			(ts.isPropertyAssignment(parent.parent) && parent.parent.initializer === parent) ||
+			(ts.isJsxExpression(parent.parent) && parent.parent.expression === parent && ts.isJsxAttribute(parent.parent.parent))
+		)
+			return { disabled: true };
 	}
 	const declarations: ts.Identifier[] = [];
 
@@ -623,8 +628,13 @@ function astroFrontmatter(source: string): { offset: number; source: string } | 
 	let lineStart = offset;
 	while (lineStart <= source.length) {
 		const nextLineEnd = source.indexOf('\n', lineStart);
-		const lineEnd = nextLineEnd < 0 ? source.length : nextLineEnd;
-		if (source.slice(lineStart, lineEnd).replace(R_U_REGEX, '').trim() === '---') return { offset, source: source.slice(offset, lineStart) };
+		if (
+			source
+				.slice(lineStart, nextLineEnd < 0 ? source.length : nextLineEnd)
+				.replace(R_U_REGEX, '')
+				.trim() === '---'
+		)
+			return { offset, source: source.slice(offset, lineStart) };
 		if (nextLineEnd < 0) break;
 		lineStart = nextLineEnd + 1;
 	}
@@ -669,8 +679,7 @@ export function fixNaming(cfg: QualityCfg): number {
 		const frontmatter = astroFrontmatter(readFileSync(absoluteFile, 'utf8'));
 		if (!frontmatter) continue;
 		const virtualFile = `${absoluteFile}.__terra_astro_frontmatter__.ts`;
-		const entry = { file: absoluteFile, virtualFile, offset: frontmatter.offset, source: frontmatter.source };
-		astroByFile.set(absoluteFile, entry);
+		astroByFile.set(absoluteFile, { file: absoluteFile, virtualFile, offset: frontmatter.offset, source: frontmatter.source });
 		virtualFiles.set(resolve(virtualFile), { file: absoluteFile, offset: frontmatter.offset, source: frontmatter.source });
 	}
 	const virtualSources = new Map([...virtualFiles].map(([file, entry]) => [file, entry.source]));
@@ -723,8 +732,13 @@ export function fixNaming(cfg: QualityCfg): number {
 			if (!identifierSpans) {
 				const sourceText = virtual?.source ?? readFileSync(file, 'utf8');
 				identifierSpans = new Set<string>();
-				const kind = /\.(?:tsx|jsx)$/u.test(locationFile) ? ts.ScriptKind.TSX : /\.(?:mjs|cjs|js)$/u.test(locationFile) ? ts.ScriptKind.JS : ts.ScriptKind.TS;
-				const source = ts.createSourceFile(locationFile, sourceText, ts.ScriptTarget.Latest, true, kind);
+				const source = ts.createSourceFile(
+					locationFile,
+					sourceText,
+					ts.ScriptTarget.Latest,
+					true,
+					/\.(?:tsx|jsx)$/u.test(locationFile) ? ts.ScriptKind.TSX : /\.(?:mjs|cjs|js)$/u.test(locationFile) ? ts.ScriptKind.JS : ts.ScriptKind.TS,
+				);
 				const collectIdentifiers = (node: ts.Node): void => {
 					if (ts.isJSDoc(node)) return;
 					if (ts.isIdentifier(node)) {
@@ -865,11 +879,11 @@ export function aliasFindings(cfg: QualityCfg, analysisOrFix: QualityAnalysis | 
 		const visit = (node: ts.Node): void => {
 			if (aliases.some((a) => a.statement === node)) return;
 			if (ts.isIdentifier(node)) {
-				const symbol =
-					ts.isShorthandPropertyAssignment(node.parent) && node.parent.name === node
+				const alias = symbols.get(
+					(ts.isShorthandPropertyAssignment(node.parent) && node.parent.name === node
 						? (checker.getShorthandAssignmentValueSymbol(node.parent) ?? checker.getSymbolAtLocation(node))
-						: checker.getSymbolAtLocation(node);
-				const alias = symbols.get(symbol as ts.Symbol);
+						: checker.getSymbolAtLocation(node)) as ts.Symbol,
+				);
 				if (alias && node !== alias.name) {
 					const visibleTgt = checker.getSymbolsInScope(node, ts.SymbolFlags.Type | ts.SymbolFlags.Value).find((c) => c.name === alias.targetName);
 					if (alias.targetSymbol && visibleTgt !== alias.targetSymbol) {
@@ -890,8 +904,7 @@ export function aliasFindings(cfg: QualityCfg, analysisOrFix: QualityAnalysis | 
 		const sAliases = aliases.filter((a) => !shadowed.has(a) && !chained.has(a));
 		if (!sAliases.length) continue;
 		const sAliasSet = new Set(sAliases);
-		const sEdits = edits.filter((e) => sAliasSet.has(e.alias));
-		edits.splice(0, edits.length, ...sEdits);
+		edits.splice(0, edits.length, ...edits.filter((e) => sAliasSet.has(e.alias)));
 		for (const alias of sAliases) {
 			findings.push({
 				file: displayPath(cfg, src.fileName),

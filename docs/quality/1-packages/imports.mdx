@@ -9,7 +9,7 @@ description: Resolve local imports and detect repeated imports using the shared 
 
 ```sh
 pnpm add -D @terra-symposium/standards-imports
-pnpm exec terra-imports --all --warn
+pnpm exec terra-imports --all
 ```
 
 The CLI reads root `quality.json` or `config/quality.json`; `--config PATH` chooses explicitly. Changed and untracked files are the default scope. `--all` scans the configured source roots, and `--warn` disables fixes.
@@ -21,7 +21,10 @@ The CLI reads root `quality.json` or `config/quality.json`; `--config PATH` choo
 ## API
 
 ```ts
-import { checkImports, duplicateImportFindings } from '@terra-symposium/standards-imports';
+import {
+  checkImports,
+  duplicateImportFindings,
+} from "@terra-symposium/standards-imports";
 ```
 
 Both APIs are available from the declared root export with TypeScript declarations; `./cli` is also exported. See [the config reference](/quality/2-configuration/quality-json/) for path semantics and [CLI workflows](/quality/4-workflows/cli-and-ci/) for common scope choices.

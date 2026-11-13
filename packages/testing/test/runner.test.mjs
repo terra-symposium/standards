@@ -181,11 +181,13 @@ test('consumer-defined suites run once each in manifest order and aggregate into
 	const root = fixtureRoot();
 	const logPath = join(root, 'runs.log');
 	const scriptPath = join(root, 'record.mjs');
-	const manifestPath = join(root, 'tests/terra-tests.json');
 	mkdirSync(join(root, 'tests'), { recursive: true });
 	writeFileSync(scriptPath, `import { appendFileSync } from 'node:fs';\nappendFileSync(${JSON.stringify(logPath)}, process.argv[2] + '\\n');\n`);
 	const names = ['contracts', 'unit', 'custom'];
-	writeFileSync(manifestPath, JSON.stringify({ version: 1, suites: names.map((name) => ({ name, command: process.execPath, args: [scriptPath, name], owns: [`tests/${name}`] })) }));
+	writeFileSync(
+		join(root, 'tests/terra-tests.json'),
+		JSON.stringify({ version: 1, suites: names.map((name) => ({ name, command: process.execPath, args: [scriptPath, name], owns: [`tests/${name}`] })) }),
+	);
 	const previousPath = process.env.GITHUB_EVENT_PATH;
 	const previousName = process.env.GITHUB_EVENT_NAME;
 	delete process.env.GITHUB_EVENT_PATH;
@@ -206,10 +208,10 @@ test('linear-history accepts an ancestor-only pull-request range', () => {
 	const { root, base } = initGitFixture();
 	try {
 		writeFileSync(join(root, 'head.txt'), 'head\n');
-		const head = commit(root, 'head');
-		const event = { pull_request: { base: { ref: 'development', sha: base }, head: { sha: head } } };
-		const result = withGitHubEvent(root, 'pull_request', event, () => runTestPlan({ root }));
-		assert.deepEqual(result, { passed: 1, failed: 0, selected: ['shared:linear-history'] });
+		assert.deepEqual(
+			withGitHubEvent(root, 'pull_request', { pull_request: { base: { ref: 'development', sha: base }, head: { sha: commit(root, 'head') } } }, () => runTestPlan({ root })),
+			{ passed: 1, failed: 0, selected: ['shared:linear-history'] },
+		);
 	} finally {
 		rmSync(root, { recursive: true, force: true });
 	}
@@ -224,10 +226,10 @@ test('linear-history rejects merge commits in a pull-request range', () => {
 		writeFileSync(join(root, 'main.txt'), 'main\n');
 		commit(root, 'main');
 		git(root, 'merge', '--no-edit', 'side');
-		const head = git(root, 'rev-parse', 'HEAD');
-		const event = { pull_request: { base: { ref: 'development', sha: base }, head: { sha: head } } };
-		const result = withGitHubEvent(root, 'pull_request', event, () => runTestPlan({ root }));
-		assert.deepEqual(result, { passed: 0, failed: 1, selected: ['shared:linear-history'] });
+		assert.deepEqual(
+			withGitHubEvent(root, 'pull_request', { pull_request: { base: { ref: 'development', sha: base }, head: { sha: git(root, 'rev-parse', 'HEAD') } } }, () => runTestPlan({ root })),
+			{ passed: 0, failed: 1, selected: ['shared:linear-history'] },
+		);
 	} finally {
 		rmSync(root, { recursive: true, force: true });
 	}

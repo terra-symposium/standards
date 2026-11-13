@@ -33,9 +33,7 @@ REGEX
 
 const FINDINGS_SUMMARY_REGEX = /FINDINGS SUMMARY/;
 const ERR_KNIP_EXPORTS_SRC_MAIN_TS_1_CLIENT_REGEX = /\[ERROR\] knip\/exports: src\/main\.ts:1 Client/;
-const ESLINT_BIN = fileURLToPath(new URL('../../../../config/node_modules/.bin/eslint', import.meta.url));
-const PRETTIER_BIN = fileURLToPath(new URL('../../../../config/node_modules/.bin/prettier', import.meta.url));
-const ESLINT_AVAILABLE = existsSync(ESLINT_BIN);
+const ESLINT_AVAILABLE = existsSync(fileURLToPath(new URL('../../../../config/node_modules/.bin/eslint', import.meta.url)));
 
 /*//////////////////////////////////////////////////
 REGEX
@@ -72,13 +70,12 @@ HELPERS
  * @return Absolute path to the executable command.
  */
 function recordingCmd(root, markerRelativePath = 'command-args.jsonl', cmdRelativePath = 'bin/record-command.mjs') {
-	const marker = join(root, markerRelativePath);
 	return fixtureFile(
 		root,
 		cmdRelativePath,
 		`#!/usr/bin/env node
 import { appendFileSync } from 'node:fs';
-appendFileSync(${JSON.stringify(marker)}, JSON.stringify(process.argv.slice(2)) + '\\n');
+appendFileSync(${JSON.stringify(join(root, markerRelativePath))}, JSON.stringify(process.argv.slice(2)) + '\\n');
 `,
 		0o755,
 	);
@@ -1817,7 +1814,7 @@ async function inspect(page: Page) {
 		root,
 		sourceRoots: ['src'],
 		extensions: ['.ts'],
-		tools: { prettier: PRETTIER_BIN },
+		tools: { prettier: fileURLToPath(new URL('../../../../config/node_modules/.bin/prettier', import.meta.url)) },
 		enabledChecks: {
 			import: false,
 			name: false,

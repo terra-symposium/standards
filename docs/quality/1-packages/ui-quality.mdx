@@ -9,7 +9,7 @@ description: Check JSX accessible names, React display names, client-root bounda
 
 ```sh
 pnpm add -D @terra-symposium/standards-ui-quality
-pnpm exec terra-ui-quality --all --warn
+pnpm exec terra-ui-quality --all
 ```
 
 The CLI uses shared Quality config and scope. `error-boundaries` is mandatory: Terra Quality checks React render roots for a top-level boundary and Astro configuration for the hydration integration, and this check cannot be disabled. `accessibility` and `display-name` remain opt-in through `enabledChecks`; `recommend` uses configured component rules. `--warn` is read-only and prevents the boundary fixer from writing changes.
@@ -17,7 +17,12 @@ The CLI uses shared Quality config and scope. `error-boundaries` is mandatory: T
 ## APIs
 
 ```ts
-import { accessibilityFindings, displayNameFindings, errorBoundaryFindings, uiComponentRecommendations } from '@terra-symposium/standards-ui-quality';
+import {
+  accessibilityFindings,
+  displayNameFindings,
+  errorBoundaryFindings,
+  uiComponentRecommendations,
+} from "@terra-symposium/standards-ui-quality";
 ```
 
 The APIs cover accessible-name evidence and eligible literal fixes, missing display names on supported React patterns, unguarded client-rendered roots, and configured element-to-component recommendations. The package declares `@terra-symposium/standards-error-boundaries` as a peer dependency for its error-boundary source checks; install that runtime package when the application also needs the reusable boundary implementation.

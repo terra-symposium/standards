@@ -16,7 +16,13 @@ const PRUNED_DIRS = new Set(['.cache', '.git', '.next', '.playwright-mcp', '.pnp
  * @return Normalized root, environment, exclusions, and run mode.
  */
 function options(args) {
-	const values = { root: join(homedir(), 'Desktop'), environment: 'kai-macann-all', exclude: new Set(['compression']), dryRun: false, push: true };
+	const values = {
+		root: join(homedir(), 'Desktop'),
+		environment: 'kai-macann-all',
+		exclude: new Set(['compression']),
+		dryRun: false,
+		push: true,
+	};
 	for (let index = 0; index < args.length; index += 1) {
 		const argument = args[index];
 		if (argument === '--root') values.root = args[++index];
@@ -47,8 +53,9 @@ function options(args) {
 async function findRepos(dir) {
 	const entries = await readdir(dir, { withFileTypes: true });
 	if (entries.some((entry) => entry.name === '.git')) return [dir];
-	const children = entries.filter((entry) => entry.isDirectory() && !entry.name.startsWith('.') && !PRUNED_DIRS.has(entry.name.toLowerCase()));
-	const nested = await Promise.all(children.map((entry) => findRepos(join(dir, entry.name))));
+	const nested = await Promise.all(
+		entries.filter((entry) => entry.isDirectory() && !entry.name.startsWith('.') && !PRUNED_DIRS.has(entry.name.toLowerCase())).map((entry) => findRepos(join(dir, entry.name))),
+	);
 	return nested.flat();
 }
 
@@ -75,8 +82,7 @@ async function repoIdentity(root) {
  * @return Instructions to show or submit for this repository.
  */
 function promptFor(repo, options) {
-	const repository = repo.identity.split('/').slice(-2).join('/');
-	return `Read and follow the Terra Standards Quality skill for this repository: ${repository}.${options.push ? '' : ' Do not push.'}`;
+	return `Read and follow the Terra Standards Quality skill for this repository: ${repo.identity.split('/').slice(-2).join('/')}.${options.push ? '' : ' Do not push.'}`;
 }
 
 /**
@@ -104,7 +110,14 @@ function submit(repo, environment, prompt) {
 async function main() {
 	const config = options(process.argv.slice(2));
 	const roots = await findRepos(config.root);
-	const repos = await Promise.all(roots.map(async (root) => ({ root, name: basename(root), identity: await repoIdentity(root), cloudPath: `/workspace/${basename(root)}` })));
+	const repos = await Promise.all(
+		roots.map(async (root) => ({
+			root,
+			name: basename(root),
+			identity: await repoIdentity(root),
+			cloudPath: `/workspace/${basename(root)}`,
+		})),
+	);
 	const selected = repos.filter((repo) => !config.exclude.has(repo.name.toLowerCase()) && !config.exclude.has(repo.identity.split('/').at(-1)?.toLowerCase() ?? ''));
 	if (!selected.length) throw new Error(`No repositories found beneath ${config.root}.`);
 	const duplicateNames = selected.map((repo) => repo.name).filter((name, i, names) => names.indexOf(name) !== i);
@@ -122,8 +135,9 @@ async function main() {
 	try {
 		await execFileAsync('codex', ['cloud', 'list', '--json', '--limit', '1', '--env', config.environment], { encoding: 'utf8' });
 	} catch (err) {
-		const detail = err instanceof Error ? err.message : String(err);
-		throw new Error(`Cannot use Cloud environment "${config.environment}" with the authenticated Codex CLI. No tasks were created. ${detail}`, { cause: err });
+		throw new Error(`Cannot use Cloud environment "${config.environment}" with the authenticated Codex CLI. No tasks were created. ${err instanceof Error ? err.message : String(err)}`, {
+			cause: err,
+		});
 	}
 	const tasks = await Promise.all(selected.map((repo) => submit(repo, config.environment, promptFor(repo, config))));
 	for (const task of tasks) {

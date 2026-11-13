@@ -96,9 +96,13 @@ export function securityFindings(cfg: QualityCfg): SecurityFinding[] {
  */
 function environmentAccess(file: string, text: string): EnvironmentAccess {
 	const ext = file.slice(file.lastIndexOf('.')).toLowerCase();
-	const astroFrontmatter = ext === '.astro' ? (text.match(/^---\s*\r?\n([\s\S]*?)\r?\n---/u)?.[1] ?? '') : text;
-	const kind = ['.tsx', '.jsx', '.astro'].includes(ext) ? ts.ScriptKind.TSX : ['.ts', '.mts', '.cts'].includes(ext) ? ts.ScriptKind.TS : ts.ScriptKind.JS;
-	const source = ts.createSourceFile(file, astroFrontmatter, ts.ScriptTarget.Latest, true, kind);
+	const source = ts.createSourceFile(
+		file,
+		ext === '.astro' ? (text.match(/^---\s*\r?\n([\s\S]*?)\r?\n---/u)?.[1] ?? '') : text,
+		ts.ScriptTarget.Latest,
+		true,
+		['.tsx', '.jsx', '.astro'].includes(ext) ? ts.ScriptKind.TSX : ['.ts', '.mts', '.cts'].includes(ext) ? ts.ScriptKind.TS : ts.ScriptKind.JS,
+	);
 	let readsProcessEnv = false;
 	let loadsEnvFile = false;
 	const stringValue = (node: ts.Expression | undefined): string | undefined => (node && (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) ? node.text : undefined);
@@ -110,9 +114,11 @@ function environmentAccess(file: string, text: string): EnvironmentAccess {
 			if (node.expression.kind === ts.SyntaxKind.ImportKeyword && stringValue(node.arguments[0]) === 'dotenv/config') loadsEnvFile = true;
 			if (ts.isPropertyAccessExpression(node.expression) && node.expression.name.text === 'config') {
 				const receiver = node.expression.expression;
-				const directDotenv = ts.isIdentifier(receiver) && receiver.text === 'dotenv';
-				const requiredDotenv = ts.isCallExpression(receiver) && ts.isIdentifier(receiver.expression) && receiver.expression.text === 'require' && stringValue(receiver.arguments[0]) === 'dotenv';
-				if (directDotenv || requiredDotenv) loadsEnvFile = true;
+				if (
+					(ts.isIdentifier(receiver) && receiver.text === 'dotenv') ||
+					(ts.isCallExpression(receiver) && ts.isIdentifier(receiver.expression) && receiver.expression.text === 'require' && stringValue(receiver.arguments[0]) === 'dotenv')
+				)
+					loadsEnvFile = true;
 			}
 		}
 		ts.forEachChild(node, visit);

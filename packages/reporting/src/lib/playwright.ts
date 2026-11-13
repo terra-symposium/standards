@@ -728,8 +728,7 @@ export default class ProgressReporter {
 			fs.mkdirSync(path.dirname(screenshot), { recursive: true });
 			fs.writeFileSync(screenshot, attachment.body);
 		}
-		const titleParts = testTitleParts(test);
-		const testId = loadTestId(test.location.file, titleParts, this.options.loadTesting.root);
+		const testId = loadTestId(test.location.file, testTitleParts(test), this.options.loadTesting.root);
 		const attachedLoad = loadAttachment(result.attachments);
 		const norm: VisualResult = {
 			...testIdentity(test, test.parent.project()?.name || test.titlePath().find((v) => v.startsWith('root-')) || 'unknown', this.options.viewportCatalog),
@@ -773,8 +772,7 @@ export default class ProgressReporter {
 			}
 			let capturePath = img.path || '';
 			if (!capturePath && img.body) {
-				const ext = capture.contentType === 'image/png' ? 'png' : 'jpg';
-				capturePath = path.resolve('tests/results/playwright-output', `${test.id.replace(A_Z0_9_GI_REGEX(), '-')}-${capture.attachmentName}.${ext}`);
+				capturePath = path.resolve('tests/results/playwright-output', `${test.id.replace(A_Z0_9_GI_REGEX(), '-')}-${capture.attachmentName}.${capture.contentType === 'image/png' ? 'png' : 'jpg'}`);
 				fs.mkdirSync(path.dirname(capturePath), { recursive: true });
 				fs.writeFileSync(capturePath, img.body);
 			}

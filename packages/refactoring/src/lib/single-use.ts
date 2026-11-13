@@ -129,8 +129,7 @@ function singleUseIgnoreDirectives(cfg: QualityCfg, sources: readonly ts.SourceF
 			});
 		}
 		for (const range of [...comments.values()].sort((left, right) => left.pos - right.pos)) {
-			const text = source.text.slice(range.pos, range.end);
-			if (!SINGLE_USE_IGNORE_PREFIX_REGEX.test(text)) continue;
+			if (!SINGLE_USE_IGNORE_PREFIX_REGEX.test(source.text.slice(range.pos, range.end))) continue;
 			const start = range.pos;
 			const line = source.getLineAndCharacterOfPosition(start).line + 1;
 			const attached = candidates
@@ -140,8 +139,7 @@ function singleUseIgnoreDirectives(cfg: QualityCfg, sources: readonly ts.SourceF
 					return S_REGEX.test(source.text.slice(candidate.statement.getEnd(), start));
 				})
 				.sort((left, right) => right.statement.getEnd() - left.statement.getEnd())[0];
-			const directive: SingleUseIgnoreDirective = { source, line };
-			directives.push(directive);
+			directives.push({ source, line });
 			if (attached) byCandidate.add(`${attached.file}:${attached.name.getStart(attached.source)}`);
 		}
 	}
@@ -717,8 +715,7 @@ function isPlaywrightQueryReceiver(type: ts.Type, checker: ts.TypeChecker): bool
 		return (
 			Boolean(symbol && ['Page', 'Locator', 'FrameLocator'].includes(symbol.name)) &&
 			(symbol?.declarations ?? []).some((declaration) => {
-				const file = declaration.getSourceFile().fileName.replaceAll('\\', '/');
-				return /\/node_modules\/(?:playwright-core|playwright|@playwright\/test)\//u.test(file);
+				return /\/node_modules\/(?:playwright-core|playwright|@playwright\/test)\//u.test(declaration.getSourceFile().fileName.replaceAll('\\', '/'));
 			})
 		);
 	});
@@ -868,9 +865,11 @@ function isFirstConsumerEvaluation(reference: ts.Identifier, init: ts.Expression
 	)
 		argumentExpr = argumentExpr.parent;
 	const argumentCall = argumentExpr.parent;
-	const staticCallArgument =
-		isStaticLiteralExpr(init) && ts.isCallExpression(argumentCall) && argumentCall.arguments[0] === argumentExpr && ts.isIdentifier(argumentCall.expression) && !argumentCall.questionDotToken;
-	if ((ts.isArrayLiteralExpression(initBase) || ts.isObjectLiteralExpression(initBase)) && !staticCallArgument) return false;
+	if (
+		(ts.isArrayLiteralExpression(initBase) || ts.isObjectLiteralExpression(initBase)) &&
+		!(isStaticLiteralExpr(init) && ts.isCallExpression(argumentCall) && argumentCall.arguments[0] === argumentExpr && ts.isIdentifier(argumentCall.expression) && !argumentCall.questionDotToken)
+	)
+		return false;
 	const initPreservesReceiver = ts.isPropertyAccessExpression(initBase) || ts.isElementAccessExpression(initBase);
 	while (true) {
 		const parent = expr.parent;

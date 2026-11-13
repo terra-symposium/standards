@@ -7,7 +7,6 @@ import { basename, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 const WORK_WORKTREE_CLONE_I_REGEX = /(?:^|[-_])(work|worktree|clone)(?:$|[-_])/i;
 
-const skillRoot = resolve(fileURLToPath(new URL('..', import.meta.url)));
 const defaultRoot = resolve(process.env.QUALITY_REPO_ROOT || `${homedir()}/Desktop`);
 const ignoredDirNames = new Set(['.git', '.next', '.nuxt', '.turbo', '.venv', '.codex', '.cache', '.pnpm-store', 'build', 'coverage', 'dist', 'node_modules', 'target', 'vendor']);
 const canonicalRemoteAliases = new Map([['github.com/terra-symposium/terra-symposium-website', 'github.com/terra-symposium/website']]);
@@ -20,7 +19,13 @@ const canonicalRemoteAliases = new Map([['github.com/terra-symposium/terra-sympo
  * @return Normalized options for the repository batch.
  */
 function parseArgs(args) {
-	const options = { concurrency: Number.POSITIVE_INFINITY, dryRun: false, env: 'kai-macann-all', root: defaultRoot, skips: [] };
+	const options = {
+		concurrency: Number.POSITIVE_INFINITY,
+		dryRun: false,
+		env: 'kai-macann-all',
+		root: defaultRoot,
+		skips: [],
+	};
 	for (let index = 0; index < args.length; index += 1) {
 		const arg = args[index];
 		if (arg === '--help' || arg === '-h') {
@@ -105,8 +110,7 @@ function remoteIdentity(remote) {
 	const value = remote.trim().toLowerCase();
 	const url = /^[a-z][a-z\d+.-]*:\/\//i.test(value) ? new URL(value) : undefined;
 	const ssh = url ? undefined : value.match(/^(?:[^@]+@)?([^:]+):(.+)$/);
-	const host = url?.port ? `${url.hostname}:${url.port}` : url?.hostname;
-	const norm = (url ? `${host}${url.pathname}` : ssh ? `${ssh[1]}/${ssh[2]}` : value).replace(/\.git$/, '').replace(/\/+$/, '');
+	const norm = (url ? `${url?.port ? `${url.hostname}:${url.port}` : url?.hostname}${url.pathname}` : ssh ? `${ssh[1]}/${ssh[2]}` : value).replace(/\.git$/, '').replace(/\/+$/, '');
 	return canonicalRemoteAliases.get(norm) || norm;
 }
 
@@ -212,7 +216,10 @@ function printHelp() {
  */
 function submitTask(repo, env, prompt) {
 	return new Promise((resolveTask) => {
-		const child = spawn('codex', ['cloud', 'exec', '--env', env, prompt], { cwd: repo, stdio: ['ignore', 'pipe', 'pipe'] });
+		const child = spawn('codex', ['cloud', 'exec', '--env', env, prompt], {
+			cwd: repo,
+			stdio: ['ignore', 'pipe', 'pipe'],
+		});
 		for (const [stream, output] of [
 			['stdout', child.stdout],
 			['stderr', child.stderr],
@@ -242,7 +249,7 @@ async function main() {
 		printHelp();
 		return;
 	}
-	const skillText = await readFile(resolve(skillRoot, 'SKILL.md'), 'utf8');
+	const skillText = await readFile(resolve(fileURLToPath(new URL('..', import.meta.url)), 'SKILL.md'), 'utf8');
 	const found = await findRepos(options.root);
 	const unique = uniqueRepos(found);
 	const repos = unique.filter((repo) => !isSkipped(repo, options.root, options.skips));
@@ -267,8 +274,7 @@ async function main() {
 			if ((await submitTask(repo, options.env, taskPrompt(repo, skillText))) !== 0) failed += 1;
 		}
 	};
-	const workers = Math.min(repos.length, options.concurrency);
-	await Promise.all(Array.from({ length: workers }, worker));
+	await Promise.all(Array.from({ length: Math.min(repos.length, options.concurrency) }, worker));
 	process.stdout.write(`Submitted ${repos.length - failed}/${repos.length} Cloud tasks.\n`);
 	if (failed) process.exitCode = 1;
 }

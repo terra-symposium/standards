@@ -36,7 +36,8 @@
 		"eslint": "config/node_modules/.bin/eslint",
 		"knip": "config/node_modules/.bin/knip",
 		"prettier": "config/node_modules/.bin/prettier",
-		"clang": "clang"
+		"clang": "clang",
+		"uv": "uv"
 	},
 	"oneLineImports": true,
 	"renameExports": true,

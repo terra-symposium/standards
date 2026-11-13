@@ -43,17 +43,15 @@ test('source skip settings normalize and appear in the published schema', () => 
 	assert.deepEqual(cfg.skippedDirectories, ['.build']);
 	assert.deepEqual(cfg.skippedFiles, [join(root, 'src/generated.ts')]);
 	assert.deepEqual(cfg.singleUse?.skippedDirectories, ['src/generated']);
-	const schema = JSON.parse(readFileSync(new URL('../../quality.schema.json', import.meta.url), 'utf8'));
 	assert.deepEqual(
-		Object.keys(schema.properties)
+		Object.keys(JSON.parse(readFileSync(new URL('../../quality.schema.json', import.meta.url), 'utf8')).properties)
 			.filter((k) => ['skippedDirectories', 'skippedFiles', 'singleUse'].includes(k))
 			.sort(),
 		['singleUse', 'skippedDirectories', 'skippedFiles'],
 	);
 });
 test('the published runtime dependency stays within the supported TypeScript API major', () => {
-	const manifest = JSON.parse(readFileSync(new URL('../../package.json', import.meta.url), 'utf8'));
-	assert.equal(manifest.dependencies.typescript, '^5.0.0');
+	assert.equal(JSON.parse(readFileSync(new URL('../../package.json', import.meta.url), 'utf8')).dependencies.typescript, '^5.0.0');
 });
 test('documentation warnings identify missing summary and tag descriptions without generating prose', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-doc-warnings-'));
@@ -206,9 +204,8 @@ test('performance pattern findings are reported as advisory and do not fail qual
 		runQualityCli(cfg, ['quality', '--all', '--skip-commands', '--skip-recommendations', '--report-json', 'quality-report.json']);
 		assert.equal(process.exitCode, 0);
 		assert.ok(errs.some((line) => /Consider precomputing a Map or Set/u.test(line)));
-		const report = JSON.parse(readFileSync(join(root, 'quality-report.json'), 'utf8'));
 		assert.deepEqual(
-			report.checks.find((check) => check.name === 'performance-patterns'),
+			JSON.parse(readFileSync(join(root, 'quality-report.json'), 'utf8')).checks.find((check) => check.name === 'performance-patterns'),
 			{ name: 'performance-patterns', status: 'passed', findings: 0 },
 		);
 		assert.equal(performancePatternFindings(cfg).length, 1);
@@ -267,8 +264,7 @@ test('resolves aliases and extensionless relative imports', () => {
 	mkdirSync(join(root, 'src'), { recursive: true });
 	writeFileSync(join(root, 'src', 'helper.ts'), 'export const ok = true;\n');
 	writeFileSync(join(root, 'src', 'main.ts'), "import { ok } from './helper';\nimport { ok as alias } from '@/helper';\nvoid ok; void alias;\n");
-	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], aliases: { '@/': 'src/' } });
-	assert.deepEqual(checkImports(cfg), []);
+	assert.deepEqual(checkImports(createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], aliases: { '@/': 'src/' } })), []);
 });
 test('does not recommend shape-changing forwarding or persistence payload rewrites', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-object-forwarding-'));
@@ -277,16 +273,14 @@ test('does not recommend shape-changing forwarding or persistence payload rewrit
 		join(root, 'src', 'main.ts'),
 		'send({ organizationId: input.organizationId, userId: input.userId, opportunities: input.opportunities });\nrepo.upsert({ organizationId: input.organizationId, userId: input.userId, opportunities: input.opportunities });\n',
 	);
-	const findings = objectForwardingFindings(createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] }));
-	assert.deepEqual(findings, []);
+	assert.deepEqual(objectForwardingFindings(createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] })), []);
 });
 test('quality accepts individual changed files as scoped source roots', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-file-root-'));
 	mkdirSync(join(root, 'src'));
 	const file = join(root, 'src', 'main.ts');
 	writeFileSync(file, 'const value = true;\n');
-	const cfg = createQualityCfg({ root, sourceRoots: [file], extensions: ['.ts'] });
-	assert.deepEqual(srcFiles(cfg), [file]);
+	assert.deepEqual(srcFiles(createQualityCfg({ root, sourceRoots: [file], extensions: ['.ts'] })), [file]);
 });
 test('source discovery honors configured skips and prunes generated build folders at every depth', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-source-skips-'));
@@ -301,21 +295,24 @@ test('source discovery honors configured skips and prunes generated build folder
 		mkdirSync(dirname(file), { recursive: true });
 		writeFileSync(file, 'export {}\n');
 	}
-	const cfg = createQualityCfg({
-		root,
-		sourceRoots: ['src', 'sanity', skippedDir, nestedBuild, 'target', 'config/.venv', 'scripts/__pycache__'],
-		extensions: ['.js', '.ts'],
-		skippedDirectories: ['.build', 'src/vendor'],
-		skippedFiles: ['src/generated-types.ts'],
-	});
-	assert.deepEqual(srcFiles(cfg), [retained]);
+	assert.deepEqual(
+		srcFiles(
+			createQualityCfg({
+				root,
+				sourceRoots: ['src', 'sanity', skippedDir, nestedBuild, 'target', 'config/.venv', 'scripts/__pycache__'],
+				extensions: ['.js', '.ts'],
+				skippedDirectories: ['.build', 'src/vendor'],
+				skippedFiles: ['src/generated-types.ts'],
+			}),
+		),
+		[retained],
+	);
 });
 test('reports concise-name drift without changing source', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-'));
 	mkdirSync(join(root, 'src'), { recursive: true });
 	writeFileSync(join(root, 'src', 'main.ts'), 'const organization = true;\nvoid organization;\n');
-	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
-	assert.equal(namingFindings(cfg)[0].suggestion, 'org');
+	assert.equal(namingFindings(createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] }))[0].suggestion, 'org');
 });
 test('renames requested words across casing, separators, compounds, plurals, and inflections', () => {
 	const cases = {
@@ -356,8 +353,7 @@ test('renames requested words across casing, separators, compounds, plurals, and
 });
 test('does not rename substrings, protected platform names, or underscore placeholders', () => {
 	for (const name of ['terror', 'deformat', 'repositoryFactory', 'FormData', 'NextResponse', '_']) {
-		const expected = name === 'repositoryFactory' ? 'repoFactory' : name;
-		assert.equal(renameId(name), expected, name);
+		assert.equal(renameId(name), name === 'repositoryFactory' ? 'repoFactory' : name, name);
 	}
 });
 test('does not collapse comment-only blocks before else', () => {
@@ -398,7 +394,9 @@ interface Contract {
 });
 test('collapse preserves comments and whitespace inside strings, templates, and regex literals', () => {
 	const file = join(mkdtempSync(join(tmpdir(), 'terra-quality-collapse-')), 'main.ts');
-	const src = `const commented = {
+	writeFileSync(
+		file,
+		`const commented = {
 	// The comment makes the surrounding object ineligible.
 	url: 'https://example.com/a  b',
 };
@@ -411,8 +409,8 @@ const literals = {
 third  fourth\`,
 	url: 'https://example.com/a  b',
 };
-`;
-	writeFileSync(file, src);
+`,
+	);
 	assert.equal(collapseTypesAndObjects(file), true);
 	assert.equal(
 		readFileSync(file, 'utf8'),
@@ -442,10 +440,9 @@ test('format collapses objects before invoking Prettier', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-format-order-'));
 	const srcRoot = join(root, 'src');
 	mkdirSync(srcRoot);
-	const file = join(srcRoot, 'main.ts');
 	const marker = join(root, 'formatter-ran.txt');
 	const fmt = join(root, 'formatter.mjs');
-	writeFileSync(file, 'const object = {\n value: true,\n};\n');
+	writeFileSync(join(srcRoot, 'main.ts'), 'const object = {\n value: true,\n};\n');
 	writeFileSync(
 		fmt,
 		`#!/usr/bin/env node
@@ -520,8 +517,10 @@ const long = {
 void [short, long];
 `,
 		);
-		const prettier = fileURLToPath(new URL('../../../../config/node_modules/.bin/prettier', import.meta.url));
-		runQualityCli(createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], tools: { prettier } }), ['format', '--all', '--fix']);
+		runQualityCli(
+			createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], tools: { prettier: fileURLToPath(new URL('../../../../config/node_modules/.bin/prettier', import.meta.url)) } }),
+			['format', '--all', '--fix'],
+		);
 		const result = readFileSync(file, 'utf8');
 		assert.match(result, /const short = \{ alpha: true, beta: false,? \};/);
 		assert.match(result, /type Short = \{ alpha: boolean; beta: boolean,? \};/);
@@ -536,8 +535,11 @@ test('formatting leaves documentation comments and section labels agent-owned', 
 	writeFileSync(file, original);
 	assert.equal(maintainSrcFile(root, file), false);
 	assert.equal(readFileSync(file, 'utf8'), original);
-	const prettier = fileURLToPath(new URL('../../../../config/node_modules/.bin/prettier', import.meta.url));
-	runQualityCli(createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], tools: { prettier } }), ['format', '--all', '--fix']);
+	runQualityCli(createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], tools: { prettier: fileURLToPath(new URL('../../../../config/node_modules/.bin/prettier', import.meta.url)) } }), [
+		'format',
+		'--all',
+		'--fix',
+	]);
 	const fmt = readFileSync(file, 'utf8');
 	assert.equal(fmt, '// Keep this human-authored note.\nconst value = { active: true };\n');
 	assert.equal(maintainSrcFile(root, file), false);
@@ -571,8 +573,7 @@ test('alias fixer preserves generic aliases and generic references', () => {
 	const file = join(root, 'src', 'main.ts');
 	const src = `type ArrayOf<T> = Array<T>;\ntype Alias = ArrayOf<string>;\nconst value: ArrayOf<number> = [];\nvoid value;\n`;
 	writeFileSync(file, src);
-	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
-	assert.deepEqual(aliasFindings(cfg, true), []);
+	assert.deepEqual(aliasFindings(createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] }), true), []);
 	assert.equal(readFileSync(file, 'utf8'), src);
 });
 test('naming supports read-only and automatic-fix modes', () => {
@@ -604,7 +605,9 @@ test('naming retains descriptive collection parameters and preserves empty docum
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-callback-initials-fix-'));
 	mkdirSync(join(root, 'src'), { recursive: true });
 	const file = join(root, 'src', 'main.ts');
-	const src = `/**
+	writeFileSync(
+		file,
+		`/**
  *
  * @param member
  * @returns
@@ -612,8 +615,8 @@ test('naming retains descriptive collection parameters and preserves empty docum
 function read(member: string): string { return member; }
 const mapped = records.map((member, index) => member.name + index);
 void [read, mapped];
-`;
-	writeFileSync(file, src);
+`,
+	);
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
 	runQualityCli(cfg, ['naming', '--all', '--fix']);
 	const output = readFileSync(file, 'utf8');
@@ -640,10 +643,9 @@ test('naming autofix preserves object-rest bindings', () => {
 test('naming does not add imports for unresolved inline import types', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-inline-import-type-'));
 	mkdirSync(join(root, 'src/types'), { recursive: true });
-	const types = join(root, 'src/types/docs-page.ts');
 	const file = join(root, 'src/main.ts');
 	const src = "type Cache = import('@lib/types/docs-page').CacheRec;\nexport type Result = Cache;\n";
-	writeFileSync(types, 'export type CacheRec = { value: string };\n');
+	writeFileSync(join(root, 'src/types/docs-page.ts'), 'export type CacheRec = { value: string };\n');
 	writeFileSync(file, src);
 	runQualityCli(createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] }), ['naming', '--all', '--fix']);
 	assert.equal(readFileSync(file, 'utf8'), src);
@@ -950,8 +952,7 @@ test('naming ignores external types, JSX attributes, properties, and exported co
 		join(root, 'src', 'main.tsx'),
 		"export type ResponseRecord = Record<string, string>;\nexport const response = { value: 'ok' };\nconst view = <input aria-current defaultValue={response.value} />;\nvoid view;\n",
 	);
-	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.tsx'] });
-	assert.deepEqual(namingFindings(cfg), []);
+	assert.deepEqual(namingFindings(createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.tsx'] })), []);
 });
 test('naming preserves intrinsic JSX tags when component symbols are unresolved', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-jsx-tags-'));

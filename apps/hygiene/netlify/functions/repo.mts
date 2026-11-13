@@ -57,8 +57,7 @@ export default async function handler(request: Request): Promise<Response> {
 	const requestedPage = Number(url.searchParams.get('commitPage') ?? '1');
 	if (!Number.isSafeInteger(requestedPage) || requestedPage < 1) return Response.json({ error: 'Invalid commit page' }, { status: 400 });
 	const commitTotal = Number((selectedBranch.history_status === 'complete' ? await sql`SELECT count(*) AS total FROM commits WHERE repository_id = ${id} AND branch = ${branch}` : [])[0]?.total ?? 0);
-	const pageCount = Math.max(1, Math.ceil(commitTotal / COMMIT_PAGE_SIZE));
-	const commitPage = Math.min(requestedPage, pageCount);
+	const commitPage = Math.min(requestedPage, Math.max(1, Math.ceil(commitTotal / COMMIT_PAGE_SIZE)));
 	const [commits, lineHistory, latestCommits] =
 		selectedBranch.history_status === 'complete'
 			? await Promise.all([

@@ -64,8 +64,13 @@ async function handle(request: Request): Promise<Response> {
 		)[0] as { history_status: string; history_head: string | null; snapshot_at: string | null } | undefined;
 		if (!state) return new Response('Branch is not enabled', { status: 404 });
 		const snapshotAt = state.snapshot_at ? Date.parse(state.snapshot_at) : 0;
-		const snapshotRequired = state.history_status !== 'complete' || !snapshotAt || Date.now() - snapshotAt >= 7 * 24 * 60 * 60 * 1000;
-		return Response.json({ snapshotRequired, baseSha: state.history_status === 'complete' ? state.history_head : null }, { headers: { 'Cache-Control': 'no-store' } });
+		return Response.json(
+			{
+				snapshotRequired: state.history_status !== 'complete' || !snapshotAt || Date.now() - snapshotAt >= 7 * 24 * 60 * 60 * 1000,
+				baseSha: state.history_status === 'complete' ? state.history_head : null,
+			},
+			{ headers: { 'Cache-Control': 'no-store' } },
+		);
 	}
 	if (request.method !== 'POST') return new Response('Method not allowed', { status: 405 });
 	if (Number(request.headers.get('content-length') ?? 0) > MAX_REPORT_BYTES) return new Response('Report too large', { status: 413 });
