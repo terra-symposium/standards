@@ -46,7 +46,7 @@ function parseArgs(args) {
 				options.skips.push(
 					...value
 						.split(',')
-						.map((item) => item.trim().toLowerCase())
+						.map(item => item.trim().toLowerCase())
 						.filter(Boolean),
 				);
 			if (arg === '--concurrency') {
@@ -77,9 +77,9 @@ async function findRepos(root) {
 			if (err.code === 'ENOENT' || err.code === 'EACCES' || err.code === 'EPERM') return;
 			throw err;
 		}
-		if (entries.some((entry) => entry.name === '.git')) repos.add(dir);
+		if (entries.some(entry => entry.name === '.git')) repos.add(dir);
 		if (depth >= 10) return;
-		await Promise.all(entries.filter((entry) => entry.isDirectory() && !entry.isSymbolicLink() && !ignoredDirNames.has(entry.name)).map((entry) => visit(resolve(dir, entry.name), depth + 1)));
+		await Promise.all(entries.filter(entry => entry.isDirectory() && !entry.isSymbolicLink() && !ignoredDirNames.has(entry.name)).map(entry => visit(resolve(dir, entry.name), depth + 1)));
 	};
 	await visit(root);
 	return [...repos].sort((first, second) => first.localeCompare(second));
@@ -134,7 +134,7 @@ function uniqueRepos(repos) {
 	}
 	return [...groups.values()]
 		.map(
-			(candidates) =>
+			candidates =>
 				candidates.sort((first, second) => {
 					const firstWorktree = first.gitDir === first.commonDir ? 0 : 1;
 					const secondWorktree = second.gitDir === second.commonDir ? 0 : 1;
@@ -160,7 +160,7 @@ function uniqueRepos(repos) {
 function isSkipped(repo, root, skips) {
 	const name = basename(repo).toLowerCase();
 	const path = relative(root, repo).toLowerCase().split(/[\\/]/);
-	return skips.includes(name) || path.some((segment) => skips.includes(segment));
+	return skips.includes(name) || path.some(segment => skips.includes(segment));
 }
 
 /**
@@ -215,7 +215,7 @@ function printHelp() {
  * @return Exit code from the Cloud command, or `1` when it cannot start.
  */
 function submitTask(repo, env, prompt) {
-	return new Promise((resolveTask) => {
+	return new Promise(resolveTask => {
 		const child = spawn('codex', ['cloud', 'exec', '--env', env, prompt], {
 			cwd: repo,
 			stdio: ['ignore', 'pipe', 'pipe'],
@@ -224,17 +224,17 @@ function submitTask(repo, env, prompt) {
 			['stdout', child.stdout],
 			['stderr', child.stderr],
 		]) {
-			output.on('data', (chunk) => {
+			output.on('data', chunk => {
 				for (const line of chunk.toString().split(/(?<=\n)/)) {
 					if (line) process[stream].write(`[${basename(repo)}] ${line}`);
 				}
 			});
 		}
-		child.on('error', (err) => {
+		child.on('error', err => {
 			process.stderr.write(`[${basename(repo)}] ${err.message}\n`);
 			resolveTask(1);
 		});
-		child.on('close', (code) => resolveTask(code ?? 1));
+		child.on('close', code => resolveTask(code ?? 1));
 	});
 }
 
@@ -252,10 +252,10 @@ async function main() {
 	const skillText = await readFile(resolve(fileURLToPath(new URL('..', import.meta.url)), 'SKILL.md'), 'utf8');
 	const found = await findRepos(options.root);
 	const unique = uniqueRepos(found);
-	const repos = unique.filter((repo) => !isSkipped(repo, options.root, options.skips));
+	const repos = unique.filter(repo => !isSkipped(repo, options.root, options.skips));
 	if (!repos.length) throw new Error(`No repositories found under ${options.root} after exclusions`);
-	const missingRemotes = repos.filter((repo) => !gitValue(repo, ['remote', 'get-url', 'origin']));
-	if (missingRemotes.length) throw new Error(`Cannot provision Cloud tasks without an origin remote:\n${missingRemotes.map((repo) => `- ${relative(options.root, repo)}`).join('\n')}`);
+	const missingRemotes = repos.filter(repo => !gitValue(repo, ['remote', 'get-url', 'origin']));
+	if (missingRemotes.length) throw new Error(`Cannot provision Cloud tasks without an origin remote:\n${missingRemotes.map(repo => `- ${relative(options.root, repo)}`).join('\n')}`);
 	process.stdout.write(
 		`Selected ${repos.length} unique repositories under ${options.root}; skipped ${unique.length - repos.length} by request and collapsed ${found.length - unique.length} duplicate worktrees or remotes.\n`,
 	);

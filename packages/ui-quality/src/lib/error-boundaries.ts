@@ -169,8 +169,8 @@ function reactRootRenders(source: ts.SourceFile): RenderSite[] {
  */
 function sourceInfos(cfg: QualityCfg): { file: string; text: string; source: ts.SourceFile; boundaries: Set<string>; renderSites: RenderSite[] }[] {
 	return srcFiles(cfg)
-		.filter((f) => SOURCE_EXTS.has(f.slice(f.lastIndexOf('.')).toLowerCase()))
-		.map((f) => {
+		.filter(f => SOURCE_EXTS.has(f.slice(f.lastIndexOf('.')).toLowerCase()))
+		.map(f => {
 			const text = readFileSync(f, 'utf8');
 			const ext = f.slice(f.lastIndexOf('.')).toLowerCase();
 			const source = ts.createSourceFile(f, text, ts.ScriptTarget.Latest, true, ext === '.tsx' || ext === '.jsx' ? ts.ScriptKind.TSX : /\.[cm]?ts$/iu.test(ext) ? ts.ScriptKind.TS : ts.ScriptKind.JS);
@@ -226,7 +226,7 @@ export function errorBoundaryFindings(cfg: QualityCfg): ErrorBoundaryFinding[] {
 export function fixErrorBoundaries(cfg: QualityCfg): number {
 	let fixedFiles = fixAstroBoundaryIntegrations(cfg.root);
 	for (const info of sourceInfos(cfg)) {
-		const unguarded = info.renderSites.filter((s) => !isBoundaryExpr(s.expression, info.boundaries));
+		const unguarded = info.renderSites.filter(s => !isBoundaryExpr(s.expression, info.boundaries));
 		if (!unguarded.length || !FIXABLE_EXTS.has(info.file.slice(info.file.lastIndexOf('.')).toLowerCase())) continue;
 		const ext = info.file.slice(info.file.lastIndexOf('.')).toLowerCase();
 		const supportsJsx = ext === '.jsx' || ext === '.tsx';
@@ -246,7 +246,7 @@ export function fixErrorBoundaries(cfg: QualityCfg): number {
 		const needsBoundaryImport = info.boundaries.size === 0;
 		const boundaryName = info.boundaries.values().next().value ?? uniqueName('TerraRootErrorBoundary');
 		const createElementName = supportsJsx ? '' : uniqueName('terraCreateElement');
-		const edits = unguarded.map((s) => ({
+		const edits = unguarded.map(s => ({
 			start: s.expression.getStart(info.source),
 			end: s.expression.getEnd(),
 			text: supportsJsx
@@ -254,7 +254,7 @@ export function fixErrorBoundaries(cfg: QualityCfg): number {
 				: `${createElementName}(${boundaryName}, { name: 'Application root' }, (${info.text.slice(s.expression.getStart(info.source), s.expression.getEnd())}))`,
 		}));
 		if (needsBoundaryImport || !supportsJsx) {
-			const insertion = info.source.statements.filter((s) => ts.isImportDeclaration(s) || (ts.isExpressionStatement(s) && ts.isStringLiteral(s.expression))).at(-1)?.end ?? 0;
+			const insertion = info.source.statements.filter(s => ts.isImportDeclaration(s) || (ts.isExpressionStatement(s) && ts.isStringLiteral(s.expression))).at(-1)?.end ?? 0;
 			edits.push({
 				start: insertion,
 				end: insertion,
@@ -340,7 +340,7 @@ function astroIntegrationSpecifier(configFile: string, root: string): string | u
 	if (!packageJson) return;
 	const dependencies = [packageJson.dependencies, packageJson.devDependencies, packageJson.peerDependencies].filter((value): value is Record<string, unknown> => !!value && typeof value === 'object');
 	for (const name of ['@terra-symposium/standards-error-boundaries', '@terra-symposium/standards-quality']) {
-		if (!dependencies.some((group) => typeof group[name] === 'string')) continue;
+		if (!dependencies.some(group => typeof group[name] === 'string')) continue;
 		const parts = name.split('/');
 		let installedPath: string | undefined;
 		for (let dir = packageRoot; dir === root || dir.startsWith(`${root}/`); dir = dirname(dir)) {
@@ -377,11 +377,11 @@ function fixAstroBoundaryIntegrations(root: string): number {
 		const specifier = astroIntegrationSpecifier(file, root);
 		if (!specifier) continue;
 		const alias = '__terraErrorBoundaryIntegration';
-		if (BINTEGRATIONS_S_S_U_REGEX.test(text)) text = text.replace(BINTEGRATIONS_S_S_U_REGEX, (m) => `${m}${alias}(), `);
+		if (BINTEGRATIONS_S_S_U_REGEX.test(text)) text = text.replace(BINTEGRATIONS_S_S_U_REGEX, m => `${m}${alias}(), `);
 		else {
 			const objectStart = /(?:defineConfig\s*\(\s*|export\s+default\s*)\{/u;
 			if (!objectStart.test(text)) continue;
-			text = text.replace(objectStart, (m) => `${m}\n\tintegrations: [${alias}()],`);
+			text = text.replace(objectStart, m => `${m}\n\tintegrations: [${alias}()],`);
 		}
 		text = `import { terraErrorBoundaryIntegration as ${alias} } from '${specifier}';\n${text}`;
 		writeFileSync(file, text);

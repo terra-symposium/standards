@@ -258,7 +258,7 @@ function combine(states: NameState[]): NameState {
 function contentState(element: ElementRef, forLabel = false): NameState {
 	const children = childrenOf(element);
 	if (!children.length) return 'empty';
-	return combine(children.map((c) => childContentState(c, forLabel)));
+	return combine(children.map(c => childContentState(c, forLabel)));
 }
 
 /**
@@ -280,7 +280,7 @@ function childContentState(child: ts.JsxChild, forLabel: boolean): NameState {
 	}
 	if (ts.isJsxElement(child)) return elementContentState(child, forLabel);
 	if (ts.isJsxSelfClosingElement(child)) return elementContentState(child, forLabel);
-	if (ts.isJsxFragment(child)) return combine(child.children.map((n) => childContentState(n, forLabel)));
+	if (ts.isJsxFragment(child)) return combine(child.children.map(n => childContentState(n, forLabel)));
 	return 'unknown';
 }
 
@@ -357,7 +357,7 @@ function idContentStates(source: ts.SourceFile): Map<string, NameState> {
 								return alt.state === 'static' ? 'named' : alt.state === 'unknown' ? 'unknown' : 'empty';
 							}
 							if (staticAttr(attrOf(element, 'aria-labelledby')).state !== 'empty') return 'unknown';
-							return combine(childrenOf(element).map((c) => childContentState(c, false)));
+							return combine(childrenOf(element).map(c => childContentState(c, false)));
 						})(node),
 					);
 			}
@@ -392,7 +392,7 @@ function associatedLabels(source: ts.SourceFile): Map<string, NameState> {
 			}
 		}
 		const currentHidden = hidden || ((ts.isJsxElement(node) || ts.isJsxSelfClosingElement(node)) && hiddenState(node) !== 'empty');
-		ts.forEachChild(node, (c) => visit(c, currentHidden));
+		ts.forEachChild(node, c => visit(c, currentHidden));
 	};
 	visit(source, false);
 	return labels;
@@ -473,7 +473,7 @@ function decorativeIcons(element: ElementRef): ElementRef[] {
 			const ownName = ariaNameState(node);
 			const title = literalTitle(attrOf(node, 'title'));
 			const hidden = hiddenState(node);
-			const hasUncertainAttrs = attrsOf(node).properties.some(ts.isJsxSpreadAttribute) || ['focusable', 'tabIndex'].some((n) => attrOf(node, n));
+			const hasUncertainAttrs = attrsOf(node).properties.some(ts.isJsxSpreadAttribute) || ['focusable', 'tabIndex'].some(n => attrOf(node, n));
 			if (role.state === 'empty' && ownName === 'empty' && title.state === 'empty' && contentState(node) === 'empty' && hidden === 'empty' && !hasUncertainAttrs) icons.push(node);
 			return;
 		}
@@ -532,7 +532,7 @@ function inspectFile(cfg: QualityCfg, file: string, parsed: ts.SourceFile): { fi
 								if (value.state !== 'static') return value.state;
 								const references = value.value.trim().split(/\s+/).filter(Boolean);
 								if (!references.length) return 'empty';
-								return combine(references.map((i) => ids.get(i) ?? 'empty'));
+								return combine(references.map(i => ids.get(i) ?? 'empty'));
 							})(node, ids)
 						: ariaLabel;
 				const name = ariaName === 'empty' ? elementNameState(node, kind, labels, nestedLabel) : { state: ariaName, iconOnly: false };
@@ -567,10 +567,10 @@ function inspectFile(cfg: QualityCfg, file: string, parsed: ts.SourceFile): { fi
 					}
 				}
 			}
-			ts.forEachChild(node, (c) => visit(c, currentHidden, childLabel));
+			ts.forEachChild(node, c => visit(c, currentHidden, childLabel));
 			return;
 		}
-		ts.forEachChild(node, (c) => visit(c, hidden, nestedLabel));
+		ts.forEachChild(node, c => visit(c, hidden, nestedLabel));
 	};
 	visit(parsed, false, 'empty');
 	return { findings, candidates, decorativeCandidates };
@@ -585,7 +585,7 @@ function inspectFile(cfg: QualityCfg, file: string, parsed: ts.SourceFile): { fi
  * @return Configured source files whose extensions support JSX parsing.
  */
 function sourceFiles(cfg: QualityCfg, analysis?: QualityAnalysis): string[] {
-	return (analysis?.files ?? srcFiles(cfg)).filter((f) => JSX_EXTS.test(f));
+	return (analysis?.files ?? srcFiles(cfg)).filter(f => JSX_EXTS.test(f));
 }
 
 /**
@@ -615,7 +615,7 @@ PUBLIC API
  * @return Accessible-name findings with a flag for title-based fixes that can be applied safely.
  */
 export function accessibilityFindings(cfg: QualityCfg, analysis?: QualityAnalysis): AccessibilityFinding[] {
-	return sourceFiles(cfg, analysis).flatMap((f) => {
+	return sourceFiles(cfg, analysis).flatMap(f => {
 		const { parsed } = sourceFor(f, analysis);
 		return inspectFile(cfg, f, parsed).findings;
 	});
@@ -635,7 +635,7 @@ export function fixAccessibleNames(cfg: QualityCfg): { fixed: number } {
 		const { text, parsed } = sourceFor(file);
 		const { candidates, decorativeCandidates } = inspectFile(cfg, file, parsed);
 		if (!candidates.length && !decorativeCandidates.length) continue;
-		const edits: { start: number; end: number; text: string }[] = candidates.map((c) => {
+		const edits: { start: number; end: number; text: string }[] = candidates.map(c => {
 			const text = `aria-label=${c.title.source}`;
 			if (c.emptyAriaLabel) return { start: c.emptyAriaLabel.getStart(c.parsed), end: c.emptyAriaLabel.end, text };
 			const attrs = c.opening.attributes;

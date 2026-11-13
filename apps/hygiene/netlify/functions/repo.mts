@@ -50,7 +50,7 @@ export default async function handler(request: Request): Promise<Response> {
 	if (request.method !== 'GET') return new Response('Method not allowed', { status: 405 });
 	const branches = await sql`SELECT name, enabled, history_head, history_count, history_status, history_updated_at FROM branches WHERE repository_id = ${id} ORDER BY name`;
 	const branch = url.searchParams.get('branch') ?? 'main';
-	const selectedBranch = branches.find((r) => r.name === branch && r.enabled) as { history_status: string; history_count: number } | undefined;
+	const selectedBranch = branches.find(r => r.name === branch && r.enabled) as { history_status: string; history_count: number } | undefined;
 	if (!selectedBranch) return Response.json({ error: 'Branch not tracked' }, { status: 404 });
 	const runs =
 		await sql`SELECT run_id, run_attempt, head_sha, completed_at, conclusion, run_source AS source, quality_policy_branch, tests_passed, tests_failed, tests_skipped, checks_enabled, checks_total, checks_clean, quality_findings FROM runs WHERE repository_id = ${id} AND branch = ${branch} ORDER BY completed_at DESC LIMIT 300`;

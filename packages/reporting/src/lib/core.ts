@@ -118,7 +118,7 @@ export const diagnosticCount = (value: string): number => (value ? value.split('
  * @return A complete status-to-count map.
  */
 export const statusCounts = (results: readonly VisualResult[]): Record<VisualStatus, number> => {
-	const counts = Object.fromEntries(VISUAL_STATUSES.map((s) => [s, 0])) as Record<VisualStatus, number>;
+	const counts = Object.fromEntries(VISUAL_STATUSES.map(s => [s, 0])) as Record<VisualStatus, number>;
 	for (const result of results) counts[result.status] += 1;
 	return counts;
 };
@@ -131,10 +131,10 @@ export const statusCounts = (results: readonly VisualResult[]): Record<VisualSta
  * @return Unique feature-file names in report order.
  */
 export const orderedFiles = (run: ReportRun): string[] => [
-	...run.featureFiles.filter((f) => run.results.some((r) => r.file === f)),
+	...run.featureFiles.filter(f => run.results.some(r => r.file === f)),
 	...run.results
-		.map((r) => r.file)
-		.filter((f) => !run.featureFiles.includes(f))
+		.map(r => r.file)
+		.filter(f => !run.featureFiles.includes(f))
 		.filter((f, i, v) => v.indexOf(f) === i),
 ];
 
@@ -146,4 +146,4 @@ export const orderedFiles = (run: ReportRun): string[] => [
  *
  * @return Results associated with the requested feature file.
  */
-export const resultsForFile = (run: ReportRun, file: string): VisualResult[] => run.results.filter((r) => r.file === file);
+export const resultsForFile = (run: ReportRun, file: string): VisualResult[] => run.results.filter(r => r.file === file);

@@ -14,37 +14,37 @@ The CLI reads `quality.json` from the current working directory. Use `pnpm exec 
 The phase diagram makes the aggregate contract visible: select scope and checks, run in fixed phase order, then report all findings and the final status.
 
 <Nodes
-  direction="LR"
-  nodes={[
-    {
-      id: "scope",
-      type: "origin",
-      data: { title: "Select changed files or --all" },
-    },
-    {
-      id: "format",
-      type: "process",
-      data: { title: "Format and static checks" },
-    },
-    { id: "tests", type: "process", data: { title: "Tests and type checks" } },
-    {
-      id: "build",
-      type: "process",
-      data: { title: "Build and repository health" },
-    },
-    {
-      id: "report",
-      type: "terminal",
-      data: { title: "Findings and exit status" },
-    },
-  ]}
-  edges={[
-    { id: "scope-format", source: "scope", target: "format" },
-    { id: "format-tests", source: "format", target: "tests" },
-    { id: "tests-build", source: "tests", target: "build" },
-    { id: "build-report", source: "build", target: "report" },
-  ]}
-  height={230}
+	direction='LR'
+	nodes={[
+		{
+			id: 'scope',
+			type: 'origin',
+			data: { title: 'Select changed files or --all' },
+		},
+		{
+			id: 'format',
+			type: 'process',
+			data: { title: 'Format and static checks' },
+		},
+		{ id: 'tests', type: 'process', data: { title: 'Tests and type checks' } },
+		{
+			id: 'build',
+			type: 'process',
+			data: { title: 'Build and repository health' },
+		},
+		{
+			id: 'report',
+			type: 'terminal',
+			data: { title: 'Findings and exit status' },
+		},
+	]}
+	edges={[
+		{ id: 'scope-format', source: 'scope', target: 'format' },
+		{ id: 'format-tests', source: 'format', target: 'tests' },
+		{ id: 'tests-build', source: 'tests', target: 'build' },
+		{ id: 'build-report', source: 'build', target: 'report' },
+	]}
+	height={230}
 />
 
 ## Choose a run mode
@@ -91,8 +91,7 @@ Terra Quality owns the full-run order: **Format → Static quality → Tests →
 
 In interactive terminals, each full-run check shows an animated spinner while work is in progress. After completion, its findings appear as a bullet list directly beneath its status.
 
-=== [Dead-code safety details]
-The dead-code phase keeps edits and verification separate. Safe fixes scan Knip import consumers, ESLint unused declarations, and single-use declarations/references, classify candidates, and apply only proven changes. Verification checks unused-file/export/dependency reachability, final ESLint and single-use findings, and TypeScript safety.
+=== [Dead-code safety details] The dead-code phase keeps edits and verification separate. Safe fixes scan Knip import consumers, ESLint unused declarations, and single-use declarations/references, classify candidates, and apply only proven changes. Verification checks unused-file/export/dependency reachability, final ESLint and single-use findings, and TypeScript safety.
 
 # All findings are listed in stable order and fail quality; later configured checks still run before the command returns failure.
 
@@ -184,9 +183,9 @@ A repository should expose one canonical quality script and pass scope or report
 
 ```json
 {
-  "scripts": {
-    "quality": "terra-quality quality"
-  }
+	"scripts": {
+		"quality": "terra-quality quality"
+	}
 }
 ```
 

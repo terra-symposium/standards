@@ -30,6 +30,7 @@ tests/results/
 
 # Local deployment state
 .netlify
+!docs/.netlify
 
 # Vendored dependencies
 vendor/
@@ -37,3 +38,6 @@ vendor/
 
 # Local error logs
 error.log
+
+# Generated test reports
+**/tests/results/

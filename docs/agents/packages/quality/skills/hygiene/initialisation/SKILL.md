@@ -15,40 +15,25 @@ Initialize the repository's commit-time quality gate and semantic version workfl
 
 ## Husky pre-commit check
 
-For a Node repository without Husky, add a package-manager-compatible Husky dependency and a
-`prepare` script that invokes `husky`. Register the hook through the repository's package manager.
+For a Node repository without Husky, add a package-manager-compatible Husky dependency and a `prepare` script that invokes `husky`. Register the hook through the repository's package manager.
 
-Create `.husky/pre-commit` with the repository's existing, non-mutating static quality or type
-check. Prefer a focused command that does not run tests, contact external services, or rewrite
-files. If no suitable local check exists, use `git diff --cached --check`.
+Create `.husky/pre-commit` with the repository's existing, non-mutating static quality or type check. Prefer a focused command that does not run tests, contact external services, or rewrite files. If no suitable local check exists, use `git diff --cached --check`.
 
-Preserve every existing hook command and its safeguards. When updating an old Husky installation,
-remove only obsolete Husky bootstrap lines; keep the hook body intact and migrate `prepare` and
-dependency together.
+Preserve every existing hook command and its safeguards. When updating an old Husky installation, remove only obsolete Husky bootstrap lines; keep the hook body intact and migrate `prepare` and dependency together.
 
-Do not add commit-message policy, test suites, format-on-commit, or release automation unless the
-user asks for those behaviors.
+Do not add commit-message policy, test suites, format-on-commit, or release automation unless the user asks for those behaviors.
 
 ## Changesets version tracking
 
-If the repository has no established versioning convention in its package versions, release tags,
-changelog, or release workflows, use Changesets for Node packages. Add `@changesets/cli`, a
-`changeset` command, a `version-packages` command that runs `changeset version`, and
-`.changeset/config.json`.
+If the repository has no established versioning convention in its package versions, release tags, changelog, or release workflows, use Changesets for Node packages. Add `@changesets/cli`, a `changeset` command, a `version-packages` command that runs `changeset version`, and `.changeset/config.json`.
 
-Set `baseBranch` from the repository's verified release/default branch. Preserve existing package
-versions and workspace definitions. Version only packages that the package manager recognizes; do
-not add workspace members just to make nested projects versionable.
+Set `baseBranch` from the repository's verified release/default branch. Preserve existing package versions and workspace definitions. Version only packages that the package manager recognizes; do not add workspace members just to make nested projects versionable.
 
-Configure private package versioning only when private packages are intended to receive semver
-updates. Keep private package tagging disabled unless the user requests release tags. Preserve the
-repository's public/private publish access settings.
+Configure private package versioning only when private packages are intended to receive semver updates. Keep private package tagging disabled unless the user requests release tags. Preserve the repository's public/private publish access settings.
 
-If a version is missing, determine a credible initial version from release tags, published versions,
-or an established sibling package. Ask before guessing when no reliable baseline exists.
+If a version is missing, determine a credible initial version from release tags, published versions, or an established sibling package. Ask before guessing when no reliable baseline exists.
 
-Do not add a publish command or release workflow as part of versioning setup. Do not run `changeset
-publish`, package publication, or any remote release action.
+Do not add a publish command or release workflow as part of versioning setup. Do not run `changeset publish`, package publication, or any remote release action.
 
 ## Validate
 

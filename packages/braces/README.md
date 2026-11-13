@@ -8,23 +8,15 @@ Vendored braces source preserved for repository use.
 
 Brace patterns make globs more powerful by adding the ability to match specific ranges and sequences of characters.
 
-**Accurate** - complete support for the [Bash 4.3 Brace Expansion](www.gnu.org/software/bash/)
-specification (passes all of the Bash braces tests)
+**Accurate** - complete support for the [Bash 4.3 Brace Expansion](www.gnu.org/software/bash/) specification (passes all of the Bash braces tests)
 
-**[fast and performant](#benchmarks)** - Starts fast, runs fast and [scales well](#performance) as
-patterns increase in complexity.
+**[fast and performant](#benchmarks)** - Starts fast, runs fast and [scales well](#performance) as patterns increase in complexity.
 
-**Organized code base** - The parser and compiler are easy to maintain and update when edge cases
-crop up.
+**Organized code base** - The parser and compiler are easy to maintain and update when edge cases crop up.
 
-**Well-tested** - Thousands of test assertions, and passes all of the Bash, minimatch, and
-[brace-expansion](https://github.com/juliangruber/brace-expansion) unit tests (as of the date this
-was written).
+**Well-tested** - Thousands of test assertions, and passes all of the Bash, minimatch, and [brace-expansion](https://github.com/juliangruber/brace-expansion) unit tests (as of the date this was written).
 
-**Safer** - You shouldn't have to worry about users defining aggressive or malicious brace patterns
-that can break your application. Braces takes measures to prevent malicious regex that can be used
-for DDoS attacks (see [catastrophic
-backtracking](https://www.regular-expressions.info/catastrophic.html)).
+**Safer** - You shouldn't have to worry about users defining aggressive or malicious brace patterns that can break your application. Braces takes measures to prevent malicious regex that can be used for DDoS attacks (see [catastrophic backtracking](https://www.regular-expressions.info/catastrophic.html)).
 
 - [Supports lists](#lists) - (aka "sets") `a/{b,c}/d` => `['a/b/d', 'a/c/d']`
 - [Supports sequences](#sequences) - (aka "ranges") `{01..03}` => `['01', '02', '03']`
@@ -115,11 +107,9 @@ The main export is a function that takes one or more brace `patterns` and `optio
 
 ## Credits and license
 
-console.log(braces(['{01..05}', '{a..e}']));
-//=> ['(0[1-5])', '([a-e])']
+console.log(braces(['{01..05}', '{a..e}'])); //=> ['(0[1-5])', '([a-e])']
 
-console.log(braces(['{01..05}', '{a..e}'], { expand: true }));
-//=> ['01', '02', '03', '04', '05', 'a', 'b', 'c', 'd', 'e']
+console.log(braces(['{01..05}', '{a..e}'], { expand: true })); //=> ['01', '02', '03', '04', '05', 'a', 'b', 'c', 'd', 'e']
 
 ````
 
@@ -462,11 +452,9 @@ Although brace patterns offer a user-friendly way of matching ranges or sets of 
 
 - brace expansion can eat up a huge amount of processing resources
 
-as brace patterns increase _linearly in size_, the system resources required to expand the pattern
-increase exponentially
+as brace patterns increase _linearly in size_, the system resources required to expand the pattern increase exponentially
 
-users can accidentally (or intentially) exhaust your system's resources resulting in the equivalent
-of a DoS attack (bonus: no programming knowledge is required!)
+users can accidentally (or intentially) exhaust your system's resources resulting in the equivalent of a DoS attack (bonus: no programming knowledge is required!)
 
 For a more detailed explanation with examples, see the [geometric complexity](#geometric-complexity) section.
 
@@ -614,7 +602,7 @@ _(the following results were generated using `braces.expand()` and `minimatch.br
 | `{1..10}`       | `20 B` (487μs)              | `20 B` (72μs)                |
 | `{1..3}`        | `5 B` (166μs)               | `5 B` (27μs)                 |
 
-If you'd like to run these comparisons yourself, see [test/support/generate.js](test/support/generate.js).
+If you'd like to run these comparisons yourself, see [tests/support/generate.js](tests/support/generate.js).
 
 ## Deployment and operations
 

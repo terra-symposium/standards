@@ -10,12 +10,9 @@ Use for browser tests in an authorized Terra Codex Cloud task. Apply the reposit
 ## Preflight
 
 1. Fetch the connected usage allowance before every Cloud run.
-2. Dispatch when `ordinaryUsageAllowed` is true.
-   Empty reset credits alone do not block work.
+2. Dispatch when `ordinaryUsageAllowed` is true. Empty reset credits alone do not block work.
 3. Record the usage account ID. Do not require a Cloud UI ID match.
-4. If the limit is exhausted, explain the shared allowance.
-   Ask the user to switch accounts.
-   Wait for confirmation, then fetch usage again and reverify access.
+4. If the limit is exhausted, explain the shared allowance. Ask the user to switch accounts. Wait for confirmation, then fetch usage again and reverify access.
 5. Never switch accounts or edit auth caches automatically.
 6. Verify the repo, environment, branch, and task before dispatch or resume.
 7. Read the task's current executor readiness and enforced network policy.
@@ -35,8 +32,7 @@ The shared environment supplies reviewed test setup and service access, not repo
 
 ## Report
 
-Record the account ID, task URL, revision, branch, SHA, commands, results, and cleanup.
-Report authentication, usage, and environment-access failures separately.
+Record the account ID, task URL, revision, branch, SHA, commands, results, and cleanup. Report authentication, usage, and environment-access failures separately.
 
 ## Terra Symposium website environment
 

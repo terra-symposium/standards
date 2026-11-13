@@ -5,7 +5,7 @@
 			"name": "standards-workspace",
 			"command": "node",
 			"args": ["packages/quality/dist/app/workspace-test-runner.js"],
-			"owns": ["packages/*/test/**/*", "apps/hygiene/test/**/*"]
+			"owns": ["packages/*/tests/**/*", "apps/hygiene/tests/**/*"]
 		}
 	]
 }

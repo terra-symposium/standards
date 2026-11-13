@@ -27,8 +27,8 @@ export default async function handler(request: Request): Promise<Response> {
 		request.headers
 			.get('cookie')
 			?.split(';')
-			.map((p) => p.trim())
-			.find((p) => p.startsWith('terra_hygiene_state='))
+			.map(p => p.trim())
+			.find(p => p.startsWith('terra_hygiene_state='))
 			?.split('=')[1] ?? '';
 	if (!state || !equalSecret(state, saved)) return new Response('Invalid sign-in state', { status: 400 });
 	const code = url.searchParams.get('code');

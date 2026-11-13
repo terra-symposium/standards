@@ -49,16 +49,11 @@ The model is fixed in `_openai.ts` (`gpt-4o-mini`, `gpt-image-1` for topic cover
 
 ## What gets written
 
-**Topic:** reused when one matches by id, title (case-insensitive) or base slug. Otherwise the AI
-writes the title and description and a cover image is generated. A topic that passes validation
-(title, slug, image, description of 80–100 characters) is published with a Sanity-generated `_id`.
-Otherwise it's saved as `drafts.<uuid>` and handed to Studio finalize.
+**Topic:** reused when one matches by id, title (case-insensitive) or base slug. Otherwise the AI writes the title and description and a cover image is generated. A topic that passes validation (title, slug, image, description of 80–100 characters) is published with a Sanity-generated `_id`. Otherwise it's saved as `drafts.<uuid>` and handed to Studio finalize.
 
 - **Arc:** same match-or-create rule. Problems are generated **only if the arc ends up published**.
 
-**Problems:** title-only stubs are created published first, then filled. A problem that fails
-validation becomes a draft, and its published title-only stub stays alongside it. The run finishes
-by writing `arc.graph.arc`.
+**Problems:** title-only stubs are created published first, then filled. A problem that fails validation becomes a draft, and its published title-only stub stays alongside it. The run finishes by writing `arc.graph.arc`.
 
 - Re-running reuses matched topics, arcs and problem stubs rather than duplicating them.
 
@@ -71,24 +66,17 @@ by writing `arc.graph.arc`.
    - `/dashboard/create/<arcId>` shows the arc with its problems, taken from `graph.arc`.
    - `/dashboard/classes/<topicId>` and `/dashboard/schedule` show the topic with its arcs.
 
-`/dashboard/problem/<ref>` takes a **room id**, not a problem id. Open problems through the arc
-instead.
+`/dashboard/problem/<ref>` takes a **room id**, not a problem id. Open problems through the arc instead.
 
 ## Gotchas
 
-`--project=root-generation` without a file filter also runs `generation.spec.ts`. That brings in the
-Maintenance driver (patches `definition` documents), the Preset driver for every state, and the Leaf
-driver (starts `mcp.ts`, which imports the missing `_coverage`/`_heal` modules).
+`--project=root-generation` without a file filter also runs `generation.spec.ts`. That brings in the Maintenance driver (patches `definition` documents), the Preset driver for every state, and the Leaf driver (starts `mcp.ts`, which imports the missing `_coverage`/`_heal` modules).
 
-The `OpenAI Driver` tests in `generation.spec.ts` catch their errors and only warn, so they **pass
-even when generation fails**. Don't use them as evidence.
+The `OpenAI Driver` tests in `generation.spec.ts` catch their errors and only warn, so they **pass even when generation fails**. Don't use them as evidence.
 
-The Gemini describes in `generation.spec.ts` (`Topic Driver`, `Arc Driver`, `Problem Driver`) drive
-the gemini.google.com UI. `root-generation` has no `storageState`, and Gemini topics can't produce a
-cover image, so treat that path as unsupported.
+The Gemini describes in `generation.spec.ts` (`Topic Driver`, `Arc Driver`, `Problem Driver`) drive the gemini.google.com UI. `root-generation` has no `storageState`, and Gemini topics can't produce a cover image, so treat that path as unsupported.
 
-`generation.spec.ts`'s `setupWorker` errors mention `tests/_config.json`. The real file is
-`scripts/generation/_config.json`.
+`generation.spec.ts`'s `setupWorker` errors mention `tests/_config.json`. The real file is `scripts/generation/_config.json`.
 
 ## Checklist
 
@@ -100,8 +88,7 @@ cover image, so treat that path as unsupported.
 
 ## Related
 
-`docs/implementation-plans/ai-generation-schema-conformance.md`: schema conformance status and the
-reference live run.
+`docs/implementation-plans/ai-generation-schema-conformance.md`: schema conformance status and the reference live run.
 
 - The shared `gem` skill's `references/provider-modes.md`: OpenAI vs Gemini provider behaviour.
 - `scripts/generation/content.ts`: `Topic`, `Arc`, `Problem`.

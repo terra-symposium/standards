@@ -124,7 +124,7 @@ const officeColor = (value: string): string => value.replace(/^#/, '').toUpperCa
 const hexColor = (channels: string): string =>
 	`#${channels
 		.split(' ')
-		.map((c) => Math.round(Number(c)).toString(16).padStart(2, '0'))
+		.map(c => Math.round(Number(c)).toString(16).padStart(2, '0'))
 		.join('')}`;
 /**
  * Creates the low-saturation report palette from Styling's shared hue generator.
@@ -226,7 +226,7 @@ const fitImg = (width: number, height: number, x: number, y: number, maxWidth: n
 const previewImg = async (file: string, viewportSize: string): Promise<{ data: string; height: number; width: number }> => {
 	const metadata = await sharp(file).metadata();
 	const width = metadata.width || 1;
-	const [viewportWidth, viewportHeight] = viewportSize.split('×').map((v) => Number.parseInt(v, 10));
+	const [viewportWidth, viewportHeight] = viewportSize.split('×').map(v => Number.parseInt(v, 10));
 	const height = Math.min(metadata.height || 1, Math.max(1, viewportWidth && viewportHeight ? Math.round((width * viewportHeight) / viewportWidth) : Math.round(width / 0.38)));
 	return { data: `data:image/png;base64,${(await sharp(file).extract({ height, left: 0, top: 0, width }).png().toBuffer()).toString('base64')}`, height, width };
 };
@@ -264,9 +264,9 @@ const slideCopy = (r: VisualResult, review: ImgReview): string => {
 		`${r.project} · ${r.viewport} · ${r.viewportSize}`,
 		r.groups || r.file,
 		`Status: ${r.status}${r.duration ? ` · ${r.duration} ms` : ''}${grade ? ` · Load: ${grade}` : ''}`,
-		...measurements.map((i) => `Load ${i.kind}: ${i.name} — ${i.durationMs.toFixed(1)} ms (${i.grade}; warn ${i.budget.warnMs} / fail ${i.budget.failMs} ms)`),
+		...measurements.map(i => `Load ${i.kind}: ${i.name} — ${i.durationMs.toFixed(1)} ms (${i.grade}; warn ${i.budget.warnMs} / fail ${i.budget.failMs} ms)`),
 		'',
-		...review.cues.map((c) => `• ${c}`),
+		...review.cues.map(c => `• ${c}`),
 	];
 	if (r.error) lines.push('', `Test error: ${r.error}`);
 	if (r.browserErrors) lines.push('', `Browser: ${r.browserErrors}`);
@@ -360,7 +360,7 @@ export const readScreenshotCapturesFromDirectory = (dir: string, currentRunId?: 
 		if (currentRunIds.has(run.runId) && Array.isArray(run.expectedCaptureGroups))
 			currentCaptureGroups = new Map(
 				run.expectedCaptureGroups
-					.filter((i) => i && typeof i.group === 'string' && Array.isArray(i.viewports) && i.viewports.every((viewport) => typeof viewport === 'string'))
+					.filter(i => i && typeof i.group === 'string' && Array.isArray(i.viewports) && i.viewports.every(viewport => typeof viewport === 'string'))
 					.map(({ group: g, viewports: v }) => [g, new Set(v)]),
 			);
 	} catch {
@@ -385,7 +385,7 @@ export const readScreenshotCapturesFromDirectory = (dir: string, currentRunId?: 
 			const viewport = capture.viewport;
 			const screenshot = path.isAbsolute(capture.screenshot)
 				? capture.screenshot
-				: [path.resolve(dir, capture.screenshot), path.resolve(capture.screenshot)].find((candidate) => fs.existsSync(candidate));
+				: [path.resolve(dir, capture.screenshot), path.resolve(capture.screenshot)].find(candidate => fs.existsSync(candidate));
 			if (!screenshot || !fs.existsSync(screenshot)) return [];
 			const captureRunId = typeof capture.runId === 'string' ? capture.runId : undefined;
 			const currentTest =
@@ -422,7 +422,7 @@ export const readScreenshotCapturesFromDirectory = (dir: string, currentRunId?: 
  * @param colors Palette used for the summary slide's background and text.
  */
 const addLoadSummarySlide = (presentation: Presentation, results: readonly VisualResult[], colors: ReportColors): void => {
-	const measurements: LoadRow[] = results.flatMap((r) => (r.loadMeasurements || []).map((measurement) => ({ result: r, measurement })));
+	const measurements: LoadRow[] = results.flatMap(r => (r.loadMeasurements || []).map(measurement => ({ result: r, measurement })));
 	const counts = loadGradeCounts(measurements.map(({ measurement: m }) => m));
 	const slowest = [...measurements].sort((a, b) => b.measurement.durationMs - a.measurement.durationMs).slice(0, 6);
 	const slide = presentation.addSlide();
@@ -455,7 +455,7 @@ const addLoadSummarySlide = (presentation: Presentation, results: readonly Visua
  * @return Number of detail slides added.
  */
 const addLoadDetailSlides = (presentation: Presentation, results: readonly VisualResult[], colors: ReportColors): number => {
-	const measurements: LoadRow[] = results.flatMap((r) => (r.loadMeasurements || []).map((measurement) => ({ result: r, measurement })));
+	const measurements: LoadRow[] = results.flatMap(r => (r.loadMeasurements || []).map(measurement => ({ result: r, measurement })));
 	const pageSize = 12;
 	const pages = Math.max(1, Math.ceil(measurements.length / pageSize));
 	for (let page = 0; page < pages; page += 1) {
@@ -493,7 +493,7 @@ const addLoadDetailSlides = (presentation: Presentation, results: readonly Visua
  * @return A promise that resolves after the slideshow has been written.
  */
 export const writeSlideshow = async (file: string, results: readonly VisualResult[], opts: SlideshowOptions = {}): Promise<void> => {
-	const loadEnabled = opts.loadTestingEnabled ?? results.some((r) => !!r.loadMeasurements?.length);
+	const loadEnabled = opts.loadTestingEnabled ?? results.some(r => !!r.loadMeasurements?.length);
 	const brand = createDocumentBrand();
 	const colors = reportColors(brand);
 	const presentation = new /* The runtime package is CommonJS while NodeNext exposes its constructor through a namespace type. */ (require('pptxgenjs') as new () => Presentation)();
@@ -652,17 +652,17 @@ const readScreenshotCapturesFromDirTree = (root: string, opts: ScreenshotSlidesh
 		const sourcePath = path.relative(root, dir);
 		const sourceName = sourcePath ? sourcePath.split(path.sep)[0] : '';
 		const prefix = sourceName ? `${sourceName} · ` : '';
-		const local = readScreenshotCapturesFromDirectory(dir, isRoot ? opts.currentRunId : opts.currentRunIdsBySource?.[sourceName]).map((c) => ({
+		const local = readScreenshotCapturesFromDirectory(dir, isRoot ? opts.currentRunId : opts.currentRunIdsBySource?.[sourceName]).map(c => ({
 			...c,
 			group: `${prefix}${c.group}`,
 			key: sourceName ? `${sourceName}:${c.key}` : c.key,
 			title: `${prefix}${c.title}`,
 		}));
 		const nested = entries
-			.filter((e) => !['.git', 'node_modules'].includes(e.name))
-			.filter((e) => e.isDirectory() || e.isSymbolicLink())
+			.filter(e => !['.git', 'node_modules'].includes(e.name))
+			.filter(e => e.isDirectory() || e.isSymbolicLink())
 			.sort((f, s) => f.name.localeCompare(s.name))
-			.flatMap((e) => {
+			.flatMap(e => {
 				const child = path.join(dir, e.name);
 				try {
 					return fs.statSync(child).isDirectory() ? read(child) : [];
@@ -682,7 +682,7 @@ const readScreenshotCapturesFromDirTree = (root: string, opts: ScreenshotSlidesh
  * @param opts Presentation metadata and optional run selection.
  */
 export const writeScreenshotSlideshowFromDirectory = async (dir: string, file: string, opts: ScreenshotSlideshowOptions = {}): Promise<void> => {
-	const captures = readScreenshotCapturesFromDirTree(dir, opts).filter((c) => {
+	const captures = readScreenshotCapturesFromDirTree(dir, opts).filter(c => {
 		if (opts.currentRunId) return c.runId === opts.currentRunId && !c.historical;
 		const sourceName = c.group.includes(' · ') ? c.group.slice(0, c.group.indexOf(' · ')) : '';
 		const currentRunIds = opts.currentRunIdsBySource?.[sourceName];
@@ -701,8 +701,8 @@ export const writeScreenshotSlideshowFromDirectory = async (dir: string, file: s
 export const writeScreenshotSlideshowFromDirectories = async (file: string, sources: readonly ScreenshotDirectorySource[], opts: ScreenshotSlideshowOptions = {}): Promise<void> => {
 	const captures = sources.flatMap(({ label: l, directory: d, runId: r }) =>
 		readScreenshotCapturesFromDirectory(d, r)
-			.filter((capture) => !r || capture.runId === r)
-			.map((capture) => ({ ...capture, group: `${l}/${capture.group}`, key: `${l}/${capture.key}`, title: `${l} · ${capture.title}` })),
+			.filter(capture => !r || capture.runId === r)
+			.map(capture => ({ ...capture, group: `${l}/${capture.group}`, key: `${l}/${capture.key}`, title: `${l} · ${capture.title}` })),
 	);
 	await writeScreenshotSlideshow(file, captures, opts);
 };

@@ -11,10 +11,10 @@
 		"out": "dist/docs"
 	},
 	"scripts": {
-		"build": "cd .. && pnpm -r --filter '@terra-symposium/standards-quality...' build && pnpm --filter @terra-symposium/standards-error-boundaries build && pnpm -r build",
+		"build": "cd .. && pnpm -r --filter '!@terra-symposium/standards' --filter '!standards-workspace-adapter' build",
 		"test": "cd .. && node packages/testing/src/cli.mjs run --manifest config/terra-tests.json",
-		"quality": "cd .. && uv run --locked node scripts/quality.mjs quality",
-		"quality:all": "cd .. && uv run --locked node scripts/quality.mjs quality --all",
+		"quality": "node \"$(git rev-parse --show-toplevel)/scripts/quality-runner.mjs\" quality",
+		"quality:all": "node \"$(git rev-parse --show-toplevel)/scripts/quality-runner.mjs\" quality --all",
 		"docs": "cd .. && node config/scripts/build-docs.mjs --dev",
 		"docs:build": "cd .. && node config/scripts/build-docs.mjs",
 		"prepare": "cd .. && husky config/husky",

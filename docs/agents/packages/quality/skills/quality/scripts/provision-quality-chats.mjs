@@ -52,9 +52,9 @@ function options(args) {
  */
 async function findRepos(dir) {
 	const entries = await readdir(dir, { withFileTypes: true });
-	if (entries.some((entry) => entry.name === '.git')) return [dir];
+	if (entries.some(entry => entry.name === '.git')) return [dir];
 	const nested = await Promise.all(
-		entries.filter((entry) => entry.isDirectory() && !entry.name.startsWith('.') && !PRUNED_DIRS.has(entry.name.toLowerCase())).map((entry) => findRepos(join(dir, entry.name))),
+		entries.filter(entry => entry.isDirectory() && !entry.name.startsWith('.') && !PRUNED_DIRS.has(entry.name.toLowerCase())).map(entry => findRepos(join(dir, entry.name))),
 	);
 	return nested.flat();
 }
@@ -95,14 +95,14 @@ function promptFor(repo, options) {
  * @return Promise resolving with the child process result.
  */
 function submit(repo, environment, prompt) {
-	return new Promise((resolveTask) => {
+	return new Promise(resolveTask => {
 		console.log(`[${repo.name}] submitting`);
 		const child = spawn('codex', ['cloud', 'exec', '-c', 'model="gpt-6-luna"', '--env', environment, prompt], { stdio: ['ignore', 'pipe', 'pipe'] });
 		let output = '';
-		child.stdout.setEncoding('utf8').on('data', (chunk) => (output += chunk));
-		child.stderr.setEncoding('utf8').on('data', (chunk) => (output += chunk));
-		child.on('error', (err) => resolveTask({ repository: repo, error: err }));
-		child.on('close', (code) => resolveTask({ repository: repo, code, output: output.trim() }));
+		child.stdout.setEncoding('utf8').on('data', chunk => (output += chunk));
+		child.stderr.setEncoding('utf8').on('data', chunk => (output += chunk));
+		child.on('error', err => resolveTask({ repository: repo, error: err }));
+		child.on('close', code => resolveTask({ repository: repo, code, output: output.trim() }));
 	});
 }
 
@@ -111,16 +111,16 @@ async function main() {
 	const config = options(process.argv.slice(2));
 	const roots = await findRepos(config.root);
 	const repos = await Promise.all(
-		roots.map(async (root) => ({
+		roots.map(async root => ({
 			root,
 			name: basename(root),
 			identity: await repoIdentity(root),
 			cloudPath: `/workspace/${basename(root)}`,
 		})),
 	);
-	const selected = repos.filter((repo) => !config.exclude.has(repo.name.toLowerCase()) && !config.exclude.has(repo.identity.split('/').at(-1)?.toLowerCase() ?? ''));
+	const selected = repos.filter(repo => !config.exclude.has(repo.name.toLowerCase()) && !config.exclude.has(repo.identity.split('/').at(-1)?.toLowerCase() ?? ''));
 	if (!selected.length) throw new Error(`No repositories found beneath ${config.root}.`);
-	const duplicateNames = selected.map((repo) => repo.name).filter((name, i, names) => names.indexOf(name) !== i);
+	const duplicateNames = selected.map(repo => repo.name).filter((name, i, names) => names.indexOf(name) !== i);
 	if (duplicateNames.length) throw new Error(`Cloud checkout names are ambiguous: ${[...new Set(duplicateNames)].join(', ')}`);
 
 	if (config.dryRun) {
@@ -139,14 +139,14 @@ async function main() {
 			cause: err,
 		});
 	}
-	const tasks = await Promise.all(selected.map((repo) => submit(repo, config.environment, promptFor(repo, config))));
+	const tasks = await Promise.all(selected.map(repo => submit(repo, config.environment, promptFor(repo, config))));
 	for (const task of tasks) {
 		console.log(`\n[${task.repository.name}]`);
 		if (task.output) console.log(task.output);
 		if (task.error) console.error(task.error.message);
 		else if (task.code !== 0) console.error(`Cloud submission exited with ${task.code}.`);
 	}
-	if (tasks.some((task) => task.error || task.code !== 0)) process.exitCode = 1;
+	if (tasks.some(task => task.error || task.code !== 0)) process.exitCode = 1;
 }
 
 try {

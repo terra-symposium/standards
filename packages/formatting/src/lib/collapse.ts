@@ -19,6 +19,24 @@ CONFIG
 
 const SUPPORTED = new Set(['.cjs', '.cts', '.js', '.jsx', '.mjs', '.mts', '.ts', '.tsx']);
 
+/**
+ * Captures non-whitespace tokens so a layout rewrite cannot change source code.
+ *
+ * @param text Source text to tokenize.
+ * @param variant Language variant for the TypeScript scanner.
+ *
+ * @return The token kinds and original token text.
+ */
+function sourceTokens(text: string, variant: ts.LanguageVariant): string[] {
+	const scanner = ts.createScanner(ts.ScriptTarget.Latest, false, variant, text);
+	const tokens: string[] = [];
+	for (let kind = scanner.scan(); kind !== ts.SyntaxKind.EndOfFileToken; kind = scanner.scan()) {
+		if (kind === ts.SyntaxKind.WhitespaceTrivia || kind === ts.SyntaxKind.NewLineTrivia) continue;
+		tokens.push(`${kind}:${scanner.getTokenText()}`);
+	}
+	return tokens;
+}
+
 /*//////////////////////////////////////////////////
 HELPERS
 //////////////////////////////////////////////////*/
@@ -70,7 +88,7 @@ export function collapseTypesAndObjects(fileName: string): boolean {
 	// ENVIRONMENT
 	if (!SUPPORTED.has(extname(fileName))) return false;
 	const original = readFileSync(fileName, 'utf8');
-	const parsed = ts.createSourceFile(fileName, original, ts.ScriptTarget.Latest, true, sourceKind(fileName));
+	const parsed = ts.createSourceFile(fileName, original, ts.ScriptTarget.Latest, true, sourceKind(fileName)) as ts.SourceFile & { parseDiagnostics: readonly ts.Diagnostic[] };
 	const edits: { start: number; end: number; text: string }[] = [];
 
 	// HELPERS
@@ -110,7 +128,7 @@ export function collapseTypesAndObjects(fileName: string): boolean {
 		 *
 		 * @return Whether the offset belongs to a string, template, regex, or JSX text span.
 		 */
-		const isProtected = (pos: number): boolean => protectedRanges.some((r) => pos >= r.start && pos < r.end);
+		const isProtected = (pos: number): boolean => protectedRanges.some(r => pos >= r.start && pos < r.end);
 		const scanner = ts.createScanner(ts.ScriptTarget.Latest, false, parsed.languageVariant, text);
 		let result = '';
 		let whitespace = false;
@@ -151,6 +169,11 @@ export function collapseTypesAndObjects(fileName: string): boolean {
 	if (!edits.length) return false;
 	const n = edits.sort((a, b) => b.start - a.start).reduce((t, e) => `${t.slice(0, e.start)}${e.text}${t.slice(e.end)}`, original);
 	if (n === original) return false;
+	if (JSON.stringify(sourceTokens(original, parsed.languageVariant)) !== JSON.stringify(sourceTokens(n, parsed.languageVariant))) return false;
+	const rewritten = ts.createSourceFile(fileName, n, ts.ScriptTarget.Latest, true, sourceKind(fileName)) as ts.SourceFile & { parseDiagnostics: readonly ts.Diagnostic[] };
+	const diagnostics = (file: typeof parsed): string[] => file.parseDiagnostics.map(d => `${d.code}:${ts.flattenDiagnosticMessageText(d.messageText, ' ')}`);
+	const prior = diagnostics(parsed);
+	if (diagnostics(rewritten).some(message => !prior.includes(message))) return false;
 	writeFileSync(fileName, n);
 	return true;
 }

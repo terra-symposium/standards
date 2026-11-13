@@ -35,7 +35,7 @@ HELPERS
 export function createQualityAnalysis(cfg: QualityCfg): { files: string[]; texts: Map<string, string>; sources: Map<string, ts.SourceFile>; program: ts.Program; checker: ts.TypeChecker } {
 	const files = srcFiles(cfg);
 	const program = ts.createProgram({
-		rootNames: files.filter((f) => /\.(?:c|m)?(?:js|jsx|ts|tsx)$/.test(f)),
+		rootNames: files.filter(f => /\.(?:c|m)?(?:js|jsx|ts|tsx)$/.test(f)),
 		options: {
 			allowNonTsExtensions: true,
 			allowJs: true,
@@ -49,8 +49,8 @@ export function createQualityAnalysis(cfg: QualityCfg): { files: string[]; texts
 	});
 	return {
 		files,
-		texts: new Map(files.map((f) => [f, readFileSync(f, 'utf8')])),
-		sources: new Map(files.map((f) => [f, program.getSourceFile(f)]).filter((e): e is [string, ts.SourceFile] => Boolean(e[1]))),
+		texts: new Map(files.map(f => [f, readFileSync(f, 'utf8')])),
+		sources: new Map(files.map(f => [f, program.getSourceFile(f)]).filter((e): e is [string, ts.SourceFile] => Boolean(e[1]))),
 		program,
 		checker: program.getTypeChecker(),
 	};

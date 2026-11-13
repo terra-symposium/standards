@@ -35,7 +35,7 @@ function parseArgs(args) {
 		} else if (flag === '--suites' && value) {
 			options.suites = value
 				.split(',')
-				.map((name) => name.trim())
+				.map(name => name.trim())
 				.filter(Boolean);
 			index++;
 		} else if (flag === '--shared-only') {

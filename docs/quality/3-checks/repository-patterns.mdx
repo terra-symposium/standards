@@ -106,7 +106,7 @@ For example, configure a repeated bespoke button class as a forbidden pattern:
 **Before** — the flagged pattern appears in the source:
 
 ```tsx
-<button className="legacy-button">Save</button>
+<button className='legacy-button'>Save</button>
 ```
 
 **After** — replace it with the repository's approved shared primitive (illustrative API):
@@ -132,9 +132,24 @@ The default names and imports follow the common shadcn layout. Configure `uiReco
 	"uiRecommendations": {
 		"rules": [
 			{ "element": "button", "component": "Button", "import": "@/components/ui/button" },
-			{ "element": "input", "component": "Input", "import": "@/components/ui/input", "types": ["text", "search", "email"] },
-			{ "element": "a", "component": "ButtonLink", "import": "@/components/ui/button", "when": "button-like" },
-			{ "element": "a", "component": "ButtonLink", "import": "@/components/ui/button", "when": "text-link" }
+			{
+				"element": "input",
+				"component": "Input",
+				"import": "@/components/ui/input",
+				"types": ["text", "search", "email"]
+			},
+			{
+				"element": "a",
+				"component": "ButtonLink",
+				"import": "@/components/ui/button",
+				"when": "button-like"
+			},
+			{
+				"element": "a",
+				"component": "ButtonLink",
+				"import": "@/components/ui/button",
+				"when": "text-link"
+			}
 		],
 		"ignoredDirectories": ["src/components/ui"]
 	}

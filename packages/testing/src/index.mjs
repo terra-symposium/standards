@@ -42,7 +42,7 @@ HELPERS
  */
 function listTestFiles(root) {
 	const files = [];
-	const visit = (dir) => {
+	const visit = dir => {
 		for (const entry of readdirSync(dir, { withFileTypes: true })) {
 			if (entry.name === 'node_modules' || entry.name === '.git') continue;
 			const path = resolve(dir, entry.name);
@@ -211,7 +211,7 @@ export function validateTestPlan(value, root) {
 		if (names.has(suite.name)) throw new Error(`Duplicate test suite name: ${suite.name}`);
 		names.add(suite.name);
 		if (typeof suite.command !== 'string' || suite.command.trim() === '') throw new Error(`Test suite ${suite.name} must name a command.`);
-		if (suite.args !== undefined && (!Array.isArray(suite.args) || suite.args.some((arg) => typeof arg !== 'string'))) throw new Error(`Test suite ${suite.name} args must be strings.`);
+		if (suite.args !== undefined && (!Array.isArray(suite.args) || suite.args.some(arg => typeof arg !== 'string'))) throw new Error(`Test suite ${suite.name} args must be strings.`);
 		const args = /** @type {string[]} */ (suite.args ?? []);
 		const cwd = typeof suite.cwd === 'string' ? suite.cwd : '.';
 		const absoluteCwd = resolve(root, cwd);
@@ -219,21 +219,21 @@ export function validateTestPlan(value, root) {
 		const cmdKey = JSON.stringify([suite.command, args, relative(resolve(root), absoluteCwd)]);
 		if (cmds.has(cmdKey)) throw new Error(`Duplicate test command in suite ${suite.name}; each command must run once.`);
 		cmds.add(cmdKey);
-		if (!Array.isArray(suite.owns) || suite.owns.some((owner) => typeof owner !== 'string' || owner.trim() === ''))
+		if (!Array.isArray(suite.owns) || suite.owns.some(owner => typeof owner !== 'string' || owner.trim() === ''))
 			throw new Error(`Test suite ${suite.name} owns must be a list of non-empty repository-relative file globs.`);
 		for (const owner of /** @type {string[]} */ (suite.owns ?? [])) {
 			const norm = owner.replaceAll('\\', '/').replace(/\/+$/u, '');
 			if (!norm || isAbsolute(norm) || norm === '..' || norm.startsWith('../') || norm.split('/').includes('..')) throw new Error(`Test suite ${suite.name} has an invalid owner: ${owner}`);
 			if (owners.has(norm)) throw new Error(`Test ownership overlaps: ${norm} is claimed by ${owners.get(norm)} and ${suite.name}.`);
 			owners.set(norm, suite.name);
-			for (const file of testFiles.filter((path) => globRegex(norm).test(path))) {
+			for (const file of testFiles.filter(path => globRegex(norm).test(path))) {
 				const previous = ownedFiles.get(file);
 				if (previous) throw new Error(`Test file ownership overlaps: ${file} is claimed by ${previous} and ${suite.name}.`);
 				ownedFiles.set(file, suite.name);
 			}
 		}
 	}
-	const omitted = testFiles.filter((file) => !ownedFiles.has(file));
+	const omitted = testFiles.filter(file => !ownedFiles.has(file));
 	if (omitted.length) throw new Error(`Test files are not owned by any suite: ${omitted.join(', ')}`);
 }
 
@@ -250,9 +250,9 @@ export function validateTestPlan(value, root) {
 export function runTestPlan({ root, manifest, suites: requested = [], sharedOnly = false }) {
 	const absoluteRoot = resolve(root);
 	const allSuites = /** @type {Array<{name: string, command: string, args?: string[], cwd?: string}>} */ ((sharedOnly ? emptyTestPlan : readTestPlan(absoluteRoot, manifest)).suites);
-	const selected = sharedOnly ? [] : requested.length ? allSuites.filter((suite) => requested.includes(suite.name)) : allSuites;
-	const known = new Set(allSuites.map((suite) => suite.name));
-	const unknown = requested.filter((name) => !known.has(name));
+	const selected = sharedOnly ? [] : requested.length ? allSuites.filter(suite => requested.includes(suite.name)) : allSuites;
+	const known = new Set(allSuites.map(suite => suite.name));
+	const unknown = requested.filter(name => !known.has(name));
 	if (unknown.length) throw new Error(`Unknown test suite${unknown.length === 1 ? '' : 's'}: ${unknown.join(', ')}`);
 	let passed = 0;
 	let failed = 0;

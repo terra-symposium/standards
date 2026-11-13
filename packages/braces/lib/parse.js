@@ -56,7 +56,7 @@ const parse = (input, options = {}) => {
 
 	// HELPERS
 	const advance = () => input[index++];
-	const push = (node) => {
+	const push = node => {
 		if (node.type === 'text' && prev.type === 'dot') prev.type = 'text';
 		if (prev && prev.type === 'text' && node.type === 'text') {
 			prev.value += node.value;
@@ -240,7 +240,7 @@ const parse = (input, options = {}) => {
 	do {
 		block = stack.pop();
 		if (block.type !== 'root') {
-			block.nodes.forEach((n) => {
+			block.nodes.forEach(n => {
 				if (!n.nodes) {
 					if (n.type === 'open') n.isOpen = true;
 					if (n.type === 'close') n.isClose = true;

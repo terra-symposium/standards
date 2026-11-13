@@ -134,7 +134,7 @@ export function uiComponentRecommendations(cfg: QualityCfg): UiComponentRecommen
 	const settings = cfg.uiRecommendations;
 	const rules = settings?.rules ?? DEFAULT_RULES;
 	const exts = settings?.extensions ?? DEFAULT_EXTS;
-	const ignoredFiles = new Set((settings?.ignoredFiles ?? []).map((f) => f.replaceAll('\\', '/')));
+	const ignoredFiles = new Set((settings?.ignoredFiles ?? []).map(f => f.replaceAll('\\', '/')));
 	const findings: UiComponentRecommendation[] = [];
 	for (const file of srcFiles({ ...cfg, extensions: exts })) {
 		const relativeFile = displayPath(cfg, file).replaceAll('\\', '/');
@@ -145,7 +145,7 @@ export function uiComponentRecommendations(cfg: QualityCfg): UiComponentRecommen
 				return (
 					segments.some((s, i) => s === 'components' && segments[i + 1] === 'ui') ||
 					ignoredFiles.has(norm) ||
-					ignoredDirs.some((d) => {
+					ignoredDirs.some(d => {
 						const prefix = d.replaceAll('\\', '/').replace(/^\/+|\/+$/gu, '');
 						return prefix && (norm === prefix || norm.startsWith(`${prefix}/`));
 					})
@@ -160,7 +160,7 @@ export function uiComponentRecommendations(cfg: QualityCfg): UiComponentRecommen
 				const element = node.tagName.text;
 				if (element === element.toLowerCase()) {
 					const rule = rules.find(
-						(c) =>
+						c =>
 							c.element === element &&
 							(function ruleMatches(rule: UiRecommendationRule, element: ts.JsxOpeningLikeElement): boolean {
 								const type = jsxAttr(element, 'type');
@@ -172,10 +172,10 @@ export function uiComponentRecommendations(cfg: QualityCfg): UiComponentRecommen
 									return (function isButtonLike(value: string | undefined): boolean {
 										const classes = new Set((value ?? '').split(S_U_REGEX).filter(Boolean));
 										return (
-											[...classes].some((c) => /^px-/u.test(c)) &&
-											[...classes].some((c) => /^py-/u.test(c)) &&
-											[...classes].some((c) => c === 'border' || c === 'inline-flex' || c === 'flex' || c.startsWith('rounded')) &&
-											[...classes].some((c) => c === 'font-medium' || c === 'no-underline' || c.startsWith('bg-'))
+											[...classes].some(c => /^px-/u.test(c)) &&
+											[...classes].some(c => /^py-/u.test(c)) &&
+											[...classes].some(c => c === 'border' || c === 'inline-flex' || c === 'flex' || c.startsWith('rounded')) &&
+											[...classes].some(c => c === 'font-medium' || c === 'no-underline' || c.startsWith('bg-'))
 										);
 									})(staticClasses(element));
 								if (rule.when === 'text-link') return Boolean(textLinkVariant(staticClasses(element)));

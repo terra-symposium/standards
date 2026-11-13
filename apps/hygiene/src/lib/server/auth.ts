@@ -101,8 +101,8 @@ function sessionToken(request: Request): string | undefined {
 	return request.headers
 		.get('cookie')
 		?.split(';')
-		.map((p) => p.trim())
-		.find((p) => p.startsWith(`${COOKIE}=`))
+		.map(p => p.trim())
+		.find(p => p.startsWith(`${COOKIE}=`))
 		?.slice(COOKIE.length + 1);
 }
 

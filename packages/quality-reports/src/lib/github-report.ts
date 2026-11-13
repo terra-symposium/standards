@@ -152,7 +152,7 @@ function ghApi(path: string, paginate = false): ApiResult {
 			value: result.stdout
 				.trim()
 				.split(/\r?\n/)
-				.map((l) => {
+				.map(l => {
 					const item = JSON.parse(l) as unknown;
 					return typeof item === 'string' ? (JSON.parse(item) as unknown) : item;
 				}),
@@ -190,7 +190,7 @@ function resultItems(result: ApiResult): { items: unknown[]; resource: GitHubRes
 	if (!result.ok) return { items: [], resource: { state: result.state, count: null, detail: result.detail } };
 	const items = (function flattenPages(val: unknown): unknown[] {
 		if (!Array.isArray(val)) return [];
-		return val.flatMap((p) => (Array.isArray(p) ? p : [p]));
+		return val.flatMap(p => (Array.isArray(p) ? p : [p]));
 	})(result.value);
 	return { items, resource: { state: 'available', count: items.length } };
 }
@@ -258,7 +258,7 @@ function issueFindings(repo: string, vals: unknown[]): { findings: GitHubFinding
 		}
 		issues++;
 		const title = text(item.title) ?? `Open issue #${number}`;
-		const labels = Array.isArray(item.labels) ? item.labels.map((l) => text(rec(l)?.name)).filter((l): l is string => Boolean(l)) : [];
+		const labels = Array.isArray(item.labels) ? item.labels.map(l => text(rec(l)?.name)).filter((l): l is string => Boolean(l)) : [];
 		findings.push({
 			repository: repo,
 			category: 'issue',
@@ -458,7 +458,7 @@ export function buildGitHubReport(repos: readonly string[], requiredFeatures: re
 			codeScanning: codeResult.resource,
 			secretScanning: secretResult.resource,
 		};
-		if (Object.values(resources).some((r) => !['available', 'disabled', 'not-configured'].includes(r.state))) partial = true;
+		if (Object.values(resources).some(r => !['available', 'disabled', 'not-configured'].includes(r.state))) partial = true;
 		const findings = [...issues.findings, ...dependencyFindings, ...malwareFindings, ...codeFindings, ...secretFindings];
 		for (const feature of requiredFeatures)
 			if (features[feature] !== 'enabled')
@@ -532,13 +532,13 @@ export function hasGitHubAuth(): boolean {
  */
 export function formatGitHubReport(report: GitHubReport): string[] {
 	if (report.state === 'skipped') return [report.detail ?? 'GitHub reporting was skipped.'];
-	return report.repositories.flatMap((r) => {
+	return report.repositories.flatMap(r => {
 		const { metrics } = r;
 		const summary = `${r.repository}: ${metrics.openIssues ?? '?'} issues, ${metrics.openPullRequests ?? '?'} PRs, ${metrics.dependabotAlerts ?? '?'} Dependabot, ${metrics.malwareAlerts ?? '?'} malware, ${metrics.codeScanningAlerts ?? '?'} code scanning, ${metrics.secretScanningAlerts ?? '?'} secret scanning`;
 		const counts = new Map<string, number>();
 		for (const finding of r.findings) counts.set(finding.category, (counts.get(finding.category) ?? 0) + 1);
 		const findingSummary = [...counts].map(([cat, count]) => `${count} ${cat}`).join(', ');
-		const settingFindings = r.findings.filter((finding) => finding.category === 'setting' || finding.category === 'access').map((finding) => `  - ${finding.category}: ${finding.title}`);
+		const settingFindings = r.findings.filter(finding => finding.category === 'setting' || finding.category === 'access').map(finding => `  - ${finding.category}: ${finding.title}`);
 		return [summary, ...(findingSummary ? [`  Findings: ${findingSummary}`, ...settingFindings] : [])];
 	});
 }

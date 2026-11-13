@@ -10,7 +10,7 @@ Every `terra-test run` validates the test plan and file ownership before it runs
 Use the npm package command in a Node workflow. Shared checks do not replace repository unit, integration, browser, build, or production health coverage.
 
 <Nodes
-	direction="LR"
+	direction='LR'
 	nodes={[
 		{ id: 'checkout', type: 'origin', data: { title: 'Checkout repository' } },
 		{ id: 'validate', type: 'process', data: { title: 'Shared plan checks' } },
@@ -31,8 +31,7 @@ Use the npm package command in a Node workflow. Shared checks do not replace rep
 pnpm exec terra-test run --manifest config/terra-tests.json
 ```
 
-The shared stage runs first; selected custom suites run afterward.
-|||
+The shared stage runs first; selected custom suites run afterward. |||
 
 ||| [Use the public Action]
 
@@ -44,8 +43,7 @@ Pin the mirror to an immutable commit and pass the manifest path:
     manifest: config/terra-tests.json
 ```
 
-The package source in this repository is canonical. A published Action change must update the public mirror as well.
-|||
+The package source in this repository is canonical. A published Action change must update the public mirror as well. |||
 
 ## Split CI stages deliberately
 

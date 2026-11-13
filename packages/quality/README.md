@@ -46,11 +46,11 @@ Add focused fixtures and tests for each new rule or transform; record user-facin
 
 ## Credits and license
 
-| Profile  | Default checks                                                                                                 | Native prerequisites                                                                                 |
-| -------- | -------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| `c`      | clang-format; Clang AST function documentation; clang-tidy and Clang Static Analyzer                           | LLVM/Clang 14+                                                                                       |
-| `java`   | google-java-format; Checkstyle with all-access Javadocs; PMD source rules; SpotBugs on compiled classes        | google-java-format 1.14+; Checkstyle 10+; PMD 7+; SpotBugs 4.8+; compatible JDK and compiled classes |
-| `python` | Ruff format/lint; mypy; Bandit; Vulture; interrogate and pydoclint documentation coverage for `.py` and `.pyi` | Ruff 0.1+; mypy 1+; Bandit 1.7+; Vulture 2+; interrogate 1.7+; pydoclint 0.11+                       |
+| Profile | Default checks | Native prerequisites |
+| --- | --- | --- |
+| `c` | clang-format; Clang AST function documentation; clang-tidy and Clang Static Analyzer | LLVM/Clang 14+ |
+| `java` | google-java-format; Checkstyle with all-access Javadocs; PMD source rules; SpotBugs on compiled classes | google-java-format 1.14+; Checkstyle 10+; PMD 7+; SpotBugs 4.8+; compatible JDK and compiled classes |
+| `python` | Ruff format/lint; mypy; Bandit; Vulture; interrogate and pydoclint documentation coverage for `.py` and `.pyi` | Ruff 0.1+; mypy 1+; Bandit 1.7+; Vulture 2+; interrogate 1.7+; pydoclint 0.11+ |
 
 For example, on macOS install the native tools with Homebrew and add Ruff to a Python project with uv:
 
@@ -66,14 +66,14 @@ Builds and functional tests are separate suites from quality. Keep `build` and `
 
 ```json
 {
-  "qualityCommands": [
-    { "name": "c-doc-params", "command": "make", "args": ["check-doc-params"] },
-    {
-      "name": "python-typecheck",
-      "command": "uv",
-      "args": ["run", "mypy", "src"]
-    }
-  ]
+	"qualityCommands": [
+		{ "name": "c-doc-params", "command": "make", "args": ["check-doc-params"] },
+		{
+			"name": "python-typecheck",
+			"command": "uv",
+			"args": ["run", "mypy", "src"]
+		}
+	]
 }
 ```
 
@@ -81,12 +81,12 @@ Expose and invoke the three suites independently. A repository may omit a suite 
 
 ```json
 {
-  "scripts": {
-    "quality": "terra-quality quality",
-    "quality:all": "terra-quality quality --all",
-    "build": "<compile or generate project artifacts>",
-    "test": "<run unit, integration, contract, and browser tests>"
-  }
+	"scripts": {
+		"quality": "terra-quality quality",
+		"quality:all": "terra-quality quality --all",
+		"build": "<compile or generate project artifacts>",
+		"test": "<run unit, integration, contract, and browser tests>"
+	}
 }
 ```
 
@@ -125,16 +125,10 @@ Add a `github` section to `quality.json` to include GitHub analytics in the same
 
 ```json
 {
-  "github": {
-    "repositories": ["owner/repo"],
-    "requiredFeatures": [
-      "dependabotAlerts",
-      "malwareAlerts",
-      "securityUpdates",
-      "versionUpdates",
-      "groupedUpdates"
-    ]
-  }
+	"github": {
+		"repositories": ["owner/repo"],
+		"requiredFeatures": ["dependabotAlerts", "malwareAlerts", "securityUpdates", "versionUpdates", "groupedUpdates"]
+	}
 }
 ```
 
@@ -155,14 +149,13 @@ When no GitHub repositories are configured, the normal quality run marks this st
 
 - [Install and understand a run](https://standards-docs.netlify.app/quality/0-getting-started/setup/)
 
-[Complete `quality.json`
-reference](https://standards-docs.netlify.app/quality/2-configuration/quality-json/)
+[Complete `quality.json` reference](https://standards-docs.netlify.app/quality/2-configuration/quality-json/)
 
 - [CLI and CI workflows](https://standards-docs.netlify.app/quality/4-workflows/cli-and-ci/)
 - [Check behavior and autofix limits](https://standards-docs.netlify.app/quality/3-checks/check-reference/)
 - [Troubleshooting](https://standards-docs.netlify.app/quality/5-operations/troubleshooting/)
 
-The installed `quality.schema.json` provides editor validation. The [test README](test/README.md) describes the package's isolated test coverage.
+The installed `quality.schema.json` provides editor validation. The [test README](tests/README.md) describes the package's isolated test coverage.
 
 ## Configuration and security
 
@@ -186,15 +179,15 @@ Create `quality.json` in the repository root:
 
 ```json
 {
-  "$schema": "./node_modules/@terra-symposium/standards-quality/quality.schema.json",
-  "sourceRoots": ["src"],
-  "extensions": [".js", ".jsx", ".ts", ".tsx"],
-  "enabledChecks": {
-    "format": false,
-    "lint": false,
-    "knip": false,
-    "dead-code": false
-  }
+	"$schema": "./node_modules/@terra-symposium/standards-quality/quality.schema.json",
+	"sourceRoots": ["src"],
+	"extensions": [".js", ".jsx", ".ts", ".tsx"],
+	"enabledChecks": {
+		"format": false,
+		"lint": false,
+		"knip": false,
+		"dead-code": false
+	}
 }
 ```
 

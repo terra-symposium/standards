@@ -137,7 +137,7 @@ function candidatesForAssignment(node: ts.Node, name: string, byName: Map<string
 	if (!candidates) return [];
 	for (let current: ts.Node | undefined = node.parent; current; current = current.parent) {
 		if (!isBindingScope(current)) continue;
-		const matches = candidates.filter((c) => c.scope === current);
+		const matches = candidates.filter(c => c.scope === current);
 		if (matches.length) return matches;
 	}
 	return [];
@@ -228,7 +228,7 @@ function findingsForFile(cfg: QualityCfg, file: string, analysis?: QualityAnalys
  * @return Missing or conflicting displayName recommendations.
  */
 export function displayNameFindings(cfg: QualityCfg, analysis?: QualityAnalysis): DisplayNameFinding[] {
-	return (analysis?.files ?? srcFiles(cfg)).flatMap((f) => findingsForFile(cfg, f, analysis));
+	return (analysis?.files ?? srcFiles(cfg)).flatMap(f => findingsForFile(cfg, f, analysis));
 }
 
 /**
@@ -274,7 +274,7 @@ export function fixDisplayNames(cfg: QualityCfg, analysis?: QualityAnalysis): { 
 		let updated = src;
 		const lineBreak = src.includes('\r\n') ? '\r\n' : '\n';
 		for (const [at, edit] of [...edits.entries()].sort((a, b) => b[0] - a[0])) {
-			updated = `${updated.slice(0, at)}${lineBreak}${edit.names.map((n) => `${edit.indent}${n}.displayName = '${n}';`).join(lineBreak)}${updated.slice(at)}`;
+			updated = `${updated.slice(0, at)}${lineBreak}${edit.names.map(n => `${edit.indent}${n}.displayName = '${n}';`).join(lineBreak)}${updated.slice(at)}`;
 			fixed += edit.names.length;
 		}
 		if ((ts.createSourceFile(file, updated, ts.ScriptTarget.Latest, true, scriptKind(file)) as ts.SourceFile & { parseDiagnostics?: readonly ts.Diagnostic[] }).parseDiagnostics?.length) {

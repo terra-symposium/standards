@@ -8,7 +8,7 @@ Terra Quality reads `quality.json` from the current working directory. The packa
 The configuration lifecycle is: discover the file, resolve the repository root, select source roots and extensions, then apply check and tool policy.
 
 <Nodes
-	direction="LR"
+	direction='LR'
 	nodes={[
 		{ id: 'file', type: 'origin', data: { title: 'Find quality.json' } },
 		{ id: 'root', type: 'process', data: { title: 'Resolve root and configRoot' } },
@@ -49,44 +49,28 @@ Install and configure a tool before enabling the check that invokes it. For exam
 
 Use these two common layouts to understand the default path resolution. An explicit `root` or `configRoot` overrides the inferred location.
 
-||| [Root-level configuration]
-§§§text
-repository/
-├── quality.json
-├── src/
-└── config/
-└── eslint.config.mjs
-§§§
+||| [Root-level configuration] §§§text repository/ ├── quality.json ├── src/ └── config/ └── eslint.config.mjs §§§
 
-A root `quality.json` defaults the project root to its containing directory and `configRoot` to `<root>/config`.
-|||
+A root `quality.json` defaults the project root to its containing directory and `configRoot` to `<root>/config`. |||
 
-||| [Config-directory configuration]
-§§§text
-repository/
-├── config/
-│ ├── quality.json
-│ └── eslint.config.mjs
-└── src/
-§§§
+||| [Config-directory configuration] §§§text repository/ ├── config/ │ ├── quality.json │ └── eslint.config.mjs └── src/ §§§
 
-A `config/quality.json` defaults the project root to the parent directory and `configRoot` to the directory containing the configuration.
-|||
+A `config/quality.json` defaults the project root to the parent directory and `configRoot` to the directory containing the configuration. |||
 
 The editor-only `$schema` path points to the installed JSON Schema; the runner does not read it. The table below describes the path fields.
 
-| Field                   | Purpose                                                                                                                                                                                                 |
-| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `root`                  | Repository root used for source discovery and child-process working directories. Relative to the inferred project root.                                                                                 |
-| `configRoot`            | Central tool-config directory searched after root-level config files for ESLint, Prettier, Knip, and the default TypeScript project. Relative to `root`; defaults based on the `quality.json` location. |
-| `sourceRoots`           | Required source roots scanned by regular checks.                                                                                                                                                        |
-| `includeRoots`          | Additional source roots appended to `sourceRoots` during discovery.                                                                                                                                     |
-| `extensions`            | Required file extensions for source discovery, including the leading dot.                                                                                                                               |
-| `aliases`               | Internal import prefixes mapped to repository paths, such as `{ "@/": "src/" }`.                                                                                                                        |
-| `externalPrefixes`      | Import prefixes that the import checker should treat as external.                                                                                                                                       |
-| `frameworkEntryExports` | Explicit framework-discovered exports that Knip should retain, keyed by a source file path or supported `/**/*.ts` / `/**/*.tsx` pattern.                                                               |
-| `protectedIdentifiers`  | Names that naming maintenance must preserve.                                                                                                                                                            |
-| `renameExports`         | Whether eligible exported names can be renamed. Defaults to `false`.                                                                                                                                    |
+| Field | Purpose |
+| --- | --- |
+| `root` | Repository root used for source discovery and child-process working directories. Relative to the inferred project root. |
+| `configRoot` | Central tool-config directory searched after root-level config files for ESLint, Prettier, Knip, and the default TypeScript project. Relative to `root`; defaults based on the `quality.json` location. |
+| `sourceRoots` | Required source roots scanned by regular checks. |
+| `includeRoots` | Additional source roots appended to `sourceRoots` during discovery. |
+| `extensions` | Required file extensions for source discovery, including the leading dot. |
+| `aliases` | Internal import prefixes mapped to repository paths, such as `{ "@/": "src/" }`. |
+| `externalPrefixes` | Import prefixes that the import checker should treat as external. |
+| `frameworkEntryExports` | Explicit framework-discovered exports that Knip should retain, keyed by a source file path or supported `/**/*.ts` / `/**/*.tsx` pattern. |
+| `protectedIdentifiers` | Names that naming maintenance must preserve. |
+| `renameExports` | Whether eligible exported names can be renamed. Defaults to `false`. |
 
 Quality checks scan every matching source file below the configured roots and apply only the shared package's standard dependency and generated-output exclusions, including Rust `target` output. Terra consumer configs must not add repository-specific skipped directories, skipped files, or single-use skips. If a generated or vendored file is incorrectly classified as source, fix the shared classifier or the owning generation boundary instead of carving that path out.
 
@@ -259,14 +243,14 @@ Commands run from `root`, inherit the caller's environment, and are not automati
 
 These checks require the corresponding policy object. See [check behavior](/quality/0-getting-started/overview/#repository-policies-and-patterns) before enabling them.
 
-| Field               | Options                                                             | Purpose                                                                                                                                                                   |
-| ------------------- | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `security`          | `forbiddenTerms`, `forbiddenImports`, `clientRoots`, `runtimeRoots` | Report configured terms/imports, root-level or committed environment files, secret-shaped access in client roots, and process-environment use outside Node runtime roots. |
-| `repeatedClasses`   | `minimumCount`, `extensions`                                        | Find repeated static class strings in selected source files.                                                                                                              |
-| `regexDedup`        | `minimumCount`, `extensions`, `sharedModule`                        | Find duplicate regex sources; an optional repository-relative `.mjs` module with a matching `.d.mts` declaration supports shared extraction.                              |
-| `uiPatterns`        | `forbidden`, `extensions`                                           | Report configured UI source patterns for review.                                                                                                                          |
-| `uiRecommendations` | `rules`, `extensions`, `ignoredFiles`, `ignoredDirectories`         | Configure the on-demand Astro/JSX shared-component recommendation report.                                                                                                 |
-| `tailwindCanonical` | required `stylesheet`, optional `sourceRoots`                       | Configure the Tailwind v4 canonical-class check and autofix.                                                                                                              |
+| Field | Options | Purpose |
+| --- | --- | --- |
+| `security` | `forbiddenTerms`, `forbiddenImports`, `clientRoots`, `runtimeRoots` | Report configured terms/imports, root-level or committed environment files, secret-shaped access in client roots, and process-environment use outside Node runtime roots. |
+| `repeatedClasses` | `minimumCount`, `extensions` | Find repeated static class strings in selected source files. |
+| `regexDedup` | `minimumCount`, `extensions`, `sharedModule` | Find duplicate regex sources; an optional repository-relative `.mjs` module with a matching `.d.mts` declaration supports shared extraction. |
+| `uiPatterns` | `forbidden`, `extensions` | Report configured UI source patterns for review. |
+| `uiRecommendations` | `rules`, `extensions`, `ignoredFiles`, `ignoredDirectories` | Configure the on-demand Astro/JSX shared-component recommendation report. |
+| `tailwindCanonical` | required `stylesheet`, optional `sourceRoots` | Configure the Tailwind v4 canonical-class check and autofix. |
 
 Configured repositories run `tailwind-canonical` during the normal quality command. Set `enabledChecks["tailwind-canonical"]` to `false` to disable it, or `autofix.tailwindCanonical` to `false` to retain diagnostics without writes. The standalone command is `terra-quality tailwind-canonical`; add `--warn` for a read-only check. The API remains exported as `runTailwindCanonical(cfg, fix?)`. See [Tailwind canonical classes](/quality/0-getting-started/overview/#tailwind-canonical-classes) for examples and Tailwind v4 compatibility details.
 

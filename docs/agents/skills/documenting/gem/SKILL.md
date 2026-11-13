@@ -9,44 +9,27 @@ Use when changing the saved Terra Document Gem, its knowledge, or its browser-ba
 
 ## Ownership and provider choice
 
-In the website checkout, `scripts/generation/_gemini.ts` owns the local `geminiPrompt()` composer
-prompt, chat, uploads, provider selection, and response extraction. It does not currently implement
-saved Gem mutation.
+In the website checkout, `scripts/generation/_gemini.ts` owns the local `geminiPrompt()` composer prompt, chat, uploads, provider selection, and response extraction. It does not currently implement saved Gem mutation.
 
-The website checkout's `tests/scripts/generation/generation.spec.ts` imports the generation case
-files; it is not a Gem metadata editor.
+The website checkout's `tests/scripts/generation/generation.spec.ts` imports the generation case files; it is not a Gem metadata editor.
 
-The website checkout's `tests/scripts/generation/playwright.gem.config.ts` targets
-`scripts/generation/document-gem.spec.ts`, which must exist before the configured update command can
-work.
+The website checkout's `tests/scripts/generation/playwright.gem.config.ts` targets `scripts/generation/document-gem.spec.ts`, which must exist before the configured update command can work.
 
-The latest prompt source is `geminiPrompt()` in `_gemini.ts`; older journal records may refer to
-`GEMINI_LEAF_PROMPT` and are historical.
+The latest prompt source is `geminiPrompt()` in `_gemini.ts`; older journal records may refer to `GEMINI_LEAF_PROMPT` and are historical.
 
-Keep the exact saved Gem instruction, metadata, and knowledge inventory in a local snapshot under
-[`snapshots/`](snapshots/). The prompt source in `_gemini.ts` is not proof of the live saved
-instruction.
+Keep the exact saved Gem instruction, metadata, and knowledge inventory in a local snapshot under [`snapshots/`](snapshots/). The prompt source in `_gemini.ts` is not proof of the live saved instruction.
 
-Prepare the instruction/knowledge work with [Gem content maintenance](content/SKILL.md) and the
-display name/description/citation/identity work with [Gem metadata maintenance](metadata/SKILL.md).
-Prepare both tracks independently, then apply and verify them in one sequential UI session so they
-cannot overwrite each other.
+Prepare the instruction/knowledge work with [Gem content maintenance](content/SKILL.md) and the display name/description/citation/identity work with [Gem metadata maintenance](metadata/SKILL.md). Prepare both tracks independently, then apply and verify them in one sequential UI session so they cannot overwrite each other.
 
-Read [`provider-modes.md`](references/provider-modes.md) before selecting a provider. Gemini Gem
-updates use the Gemini web UI; OpenAI uses `OpenAI.chat()` and `OPENAI_API_KEY`, has no Gem or
-browser knowledge list, and currently does not upload the shared `files` input.
+Read [`provider-modes.md`](references/provider-modes.md) before selecting a provider. Gemini Gem updates use the Gemini web UI; OpenAI uses `OpenAI.chat()` and `OPENAI_API_KEY`, has no Gem or browser knowledge list, and currently does not upload the shared `files` input.
 
 ## Safety contract
 
-Reuse the authenticated Gemini browser profile. When the user specifies the in-app browser, keep all
-Gemini UI work in that existing tab; do not substitute isolated Playwright or a second browser
-session.
+Reuse the authenticated Gemini browser profile. When the user specifies the in-app browser, keep all Gemini UI work in that existing tab; do not substitute isolated Playwright or a second browser session.
 
-Never create a second anonymous context, duplicate headed window, or parallel Gemini session for one
-leaf. Stop on auth failure; do not open a fallback session.
+Never create a second anonymous context, duplicate headed window, or parallel Gemini session for one leaf. Stop on auth failure; do not open a fallback session.
 
-Keep credentials out of prompts, source, logs, and artifacts. Do not call any Docs/Sanity mutation
-during local iteration.
+Keep credentials out of prompts, source, logs, and artifacts. Do not call any Docs/Sanity mutation during local iteration.
 
 - Never commit unless separately authorized.
 - Use the shared bounded `HealWorkflow` and attachment validator. Preserve raw responses and audit diagnostics; no more than three retries after the initial attempt, and no write after failed validation.

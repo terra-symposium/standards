@@ -73,11 +73,11 @@ export const resolveVisualViewports = (raw = process.env.PW_VIEWPORTS, catalog: 
 			: selection
 					.split(/[\s,]+/)
 					.filter(Boolean)
-					.map((n) => (names.includes(n) ? n : { computer: 'xl', default: 'xl', desktop: 'xl', phone: 'mobile', tablet: 'md', wide: '2xl' }[n] || n));
+					.map(n => (names.includes(n) ? n : { computer: 'xl', default: 'xl', desktop: 'xl', phone: 'mobile', tablet: 'md', wide: '2xl' }[n] || n));
 	const unique = selected.filter((n, i) => selected.indexOf(n) === i);
-	const invalid = unique.filter((n) => !names.includes(n));
+	const invalid = unique.filter(n => !names.includes(n));
 	if (invalid.length) throw new Error(`Unknown PW_VIEWPORTS value(s): ${invalid.join(', ')}. Use default, all, or ${names.join(', ')}.`);
-	return unique.map((n) => ({ name: n, ...catalog[n] }));
+	return unique.map(n => ({ name: n, ...catalog[n] }));
 };
 
 /**
@@ -102,7 +102,7 @@ export const visualProjectName = (baseName: string, viewport: VisualViewport, se
  */
 export const projectViewportName = (projectName: string, catalog: ViewportCatalog = VISUAL_VIEWPORTS): string => {
 	const names = Object.keys(catalog).sort((a, b) => b.length - a.length);
-	const match = names.find((n) => projectName.endsWith(`-${n}`));
+	const match = names.find(n => projectName.endsWith(`-${n}`));
 	if (match) return match;
 	return names.includes(projectName) ? projectName : 'xl';
 };
@@ -178,11 +178,11 @@ export const withResponsivePlaywright = <T extends PlaywrightTestConfig>(cfg: T,
 		path.resolve(process.cwd(), 'dist'),
 		path.resolve(process.cwd(), 'packages/reporting/dist'),
 	];
-	const sharedDist = sharedDistCandidates.find((c) => fs.existsSync(c)) || sharedDistCandidates[0];
+	const sharedDist = sharedDistCandidates.find(c => fs.existsSync(c)) || sharedDistCandidates[0];
 	const resolvedSharedDist = fs.existsSync(sharedDist) ? fs.realpathSync(sharedDist) : sharedDist;
 	const external = [...(cfg.build?.external || []), path.join(resolvedSharedDist, '**')];
 	const projects = (cfg.projects || []) as Array<{ dependencies?: readonly string[]; name?: string; testMatch?: unknown; grep?: unknown; use?: Record<string, unknown> }>;
-	const dependencyProjects = new Set(projects.flatMap((p) => p.dependencies || []));
+	const dependencyProjects = new Set(projects.flatMap(p => p.dependencies || []));
 	const singleRun = new Set(opts.singleRunProjects || []);
 	/**
 	 * Identifies projects that should run once instead of expanding across viewports.
@@ -194,13 +194,13 @@ export const withResponsivePlaywright = <T extends PlaywrightTestConfig>(cfg: T,
 	 */
 	const isSetup = (project: (typeof projects)[number], idx: number): boolean => {
 		const name = project.name || `project-${idx + 1}`;
-		const matchText = (Array.isArray(project.testMatch) ? project.testMatch : [project.testMatch]).map((e) => (e instanceof RegExp ? e.source : String(e || ''))).join(' ');
+		const matchText = (Array.isArray(project.testMatch) ? project.testMatch : [project.testMatch]).map(e => (e instanceof RegExp ? e.source : String(e || ''))).join(' ');
 		return dependencyProjects.has(name) || /setup/i.test(name) || /\.setup\.[cm]?[jt]sx?/i.test(matchText);
 	};
 	const responsiveProjects = projects.flatMap((p, i) => {
 		const baseName = p.name || `project-${i + 1}`;
 		if (isSetup(p, i) || singleRun.has(baseName)) return [p];
-		return viewports.map((v) => ({
+		return viewports.map(v => ({
 			...p,
 			name: visualProjectName(baseName, v, viewports),
 			...(opts.viewportPolicy === 'declared'
@@ -227,7 +227,7 @@ export const withResponsivePlaywright = <T extends PlaywrightTestConfig>(cfg: T,
 		screenshotOnlySlideshow: opts.screenshotOnlySlideshow ?? process.env.TERRA_SCREENSHOT_ONLY_SLIDESHOW !== '0',
 	};
 	const reporters = [
-		...cfgdReporters.filter((r) => {
+		...cfgdReporters.filter(r => {
 			const name = Array.isArray(r) ? r[0] : r;
 			return !(typeof name === 'string' && name.includes('@terra-symposium/standards-reporting/playwright'));
 		}),

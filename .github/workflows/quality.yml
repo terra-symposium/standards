@@ -24,11 +24,9 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: uv sync --locked --group dev
       - name: Capture full-repository quality findings
-        run: pnpm run quality --all --warn --report-json standards-quality.json
-      - name: Check formatting
-        run: node packages/quality/dist/lib/runner.js format --all --warn
-      - name: Check lint
-        run: node packages/quality/dist/lib/runner.js lint --all --warn
+        run: pnpm run quality:all -- --report-json standards-quality.json
+      - name: Require committed Quality fixes
+        run: git diff --exit-code
       - name: Upload quality report
         if: always()
         uses: actions/upload-artifact@v4

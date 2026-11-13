@@ -20,7 +20,7 @@ if (args.includes('--help') || args.includes('-h')) {
 }
 const configIndex = args.indexOf('--config');
 const cfg = loadQualityConfig(configIndex >= 0 ? args[configIndex + 1] : undefined);
-const cmd = args.find((a) => a === 'github' || a === 'history');
+const cmd = args.find(a => a === 'github' || a === 'history');
 if (configIndex >= 0 && !args[configIndex + 1]) throw new Error('--config requires a path.');
 if (cmd === 'github') process.stdout.write(`${JSON.stringify(buildGitHubReport(cfg.github?.repositories ?? [], cfg.github?.requiredFeatures ?? []), null, 2)}\n`);
 else if (cmd === 'history') {

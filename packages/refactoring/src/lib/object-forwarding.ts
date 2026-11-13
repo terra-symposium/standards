@@ -105,7 +105,7 @@ function findingsForFile(cfg: QualityCfg, file: string, analysis?: QualityAnalys
  * @return Object-forwarding errors.
  */
 export function objectForwardingFindings(cfg: QualityCfg, analysis?: QualityAnalysis): ObjectForwardingFinding[] {
-	return (analysis?.files ?? srcFiles(cfg)).flatMap((f) => findingsForFile(cfg, f, analysis));
+	return (analysis?.files ?? srcFiles(cfg)).flatMap(f => findingsForFile(cfg, f, analysis));
 }
 
 /**

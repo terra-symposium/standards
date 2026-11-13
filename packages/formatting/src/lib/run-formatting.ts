@@ -47,11 +47,11 @@ HELPERS
  * @return Prettier's exit status, or zero when the configured source scope is empty.
  */
 export function runFormatting(cfg: QualityCfg, options: Pick<CapabilityOptions, 'fix'>): number {
-	const files = srcFiles(cfg).filter((file) => !hasGeneratedSourceHeader(readFileSync(file, 'utf8')));
+	const files = srcFiles(cfg).filter(file => !hasGeneratedSourceHeader(readFileSync(file, 'utf8')));
 	if (!files.length) return 0;
 	const fix = options.fix && cfg.autofix?.format !== false;
 	const configRoot = cfg.configRoot ?? resolve(cfg.root, 'config');
-	const prettierConfig = CONFIG_NAMES.flatMap((n) => [resolve(configRoot, n), resolve(cfg.root, n)]).find(existsSync);
+	const prettierConfig = CONFIG_NAMES.flatMap(n => [resolve(configRoot, n), resolve(cfg.root, n)]).find(existsSync);
 	const prettierIgnore = [resolve(configRoot, '.prettierignore'), resolve(cfg.root, '.prettierignore')].find(existsSync);
 	const tool = cfg.tools?.prettier;
 	const executable = tool && (tool.includes('/') || tool.includes('\\')) ? tool : resolve(cfg.root, 'node_modules/.bin', tool ?? 'prettier');
@@ -64,7 +64,7 @@ export function runFormatting(cfg: QualityCfg, options: Pick<CapabilityOptions, 
 			return available.status || 1;
 		}
 	}
-	const originals = fix ? new Map(files.map((file) => [file, readFileSync(file, 'utf8')])) : undefined;
+	const originals = fix ? new Map(files.map(file => [file, readFileSync(file, 'utf8')])) : undefined;
 	if (fix) {
 		for (const file of files) {
 			if (/\.(?:c|m)?(?:js|jsx|ts|tsx)$/u.test(file)) {

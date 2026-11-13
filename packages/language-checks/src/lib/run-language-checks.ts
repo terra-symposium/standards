@@ -45,8 +45,8 @@ export function runLanguageChecks(cfg: QualityCfg, options: Pick<CapabilityOptio
 		process.exitCode = 1;
 		console.error(`${failure.name} failed: ${failure.reason}.`);
 	}
-	const configured = new Map((cfg.qualityCommands ?? []).map((c) => [c.name, c]));
-	const checks = resolution.checks.filter((c) => capabilityCommandEnabled(cfg, c.name));
+	const configured = new Map((cfg.qualityCommands ?? []).map(c => [c.name, c]));
+	const checks = resolution.checks.filter(c => capabilityCommandEnabled(cfg, c.name));
 	const toolResults = new Map<string, ReturnType<typeof inspectLanguageProfileTool>>();
 	const toolErr = (tool: NonNullable<(typeof checks)[number]['tool']>): string | undefined => {
 		const key = JSON.stringify([tool.command, tool.versionArgs, tool.minimumVersion]);
@@ -71,14 +71,14 @@ export function runLanguageChecks(cfg: QualityCfg, options: Pick<CapabilityOptio
 					continue;
 				}
 			}
-			const args = check.autofix.args.flatMap((a) => (a === '{files}' ? check.files : [a]));
+			const args = check.autofix.args.flatMap(a => (a === '{files}' ? check.files : [a]));
 			const result = spawnSync(check.autofix.command, args, { cwd: cfg.root, stdio: 'inherit' });
 			if (result.error) reportFailure(check.name, result.error.message);
 			else if (result.status !== 0) reportFailure(check.name, `${check.autofix.command} exited with status ${result.status ?? 1}`);
 		}
 	}
 	for (const phase of PHASES) {
-		for (const check of checks.filter((c) => c.phase === phase)) {
+		for (const check of checks.filter(c => c.phase === phase)) {
 			const override = configured.get(check.name);
 			const cmd = override?.command ?? check.command;
 			const rawArgs = override?.args ?? check.args;
@@ -89,9 +89,9 @@ export function runLanguageChecks(cfg: QualityCfg, options: Pick<CapabilityOptio
 					continue;
 				}
 			}
-			const args = rawArgs.flatMap((a) => {
+			const args = rawArgs.flatMap(a => {
 				if (a === '{classes}') {
-					const classes = [resolve(cfg.root, 'target/classes'), resolve(cfg.root, 'build/classes/java/main')].filter((path) => existsSync(path) && statSync(path).isDirectory());
+					const classes = [resolve(cfg.root, 'target/classes'), resolve(cfg.root, 'build/classes/java/main')].filter(path => existsSync(path) && statSync(path).isDirectory());
 					return classes.length ? classes : ['{classes}'];
 				}
 				return [a];

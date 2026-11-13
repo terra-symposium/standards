@@ -51,8 +51,8 @@ const GIT_OUTPUT_LIMIT = 128 * 1024 * 1024;
  */
 export function isHistorySourcePath(path: string): boolean {
 	const parts = path.split('/');
-	if (!parts.length || parts.some((p) => p === '..' || p === '')) return false;
-	if (parts.slice(0, -1).some((p) => EXCLUDED_DIR.test(p))) return false;
+	if (!parts.length || parts.some(p => p === '..' || p === '')) return false;
+	if (parts.slice(0, -1).some(p => EXCLUDED_DIR.test(p))) return false;
 	const file = parts.at(-1) ?? '';
 	return SRC_EXT.test(file) && !EXCLUDED_FILE.test(file) && !/\.(?:config|generated|gen|min|map|snap|lock)\.[^.]+$/i.test(file) && !/^\./.test(file);
 }
@@ -218,7 +218,7 @@ export function createHistoryReport(root: string, opts: { repository?: string; b
 			.trim()
 			.split('\n')
 			.filter(Boolean)
-			.map((l) => {
+			.map(l => {
 				const [sha, authorDate, parents = ''] = l.split('\x00');
 				if (!A_F_D_40_I_REGEX.test(sha) || !Number.isFinite(Date.parse(authorDate))) throw new Error('Git returned invalid commit metadata.');
 				return { sha, authorDate, parents: parents.trim().split(S_REGEX).filter(Boolean) };
@@ -230,9 +230,9 @@ export function createHistoryReport(root: string, opts: { repository?: string; b
 	const lineCounts = new Map<string, number>();
 	const reportCommits: HistoryCommitReport[] = [];
 	for (let start = 0; start < commits.length; start += HISTORY_BATCH_SIZE) {
-		const batch = commits.slice(start, start + HISTORY_BATCH_SIZE).map((c) => ({ commit: c, blobs: parseTree(root, c.sha) }));
+		const batch = commits.slice(start, start + HISTORY_BATCH_SIZE).map(c => ({ commit: c, blobs: parseTree(root, c.sha) }));
 		(function blobLineCounts(root: string, blobs: string[], cache: Map<string, number>): void {
-			const unknown = [...new Set(blobs)].filter((s) => !cache.has(s));
+			const unknown = [...new Set(blobs)].filter(s => !cache.has(s));
 			for (let start = 0; start < unknown.length; start += BLOB_BATCH_SIZE) {
 				const batch = unknown.slice(start, start + BLOB_BATCH_SIZE);
 				const output = gitBuffer(root, ['cat-file', '--batch'], `${batch.join('\n')}\n`);
@@ -259,7 +259,7 @@ export function createHistoryReport(root: string, opts: { repository?: string; b
 			}
 		})(
 			root,
-			batch.flatMap((i) => i.blobs),
+			batch.flatMap(i => i.blobs),
 			lineCounts,
 		);
 		for (const { commit, blobs } of batch) {

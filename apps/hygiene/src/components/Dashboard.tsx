@@ -106,22 +106,22 @@ function year(value: string): string {
  * @returns An empty-state message when there is no data, otherwise an SVG line chart.
  */
 function LineChart({ values, color, label }: { values: number[]; color: string; label: string }) {
-	if (!values.length) return <div className="empty">No data yet</div>;
+	if (!values.length) return <div className='empty'>No data yet</div>;
 	const width = 700;
 	const height = 180;
 	const max = Math.max(...values);
 	const min = Math.min(...values);
 	return (
-		<svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label={label} preserveAspectRatio="none">
-			<line x1="0" y1="168" x2="700" y2="168" stroke="#27423c" />
+		<svg viewBox={`0 0 ${width} ${height}`} role='img' aria-label={label} preserveAspectRatio='none'>
+			<line x1='0' y1='168' x2='700' y2='168' stroke='#27423c' />
 			<polyline
 				points={values.map((value, i) => `${(i / Math.max(1, values.length - 1)) * width},${height - ((value - min) / Math.max(1, max - min)) * (height - 24) - 12}`).join(' ')}
-				fill="none"
+				fill='none'
 				stroke={color}
-				strokeWidth="3"
-				vectorEffect="non-scaling-stroke"
-				strokeLinejoin="round"
-				strokeLinecap="round"
+				strokeWidth='3'
+				vectorEffect='non-scaling-stroke'
+				strokeLinejoin='round'
+				strokeLinecap='round'
 			/>
 		</svg>
 	);
@@ -150,7 +150,7 @@ export default function Dashboard() {
 	const [err, setErr] = useState('');
 	useEffect(() => {
 		void fetch('/api/repos')
-			.then(async (response) => {
+			.then(async response => {
 				if (response.status === 401) {
 					setLoading(false);
 					return;
@@ -184,7 +184,7 @@ export default function Dashboard() {
 	}, [selected, branch, commitPage, refreshKey]);
 	const latest = detail?.runs[0];
 	const latestCommit = detail?.latestCommit;
-	const currentBranch = detail?.branches.find((i) => i.name === branch);
+	const currentBranch = detail?.branches.find(i => i.name === branch);
 	const pageCount = Math.max(1, Math.ceil((detail?.commitTotal ?? 0) / (detail?.commitPageSize ?? 25)));
 
 	const kpis = [
@@ -232,20 +232,20 @@ export default function Dashboard() {
 		},
 	];
 	return (
-		<div className="app-shell">
-			<aside className="sidebar">
-				<div className="brand">
-					<span className="brand-mark">T</span>
+		<div className='app-shell'>
+			<aside className='sidebar'>
+				<div className='brand'>
+					<span className='brand-mark'>T</span>
 					<span>
 						TERRA <small>SHARED</small>
 					</span>
 				</div>
-				<div className="side-label">WORKSPACE</div>
-				<div className="side-item active">
+				<div className='side-label'>WORKSPACE</div>
+				<div className='side-item active'>
 					◉ <span>Overview</span>
 				</div>
-				<div className="side-label repos-label">CONNECTED REPOSITORIES</div>
-				{repos.map((repo) => (
+				<div className='side-label repos-label'>CONNECTED REPOSITORIES</div>
+				{repos.map(repo => (
 					<button
 						className={`repo-button ${selected === repo.id ? 'selected' : ''}`}
 						key={repo.id}
@@ -257,26 +257,26 @@ export default function Dashboard() {
 							setSetupOpen(false);
 						}}
 					>
-						<span className="repo-dot" />
+						<span className='repo-dot' />
 						{repo.name}
 					</button>
 				))}
-				<div className="side-bottom">
-					<span className="status-dot" /> Read-only GitHub App
+				<div className='side-bottom'>
+					<span className='status-dot' /> Read-only GitHub App
 				</div>
 			</aside>
 			<main>
-				<header className="topbar">
+				<header className='topbar'>
 					<span>
-						Engineering intelligence <span className="slash">/</span> Overview
+						Engineering intelligence <span className='slash'>/</span> Overview
 					</span>
 					<div>
 						{user ? (
 							<>
-								<span className="avatar">{user[0]?.toUpperCase()}</span>
+								<span className='avatar'>{user[0]?.toUpperCase()}</span>
 								<span>{user}</span>
 								<button
-									className="subtle"
+									className='subtle'
 									onClick={() => {
 										void fetch('/api/logout', { method: 'POST' }).then(() => location.reload());
 									}}
@@ -289,58 +289,58 @@ export default function Dashboard() {
 						)}
 					</div>
 				</header>
-				<div className="content">
+				<div className='content'>
 					{loading ? (
-						<div className="empty-state">Loading repository hygiene…</div>
+						<div className='empty-state'>Loading repository hygiene…</div>
 					) : !user ? (
-						<div className="intro">
-							<div className="eyebrow">REPOSITORY HYGIENE</div>
+						<div className='intro'>
+							<div className='eyebrow'>REPOSITORY HYGIENE</div>
 							<h1>Understand the health of every connected repository.</h1>
 							<p>Track test outcomes, quality findings, and source history across your branches. Access follows GitHub repository admin permissions.</p>
-							<a className="primary" href="/api/login">
+							<a className='primary' href='/api/login'>
 								Sign in with GitHub <span>↗</span>
 							</a>
 						</div>
 					) : repos.length === 0 ? (
-						<div className="intro">
-							<div className="eyebrow">NO CONNECTED REPOSITORIES</div>
+						<div className='intro'>
+							<div className='eyebrow'>NO CONNECTED REPOSITORIES</div>
 							<h1>Your dashboard is ready.</h1>
 							<p>Install the Terra Hygiene GitHub App on a selected repository to start collecting trends.</p>
-							<a className="primary" href="https://github.com/apps/terra-hygiene/installations/new">
+							<a className='primary' href='https://github.com/apps/terra-hygiene/installations/new'>
 								Install GitHub App <span>↗</span>
 							</a>
 						</div>
 					) : (
 						<>
-							<div className="heading">
+							<div className='heading'>
 								<div>
-									<div className="eyebrow">
-										REPOSITORY HEALTH <span className="eyebrow-sep">/</span> LIVE OVERVIEW
+									<div className='eyebrow'>
+										REPOSITORY HEALTH <span className='eyebrow-sep'>/</span> LIVE OVERVIEW
 									</div>
 									<h1>{detail ? detail.repository.name : 'Repository overview'}</h1>
 									<p>{detail ? `${detail.repository.owner}/${detail.repository.name}` : 'Loading metrics…'}</p>
 								</div>
-								<div className="heading-actions">
-									<span className="privacy">● {detail?.repository.private ? 'Private' : 'Public'} repository</span>
-									<button className="github-link refresh-button" onClick={() => setRefreshKey((value) => value + 1)}>
+								<div className='heading-actions'>
+									<span className='privacy'>● {detail?.repository.private ? 'Private' : 'Public'} repository</span>
+									<button className='github-link refresh-button' onClick={() => setRefreshKey(value => value + 1)}>
 										Refresh data
 									</button>
-									<button className="github-link refresh-button" onClick={() => setSetupOpen((open) => !open)}>
+									<button className='github-link refresh-button' onClick={() => setSetupOpen(open => !open)}>
 										Local report setup
 									</button>
-									<a className="github-link add-repository" href="https://github.com/apps/terra-hygiene/installations/new" target="_blank" rel="noreferrer">
+									<a className='github-link add-repository' href='https://github.com/apps/terra-hygiene/installations/new' target='_blank' rel='noreferrer'>
 										Add repositories ↗
 									</a>
-									<a className="github-link" href={detail ? `https://github.com/${detail.repository.owner}/${detail.repository.name}` : '#'} target="_blank" rel="noreferrer">
+									<a className='github-link' href={detail ? `https://github.com/${detail.repository.owner}/${detail.repository.name}` : '#'} target='_blank' rel='noreferrer'>
 										View on GitHub ↗
 									</a>
 								</div>
 							</div>
 							{setupOpen && (
-								<section className="panel collector-setup">
-									<div className="panel-head">
+								<section className='panel collector-setup'>
+									<div className='panel-head'>
 										<div>
-											<div className="eyebrow">LOCAL REPORTS</div>
+											<div className='eyebrow'>LOCAL REPORTS</div>
 											<h2>Collect reports from a local checkout</h2>
 										</div>
 									</div>
@@ -351,17 +351,17 @@ export default function Dashboard() {
 									<pre>
 										<code>{`pnpm --dir apps/hygiene run reports:import -- --repository ${detail ? `${detail.repository.owner}/${detail.repository.name}` : 'OWNER/REPOSITORY'} --checkout /path/to/checkout --branch ${branch}`}</code>
 									</pre>
-									<p className="history-note">
+									<p className='history-note'>
 										The current local importer is configured for the Terra Symposium website test suite. Reports are labeled Local analysis in the dashboard. Other repositories need their JUnit test
 										command added to the importer before importing their test metrics.
 									</p>
 								</section>
 							)}
-							<div className="branches">
+							<div className='branches'>
 								<span>BRANCH</span>
 								{detail?.branches
-									.filter((i) => i.enabled)
-									.map((i) => (
+									.filter(i => i.enabled)
+									.map(i => (
 										<button
 											key={i.name}
 											className={branch === i.name ? 'active' : ''}
@@ -375,7 +375,7 @@ export default function Dashboard() {
 										</button>
 									))}
 								<form
-									onSubmit={(event) => {
+									onSubmit={event => {
 										void (async function addBranch(event: React.FormEvent<HTMLFormElement>) {
 											event.preventDefault();
 											if (!selected) return;
@@ -400,39 +400,39 @@ export default function Dashboard() {
 										})(event);
 									}}
 								>
-									<input name="branch" aria-label="Additional branch" placeholder="Add branch" pattern="[A-Za-z0-9._/-]+" />
-									<button title="Track branch">+</button>
+									<input name='branch' aria-label='Additional branch' placeholder='Add branch' pattern='[A-Za-z0-9._/-]+' />
+									<button title='Track branch'>+</button>
 								</form>
 							</div>
-							{err && <div className="error">{err}</div>}
-							<section className="kpis">
+							{err && <div className='error'>{err}</div>}
+							<section className='kpis'>
 								{kpis.map(({ key, className, label, value, detail }) => (
 									<div className={className} key={key}>
-										<div className="kpi-label">{label}</div>
-										<div className="kpi-value">{value}</div>
+										<div className='kpi-label'>{label}</div>
+										<div className='kpi-value'>{value}</div>
 										<p>{detail}</p>
 									</div>
 								))}
 							</section>
-							<div className="grid">
-								<section className="panel">
-									<div className="panel-head">
+							<div className='grid'>
+								<section className='panel'>
+									<div className='panel-head'>
 										<div>
-											<div className="eyebrow">EVOLUTION</div>
+											<div className='eyebrow'>EVOLUTION</div>
 											<h2>Source lines over time</h2>
 										</div>
 										<span>{currentBranch?.history_status === 'complete' ? `${currentBranch.history_count.toLocaleString()} commits indexed` : 'Awaiting full history report'}</span>
 									</div>
-									<LineChart values={detail?.lineHistory.map((i) => i.source_lines) ?? []} color="#87dcac" label="Source lines per commit" />
-									<div className="chart-foot">
+									<LineChart values={detail?.lineHistory.map(i => i.source_lines) ?? []} color='#87dcac' label='Source lines per commit' />
+									<div className='chart-foot'>
 										<span>{detail?.lineHistory[0] ? year(detail.lineHistory[0].committed_at) : 'First commit'}</span>
 										<span>{latestCommit ? year(latestCommit.committed_at) : 'Latest commit'}</span>
 									</div>
 								</section>
-								<section className="panel">
-									<div className="panel-head">
+								<section className='panel'>
+									<div className='panel-head'>
 										<div>
-											<div className="eyebrow">REPORTS</div>
+											<div className='eyebrow'>REPORTS</div>
 											<h2>Score trend</h2>
 										</div>
 										<span>
@@ -445,28 +445,28 @@ export default function Dashboard() {
 											detail?.runs
 												.slice()
 												.reverse()
-												.map((i) => i.metrics.score)
+												.map(i => i.metrics.score)
 												.filter((i): i is number => i !== null) ?? []
 										}
-										color="#e4b773"
-										label="Hygiene score by report"
+										color='#e4b773'
+										label='Hygiene score by report'
 									/>
-									<div className="chart-foot">
+									<div className='chart-foot'>
 										<span>Older reports</span>
 										<span>Most recent</span>
 									</div>
 								</section>
 							</div>
-							<section className="panel history">
-								<div className="panel-head">
+							<section className='panel history'>
+								<div className='panel-head'>
 									<div>
-										<div className="eyebrow">COMMIT HISTORY</div>
+										<div className='eyebrow'>COMMIT HISTORY</div>
 										<h2>Code changes</h2>
 									</div>
 									<span>{currentBranch?.history_status === 'complete' ? `${currentBranch.history_count.toLocaleString()} commits` : 'No history report yet'}</span>
 								</div>
 								{currentBranch && (
-									<p className="history-note" role="status">
+									<p className='history-note' role='status'>
 										{currentBranch.history_status === 'complete' ? (
 											`${currentBranch.history_count.toLocaleString()} reachable branch commits are indexed.`
 										) : (
@@ -477,7 +477,7 @@ export default function Dashboard() {
 										{historyMessage}
 									</p>
 								)}
-								<div className="table-wrap">
+								<div className='table-wrap'>
 									<table>
 										<thead>
 											<tr>
@@ -489,36 +489,36 @@ export default function Dashboard() {
 											</tr>
 										</thead>
 										<tbody>
-											{detail?.commits.map((commit) => (
+											{detail?.commits.map(commit => (
 												<tr key={commit.sha}>
 													<td>
-														<a href={`https://github.com/${detail.repository.owner}/${detail.repository.name}/commit/${commit.sha}`} target="_blank" rel="noreferrer">
+														<a href={`https://github.com/${detail.repository.owner}/${detail.repository.name}/commit/${commit.sha}`} target='_blank' rel='noreferrer'>
 															{commit.sha.slice(0, 9)} ↗
 														</a>
 													</td>
 													<td>{date(commit.committed_at)}</td>
-													<td className="added">+{commit.additions}</td>
-													<td className="removed">−{commit.deletions}</td>
+													<td className='added'>+{commit.additions}</td>
+													<td className='removed'>−{commit.deletions}</td>
 													<td>{commit.source_lines.toLocaleString()}</td>
 												</tr>
 											))}
 										</tbody>
 									</table>
-									{detail && !detail.commitTotal && currentBranch?.history_status === 'complete' && <div className="empty">This branch has no reachable commits.</div>}
+									{detail && !detail.commitTotal && currentBranch?.history_status === 'complete' && <div className='empty'>This branch has no reachable commits.</div>}
 								</div>
-								<div className="pagination">
+								<div className='pagination'>
 									<span>
 										Showing {(detail?.commitTotal ? (commitPage - 1) * (detail.commitPageSize ?? 25) + 1 : 0).toLocaleString()}–
 										{Math.min(commitPage * (detail?.commitPageSize ?? 25), detail?.commitTotal ?? 0).toLocaleString()} of {(detail?.commitTotal ?? 0).toLocaleString()} indexed commits
 									</span>
 									<div>
-										<button onClick={() => setCommitPage((page) => Math.max(1, page - 1))} disabled={commitPage <= 1}>
+										<button onClick={() => setCommitPage(page => Math.max(1, page - 1))} disabled={commitPage <= 1}>
 											Previous
 										</button>
 										<span>
 											Page {commitPage.toLocaleString()} of {pageCount.toLocaleString()}
 										</span>
-										<button onClick={() => setCommitPage((page) => Math.min(pageCount, page + 1))} disabled={commitPage >= pageCount}>
+										<button onClick={() => setCommitPage(page => Math.min(pageCount, page + 1))} disabled={commitPage >= pageCount}>
 											Next
 										</button>
 									</div>

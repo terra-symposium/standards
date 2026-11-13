@@ -30,8 +30,7 @@ Setup and dependency projects run once. Regular projects expand across the confi
 
 ||| [Full responsive matrix]
 
-Run the full default set: `mobile` (390 × 844), `sm` (640 × 800), `md` (768 × 900), `lg` (1024 × 768), `xl` (1280 × 720), and `2xl` (1536 × 864).
-|||
+Run the full default set: `mobile` (390 × 844), `sm` (640 × 800), `md` (768 × 900), `lg` (1024 × 768), `xl` (1280 × 720), and `2xl` (1536 × 864). |||
 
 ||| [Focused viewport selection]
 
@@ -41,15 +40,14 @@ Set a comma- or space-separated `PW_VIEWPORTS` list for a targeted run:
 PW_VIEWPORTS=mobile,lg pnpm exec playwright test
 ```
 
-Aliases include `phone` for `mobile`, `tablet` for `md`, `desktop` or `default` for `xl`, and `wide` for `2xl`.
-|||
+Aliases include `phone` for `mobile`, `tablet` for `md`, `desktop` or `default` for `xl`, and `wide` for `2xl`. |||
 
 ## Capture diagnostics and visual states
 
 The flow shows how one browser test can produce a reviewable record without custom listener plumbing in every test.
 
 <Nodes
-	direction="LR"
+	direction='LR'
 	nodes={[
 		{ id: 'test', type: 'origin', data: { title: 'Run browser test' } },
 		{ id: 'capture', type: 'process', data: { title: 'Capture console and page errors' } },
@@ -98,8 +96,7 @@ test('captures an account state', async ({ page, visuals }) => {
 
 The reporter writes each run’s workbook and copied screenshots under `tests/results/visual`. It also stores keyed screenshots and metadata in `tests/results/visual/screenshots`. The workbook includes result and diagnostics sheets and, when enabled, load timing data. The default slideshow contains responsive screenshots grouped by test.
 
-=== [Parallel viewport processes]
-An orchestrator can use the same `TERRA_SCREENSHOT_RUN_ID` in each process. Set `TERRA_SCREENSHOT_RUN_FINALIZE=0` for intermediate processes and `TERRA_SCREENSHOT_RUN_FINALIZE=1` for the final process. Intermediate processes save their workbook, captures, and run marker; the final process unions expected and completed test IDs and creates the deck.
+=== [Parallel viewport processes] An orchestrator can use the same `TERRA_SCREENSHOT_RUN_ID` in each process. Set `TERRA_SCREENSHOT_RUN_FINALIZE=0` for intermediate processes and `TERRA_SCREENSHOT_RUN_FINALIZE=1` for the final process. Intermediate processes save their workbook, captures, and run marker; the final process unions expected and completed test IDs and creates the deck.
 
 # If a run is interrupted, reuse its run ID to continue the same matrix. Repeated test and viewport captures replace matching images. Without a shared run ID, each reporter process finalizes its own run by default.
 

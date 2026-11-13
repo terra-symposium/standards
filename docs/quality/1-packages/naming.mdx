@@ -17,12 +17,7 @@ Normal runs select changed and untracked files. `--all` covers all configured ro
 ## API
 
 ```ts
-import {
-  namingFindings,
-  aliasFindings,
-  fixNaming,
-  renameId,
-} from "@terra-symposium/standards-naming";
+import { namingFindings, aliasFindings, fixNaming, renameId } from '@terra-symposium/standards-naming';
 ```
 
 The package also exports identifier token and callback alias helpers, protected-name sets, and rename utilities. `fixNaming()` applies eligible TypeScript language-service edits; it does not guess when a binding is protected or its references cannot be safely renamed. Review public API and serialized identifiers before accepting any suggested rename.

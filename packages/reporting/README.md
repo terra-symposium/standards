@@ -30,9 +30,9 @@ import { withResponsivePlaywright } from '@terra-symposium/standards-reporting/v
 
 ## Structure
 
-`src/` exports reporting helpers; `test/` covers the API; `.agents/skills/` contains maintainer guidance. The package depends on Playwright and Office artifact libraries.
+`src/` exports reporting helpers; `tests/` covers the API; `.agents/skills/` contains maintainer guidance. The package depends on Playwright and Office artifact libraries.
 
-A timestamped directory under `tests/results/visual` contains the workbook, slideshow, and copied screenshots. Each Playwright result screenshot and keyed visual capture is also stored with metadata under `tests/results/visual/screenshots`. Repeated test/viewport captures replace their previous file, and each new slideshow is rebuilt from the whole folder, so interrupted and subset runs retain earlier evidence. The run marker records the current test and viewport inventory across processes in the same logical run; captures outside that inventory, from older runs, or from legacy folders are visibly labeled `HISTORICAL CAPTURE` and never counted as current coverage. The Playwright output directory defaults to `tests/results/playwright-output`.
+A timestamped directory under `tests/results/visual` contains the workbook, slideshow, and copied screenshots. Each Playwright result screenshot and keyed visual capture is also stored with metadata under `tests/results/visual/screenshots`. Repeated tests/viewport captures replace their previous file, and each new slideshow is rebuilt from the whole folder, so interrupted and subset runs retain earlier evidence. The run marker records the current test and viewport inventory across processes in the same logical run; captures outside that inventory, from older runs, or from legacy folders are visibly labeled `HISTORICAL CAPTURE` and never counted as current coverage. The Playwright output directory defaults to `tests/results/playwright-output`.
 
 ### More capabilities
 - Import `diagnosticsTest` from `/playwright` to attach browser console, page, and request failures.

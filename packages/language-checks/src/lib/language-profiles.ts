@@ -185,18 +185,18 @@ const NATIVE_AUTOFIXES: Record<LanguageProfileId, Partial<Record<LangAutofixName
 /** Full check and autofix disposition for every built-in language. */
 export const LANGUAGE_CAPABILITIES: Record<'js-ts' | LanguageProfileId, { checks: Record<QualityCheckName, LanguageCapability>; autofixes: Record<LangAutofixName, LanguageCapability> }> = {
 	'js-ts': {
-		checks: Object.fromEntries(QUALITY_CAPABILITY_CHECKS.map((n) => [n, shared(n === 'document' ? 'Terra Quality JS/TS documentation analyzer' : 'Terra Quality JS/TS analyzer')])) as Record<
+		checks: Object.fromEntries(QUALITY_CAPABILITY_CHECKS.map(n => [n, shared(n === 'document' ? 'Terra Quality JS/TS documentation analyzer' : 'Terra Quality JS/TS analyzer')])) as Record<
 			QualityCheckName,
 			LanguageCapability
 		>,
-		autofixes: Object.fromEntries(QUALITY_CAPABILITY_AUTOFIXES.map((n) => [n, n === 'documentedCommands' ? shared() : shared('Terra Quality JS/TS fixer')])) as Record<
+		autofixes: Object.fromEntries(QUALITY_CAPABILITY_AUTOFIXES.map(n => [n, n === 'documentedCommands' ? shared() : shared('Terra Quality JS/TS fixer')])) as Record<
 			LangAutofixName,
 			LanguageCapability
 		>,
 	},
 	c: {
 		checks: Object.fromEntries(
-			QUALITY_CAPABILITY_CHECKS.map((n) => [
+			QUALITY_CAPABILITY_CHECKS.map(n => [
 				n,
 				COMMON_SHARED_CHECKS.includes(n)
 					? shared()
@@ -206,12 +206,12 @@ export const LANGUAGE_CAPABILITIES: Record<'js-ts' | LanguageProfileId, { checks
 			]),
 		) as Record<QualityCheckName, LanguageCapability>,
 		autofixes: Object.fromEntries(
-			QUALITY_CAPABILITY_AUTOFIXES.map((n) => [n, n === 'documentedCommands' ? shared() : NATIVE_AUTOFIXES.c[n] ? native(NATIVE_AUTOFIXES.c[n]!) : notApplicable(NO_NATIVE_FIX)]),
+			QUALITY_CAPABILITY_AUTOFIXES.map(n => [n, n === 'documentedCommands' ? shared() : NATIVE_AUTOFIXES.c[n] ? native(NATIVE_AUTOFIXES.c[n]!) : notApplicable(NO_NATIVE_FIX)]),
 		) as Record<LangAutofixName, LanguageCapability>,
 	},
 	java: {
 		checks: Object.fromEntries(
-			QUALITY_CAPABILITY_CHECKS.map((n) => [
+			QUALITY_CAPABILITY_CHECKS.map(n => [
 				n,
 				COMMON_SHARED_CHECKS.includes(n)
 					? shared()
@@ -221,12 +221,12 @@ export const LANGUAGE_CAPABILITIES: Record<'js-ts' | LanguageProfileId, { checks
 			]),
 		) as Record<QualityCheckName, LanguageCapability>,
 		autofixes: Object.fromEntries(
-			QUALITY_CAPABILITY_AUTOFIXES.map((n) => [n, n === 'documentedCommands' ? shared() : NATIVE_AUTOFIXES.java[n] ? native(NATIVE_AUTOFIXES.java[n]!) : notApplicable(NO_NATIVE_FIX)]),
+			QUALITY_CAPABILITY_AUTOFIXES.map(n => [n, n === 'documentedCommands' ? shared() : NATIVE_AUTOFIXES.java[n] ? native(NATIVE_AUTOFIXES.java[n]!) : notApplicable(NO_NATIVE_FIX)]),
 		) as Record<LangAutofixName, LanguageCapability>,
 	},
 	python: {
 		checks: Object.fromEntries(
-			QUALITY_CAPABILITY_CHECKS.map((n) => [
+			QUALITY_CAPABILITY_CHECKS.map(n => [
 				n,
 				COMMON_SHARED_CHECKS.includes(n)
 					? shared()
@@ -236,7 +236,7 @@ export const LANGUAGE_CAPABILITIES: Record<'js-ts' | LanguageProfileId, { checks
 			]),
 		) as Record<QualityCheckName, LanguageCapability>,
 		autofixes: Object.fromEntries(
-			QUALITY_CAPABILITY_AUTOFIXES.map((n) => [n, n === 'documentedCommands' ? shared() : NATIVE_AUTOFIXES.python[n] ? native(NATIVE_AUTOFIXES.python[n]!) : notApplicable(NO_NATIVE_FIX)]),
+			QUALITY_CAPABILITY_AUTOFIXES.map(n => [n, n === 'documentedCommands' ? shared() : NATIVE_AUTOFIXES.python[n] ? native(NATIVE_AUTOFIXES.python[n]!) : notApplicable(NO_NATIVE_FIX)]),
 		) as Record<LangAutofixName, LanguageCapability>,
 	},
 };
@@ -476,7 +476,7 @@ export function isLanguageProfileId(id: string): id is LanguageProfileId {
 export function resolveLanguageProfiles(cfg: QualityCfg): LanguageProfileResolution {
 	const result: LanguageProfileResolution = { checks: [], skipped: [], failed: [] };
 	for (const profileId of cfg.languageProfiles ?? []) {
-		const profile = LANGUAGE_PROFILES.find((c) => c.id === profileId);
+		const profile = LANGUAGE_PROFILES.find(c => c.id === profileId);
 		if (!profile) continue;
 		const skippedDirs = new Set([...(cfg.skippedDirectories ?? []), '.venv', 'venv', '__pycache__', '.tox', '.ruff_cache', '.pytest_cache', '.gradle', 'target', 'vendor', 'generated', 'out']);
 		const sourceFiles = srcFiles({ ...cfg, extensions: profile.sourceExtensions, skippedDirectories: [...skippedDirs] });
@@ -490,12 +490,12 @@ export function resolveLanguageProfiles(cfg: QualityCfg): LanguageProfileResolut
 				result.failed.push({ name: check.name, profileId, reason: `required configuration ${check.requiredFile} is absent` });
 				continue;
 			}
-			const files = check.fileExtensions ? sourceFiles.filter((f) => check.fileExtensions!.some((ext) => f.endsWith(ext))) : sourceFiles;
+			const files = check.fileExtensions ? sourceFiles.filter(f => check.fileExtensions!.some(ext => f.endsWith(ext))) : sourceFiles;
 			if (check.args.includes('{files}') && !files.length) {
 				result.skipped.push({ name: check.name, profileId, reason: 'no files matched this check' });
 				continue;
 			}
-			const args = check.args.flatMap((a) => (a === '{files}' ? files : a === '{files-comma}' ? [files.join(',')] : [a]));
+			const args = check.args.flatMap(a => (a === '{files}' ? files : a === '{files-comma}' ? [files.join(',')] : [a]));
 			result.checks.push({ ...check, args, profileId, files });
 		}
 	}
@@ -503,17 +503,17 @@ export function resolveLanguageProfiles(cfg: QualityCfg): LanguageProfileResolut
 	if (profileQualityCheckEnabled(cfg, 'document')) {
 		for (const profile of LANGUAGE_PROFILES) {
 			if (cfg.languageProfiles?.includes(profile.id)) continue;
-			const exts = profile.sourceExtensions.filter((ext) => cfg.extensions.includes(ext));
+			const exts = profile.sourceExtensions.filter(ext => cfg.extensions.includes(ext));
 			if (!exts.length) continue;
 			const files = srcFiles({ ...cfg, extensions: exts, skippedDirectories: [...(cfg.skippedDirectories ?? []), 'generated', 'vendor', 'target', 'out'] });
 			if (!files.length) continue;
-			for (const check of profile.checks.filter((c) => c.qualityChecks.includes('document'))) {
+			for (const check of profile.checks.filter(c => c.qualityChecks.includes('document'))) {
 				if (check.requiredFile && !existsSync(resolve(cfg.root, check.requiredFile))) {
 					result.failed.push({ name: check.name, profileId: profile.id, reason: `required configuration ${check.requiredFile} is absent` });
 					continue;
 				}
-				const checkFiles = check.fileExtensions ? files.filter((f) => check.fileExtensions!.some((ext) => f.endsWith(ext))) : files;
-				const args = check.args.flatMap((a) => (a === '{files}' ? checkFiles : a === '{files-comma}' ? [checkFiles.join(',')] : [a]));
+				const checkFiles = check.fileExtensions ? files.filter(f => check.fileExtensions!.some(ext => f.endsWith(ext))) : files;
+				const args = check.args.flatMap(a => (a === '{files}' ? checkFiles : a === '{files-comma}' ? [checkFiles.join(',')] : [a]));
 				result.checks.push({ ...check, args, profileId: profile.id, files: checkFiles });
 			}
 		}

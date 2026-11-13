@@ -27,11 +27,7 @@ Pin native tools in the consumer repository or CI image for reproducible behavio
 ## API
 
 ```ts
-import {
-  resolveLanguageProfiles,
-  inspectLanguageProfileTool,
-  runLanguageChecks,
-} from "@terra-symposium/standards-language-checks";
+import { resolveLanguageProfiles, inspectLanguageProfileTool, runLanguageChecks } from '@terra-symposium/standards-language-checks';
 ```
 
 The package also exports profile IDs, capability maps, resolved check types, and profile definitions. Its `./cli` export and `terra-language-checks` bin are both public. See [profile configuration](/quality/2-configuration/quality-json/) for exact option names.

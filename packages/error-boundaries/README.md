@@ -29,7 +29,7 @@ import { ErrorBoundary } from '@terra-symposium/standards-error-boundaries/react
 
 ## Structure
 
-- See [src](src/), [package.json](package.json), and `test/`.
+- See [src](src/), [package.json](package.json), and `tests/`.
 
 ## References
 
@@ -50,14 +50,11 @@ The Astro wrapper listens for Astro's cancelable `astro:hydration-error` event a
 
 ### Other entry points
 
-`@terra-symposium/standards-error-boundaries/astro` exports status-copy helpers for 400, 401, 403,
-404, 500, 502, and 503 responses.
+`@terra-symposium/standards-error-boundaries/astro` exports status-copy helpers for 400, 401, 403, 404, 500, 502, and 503 responses.
 
-`@terra-symposium/standards-error-boundaries/astro-boundary` exports the reusable static Astro
-island guard.
+`@terra-symposium/standards-error-boundaries/astro-boundary` exports the reusable static Astro island guard.
 
-`@terra-symposium/standards-error-boundaries/next` exports types and `errorDigest(error)` for
-framework-provided route-error digests.
+`@terra-symposium/standards-error-boundaries/next` exports types and `errorDigest(error)` for framework-provided route-error digests.
 
 - The package root re-exports all entry-point APIs.
 

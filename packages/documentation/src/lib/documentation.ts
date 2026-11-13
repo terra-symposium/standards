@@ -77,9 +77,9 @@ const PNPM_DIR_FLAG = /^(\s*(?:\$\s*)?pnpm)\s+(?:-C|--prefix)(\s+)("[^"]+"|'[^']
  * @return Deprecated pnpm directory commands found in configured Markdown.
  */
 export function documentedCommandFindings(cfg: QualityCfg): { file: string; line: number; command: string; recommendation: string }[] {
-	const roots = cfg.documentation?.commandRoots?.map((p) => resolve(cfg.root, p)) ?? [];
+	const roots = cfg.documentation?.commandRoots?.map(p => resolve(cfg.root, p)) ?? [];
 	if (!roots.length) return [];
-	return srcFiles({ ...cfg, sourceRoots: roots, extensions: ['.md', '.mdx'] }).flatMap((f) => {
+	return srcFiles({ ...cfg, sourceRoots: roots, extensions: ['.md', '.mdx'] }).flatMap(f => {
 		const lines = readFileSync(f, 'utf8').split(N_REGEX);
 		let inShellFence = false;
 		return lines.flatMap((s, i) => {
@@ -105,7 +105,7 @@ export function documentedCommandFindings(cfg: QualityCfg): { file: string; line
  * @return Number of deprecated commands replaced.
  */
 export function fixDocumentedCommands(cfg: QualityCfg): number {
-	const roots = cfg.documentation?.commandRoots?.map((p) => resolve(cfg.root, p)) ?? [];
+	const roots = cfg.documentation?.commandRoots?.map(p => resolve(cfg.root, p)) ?? [];
 	if (!roots.length) return 0;
 	let fixed = 0;
 	for (const file of srcFiles({ ...cfg, sourceRoots: roots, extensions: ['.md', '.mdx'] })) {
@@ -113,7 +113,7 @@ export function fixDocumentedCommands(cfg: QualityCfg): number {
 		let inShellFence = false;
 		const updated = source
 			.split(N_REGEX)
-			.map((s) => {
+			.map(s => {
 				const line = s.replace(R_N_END_REGEX, '');
 				if (!inShellFence) {
 					if (PNPM_FENCE.test(line)) inShellFence = true;
@@ -270,7 +270,7 @@ export function duplicateImportFindings(files: string[]): DuplicateImportFinding
 					keys.push(`${declaration.moduleSpecifier.text}|${typeOnly ? 'TYPES' : importGroup(element.name.text)}|${typeOnly ? 'type' : 'value'}|${element.getText(parsed).replace(TYPE_S_REGEX, '')}`);
 				}
 			}
-			if (keys.some((k) => seen.has(k))) {
+			if (keys.some(k => seen.has(k))) {
 				const { line } = parsed.getLineAndCharacterOfPosition(declaration.getStart(parsed));
 				findings.push({ file, line: line + source.lineOffset + 1, module: declaration.moduleSpecifier.text });
 			}
@@ -413,7 +413,7 @@ function documentationSupported(fileName: string): boolean {
 function documentationSourceIncluded(cfg: QualityCfg, file: string): boolean {
 	return !relative(cfg.root, file)
 		.split(sep)
-		.some((d) => ['generated', 'vendor', 'target', 'out'].includes(d));
+		.some(d => ['generated', 'vendor', 'target', 'out'].includes(d));
 }
 
 /**
@@ -454,9 +454,9 @@ function cDocumentationFindings(cfg: QualityCfg, file: string, source: string, d
 				name: node.name,
 				signature: `${node.name}|${node.type?.qualType ?? ''}`,
 				line: node.loc.line ?? source.slice(0, node.loc.offset).split('\n').length,
-				params: children.filter((c) => c.kind === 'ParmVarDecl').map((c) => c.name ?? '<unnamed>'),
+				params: children.filter(c => c.kind === 'ParmVarDecl').map(c => c.name ?? '<unnamed>'),
 				returnsValue: !/^void\s*\(/.test(node.type?.qualType ?? ''),
-				comment: children.find((c) => c.kind === 'FullComment'),
+				comment: children.find(c => c.kind === 'FullComment'),
 			});
 		}
 		for (const child of node.inner ?? []) walk(child);
@@ -502,7 +502,7 @@ function cDocumentationFindings(cfg: QualityCfg, file: string, source: string, d
 		if (!comment.summary.trim()) report('<summary>', 'summary', 'add a meaningful documentation summary');
 		const documented = comment.params.map(({ name: n }) => n);
 		for (const name of declaration.params) if (!documented.includes(name)) report(`@param ${name}`, 'param', `missing @param ${name}`);
-		for (const name of new Set(documented.filter((n) => !declaration.params.includes(n)))) report(`@param ${name}`, 'param', `stale @param ${name}`);
+		for (const name of new Set(documented.filter(n => !declaration.params.includes(n)))) report(`@param ${name}`, 'param', `stale @param ${name}`);
 		if (declaration.params.some((n, i) => documented[i] !== n)) report('@param order', 'param', `@param tags must follow signature order: ${declaration.params.join(', ')}`);
 		for (const { name, description } of comment.params) if (declaration.params.includes(name) && !description.trim()) report(`@param ${name}`, 'param', `missing description for @param ${name}`);
 		if (declaration.returnsValue && !comment.returns?.trim()) report('@return', 'return', 'missing @return description');
@@ -542,8 +542,8 @@ function documented(node: ts.Node, src: string): boolean {
 	const docLines = doc[0]!
 		.slice(3, -2)
 		.split(R_N_REGEX)
-		.map((l) => l.replace(S_CLASS_3, '').trim());
-	return !(prefix.trim() === '' && docLines.some((l) => C_M_JS_JSX_TS_TSX_REGEX.test(l)));
+		.map(l => l.replace(S_CLASS_3, '').trim());
+	return !(prefix.trim() === '' && docLines.some(l => C_M_JS_JSX_TS_TSX_REGEX.test(l)));
 }
 
 /**
@@ -555,7 +555,7 @@ function documented(node: ts.Node, src: string): boolean {
  */
 function exported(node: ts.Node): boolean {
 	const target = documentationTarget(node);
-	return !!(ts.canHaveModifiers(target) && ts.getModifiers(target)?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword));
+	return !!(ts.canHaveModifiers(target) && ts.getModifiers(target)?.some(m => m.kind === ts.SyntaxKind.ExportKeyword));
 }
 
 /**
@@ -567,7 +567,7 @@ function exported(node: ts.Node): boolean {
  */
 function bindingParamNames(name: ts.BindingName): string[] {
 	if (ts.isIdentifier(name)) return [name.text];
-	return name.elements.flatMap((element) => (ts.isOmittedExpression(element) ? [] : bindingParamNames(element.name)));
+	return name.elements.flatMap(element => (ts.isOmittedExpression(element) ? [] : bindingParamNames(element.name)));
 }
 
 /**
@@ -595,7 +595,7 @@ function documentationNodeName(node: ts.Node): string {
 	if (ts.isConstructorDeclaration(node)) return 'constructor';
 	const target = documentationTarget(node);
 	if (target !== node && ts.isVariableStatement(target)) {
-		const declaration = target.declarationList.declarations.find((c) => containsNode(c, node));
+		const declaration = target.declarationList.declarations.find(c => containsNode(c, node));
 		if (declaration) return declaration.name.getText();
 	}
 	const candidate = (node as unknown as { name?: ts.Node }).name ?? node;
@@ -695,7 +695,7 @@ function tsdocLines(block: TSDocBlock): TSDocLine[] {
 	const body = block.text.slice(3, -2);
 	const lineSize = body.includes('\r\n') ? 2 : 1;
 	let offset = block.start + 3;
-	return body.split(R_N_REGEX).map((l) => {
+	return body.split(R_N_REGEX).map(l => {
 		const result = { offset, text: l.replace(S_CLASS_3, '').trim() };
 		offset += l.length + lineSize;
 		return result;
@@ -711,10 +711,10 @@ function tsdocLines(block: TSDocBlock): TSDocLine[] {
  * @return The top-level file-header block, or `undefined` when it is missing.
  */
 function fileHeaderBlock(src: string, blocks: TSDocBlock[]): TSDocBlock | undefined {
-	return blocks.find((b) => {
+	return blocks.find(b => {
 		let prefix = src.slice(0, b.start).replace(UFEFF_REGEX, '');
 		if (prefix.startsWith('#!')) prefix = prefix.slice(prefix.indexOf('\n') + 1);
-		return prefix.trim() === '' && tsdocLines(b).some((l) => C_M_JS_JSX_TS_TSX_REGEX.test(l.text));
+		return prefix.trim() === '' && tsdocLines(b).some(l => C_M_JS_JSX_TS_TSX_REGEX.test(l.text));
 	});
 }
 
@@ -840,7 +840,7 @@ function descriptionFindingsForFile(cfg: QualityCfg, file: string, src: string, 
 	};
 	markAttached(parsed);
 	for (const block of blocks) {
-		if (!tsdocTagEntries(tsdocLines(block)).some((entry) => entry.tag.toLowerCase() === 'typedef')) continue;
+		if (!tsdocTagEntries(tsdocLines(block)).some(entry => entry.tag.toLowerCase() === 'typedef')) continue;
 		attached.add(block.start);
 		if (requirements.types) requiredAttached.add(block.start);
 	}
@@ -852,11 +852,11 @@ function descriptionFindingsForFile(cfg: QualityCfg, file: string, src: string, 
 		}
 		if (!requiredAttached.has(block.start)) continue;
 		const lines = tsdocLines(block);
-		const firstTag = lines.findIndex((l) => l.text.startsWith('@'));
+		const firstTag = lines.findIndex(l => l.text.startsWith('@'));
 		if (
 			!lines
 				.slice(0, firstTag < 0 ? lines.length : firstTag)
-				.map((l) => l.text)
+				.map(l => l.text)
 				.filter(Boolean).length
 		)
 			findings.push(documentationCommentReport(file, parsed, block.start, '<TSDoc summary>', 'summary', 'add a meaningful description for this TSDoc block', cfg));
@@ -947,20 +947,20 @@ function documentationFindingsForFile(
 					const block = documentationBlockFor(src, node);
 					if (block) {
 						const entries = tsdocTagEntries(tsdocLines(block));
-						const documentedParams = new Set(entries.filter((e) => e.tag.toLowerCase() === 'param').map((e) => e.subject));
+						const documentedParams = new Set(entries.filter(e => e.tag.toLowerCase() === 'param').map(e => e.subject));
 						const declaredParams = new Set(node.parameters.flatMap((param, i) => fnParamNames(param, i)));
 						for (const [idx, param] of node.parameters.entries()) {
 							for (const name of fnParamNames(param, idx))
 								if (!documentedParams.has(name)) findings.push(documentationReport(file, parsed, node, `@param ${name}`, 'param', `document the ${name} parameter`, cfg));
 						}
-						for (const entry of entries.filter((item) => {
+						for (const entry of entries.filter(item => {
 							if (item.tag.toLowerCase() !== 'param' || !item.subject || declaredParams.has(item.subject)) return false;
 							return !declaredParams.has(item.subject.split('.')[0]!);
 						})) {
-							const destructuredProps = entry.subject === 'props' && node.parameters.some((parameter) => ts.isObjectBindingPattern(parameter.name));
+							const destructuredProps = entry.subject === 'props' && node.parameters.some(parameter => ts.isObjectBindingPattern(parameter.name));
 							if (!destructuredProps) findings.push(documentationCommentReport(file, parsed, entry.offset, `@param ${entry.subject}`, 'param', `remove stale @param ${entry.subject}`, cfg));
 						}
-						const hasReturnTag = entries.some((e) => ['return', 'returns'].includes(e.tag.toLowerCase()));
+						const hasReturnTag = entries.some(e => ['return', 'returns'].includes(e.tag.toLowerCase()));
 						if (returnsVal(node) && !hasReturnTag) findings.push(documentationReport(file, parsed, node, '@return', 'return', 'document the value returned by this function', cfg));
 					}
 				}
@@ -985,17 +985,17 @@ function documentationFindingsForFile(
 export function documentationFindings(cfg: QualityCfg, analysis?: QualityAnalysis): DocumentationFinding[] {
 	const requirements = { functions: true, ...cfg.documentation?.required };
 	const sharedAnalysis = analysis;
-	const cFiles = srcFiles({ ...cfg, extensions: ['.c', '.h'] }).filter((f) => documentationSourceIncluded(cfg, f));
+	const cFiles = srcFiles({ ...cfg, extensions: ['.c', '.h'] }).filter(f => documentationSourceIncluded(cfg, f));
 	const documentedSignatures = new Set<string>();
 	const missingTargets = new Map<string, string>();
-	const cFindings = cFiles.flatMap((f) => cDocumentationFindings(cfg, f, readFileSync(f, 'utf8'), documentedSignatures, missingTargets));
+	const cFindings = cFiles.flatMap(f => cDocumentationFindings(cfg, f, readFileSync(f, 'utf8'), documentedSignatures, missingTargets));
 	const otherFiles = sharedAnalysis?.files
-		? sharedAnalysis.files.filter((f) => documentationSourceIncluded(cfg, f) && documentationSupported(f))
-		: srcFiles(cfg).filter((f) => documentationSourceIncluded(cfg, f) && documentationSupported(f));
-	const otherFindings = otherFiles.flatMap((f) => documentationFindingsForFile(cfg, f, requirements, sharedAnalysis));
+		? sharedAnalysis.files.filter(f => documentationSourceIncluded(cfg, f) && documentationSupported(f))
+		: srcFiles(cfg).filter(f => documentationSourceIncluded(cfg, f) && documentationSupported(f));
+	const otherFindings = otherFiles.flatMap(f => documentationFindingsForFile(cfg, f, requirements, sharedAnalysis));
 	const primaryMissing = new Map<string, string>();
 	for (const [target, signature] of missingTargets) if (!primaryMissing.has(signature)) primaryMissing.set(signature, target);
-	return [...cFindings, ...otherFindings].filter((f) => {
+	return [...cFindings, ...otherFindings].filter(f => {
 		if (f.kind !== 'function' || !f.reason.startsWith('missing documentation block')) return true;
 		const target = `${f.file}|${f.line}|${f.name}`;
 		const signature = missingTargets.get(target);

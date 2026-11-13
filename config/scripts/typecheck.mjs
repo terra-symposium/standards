@@ -15,8 +15,8 @@ const ignoredDirs = new Set(['.git', '.next', '.nuxt', '.turbo', '.vercel', '.vi
  */
 function childDirs(dir) {
 	return readdirSync(dir, { withFileTypes: true })
-		.filter((entry) => entry.isDirectory() && !ignoredDirs.has(entry.name))
-		.map((entry) => join(dir, entry.name));
+		.filter(entry => entry.isDirectory() && !ignoredDirs.has(entry.name))
+		.map(entry => join(dir, entry.name));
 }
 
 /**
@@ -55,7 +55,7 @@ export function discoverTypecheckTargets(repoRoot = root) {
 			const manifestPath = join(dir, 'package.json');
 			if (!statSync(manifestPath, { throwIfNoEntry: false })?.isFile()) continue;
 			const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
-			const tsconfigPath = [join(dir, 'config', 'tsconfig.json'), join(dir, 'tsconfig.json')].find((path) => statSync(path, { throwIfNoEntry: false })?.isFile());
+			const tsconfigPath = [join(dir, 'config', 'tsconfig.json'), join(dir, 'tsconfig.json')].find(path => statSync(path, { throwIfNoEntry: false })?.isFile());
 			if (!tsconfigPath && !hasTypeScriptSource(dir)) continue;
 			if (!tsconfigPath) throw new Error(`${relative(repoRoot, dir)} has TypeScript source but no tsconfig.json`);
 			if (typeof manifest.scripts?.typecheck !== 'string' || !manifest.scripts.typecheck.trim())

@@ -62,8 +62,8 @@ export default class QualityPlaywrightReporter {
 	 * @param opts Optional sinks for output and progress.
 	 */
 	constructor(opts: { write?: (text: string) => void; writeProgress?: (text: string) => void } = {}) {
-		this.write = opts.write ?? ((text) => void process.stdout.write(text));
-		this.writeProgress = opts.writeProgress ?? ((text) => void process.stderr.write(text));
+		this.write = opts.write ?? (text => void process.stdout.write(text));
+		this.writeProgress = opts.writeProgress ?? (text => void process.stderr.write(text));
 	}
 
 	/**

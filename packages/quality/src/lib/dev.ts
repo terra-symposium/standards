@@ -24,11 +24,8 @@ HELPERS
 function applyErrBoundaries(): void {
 	if (!existsSync('quality.json') && !existsSync('config/quality.json')) return;
 	if (
-		spawnSync(process.execPath, [fileURLToPath(new URL('./runner.js', import.meta.url)), 'error-boundaries', '--all', '--safe-fix'], {
-			cwd: process.cwd(),
-			env: process.env,
-			stdio: 'inherit',
-		}).status !== 0
+		spawnSync(process.execPath, [fileURLToPath(new URL('./runner.js', import.meta.url)), 'error-boundaries', '--all', '--safe-fix'], { cwd: process.cwd(), env: process.env, stdio: 'inherit' })
+			.status !== 0
 	)
 		throw new Error('Could not apply the configured application error boundaries.');
 }
@@ -72,7 +69,7 @@ function defaultPort(cmdName: string): number {
  * @param executableArgs Arguments passed to the development server.
  */
 function run(executable: string, executableArgs: string[]): Promise<void> {
-	return new Promise((resolve) => {
+	return new Promise(resolve => {
 		const child = spawn(executable, executableArgs, { cwd: process.cwd(), env: process.env, stdio: 'inherit' });
 		let finished = false;
 		const finish = (code: number | null, signal: NodeJS.Signals | null) => {
@@ -87,7 +84,7 @@ function run(executable: string, executableArgs: string[]): Promise<void> {
 		const forwardTerminate = () => child.kill('SIGTERM');
 		process.once('SIGINT', forwardInterrupt);
 		process.once('SIGTERM', forwardTerminate);
-		child.once('error', (e) => {
+		child.once('error', e => {
 			console.error('[terra-quality-dev] Could not start the dev server: ' + e.message);
 			finish(1, null);
 		});
@@ -119,7 +116,7 @@ async function main(): Promise<void> {
 	await run(cmd, finalArgs);
 }
 
-main().catch((e) => {
+main().catch(e => {
 	console.error('[terra-quality-dev] ' + (e instanceof Error ? e.message : String(e)));
 	process.exitCode = 1;
 });

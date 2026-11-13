@@ -15,7 +15,7 @@ pnpm exec terra-test run --manifest config/terra-tests.json
 Use Node.js `>=20`. The diagram shows why the manifest is validated before repository suites run.
 
 <Nodes
-	direction="LR"
+	direction='LR'
 	nodes={[
 		{ id: 'discover', type: 'origin', data: { title: 'Discover test files' } },
 		{ id: 'manifest', type: 'process', data: { title: 'Validate manifest ownership' } },
@@ -60,8 +60,7 @@ The runner discovers test files in `test/` and `tests/` directories and names ma
 pnpm exec terra-test run --manifest config/terra-tests.json
 ```
 
-Runs shared checks followed by the ordered repository suites.
-|||
+Runs shared checks followed by the ordered repository suites. |||
 
 ||| [Shared checks only]
 
@@ -69,8 +68,7 @@ Runs shared checks followed by the ordered repository suites.
 pnpm exec terra-test run --manifest config/terra-tests.json --shared-only
 ```
 
-Use this when a workflow intentionally separates test execution from plan validation.
-|||
+Use this when a workflow intentionally separates test execution from plan validation. |||
 
 ||| [Selected suites]
 
@@ -78,15 +76,13 @@ Use this when a workflow intentionally separates test execution from plan valida
 pnpm exec terra-test run --manifest config/terra-tests.json --suites unit,contracts
 ```
 
-Select named custom suites while retaining the shared checks.
-|||
+Select named custom suites while retaining the shared checks. |||
 
 ## Discovery and compatibility
 
 The canonical path is `config/terra-tests.json`. If it is absent, the runner recognizes `tests/terra-tests.json` and the legacy root `.terra-tests.json`. Pass `--manifest PATH` to select another location.
 
-=== [When tests move]
-Map each moved or retired test to its new owner. Update the `owns` globs in the same change. Keep a retired assertion only when its behavior is covered elsewhere or the coverage gap is explicitly accepted.
+=== [When tests move] Map each moved or retired test to its new owner. Update the `owns` globs in the same change. Keep a retired assertion only when its behavior is covered elsewhere or the coverage gap is explicitly accepted.
 
 # Place tests near the module or route they prove. Use unit/contract suites for isolated behavior, integration suites for composed services, and browser suites for visible interactions. Exclude fixture-only files from ownership globs when they are not test cases.
 

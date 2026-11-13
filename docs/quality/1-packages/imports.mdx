@@ -21,10 +21,7 @@ The CLI reads root `quality.json` or `config/quality.json`; `--config PATH` choo
 ## API
 
 ```ts
-import {
-  checkImports,
-  duplicateImportFindings,
-} from "@terra-symposium/standards-imports";
+import { checkImports, duplicateImportFindings } from '@terra-symposium/standards-imports';
 ```
 
 Both APIs are available from the declared root export with TypeScript declarations; `./cli` is also exported. See [the config reference](/quality/2-configuration/quality-json/) for path semantics and [CLI workflows](/quality/4-workflows/cli-and-ci/) for common scope choices.

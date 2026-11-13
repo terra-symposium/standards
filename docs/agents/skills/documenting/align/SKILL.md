@@ -43,13 +43,11 @@ Put the output contract before style guidance. Require:
 - fenced code blocks with a language label;
 - permitted Docs blocks only; no invented components;
 
-concise headings and one idea per bullet, with natural prose and lines under 140 characters where
-practical;
+concise headings and one idea per bullet, with natural prose and lines under 140 characters where practical;
 
 - inline `<code>` for technical tokens and `$...$` for symbolic relationships;
 
-tables for repeated/comparison data, concise asides for salient constraints, `<Nodes>` for real
-sequences, accordions for secondary detail, and numbered lists only for ordered procedures;
+tables for repeated/comparison data, concise asides for salient constraints, `<Nodes>` for real sequences, accordions for secondary detail, and numbered lists only for ordered procedures;
 
 - a silent structural self-check and a complete corrected artifact when the driver reports an error.
 

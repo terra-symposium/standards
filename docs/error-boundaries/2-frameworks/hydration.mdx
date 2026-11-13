@@ -13,10 +13,7 @@ import AstroErrorBoundary from '@terra-symposium/standards-error-boundaries/astr
 import Workspace from '../components/Workspace.tsx';
 ---
 
-<AstroErrorBoundary
-	title="Workspace unavailable"
-	description="The interactive workspace did not start. Reload to try again."
->
+<AstroErrorBoundary title='Workspace unavailable' description='The interactive workspace did not start. Reload to try again.'>
 	<Workspace client:load />
 </AstroErrorBoundary>
 ```

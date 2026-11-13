@@ -17,11 +17,7 @@ The CLI reads the shared Quality config and scope. `--warn` performs a read-only
 ## API and safety model
 
 ```ts
-import {
-  objectForwardingFindings,
-  singleUseFindings,
-  fixSingleUseDeclarations,
-} from "@terra-symposium/standards-refactoring";
+import { objectForwardingFindings, singleUseFindings, fixSingleUseDeclarations } from '@terra-symposium/standards-refactoring';
 ```
 
 The package exports forwarding analysis, single-use type/declaration findings, fix helpers, and dead-code TypeScript-program utilities. Candidate dead-code edits are type-checked before write. Knip and ESLint consumers are also coordinated by the aggregate runner. A declaration marked `// terra-quality-ignore single-use -- <reason>` remains a review-only exception and its marker is itself validated; safe inline candidates are not suppressed by this directive.

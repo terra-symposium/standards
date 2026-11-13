@@ -98,7 +98,7 @@ const resultLoadGrade = (val: VisualResult): string => {
  * @return A promise that resolves after the workbook has been written.
  */
 export const writeSpreadsheet = async (file: string, run: ReportRun): Promise<void> => {
-	const loadEnabled = run.loadTestingEnabled ?? run.results.some((r) => !!r.loadMeasurements?.length);
+	const loadEnabled = run.loadTestingEnabled ?? run.results.some(r => !!r.loadMeasurements?.length);
 	const book = new ExcelJS.Workbook();
 	book.creator = 'Test evidence reporter';
 	book.lastModifiedBy = 'Test evidence reporter';
@@ -111,13 +111,8 @@ export const writeSpreadsheet = async (file: string, run: ReportRun): Promise<vo
 		for (const file of orderedFiles(run)) {
 			const vals = resultsForFile(run, file);
 			const counts = statusCounts(vals);
-			const loadCounts = loadGradeCounts(vals.flatMap((r) => r.loadMeasurements || []));
-			sheet.addRow([
-				file,
-				...VISUAL_STATUSES.map((s) => counts[s]),
-				VISUAL_STATUSES.reduce((t, s) => t + counts[s], 0),
-				...(loadEnabled ? [loadCounts.pass, loadCounts.warning, loadCounts.fail] : []),
-			]);
+			const loadCounts = loadGradeCounts(vals.flatMap(r => r.loadMeasurements || []));
+			sheet.addRow([file, ...VISUAL_STATUSES.map(s => counts[s]), VISUAL_STATUSES.reduce((t, s) => t + counts[s], 0), ...(loadEnabled ? [loadCounts.pass, loadCounts.warning, loadCounts.fail] : [])]);
 		}
 		styleHeader(sheet);
 		sheet.columns = [{ width: 32 }, ...Array.from({ length: loadEnabled ? 9 : 6 }, () => ({ width: 14 }))];
@@ -125,13 +120,13 @@ export const writeSpreadsheet = async (file: string, run: ReportRun): Promise<vo
 	for (const fileName of orderedFiles(run)) {
 		const base =
 			[...fileName]
-				.map((c) => ('\\/:*?[]'.includes(c) ? '_' : c))
+				.map(c => ('\\/:*?[]'.includes(c) ? '_' : c))
 				.join('')
 				.replace(/^'+|'+$/g, '')
 				.slice(0, 31) || 'Results';
 		let sheetName = base;
 		let suffix = 2;
-		while (new Set([...book.worksheets.map((s) => s.name.toLowerCase()), ...['summary', 'projects', 'run diagnostics']]).has(sheetName.toLowerCase())) {
+		while (new Set([...book.worksheets.map(s => s.name.toLowerCase()), ...['summary', 'projects', 'run diagnostics']]).has(sheetName.toLowerCase())) {
 			const label = ` (${suffix})`;
 			suffix += 1;
 			sheetName = `${base.slice(0, 31 - label.length)}${label}`;
@@ -245,8 +240,8 @@ export const writeSpreadsheet = async (file: string, run: ReportRun): Promise<vo
 		const sheet = book.addWorksheet('Projects');
 		sheet.addRow(['Project', 'Configured files', 'Passed', 'Failed', 'Timed out', 'Skipped', 'Interrupted', 'Total']);
 		for (const project of run.projects) {
-			const counts = statusCounts(run.results.filter((r) => r.project === project.name));
-			sheet.addRow([project.name, project.configuredFiles.join(', '), ...VISUAL_STATUSES.map((s) => counts[s]), VISUAL_STATUSES.reduce((t, s) => t + counts[s], 0)]);
+			const counts = statusCounts(run.results.filter(r => r.project === project.name));
+			sheet.addRow([project.name, project.configuredFiles.join(', '), ...VISUAL_STATUSES.map(s => counts[s]), VISUAL_STATUSES.reduce((t, s) => t + counts[s], 0)]);
 		}
 		sheet.columns = [{ width: 30 }, { width: 48 }, ...Array.from({ length: 6 }, () => ({ width: 14 }))];
 		styleHeader(sheet);
@@ -283,7 +278,7 @@ const copyWorksheet = (source: ExcelJS.Worksheet, target: ExcelJS.Worksheet, sou
 	target.pageSetup = structuredClone(source.pageSetup);
 	target.headerFooter = structuredClone(source.headerFooter);
 	target.state = source.state;
-	target.columns = source.columns.map((c) => ({ width: c.width, hidden: c.hidden, outlineLevel: c.outlineLevel, style: structuredClone(c.style), header: structuredClone(c.header), key: c.key }));
+	target.columns = source.columns.map(c => ({ width: c.width, hidden: c.hidden, outlineLevel: c.outlineLevel, style: structuredClone(c.style), header: structuredClone(c.header), key: c.key }));
 	source.eachRow({ includeEmpty: true }, (r, v) => {
 		const targetRow = target.getRow(v);
 		targetRow.height = r.height;

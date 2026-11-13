@@ -132,7 +132,7 @@ HELPERS
 function sourceCandidates(cfg: QualityCfg): string[] {
 	const roots = [...cfg.sourceRoots, ...(cfg.includeRoots ?? [])];
 	const exts = new Set(cfg.extensions);
-	const skippedFiles = new Set((cfg.skippedFiles ?? []).map((f) => resolve(cfg.root, f)));
+	const skippedFiles = new Set((cfg.skippedFiles ?? []).map(f => resolve(cfg.root, f)));
 	const files: string[] = [];
 	/**
 	 * Checks an encountered directory against configured skip paths.
@@ -143,7 +143,7 @@ function sourceCandidates(cfg: QualityCfg): string[] {
 	 */
 	const isSkippedDir = (dir: string): boolean => {
 		const repoPath = relative(cfg.root, dir);
-		return (cfg.skippedDirectories ?? []).some((s) => {
+		return (cfg.skippedDirectories ?? []).some(s => {
 			const norm = normalize(s.replaceAll('\\', '/'));
 			if (!norm || norm === '.') return false;
 			if (!norm.includes(sep)) return basename(dir) === norm;
@@ -193,7 +193,7 @@ function sourceCandidates(cfg: QualityCfg): string[] {
 	for (const root of roots) walk(root);
 	const candidates = files.sort((a, b) => a.localeCompare(b));
 	if (!candidates.length) return candidates;
-	const gitPaths = candidates.map((file) => relative(cfg.root, file)).filter((file) => file && file !== '..' && !file.startsWith(`..${sep}`));
+	const gitPaths = candidates.map(file => relative(cfg.root, file)).filter(file => file && file !== '..' && !file.startsWith(`..${sep}`));
 	if (!gitPaths.length) return candidates;
 	try {
 		const ignored = execFileSync('git', ['check-ignore', '--stdin', '-z'], {
@@ -205,9 +205,9 @@ function sourceCandidates(cfg: QualityCfg): string[] {
 		})
 			.split('\0')
 			.filter(Boolean)
-			.map((file) => resolve(cfg.root, file));
+			.map(file => resolve(cfg.root, file));
 		const ignoredPaths = new Set(ignored);
-		return candidates.filter((file) => !ignoredPaths.has(resolve(file)));
+		return candidates.filter(file => !ignoredPaths.has(resolve(file)));
 	} catch (err) {
 		const status = err && typeof err === 'object' && 'status' in err ? err.status : undefined;
 		if (status === 1 || status === 128) return candidates;
@@ -234,7 +234,7 @@ export function srcFiles(cfg: QualityCfg): string[] {
  * @return Sorted absolute paths for non-program files with JavaScript or TypeScript suffixes.
  */
 export function nonProgramSrcFiles(cfg: QualityCfg): string[] {
-	return sourceCandidates(cfg).filter((path) => JAVASCRIPT_SOURCE_EXTS.test(path) && !isProgramSource(path));
+	return sourceCandidates(cfg).filter(path => JAVASCRIPT_SOURCE_EXTS.test(path) && !isProgramSource(path));
 }
 
 /**
@@ -250,9 +250,9 @@ export function workingSrcFiles(cfg: QualityCfg): string[] {
 			.concat(execFileSync('git', ['ls-files', '--others', '--exclude-standard'], { cwd: cfg.root, encoding: 'utf8' }))
 			.split('\n')
 			.filter(Boolean)
-			.map((p) => join(cfg.root, p)),
+			.map(p => join(cfg.root, p)),
 	);
-	return srcFiles(cfg).filter((f) => changed.has(f));
+	return srcFiles(cfg).filter(f => changed.has(f));
 }
 
 /**

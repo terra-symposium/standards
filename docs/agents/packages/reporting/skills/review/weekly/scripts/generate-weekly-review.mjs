@@ -49,7 +49,7 @@ function hue() {
 	for (let attempt = 0; attempt < 100; attempt += 1) {
 		let value = randomInt(0, 360);
 		if (value >= 70 && value <= 130) value += 60;
-		if (usedHues.every((existing) => Math.min(Math.abs(existing - value), 360 - Math.abs(existing - value)) >= 35)) {
+		if (usedHues.every(existing => Math.min(Math.abs(existing - value), 360 - Math.abs(existing - value)) >= 35)) {
 			usedHues.push(value);
 			return value;
 		}
@@ -173,7 +173,7 @@ function rule(slide, left, top, width, color, name) {
  * @param lines Source references to record in the notes.
  */
 function notes(slide, lines) {
-	slide.speakerNotes.textFrame.setText(`[Sources]\n${lines.map((line) => `- ${line}`).join('\n')}`);
+	slide.speakerNotes.textFrame.setText(`[Sources]\n${lines.map(line => `- ${line}`).join('\n')}`);
 	slide.speakerNotes.setVisible(true);
 }
 
@@ -188,7 +188,7 @@ function notes(slide, lines) {
 function wrapLines(value, maxChars) {
 	return String(value)
 		.split('\n')
-		.flatMap((line) => {
+		.flatMap(line => {
 			const lines = [];
 			let current = '';
 			for (const word of line.split(/\s+/)) {
@@ -247,8 +247,8 @@ function addCode(slide, codeInput, position, colors) {
 		.slice(codeInput.start - 1, codeInput.end)
 		.join('\n')
 		.split('\n')
-		.map((line) => line.replaceAll('\t', '    '));
-	const longest = Math.max(...lines.map((line) => line.length));
+		.map(line => line.replaceAll('\t', '    '));
+	const longest = Math.max(...lines.map(line => line.length));
 	const fontSize = Math.max(8, Math.min(14, Math.floor((position.width - 36) / Math.max(1, longest * 0.58))));
 	if (fontSize === 8 && longest * 0.58 * fontSize > position.width - 36)
 		throw new Error(`Code excerpt ${codeInput.path}:${codeInput.start}-${codeInput.end} is too wide; use a wider layout or a narrower complete range.`);
@@ -269,7 +269,7 @@ function addCode(slide, codeInput, position, colors) {
 		line: { style: 'solid', fill: 'none', width: 0 },
 	});
 	shape.text.style = { fontSize, typeface: 'Menlo', alignment: 'left', verticalAlignment: 'top', wrap: 'none', autoFit: 'none', insets: { top: 0, right: 0, bottom: 0, left: 0 } };
-	shape.text = lines.map((line) => {
+	shape.text = lines.map(line => {
 		const runs = [];
 		let last = 0;
 		for (const match of line.matchAll(
@@ -350,16 +350,16 @@ function planDay(date, plan) {
  */
 function validPlan(plan, contributor, { requirePreviousObjective = true, allowUnknownProgress = false } = {}) {
 	if (!plan) return false;
-	if (![plan.source, plan.start, plan.end, plan.asOf, plan.outcome, ...(requirePreviousObjective ? [plan.previousObjective] : [])].every((value) => typeof value === 'string' && value.length))
+	if (![plan.source, plan.start, plan.end, plan.asOf, plan.outcome, ...(requirePreviousObjective ? [plan.previousObjective] : [])].every(value => typeof value === 'string' && value.length))
 		throw new Error(`${contributor.name}: plan requires source, start, end, asOf, outcome${requirePreviousObjective ? ', and previousObjective' : ''}.`);
 	if (!Array.isArray(plan.milestones) || !plan.milestones.length || plan.milestones.length > 6) throw new Error(`${contributor.name}: plan requires one to six milestones.`);
 	const planStart = new Date(`${plan.start}T00:00:00Z`);
 	const planEnd = new Date(`${plan.end}T00:00:00Z`);
 	const asOf = new Date(`${plan.asOf}T00:00:00Z`);
-	if ([planStart, planEnd, asOf].some((date) => Number.isNaN(date.valueOf())) || planStart >= planEnd || asOf < planStart || asOf > planEnd)
+	if ([planStart, planEnd, asOf].some(date => Number.isNaN(date.valueOf())) || planStart >= planEnd || asOf < planStart || asOf > planEnd)
 		throw new Error(`${contributor.name}: plan start, end, and asOf must be ordered ISO dates.`);
 	for (const milestone of plan.milestones) {
-		if (![milestone.name, milestone.start, milestone.end, milestone.evidence].every((value) => typeof value === 'string' && value.length))
+		if (![milestone.name, milestone.start, milestone.end, milestone.evidence].every(value => typeof value === 'string' && value.length))
 			throw new Error(`${contributor.name}: each milestone requires name, start, end, and evidence.`);
 		if (!(allowUnknownProgress && milestone.progress === null) && (!Number.isInteger(milestone.progress) || milestone.progress < 0 || milestone.progress > 100))
 			throw new Error(`${contributor.name}: milestone progress must be an integer from 0 through 100${allowUnknownProgress ? ' or null when progress is unverified' : ''}.`);
@@ -382,9 +382,9 @@ function validPlan(plan, contributor, { requirePreviousObjective = true, allowUn
 function assessBigFiveTimeline(plan, historyCommits) {
 	if (typeof plan?.source !== 'string' || !plan.source.trim() || !Array.isArray(plan.objectives) || plan.objectives.length !== 5)
 		throw new Error('Big Five timeline requires a source and five objectives, each assessed against the complete history of the requested refs.');
-	const historyBySha = new Map(historyCommits.map((commit) => [commit.sha, commit]));
+	const historyBySha = new Map(historyCommits.map(commit => [commit.sha, commit]));
 	const progressByStatus = { complete: 1, partial: 0.5, not_found: 0 };
-	const milestones = plan.objectives.map((objective) => {
+	const milestones = plan.objectives.map(objective => {
 		if (typeof objective.name !== 'string' || !objective.name.trim() || !Array.isArray(objective.deliverables) || !objective.deliverables.length)
 			throw new Error('Each Big Five objective requires a name and source-backed deliverable assessments.');
 		let score = 0;
@@ -404,7 +404,7 @@ function assessBigFiveTimeline(plan, historyCommits) {
 			}
 			score += progressByStatus[deliverable.status];
 		}
-		const uniqueEvidence = [...new Map(evidence.map((commit) => [commit.sha, commit])).values()].sort((a, b) => a.date.localeCompare(b.date));
+		const uniqueEvidence = [...new Map(evidence.map(commit => [commit.sha, commit])).values()].sort((a, b) => a.date.localeCompare(b.date));
 		return {
 			name: objective.name,
 			progress: Math.round((score / objective.deliverables.length) * 100),
@@ -414,7 +414,7 @@ function assessBigFiveTimeline(plan, historyCommits) {
 			evidence: uniqueEvidence,
 		};
 	});
-	const allDates = historyCommits.map((commit) => commit.date).sort();
+	const allDates = historyCommits.map(commit => commit.date).sort();
 	if (!allDates.length) throw new Error('The requested refs contain no Git history for the Big Five assessment.');
 	return {
 		title: plan.title ?? 'Big Five progress across full Git history',
@@ -451,7 +451,7 @@ function addContributorSummary(deck, section, goal, colors, page, sources) {
 		{ fontSize: 20, color: colors.muted, maxChars: 74 },
 		`contribution-meta-${page}`,
 	);
-	const outcomes = section.slides.flatMap((i) => i.bullets ?? []).slice(0, 6);
+	const outcomes = section.slides.flatMap(i => i.bullets ?? []).slice(0, 6);
 	const body = outcomes.length ? wrapLines(outcomes.join('\n'), 64) : '• No contribution detail was supplied for this identity.';
 	card(slide, { left: 58, top: 214, width: 680, height: 332 }, colors, `contribution-outcomes-${page}`);
 	addText(slide, 'Recorded outcomes', { left: 84, top: 238, width: 600, height: 26 }, { fontSize: 20, color: colors.text, maxChars: 34 }, `contribution-heading-${page}`);
@@ -473,7 +473,7 @@ function addContributorSummary(deck, section, goal, colors, page, sources) {
 	);
 	addText(slide, goal?.status ?? 'Attribution not verified', { left: 796, top: 476, width: 400, height: 28 }, { fontSize: 15, color: colors.muted, maxChars: 44 }, `contribution-status-${page}`);
 	footer(slide, `${section.commitCount} commits · ${identity.toLowerCase()} · branch evidence only`, page, colors);
-	notes(slide, [...sources, ...(goal ? [`${goal.source} · ${goal.status}`] : []), ...section.slides.flatMap((i) => i.sources ?? [])]);
+	notes(slide, [...sources, ...(goal ? [`${goal.source} · ${goal.status}`] : []), ...section.slides.flatMap(i => i.sources ?? [])]);
 }
 
 /**
@@ -486,7 +486,7 @@ async function main() {
 	const historyCommits = git(['log', ...refs, `--until=${report.until}`, '--no-merges', `--format=${'%H%x09%h%x09%aN%x09%aI%x09%s'}`])
 		.split('\n')
 		.filter(Boolean)
-		.map((line) => {
+		.map(line => {
 			const [sha, short, author, authoredAt, ...subject] = line.split('\t');
 			return { sha, short, author, date: authoredAt.slice(0, 10), subject: subject.join('\t') };
 		});
@@ -494,13 +494,13 @@ async function main() {
 	const commits = git(['log', ...refs, `--since=${report.since}`, `--until=${report.until}`, '--no-merges', `--format=${'%H%x09%h%x09%aN%x09%aI%x09%s'}`])
 		.split('\n')
 		.filter(Boolean)
-		.map((line) => {
+		.map(line => {
 			const [sha, short, author, authoredAt, ...subject] = line.split('\t');
 			return { sha, short, author, date: authoredAt.slice(0, 10), subject: subject.join('\t'), paths: git(['show', '--format=', '--name-only', sha]).split('\n').filter(Boolean) };
 		});
 	const mergeCount = Number(git(['rev-list', '--count', ...refs, `--since=${report.since}`, `--until=${report.until}`, '--merges']));
-	const counts = new Map(commits.map((commit) => [commit.author, commits.filter((other) => other.author === commit.author).length]));
-	const screenshotCount = report.contributors.flatMap((section) => section.slides).filter((i) => i.screenshot).length;
+	const counts = new Map(commits.map(commit => [commit.author, commits.filter(other => other.author === commit.author).length]));
+	const screenshotCount = report.contributors.flatMap(section => section.slides).filter(i => i.screenshot).length;
 	const sources = [
 		`Refs: ${refs.join(', ')}`,
 		`Window: ${report.since} through ${report.until} (${report.timezone})`,
@@ -541,7 +541,7 @@ async function main() {
 			addText(slide, goal.status, { left: left + 24, top: top + 140, width: 304, height: 20 }, { fontSize: 13, color: colors.muted, maxChars: 42 }, `goal-status-${i}`);
 		});
 		footer(slide, 'Planning context informs the review; repo evidence remains the implementation source of truth.', page, colors);
-		notes(slide, [...sources, ...report.goals.map((goal) => `${goal.source} · ${goal.status}`)]);
+		notes(slide, [...sources, ...report.goals.map(goal => `${goal.source} · ${goal.status}`)]);
 		page += 1;
 	}
 	if (report.access?.columns?.length) {
@@ -580,7 +580,7 @@ async function main() {
 		const rangeStart = new Date(`${plan.start}T00:00:00Z`).valueOf();
 		const range = Math.max(1, new Date(`${plan.end}T00:00:00Z`).valueOf() - rangeStart);
 
-		const timelineX = (date) => chartLeft + ((new Date(`${date}T00:00:00Z`).valueOf() - rangeStart) / range) * chartWidth;
+		const timelineX = date => chartLeft + ((new Date(`${date}T00:00:00Z`).valueOf() - rangeStart) / range) * chartWidth;
 		const marker = timelineX(plan.asOf);
 		for (let index = 0; index <= 4; index += 1) {
 			const x = chartLeft + (index / 4) * chartWidth;
@@ -621,9 +621,9 @@ async function main() {
 		notes(slide, [
 			...sources,
 			plan.source,
-			...plan.milestones.flatMap((milestone) => [
-				`${milestone.name}: ${milestone.deliverables.map((i) => `${i.name} — ${i.status}`).join('; ')}`,
-				...milestone.evidence.map((commit) => `${commit.sha} · ${commit.date} · ${commit.subject} · ${commit.paths.join(', ')}`),
+			...plan.milestones.flatMap(milestone => [
+				`${milestone.name}: ${milestone.deliverables.map(i => `${i.name} — ${i.status}`).join('; ')}`,
+				...milestone.evidence.map(commit => `${commit.sha} · ${commit.date} · ${commit.subject} · ${commit.paths.join(', ')}`),
 			]),
 		]);
 		page += 1;
@@ -680,12 +680,12 @@ async function main() {
 	const sections = report.contributors;
 	const matchedSections = new Set();
 	for (const { goal, section } of [
-		...orderedGoals.map((goal) => {
-			const section = sections.find((i) => i.name.toLowerCase() === goal.person.toLowerCase() || i.name.toLowerCase().startsWith(`${goal.person.toLowerCase()} `));
+		...orderedGoals.map(goal => {
+			const section = sections.find(i => i.name.toLowerCase() === goal.person.toLowerCase() || i.name.toLowerCase().startsWith(`${goal.person.toLowerCase()} `));
 			if (section) matchedSections.add(section);
 			return { goal, section };
 		}),
-		...sections.filter((section) => !matchedSections.has(section)).map((section) => ({ section })),
+		...sections.filter(section => !matchedSections.has(section)).map(section => ({ section })),
 	]) {
 		const colors = theme();
 		if (!section || section.commitCount <= 0) {
@@ -798,7 +798,7 @@ async function main() {
 				`plan-legend-${page}`,
 			);
 			footer(slide, `Planning context only · ${plan.source.split(' · https://')[0]}`, page, colors);
-			notes(slide, [...sources, plan.source, ...plan.milestones.map((milestone) => `${milestone.name}: ${milestone.evidence}`)]);
+			notes(slide, [...sources, plan.source, ...plan.milestones.map(milestone => `${milestone.name}: ${milestone.evidence}`)]);
 			page += 1;
 		}
 		addContributorSummary(deck, section, goal, colors, page, sources);
@@ -849,7 +849,7 @@ if (!report.bigFive)
 	throw new Error(
 		'A Big Five progress timeline is required. Assess every objective against the complete Git history on the requested refs through the report end date, then supply deliverable assessments with full commit SHAs.',
 	);
-main().catch((err) => {
+main().catch(err => {
 	console.error(err);
 	process.exitCode = 1;
 });

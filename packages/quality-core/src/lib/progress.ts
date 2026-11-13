@@ -34,7 +34,7 @@ HELPERS
  *
  * @return Nothing; the progress bar is written to standard error and may end with a newline.
  */
-export function qualityProgress(label: string, curr: number, total: number, write: (text: string) => void = (text) => void process.stderr.write(text), opts: { finalize?: boolean } = {}): void {
+export function qualityProgress(label: string, curr: number, total: number, write: (text: string) => void = text => void process.stderr.write(text), opts: { finalize?: boolean } = {}): void {
 	if (progressSuppressed) return;
 	const sTotal = Number.isFinite(total) ? Math.max(0, Math.floor(total)) : 0;
 	const completed = sTotal ? Math.min(Math.max(Math.floor(curr), 0), sTotal) : 0;
