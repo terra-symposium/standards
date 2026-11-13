@@ -6,8 +6,11 @@ import { spawnSync } from 'node:child_process';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
+// terra-quality-ignore single-use -- Keep the installed Knip executable path for the isolated consumer fixture.
 const KNIP_BIN = fileURLToPath(new URL('../../../../config/node_modules/.bin/knip', import.meta.url));
+// terra-quality-ignore single-use -- Keep the installed ESLint executable path for the isolated consumer fixture.
 const ESLINT_BIN = fileURLToPath(new URL('../../../../config/node_modules/.bin/eslint', import.meta.url));
+// terra-quality-ignore single-use -- Keep the built Quality runner path for the isolated consumer fixture.
 const RUNNER = fileURLToPath(new URL('../../dist/lib/runner.js', import.meta.url));
 
 test('Knip source ownership counts only declared dependencies imported by mapped parent sources', () => {

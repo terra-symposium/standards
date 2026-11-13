@@ -59,6 +59,7 @@ test('security checks honor tracked visibility and runtime-root exceptions in a 
 	execFileSync('git', ['add', '.gitignore'], { cwd: root });
 	execFileSync('git', ['add', '-f', '.env.committed'], { cwd: root });
 	execFileSync('git', ['-c', 'user.name=quality-test', '-c', 'user.email=quality@example.test', 'commit', '-qm', 'fixture'], { cwd: root });
+	// terra-quality-ignore single-use -- Keep this test configuration named so its fixture scope is established before the check under test runs.
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], security: {} });
 	assert.deepEqual(securityFindings(cfg), [{ file: '.env.committed', message: 'environment files must not be committed' }]);
 });
@@ -67,6 +68,7 @@ test('security runtime roots accept exact files and the legacy root alias', () =
 	const root = fixtureRoot('terra-quality-security-server-files-');
 	fixtureFile(root, 'src/config/runtime.mjs', 'const token = process.env.TOKEN;\nvoid token;\n');
 	fixtureFile(root, 'src/runtime/legacy.mjs', 'const token = process.env.TOKEN;\nvoid token;\n');
+	// terra-quality-ignore single-use -- Keep this test configuration named so its fixture scope is established before the check under test runs.
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.mjs'], security: { runtimeRoots: ['src/config/runtime.mjs'], allowProcessEnvRoots: ['src/runtime'] } });
 	assert.deepEqual(securityFindings(cfg), []);
 });
@@ -75,6 +77,7 @@ test('security runtime checks ignore prose and data files while scanning executa
 	fixtureFile(root, 'docs/security.md', 'The example reads process.env.SECRET and calls dotenv.config().\n');
 	fixtureFile(root, 'data/example.json', JSON.stringify({ example: 'process.env.SECRET dotenv.config()' }));
 	fixtureFile(root, 'src/runtime.ts', 'const token = process.env.TOKEN;\nvoid token;\n');
+	// terra-quality-ignore single-use -- Keep this test configuration named so its fixture scope is established before the check under test runs.
 	const cfg = createQualityCfg({ root, sourceRoots: ['.'], extensions: ['.md', '.json', '.ts'], security: {} });
 	assert.deepEqual(securityFindings(cfg), [{ file: 'src/runtime.ts', message: 'process.env access is outside a configured runtime root' }]);
 });

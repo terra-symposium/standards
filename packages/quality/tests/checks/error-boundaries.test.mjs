@@ -95,6 +95,7 @@ test('accepts an existing top-level boundary, including a local alias', () => {
 		join(root, 'src', 'main.tsx'),
 		"import { ErrorBoundary as AppBoundary } from '@terra-symposium/standards-error-boundaries/react';\nimport { createRoot } from 'react-dom/client';\nconst root = createRoot(document.getElementById('root')!);\nroot.render(<AppBoundary><App /></AppBoundary>);\n",
 	);
+	// terra-quality-ignore single-use -- Keep this test configuration named so its fixture scope is established before the check under test runs.
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.tsx'] });
 	assert.deepEqual(errorBoundaryFindings(cfg), []);
 });
@@ -111,6 +112,7 @@ test('recognizes the Quality compatibility re-export for existing Astro configs'
 test('runs the focused boundary command without requiring an ESLint config', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-error-boundary-cli-'));
 	writeFileSync(join(root, 'quality.json'), JSON.stringify({ sourceRoots: ['src'], extensions: ['.tsx'] }));
+	// terra-quality-ignore single-use -- Keep the Quality runner URL named for the subprocess command under test.
 	const runner = new URL('../../dist/lib/runner.js', import.meta.url);
 	const result = spawnSync(process.execPath, [runner.pathname, 'error-boundaries', '--all'], { cwd: root, encoding: 'utf8' });
 	assert.equal(result.status, 0, result.stderr);

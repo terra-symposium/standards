@@ -414,7 +414,9 @@ test('single-use type analysis distinguishes same-named declarations by resolved
 	fixtureFile(root, 'src/consumer.ts', `import type { Payload } from './second';\nconst payload: Payload = { second: 1 };\nvoid payload;\n`);
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
 	assert.deepEqual(
-		singleUseFindings(cfg).filter(finding => finding.name === 'Payload').map(({ file: f }) => f),
+		singleUseFindings(cfg)
+			.filter(finding => finding.name === 'Payload')
+			.map(({ file: f }) => f),
 		['src/second.ts'],
 	);
 	assert.equal(fixSingleUseDeclarations(cfg), 0);

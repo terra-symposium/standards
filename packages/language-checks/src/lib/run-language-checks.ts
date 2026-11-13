@@ -71,7 +71,11 @@ export function runLanguageChecks(cfg: QualityCfg, options: Pick<CapabilityOptio
 					continue;
 				}
 			}
-			const result = spawnSync(check.autofix.command, check.autofix.args.flatMap(a => (a === '{files}' ? check.files : [a])), { cwd: cfg.root, stdio: 'inherit' });
+			const result = spawnSync(
+				check.autofix.command,
+				check.autofix.args.flatMap(a => (a === '{files}' ? check.files : [a])),
+				{ cwd: cfg.root, stdio: 'inherit' },
+			);
 			if (result.error) reportFailure(check.name, result.error.message);
 			else if (result.status !== 0) reportFailure(check.name, `${check.autofix.command} exited with status ${result.status ?? 1}`);
 		}

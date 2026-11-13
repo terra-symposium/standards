@@ -40,6 +40,7 @@ void [local, alias, indexed, lazy, asset, dynamic, twoArgRequire];
 	fixtureFile(root, 'src/folder/index.ts', 'export const indexed = true;\n');
 	fixtureFile(root, 'src/lazy.ts', 'export const lazy = true;\n');
 	fixtureFile(root, 'src/asset.svg', '<svg />\n');
+	// terra-quality-ignore single-use -- Keep this test configuration named so its fixture scope is established before the check under test runs.
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], aliases: { '@/': 'src/' } });
 	assert.deepEqual(checkImports(cfg), [{ importer: 'src/main.ts', specifier: './missing.js' }]);
 });
@@ -55,6 +56,7 @@ import './missing.txt';
 void external;
 `,
 	);
+	// terra-quality-ignore single-use -- Keep this test configuration named so its fixture scope is established before the check under test runs.
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], aliases: { '~/': 'vendor/' }, externalPrefixes: ['~/'] });
 	assert.deepEqual(checkImports(cfg), [{ importer: 'src/main.ts', specifier: './missing.css' }]);
 });

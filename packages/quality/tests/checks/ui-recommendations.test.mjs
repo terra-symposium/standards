@@ -105,8 +105,11 @@ test('UI recommendation rules override defaults and honor input types and ignore
 test('ui-recommendations reports errors and fails when findings remain', async () => {
 	const root = fixtureRoot('terra-quality-ui-recommendation-cli-');
 	fixtureFile(root, 'src/view.tsx', '<><button>Save</button><a href="/" className="text-primary hover:underline">Home</a></>\n');
+	// terra-quality-ignore single-use -- Keep this test configuration named so its fixture scope is established before the check under test runs.
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.tsx'] });
+	// terra-quality-ignore single-use -- Snapshot console.info before replacing it so cleanup restores the original logger.
 	const originalInfo = console.info;
+	// terra-quality-ignore single-use -- Snapshot console.error before replacing it so cleanup restores the original logger.
 	const originalErr = console.error;
 	const output = [];
 	console.error = (...values) => output.push(values.join(' '));

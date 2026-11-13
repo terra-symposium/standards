@@ -122,6 +122,7 @@ export async function runQualityFromCfg(root, args) {
 	const beforeCourseData = readFileSync(courseDataPath, 'utf8');
 	const beforeDeclaration = readFileSync(join(root, 'src/vite-env.d.ts'), 'utf8');
 	const beforeMinified = readFileSync(join(root, 'content/viewer/bundle.js'), 'utf8');
+	// terra-quality-ignore single-use -- Snapshot the workflow file before automation rewrites it for the preservation assertion.
 	const originalWorkflow = readFileSync(workflow, 'utf8');
 	runQualityCli(cfg, ['quality', '--warn', '--skip-commands', '--skip-recommendations']);
 	assert.equal(readFileSync(workflow, 'utf8'), originalWorkflow, 'warning mode must not modify an untracked source');
@@ -306,6 +307,7 @@ const view = <>
 });
 test('malformed JSX is reported without edits', () => {
 	const { root, cfg } = fixtureConfig('<button title="Save" aria-label=>');
+	// terra-quality-ignore single-use -- Snapshot source text before the tested fix so the later assertion compares original bytes.
 	const before = fixtureText(root, 'src/view.tsx');
 	assert.deepEqual(accessibilityFindings(cfg), []);
 	assert.deepEqual(fixAccessibleNames(cfg), { fixed: 0 });
@@ -370,6 +372,7 @@ test('displayName fixer leaves malformed source untouched', () => {
 	const root = fixtureRoot('terra-quality-display-name-malformed-');
 	fixtureFile(root, 'src/components.tsx', 'const Broken = forwardRef(() => <button>');
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.tsx'] });
+	// terra-quality-ignore single-use -- Snapshot source text before the tested fix so the later assertion compares original bytes.
 	const before = fixtureText(root, 'src/components.tsx');
 	assert.deepEqual(displayNameFindings(cfg), []);
 	assert.deepEqual(fixDisplayNames(cfg), { fixed: 0, skipped: 0 });

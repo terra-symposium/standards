@@ -53,16 +53,19 @@ function historyFixture() {
 	write('src/vite.config.ts', 'configuration\n');
 	git(root, ['add', '.']);
 	git(root, ['commit', '-qm', 'first source files'], '2022-04-03T05:06:07+00:00');
+	// terra-quality-ignore single-use -- Capture the first commit SHA before creating the second commit in the history test.
 	const firstSha = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim();
 	renameSync(join(root, 'src/main.ts'), join(root, 'docs/main.ts'));
 	write('src/new.ts', 'alpha\nbeta\ngamma\n');
 	write('docs/example.ts', 'documentation updated\n');
 	git(root, ['add', '-A']);
 	git(root, ['commit', '-qm', 'move source into docs'], '2023-05-04T06:07:08+00:00');
+	// terra-quality-ignore single-use -- Capture the second commit SHA before creating the later history head.
 	const secondSha = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim();
 	renameSync(join(root, 'src/new.ts'), join(root, 'src/renamed.ts'));
 	git(root, ['add', '-A']);
 	git(root, ['commit', '-qm', 'rename source file'], '2024-06-05T07:08:09+00:00');
+	// terra-quality-ignore single-use -- Capture the final history head before reading and comparing the report.
 	const headSha = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim();
 	return { root, firstSha, secondSha, headSha };
 }
@@ -99,6 +102,7 @@ test('push deltas contain commits after the supplied base and the CLI writes sch
 	const { root, secondSha, headSha } = historyFixture();
 	const oldRepo = process.env.GITHUB_REPOSITORY;
 	const oldBranch = process.env.GITHUB_REF_NAME;
+	// terra-quality-ignore single-use -- Snapshot the working directory before changing it so cleanup restores the original directory.
 	const prevCwd = process.cwd();
 	try {
 		const delta = createHistoryReport(root, { repository: 'owner/repo', branch: 'main', baseSha: secondSha });

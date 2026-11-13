@@ -41,6 +41,7 @@ test('source discovery scans configured roots and include roots, handles direct 
 });
 test('source discovery includes test and spec files under configured roots', () => {
 	const root = fixtureRoot('terra-quality-exclude-tests-');
+	// terra-quality-ignore single-use -- Keep the implementation fixture path distinct from its generated and dependency files.
 	const implementation = fixtureFile(root, 'src/feature.ts', 'export const feature = true;\n');
 	fixtureFile(root, 'src/feature.test.ts', 'export const testFeature = true;\n');
 	fixtureFile(root, 'src/feature.spec.tsx', 'export const specFeature = true;\n');
@@ -59,8 +60,11 @@ test('source discovery ignores symlink entries and direct symlink roots', () => 
 });
 test('source discovery separates captured prose and archived Gem attachments from authored source', () => {
 	const root = fixtureRoot('terra-quality-captured-source-');
+	// terra-quality-ignore single-use -- Keep the app source fixture path distinct from JSX and generated attachments in discovery checks.
 	const application = fixtureFile(root, 'src/app.ts', 'export function startApp() {\n\treturn true;\n}\n');
+	// terra-quality-ignore single-use -- Keep the JSX fragment fixture path distinct from the other authored source fixtures.
 	const jsxFragment = fixtureFile(root, 'src/controls.tsx', '<><button type="button">Save</button><input aria-label="Search" /></>\n');
+	// terra-quality-ignore single-use -- Keep the long authored source fixture path for the minified-file exclusion assertion.
 	const authoredLongLine = fixtureFile(root, 'src/long-literal.ts', `export const article = '${'x'.repeat(10_001)}';\n`);
 	fixtureFile(
 		root,
@@ -75,6 +79,7 @@ Account
 This captured page contains ordinary course text.
 `,
 	);
+	// terra-quality-ignore single-use -- Keep the imported JSX fixture path for the source-discovery assertion.
 	const importedJsx = fixtureFile(
 		root,
 		'src/imported-view.tsx',
@@ -88,8 +93,11 @@ This captured page contains ordinary course text.
 		'content/viewer/bundle.js',
 		`!function(e){function t(r){return e[r]}}({${'var module={};module.exports=function(value){return value+1};'.repeat(200)}});\n//# sourceMappingURL=bundle.js.map\n`,
 	);
+	// terra-quality-ignore single-use -- Keep the formatted bundle attachment path distinct from authored source files.
 	const fmtBundle = fixtureFile(root, 'content/viewer/formatted/bundle.js', '/* bundled module */\nconst moduleValue = 1;\n'.repeat(3_000));
+	// terra-quality-ignore single-use -- Keep the archived gem attachment path distinct from executable source files.
 	const gemAttachment = fixtureFile(root, '.agents/personas/gems/content/blocks-mtwolpip.tsx', 'export function oldBlocks() { return []; }\n');
+	// terra-quality-ignore single-use -- Keep the gem tool fixture path distinct from archived attachment code.
 	const gemTool = fixtureFile(root, '.agents/personas/scripts/check.ts', 'export function checkPersonas() { return true; }\n');
 	const cfg = createQualityCfg({ root, sourceRoots: ['.'], extensions: ['.js', '.tsx', '.ts'] });
 	assert.deepEqual(
@@ -111,12 +119,14 @@ This captured page contains ordinary course text.
 });
 test('root-wide source discovery excludes nested pnpm dependency sources', () => {
 	const root = fixtureRoot('terra-quality-pnpm-source-scope-');
+	// terra-quality-ignore single-use -- Keep the app source fixture path for the Git-tracking discovery assertion.
 	const appSource = fixtureFile(root, 'src/main.ts', 'export const ready = true;\n');
 	fixtureFile(root, 'node_modules/.pnpm/toolkit@1.0.0/node_modules/toolkit/uncheckedindexed.ts', 'const index = 0;\nexport const result = index + 1;\n');
 	assert.deepEqual(srcFiles(createQualityCfg({ root, sourceRoots: ['.'], extensions: ['.ts'] })), [appSource]);
 });
 test('root-wide source discovery excludes Rust target build artifacts', () => {
 	const root = fixtureRoot('terra-quality-rust-target-scope-');
+	// terra-quality-ignore single-use -- Keep the app source fixture path for the Git-tracking discovery assertion.
 	const appSource = fixtureFile(root, 'src/main.ts', 'export const ready = true;\n');
 	fixtureFile(root, 'aussieplusplus/target/doc/search-index.js', 'var searchIndex = [];\n');
 	fixtureFile(root, 'aussieplusplus/target/debug/build/generated.rs', 'pub fn generated() {}\n');
@@ -125,6 +135,7 @@ test('root-wide source discovery excludes Rust target build artifacts', () => {
 test('source discovery excludes ignored local artifacts while retaining tracked files', () => {
 	const root = fixtureRoot('terra-quality-git-ignored-source-');
 	fixtureFile(root, '.gitignore', '*.json\n');
+	// terra-quality-ignore single-use -- Keep the tracked config fixture path distinct from deleted and untracked files.
 	const tracked = fixtureFile(root, 'config.json', '{"enabled":true}\n');
 	execFileSync('git', ['init', '-q'], { cwd: root });
 	execFileSync('git', ['add', '.gitignore'], { cwd: root });
@@ -134,7 +145,9 @@ test('source discovery excludes ignored local artifacts while retaining tracked 
 });
 test('root-wide source discovery excludes Python virtual-environment packages', () => {
 	const root = fixtureRoot('terra-quality-python-environment-scope-');
+	// terra-quality-ignore single-use -- Keep the Python source fixture path distinct from the C source profile fixture.
 	const appPython = fixtureFile(root, 'src/app.py', 'def run():\n    return True\n');
+	// terra-quality-ignore single-use -- Keep the C source fixture path distinct from the Python source profile fixture.
 	const appC = fixtureFile(root, 'src/native.c', 'int run(void) { return 1; }\n');
 	fixtureFile(root, 'config/.venv/lib/python3.13/site-packages/third_party/module.py', 'def vendored():\n    return False\n');
 	fixtureFile(root, 'config/venv/lib/python3.13/site-packages/third_party/module.pyi', 'def vendored() -> bool: ...\n');
@@ -157,6 +170,7 @@ test('working-tree discovery includes modified and untracked sources but exclude
 	fixtureFile(root, 'src/changed.ts', 'export const changed = true;\n');
 	fixtureFile(root, 'src/new.ts', 'export const added = true;\n');
 	fixtureFile(root, 'src/ignored.ts', 'export const ignored = true;\n');
+	// terra-quality-ignore single-use -- Keep the deleted source path named for the tracked-file exclusion assertion.
 	const deleted = join(root, 'src/deleted.ts');
 	execFileSync('git', ['rm', '-q', deleted], { cwd: root });
 	assert.deepEqual(workingSrcFiles(createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] })), [join(root, 'src/changed.ts'), join(root, 'src/new.ts')]);

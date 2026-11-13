@@ -28,6 +28,7 @@ const repo = 'acme/project';
  */
 const apiPath = endpoint => `repos/acme/project${endpoint ? `/${endpoint}` : ''}`;
 test('GitHub report classifies open issues and security alerts without exposing secret values', () => {
+	// terra-quality-ignore single-use -- Keep the GitHub API call inventory for the report-request assertion.
 	const calls = new Map([
 		[
 			apiPath(''),
@@ -132,6 +133,7 @@ test('GitHub report classifies open issues and security alerts without exposing 
 	assert.match(result.findings.find(finding => finding.category === 'secret-scanning').agentInstructions, /Never read, copy, print/);
 });
 test('GitHub report keeps unavailable alert counts unknown instead of reporting zero', () => {
+	// terra-quality-ignore single-use -- Keep the fake GitHub API function identity stable across report requests.
 	const api = path => {
 		if (path === apiPath('')) return { ok: true, value: { default_branch: 'main' } };
 		if (path.includes('/issues?')) return { ok: true, value: [[]] };
@@ -177,6 +179,7 @@ process.stdout.write('[]');
 	try {
 		process.env.PATH = `${bin}:${originalPath}`;
 		process.env.GH_TOKEN = 'fixture-token';
+		// terra-quality-ignore single-use -- Keep this test configuration named so its fixture scope is established before the check under test runs.
 		const cfg = { root, sourceRoots: ['src'], extensions: ['.ts'], github: { repositories: [repo] } };
 		runQualityCli(cfg, ['github', '--repository', repo, '--report-json', 'github-report.json']);
 		const report = JSON.parse(readFileSync(join(root, 'github-report.json'), 'utf8'));

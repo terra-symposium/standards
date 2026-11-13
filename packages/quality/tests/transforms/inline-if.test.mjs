@@ -56,11 +56,14 @@ if (multiple) { first(); second(); }
 });
 test('collapseInlineIfs preserves the historical nested-if else owner and runtime behavior', () => {
 	const root = fixtureRoot('terra-quality-inline-if-else-owner-');
+	// terra-quality-ignore single-use -- Keep this source fixture path named so the test can identify the exact file under inspection.
 	const file = fixtureFile(root, 'src/main.ts', 'if (outer) { if (inner) run(); } else stop();\n');
 	const original = fixtureText(root, 'src/main.ts');
 	const execute = (src, outer, inner) => {
 		const result = [];
+		// terra-quality-ignore single-use -- Keep this callback identity stable while the inline-if test compares execution order.
 		const run = () => result.push('run');
+		// terra-quality-ignore single-use -- Keep this callback identity stable while the inline-if test compares execution order.
 		const stop = () => result.push('stop');
 		runInNewContext(`(() => { const outer = ${outer}; const inner = ${inner}; ${src} return result; })()`, { result, run, stop });
 		return result;

@@ -20,11 +20,14 @@ TESTS
 test('collapseTypesAndObjects preserves JSX-bearing objects and unsupported files while handling JavaScript-family extensions', () => {
 	const root = fixtureRoot('terra-quality-collapse-edges-');
 	const file = fixtureFile(root, 'src/main.mts', `const object = {\n\tvalue: true,\n};\n`);
+	// terra-quality-ignore single-use -- Keep the JSX fixture path for checking that structural formatting leaves it untouched.
 	const jsx = fixtureFile(root, 'src/view.tsx', `const view = {\n\tcontent: <span>keep layout</span>,\n};\n`);
+	// terra-quality-ignore single-use -- Keep the JSON fixture path for asserting unsupported files remain unchanged.
 	const unsupported = fixtureFile(root, 'src/data.json', '{\n  "value": true\n}\n');
 	assert.equal(collapseTypesAndObjects(file), true);
 	assert.match(fixtureText(root, 'src/main.mts'), /const object = \{ value: true, \};/);
 	assert.equal(collapseTypesAndObjects(file), false);
+	// terra-quality-ignore single-use -- Snapshot JSX text before formatting so the test can detect unwanted changes.
 	const jsxBefore = fixtureText(root, 'src/view.tsx');
 	assert.equal(collapseTypesAndObjects(jsx), false);
 	assert.equal(fixtureText(root, 'src/view.tsx'), jsxBefore);

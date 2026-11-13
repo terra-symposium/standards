@@ -52,7 +52,9 @@ test('Playwright reporter counts retries once and writes terminal results in dis
 	const flaky = testCase('flaky case', { retries: 1, outcome: 'flaky', titlePath: ['file.spec.ts', 'suite', 'flaky case'] });
 	const expectedFailure = testCase('expected failure', { expectedStatus: 'failed', outcome: 'expected' });
 	const unexpectedFailure = testCase('unexpected failure', { outcome: 'unexpected' });
+	// terra-quality-ignore single-use -- Keep the skipped test-case object identity for the reporter result inventory.
 	const skipped = testCase('skipped case', { expectedStatus: 'skipped', outcome: 'skipped' });
+	// terra-quality-ignore single-use -- Keep the full test-case inventory named before replaying reporter events.
 	const tests = [flaky, expectedFailure, unexpectedFailure, skipped];
 	const reporter = new QualityPlaywrightReporter({ write: chunk => output.push(chunk), writeProgress: chunk => progress.push(chunk) });
 	reporter.onBegin({}, { allTests: () => tests });

@@ -25,6 +25,7 @@ test('format fix leaves source unchanged when Prettier is unavailable', t => {
 	mkdirSync(join(root, 'src'));
 	const original = 'export const config = {\n\tenabled: true,\n\toptions: {\n\t\tmode: "safe"\n\t}\n};\n';
 	writeFileSync(source, original);
+	// terra-quality-ignore single-use -- Capture the command exit status before asserting its output and side effects.
 	const status = runFormatting({ root, sourceRoots: [join(root, 'src')], extensions: ['.ts'], tools: { prettier: 'terra-prettier-that-does-not-exist' } }, { fix: true });
 	assert.notEqual(status, 0);
 	assert.equal(readFileSync(source, 'utf8'), original);
@@ -40,6 +41,7 @@ test('format fix restores source when Prettier rejects a candidate', t => {
 	writeFileSync(source, original);
 	writeFileSync(prettier, '#!/usr/bin/env node\nif (process.argv.includes("--version")) process.stdout.write("prettier 3\\n");\nelse process.exit(2);\n');
 	chmodSync(prettier, 0o755);
+	// terra-quality-ignore single-use -- Capture the command exit status before asserting its output and side effects.
 	const status = runFormatting({ root, sourceRoots: [join(root, 'src')], extensions: ['.ts'], tools: { prettier } }, { fix: true });
 	assert.equal(status, 2);
 	assert.equal(readFileSync(source, 'utf8'), original);
@@ -61,6 +63,7 @@ test('format checking includes configured Astro sources', t => {
 		`#!/usr/bin/env node\nimport { appendFileSync } from 'node:fs';\nif (process.argv.includes('--version')) process.stdout.write('prettier 3\\n');\nelse appendFileSync(${JSON.stringify(marker)}, JSON.stringify(process.argv.slice(2)) + '\\n');\n`,
 	);
 	chmodSync(prettier, 0o755);
+	// terra-quality-ignore single-use -- Capture the command exit status before asserting its output and side effects.
 	const status = runFormatting({ root, sourceRoots: [src], extensions: ['.ts', '.astro'], tools: { prettier } }, { fix: true });
 	assert.equal(status, 0);
 	const invocations = readFileSync(marker, 'utf8')
@@ -90,6 +93,7 @@ test('formatting preserves generated source files while formatting authored sour
 		`#!/usr/bin/env node\nimport { appendFileSync } from 'node:fs';\nif (process.argv.includes('--version')) process.stdout.write('prettier 3\\n');\nelse appendFileSync(${JSON.stringify(marker)}, JSON.stringify(process.argv.slice(2)) + '\\n');\n`,
 	);
 	chmodSync(prettier, 0o755);
+	// terra-quality-ignore single-use -- Capture the command exit status before asserting its output and side effects.
 	const status = runFormatting({ root, sourceRoots: [src], extensions: ['.js'], tools: { prettier } }, { fix: true });
 	assert.equal(status, 0);
 	const args = readFileSync(marker, 'utf8')
@@ -126,6 +130,7 @@ else if (process.argv.includes('--write')) {
 `,
 	);
 	chmodSync(prettier, 0o755);
+	// terra-quality-ignore single-use -- Capture the command exit status before asserting its output and side effects.
 	const status = runFormatting({ root, sourceRoots: [src], extensions: ['.ts'], tools: { prettier } }, { fix: true });
 	assert.equal(status, 0);
 	assert.equal(readFileSync(source, 'utf8'), canonical);

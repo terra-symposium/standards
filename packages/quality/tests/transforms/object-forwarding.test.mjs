@@ -38,6 +38,7 @@ repo.append({ organizationId: input.organizationId, userId: input.userId, opport
 repo.assign({ organizationId: input.organizationId, userId: input.userId, opportunities: input.opportunities });
 `,
 	);
+	// terra-quality-ignore single-use -- Keep the reported findings list named while asserting its specific diagnostics.
 	const findings = objectForwardingFindings(createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] }));
 	assert.deepEqual(findings, []);
 });
@@ -45,7 +46,9 @@ test('object forwarding accepts a shared analysis cache without reporting ambigu
 	const root = fixtureRoot('terra-quality-forwarding-analysis-');
 	fixtureFile(root, 'src/main.ts', 'send({ a: first.a, b: first.b, c: first.c }, { a: second.a, b: second.b, c: second.c });\n');
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
+	// terra-quality-ignore single-use -- Keep the shared analysis object so the forwarding check uses one source snapshot.
 	const analysis = createQualityAnalysis(cfg);
+	// terra-quality-ignore single-use -- Keep the reported findings list named while asserting its specific diagnostics.
 	const findings = objectForwardingFindings(cfg, analysis);
 	assert.deepEqual(findings, []);
 });

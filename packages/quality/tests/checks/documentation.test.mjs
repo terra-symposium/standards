@@ -56,6 +56,7 @@ size_t copy_bytes(const char *input, char *output, size_t size) { return size; }
 static void clear_buffer(void) { const char *text = "fake_call()"; (void)text; }
 `,
 	);
+	// terra-quality-ignore single-use -- Keep this test configuration named so its fixture scope is established before the check under test runs.
 	const cfg = createQualityCfg({ root, sourceRoots: ['src/c'], extensions: [], documentation: { cAuthors: { 'src/c': 'haadi', 'src/c/compression': 'kai' } } });
 	assert.deepEqual(
 		documentationFindings(cfg).map(({ name: n, file: f, line: l }) => [n, f, l]),
@@ -67,6 +68,7 @@ test('C documentation treats matching header prototypes and source definitions a
 	fixtureFile(root, 'src/c/module/api.h', 'int transform(int value);\n');
 	fixtureFile(root, 'src/c/module/impl.c', 'int transform(int value) { return value; }\n');
 	const cfg = createQualityCfg({ root, sourceRoots: ['src/c'], extensions: [] });
+	// terra-quality-ignore single-use -- Keep the reported findings list named while asserting its specific diagnostics.
 	const findings = documentationFindings(cfg).filter(({ kind: k, name: n }) => k === 'function' && n === 'transform');
 	assert.equal(findings.length, 1);
 	fixtureFile(root, 'src/c/other/api.h', `/** Transforms a value.\n * @param value input value\n * @return transformed value\n * @author haadi\n */\nint transform_value(int value);\n`);
@@ -128,6 +130,7 @@ void (*callback)(int value);
 void invoke(void (*callback)(int), int value) { if (value) callback(value); }
 `,
 	);
+	// terra-quality-ignore single-use -- Keep this test configuration named so its fixture scope is established before the check under test runs.
 	const cfg = createQualityCfg({ root, sourceRoots: ['src/c'], extensions: [], documentation: { cAuthors: { 'src/c': 'haadi' } } });
 	assert.deepEqual(
 		documentationFindings(cfg).map(({ name: n }) => n),
@@ -139,6 +142,7 @@ test('documentation policy excludes generated and vendor source trees', () => {
 	fixtureFile(root, 'src/main.ts', 'function documentedScope() { return true; }\n');
 	fixtureFile(root, 'src/generated/generated.ts', 'function generatedHelper() { return true; }\n');
 	fixtureFile(root, 'src/vendor/vendor.ts', 'function vendorHelper() { return true; }\n');
+	// terra-quality-ignore single-use -- Keep this test configuration named so its fixture scope is established before the check under test runs.
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
 	assert.deepEqual(
 		documentationFindings(cfg).map(({ name: n }) => n),
@@ -191,8 +195,10 @@ test('documented commands diagnose and fix only deprecated pnpm directory flags 
 test('documented command check is disabled without explicit roots and preserves CRLF', () => {
 	const root = fixtureRoot('terra-quality-document-command-disabled-');
 	fixtureFile(root, 'docs/commands.md', '```bash\r\npnpm -C packages/app test\r\n```\r\n');
+	// terra-quality-ignore single-use -- Keep the disabled-check configuration distinct from the enabled configuration asserted later.
 	const disabled = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
 	assert.deepEqual(documentedCommandFindings(disabled), []);
+	// terra-quality-ignore single-use -- Keep this test configuration named so its fixture scope is established before the check under test runs.
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], documentation: { commandRoots: ['docs'] } });
 	assert.equal(fixDocumentedCommands(cfg), 1);
 	assert.equal(fixtureText(root, 'docs/commands.md'), '```bash\r\npnpm --dir packages/app test\r\n```\r\n');
@@ -200,6 +206,7 @@ test('documented command check is disabled without explicit roots and preserves 
 test('documented command autofix preserves mixed line endings', () => {
 	const root = fixtureRoot('terra-quality-document-command-mixed-lines-');
 	fixtureFile(root, 'docs/commands.md', '```sh\r\npnpm -C packages/app test\r\npnpm --prefix packages/docs build\n```\n');
+	// terra-quality-ignore single-use -- Keep this test configuration named so its fixture scope is established before the check under test runs.
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], documentation: { commandRoots: ['docs'] } });
 	assert.equal(fixDocumentedCommands(cfg), 2);
 	assert.equal(fixtureText(root, 'docs/commands.md'), '```sh\r\npnpm --dir packages/app test\r\npnpm --dir packages/docs build\n```\n');
@@ -259,6 +266,7 @@ const namedArrow = (flag: boolean) => flag;
 [1].forEach((item) => void item);
 `,
 	);
+	// terra-quality-ignore single-use -- Keep this test configuration named so its fixture scope is established before the check under test runs.
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
 	assert.deepEqual(
 		documentationFindings(cfg).map(({ kind: k, name: n }) => [k, n]),
@@ -285,6 +293,7 @@ export function processValue(value: number): number {
 }
 `,
 	);
+	// terra-quality-ignore single-use -- Keep this test configuration named so its fixture scope is established before the check under test runs.
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
 	assert.deepEqual(documentationFindings(cfg), []);
 });
@@ -292,6 +301,7 @@ test('documentation policy skips the explicit generated regex-dedup registry mar
 	const root = fixtureRoot('terra-quality-generated-regex-docs-');
 	fixtureFile(root, 'src/shared/regex.mjs', '// Generated by @terra-symposium/standards-quality regex-dedup. Do not edit.\nexport const REGEX_WORD_REGEX = () => /word/;\n');
 	fixtureFile(root, 'src/handwritten.mjs', 'export function handwritten() { return 1; }\n');
+	// terra-quality-ignore single-use -- Keep this test configuration named so its fixture scope is established before the check under test runs.
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.mjs'] });
 	assert.deepEqual(
 		documentationFindings(cfg).map(({ file, name }) => [file, name]),
@@ -339,6 +349,7 @@ export function publicHelper(value: string) { return value; }
 void [privateHelper, publicHelper];
 `,
 	);
+	// terra-quality-ignore single-use -- Keep this test configuration named so its fixture scope is established before the check under test runs.
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], documentation: { required: { types: true, functions: false, exportedFunctions: true } } });
 	assert.deepEqual(
 		documentationFindings(cfg).map(({ kind: k, name: n }) => [k, n]),
@@ -360,6 +371,7 @@ export function useDashboardConfigurationDialog(initialConfigure: string | undef
 }
 `,
 	);
+	// terra-quality-ignore single-use -- Keep this test configuration named so its fixture scope is established before the check under test runs.
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], documentation: { required: { exportedFunctions: true } } });
 	assert.deepEqual(
 		documentationFindings(cfg).map(f => [f.kind, f.name, f.severity]),
@@ -375,7 +387,9 @@ test('documentation errors identify detached TSDoc without rewriting it', () => 
 	const original = `/** src/main.ts */
 /** Describes a declaration that was removed. */
 `;
+	// terra-quality-ignore single-use -- Keep this source fixture path named so the test can identify the exact file under inspection.
 	const file = fixtureFile(root, 'src/main.ts', original);
+	// terra-quality-ignore single-use -- Keep this test configuration named so its fixture scope is established before the check under test runs.
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
 	assert.deepEqual(
 		documentationFindings(cfg).map(({ kind: k, name: n, severity: s }) => [k, n, s]),
@@ -401,6 +415,7 @@ test('documentation recognizes standalone JSDoc typedef declarations and audits 
  */
 `,
 	);
+	// terra-quality-ignore single-use -- Keep this test configuration named so its fixture scope is established before the check under test runs.
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.mjs'], documentation: { required: { types: true } } });
 	assert.deepEqual(
 		documentationFindings(cfg).map(({ kind: findingKind, name }) => [findingKind, name]),
@@ -420,6 +435,7 @@ test('documentation errors identify an earlier TSDoc block left before a declara
 export function normalizeTitle(title: string): string { return title.trim(); }
 `,
 	);
+	// terra-quality-ignore single-use -- Keep this test configuration named so its fixture scope is established before the check under test runs.
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], documentation: { required: { exportedFunctions: true } } });
 	assert.deepEqual(
 		documentationFindings(cfg).map(({ kind: findingKind, name, severity }) => [findingKind, name, severity]),
@@ -437,6 +453,7 @@ test('documentation description audit accepts TSDoc attached to a type member', 
 };
 `,
 	);
+	// terra-quality-ignore single-use -- Keep this test configuration named so its fixture scope is established before the check under test runs.
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
 	assert.deepEqual(documentationFindings(cfg), []);
 });
@@ -452,6 +469,7 @@ test('documentation findings reject props aggregates and require individual dest
 export function renderLabel({ label }: { label: string }) { return label; }
 `,
 	);
+	// terra-quality-ignore single-use -- Keep this test configuration named so its fixture scope is established before the check under test runs.
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], documentation: { required: { exportedFunctions: true } } });
 	assert.deepEqual(
 		documentationFindings(cfg).map(f => [f.kind, f.name, f.reason]),
@@ -509,6 +527,7 @@ test('documentation diagnostics report empty parameter and return descriptions',
 export function check(value: string): string { return value; }
 `,
 	);
+	// terra-quality-ignore single-use -- Keep this test configuration named so its fixture scope is established before the check under test runs.
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], documentation: { required: { exportedFunctions: true } } });
 	assert.deepEqual(
 		documentationFindings(cfg).map(({ kind: checkKind, name }) => [checkKind, name]),
@@ -558,6 +577,7 @@ test('documentation accepts tags for properties of an object parameter', () => {
 export function resolveWorkspace(options: { project: string }): string { return options.project; }
 `,
 	);
+	// terra-quality-ignore single-use -- Keep this test configuration named so its fixture scope is established before the check under test runs.
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], documentation: { required: { exportedFunctions: true } } });
 	assert.deepEqual(documentationFindings(cfg), []);
 });
@@ -581,6 +601,7 @@ test('documentation description audit continues after nested template expression
 			'function read(input) { return `${value}${input}`; }',
 		].join('\n'),
 	);
+	// terra-quality-ignore single-use -- Keep this test configuration named so its fixture scope is established before the check under test runs.
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.mjs'] });
 	assert.deepEqual(
 		documentationFindings(cfg).map(f => [f.kind, f.name]),
@@ -596,6 +617,7 @@ test('documentation description audit continues after nested template expression
 test('documentation audits recognize a BOM and shebang before a generated file header', () => {
 	const root = fixtureRoot('terra-quality-documentation-header-');
 	fixtureFile(root, 'src/script.ts', '\uFEFF#!/usr/bin/env node\n/**\n * src/script.ts\n * Runs the fixture as a script.\n */\nconst value = true;\nvoid value;\n');
+	// terra-quality-ignore single-use -- Keep this test configuration named so its fixture scope is established before the check under test runs.
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
 	assert.deepEqual(documentationFindings(cfg), []);
 });
@@ -616,6 +638,7 @@ void [existing, missing, publicMissing, inline];
 `,
 	);
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], documentation: { required: { types: true, functions: true, exportedFunctions: true, noInlineFunctions: true } } });
+	// terra-quality-ignore single-use -- Capture the original fixture text before the tested transformation changes or compares it.
 	const original = fixtureText(root, 'src/main.ts');
 	assert.equal(documentSrcFile(cfg, file), false);
 	const first = fixtureText(root, 'src/main.ts');
@@ -634,6 +657,7 @@ CUSTOM SECTION
 //////////////////////////////////////////////////*/
 export const value = true;
 `;
+	// terra-quality-ignore single-use -- Keep this source fixture path named so the test can identify the exact file under inspection.
 	const file = fixtureFile(root, 'src/main.ts', original);
 	assert.equal(maintainSrcFile(root, file), false);
 	assert.equal(fixtureText(root, 'src/main.ts'), original);
@@ -664,6 +688,7 @@ test('duplicate import autofix leaves declarations with attached comments unchan
 });
 test('duplicate import audit and autofix inspect only Astro frontmatter', () => {
 	const root = fixtureRoot('terra-quality-astro-import-audit-');
+	// terra-quality-ignore single-use -- Capture the original fixture text before the tested transformation changes or compares it.
 	const original = `---\nimport { pageForSlug } from '../lib/catalog.js';\nimport { pageForSlug } from '../lib/catalog.js';\nconst page = pageForSlug('');\n---\n<p>{page.title}</p>\n`;
 	const file = fixtureFile(root, 'src/page.astro', original);
 	assert.deepEqual(duplicateImportFindings([file]), [{ file, line: 3, module: '../lib/catalog.js' }]);

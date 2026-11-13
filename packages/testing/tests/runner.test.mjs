@@ -93,6 +93,7 @@ function initGitFixture() {
 	git(root, 'config', 'user.name', 'Standards Tests');
 	git(root, 'config', 'user.email', 'standards-tests@example.invalid');
 	writeFileSync(join(root, 'base.txt'), 'base\n');
+	// terra-quality-ignore single-use -- Capture the base commit SHA before the test creates later commits.
 	const base = commit(root, 'base');
 	return { root, base };
 }
@@ -193,6 +194,7 @@ test('consumer-defined suites run once each in manifest order and aggregate into
 	delete process.env.GITHUB_EVENT_PATH;
 	delete process.env.GITHUB_EVENT_NAME;
 	try {
+		// terra-quality-ignore single-use -- Keep the test-plan result named while asserting its suite and exit status.
 		const result = runTestPlan({ root });
 		assert.deepEqual(readFileSync(logPath, 'utf8').trim().split('\n'), names);
 		assert.deepEqual(result, { passed: names.length, failed: 0, selected: ['shared:linear-history', ...names] });

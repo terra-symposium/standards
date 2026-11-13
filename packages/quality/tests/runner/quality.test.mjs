@@ -156,6 +156,7 @@ test('quality scans generated source but does not apply naming edits to it', () 
 	assert.equal(readFileSync(file, 'utf8'), original);
 });
 test('documentation findings fail quality as errors', () => {
+	// terra-quality-ignore single-use -- Snapshot the process exit code before the test changes it so cleanup restores the exact prior value.
 	const previousExitCode = process.exitCode;
 	process.exitCode = 0;
 	try {
@@ -196,7 +197,9 @@ test('performance pattern findings are reported as advisory and do not fail qual
 		},
 	});
 	const errs = [];
+	// terra-quality-ignore single-use -- Snapshot the process exit code before the test changes it so cleanup restores the exact prior value.
 	const previousExitCode = process.exitCode;
+	// terra-quality-ignore single-use -- Snapshot console.error before replacing it so cleanup restores the original logger.
 	const previousConsoleErr = console.error;
 	process.exitCode = 0;
 	console.error = (...args) => errs.push(args.join(' '));
@@ -215,6 +218,7 @@ test('performance pattern findings are reported as advisory and do not fail qual
 	}
 });
 test('regex advisories fail full quality by default', () => {
+	// terra-quality-ignore single-use -- Snapshot the process exit code before the test changes it so cleanup restores the exact prior value.
 	const previousExitCode = process.exitCode;
 	process.exitCode = 0;
 	try {

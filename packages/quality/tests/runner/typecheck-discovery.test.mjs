@@ -35,11 +35,13 @@ test('typecheck discovery finds configured package and app projects and rejects 
 
 test('typecheck runner stops at and returns the first failing workspace command', () => {
 	const root = '/repo';
+	// terra-quality-ignore single-use -- Keep the typecheck target inventory named while asserting command dispatch.
 	const targets = [
 		{ directory: '/repo/packages/first', name: 'first', script: 'typecheck' },
 		{ directory: '/repo/apps/second', name: 'second', script: 'typecheck' },
 	];
 	const invocations = [];
+	// terra-quality-ignore single-use -- Capture the command exit status before asserting its output and side effects.
 	const status = runTypecheckTargets(targets, root, (command, args, options) => {
 		invocations.push({ command, args, cwd: options.cwd });
 		return { status: 2 };

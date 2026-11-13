@@ -127,6 +127,7 @@ test('Node reporter options replace inherited reporters and preserve unrelated r
 });
 test('Node reporter ignores reporter API context values that are not progress writers', async () => {
 	const stderr = [];
+	// terra-quality-ignore single-use -- Snapshot stderr.write before replacing it so cleanup restores the original writer.
 	const originalWrite = process.stderr.write;
 	process.stderr.write = chunk => {
 		stderr.push(String(chunk));

@@ -35,6 +35,7 @@ test('autofix restores a file when a formatter introduces syntax errors', async 
 		await runQualityFromCfg(config, ['quality', '--all', '--fix']);
 		assert.equal(readFileSync(source, 'utf8'), 'export const value = { ok: true };\n');
 		assert.equal(process.exitCode, 1);
+		// terra-quality-ignore single-use -- Keep the exact lock path for asserting that the fixing run releases it.
 		const lock = join(tmpdir(), `terra-quality-${createHash('sha256').update(root).digest('hex').slice(0, 24)}.lock`);
 		assert.equal(existsSync(lock), false);
 	} finally {

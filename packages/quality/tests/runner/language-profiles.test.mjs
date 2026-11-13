@@ -194,8 +194,10 @@ test('profile tool checks enforce their minimum version and include installation
 test('selected profiles fail clearly when a required tool is missing', () => {
 	const root = fixtureRoot('terra-quality-language-profile-missing-tool-');
 	fixtureFile(root, 'src/app.py', 'print("ready")\n');
+	// terra-quality-ignore single-use -- Keep this test configuration named so its fixture scope is established before the check under test runs.
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: [], languageProfiles: ['python'], enabledChecks: DISABLED_SOURCE_CHECKS });
 	const previousPath = process.env.PATH;
+	// terra-quality-ignore single-use -- Snapshot console.error before replacing it so cleanup restores the original logger.
 	const previousErr = console.error;
 	const errs = [];
 	const gitExecutable = previousPath

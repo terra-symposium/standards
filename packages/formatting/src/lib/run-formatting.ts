@@ -49,7 +49,9 @@ export function runFormatting(cfg: QualityCfg, options: Pick<CapabilityOptions, 
 		'prettier.config.js',
 		'prettier.config.mjs',
 		'prettier.config.cjs',
-	].flatMap(n => [resolve(configRoot, n), resolve(cfg.root, n)]).find(existsSync);
+	]
+		.flatMap(n => [resolve(configRoot, n), resolve(cfg.root, n)])
+		.find(existsSync);
 	const prettierIgnore = [resolve(configRoot, '.prettierignore'), resolve(cfg.root, '.prettierignore')].find(existsSync);
 	const tool = cfg.tools?.prettier;
 	const executable = tool && (tool.includes('/') || tool.includes('\\')) ? tool : resolve(cfg.root, 'node_modules/.bin', tool ?? 'prettier');

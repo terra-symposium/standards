@@ -517,7 +517,12 @@ export function resolveLanguageProfiles(cfg: QualityCfg): LanguageProfileResolut
 					continue;
 				}
 				const checkFiles = check.fileExtensions ? files.filter(f => check.fileExtensions!.some(ext => f.endsWith(ext))) : files;
-				result.checks.push({ ...check, args: check.args.flatMap(a => (a === '{files}' ? checkFiles : a === '{files-comma}' ? [checkFiles.join(',')] : [a])), profileId: profile.id, files: checkFiles });
+				result.checks.push({
+					...check,
+					args: check.args.flatMap(a => (a === '{files}' ? checkFiles : a === '{files-comma}' ? [checkFiles.join(',')] : [a])),
+					profileId: profile.id,
+					files: checkFiles,
+				});
 			}
 		}
 	}
