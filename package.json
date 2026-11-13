@@ -14,6 +14,7 @@
 		"verify": "pnpm run quality:all && pnpm run test && pnpm run build && pnpm run docs:build"
 	},
 	"devDependencies": {
+		"@changesets/cli": "^3.0.3",
 		"prettier-plugin-astro": "^1.1.2"
 	}
 }
