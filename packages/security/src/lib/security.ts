@@ -26,6 +26,7 @@ const PROCESS_ENV_SOURCE_REGEX = /\.(?:astro|cjs|cts|js|jsx|mjs|mts|ts|tsx)$/iu;
 /** A source or repository-boundary issue found by a configured security policy. */
 export type SecurityFinding = { file?: string; message: string };
 
+// terra-quality-ignore single-use -- Keep the documented EnvironmentAccess declaration so its parameter and return contract remains attached.
 /** Source-level environment behavior found outside comments and literal text. */
 type EnvironmentAccess = { readsProcessEnv: boolean; loadsEnvFile: boolean };
 
@@ -51,35 +52,35 @@ export function securityFindings(cfg: QualityCfg): SecurityFinding[] {
 				execFileSync('git', ['ls-files', '--cached', '--others', '--exclude-standard'], { cwd: cfg.root, encoding: 'utf8' })
 					.split('\n')
 					.filter(Boolean)
-					.map((f) => join(cfg.root, f)),
+					.map(f => join(cfg.root, f)),
 			);
 		} catch {
 			return undefined;
 		}
 	})();
-	const files = srcFiles(cfg).filter((f) => !visible || visible.has(f));
-	const allNames = files.map((f) => displayPath(cfg, f));
+	const files = srcFiles(cfg).filter(f => !visible || visible.has(f));
+	const allNames = files.map(f => displayPath(cfg, f));
 
 	// WALKTHROUGH
 	for (const file of allNames) if (ENV_REGEX.test(file)) findings.push({ file, message: 'environment files must not be committed' });
 	for (const entry of readdirSync(cfg.root, { withFileTypes: true }))
 		if (entry.isFile() && ENV_REGEX.test(entry.name) && (!visible || visible.has(join(cfg.root, entry.name)))) findings.push({ file: entry.name, message: 'environment files must not be committed' });
-	const forbiddenTerms = (settings.forbiddenTerms ?? []).map((t) => new RegExp(t, 'i'));
+	const forbiddenTerms = (settings.forbiddenTerms ?? []).map(t => new RegExp(t, 'i'));
 	const forbiddenImports = settings.forbiddenImports ?? [];
-	const clientRoots = (settings.clientRoots ?? []).map((r) => resolve(cfg.root, r));
-	const runtimeRoots = [...(settings.runtimeRoots ?? []), ...(settings.allowProcessEnvRoots ?? [])].map((r) => resolve(cfg.root, r));
+	const clientRoots = (settings.clientRoots ?? []).map(r => resolve(cfg.root, r));
+	const runtimeRoots = [...(settings.runtimeRoots ?? []), ...(settings.allowProcessEnvRoots ?? [])].map(r => resolve(cfg.root, r));
 	for (const file of files) {
 		const name = displayPath(cfg, file);
 		const src = readFileSync(file, 'utf8');
 		for (const pattern of forbiddenTerms) if (pattern.test(src)) findings.push({ file: name, message: `forbidden term matches ${pattern}` });
 		for (const specifier of forbiddenImports)
 			if (new RegExp(`(?:from|import)\\s*(?:\\(\\s*)?['"]${specifier.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&')}['"]`).test(src)) findings.push({ file: name, message: `forbidden import ${specifier}` });
-		if (clientRoots.some((r) => file === r || file.startsWith(`${r}${sep}`)) && /(?:SECRET|TOKEN|PASSWORD|PRIVATE_KEY|DATABASE_URL)/.test(src) && /import\.meta\.env|process\.env/.test(src))
+		if (clientRoots.some(r => file === r || file.startsWith(`${r}${sep}`)) && /(?:SECRET|TOKEN|PASSWORD|PRIVATE_KEY|DATABASE_URL)/.test(src) && /import\.meta\.env|process\.env/.test(src))
 			findings.push({ file: name, message: 'client source references a secret-shaped environment value' });
 		if (PROCESS_ENV_SOURCE_REGEX.test(file)) {
 			const access = environmentAccess(file, src);
 			if (access.loadsEnvFile) findings.push({ file: name, message: 'environment-file loading is forbidden' });
-			if (access.readsProcessEnv && !runtimeRoots.some((r) => file === r || file.startsWith(`${r}${sep}`)))
+			if (access.readsProcessEnv && !runtimeRoots.some(r => file === r || file.startsWith(`${r}${sep}`)))
 				findings.push({ file: name, message: 'process.env access is outside a configured runtime root' });
 		}
 	}
@@ -96,9 +97,6 @@ export function securityFindings(cfg: QualityCfg): SecurityFinding[] {
  */
 function environmentAccess(file: string, text: string): EnvironmentAccess {
 	const ext = file.slice(file.lastIndexOf('.')).toLowerCase();
-	const astroFrontmatter = ext === '.astro' ? (text.match(/^---\s*\r?\n([\s\S]*?)\r?\n---/u)?.[1] ?? '') : text;
-	const kind = ['.tsx', '.jsx', '.astro'].includes(ext) ? ts.ScriptKind.TSX : ['.ts', '.mts', '.cts'].includes(ext) ? ts.ScriptKind.TS : ts.ScriptKind.JS;
-	const source = ts.createSourceFile(file, astroFrontmatter, ts.ScriptTarget.Latest, true, kind);
 	let readsProcessEnv = false;
 	let loadsEnvFile = false;
 	const stringValue = (node: ts.Expression | undefined): string | undefined => (node && (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) ? node.text : undefined);
@@ -110,13 +108,23 @@ function environmentAccess(file: string, text: string): EnvironmentAccess {
 			if (node.expression.kind === ts.SyntaxKind.ImportKeyword && stringValue(node.arguments[0]) === 'dotenv/config') loadsEnvFile = true;
 			if (ts.isPropertyAccessExpression(node.expression) && node.expression.name.text === 'config') {
 				const receiver = node.expression.expression;
-				const directDotenv = ts.isIdentifier(receiver) && receiver.text === 'dotenv';
-				const requiredDotenv = ts.isCallExpression(receiver) && ts.isIdentifier(receiver.expression) && receiver.expression.text === 'require' && stringValue(receiver.arguments[0]) === 'dotenv';
-				if (directDotenv || requiredDotenv) loadsEnvFile = true;
+				if (
+					(ts.isIdentifier(receiver) && receiver.text === 'dotenv') ||
+					(ts.isCallExpression(receiver) && ts.isIdentifier(receiver.expression) && receiver.expression.text === 'require' && stringValue(receiver.arguments[0]) === 'dotenv')
+				)
+					loadsEnvFile = true;
 			}
 		}
 		ts.forEachChild(node, visit);
 	};
-	visit(source);
+	visit(
+		ts.createSourceFile(
+			file,
+			ext === '.astro' ? (text.match(/^---\s*\r?\n([\s\S]*?)\r?\n---/u)?.[1] ?? '') : text,
+			ts.ScriptTarget.Latest,
+			true,
+			['.tsx', '.jsx', '.astro'].includes(ext) ? ts.ScriptKind.TSX : ['.ts', '.mts', '.cts'].includes(ext) ? ts.ScriptKind.TS : ts.ScriptKind.JS,
+		),
+	);
 	return { readsProcessEnv, loadsEnvFile };
 }

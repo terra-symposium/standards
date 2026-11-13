@@ -17,8 +17,7 @@ Track each task independently until its exact gate exits 0. A nonzero result fro
 
 Work on the named repository only. Do not start additional chats from a worker task.
 
-1. Read the repository's `AGENTS.md`, README guidance, and quality configuration. Confirm the checkout, remote, branch, and working-tree state before editing.
-   Confirm the repository-pinned Node and pnpm versions, installed dependencies, and any required Rust toolchain or components; repair missing environment prerequisites without changing project checks or weakening dependency build approvals.
+1. Read the repository's `AGENTS.md`, README guidance, and quality configuration. Confirm the checkout, remote, branch, and working-tree state before editing. Confirm the repository-pinned Node and pnpm versions, installed dependencies, and any required Rust toolchain or components; repair missing environment prerequisites without changing project checks or weakening dependency build approvals.
 2. Run the exact command `pnpm run quality:all` in the repository root, capturing its entire stdout and stderr with its exit code. If the script is missing, add a safe root wrapper for the repository's full configured Terra Quality gate, then rerun the exact command.
 3. Treat every nonzero exit caused by repository findings as unfinished work. Inspect the findings, fix them in their owning source files, and preserve behavior, public contracts, existing work, checker rules, thresholds, and waivers. Do not hide, disable, or weaken checks.
 4. After each coherent repair batch, rerun the exact `pnpm run quality:all` and review the complete output. Repeat without an attempt limit until it exits 0; continue through context compactions and long runs. Run any additional tests, type checks, builds, or validation named by repository instructions. Never report a red run as a final result or accept red findings as a stopping point.

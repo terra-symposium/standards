@@ -203,7 +203,7 @@ export const gradeLoad = (durationMs: number, budget: LoadBudget): LoadGrade => 
 	return LOAD_GRADES[0];
 };
 /**
- * Resolves and grades one measurement using test/helper overrides, named config, and defaults.
+ * Resolves and grades one measurement using tests/helper overrides, named config, and defaults.
  *
  * @param input Raw timing measurement.
  * @param cfg Normalized timing settings used as the fallback budget source.
@@ -250,7 +250,7 @@ export const loadGradeCounts = (measurements: readonly Pick<LoadMeasurement, 'gr
 export const timeLoadOperation = async <T>(name: string, op: () => T | Promise<T>, rec: (measurement: LoadMeasurementInput) => void, budget?: LoadBudgetOverride): Promise<T> => {
 	if (!name.trim()) throw new Error('A named load measurement is required.');
 	const valid = budget ? validateLoadBudgetOverride(budget) : undefined;
-	return await (async (start) => {
+	return await (async start => {
 		try {
 			return await op();
 		} finally {

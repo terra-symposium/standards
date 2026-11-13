@@ -7,8 +7,7 @@ description: Audit repository environment, build, and security health; improve s
 
 Use for repository hygiene across environment and security health, source readability, and behavior-preserving compaction. Apply the sections that match the requested scope and keep each change within the repository's ownership and validation rules.
 
-For first-time Husky and Changesets setup, use [Initialisation](initialisation/SKILL.md).
-For rolling a released Terra package through Desktop consumers and restarting their existing local servers, use [Package Update](../package-update/SKILL.md).
+For first-time Husky and Changesets setup, use [Initialisation](initialisation/SKILL.md). For rolling a released Terra package through Desktop consumers and restarting their existing local servers, use [Package Update](../package-update/SKILL.md).
 
 ## Repository and environment health
 
@@ -23,19 +22,15 @@ Use for end-to-end build, deployment, and GitHub security health reviews. Read-o
 
 ### Verify builds and deployment
 
-Build every deployable workspace with the same scripts/configuration used by CI or Netlify. Capture
-exit status and warnings.
+Build every deployable workspace with the same scripts/configuration used by CI or Netlify. Capture exit status and warnings.
 
 Run required type generation or schema validation. Do not weaken checks or replace them with stubs.
 
-Authenticate to Netlify and confirm site identity before reading deploy state. Inspect the matching
-branch/commit, build command, versions, context, output, warnings, and runtime errors.
+Authenticate to Netlify and confirm site identity before reading deploy state. Inspect the matching branch/commit, build command, versions, context, output, warnings, and runtime errors.
 
-A local green build is not remote deployment evidence. Do not copy Netlify secrets locally; use
-public config, mocks, or approved remote endpoints.
+A local green build is not remote deployment evidence. Do not copy Netlify secrets locally; use public config, mocks, or approved remote endpoints.
 
-If a failure is pre-application, repair install/config/toolchain first. If it reaches app build,
-reproduce the same workspace and command before editing code.
+If a failure is pre-application, repair install/config/toolchain first. If it reaches app build, reproduce the same workspace and command before editing code.
 
 ### Review GitHub findings
 
@@ -111,45 +106,23 @@ For tests, document a suite when its responsibility is not clear from its name a
 
 Test suites need both an executable hierarchy and comments at the right scope. A fence documents the file section; `describe` documents a runner-visible behavior boundary; a group comment groups adjacent cases that do not need a separate runner boundary; a phase comment explains a substantial flow inside one test. Do not substitute one level for another or leave a long suite as an undifferentiated run of test declarations.
 
-Use one full-width `TESTS` section fence for the test region of a file. It is a file-level section,
-not a suite or group heading.
+Use one full-width `TESTS` section fence for the test region of a file. It is a file-level section, not a suite or group heading.
 
-Under the fence, make the top-level `describe`/`test.describe` express the file's test
-responsibility. Use nested `describe`/`test.describe` for a distinct behavior, state boundary, or
-setup context that readers may need to run or understand separately. Use the shared `describeGroup`
-wrapper for independently selectable Node groups; it must remain a normal Node test suite so
-`--test-name-pattern` can filter it.
+Under the fence, make the top-level `describe`/`test.describe` express the file's test responsibility. Use nested `describe`/`test.describe` for a distinct behavior, state boundary, or setup context that readers may need to run or understand separately. Use the shared `describeGroup` wrapper for independently selectable Node groups; it must remain a normal Node test suite so `--test-name-pattern` can filter it.
 
-Use a concise uppercase group comment such as `// CUSTOMER SEARCH` or `// KEYBOARD ACCESSIBILITY`
-only for a contiguous block of related tests that does not warrant another runner-visible suite. Put
-it directly above the first test or the setup hook it scopes. Do not repeat a suite title as a
-comment or section fence.
+Use a concise uppercase group comment such as `// CUSTOMER SEARCH` or `// KEYBOARD ACCESSIBILITY` only for a contiguous block of related tests that does not warrant another runner-visible suite. Put it directly above the first test or the setup hook it scopes. Do not repeat a suite title as a comment or section fence.
 
-Put setup hooks at the narrowest suite that owns their prerequisites. A hook that changes shared
-state belongs in a serial suite only when tests genuinely depend on execution order; prefer
-independent tests and isolated fixtures over serial execution.
+Put setup hooks at the narrowest suite that owns their prerequisites. A hook that changes shared state belongs in a serial suite only when tests genuinely depend on execution order; prefer independent tests and isolated fixtures over serial execution.
 
-Use data-driven cases when inputs vary but the contract and assertions stay the same. Give each case
-a descriptive test title and keep materially different outcomes as separate named tests or nested
-suites.
+Use data-driven cases when inputs vary but the contract and assertions stay the same. Give each case a descriptive test title and keep materially different outcomes as separate named tests or nested suites.
 
-Keep tests in the same group adjacent: no blank lines between their declarations. Put one blank line
-before the next group comment. Do not add blank lines between a group comment and its first
-declaration.
+Keep tests in the same group adjacent: no blank lines between their declarations. Put one blank line before the next group comment. Do not add blank lines between a group comment and its first declaration.
 
-Group by behavior or contract (for example, `// AUTHENTICATED STATE`, `// HEADER CONTAINMENT`, `//
-KEYBOARD ACCESSIBILITY`), not by test count, implementation file, or historical milestone. Prefer
-nested `describe`/`test.describe` when the grouping is also a meaningful runner/filter boundary;
-otherwise use a line comment.
+Group by behavior or contract (for example, `// AUTHENTICATED STATE`, `// HEADER CONTAINMENT`, `// KEYBOARD ACCESSIBILITY`), not by test count, implementation file, or historical milestone. Prefer nested `describe`/`test.describe` when the grouping is also a meaningful runner/filter boundary; otherwise use a line comment.
 
-Add a short TSDoc directly above a suite when its responsibility is not clear from the suite name.
-Add individual test TSDoc only when the scenario or expected invariant is not clear from its group
-and test title; never paraphrase the title.
+Add a short TSDoc directly above a suite when its responsibility is not clear from the suite name. Add individual test TSDoc only when the scenario or expected invariant is not clear from its group and test title; never paraphrase the title.
 
-For a long test, add uppercase phase comments only where execution crosses a meaningful boundary:
-`// PREPARE EVIDENCE`, `// PERFORM USER ACTION`, `// VERIFY PERSISTENCE`, or `// ASSERT THE
-CONTRACT`. Keep code in each phase together with no blank lines inside the phase. Do not label every
-assertion or narrate obvious fixture setup.
+For a long test, add uppercase phase comments only where execution crosses a meaningful boundary: `// PREPARE EVIDENCE`, `// PERFORM USER ACTION`, `// VERIFY PERSISTENCE`, or `// ASSERT THE CONTRACT`. Keep code in each phase together with no blank lines inside the phase. Do not label every assertion or narrate obvious fixture setup.
 
 ```ts
 /*//////////////////////////////////////////////////
@@ -167,7 +140,7 @@ test.describe('authenticated dashboard header', () => {
 	// HEADER CONTAINMENT
 	test('keeps navigation inside the visible header', async ({ page }) => {
 		// MEASURE RENDERED STATE
-		const bounds = await page.locator('header').evaluate((element) => {
+		const bounds = await page.locator('header').evaluate(element => {
 			const rect = element.getBoundingClientRect();
 			return {
 				left: rect.left,
@@ -214,77 +187,32 @@ Run a Node group by passing its literal title to the suite runner, or use Playwr
 
 - Prefer one accurate comment over several paraphrases.
 
-Explain why, invariants, boundaries, and consequences; omit comments that merely translate `if`,
-`map`, or a component name.
+Explain why, invariants, boundaries, and consequences; omit comments that merely translate `if`, `map`, or a component name.
 
 - Keep comments adjacent to the code they govern and move them when the code moves.
 
-Preserve comments that are prompt context, generated-source markers, legal notices, or product
-documentation unless their owning workflow says otherwise.
+Preserve comments that are prompt context, generated-source markers, legal notices, or product documentation unless their owning workflow says otherwise.
 
-Protect literal strings, templates, JSX text, regexes, and generated content from structural comment
-tooling.
+Protect literal strings, templates, JSX text, regexes, and generated content from structural comment tooling.
 
-Check for duplicate fences, empty adjacent sections, orphaned labels, stale parameter names,
-misleading return descriptions, and comments that contradict tests.
+Check for duplicate fences, empty adjacent sections, orphaned labels, stale parameter names, misleading return descriptions, and comments that contradict tests.
 
-Reject filler wording such as “Input overrides used by the surrounding operation” or “Result
-produced by this function.” Each parameter description must explain its semantic role, source,
-constraints, or effect, and each return description must explain the value's contract, edge
-behavior, or downstream use.
+Reject filler wording such as “Input overrides used by the surrounding operation” or “Result produced by this function.” Each parameter description must explain its semantic role, source, constraints, or effect, and each return description must explain the value's contract, edge behavior, or downstream use.
 
-Do not mass-generate documentation from names or signatures. Never emit formulaic comments such as
-`Describes the X type`, `Shared type for X`, `Allowed values for X`, `Props accepted by X`, or
-`Result produced by this function`; these are not documentation. A documentation-only pass still
-requires function-by-function or type-by-type review and a final search for generic, blank,
-duplicated, orphaned, or stale tags.
+Do not mass-generate documentation from names or signatures. Never emit formulaic comments such as `Describes the X type`, `Shared type for X`, `Allowed values for X`, `Props accepted by X`, or `Result produced by this function`; these are not documentation. A documentation-only pass still requires function-by-function or type-by-type review and a final search for generic, blank, duplicated, orphaned, or stale tags.
 
 See [Terra conventions](references/conventions.md) for the repository-derived rules and quality-tool behavior used to shape this skill.
 
 ## Prevent recurring manual fixes
 
-Make a package-automation retrospective a required part of every code repair.
-Before closing the task, inspect the complete working diff and each resulting
-commit, when one was made. When reviewing an existing commit, apply the same
-retrospective to its complete diff; do not postpone an automatable correction
-until a later cleanup. For every correction made agentically, ask whether
-its owning Terra package could find and apply that correction safely from source
-syntax, repository configuration, or another explicit invariant. If it can,
-implement the rule in that package, connect it to the package's normal automatic
-workflow, and apply it to the full eligible scope in the same task. Do not leave
-deterministic one-offs in a follow-up list, backlog, or later run, and do not
-wait for the finding to recur before automating it.
+Make a package-automation retrospective a required part of every code repair. Before closing the task, inspect the complete working diff and each resulting commit, when one was made. When reviewing an existing commit, apply the same retrospective to its complete diff; do not postpone an automatable correction until a later cleanup. For every correction made agentically, ask whether its owning Terra package could find and apply that correction safely from source syntax, repository configuration, or another explicit invariant. If it can, implement the rule in that package, connect it to the package's normal automatic workflow, and apply it to the full eligible scope in the same task. Do not leave deterministic one-offs in a follow-up list, backlog, or later run, and do not wait for the finding to recur before automating it.
 
-- If a correction is deterministic and behavior-preserving, implement it in the
-  owning package even when it was found in only one repository. Put rules for
-  multiple consumers in their shared Terra package. Prefer an idempotent fixer
-  invoked by the normal quality workflow, so eligible files are repaired
-  automatically without relying on someone to remember a separate command.
-  When reviewing a commit, convert every safely automatable manual correction
-  from that commit into the package rule and regression coverage before
-  considering the work complete.
-- Apply the fixer to all current eligible files and add focused regression
-  coverage for its rule and behavior. Check the full intended scope, preservation
-  of literals and generated content, and idempotence by running it twice. Run
-  the package's quality workflow and inspect every changed file.
-- Do not replace mechanical fixes with broad text substitutions, ignored paths,
-  or exemptions. Use syntax-aware transformations when an edit touches source
-  structure, and preserve public names or serialized values unless the requested
-  migration explicitly changes them.
-- Keep authorial work agentic. The agent must write and review comments,
-  docstrings, TSDoc, documentation prose, and other explanations by inspecting
-  their implementation and context. Package automation must not add, rewrite,
-  delete, or relocate comments or documentation text, including placeholders;
-  Quality tooling may diagnose them, but the agent must make each correction
-  with implementation-specific evidence. Never generate or rewrite prose from
-  names, signatures, or templates to satisfy a rule.
-- If correctness depends on intent or domain judgment, retain the agentic repair
-  and state why it cannot be made into a safe shared rule. Do not leave an
-  otherwise mechanical fix as a one-off when the package can own it.
-- Record the retrospective outcome before closing: identify each correction
-  automated in the owning package, its regression coverage and applied scope,
-  and each correction kept agentic with the reason it needs contextual judgment.
-  Do not leave safe automation candidates as untracked follow-up work.
+- If a correction is deterministic and behavior-preserving, implement it in the owning package even when it was found in only one repository. Put rules for multiple consumers in their shared Terra package. Prefer an idempotent fixer invoked by the normal quality workflow, so eligible files are repaired automatically without relying on someone to remember a separate command. When reviewing a commit, convert every safely automatable manual correction from that commit into the package rule and regression coverage before considering the work complete.
+- Apply the fixer to all current eligible files and add focused regression coverage for its rule and behavior. Check the full intended scope, preservation of literals and generated content, and idempotence by running it twice. Run the package's quality workflow and inspect every changed file.
+- Do not replace mechanical fixes with broad text substitutions, ignored paths, or exemptions. Use syntax-aware transformations when an edit touches source structure, and preserve public names or serialized values unless the requested migration explicitly changes them.
+- Keep authorial work agentic. The agent must write and review comments, docstrings, TSDoc, documentation prose, and other explanations by inspecting their implementation and context. Package automation must not add, rewrite, delete, or relocate comments or documentation text, including placeholders; Quality tooling may diagnose them, but the agent must make each correction with implementation-specific evidence. Never generate or rewrite prose from names, signatures, or templates to satisfy a rule.
+- If correctness depends on intent or domain judgment, retain the agentic repair and state why it cannot be made into a safe shared rule. Do not leave an otherwise mechanical fix as a one-off when the package can own it.
+- Record the retrospective outcome before closing: identify each correction automated in the owning package, its regression coverage and applied scope, and each correction kept agentic with the reason it needs contextual judgment. Do not leave safe automation candidates as untracked follow-up work.
 
 ## Behavior-preserving compaction
 

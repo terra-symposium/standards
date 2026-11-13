@@ -15,65 +15,35 @@ Apply this source tree as a rule, not a suggestion. Every source file must have 
 
 - `src/app/` owns application bootstrapping and composition that is not a framework-owned route.
 
-`src/lib/` owns non-visual domain logic, server services, adapters, presets, algorithms, and shared
-types. Put server-only modules under `src/lib/server/`; do not invent a parallel `src/server/`
-owner. Put the package API barrel in `src/lib/index.ts`.
+`src/lib/` owns non-visual domain logic, server services, adapters, presets, algorithms, and shared types. Put server-only modules under `src/lib/server/`; do not invent a parallel `src/server/` owner. Put the package API barrel in `src/lib/index.ts`.
 
-`src/actions/` owns framework-native actions and request handlers only when the framework defines
-that source owner; ordinary services called by those handlers still belong in `src/lib/`.
+`src/actions/` owns framework-native actions and request handlers only when the framework defines that source owner; ordinary services called by those handlers still belong in `src/lib/`.
 
 - `src/components/` owns rendered UI; keep component domains below it, such as `src/components/ui/`.
 
-`src/hooks/` owns reusable framework hooks. Keep a hook beside its sole owning component only when
-it is genuinely private to that component.
+`src/hooks/` owns reusable framework hooks. Keep a hook beside its sole owning component only when it is genuinely private to that component.
 
-`src/styles/` owns authored stylesheets and design tokens. `src/assets/` owns imported images,
-fonts, and other source assets with their attribution.
+`src/styles/` owns authored stylesheets and design tokens. `src/assets/` owns imported images, fonts, and other source assets with their attribution.
 
-`src/pages/` owns framework route entries only. Move importable private components, services, types,
-and assets out of route trees to their canonical owner even when the framework ignores their current
-filename as a route.
+`src/pages/` owns framework route entries only. Move importable private components, services, types, and assets out of route trees to their canonical owner even when the framework ignores their current filename as a route.
 
-Framework routes stay at the exact path required by the framework. A public facade may remain in its
-named domain, but its implementation belongs to its source owner.
+Framework routes stay at the exact path required by the framework. A public facade may remain in its named domain, but its implementation belongs to its source owner.
 
-Put a type beside its sole owner. Put cross-module types in `src/lib/types.ts`; do not create a
-second root `src/types.ts`.
+Put a type beside its sole owner. Put cross-module types in `src/lib/types.ts`; do not create a second root `src/types.ts`.
 
 - Tests mirror source ownership under the established test root. Update discovery when tests move.
 
-A package root `src/index.ts` may remain only as a thin public facade to `src/lib/index.ts`; put its
-implementation under the owning folder. The same exception applies to a `src/<subpath>/index.ts`
-only when `package.json#exports` declares that exact public subpath and the file only re-exports
-canonical owners.
+A package root `src/index.ts` may remain only as a thin public facade to `src/lib/index.ts`; put its implementation under the owning folder. The same exception applies to a `src/<subpath>/index.ts` only when `package.json#exports` declares that exact public subpath and the file only re-exports canonical owners.
 
-A `src/lib/` owner is mandatory as soon as a package has reusable non-visual implementation. Put
-color/hue algorithms, class-name helpers, presets, adapters, and cross-domain types there even when
-they began as convenient root files. The package root barrel exports library APIs only; it must not
-re-export UI or application modules.
+A `src/lib/` owner is mandatory as soon as a package has reusable non-visual implementation. Put color/hue algorithms, class-name helpers, presets, adapters, and cross-domain types there even when they began as convenient root files. The package root barrel exports library APIs only; it must not re-export UI or application modules.
 
-Visual code has one owner: `src/components/<domain>/`. Do not keep parallel `src/ui/` and
-`src/components/ui/` implementations. A declared `./ui` package export may have a thin facade at
-`src/ui/index.ts`; its implementation remains under `src/components/`.
+Visual code has one owner: `src/components/<domain>/`. Do not keep parallel `src/ui/` and `src/components/ui/` implementations. A declared `./ui` package export may have a thin facade at `src/ui/index.ts`; its implementation remains under `src/components/`.
 
-Do not leave repository-owned source or test modules in catchall basenames or folders (`misc`,
-`common`, `helpers`, `utils`, `utilities`), optionally prefixed with `_`, in any supported extension
-or directory. This prohibition applies at every depth, including `src/lib/`, script modules, and
-test support. Split mixed files into responsibility-named modules; moving or renaming a catchall
-intact does not fix ownership. Do not duplicate domains such as `src/ui/ui/`. A directory containing
-only a pass-through barrel has no ownership and must be merged away unless that exact path is a
-declared public subpath. Framework/tool exceptions must name the exact required path and rule.
+Do not leave repository-owned source or test modules in catchall basenames or folders (`misc`, `common`, `helpers`, `utils`, `utilities`), optionally prefixed with `_`, in any supported extension or directory. This prohibition applies at every depth, including `src/lib/`, script modules, and test support. Split mixed files into responsibility-named modules; moving or renaming a catchall intact does not fix ownership. Do not duplicate domains such as `src/ui/ui/`. A directory containing only a pass-through barrel has no ownership and must be merged away unless that exact path is a declared public subpath. Framework/tool exceptions must name the exact required path and rule.
 
-Apply host source-ownership and catchall rules only to code maintained as part of the repository. A
-`vendor/<package>/` tree that is an exact lockfile dependency or a documented fork keeps that
-package's upstream layout, internal basenames, and relative imports. Preserve the upstream names
-when a documented patch or security fix depends on them; record the exact dependency and reason
-rather than renaming vendored internals to satisfy host conventions. Dependency trees and generated
-outputs are audited as artifacts, not as host application source.
+Apply host source-ownership and catchall rules only to code maintained as part of the repository. A `vendor/<package>/` tree that is an exact lockfile dependency or a documented fork keeps that package's upstream layout, internal basenames, and relative imports. Preserve the upstream names when a documented patch or security fix depends on them; record the exact dependency and reason rather than renaming vendored internals to satisfy host conventions. Dependency trees and generated outputs are audited as artifacts, not as host application source.
 
-Do not retain misplaced files merely to avoid editing references. Move each implementation to its
-owner, then update imports, exports, test discovery, package manifests, documentation, generated
-indexes, and consumers in the same change.
+Do not retain misplaced files merely to avoid editing references. Move each implementation to its owner, then update imports, exports, test discovery, package manifests, documentation, generated indexes, and consumers in the same change.
 
 ### Delete-first pruning
 
@@ -125,21 +95,12 @@ indexes, and consumers in the same change.
 
 The task is complete only when:
 
-Every inventoried file has an exact disposition and every unblocked move, merge, or deletion is
-applied.
+Every inventoried file has an exact disposition and every unblocked move, merge, or deletion is applied.
 
-Source ownership is canonical: reusable non-visual implementation is under `src/lib/`, visual
-implementation under `src/components/<domain>/`, and only framework-required files or declared thin
-package-export facades remain elsewhere. Each repository needing manual environment setup has one
-root template, and no unexplained duplicate or generated residue remains.
+Source ownership is canonical: reusable non-visual implementation is under `src/lib/`, visual implementation under `src/components/<domain>/`, and only framework-required files or declared thin package-export facades remain elsewhere. Each repository needing manual environment setup has one root template, and no unexplained duplicate or generated residue remains.
 
-Every retained script has a caller or named operator/recovery role; every removed migration is
-proven abandoned or replaced by a supported baseline, and unresolved migration state is reported as
-blocked.
+Every retained script has a caller or named operator/recovery role; every removed migration is proven abandoned or replaced by a supported baseline, and unresolved migration state is reported as blocked.
 
-Imports, exports, scripts, routes, test discovery, docs, manifests, and consumers reference the
-final paths. Searches for removed paths return no live references.
+Imports, exports, scripts, routes, test discovery, docs, manifests, and consumers reference the final paths. Searches for removed paths return no live references.
 
-Report exact moved, merged, and deleted paths; before/after structure; checks run; preserved
-working-tree state; and any blocked files with the evidence preventing removal. Never substitute a
-percentage for file dispositions.
+Report exact moved, merged, and deleted paths; before/after structure; checks run; preserved working-tree state; and any blocked files with the evidence preventing removal. Never substitute a percentage for file dispositions.

@@ -9,7 +9,7 @@ description: Resolve local imports and detect repeated imports using the shared 
 
 ```sh
 pnpm add -D @terra-symposium/standards-imports
-pnpm exec terra-imports --all --warn
+pnpm exec terra-imports --all
 ```
 
 The CLI reads root `quality.json` or `config/quality.json`; `--config PATH` chooses explicitly. Changed and untracked files are the default scope. `--all` scans the configured source roots, and `--warn` disables fixes.

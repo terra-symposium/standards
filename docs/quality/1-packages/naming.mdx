@@ -9,7 +9,7 @@ description: Find nonconforming identifiers and aliases, with scope-aware rename
 
 ```sh
 pnpm add -D @terra-symposium/standards-naming
-pnpm exec terra-naming --config config/quality.json --all --warn
+pnpm exec terra-naming --config config/quality.json --all
 ```
 
 Normal runs select changed and untracked files. `--all` covers all configured roots and `--warn` is read-only. Set `protectedIdentifiers`, `renameExports`, and applicable source scope in `quality.json` to control policy. Framework-reserved filenames and protected source paths are excluded according to the implementation's conventions.

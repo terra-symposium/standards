@@ -59,10 +59,9 @@ function resolveImport(specifier: string, importer: string, cfg: QualityCfg): st
  * @return Module specifiers found in the file.
  */
 function specifiers(fileName: string): string[] {
-	const src = readFileSync(fileName, 'utf8');
-	const file = ts.createSourceFile(fileName, src, ts.ScriptTarget.Latest, true);
+	const file = ts.createSourceFile(fileName, readFileSync(fileName, 'utf8'), ts.ScriptTarget.Latest, true);
 	const vals: string[] = [];
-	ts.forEachChild(file, (n) => {
+	ts.forEachChild(file, n => {
 		if (ts.isImportDeclaration(n) && ts.isStringLiteral(n.moduleSpecifier)) vals.push(n.moduleSpecifier.text);
 		if (ts.isExportDeclaration(n) && n.moduleSpecifier && ts.isStringLiteral(n.moduleSpecifier)) vals.push(n.moduleSpecifier.text);
 		if (ts.isCallExpression(n) && n.arguments.length === 1 && ts.isStringLiteral(n.arguments[0]) && (n.expression.kind === ts.SyntaxKind.ImportKeyword || n.expression.getText(file) === 'require'))
@@ -82,8 +81,8 @@ export function checkImports(cfg: QualityCfg): ImportFailure[] {
 	const failures: ImportFailure[] = [];
 	for (const i of srcFiles(cfg)) {
 		for (const s of specifiers(i)) {
-			if (cfg.externalPrefixes?.some((p) => s.startsWith(p))) continue;
-			if (!s.startsWith('.') && !Object.keys(cfg.aliases ?? {}).some((p) => s.startsWith(p))) continue;
+			if (cfg.externalPrefixes?.some(p => s.startsWith(p))) continue;
+			if (!s.startsWith('.') && !Object.keys(cfg.aliases ?? {}).some(p => s.startsWith(p))) continue;
 			if (s.startsWith('.') && extname(s) && !MODULE_EXTS.includes(extname(s))) continue;
 			if (!resolveImport(s, i, cfg)) failures.push({ importer: displayPath(cfg, i), specifier: s });
 		}

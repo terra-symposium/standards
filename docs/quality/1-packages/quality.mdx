@@ -9,7 +9,7 @@ description: Aggregate CLI, compatibility API, phase ordering, orchestration, an
 
 ```sh
 pnpm add -D @terra-symposium/standards-quality
-pnpm exec terra-quality quality --all --warn
+pnpm exec terra-quality quality --all
 ```
 
 The package requires Node.js `>=18.18`. Its normal run selects changed and untracked source files; `--all` selects all configured source roots. `--warn` disables automatic edits. The configured `quality.json` is the single policy file: `--config PATH` selects a different file, and `config/quality.json` is discovered when no root-level file is present.

@@ -41,6 +41,7 @@ REGEX
 //////////////////////////////////////////////////*/
 
 const S_ONLY_REGEX = /^\s*$/;
+// terra-quality-ignore single-use -- Keep the documented S_S_G_REGEX declaration so its parameter and return contract remains attached.
 /**
  * Creates a fresh matcher for complete TSDoc comment blocks.
  *
@@ -77,23 +78,24 @@ const PNPM_DIR_FLAG = /^(\s*(?:\$\s*)?pnpm)\s+(?:-C|--prefix)(\s+)("[^"]+"|'[^']
  * @return Deprecated pnpm directory commands found in configured Markdown.
  */
 export function documentedCommandFindings(cfg: QualityCfg): { file: string; line: number; command: string; recommendation: string }[] {
-	const roots = cfg.documentation?.commandRoots?.map((p) => resolve(cfg.root, p)) ?? [];
+	const roots = cfg.documentation?.commandRoots?.map(p => resolve(cfg.root, p)) ?? [];
 	if (!roots.length) return [];
-	return srcFiles({ ...cfg, sourceRoots: roots, extensions: ['.md', '.mdx'] }).flatMap((f) => {
-		const lines = readFileSync(f, 'utf8').split(N_REGEX);
+	return srcFiles({ ...cfg, sourceRoots: roots, extensions: ['.md', '.mdx'] }).flatMap(f => {
 		let inShellFence = false;
-		return lines.flatMap((s, i) => {
-			const line = s.replace(R_N_END_REGEX, '');
-			if (!inShellFence) {
-				if (PNPM_FENCE.test(line)) inShellFence = true;
-				return [];
-			}
-			if (FENCE_CLOSE.test(line)) {
-				inShellFence = false;
-				return [];
-			}
-			return PNPM_DIR_FLAG.exec(line) ? [{ file: displayPath(cfg, f), line: i + 1, command: line.trim(), recommendation: 'replace the pnpm directory flag with --dir' }] : [];
-		});
+		return readFileSync(f, 'utf8')
+			.split(N_REGEX)
+			.flatMap((s, i) => {
+				const line = s.replace(R_N_END_REGEX, '');
+				if (!inShellFence) {
+					if (PNPM_FENCE.test(line)) inShellFence = true;
+					return [];
+				}
+				if (FENCE_CLOSE.test(line)) {
+					inShellFence = false;
+					return [];
+				}
+				return PNPM_DIR_FLAG.exec(line) ? [{ file: displayPath(cfg, f), line: i + 1, command: line.trim(), recommendation: 'replace the pnpm directory flag with --dir' }] : [];
+			});
 	});
 }
 
@@ -105,7 +107,7 @@ export function documentedCommandFindings(cfg: QualityCfg): { file: string; line
  * @return Number of deprecated commands replaced.
  */
 export function fixDocumentedCommands(cfg: QualityCfg): number {
-	const roots = cfg.documentation?.commandRoots?.map((p) => resolve(cfg.root, p)) ?? [];
+	const roots = cfg.documentation?.commandRoots?.map(p => resolve(cfg.root, p)) ?? [];
 	if (!roots.length) return 0;
 	let fixed = 0;
 	for (const file of srcFiles({ ...cfg, sourceRoots: roots, extensions: ['.md', '.mdx'] })) {
@@ -113,9 +115,8 @@ export function fixDocumentedCommands(cfg: QualityCfg): number {
 		let inShellFence = false;
 		const updated = source
 			.split(N_REGEX)
-			.map((s) => {
+			.map(s => {
 				const line = s.replace(R_N_END_REGEX, '');
-				const lineEnding = s.slice(line.length);
 				if (!inShellFence) {
 					if (PNPM_FENCE.test(line)) inShellFence = true;
 					return s;
@@ -127,7 +128,7 @@ export function fixDocumentedCommands(cfg: QualityCfg): number {
 				const match = PNPM_DIR_FLAG.exec(line);
 				if (!match) return s;
 				fixed++;
-				return `${match[1]} --dir${match[2]}${match[3]}${match[4]}${lineEnding}`;
+				return `${match[1]} --dir${match[2]}${match[3]}${match[4]}${s.slice(line.length)}`;
 			})
 			.join('');
 		if (source !== updated) writeFileSync(file, updated);
@@ -160,6 +161,7 @@ const DESCRIPTION_OPTIONAL_TAGS = new Set(['abstract', 'const', 'default', 'even
 HELPERS
 //////////////////////////////////////////////////*/
 
+// terra-quality-ignore single-use -- Keep the documented writeValidatedSrc declaration so its parameter and return contract remains attached.
 /**
  * Writes a generated source update through a temporary file after validating
  * that the candidate still has no TypeScript or JavaScript parse errors.
@@ -249,8 +251,7 @@ export function duplicateImportFindings(files: string[]): DuplicateImportFinding
 	const findings: DuplicateImportFinding[] = [];
 	for (const file of files) {
 		if (!IMPORT_SUPPORTED.has(extname(file))) continue;
-		const text = readFileSync(file, 'utf8');
-		const source = duplicateImportSource(file, text);
+		const source = duplicateImportSource(file, readFileSync(file, 'utf8'));
 		if (!source) continue;
 		const parsed = ts.createSourceFile(file, source.text, ts.ScriptTarget.Latest, true, srcKind(file));
 		const seen = new Set<string>();
@@ -268,12 +269,10 @@ export function duplicateImportFindings(files: string[]): DuplicateImportFinding
 			if (declaration.importClause.namedBindings && ts.isNamedImports(declaration.importClause.namedBindings)) {
 				for (const element of declaration.importClause.namedBindings.elements) {
 					const typeOnly = declaration.importClause.isTypeOnly || element.isTypeOnly;
-					const group = typeOnly ? 'TYPES' : importGroup(element.name.text);
-					const binding = element.getText(parsed).replace(TYPE_S_REGEX, '');
-					keys.push(`${declaration.moduleSpecifier.text}|${group}|${typeOnly ? 'type' : 'value'}|${binding}`);
+					keys.push(`${declaration.moduleSpecifier.text}|${typeOnly ? 'TYPES' : importGroup(element.name.text)}|${typeOnly ? 'type' : 'value'}|${element.getText(parsed).replace(TYPE_S_REGEX, '')}`);
 				}
 			}
-			if (keys.some((k) => seen.has(k))) {
+			if (keys.some(k => seen.has(k))) {
 				const { line } = parsed.getLineAndCharacterOfPosition(declaration.getStart(parsed));
 				findings.push({ file, line: line + source.lineOffset + 1, module: declaration.moduleSpecifier.text });
 			}
@@ -310,9 +309,8 @@ export function fixDuplicateImports(files: string[]): number {
 			if (ts.getLeadingCommentRanges(source.text, declaration.getFullStart())?.length || ts.getTrailingCommentRanges(source.text, declaration.end)?.length) continue;
 			const lineStart = source.text.lastIndexOf('\n', declaration.getStart(parsed) - 1) + 1;
 			const newlineStart = source.text.indexOf('\n', declaration.end);
-			const lineEnd = newlineStart < 0 ? source.text.length : newlineStart + 1;
 			if (source.text.slice(lineStart, declaration.getStart(parsed)).trim() || source.text.slice(declaration.end, newlineStart < 0 ? source.text.length : newlineStart).trim()) continue;
-			edits.push({ start: source.offset + lineStart, end: source.offset + lineEnd });
+			edits.push({ start: source.offset + lineStart, end: source.offset + (newlineStart < 0 ? source.text.length : newlineStart + 1) });
 		}
 		if (!edits.length) continue;
 		const updated = edits.sort((left, right) => right.start - left.start).reduce((source, edit) => `${source.slice(0, edit.start)}${source.slice(edit.end)}`, text);
@@ -369,8 +367,7 @@ export function protectLongImports(fileName: string, printWidth = 200): boolean 
 		const nline = original.indexOf('\n', n.end);
 		if (original.slice(lineStart, nline < 0 ? original.length : nline).replace(/\r$/, '').length <= printWidth || original.slice(lineStart, n.getStart(parsed)).trim()) continue;
 		const prevLineEnd = lineStart > 0 ? lineStart - 1 : -1;
-		const prevLineStart = prevLineEnd >= 0 ? original.lastIndexOf('\n', prevLineEnd - 1) + 1 : 0;
-		if (original.slice(prevLineStart, prevLineEnd + 1).trim() === '// prettier-ignore') continue;
+		if (original.slice(prevLineEnd >= 0 ? original.lastIndexOf('\n', prevLineEnd - 1) + 1 : 0, prevLineEnd + 1).trim() === '// prettier-ignore') continue;
 		insertions.add(lineStart);
 	}
 	if (!insertions.size) return false;
@@ -382,6 +379,7 @@ export function protectLongImports(fileName: string, printWidth = 200): boolean 
 	return writeValidatedSrc(fileName, next);
 }
 
+// terra-quality-ignore single-use -- Keep the documented documentationScriptKind declaration so its parameter and return contract remains attached.
 /**
  * Selects the TypeScript parser mode used by documentation checks.
  *
@@ -418,7 +416,7 @@ function documentationSupported(fileName: string): boolean {
 function documentationSourceIncluded(cfg: QualityCfg, file: string): boolean {
 	return !relative(cfg.root, file)
 		.split(sep)
-		.some((d) => ['generated', 'vendor', 'target', 'out'].includes(d));
+		.some(d => ['generated', 'vendor', 'target', 'out'].includes(d));
 }
 
 /**
@@ -450,7 +448,6 @@ function cDocumentationFindings(cfg: QualityCfg, file: string, source: string, d
 				severity: 'error',
 			},
 		];
-	const ast = JSON.parse(parsed.stdout) as CNode;
 	const declarations: { name: string; signature: string; line: number; params: string[]; returnsValue: boolean; comment?: CNode }[] = [];
 	const walk = (node: CNode): void => {
 		if (node.kind === 'FunctionDecl' && node.name && node.loc?.offset !== undefined && !node.loc.includedFrom && (!node.loc.file || resolve(node.loc.file) === resolve(file))) {
@@ -459,14 +456,14 @@ function cDocumentationFindings(cfg: QualityCfg, file: string, source: string, d
 				name: node.name,
 				signature: `${node.name}|${node.type?.qualType ?? ''}`,
 				line: node.loc.line ?? source.slice(0, node.loc.offset).split('\n').length,
-				params: children.filter((c) => c.kind === 'ParmVarDecl').map((c) => c.name ?? '<unnamed>'),
+				params: children.filter(c => c.kind === 'ParmVarDecl').map(c => c.name ?? '<unnamed>'),
 				returnsValue: !/^void\s*\(/.test(node.type?.qualType ?? ''),
-				comment: children.find((c) => c.kind === 'FullComment'),
+				comment: children.find(c => c.kind === 'FullComment'),
 			});
 		}
 		for (const child of node.inner ?? []) walk(child);
 	};
-	walk(ast);
+	walk(JSON.parse(parsed.stdout) as CNode);
 	const rel = relative(cfg.root, file).split(sep).join('/');
 	const author = Object.entries(cfg.documentation?.cAuthors ?? {})
 		.filter(([p]) => rel.startsWith(p.replace(/\/$/, '') + '/'))
@@ -507,7 +504,7 @@ function cDocumentationFindings(cfg: QualityCfg, file: string, source: string, d
 		if (!comment.summary.trim()) report('<summary>', 'summary', 'add a meaningful documentation summary');
 		const documented = comment.params.map(({ name: n }) => n);
 		for (const name of declaration.params) if (!documented.includes(name)) report(`@param ${name}`, 'param', `missing @param ${name}`);
-		for (const name of new Set(documented.filter((n) => !declaration.params.includes(n)))) report(`@param ${name}`, 'param', `stale @param ${name}`);
+		for (const name of new Set(documented.filter(n => !declaration.params.includes(n)))) report(`@param ${name}`, 'param', `stale @param ${name}`);
 		if (declaration.params.some((n, i) => documented[i] !== n)) report('@param order', 'param', `@param tags must follow signature order: ${declaration.params.join(', ')}`);
 		for (const { name, description } of comment.params) if (declaration.params.includes(name) && !description.trim()) report(`@param ${name}`, 'param', `missing description for @param ${name}`);
 		if (declaration.returnsValue && !comment.returns?.trim()) report('@return', 'return', 'missing @return description');
@@ -542,14 +539,16 @@ function documented(node: ts.Node, src: string): boolean {
 	// the first declaration. Only exclude it when the block is the first
 	// path-bearing TSDoc in the file; a declaration's own later TSDoc remains
 	// valid even when the file also has a header.
-	const blockStart = target.getFullStart() + doc.index!;
-	let prefix = src.slice(0, blockStart).replace(UFEFF_REGEX, '');
+	let prefix = src.slice(0, target.getFullStart() + doc.index!).replace(UFEFF_REGEX, '');
 	if (prefix.startsWith('#!')) prefix = prefix.slice(prefix.indexOf('\n') + 1);
-	const docLines = doc[0]!
-		.slice(3, -2)
-		.split(R_N_REGEX)
-		.map((l) => l.replace(S_CLASS_3, '').trim());
-	return !(prefix.trim() === '' && docLines.some((l) => C_M_JS_JSX_TS_TSX_REGEX.test(l)));
+	return !(
+		prefix.trim() === '' &&
+		doc[0]!
+			.slice(3, -2)
+			.split(R_N_REGEX)
+			.map(l => l.replace(S_CLASS_3, '').trim())
+			.some(l => C_M_JS_JSX_TS_TSX_REGEX.test(l))
+	);
 }
 
 /**
@@ -561,7 +560,7 @@ function documented(node: ts.Node, src: string): boolean {
  */
 function exported(node: ts.Node): boolean {
 	const target = documentationTarget(node);
-	return !!(ts.canHaveModifiers(target) && ts.getModifiers(target)?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword));
+	return !!(ts.canHaveModifiers(target) && ts.getModifiers(target)?.some(m => m.kind === ts.SyntaxKind.ExportKeyword));
 }
 
 /**
@@ -573,7 +572,7 @@ function exported(node: ts.Node): boolean {
  */
 function bindingParamNames(name: ts.BindingName): string[] {
 	if (ts.isIdentifier(name)) return [name.text];
-	return name.elements.flatMap((element) => (ts.isOmittedExpression(element) ? [] : bindingParamNames(element.name)));
+	return name.elements.flatMap(element => (ts.isOmittedExpression(element) ? [] : bindingParamNames(element.name)));
 }
 
 /**
@@ -601,7 +600,7 @@ function documentationNodeName(node: ts.Node): string {
 	if (ts.isConstructorDeclaration(node)) return 'constructor';
 	const target = documentationTarget(node);
 	if (target !== node && ts.isVariableStatement(target)) {
-		const declaration = target.declarationList.declarations.find((c) => containsNode(c, node));
+		const declaration = target.declarationList.declarations.find(c => containsNode(c, node));
 		if (declaration) return declaration.name.getText();
 	}
 	const candidate = (node as unknown as { name?: ts.Node }).name ?? node;
@@ -663,6 +662,7 @@ function containsNode(parent: ts.Node, target: ts.Node): boolean {
 	return false;
 }
 
+// terra-quality-ignore single-use -- Keep the documented tsdocBlocks declaration so its parameter and return contract remains attached.
 /**
  * Scans source text for TSDoc blocks without treating comment-shaped text inside literals as documentation.
  *
@@ -701,13 +701,15 @@ function tsdocLines(block: TSDocBlock): TSDocLine[] {
 	const body = block.text.slice(3, -2);
 	const lineSize = body.includes('\r\n') ? 2 : 1;
 	let offset = block.start + 3;
-	return body.split(R_N_REGEX).map((l) => {
+	return body.split(R_N_REGEX).map(l => {
+		// terra-quality-ignore single-use -- Record this line's starting offset before advancing to the next line.
 		const result = { offset, text: l.replace(S_CLASS_3, '').trim() };
 		offset += l.length + lineSize;
 		return result;
 	});
 }
 
+// terra-quality-ignore single-use -- Keep the documented fileHeaderBlock declaration so its parameter and return contract remains attached.
 /**
  * Finds the generated path-bearing mock-TSDoc block at the top of a source file, allowing a shebang and whitespace before it.
  *
@@ -717,10 +719,10 @@ function tsdocLines(block: TSDocBlock): TSDocLine[] {
  * @return The top-level file-header block, or `undefined` when it is missing.
  */
 function fileHeaderBlock(src: string, blocks: TSDocBlock[]): TSDocBlock | undefined {
-	return blocks.find((b) => {
+	return blocks.find(b => {
 		let prefix = src.slice(0, b.start).replace(UFEFF_REGEX, '');
 		if (prefix.startsWith('#!')) prefix = prefix.slice(prefix.indexOf('\n') + 1);
-		return prefix.trim() === '' && tsdocLines(b).some((l) => C_M_JS_JSX_TS_TSX_REGEX.test(l.text));
+		return prefix.trim() === '' && tsdocLines(b).some(l => C_M_JS_JSX_TS_TSX_REGEX.test(l.text));
 	});
 }
 
@@ -745,10 +747,9 @@ function tsdocTagEntries(lines: TSDocLine[]): { tag: string; subject: string; de
 		}
 		const rawContent = content.join(' ').trim();
 		const paramText = rawContent.replace(/^\{[^}]*\}\s*/, '').split(/\s+/)[0] ?? '';
-		const subject = tag.toLowerCase() === 'param' ? paramText.replace(/^\[/, '').replace(/\]$/, '').split('=')[0]! : tag.toLowerCase() === 'typeparam' ? paramText : '';
 		entries.push({
 			tag,
-			subject,
+			subject: tag.toLowerCase() === 'param' ? paramText.replace(/^\[/, '').replace(/\]$/, '').split('=')[0]! : tag.toLowerCase() === 'typeparam' ? paramText : '',
 			description: (function tagDescription(tag: string, content: string): string {
 				let description = content.trim().replace(S_CLASS_5, '');
 				if (tag.toLowerCase() === 'param' || tag.toLowerCase() === 'typeparam') description = description.replace(/^\[[^\]]+\]\s*/, '').replace(/^\S+\s*/, '');
@@ -761,6 +762,7 @@ function tsdocTagEntries(lines: TSDocLine[]): { tag: string; subject: string; de
 	return entries;
 }
 
+// terra-quality-ignore single-use -- Keep the documented returnsVal declaration so its parameter and return contract remains attached.
 /**
  * Determines whether a function exposes a value through its return type or body.
  *
@@ -785,6 +787,7 @@ function returnsVal(node: ts.SignatureDeclaration): boolean {
 	return valReturn;
 }
 
+// terra-quality-ignore single-use -- Keep the documented documentationBlockFor declaration so its parameter and return contract remains attached.
 /**
  * Finds the TSDoc block directly attached to a declaration.
  *
@@ -794,12 +797,12 @@ function returnsVal(node: ts.SignatureDeclaration): boolean {
  * @return The attached TSDoc block, or `undefined` when the declaration is undocumented.
  */
 function documentationBlockFor(src: string, node: ts.Node): TSDocBlock | undefined {
-	const target = documentationTarget(node);
-	const range = (ts.getLeadingCommentRanges(src, target.getFullStart()) ?? []).at(-1);
+	const range = (ts.getLeadingCommentRanges(src, documentationTarget(node).getFullStart()) ?? []).at(-1);
 	if (!range || range.kind !== ts.SyntaxKind.MultiLineCommentTrivia || !src.slice(range.pos, range.end).startsWith('/**')) return undefined;
 	return { start: range.pos, end: range.end, text: src.slice(range.pos, range.end) };
 }
 
+// terra-quality-ignore single-use -- Keep the documented descriptionFindingsForFile declaration so its parameter and return contract remains attached.
 /**
  * Audits existing TSDoc prose without inventing replacement text. Generated file
  * path headers are source metadata and are intentionally excluded from this audit.
@@ -847,37 +850,46 @@ function descriptionFindingsForFile(cfg: QualityCfg, file: string, src: string, 
 	};
 	markAttached(parsed);
 	for (const block of blocks) {
-		if (!tsdocTagEntries(tsdocLines(block)).some((entry) => entry.tag.toLowerCase() === 'typedef')) continue;
+		if (!tsdocTagEntries(tsdocLines(block)).some(entry => entry.tag.toLowerCase() === 'typedef')) continue;
 		attached.add(block.start);
 		if (requirements.types) requiredAttached.add(block.start);
 	}
 	for (const block of blocks) {
 		if (block === header) continue;
 		if (!attached.has(block.start)) {
-			const finding = documentationCommentReport(file, parsed, block.start, '<detached TSDoc>', 'orphan', 'remove or attach this TSDoc to a declaration', cfg);
-			findings.push(finding);
+			findings.push(documentationCommentReport(file, parsed, block.start, '<detached TSDoc>', 'orphan', 'remove or attach this TSDoc to a declaration', cfg));
 			continue;
 		}
 		if (!requiredAttached.has(block.start)) continue;
 		const lines = tsdocLines(block);
-		const firstTag = lines.findIndex((l) => l.text.startsWith('@'));
+		const firstTag = lines.findIndex(l => l.text.startsWith('@'));
 		if (
 			!lines
 				.slice(0, firstTag < 0 ? lines.length : firstTag)
-				.map((l) => l.text)
+				.map(l => l.text)
 				.filter(Boolean).length
 		)
 			findings.push(documentationCommentReport(file, parsed, block.start, '<TSDoc summary>', 'summary', 'add a meaningful description for this TSDoc block', cfg));
 		for (const entry of tsdocTagEntries(lines)) {
 			if (entry.tag.toLowerCase() === 'param' && entry.subject.toLowerCase() === 'props') {
-				const name = `@${entry.tag} ${entry.subject}`;
-				findings.push(documentationCommentReport(file, parsed, entry.offset, name, 'param', 'replace the aggregate props tag with an individual @param tag for each binding', cfg));
+				findings.push(
+					documentationCommentReport(file, parsed, entry.offset, `@${entry.tag} ${entry.subject}`, 'param', 'replace the aggregate props tag with an individual @param tag for each binding', cfg),
+				);
 				continue;
 			}
 			if (DESCRIPTION_OPTIONAL_TAGS.has(entry.tag.toLowerCase()) || entry.description) continue;
-			const kind = entry.tag.toLowerCase() === 'param' ? 'param' : entry.tag.toLowerCase() === 'return' || entry.tag.toLowerCase() === 'returns' ? 'return' : 'tag';
 			const name = `@${entry.tag}${entry.subject ? ` ${entry.subject}` : ''}`;
-			findings.push(documentationCommentReport(file, parsed, entry.offset, name, kind, `add a meaningful description for ${name}`, cfg));
+			findings.push(
+				documentationCommentReport(
+					file,
+					parsed,
+					entry.offset,
+					name,
+					entry.tag.toLowerCase() === 'param' ? 'param' : entry.tag.toLowerCase() === 'return' || entry.tag.toLowerCase() === 'returns' ? 'return' : 'tag',
+					`add a meaningful description for ${name}`,
+					cfg,
+				),
+			);
 		}
 	}
 	return findings;
@@ -937,12 +949,15 @@ function documentationFindingsForFile(
 ): DocumentationFinding[] {
 	if (!documentationSupported(file)) return [];
 	const src = analysis?.texts.get(file) ?? readFileSync(file, 'utf8');
+	// Regex-dedup registries are generated API plumbing marked as non-editable;
+	// their exported factories inherit documentation from the authored source use sites.
+	if (/^\/\/ Generated by @terra-symposium\/standards-quality regex-dedup\. Do not edit\.$/mu.test(src)) return [];
 	const parsed = analysis?.sources.get(file) ?? ts.createSourceFile(file, src, ts.ScriptTarget.Latest, true, documentationScriptKind(file));
 	const findings = descriptionFindingsForFile(cfg, file, src, parsed);
 
 	const visit = (node: ts.Node): void => {
-		const isType = ts.isClassDeclaration(node) || ts.isEnumDeclaration(node) || ts.isInterfaceDeclaration(node) || ts.isTypeAliasDeclaration(node);
-		if (requirements.types && isType && !documented(node, src)) findings.push(documentationReport(file, parsed, node, documentationNodeName(node), 'type', 'add TSDoc for this type', cfg));
+		if (requirements.types && (ts.isClassDeclaration(node) || ts.isEnumDeclaration(node) || ts.isInterfaceDeclaration(node) || ts.isTypeAliasDeclaration(node)) && !documented(node, src))
+			findings.push(documentationReport(file, parsed, node, documentationNodeName(node), 'type', 'add TSDoc for this type', cfg));
 		if (isNamedDocumentationFn(node)) {
 			if (requirements.functions || (requirements.exportedFunctions && exported(node))) {
 				if (!documented(node, src)) {
@@ -951,21 +966,21 @@ function documentationFindingsForFile(
 					const block = documentationBlockFor(src, node);
 					if (block) {
 						const entries = tsdocTagEntries(tsdocLines(block));
-						const documentedParams = new Set(entries.filter((e) => e.tag.toLowerCase() === 'param').map((e) => e.subject));
+						const documentedParams = new Set(entries.filter(e => e.tag.toLowerCase() === 'param').map(e => e.subject));
 						const declaredParams = new Set(node.parameters.flatMap((param, i) => fnParamNames(param, i)));
 						for (const [idx, param] of node.parameters.entries()) {
 							for (const name of fnParamNames(param, idx))
 								if (!documentedParams.has(name)) findings.push(documentationReport(file, parsed, node, `@param ${name}`, 'param', `document the ${name} parameter`, cfg));
 						}
-						for (const entry of entries.filter((item) => {
+						for (const entry of entries.filter(item => {
 							if (item.tag.toLowerCase() !== 'param' || !item.subject || declaredParams.has(item.subject)) return false;
 							return !declaredParams.has(item.subject.split('.')[0]!);
 						})) {
-							const destructuredProps = entry.subject === 'props' && node.parameters.some((parameter) => ts.isObjectBindingPattern(parameter.name));
-							if (!destructuredProps) findings.push(documentationCommentReport(file, parsed, entry.offset, `@param ${entry.subject}`, 'param', `remove stale @param ${entry.subject}`, cfg));
+							if (!(entry.subject === 'props' && node.parameters.some(parameter => ts.isObjectBindingPattern(parameter.name))))
+								findings.push(documentationCommentReport(file, parsed, entry.offset, `@param ${entry.subject}`, 'param', `remove stale @param ${entry.subject}`, cfg));
 						}
-						const hasReturnTag = entries.some((e) => ['return', 'returns'].includes(e.tag.toLowerCase()));
-						if (returnsVal(node) && !hasReturnTag) findings.push(documentationReport(file, parsed, node, '@return', 'return', 'document the value returned by this function', cfg));
+						if (returnsVal(node) && !entries.some(e => ['return', 'returns'].includes(e.tag.toLowerCase())))
+							findings.push(documentationReport(file, parsed, node, '@return', 'return', 'document the value returned by this function', cfg));
 					}
 				}
 			}
@@ -989,17 +1004,21 @@ function documentationFindingsForFile(
 export function documentationFindings(cfg: QualityCfg, analysis?: QualityAnalysis): DocumentationFinding[] {
 	const requirements = { functions: true, ...cfg.documentation?.required };
 	const sharedAnalysis = analysis;
-	const cFiles = srcFiles({ ...cfg, extensions: ['.c', '.h'] }).filter((f) => documentationSourceIncluded(cfg, f));
 	const documentedSignatures = new Set<string>();
 	const missingTargets = new Map<string, string>();
-	const cFindings = cFiles.flatMap((f) => cDocumentationFindings(cfg, f, readFileSync(f, 'utf8'), documentedSignatures, missingTargets));
-	const otherFiles = sharedAnalysis?.files
-		? sharedAnalysis.files.filter((f) => documentationSourceIncluded(cfg, f) && documentationSupported(f))
-		: srcFiles(cfg).filter((f) => documentationSourceIncluded(cfg, f) && documentationSupported(f));
-	const otherFindings = otherFiles.flatMap((f) => documentationFindingsForFile(cfg, f, requirements, sharedAnalysis));
+	// terra-quality-ignore single-use -- Analyze C files first to populate documented signatures and missing targets before other findings.
+	const cFindings = srcFiles({ ...cfg, extensions: ['.c', '.h'] })
+		.filter(f => documentationSourceIncluded(cfg, f))
+		.flatMap(f => cDocumentationFindings(cfg, f, readFileSync(f, 'utf8'), documentedSignatures, missingTargets));
+	// terra-quality-ignore single-use -- Complete the other source scan before selecting primary C declarations below.
+	const otherFindings = (
+		sharedAnalysis?.files
+			? sharedAnalysis.files.filter(f => documentationSourceIncluded(cfg, f) && documentationSupported(f))
+			: srcFiles(cfg).filter(f => documentationSourceIncluded(cfg, f) && documentationSupported(f))
+	).flatMap(f => documentationFindingsForFile(cfg, f, requirements, sharedAnalysis));
 	const primaryMissing = new Map<string, string>();
 	for (const [target, signature] of missingTargets) if (!primaryMissing.has(signature)) primaryMissing.set(signature, target);
-	return [...cFindings, ...otherFindings].filter((f) => {
+	return [...cFindings, ...otherFindings].filter(f => {
 		if (f.kind !== 'function' || !f.reason.startsWith('missing documentation block')) return true;
 		const target = `${f.file}|${f.line}|${f.name}`;
 		const signature = missingTargets.get(target);

@@ -18,7 +18,7 @@ pnpm install --frozen-lockfile
 The diagram shows the normal contribution path. A package change should reach its public API and shipped documentation, not just its source file.
 
 <Nodes
-	direction="LR"
+	direction='LR'
 	nodes={[
 		{ id: 'owner', type: 'origin', data: { title: 'Identify owner' } },
 		{ id: 'change', type: 'process', data: { title: 'Make focused change' } },
@@ -45,8 +45,7 @@ pnpm run test
 pnpm run quality -- --all
 ```
 
-The build compiles workspace packages. The test command runs the ordered plan in `config/terra-tests.json`. The full quality command scans the configured source scope; repository build and test commands remain explicit in this sequence.
-|||
+The build compiles workspace packages. The test command runs the ordered plan in `config/terra-tests.json`. The full quality command scans the configured source scope; repository build and test commands remain explicit in this sequence. |||
 
 ||| [Documentation-only change]
 
@@ -57,8 +56,7 @@ pnpm run docs:build
 pnpm exec docs preview --port 2050
 ```
 
-The preview serves the built pages and does not hot-reload source edits. Rebuild after changing content, routes, or assets, then inspect the affected page in a browser.
-|||
+The preview serves the built pages and does not hot-reload source edits. Rebuild after changing content, routes, or assets, then inspect the affected page in a browser. |||
 
 ## Keep repository boundaries clear
 

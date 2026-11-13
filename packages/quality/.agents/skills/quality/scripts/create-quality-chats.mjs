@@ -7,11 +7,12 @@ import { basename, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 const WORK_WORKTREE_CLONE_I_REGEX = /(?:^|[-_])(work|worktree|clone)(?:$|[-_])/i;
 
-const skillRoot = resolve(fileURLToPath(new URL('..', import.meta.url)));
 const defaultRoot = resolve(process.env.QUALITY_REPO_ROOT || `${homedir()}/Desktop`);
 const ignoredDirNames = new Set(['.git', '.next', '.nuxt', '.turbo', '.venv', '.codex', '.cache', '.pnpm-store', 'build', 'coverage', 'dist', 'node_modules', 'target', 'vendor']);
+// terra-quality-ignore single-use -- Reuse the canonical remote alias map while deduplicating repository checkouts.
 const canonicalRemoteAliases = new Map([['github.com/terra-symposium/terra-symposium-website', 'github.com/terra-symposium/website']]);
 
+// terra-quality-ignore single-use -- Keep the documented parseArgs declaration so its parameter and return contract remains attached.
 /**
  * Parses discovery, Cloud submission, concurrency, and dry-run options.
  *
@@ -20,7 +21,13 @@ const canonicalRemoteAliases = new Map([['github.com/terra-symposium/terra-sympo
  * @return Normalized options for the repository batch.
  */
 function parseArgs(args) {
-	const options = { concurrency: Number.POSITIVE_INFINITY, dryRun: false, env: 'kai-macann-all', root: defaultRoot, skips: [] };
+	const options = {
+		concurrency: Number.POSITIVE_INFINITY,
+		dryRun: false,
+		env: 'kai-macann-all',
+		root: defaultRoot,
+		skips: [],
+	};
 	for (let index = 0; index < args.length; index += 1) {
 		const arg = args[index];
 		if (arg === '--help' || arg === '-h') {
@@ -41,7 +48,7 @@ function parseArgs(args) {
 				options.skips.push(
 					...value
 						.split(',')
-						.map((item) => item.trim().toLowerCase())
+						.map(item => item.trim().toLowerCase())
 						.filter(Boolean),
 				);
 			if (arg === '--concurrency') {
@@ -55,6 +62,7 @@ function parseArgs(args) {
 	return options;
 }
 
+// terra-quality-ignore single-use -- Keep the documented findRepos declaration so its parameter and return contract remains attached.
 /**
  * Finds Git repositories below a root without traversing dependency/build trees.
  *
@@ -72,9 +80,9 @@ async function findRepos(root) {
 			if (err.code === 'ENOENT' || err.code === 'EACCES' || err.code === 'EPERM') return;
 			throw err;
 		}
-		if (entries.some((entry) => entry.name === '.git')) repos.add(dir);
+		if (entries.some(entry => entry.name === '.git')) repos.add(dir);
 		if (depth >= 10) return;
-		await Promise.all(entries.filter((entry) => entry.isDirectory() && !entry.isSymbolicLink() && !ignoredDirNames.has(entry.name)).map((entry) => visit(resolve(dir, entry.name), depth + 1)));
+		await Promise.all(entries.filter(entry => entry.isDirectory() && !entry.isSymbolicLink() && !ignoredDirNames.has(entry.name)).map(entry => visit(resolve(dir, entry.name), depth + 1)));
 	};
 	await visit(root);
 	return [...repos].sort((first, second) => first.localeCompare(second));
@@ -105,11 +113,11 @@ function remoteIdentity(remote) {
 	const value = remote.trim().toLowerCase();
 	const url = /^[a-z][a-z\d+.-]*:\/\//i.test(value) ? new URL(value) : undefined;
 	const ssh = url ? undefined : value.match(/^(?:[^@]+@)?([^:]+):(.+)$/);
-	const host = url?.port ? `${url.hostname}:${url.port}` : url?.hostname;
-	const norm = (url ? `${host}${url.pathname}` : ssh ? `${ssh[1]}/${ssh[2]}` : value).replace(/\.git$/, '').replace(/\/+$/, '');
+	const norm = (url ? `${url?.port ? `${url.hostname}:${url.port}` : url?.hostname}${url.pathname}` : ssh ? `${ssh[1]}/${ssh[2]}` : value).replace(/\.git$/, '').replace(/\/+$/, '');
 	return canonicalRemoteAliases.get(norm) || norm;
 }
 
+// terra-quality-ignore single-use -- Keep the documented uniqueRepos declaration so its parameter and return contract remains attached.
 /**
  * Collapses duplicate worktrees or clones that share one remote identity.
  *
@@ -122,6 +130,7 @@ function uniqueRepos(repos) {
 	for (const repo of repos) {
 		const remote = gitValue(repo, ['remote', 'get-url', 'origin']);
 		const commonDir = resolve(repo, gitValue(repo, ['rev-parse', '--git-common-dir']) || '.git');
+		// terra-quality-ignore single-use -- Resolve the Git directory before deriving identity so Git failures keep their original order.
 		const gitDir = resolve(repo, gitValue(repo, ['rev-parse', '--git-dir']) || '.git');
 		const identity = remote ? remoteIdentity(remote) : commonDir;
 		const candidates = groups.get(identity) || [];
@@ -130,7 +139,7 @@ function uniqueRepos(repos) {
 	}
 	return [...groups.values()]
 		.map(
-			(candidates) =>
+			candidates =>
 				candidates.sort((first, second) => {
 					const firstWorktree = first.gitDir === first.commonDir ? 0 : 1;
 					const secondWorktree = second.gitDir === second.commonDir ? 0 : 1;
@@ -154,9 +163,13 @@ function uniqueRepos(repos) {
  * @return Whether the repository matches an explicit skip.
  */
 function isSkipped(repo, root, skips) {
-	const name = basename(repo).toLowerCase();
-	const path = relative(root, repo).toLowerCase().split(/[\\/]/);
-	return skips.includes(name) || path.some((segment) => skips.includes(segment));
+	return (
+		skips.includes(basename(repo).toLowerCase()) ||
+		relative(root, repo)
+			.toLowerCase()
+			.split(/[\\/]/)
+			.some(segment => skips.includes(segment))
+	);
 }
 
 /**
@@ -181,6 +194,7 @@ function taskPrompt(repo, skillText) {
 	].join('\n');
 }
 
+// terra-quality-ignore single-use -- Keep the documented printHelp declaration so its parameter and return contract remains attached.
 /** Prints the supported command-line options. */
 function printHelp() {
 	process.stdout.write(
@@ -211,26 +225,30 @@ function printHelp() {
  * @return Exit code from the Cloud command, or `1` when it cannot start.
  */
 function submitTask(repo, env, prompt) {
-	return new Promise((resolveTask) => {
-		const child = spawn('codex', ['cloud', 'exec', '--env', env, prompt], { cwd: repo, stdio: ['ignore', 'pipe', 'pipe'] });
+	return new Promise(resolveTask => {
+		const child = spawn('codex', ['cloud', 'exec', '--env', env, prompt], {
+			cwd: repo,
+			stdio: ['ignore', 'pipe', 'pipe'],
+		});
 		for (const [stream, output] of [
 			['stdout', child.stdout],
 			['stderr', child.stderr],
 		]) {
-			output.on('data', (chunk) => {
+			output.on('data', chunk => {
 				for (const line of chunk.toString().split(/(?<=\n)/)) {
 					if (line) process[stream].write(`[${basename(repo)}] ${line}`);
 				}
 			});
 		}
-		child.on('error', (err) => {
+		child.on('error', err => {
 			process.stderr.write(`[${basename(repo)}] ${err.message}\n`);
 			resolveTask(1);
 		});
-		child.on('close', (code) => resolveTask(code ?? 1));
+		child.on('close', code => resolveTask(code ?? 1));
 	});
 }
 
+// terra-quality-ignore single-use -- Keep the documented main declaration so its parameter and return contract remains attached.
 /**
  * Discovers the repository batch and submits tasks within the concurrency limit.
  *
@@ -242,13 +260,13 @@ async function main() {
 		printHelp();
 		return;
 	}
-	const skillText = await readFile(resolve(skillRoot, 'SKILL.md'), 'utf8');
+	const skillText = await readFile(resolve(fileURLToPath(new URL('..', import.meta.url)), 'SKILL.md'), 'utf8');
 	const found = await findRepos(options.root);
 	const unique = uniqueRepos(found);
-	const repos = unique.filter((repo) => !isSkipped(repo, options.root, options.skips));
+	const repos = unique.filter(repo => !isSkipped(repo, options.root, options.skips));
 	if (!repos.length) throw new Error(`No repositories found under ${options.root} after exclusions`);
-	const missingRemotes = repos.filter((repo) => !gitValue(repo, ['remote', 'get-url', 'origin']));
-	if (missingRemotes.length) throw new Error(`Cannot provision Cloud tasks without an origin remote:\n${missingRemotes.map((repo) => `- ${relative(options.root, repo)}`).join('\n')}`);
+	const missingRemotes = repos.filter(repo => !gitValue(repo, ['remote', 'get-url', 'origin']));
+	if (missingRemotes.length) throw new Error(`Cannot provision Cloud tasks without an origin remote:\n${missingRemotes.map(repo => `- ${relative(options.root, repo)}`).join('\n')}`);
 	process.stdout.write(
 		`Selected ${repos.length} unique repositories under ${options.root}; skipped ${unique.length - repos.length} by request and collapsed ${found.length - unique.length} duplicate worktrees or remotes.\n`,
 	);
@@ -260,15 +278,15 @@ async function main() {
 	}
 	let nextIndex = 0;
 	let failed = 0;
-	const worker = async () => {
-		while (nextIndex < repos.length) {
-			const repo = repos[nextIndex];
-			nextIndex += 1;
-			if ((await submitTask(repo, options.env, taskPrompt(repo, skillText))) !== 0) failed += 1;
-		}
-	};
-	const workers = Math.min(repos.length, options.concurrency);
-	await Promise.all(Array.from({ length: workers }, worker));
+	await Promise.all(
+		Array.from({ length: Math.min(repos.length, options.concurrency) }, async () => {
+			while (nextIndex < repos.length) {
+				const repo = repos[nextIndex];
+				nextIndex += 1;
+				if ((await submitTask(repo, options.env, taskPrompt(repo, skillText))) !== 0) failed += 1;
+			}
+		}),
+	);
 	process.stdout.write(`Submitted ${repos.length - failed}/${repos.length} Cloud tasks.\n`);
 	if (failed) process.exitCode = 1;
 }

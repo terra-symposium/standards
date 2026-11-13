@@ -28,17 +28,13 @@ Use this skill when a user asks to review, integrate, close, or clean up branche
 
 ## Protect worktrees and local changes
 
-Keep dirty, untracked, or otherwise unaccounted work. Inspect its diff before cleanup. Preserve
-wanted changes in a commit, a clearly named stash, or a recoverable worktree archive before removal.
+Keep dirty, untracked, or otherwise unaccounted work. Inspect its diff before cleanup. Preserve wanted changes in a commit, a clearly named stash, or a recoverable worktree archive before removal.
 
-Do not drop unrelated stashes. Do not remove a branch checked out in any worktree, and do not reset,
-switch, rebase, or force-remove a worktree containing unaccounted work.
+Do not drop unrelated stashes. Do not remove a branch checked out in any worktree, and do not reset, switch, rebase, or force-remove a worktree containing unaccounted work.
 
-Do not remove a worktree containing initialized submodules or embedded repositories without handling
-those separately.
+Do not remove a worktree containing initialized submodules or embedded repositories without handling those separately.
 
-Prefer the Codex worktree archive action for managed worktrees when available and allowed. If
-unavailable, use Git only after verifying that changes are clean or safely preserved.
+Prefer the Codex worktree archive action for managed worktrees when available and allowed. If unavailable, use Git only after verifying that changes are clean or safely preserved.
 
 ## Remove eligible refs
 
@@ -50,13 +46,8 @@ unavailable, use Git only after verifying that changes are clean or safely prese
 
 ## Verify and report
 
-Recheck working tree status, current branch and target sync, `git worktree list --porcelain`,
-relevant local and remote refs, and open PR usage.
+Recheck working tree status, current branch and target sync, `git worktree list --porcelain`, relevant local and remote refs, and open PR usage.
 
-Report each branch's disposition, the useful changes preserved, checks run, refs or worktrees
-removed, and items retained with reasons. Distinguish local refs from remote refs and stale tracking
-refs. State which checkout was cleaned; deleting a remote branch does not remove a local branch in a
-different checkout.
+Report each branch's disposition, the useful changes preserved, checks run, refs or worktrees removed, and items retained with reasons. Distinguish local refs from remote refs and stale tracking refs. State which checkout was cleaned; deleting a remote branch does not remove a local branch in a different checkout.
 
-Do not claim a branch or worktree was removed until its absence is verified in the repository or
-remote actually changed. Report blocked or unavailable cleanup plainly.
+Do not claim a branch or worktree was removed until its absence is verified in the repository or remote actually changed. Report blocked or unavailable cleanup plainly.

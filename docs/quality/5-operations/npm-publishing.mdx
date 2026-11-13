@@ -36,12 +36,12 @@ The workflow does not accept a repository URL or arbitrary package name. Never o
 
 ## Troubleshooting
 
-| Symptom                    | Check                                                                                                                                                                                                                                                                              |
-| -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| ENEEDAUTH                  | Confirm the workflow references PACKAGES_TOKEN and that the Standards Actions secret is configured.                                                                                                                                                                                |
+| Symptom | Check |
+| --- | --- |
+| ENEEDAUTH | Confirm the workflow references PACKAGES_TOKEN and that the Standards Actions secret is configured. |
 | Publish returns 403 or 404 | Check that the secret contains the current token and that the token has write access to every package. Compare token creation/rotation time with the secret's last-updated date. npm's 404 can also hide a failed publish authorization; it does not prove the package is missing. |
-| Version already exists     | Verify that version on npm. Release a new version if further changes are needed.                                                                                                                                                                                                   |
-| Docs checkout fails        | Supply a valid full 40-character commit SHA from Terra-Symposium/docs.                                                                                                                                                                                                             |
-| Docs build fails           | Check the selected revision and the repository's config lockfile and build workflow.                                                                                                                                                                                               |
+| Version already exists | Verify that version on npm. Release a new version if further changes are needed. |
+| Docs checkout fails | Supply a valid full 40-character commit SHA from Terra-Symposium/docs. |
+| Docs build fails | Check the selected revision and the repository's config lockfile and build workflow. |
 
 Keep the credential only in Standards Actions secrets. Rotate it through npm's account process and update the existing PACKAGES_TOKEN secret without exposing its value.

@@ -11,6 +11,7 @@ IMPORTS
 
 // API
 import ts from 'typescript';
+import { createHash } from 'node:crypto';
 // prettier-ignore
 import { accessibilityFindings, displayNameFindings, errorBoundaryFindings, fixAccessibleNames, fixDisplayNames, fixErrorBoundaries, uiComponentRecommendations } from '@terra-symposium/standards-ui-quality';
 import {
@@ -41,7 +42,7 @@ import {
 // prettier-ignore
 import { deadCodeEditsIntroduceTypeErrors, deadCodeTypeProgram, fixObjectForwarding, fixSingleUseDeclarations, objectForwardingFindings, singleUseFindings } from '@terra-symposium/standards-refactoring';
 import { documentationFindings, documentedCommandFindings, fixDocumentedCommands } from '@terra-symposium/standards-documentation';
-import { existsSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { isBuiltin } from 'node:module';
 import { tmpdir } from 'node:os';
@@ -62,13 +63,12 @@ import type { Dirent } from 'node:fs';
 import type { GitHubReport } from '@terra-symposium/standards-quality-reports';
 import type { LanguageProfileTool, LanguageQualityPhase, ResolvedLanguageCheck, SkippedLanguageCheck } from '@terra-symposium/standards-language-checks';
 import type { QualityAnalysis, QualityAutofixName, QualityCfg, QualityCheckName, QualityOptions } from '@terra-symposium/standards-quality-core';
+const BPLAYWRIGHT_B_U_REGEX = /\bplaywright\b/u;
 
 /*//////////////////////////////////////////////////
 REGEX
 //////////////////////////////////////////////////*/
 
-const BPLAYWRIGHT_B_U_REGEX = /\bplaywright\b/u;
-const BWORKSPACE_TEST_RUNNER_JS_B_U_REGEX = /\bworkspace-test-runner\.js\b/u;
 const NON_WORKSPACE_DIRS = new Set(['.git', '.next', '.nuxt', '.turbo', '.vercel', '.vite', '.astro', 'build', 'coverage', 'dist', 'node_modules', 'out', 'target', 'vendor']);
 
 /*//////////////////////////////////////////////////
@@ -147,9 +147,7 @@ const ESLINT_CONFIG_NAMES = ['eslint.config.js', 'eslint.config.mjs', 'eslint.co
  * @return Absolute config path or undefined when no flat config exists.
  */
 function findEslintConfig(root: string, configRoot = resolve(root, 'config')): string | undefined {
-	const configDirConfigs = ESLINT_CONFIG_NAMES.map((n) => resolve(configRoot, n));
-	const rootConfigs = ESLINT_CONFIG_NAMES.map((n) => resolve(root, n));
-	return [...configDirConfigs, ...rootConfigs].find((p) => existsSync(p));
+	return [...ESLINT_CONFIG_NAMES.map(n => resolve(configRoot, n)), ...ESLINT_CONFIG_NAMES.map(n => resolve(root, n))].find(p => existsSync(p));
 }
 
 /**
@@ -185,7 +183,7 @@ function isCommonJsSource(root: string, file: string): boolean {
  * @return Exact escaped ESLint pattern for the source file.
  */
 function eslintFilePattern(root: string, file: string): string {
-	return [...relative(root, file).split(sep).join('/')].map((character) => (ESLINT_GLOB_SPECIALS.has(character) ? `\\${character}` : character)).join('');
+	return [...relative(root, file).split(sep).join('/')].map(character => (ESLINT_GLOB_SPECIALS.has(character) ? `\\${character}` : character)).join('');
 }
 
 /**
@@ -198,7 +196,7 @@ function eslintFilePattern(root: string, file: string): string {
 function projectTsconfig(cfg: QualityCfg): string {
 	if (cfg.tsconfig) return resolve(cfg.root, cfg.tsconfig);
 	const candidates = [resolve(cfg.configRoot ?? resolve(cfg.root, 'config'), 'tsconfig.json'), resolve(cfg.root, 'tsconfig.json')];
-	return candidates.find((p) => existsSync(p)) ?? candidates[0]!;
+	return candidates.find(p => existsSync(p)) ?? candidates[0]!;
 }
 const ESLINT_API_FALLBACK = 78;
 const FOCUSED_ESLINT_FALLBACK = 'TERRA_QUALITY_FOCUSED_ESLINT_UNAVAILABLE';
@@ -255,6 +253,7 @@ type GenericFinding =
 	| { value: string; count: number; locations: string[] }
 	| { source: string; count: number; locations: string[] }
 	| { file: string; pattern: string };
+// terra-quality-ignore single-use -- Compile the ANSI escape matcher once for repeated process output cleanup.
 const ANSI_ESCAPE = new RegExp(`${String.fromCharCode(27)}\\[[0-?]*[ -/]*[@-~]`, 'g');
 
 /*//////////////////////////////////////////////////
@@ -327,8 +326,7 @@ export function loadQualityCfg(file?: string): QualityCfg {
 	const configDir = dirname(path);
 	const implicitConfigRoot = basename(configDir) === 'config' ? dirname(configDir) : configDir;
 	const root = raw.root ? resolve(implicitConfigRoot, raw.root) : implicitConfigRoot;
-	const defaultConfigRoot = configDir === implicitConfigRoot ? resolve(root, 'config') : configDir;
-	return createQualityCfg({ ...raw, root, configRoot: raw.configRoot ? resolve(root, raw.configRoot) : defaultConfigRoot });
+	return createQualityCfg({ ...raw, root, configRoot: raw.configRoot ? resolve(root, raw.configRoot) : configDir === implicitConfigRoot ? resolve(root, 'config') : configDir });
 }
 
 /**
@@ -340,8 +338,7 @@ export function loadQualityCfg(file?: string): QualityCfg {
  */
 export function createQualityCfg(cfg: QualityCfg): QualityCfg {
 	const root = resolve(cfg.root);
-	const configRoot = resolve(root, cfg.configRoot ?? 'config');
-	const unknownChecks = Object.keys(cfg.enabledChecks ?? {}).filter((check) => !QUALITY_CHECK_NAMES.includes(check as QualityCheckName));
+	const unknownChecks = Object.keys(cfg.enabledChecks ?? {}).filter(check => !QUALITY_CHECK_NAMES.includes(check as QualityCheckName));
 	if (unknownChecks.length) throw new Error(`Unknown quality check${unknownChecks.length === 1 ? '' : 's'}: ${unknownChecks.join(', ')}. Available checks: ${QUALITY_CHECK_NAMES.join(', ')}.`);
 	const langProfiles = cfg.languageProfiles ?? [];
 	if (!Array.isArray(langProfiles)) throw new Error('languageProfiles must be an array of profile names.');
@@ -354,16 +351,16 @@ export function createQualityCfg(cfg: QualityCfg): QualityCfg {
 		languageProfiles: langProfiles,
 		renameExports: cfg.renameExports ?? false,
 		root,
-		configRoot,
-		sourceRoots: cfg.sourceRoots.map((p) => resolve(root, p)),
-		includeRoots: (cfg.includeRoots ?? []).map((p) => resolve(root, p)),
+		configRoot: resolve(root, cfg.configRoot ?? 'config'),
+		sourceRoots: cfg.sourceRoots.map(p => resolve(root, p)),
+		includeRoots: (cfg.includeRoots ?? []).map(p => resolve(root, p)),
 		skippedDirectories: cfg.skippedDirectories ?? [],
-		skippedFiles: (cfg.skippedFiles ?? []).map((p) => resolve(root, p)),
+		skippedFiles: (cfg.skippedFiles ?? []).map(p => resolve(root, p)),
 		singleUse: cfg.singleUse ? { ...cfg.singleUse, skippedDirectories: cfg.singleUse.skippedDirectories ?? [] } : undefined,
 		aliases: cfg.aliases ?? {},
 		protectedIdentifiers: cfg.protectedIdentifiers ?? [],
-		lintRoots: (cfg.lintRoots ?? []).map((p) => resolve(root, p)),
-		typecheckRoots: (cfg.typecheckRoots ?? []).map((p) => resolve(root, p)),
+		lintRoots: (cfg.lintRoots ?? []).map(p => resolve(root, p)),
+		typecheckRoots: (cfg.typecheckRoots ?? []).map(p => resolve(root, p)),
 		typecheckCommand: cfg.typecheckCommand,
 	};
 }
@@ -384,6 +381,7 @@ function toolPath(cfg: QualityCfg, cfgd: string | undefined, fallback: string): 
 	return existsSync(local) ? local : executable;
 }
 
+// terra-quality-ignore single-use -- Keep the documented canUseLocalEslintApi declaration so its parameter and return contract remains attached.
 /**
  * Checks whether a configured ESLint executable resolves to the repository's package installation.
  *
@@ -394,9 +392,7 @@ function toolPath(cfg: QualityCfg, cfgd: string | undefined, fallback: string): 
 function canUseLocalEslintApi(cfg: QualityCfg): boolean {
 	const configured = cfg.tools?.eslint;
 	if (configured === undefined || configured === 'eslint') return true;
-	const configuredPath = resolve(cfg.root, configured);
-	const configRoot = cfg.configRoot ?? resolve(cfg.root, 'config');
-	return [resolve(cfg.root, 'node_modules', '.bin', 'eslint'), resolve(configRoot, 'node_modules', '.bin', 'eslint')].includes(configuredPath);
+	return [resolve(cfg.root, 'node_modules', '.bin', 'eslint'), resolve(cfg.configRoot ?? resolve(cfg.root, 'config'), 'node_modules', '.bin', 'eslint')].includes(resolve(cfg.root, configured));
 }
 
 /**
@@ -532,7 +528,7 @@ function recordQualityDetail(detail: string): void {
 		return;
 	}
 	if (!qualityCheckName) qualityCheckName = 'Quality Runner';
-	qualityDetails.push(...compactOutput(detail).map((l) => `    - ${l.trim().replace(/^[-•]\s*/u, '')}`));
+	qualityDetails.push(...compactOutput(detail).map(l => `    - ${l.trim().replace(/^[-•]\s*/u, '')}`));
 }
 
 /**
@@ -649,7 +645,7 @@ function workspaceManifests(root: string): WorkspaceManifest[] {
  */
 function scriptNameForInvocation(check: QualityInvocation): string {
 	const args = check.args ?? [];
-	const runIdx = args.findIndex((a) => a === 'run' || a === 'run-script');
+	const runIdx = args.findIndex(a => a === 'run' || a === 'run-script');
 	if (runIdx >= 0) return args[runIdx + 1] ?? '';
 	if (!/^(?:pnpm|npm|yarn|bun)(?:\.cmd)?$/iu.test(basename(check.command))) return '';
 	for (let idx = 0; idx < args.length; idx++) {
@@ -710,10 +706,11 @@ function invocationText(cfg: QualityCfg, check: QualityInvocation): string {
 			}
 			return selectors;
 		})(check);
-		const packages = selectors.length
-			? workspaceManifests(cfg.root).filter((m) => selectors.some((s) => matchesWorkspaceFilter(cfg.root, s, m)))
-			: workspaceManifests(cfg.root).filter((m) => m.directory === cfg.root);
-		return packages.map((m) => m.scripts[scriptName]).filter((s): s is string => typeof s === 'string');
+		return (
+			selectors.length ? workspaceManifests(cfg.root).filter(m => selectors.some(s => matchesWorkspaceFilter(cfg.root, s, m))) : workspaceManifests(cfg.root).filter(m => m.directory === cfg.root)
+		)
+			.map(m => m.scripts[scriptName])
+			.filter((s): s is string => typeof s === 'string');
 	})(cfg, check).join(' ')}`.toLowerCase();
 }
 
@@ -733,7 +730,7 @@ function phaseForInvocation(cfg: QualityCfg, check: QualityInvocation): QualityP
 			return (
 				testRunner(cfg, check) !== 'unknown' ||
 				/\b(?:test|tests|spec|specs|playwright|vitest|jest|mocha|e2e|contract|integration)\b/u.test(invocationText(cfg, check)) ||
-				(check.args ?? []).some((a) => a === '--test' || a.startsWith('--test='))
+				(check.args ?? []).some(a => a === '--test' || a.startsWith('--test='))
 			);
 		})(cfg, check)
 	)
@@ -757,9 +754,13 @@ function testRunner(cfg: QualityCfg, check: QualityInvocation): 'node' | 'playwr
 	const text = invocationText(cfg, check);
 	const args = check.args ?? [];
 	if (BPLAYWRIGHT_B_U_REGEX.test(text) || /\bplaywright\b/iu.test(args.join(' '))) return 'playwright';
-	const nodeCmd = /^(?:node|node\.exe)$/iu.test(basename(check.command));
-	const nodeTestArgs = args.some((a) => a === '--test' || a.startsWith('--test=')) || args.some((a) => /\.(?:mjs|cjs)$/iu.test(a));
-	if ((nodeCmd && nodeTestArgs) || BWORKSPACE_TEST_RUNNER_JS_B_U_REGEX.test(text) || /\bnode\s+[^\n]*--test\b/u.test(text) || /\bpnpm\s+-r\s+test\b/u.test(text)) return 'node';
+	if (
+		(/^(?:node|node\.exe)$/iu.test(basename(check.command)) && (args.some(a => a === '--test' || a.startsWith('--test=')) || args.some(a => /\.(?:mjs|cjs)$/iu.test(a)))) ||
+		/\bworkspace-test-runner\.js\b/u.test(text) ||
+		/\bnode\s+[^\n]*--test\b/u.test(text) ||
+		/\bpnpm\s+-r\s+test\b/u.test(text)
+	)
+		return 'node';
 	return 'unknown';
 }
 
@@ -774,7 +775,7 @@ function compactOutput(val: string): string[] {
 	return val
 		.replace(ANSI_ESCAPE, '')
 		.split(R_N_REGEX)
-		.map((l) => l.replace(/\s+/g, ' ').trim())
+		.map(l => l.replace(/\s+/g, ' ').trim())
 		.filter(Boolean);
 }
 
@@ -836,8 +837,7 @@ function runTestSuite(cfg: QualityCfg, check: QualityInvocation): { status: numb
 	const args = [...(check.args ?? [])];
 	const env = { ...process.env };
 	if (runner === 'node') {
-		const reporterUrl = new URL('./node-reporter.js', import.meta.url).href;
-		env.NODE_OPTIONS = qualityNodeReporterOptions(env.NODE_OPTIONS, reporterUrl);
+		env.NODE_OPTIONS = qualityNodeReporterOptions(env.NODE_OPTIONS, new URL('./node-reporter.js', import.meta.url).href);
 		env.TERRA_QUALITY_NODE_REPORTER_OWNER = '1';
 		args.splice(
 			0,
@@ -868,7 +868,7 @@ function runTestSuite(cfg: QualityCfg, check: QualityInvocation): { status: numb
 			if (!arg.startsWith('--reporter=')) selectedArgs.push(arg);
 		}
 		args.splice(0, args.length, ...selectedArgs);
-		if (/\b(?:pnpm|npm|yarn)\b/u.test(check.command) && args.some((a) => a === 'run' || a === 'run-script')) {
+		if (/\b(?:pnpm|npm|yarn)\b/u.test(check.command) && args.some(a => a === 'run' || a === 'run-script')) {
 			if (!args.includes('--')) args.push('--');
 			args.push(reporterArg);
 		} else {
@@ -903,6 +903,7 @@ function runTestSuite(cfg: QualityCfg, check: QualityInvocation): { status: numb
 	return { status, output };
 }
 
+// terra-quality-ignore single-use -- Keep the documented runQualityPhase declaration so its parameter and return contract remains attached.
 /**
  * Runs configured and profile-provided checks assigned to one fixed phase.
  *
@@ -916,16 +917,18 @@ function runTestSuite(cfg: QualityCfg, check: QualityInvocation): { status: numb
 function runQualityPhase(cfg: QualityCfg, phase: QualityPhase, profileChecks: ResolvedLanguageCheck[], toolResults: Map<string, ReturnType<typeof inspectLanguageProfileTool>>): number {
 	const cmds = (function qualityInvocations(cfg: QualityCfg, profileChecks: ResolvedLanguageCheck[]): QualityInvocation[] {
 		const configured = cfg.qualityCommands ?? [];
-		const profileNames = new Set(profileChecks.map((c) => c.name));
-		const configuredByName = new Map(configured.map((c) => [c.name, c]));
-		const profileInvocations = profileChecks.map((c): QualityInvocation => {
-			const override = configuredByName.get(c.name);
-			return override
-				? { ...override, phase: c.phase, profileId: c.profileId, qualityChecks: c.qualityChecks }
-				: { name: c.name, command: c.command, args: c.args, phase: c.phase, profileId: c.profileId, profileTool: c.tool, qualityChecks: c.qualityChecks };
-		});
-		return [...profileInvocations, ...configured.filter((c) => !profileNames.has(c.name))];
-	})(cfg, profileChecks).filter((c) => qualityCmdEnabled(cfg, c.name) && phaseForInvocation(cfg, c) === phase);
+		const profileNames = new Set(profileChecks.map(c => c.name));
+		const configuredByName = new Map(configured.map(c => [c.name, c]));
+		return [
+			...profileChecks.map((c): QualityInvocation => {
+				const override = configuredByName.get(c.name);
+				return override
+					? { ...override, phase: c.phase, profileId: c.profileId, qualityChecks: c.qualityChecks }
+					: { name: c.name, command: c.command, args: c.args, phase: c.phase, profileId: c.profileId, profileTool: c.tool, qualityChecks: c.qualityChecks };
+			}),
+			...configured.filter(c => !profileNames.has(c.name)),
+		];
+	})(cfg, profileChecks).filter(c => qualityCmdEnabled(cfg, c.name) && phaseForInvocation(cfg, c) === phase);
 	/**
 	 * Checks and caches the required tool for a configured language profile.
 	 *
@@ -945,12 +948,6 @@ function runQualityPhase(cfg: QualityCfg, phase: QualityPhase, profileChecks: Re
 	if (phase === 'Tests') {
 		const suites = (function uniqueTestSuites(checks: QualityInvocation[]): QualityInvocation[] {
 			const seen = new Set<string>();
-			const unique = checks.filter((c) => {
-				const key = JSON.stringify([c.command, c.args ?? []]);
-				if (seen.has(key)) return false;
-				seen.add(key);
-				return true;
-			});
 			/**
 			 * Orders test commands so unit and integration checks run before broader suites.
 			 *
@@ -962,10 +959,17 @@ function runQualityPhase(cfg: QualityCfg, phase: QualityPhase, profileChecks: Re
 				const name = check.name.toLowerCase();
 				if (/\bunit\b/u.test(name)) return 0;
 				if (/\bintegration\b/u.test(name)) return 1;
-				if (/\b(?:browser|e2e|playwright)\b/u.test(name) || /\bplaywright\b/u.test([check.command, ...(check.args ?? [])].join(' '))) return 2;
+				if (/\b(?:browser|e2e|playwright)\b/u.test(name) || BPLAYWRIGHT_B_U_REGEX.test([check.command, ...(check.args ?? [])].join(' '))) return 2;
 				return 3;
 			};
-			return unique.sort((l, r) => rank(l) - rank(r));
+			return checks
+				.filter(c => {
+					const key = JSON.stringify([c.command, c.args ?? []]);
+					if (seen.has(key)) return false;
+					seen.add(key);
+					return true;
+				})
+				.sort((l, r) => rank(l) - rank(r));
 		})(cmds);
 		for (const check of suites) {
 			try {
@@ -984,13 +988,16 @@ function runQualityPhase(cfg: QualityCfg, phase: QualityPhase, profileChecks: Re
 		let status = 1;
 		try {
 			requireProfileTool(check);
-			const args = [...(check.args ?? [])].flatMap((a) => {
-				if (a !== '{classes}') return [a];
-				const classes = [resolve(cfg.root, 'target/classes'), resolve(cfg.root, 'build/classes/java/main')].filter((p) => existsSync(p) && statSync(p).isDirectory());
-				if (!classes.length) throw new Error('SpotBugs requires compiled Java classes. Configure a build command before repository health checks or override java-spotbugs for the project.');
-				return classes;
-			});
-			status = run(cfg, check.command, args);
+			status = run(
+				cfg,
+				check.command,
+				[...(check.args ?? [])].flatMap(a => {
+					if (a !== '{classes}') return [a];
+					const classes = [resolve(cfg.root, 'target/classes'), resolve(cfg.root, 'build/classes/java/main')].filter(p => existsSync(p) && statSync(p).isDirectory());
+					if (!classes.length) throw new Error('SpotBugs requires compiled Java classes. Configure a build command before repository health checks or override java-spotbugs for the project.');
+					return classes;
+				}),
+			);
 		} catch (error) {
 			recordQualityFailure(`command:${check.name}`, error);
 		}
@@ -1003,6 +1010,7 @@ function runQualityPhase(cfg: QualityCfg, phase: QualityPhase, profileChecks: Re
 	return failures;
 }
 
+// terra-quality-ignore single-use -- Keep the documented reportSkippedLangChecks declaration so its parameter and return contract remains attached.
 /**
  * Records selected profile checks that cannot run because their source or optional config is absent.
  *
@@ -1020,6 +1028,7 @@ function reportSkippedLangChecks(cfg: QualityCfg, skipped: SkippedLanguageCheck[
 	}
 }
 
+// terra-quality-ignore single-use -- Keep the documented reportFailedLangChecks declaration so its parameter and return contract remains attached.
 /**
  * Marks required profile configuration failures without stopping unrelated checks.
  *
@@ -1036,6 +1045,7 @@ function reportFailedLangChecks(cfg: QualityCfg, failed: SkippedLanguageCheck[])
 	}
 }
 
+// terra-quality-ignore single-use -- Keep the documented runLangProfileFixes declaration so its parameter and return contract remains attached.
 /**
  * Applies profile-provided safe fixes while preserving the normal read-only check commands.
  *
@@ -1045,7 +1055,7 @@ function reportFailedLangChecks(cfg: QualityCfg, failed: SkippedLanguageCheck[])
  */
 function runLangProfileFixes(cfg: QualityCfg, checks: ResolvedLanguageCheck[], toolResults: Map<string, ReturnType<typeof inspectLanguageProfileTool>>): void {
 	for (const check of checks) {
-		if (!check.autofix || cfg.qualityCommands?.some((c) => c.name === check.name) || !qualityAutofixEnabled(cfg, check.autofix.name) || !qualityCmdEnabled(cfg, check.name)) continue;
+		if (!check.autofix || cfg.qualityCommands?.some(c => c.name === check.name) || !qualityAutofixEnabled(cfg, check.autofix.name) || !qualityCmdEnabled(cfg, check.name)) continue;
 		if (check.tool) {
 			const toolKey = JSON.stringify([check.tool.command, check.tool.versionArgs, check.tool.minimumVersion]);
 			let toolResult = toolResults.get(toolKey);
@@ -1055,8 +1065,11 @@ function runLangProfileFixes(cfg: QualityCfg, checks: ResolvedLanguageCheck[], t
 			}
 			if (toolResult.error) throw new Error(toolResult.error);
 		}
-		const args = check.autofix.args.flatMap((a) => (a === '{files}' ? check.files : [a]));
-		const result = spawnSync(check.autofix.command, args, { cwd: cfg.root, stdio: 'inherit' });
+		const result = spawnSync(
+			check.autofix.command,
+			check.autofix.args.flatMap(a => (a === '{files}' ? check.files : [a])),
+			{ cwd: cfg.root, stdio: 'inherit' },
+		);
 		if (result.error) throw result.error;
 		if (result.status !== 0) throw new Error(`${check.autofix.command} exited with status ${result.status ?? 1}`);
 	}
@@ -1073,6 +1086,7 @@ function isGitDiffCheck(check: QualityInvocation): boolean {
 	return basename(check.command).toLowerCase() === 'git' && check.args?.length === 2 && check.args[0] === 'diff' && check.args[1] === '--check';
 }
 
+// terra-quality-ignore single-use -- Keep the documented hasCfgdGitDiffCheck declaration so its parameter and return contract remains attached.
 /**
  * Detects whether an enabled repository-health command already performs Git's diff check.
  *
@@ -1081,7 +1095,7 @@ function isGitDiffCheck(check: QualityInvocation): boolean {
  * @return Whether a selected exact Git diff check is present.
  */
 function hasCfgdGitDiffCheck(cfg: QualityCfg): boolean {
-	return (cfg.qualityCommands ?? []).some((c) => qualityCmdEnabled(cfg, c.name) && isGitDiffCheck(c));
+	return (cfg.qualityCommands ?? []).some(c => qualityCmdEnabled(cfg, c.name) && isGitDiffCheck(c));
 }
 
 /**
@@ -1094,7 +1108,7 @@ function hasCfgdGitDiffCheck(cfg: QualityCfg): boolean {
  * @return Text snapshots keyed by absolute filename.
  */
 function snapshotFiles(cfg: QualityCfg, files: string[]): Map<string, string> {
-	return new Map(files.map((f) => [f, readFileSync(resolve(cfg.root, f), 'utf8')]));
+	return new Map(files.map(f => [f, readFileSync(resolve(cfg.root, f), 'utf8')]));
 }
 
 /**
@@ -1107,7 +1121,7 @@ function snapshotFiles(cfg: QualityCfg, files: string[]): Map<string, string> {
  * @return Number of changed files.
  */
 function changedFileCount(cfg: QualityCfg, files: string[], before: Map<string, string>): number {
-	return files.filter((f) => before.get(f) !== readFileSync(resolve(cfg.root, f), 'utf8')).length;
+	return files.filter(f => before.get(f) !== readFileSync(resolve(cfg.root, f), 'utf8')).length;
 }
 
 /**
@@ -1170,7 +1184,7 @@ function scopedCfg(cfg: QualityCfg, all: boolean): QualityCfg {
  * @return Nothing; failures are reflected in the process exit code.
  */
 function runLint(cfg: QualityCfg, opts: QualityOptions, exhaustive = false, deadCodeCoordinated = false): void {
-	const files = filesFor(cfg, opts.all).filter((file) => /\.(?:astro|cjs|js|jsx|mjs|ts|tsx)$/.test(file) && !hasGeneratedSourceHeader(readFileSync(file, 'utf8')));
+	const files = filesFor(cfg, opts.all).filter(file => /\.(?:astro|cjs|js|jsx|mjs|ts|tsx)$/.test(file) && !hasGeneratedSourceHeader(readFileSync(file, 'utf8')));
 	if (!files.length) return;
 	qualityHeader('lint', `${opts.fix ? 'Fixing' : 'Checking'} ${files.length} source files with ESLint`);
 	const flags = [
@@ -1194,12 +1208,10 @@ function runLint(cfg: QualityCfg, opts: QualityOptions, exhaustive = false, dead
 			cwd: cfg.root,
 			stdio: ['pipe', 'pipe', 'inherit'],
 			input: (function eslintApiSource(cfg: QualityCfg, files: string[], opts: QualityOptions, exhaustive: boolean, deadCodeCoordinated: boolean): string {
-				const commonJsFiles = files.filter((file) => isCommonJsSource(cfg.root, file)).map((file) => ({ file, pattern: eslintFilePattern(cfg.root, file) }));
-				const payload = JSON.stringify({ root: cfg.root, files, commonJsFiles, fix: opts.fix, exhaustive, deadCodeCoordinated, eslintConfig: findEslintConfig(cfg.root, cfg.configRoot) });
 				return `
 import { createRequire } from 'node:module';
 import { resolve } from 'node:path';
-const options = ${payload};
+const options = ${JSON.stringify({ root: cfg.root, files, commonJsFiles: files.filter(file => isCommonJsSource(cfg.root, file)).map(file => ({ file, pattern: eslintFilePattern(cfg.root, file) })), fix: opts.fix, exhaustive, deadCodeCoordinated, eslintConfig: findEslintConfig(cfg.root, cfg.configRoot) })};
 const qualityProgress = () => {};
 let ESLint;
 let engine;
@@ -1318,7 +1330,7 @@ try {
 function fixUnusedDeclarations(cfg: QualityCfg, reports: EslintReport[], changedFiles: Set<string>, importedConsumers = importedExportConsumers(cfg)): number {
 	let fixed = 0;
 	for (const report of reports) {
-		const unusedMsgs = report.messages.filter((m) => m.ruleId === 'unused-imports/no-unused-vars');
+		const unusedMsgs = report.messages.filter(m => m.ruleId === 'unused-imports/no-unused-vars');
 		if (!unusedMsgs.length) continue;
 		const src = readFileSync(report.filePath, 'utf8');
 		if (hasGeneratedSourceHeader(src)) continue;
@@ -1331,7 +1343,7 @@ function fixUnusedDeclarations(cfg: QualityCfg, reports: EslintReport[], changed
 		);
 		if ((ast as ts.SourceFile & { parseDiagnostics: readonly ts.Diagnostic[] }).parseDiagnostics.length)
 			throw new Error(`ESLint reported unused declarations in unparsable source: ${report.filePath}`);
-		const starts = new Set(unusedMsgs.map((m) => ast.getPositionOfLineAndCharacter(m.line - 1, m.column - 1)));
+		const starts = new Set(unusedMsgs.map(m => ast.getPositionOfLineAndCharacter(m.line - 1, m.column - 1)));
 		const edits: Array<{ start: number; end: number; text?: string }> = [];
 		/**
 		 * Walks the source AST to locate declarations reported as unused.
@@ -1364,7 +1376,7 @@ function fixUnusedDeclarations(cfg: QualityCfg, reports: EslintReport[], changed
 			 *
 			 * @return Whether the candidate has an export modifier.
 			 */
-			const isExported = (candidate: ts.Node): boolean => ts.canHaveModifiers(candidate) && Boolean(ts.getModifiers(candidate)?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword));
+			const isExported = (candidate: ts.Node): boolean => ts.canHaveModifiers(candidate) && Boolean(ts.getModifiers(candidate)?.some(m => m.kind === ts.SyntaxKind.ExportKeyword));
 			if (ts.isFunctionDeclaration(node) && node.name && starts.has(node.name.getStart(ast)) && isTopLevel(node) && !isExported(node) && !externallyConsumed) declaration = node;
 			if ((ts.isTypeAliasDeclaration(node) || ts.isInterfaceDeclaration(node)) && starts.has(node.name.getStart(ast)) && isTopLevel(node) && !isExported(node) && !externallyConsumed)
 				declaration = node;
@@ -1374,7 +1386,7 @@ function fixUnusedDeclarations(cfg: QualityCfg, reports: EslintReport[], changed
 					(node.parent.flags & ts.NodeFlags.Const) !== 0 &&
 					node.parent.declarations.length === 1 &&
 					ts.isVariableStatement(node.parent.parent) &&
-					!node.parent.parent.modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword) &&
+					!node.parent.parent.modifiers?.some(m => m.kind === ts.SyntaxKind.ExportKeyword) &&
 					node.initializer &&
 					isPureUnusedInit(node.initializer)
 				)
@@ -1400,7 +1412,7 @@ function fixUnusedDeclarations(cfg: QualityCfg, reports: EslintReport[], changed
 			(
 				ts.transpileModule(updated, { fileName: report.filePath, reportDiagnostics: true, compilerOptions: { allowJs: true, jsx: ts.JsxEmit.Preserve, target: ts.ScriptTarget.ESNext } }).diagnostics ??
 				[]
-			).some((d) => d.category === ts.DiagnosticCategory.Error)
+			).some(d => d.category === ts.DiagnosticCategory.Error)
 		)
 			continue;
 		writeFileSync(report.filePath, updated);
@@ -1432,8 +1444,8 @@ function isPureUnusedInit(node: ts.Expression): boolean {
 		return true;
 	if (ts.isParenthesizedExpression(node) || ts.isAsExpression(node) || ts.isTypeAssertionExpression(node) || ts.isNonNullExpression(node) || ts.isSatisfiesExpression(node))
 		return isPureUnusedInit(node.expression);
-	if (ts.isArrayLiteralExpression(node)) return node.elements.every((e) => !ts.isSpreadElement(e) && isPureUnusedInit(e));
-	if (ts.isObjectLiteralExpression(node)) return node.properties.every((p) => ts.isPropertyAssignment(p) && !ts.isComputedPropertyName(p.name) && isPureUnusedInit(p.initializer));
+	if (ts.isArrayLiteralExpression(node)) return node.elements.every(e => !ts.isSpreadElement(e) && isPureUnusedInit(e));
+	if (ts.isObjectLiteralExpression(node)) return node.properties.every(p => ts.isPropertyAssignment(p) && !ts.isComputedPropertyName(p.name) && isPureUnusedInit(p.initializer));
 	return false;
 }
 /** One file's parsed ESLint messages used by the dead-code coordinator. */
@@ -1454,9 +1466,10 @@ type KnipIssue = { file: string; [kind: string]: unknown };
  */
 function flattenKnipItems(value: unknown): unknown[] {
 	if (!Array.isArray(value)) throw new Error('finding kind is not an array');
-	return value.flatMap((i) => (Array.isArray(i) ? flattenKnipItems(i) : [i]));
+	return value.flatMap(i => (Array.isArray(i) ? flattenKnipItems(i) : [i]));
 }
 
+// terra-quality-ignore single-use -- Keep the documented canUseFocusedEslint declaration so its parameter and return contract remains attached.
 /**
  * Uses the repository's resolved unused-variable rule without evaluating its unrelated lint rules.
  *
@@ -1468,11 +1481,11 @@ function flattenKnipItems(value: unknown): unknown[] {
 function canUseFocusedEslint(cfg: QualityCfg, flatCfg: string | undefined): boolean {
 	if (!flatCfg) return false;
 	const cfgdTool = cfg.tools?.eslint;
-	const localExecutable = resolve(cfg.root, 'node_modules', '.bin', 'eslint');
-	if (cfgdTool && cfgdTool !== 'eslint' && resolve(cfg.root, cfgdTool) !== localExecutable) return false;
+	if (cfgdTool && cfgdTool !== 'eslint' && resolve(cfg.root, cfgdTool) !== resolve(cfg.root, 'node_modules', '.bin', 'eslint')) return false;
 	return existsSync(resolve(cfg.root, 'node_modules', 'eslint', 'package.json'));
 }
 
+// terra-quality-ignore single-use -- Keep the documented focusedEslintCfgSrc declaration so its parameter and return contract remains attached.
 /**
  * Builds a temporary flat config containing only each selected file's unused-variable rule.
  *
@@ -1483,16 +1496,14 @@ function canUseFocusedEslint(cfg: QualityCfg, flatCfg: string | undefined): bool
  * @return JavaScript module source for ESLint's temporary config loader.
  */
 function focusedEslintCfgSrc(cfg: QualityCfg, flatCfg: string, files: string[]): string {
-	const patterns = files.map((f) => eslintFilePattern(cfg.root, f));
-	const commonJsFiles = files.filter((file) => isCommonJsSource(cfg.root, file));
 	return `
 import { createRequire } from 'node:module';
 import { resolve } from 'node:path';
 const root = ${JSON.stringify(cfg.root)};
 const configPath = ${JSON.stringify(flatCfg)};
 const sourceFiles = ${JSON.stringify(files)};
-const filePatterns = ${JSON.stringify(patterns)};
-const commonJsFiles = new Set(${JSON.stringify(commonJsFiles)});
+const filePatterns = ${JSON.stringify(files.map(f => eslintFilePattern(cfg.root, f)))};
+const commonJsFiles = new Set(${JSON.stringify(files.filter(file => isCommonJsSource(cfg.root, file)))});
 try {
 	const requireFromRepo = createRequire(resolve(root, 'package.json'));
 	const { ESLint } = requireFromRepo('eslint');
@@ -1581,6 +1592,7 @@ function runFocusedEslint(cfg: QualityCfg, flatCfg: string, files: string[]): Re
 	return result;
 }
 
+// terra-quality-ignore single-use -- Keep the documented collectEslintReports declaration so its parameter and return contract remains attached.
 /**
  * Runs ESLint's machine-readable pass once for the selected source files.
  *
@@ -1591,7 +1603,7 @@ function runFocusedEslint(cfg: QualityCfg, flatCfg: string, files: string[]): Re
  * @return Validated ESLint reports for the selected source files.
  */
 function collectEslintReports(cfg: QualityCfg, all: boolean, selectedFiles?: string[]): EslintReport[] {
-	const files = (selectedFiles ?? filesFor(cfg, all)).filter((f) => CJS_JS_JSX_MJS_TS_TSX_REGEX.test(f));
+	const files = (selectedFiles ?? filesFor(cfg, all)).filter(f => CJS_JS_JSX_MJS_TS_TSX_REGEX.test(f));
 	const reports: EslintReport[] = [];
 	const flatCfg = findEslintConfig(cfg.root, cfg.configRoot);
 	const eslintPath = toolPath(cfg, cfg.tools?.eslint, 'eslint');
@@ -1599,15 +1611,18 @@ function collectEslintReports(cfg: QualityCfg, all: boolean, selectedFiles?: str
 	let completed = 0;
 	qualityProgress('ESLint dead-code', completed, files.length);
 	for (const filesBatch of argumentBatches(files)) {
-		const result =
-			(focusedEslint && flatCfg ? runFocusedEslint(cfg, flatCfg, filesBatch) : undefined) ??
-			spawnSync(eslintPath, ['--format', 'json', '--no-ignore', ...(flatCfg ? ['--config', flatCfg] : []), ...filesBatch], {
-				cwd: cfg.root,
-				encoding: 'utf8',
-				env: flatCfg ? { ...process.env, ESLINT_USE_FLAT_CONFIG: 'true' } : process.env,
-				maxBuffer: TOOL_OUTPUT_MAX_BUFFER,
-			});
-		reports.push(...parseEslintReports(result, filesBatch));
+		reports.push(
+			...parseEslintReports(
+				(focusedEslint && flatCfg ? runFocusedEslint(cfg, flatCfg, filesBatch) : undefined) ??
+					spawnSync(eslintPath, ['--format', 'json', '--no-ignore', ...(flatCfg ? ['--config', flatCfg] : []), ...filesBatch], {
+						cwd: cfg.root,
+						encoding: 'utf8',
+						env: flatCfg ? { ...process.env, ESLINT_USE_FLAT_CONFIG: 'true' } : process.env,
+						maxBuffer: TOOL_OUTPUT_MAX_BUFFER,
+					}),
+				filesBatch,
+			),
+		);
 		completed += filesBatch.length;
 		qualityProgress('ESLint dead-code', completed, files.length);
 	}
@@ -1628,7 +1643,7 @@ function parseEslintReports(result: ReturnType<typeof spawnSync>, files: string[
 		throw new Error(
 			`ESLint dead-code detector exited ${result.status ?? 'without a status'} for ${files.length} source files (${files
 				.slice(0, 3)
-				.map((f) => relative(process.cwd(), f))
+				.map(f => relative(process.cwd(), f))
 				.join(', ')}${files.length > 3 ? ', …' : ''}): ${compactOutput(result.stderr?.toString() ?? '').join(' ')}`,
 		);
 	try {
@@ -1636,7 +1651,7 @@ function parseEslintReports(result: ReturnType<typeof spawnSync>, files: string[
 		if (!Array.isArray(reports)) throw new Error('expected a JSON array');
 		if (
 			reports.some(
-				(r) =>
+				r =>
 					!r ||
 					typeof r.filePath !== 'string' ||
 					!Array.isArray(r.messages) ||
@@ -1650,7 +1665,7 @@ function parseEslintReports(result: ReturnType<typeof spawnSync>, files: string[
 		)
 			throw new Error('report entries must include filePath and well-formed messages');
 		const actual = new Set(reports.map((r: { filePath: string }) => resolve(r.filePath)));
-		const missing = files.map((f) => resolve(f)).filter((f) => !actual.has(f));
+		const missing = files.map(f => resolve(f)).filter(f => !actual.has(f));
 		if (missing.length) throw new Error(`missing reports for ${missing.join(', ')}`);
 		return reports as EslintReport[];
 	} catch (err) {
@@ -1661,6 +1676,7 @@ function parseEslintReports(result: ReturnType<typeof spawnSync>, files: string[
 	}
 }
 
+// terra-quality-ignore single-use -- Keep the documented unusedDeclarationFindings declaration so its parameter and return contract remains attached.
 /**
  * Reports unused private declarations, classifying only proven-safe removals as autofixable.
  *
@@ -1683,8 +1699,10 @@ function unusedDeclarationFindings(cfg: QualityCfg, reports: EslintReport[]): De
 		);
 		if ((ast as ts.SourceFile & { parseDiagnostics: readonly ts.Diagnostic[] }).parseDiagnostics.length)
 			throw new Error(`ESLint reported unused declarations in unparsable source: ${report.filePath}`);
-		for (const msg of report.messages.filter((e) => e.ruleId === 'unused-imports/no-unused-vars')) {
+		for (const msg of report.messages.filter(e => e.ruleId === 'unused-imports/no-unused-vars')) {
+			// terra-quality-ignore single-use -- Capture the diagnostic name before AST traversal and subsequent finding construction.
 			const name = (lines[msg.line - 1]?.slice(Math.max(0, msg.column - 1)) ?? '').match(/^[A-Za-z_$][\w$]*/)?.[0] ?? msg.message?.match(/^'([^']+)'/)?.[1] ?? '<unknown>';
+			// terra-quality-ignore single-use -- Compute the diagnostic offset once before recursively visiting AST nodes.
 			const pos = ast.getPositionOfLineAndCharacter(msg.line - 1, msg.column - 1);
 			let declaration: ts.Node | undefined;
 			/**
@@ -1706,17 +1724,17 @@ function unusedDeclarationFindings(cfg: QualityCfg, reports: EslintReport[]): De
 			let reason = 'The ESLint location did not resolve to a supported private declaration.';
 			const declarationExported =
 				declaration &&
-				((ts.canHaveModifiers(declaration) && Boolean(ts.getModifiers(declaration as ts.HasModifiers)?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword))) ||
+				((ts.canHaveModifiers(declaration) && Boolean(ts.getModifiers(declaration as ts.HasModifiers)?.some(m => m.kind === ts.SyntaxKind.ExportKeyword))) ||
 					(ts.isVariableDeclaration(declaration) &&
 						ts.isVariableDeclarationList(declaration.parent) &&
 						ts.isVariableStatement(declaration.parent.parent) &&
-						Boolean(declaration.parent.parent.modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword))));
-			const topLevelPrivate = Boolean(
+						Boolean(declaration.parent.parent.modifiers?.some(m => m.kind === ts.SyntaxKind.ExportKeyword))));
+			if (
 				declaration &&
+				!declarationExported &&
 				(declaration.parent === ast ||
-					(ts.isVariableDeclaration(declaration) && ts.isVariableDeclarationList(declaration.parent) && ts.isVariableStatement(declaration.parent.parent) && declaration.parent.parent.parent === ast)),
-			);
-			if (declaration && !declarationExported && topLevelPrivate) {
+					(ts.isVariableDeclaration(declaration) && ts.isVariableDeclarationList(declaration.parent) && ts.isVariableStatement(declaration.parent.parent) && declaration.parent.parent.parent === ast))
+			) {
 				if (ts.isFunctionDeclaration(declaration) || ts.isTypeAliasDeclaration(declaration) || ts.isInterfaceDeclaration(declaration)) {
 					autofixable = true;
 					reason = 'ESLint confirms this private declaration is unused and removing it has no initializer effects.';
@@ -1765,7 +1783,7 @@ function unusedDeclarationFindings(cfg: QualityCfg, reports: EslintReport[]): De
  */
 function runCfgdCmd(cfg: QualityCfg, name: string): void {
 	if (!qualityCmdEnabled(cfg, name)) return;
-	const check = cfg.qualityCommands?.find((c) => c.name === name);
+	const check = cfg.qualityCommands?.find(c => c.name === name);
 	if (!check) throw new Error(`Unknown quality domain: ${name}`);
 	qualityHeader(`command:${name}`, '');
 	let status = 1;
@@ -1778,6 +1796,7 @@ function runCfgdCmd(cfg: QualityCfg, name: string): void {
 	printCheckStatus(`command:${name}`, status ? 1 : 0);
 }
 
+// terra-quality-ignore single-use -- Keep the documented runRecommendationCmds declaration so its parameter and return contract remains attached.
 /**
  * Runs configured recommendation commands after Knip and fails when a command fails.
  *
@@ -1830,6 +1849,7 @@ function runProjectTypecheck(cfg: QualityCfg): void {
 	printCheckStatus('typecheck', status || diagnosticsReported ? 1 : 0);
 }
 
+// terra-quality-ignore single-use -- Keep the documented repairMissingImports declaration so its parameter and return contract remains attached.
 /**
  * Restores a missing local import when the repository has one unambiguous
  * source export for the unresolved identifier. This is deliberately narrow:
@@ -1846,8 +1866,8 @@ function repairMissingImports(cfg: QualityCfg, program: ts.Program, checker: ts.
 	const candidates = new Map<string, ts.SourceFile[]>();
 	const scopedSources = new Set(
 		srcFiles(cfg)
-			.filter((file) => C_M_JS_TS_X_REGEX.test(file))
-			.map((file) => resolve(file)),
+			.filter(file => C_M_JS_TS_X_REGEX.test(file))
+			.map(file => resolve(file)),
 	);
 	for (const source of program.getSourceFiles()) {
 		if (!scopedSources.has(resolve(source.fileName)) || !C_M_JS_TS_X_REGEX.test(source.fileName)) continue;
@@ -1907,13 +1927,10 @@ function repairMissingImports(cfg: QualityCfg, program: ts.Program, checker: ts.
 		 * @param n Identifier or source value currently being analyzed.
 		 */
 		const visit = (n: ts.Node): void => {
-			const intrinsicJsxTag = ts.isIdentifier(n) && (ts.isJsxOpeningLikeElement(n.parent) || ts.isJsxClosingElement(n.parent)) && n.parent.tagName === n && /^[a-z]/.test(n.text);
-			const propertyName =
-				ts.isIdentifier(n) && (('name' in n.parent && (n.parent as { name?: ts.Node }).name === n) || ('propertyName' in n.parent && (n.parent as { propertyName?: ts.Node }).propertyName === n));
 			if (
 				ts.isIdentifier(n) &&
-				!intrinsicJsxTag &&
-				!propertyName &&
+				!((ts.isJsxOpeningLikeElement(n.parent) || ts.isJsxClosingElement(n.parent)) && n.parent.tagName === n && /^[a-z]/.test(n.text)) &&
+				!(('name' in n.parent && (n.parent as { name?: ts.Node }).name === n) || ('propertyName' in n.parent && (n.parent as { propertyName?: ts.Node }).propertyName === n)) &&
 				!isImportTypeReference(n) &&
 				!checker.getSymbolAtLocation(n) &&
 				!ts.isPropertyAccessExpression(n.parent) &&
@@ -1924,13 +1941,14 @@ function repairMissingImports(cfg: QualityCfg, program: ts.Program, checker: ts.
 				!ts.isImportSpecifier(n.parent) &&
 				!ts.isExportSpecifier(n.parent)
 			) {
-				const unique = [...new Set(candidates.get(n.text) ?? [])].filter((c) => c !== src);
+				const unique = [...new Set(candidates.get(n.text) ?? [])].filter(c => c !== src);
 				if (unique.length === 1) missing.set(n.text, { source: unique[0]!, typeOnly: isTypePos(n) });
 			}
 			ts.forEachChild(n, visit);
 		};
 		visit(src);
 		if (!missing.size) continue;
+		// terra-quality-ignore single-use -- Resolve missing imports before reading and rewriting the source file.
 		const imports = [...missing.entries()].reduce((g, [n, v]) => {
 			const specifier = relative(dirname(src.fileName), v.source.fileName)
 				.replace(/\\/g, '/')
@@ -1944,10 +1962,8 @@ function repairMissingImports(cfg: QualityCfg, program: ts.Program, checker: ts.
 			return g;
 		}, new Map<string, { moduleName: string; typeOnly: boolean; names: string[] }>());
 		const text = readFileSync(src.fileName, 'utf8');
-		const importText = [...imports.values()].map((g) => `import ${g.typeOnly ? 'type ' : ''}{ ${g.names.sort().join(', ')} } from '${g.moduleName}';`).join('\n');
-		const firstBody = src.statements.find((s) => !ts.isImportDeclaration(s));
-		const pos = firstBody?.getStart(src) ?? 0;
-		const updated = `${text.slice(0, pos)}${importText}\n${text.slice(pos)}`;
+		const pos = src.statements.find(s => !ts.isImportDeclaration(s))?.getStart(src) ?? 0;
+		const updated = `${text.slice(0, pos)}${[...imports.values()].map(g => `import ${g.typeOnly ? 'type ' : ''}{ ${g.names.sort().join(', ')} } from '${g.moduleName}';`).join('\n')}\n${text.slice(pos)}`;
 		if (updated !== text) writeFileSync(src.fileName, updated);
 	}
 }
@@ -1960,25 +1976,27 @@ function repairMissingImports(cfg: QualityCfg, program: ts.Program, checker: ts.
  * @return Validated issue records reported by Knip.
  */
 function readKnipIssues(cfg: QualityCfg): KnipIssue[] {
+	// terra-quality-ignore single-use -- Resolve the Knip executable before loading or mutating its configuration.
 	const knip = toolPath(cfg, cfg.tools?.knip, 'knip');
-	const knipConfig = [resolve(cfg.configRoot ?? resolve(cfg.root, 'config'), 'knip.json'), resolve(cfg.root, 'knip.json')].find((p) => existsSync(p));
+	const knipConfig = [resolve(cfg.configRoot ?? resolve(cfg.root, 'config'), 'knip.json'), resolve(cfg.root, 'knip.json')].find(p => existsSync(p));
 	const config = loadKnipConfig(cfg, knipConfig);
 	const knipRoot = knipWorkingDir(cfg, knipConfig, config);
+	// terra-quality-ignore single-use -- Record configured tools in Knip before mapping dependencies and deciding whether a temporary config is needed.
 	const configuredToolUsage = addConfiguredToolsToKnipConfig(cfg, config);
 	const mappedDependencyUsage = mappedKnipDependencyUsage(cfg);
 	if (mappedDependencyUsage.length) config.ignoreDependencies = mergeKnipNames(config.ignoreDependencies, new Set(mappedDependencyUsage));
 	const excludedContent = nonProgramSrcFiles(cfg)
-		.map((path) => relative(knipRoot, path).split(sep).join('/'))
-		.filter((path) => path !== '..' && !path.startsWith('../') && !isAbsolute(path));
+		.map(path => relative(knipRoot, path).split(sep).join('/'))
+		.filter(path => path !== '..' && !path.startsWith('../') && !isAbsolute(path));
 	const temporaryConfigRoot = excludedContent.length || configuredToolUsage || mappedDependencyUsage.length ? mkdtempSync(join(tmpdir(), 'terra-quality-knip-')) : undefined;
 	let effectiveConfig = knipConfig;
 	if (temporaryConfigRoot) {
-		const existingIgnores = Array.isArray(config.ignoreFiles)
-			? config.ignoreFiles.filter((item): item is string => typeof item === 'string')
-			: typeof config.ignoreFiles === 'string'
-				? [config.ignoreFiles]
-				: [];
-		config.ignoreFiles = [...new Set([...existingIgnores, ...excludedContent])];
+		config.ignoreFiles = [
+			...new Set([
+				...(Array.isArray(config.ignoreFiles) ? config.ignoreFiles.filter((item): item is string => typeof item === 'string') : typeof config.ignoreFiles === 'string' ? [config.ignoreFiles] : []),
+				...excludedContent,
+			]),
+		];
 		const genConfig = join(temporaryConfigRoot, 'knip.json');
 		effectiveConfig = genConfig;
 		writeFileSync(genConfig, JSON.stringify(config, null, '\t') + '\n');
@@ -2029,6 +2047,7 @@ function readKnipIssues(cfg: QualityCfg): KnipIssue[] {
 	return issues;
 }
 
+// terra-quality-ignore single-use -- Keep the documented mappedKnipDependencyUsage declaration so its parameter and return contract remains attached.
 /**
  * Finds declared dependencies actually imported by a source tree owned by a nested package.
  *
@@ -2053,12 +2072,12 @@ function mappedKnipDependencyUsage(cfg: QualityCfg): string[] {
 				for (const name of Object.keys(dependencies)) declaredDependencies.add(name);
 			}
 		}
-		const sourceRoots = mapping.sourceRoots.map((sourceRoot) => resolve(cfg.root, sourceRoot));
+		const sourceRoots = mapping.sourceRoots.map(sourceRoot => resolve(cfg.root, sourceRoot));
 		for (const sourceRoot of sourceRoots) {
 			const sourceRelative = relative(cfg.root, sourceRoot);
 			if (sourceRelative === '..' || sourceRelative.startsWith(`..${sep}`) || isAbsolute(sourceRelative)) throw new Error(`Knip source root is outside the repository: ${sourceRoot}`);
 		}
-		const mappedFiles = new Set(sourceFiles.filter((file) => sourceRoots.some((sourceRoot) => file === sourceRoot || file.startsWith(`${sourceRoot}${sep}`))));
+		const mappedFiles = new Set(sourceFiles.filter(file => sourceRoots.some(sourceRoot => file === sourceRoot || file.startsWith(`${sourceRoot}${sep}`))));
 		for (const sourceRoot of sourceRoots) {
 			if (existsSync(sourceRoot) && statSync(sourceRoot).isDirectory()) {
 				for (const stylesheet of stylesheetFiles(sourceRoot, cfg.skippedDirectories ?? [])) mappedFiles.add(stylesheet);
@@ -2109,9 +2128,6 @@ function stylesheetFiles(root: string, additionalSkips: string[]): string[] {
 function sourcePackageSpecifiers(file: string): string[] {
 	const text = readFileSync(file, 'utf8');
 	const ext = extname(file).toLowerCase();
-	const codeText = ext === '.astro' ? (text.match(/^---\s*\r?\n([\s\S]*?)\r?\n---/u)?.[1] ?? '') : text;
-	const scriptKind = ext === '.tsx' || ext === '.jsx' || ext === '.astro' ? ts.ScriptKind.TSX : ext === '.ts' || ext === '.mts' || ext === '.cts' ? ts.ScriptKind.TS : ts.ScriptKind.JS;
-	const parsed = ts.createSourceFile(file, codeText, ts.ScriptTarget.Latest, true, scriptKind);
 	const specifiers: string[] = [];
 	const addLiteral = (node: ts.Node | undefined): void => {
 		if (node && (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node))) specifiers.push(node.text);
@@ -2124,14 +2140,21 @@ function sourcePackageSpecifiers(file: string): string[] {
 			if (ts.isIdentifier(node.expression) && node.expression.text === 'require') addLiteral(node.arguments[0]);
 			if (ts.isPropertyAccessExpression(node.expression) && node.expression.name.text === 'resolve') {
 				const resolver = node.expression.expression;
-				const isRequireResolve = ts.isIdentifier(resolver) && resolver.text === 'require';
-				const isImportMetaResolve = ts.isMetaProperty(resolver) && resolver.keywordToken === ts.SyntaxKind.ImportKeyword && resolver.name.text === 'meta';
-				if (isRequireResolve || isImportMetaResolve) addLiteral(node.arguments[0]);
+				if ((ts.isIdentifier(resolver) && resolver.text === 'require') || (ts.isMetaProperty(resolver) && resolver.keywordToken === ts.SyntaxKind.ImportKeyword && resolver.name.text === 'meta'))
+					addLiteral(node.arguments[0]);
 			}
 		}
 		ts.forEachChild(node, visit);
 	};
-	visit(parsed);
+	visit(
+		ts.createSourceFile(
+			file,
+			ext === '.astro' ? (text.match(/^---\s*\r?\n([\s\S]*?)\r?\n---/u)?.[1] ?? '') : text,
+			ts.ScriptTarget.Latest,
+			true,
+			ext === '.tsx' || ext === '.jsx' || ext === '.astro' ? ts.ScriptKind.TSX : ext === '.ts' || ext === '.mts' || ext === '.cts' ? ts.ScriptKind.TS : ts.ScriptKind.JS,
+		),
+	);
 	if (['.css', '.scss', '.sass', '.less', '.astro'].includes(ext)) {
 		for (const match of text.matchAll(/(?:@import|@use|@forward|@plugin)\s+(?:url\()?\s*["']([^"']+)["']/gu)) {
 			if (match[1]) specifiers.push(match[1]);
@@ -2153,6 +2176,7 @@ function packageNameFromSpecifier(specifier: string): string | undefined {
 	return specifier.startsWith('@') ? (parts.length > 1 ? `${parts[0]}/${parts[1]}` : undefined) : parts[0];
 }
 
+// terra-quality-ignore single-use -- Keep the documented loadKnipConfig declaration so its parameter and return contract remains attached.
 /**
  * Loads Knip settings for the shared source-classification overlay.
  *
@@ -2176,9 +2200,16 @@ function loadKnipConfig(cfg: QualityCfg, knipConfig: string | undefined): Record
 		return parsed.config as Record<string, unknown>;
 	}
 	if (/\.[cm]?js$/iu.test(knipConfig)) {
-		const loadModule =
-			"import { pathToFileURL } from 'node:url'; const loaded = await import(pathToFileURL(process.argv[1]).href); const config = loaded.default ?? loaded; process.stdout.write(JSON.stringify(config));";
-		const loaded = spawnSync(process.execPath, ['--input-type=module', '-e', loadModule, knipConfig], { cwd: cfg.root, encoding: 'utf8' as const, maxBuffer: TOOL_OUTPUT_MAX_BUFFER });
+		const loaded = spawnSync(
+			process.execPath,
+			[
+				'--input-type=module',
+				'-e',
+				"import { pathToFileURL } from 'node:url'; const loaded = await import(pathToFileURL(process.argv[1]).href); const config = loaded.default ?? loaded; process.stdout.write(JSON.stringify(config));",
+				knipConfig,
+			],
+			{ cwd: cfg.root, encoding: 'utf8' as const, maxBuffer: TOOL_OUTPUT_MAX_BUFFER },
+		);
 		if (loaded.error || loaded.status !== 0) throw new Error(`Could not load Knip configuration ${knipConfig}: ${loaded.error?.message ?? loaded.stderr ?? loaded.status}`);
 		try {
 			const parsed = JSON.parse(loaded.stdout) as unknown;
@@ -2191,6 +2222,7 @@ function loadKnipConfig(cfg: QualityCfg, knipConfig: string | undefined): Record
 	throw new Error(`Cannot apply shared source classification to Knip configuration ${knipConfig}; use a JSON, JSONC, or JavaScript config.`);
 }
 
+// terra-quality-ignore single-use -- Keep the documented addConfiguredToolsToKnipConfig declaration so its parameter and return contract remains attached.
 /**
  * Adds configured executable usage to the temporary Knip settings.
  *
@@ -2229,8 +2261,7 @@ function configuredToolPath(cfg: QualityCfg, configuredPath: string): string | u
 		const path = isAbsolute(configuredPath) ? configuredPath : resolve(cfg.root, configuredPath);
 		return existsSync(path) ? path : undefined;
 	}
-	const configRoot = cfg.configRoot ?? resolve(cfg.root, 'config');
-	return [resolve(cfg.root, 'node_modules', '.bin', configuredPath), resolve(configRoot, 'node_modules', '.bin', configuredPath)].find(existsSync);
+	return [resolve(cfg.root, 'node_modules', '.bin', configuredPath), resolve(cfg.configRoot ?? resolve(cfg.root, 'config'), 'node_modules', '.bin', configuredPath)].find(existsSync);
 }
 
 /**
@@ -2249,7 +2280,7 @@ function toolDependencyOwner(cfg: QualityCfg, executablePath: string, dependency
 		if (existsSync(manifestPath)) {
 			const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as Record<string, unknown>;
 			if (
-				['dependencies', 'devDependencies', 'optionalDependencies', 'peerDependencies'].some((field) => {
+				['dependencies', 'devDependencies', 'optionalDependencies', 'peerDependencies'].some(field => {
 					const deps = manifest[field];
 					return !!deps && typeof deps === 'object' && dependencyName in deps;
 				})
@@ -2278,6 +2309,7 @@ function mergeKnipNames(existing: unknown, additions: Set<string>): string[] {
 	return [...names].sort();
 }
 
+// terra-quality-ignore single-use -- Keep the documented knipWorkingDir declaration so its parameter and return contract remains attached.
 /**
  * Selects the package root for Knip while preserving explicit repository workspaces.
  *
@@ -2292,8 +2324,7 @@ function knipWorkingDir(cfg: QualityCfg, knipConfig: string | undefined, knipSet
 	const configPath = knipConfig ? relative(configRoot, knipConfig) : existsSync(join(configRoot, 'package.json')) ? '' : '..';
 	const workspaces = knipSettings.workspaces;
 	if (!!workspaces && typeof workspaces === 'object' && Object.keys(workspaces).length > 0) {
-		const candidates = [...new Set([configRoot, cfg.root])];
-		const scored = candidates.map((root) => ({ root, score: knipWorkspaceRootScore(cfg.root, root, workspaces as Record<string, unknown>) }));
+		const scored = [...new Set([configRoot, cfg.root])].map(root => ({ root, score: knipWorkspaceRootScore(cfg.root, root, workspaces as Record<string, unknown>) }));
 		scored.sort((left, right) => right.score - left.score);
 		if (scored[0]!.score >= 0 && (scored.length === 1 || scored[0]!.score > scored[1]!.score)) return scored[0]!.root;
 		if (existsSync(join(configRoot, 'package.json'))) return configRoot;
@@ -2318,24 +2349,22 @@ function knipWorkspaceRootScore(repoRoot: string, workingRoot: string, workspace
 	let score = 0;
 	for (const [workspace, rawSettings] of Object.entries(workspaces)) {
 		const workspacePrefix = knipLiteralPrefix(workspace);
-		const hasWorkspaceGlob = workspacePrefix !== workspace;
 		const workspacePath = resolve(root, workspacePrefix || '.');
 		const workspaceRelative = relative(repo, workspacePath);
 		if (workspaceRelative === '..' || workspaceRelative.startsWith(`..${sep}`) || isAbsolute(workspaceRelative)) return -1;
 		if (existsSync(workspacePath)) score += 1;
 		if (existsSync(join(workspacePath, 'package.json'))) score += 3;
-		else if (existsSync(workspacePath) && readdirSync(workspacePath, { withFileTypes: true }).some((entry) => entry.isDirectory() && existsSync(join(workspacePath, entry.name, 'package.json'))))
+		else if (existsSync(workspacePath) && readdirSync(workspacePath, { withFileTypes: true }).some(entry => entry.isDirectory() && existsSync(join(workspacePath, entry.name, 'package.json'))))
 			score += 2;
-		if (hasWorkspaceGlob || !rawSettings || typeof rawSettings !== 'object' || Array.isArray(rawSettings)) continue;
+		if (workspacePrefix !== workspace || !rawSettings || typeof rawSettings !== 'object' || Array.isArray(rawSettings)) continue;
 		const settings = rawSettings as { entry?: unknown; project?: unknown };
 		for (const pattern of [...(Array.isArray(settings.entry) ? settings.entry : []), ...(Array.isArray(settings.project) ? settings.project : [])]) {
 			if (typeof pattern !== 'string' || !pattern) continue;
 			const literalPrefix = knipLiteralPrefix(pattern);
-			const hasPatternGlob = literalPrefix !== pattern;
 			const target = resolve(workspacePath, literalPrefix || '.');
 			const targetRelative = relative(repo, target);
 			if (targetRelative === '..' || targetRelative.startsWith(`..${sep}`) || isAbsolute(targetRelative)) return -1;
-			if (existsSync(target)) score += hasPatternGlob ? 1 : 2;
+			if (existsSync(target)) score += literalPrefix !== pattern ? 1 : 2;
 		}
 	}
 	return score;
@@ -2349,9 +2378,8 @@ function knipWorkspaceRootScore(repoRoot: string, workingRoot: string, workspace
  * @return The path before its first wildcard token.
  */
 function knipLiteralPrefix(pattern: string): string {
-	const wildcardIndexes = ['*', '?', '{', '['].map((token) => pattern.indexOf(token)).filter((i) => i >= 0);
-	const wildcardAt = wildcardIndexes.length ? Math.min(...wildcardIndexes) : pattern.length;
-	return pattern.slice(0, wildcardAt).replace(/[\\/]+$/u, '');
+	const wildcardIndexes = ['*', '?', '{', '['].map(token => pattern.indexOf(token)).filter(i => i >= 0);
+	return pattern.slice(0, wildcardIndexes.length ? Math.min(...wildcardIndexes) : pattern.length).replace(/[\\/]+$/u, '');
 }
 
 /**
@@ -2434,10 +2462,10 @@ function knipExportCanBeMadePrivate(file: string, name: string): boolean {
 	const src = ts.createSourceFile(file, srcText, ts.ScriptTarget.Latest, true, deadCodeScriptKind(file));
 	if ((src as ts.SourceFile & { parseDiagnostics: readonly ts.Diagnostic[] }).parseDiagnostics.length) throw new Error(`Cannot safely classify Knip export in unparsable source: ${file}`);
 	for (const statement of src.statements) {
-		if (!ts.canHaveModifiers(statement) || !ts.getModifiers(statement as ts.HasModifiers)?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword)) continue;
-		if (ts.getModifiers(statement as ts.HasModifiers)?.some((m) => m.kind === ts.SyntaxKind.DefaultKeyword)) continue;
+		if (!ts.canHaveModifiers(statement) || !ts.getModifiers(statement as ts.HasModifiers)?.some(m => m.kind === ts.SyntaxKind.ExportKeyword)) continue;
+		if (ts.getModifiers(statement as ts.HasModifiers)?.some(m => m.kind === ts.SyntaxKind.DefaultKeyword)) continue;
 		if (ts.isExportDeclaration(statement) && statement.exportClause && ts.isNamedExports(statement.exportClause)) {
-			if (statement.exportClause.elements.some((e) => e.name.text === name) && !SHARED_REGEX.test(srcText.slice(statement.exportClause.getStart(src), statement.exportClause.end))) return true;
+			if (statement.exportClause.elements.some(e => e.name.text === name) && !SHARED_REGEX.test(srcText.slice(statement.exportClause.getStart(src), statement.exportClause.end))) return true;
 		} else if (ts.isVariableStatement(statement)) {
 			const declaration = statement.declarationList.declarations[0];
 			if (statement.declarationList.declarations.length === 1 && declaration && ts.isIdentifier(declaration.name) && declaration.name.text === name) return true;
@@ -2446,6 +2474,7 @@ function knipExportCanBeMadePrivate(file: string, name: string): boolean {
 	return false;
 }
 
+// terra-quality-ignore single-use -- Keep the documented fixKnipExports declaration so its parameter and return contract remains attached.
 /**
  * Removes only an unused export modifier that Knip identifies precisely.
  *
@@ -2465,48 +2494,47 @@ function fixKnipExports(cfg: QualityCfg, changedFiles: Set<string>): void {
 		if ((ast as ts.SourceFile & { parseDiagnostics: readonly ts.Diagnostic[] }).parseDiagnostics.length) throw new Error(`Cannot safely fix Knip exports in unparsable source: ${issue.file}`);
 		const edits: Array<{ start: number; end: number; text?: string }> = [];
 		const removableNames = new Set(
-			exports.filter((f) => f && typeof f.name === 'string' && !isFrameworkEntryExport(cfg, issue.file, f.name) && !hasImportedExportConsumer(importedConsumers, file, f.name)).map((f) => f.name),
+			exports.filter(f => f && typeof f.name === 'string' && !isFrameworkEntryExport(cfg, issue.file, f.name) && !hasImportedExportConsumer(importedConsumers, file, f.name)).map(f => f.name),
 		);
 		const handledNames = new Set<string>();
 		for (const statement of ast.statements) {
 			if (!ts.isExportDeclaration(statement) || !statement.exportClause || !ts.isNamedExports(statement.exportClause)) continue;
-			const removed = statement.exportClause.elements.filter((s) => removableNames.has(s.name.text));
+			const removed = statement.exportClause.elements.filter(s => removableNames.has(s.name.text));
 			if (!removed.length || SHARED_REGEX.test(src.slice(statement.exportClause.getStart(ast), statement.exportClause.end))) continue;
 			for (const specifier of removed) handledNames.add(specifier.name.text);
-			const retained = statement.exportClause.elements.filter((s) => !removableNames.has(s.name.text));
+			const retained = statement.exportClause.elements.filter(s => !removableNames.has(s.name.text));
 			let end = statement.end;
 			if (!retained.length) {
 				if (src[end] === '\r' && src[end + 1] === '\n') end += 2;
 				else if (src[end] === '\n') end++;
-				const replacement = statement.moduleSpecifier && !statement.isTypeOnly ? `import ${statement.moduleSpecifier.getText(ast)}${src.slice(statement.moduleSpecifier.end, statement.end)}` : '';
-				edits.push({ start: statement.getStart(ast), end, text: replacement });
+				edits.push({
+					start: statement.getStart(ast),
+					end,
+					text: statement.moduleSpecifier && !statement.isTypeOnly ? `import ${statement.moduleSpecifier.getText(ast)}${src.slice(statement.moduleSpecifier.end, statement.end)}` : '',
+				});
 			} else {
-				const keptClause = `{ ${retained.map((s) => s.getText(ast)).join(', ')} }`;
 				edits.push({
 					start: statement.getStart(ast),
 					end: statement.end,
-					text: `${src.slice(statement.getStart(ast), statement.exportClause.getStart(ast))}${keptClause}${src.slice(statement.exportClause.end, statement.end)}`,
+					text: `${src.slice(statement.getStart(ast), statement.exportClause.getStart(ast))}{ ${retained.map(s => s.getText(ast)).join(', ')} }${src.slice(statement.exportClause.end, statement.end)}`,
 				});
 			}
 		}
 		for (const finding of exports) {
 			if (!finding || typeof finding.name !== 'string' || !finding.name) throw new Error(`Knip returned malformed export findings for ${issue.file}`);
 			if (!removableNames.has(finding.name) || isFrameworkEntryExport(cfg, issue.file, finding.name) || handledNames.has(finding.name)) continue;
-			const declaration = ast.statements.find((s) => {
-				if (!ts.canHaveModifiers(s) || !ts.getModifiers(s as ts.HasModifiers)?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword)) return false;
-				if (ts.getModifiers(s as ts.HasModifiers)?.some((m) => m.kind === ts.SyntaxKind.DefaultKeyword)) return false;
+			const declaration = ast.statements.find(s => {
+				if (!ts.canHaveModifiers(s) || !ts.getModifiers(s as ts.HasModifiers)?.some(m => m.kind === ts.SyntaxKind.ExportKeyword)) return false;
+				if (ts.getModifiers(s as ts.HasModifiers)?.some(m => m.kind === ts.SyntaxKind.DefaultKeyword)) return false;
 				if (ts.isVariableStatement(s))
 					return s.declarationList.declarations.length === 1 && ts.isIdentifier(s.declarationList.declarations[0]!.name) && s.declarationList.declarations[0]!.name.text === finding.name;
 				return 'name' in s && s.name && ts.isIdentifier(s.name) && s.name.text === finding.name;
 			});
 			if (!declaration || (finding.line && declaration.getStart(ast) > ast.getPositionOfLineAndCharacter(finding.line - 1, 0))) continue;
-			const modifier = ts.getModifiers(declaration as ts.HasModifiers)?.find((i) => i.kind === ts.SyntaxKind.ExportKeyword);
-			if (modifier) {
-				const end = src[modifier.end] === ' ' || src[modifier.end] === '\t' ? modifier.end + 1 : modifier.end;
-				edits.push({ start: modifier.getStart(ast), end });
-			}
+			const modifier = ts.getModifiers(declaration as ts.HasModifiers)?.find(i => i.kind === ts.SyntaxKind.ExportKeyword);
+			if (modifier) edits.push({ start: modifier.getStart(ast), end: src[modifier.end] === ' ' || src[modifier.end] === '\t' ? modifier.end + 1 : modifier.end });
 		}
-		const uniqueEdits = [...new Map(edits.map((e) => [e.start, e])).values()].sort((l, r) => r.start - l.start);
+		const uniqueEdits = [...new Map(edits.map(e => [e.start, e])).values()].sort((l, r) => r.start - l.start);
 		if (uniqueEdits.length) {
 			writeFileSync(
 				file,
@@ -2527,9 +2555,9 @@ const importedExportConsumerCache = new WeakMap<QualityCfg, { signature: string;
  * @return Export names grouped by their resolved absolute source file.
  */
 function importedExportConsumers(cfg: QualityCfg): Map<string, Set<string>> {
-	const srcFiles = filesFor(cfg, true).filter((p) => C_M_JS_TS_X_CLASS_2.test(p) || p.endsWith('.astro'));
+	const srcFiles = filesFor(cfg, true).filter(p => C_M_JS_TS_X_CLASS_2.test(p) || p.endsWith('.astro'));
 	const signature = srcFiles
-		.map((f) => {
+		.map(f => {
 			const stats = statSync(f);
 			return `${f}:${stats.mtimeMs}:${stats.size}`;
 		})
@@ -2537,9 +2565,12 @@ function importedExportConsumers(cfg: QualityCfg): Map<string, Set<string>> {
 	const cached = importedExportConsumerCache.get(cfg);
 	if (cached?.signature === signature) return cached.consumers;
 	const consumers = new Map<string, Set<string>>();
-	const paths = Object.fromEntries(Object.entries(cfg.aliases ?? {}).map(([p, t]) => [p.endsWith('*') ? p : `${p}*`, [t.endsWith('*') ? t : `${t}*`]]));
-	const compilerOpts: ts.CompilerOptions = { baseUrl: cfg.root, moduleResolution: ts.ModuleResolutionKind.Bundler, paths };
-	const moduleResolutionCache = ts.createModuleResolutionCache(cfg.root, (f) => f, compilerOpts);
+	const compilerOpts: ts.CompilerOptions = {
+		baseUrl: cfg.root,
+		moduleResolution: ts.ModuleResolutionKind.Bundler,
+		paths: Object.fromEntries(Object.entries(cfg.aliases ?? {}).map(([p, t]) => [p.endsWith('*') ? p : `${p}*`, [t.endsWith('*') ? t : `${t}*`]])),
+	};
+	const moduleResolutionCache = ts.createModuleResolutionCache(cfg.root, f => f, compilerOpts);
 	const progressStep = Math.max(1, Math.ceil(srcFiles.length / 20));
 	qualityProgress('Knip import consumers', 0, srcFiles.length);
 	for (const [srcIdx, file] of srcFiles.entries()) {
@@ -2547,9 +2578,8 @@ function importedExportConsumers(cfg: QualityCfg): Map<string, Set<string>> {
 		const raw = readFileSync(file, 'utf8');
 		const astro = file.endsWith('.astro') ? /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/.exec(raw) : null;
 		if (file.endsWith('.astro') && !astro) continue;
-		const frontmatter = astro?.[1] ?? raw;
 		const markup = astro ? raw.slice(astro[0].length) : '';
-		const src = ts.createSourceFile(file, frontmatter, ts.ScriptTarget.Latest, true, file.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
+		const src = ts.createSourceFile(file, astro?.[1] ?? raw, ts.ScriptTarget.Latest, true, file.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
 		/**
 		 * Checks whether an Astro markup section contains the given identifier spelling.
 		 *
@@ -2570,8 +2600,7 @@ function importedExportConsumers(cfg: QualityCfg): Map<string, Set<string>> {
 			if (ts.isImportDeclaration(node)) return;
 			if (ts.isImportTypeNode(node) && ts.isLiteralTypeNode(node.argument) && ts.isStringLiteral(node.argument.literal)) {
 				const qualifier = node.qualifier;
-				const name = qualifier ? (ts.isIdentifier(qualifier) ? qualifier.text : qualifier.right.text) : '*';
-				importTypeReferences.push({ specifier: node.argument.literal.text, name });
+				importTypeReferences.push({ specifier: node.argument.literal.text, name: qualifier ? (ts.isIdentifier(qualifier) ? qualifier.text : qualifier.right.text) : '*' });
 			}
 			if (ts.isIdentifier(node)) referencedIdentifiers.add(node.text);
 			if (ts.isPropertyAccessExpression(node) && ts.isIdentifier(node.expression)) {
@@ -2633,6 +2662,7 @@ function hasImportedExportConsumer(importedConsumers: Map<string, Set<string>>, 
 	const names = importedConsumers.get(resolve(file));
 	return Boolean(names?.has(name) || names?.has('*'));
 }
+// terra-quality-ignore single-use -- Keep the documented acceptTypeSafeEdits declaration so its parameter and return contract remains attached.
 /**
  * Accepts proposed edits only when they add no TypeScript errors to changed files.
  *
@@ -2670,19 +2700,18 @@ function acceptTypeSafeEdits(
 			return base;
 		}
 		const midpoint = Math.floor(entries.length / 2);
-		const afterLeft = accept(entries.slice(0, midpoint), base);
-		return accept(entries.slice(midpoint), afterLeft);
+		return accept(entries.slice(midpoint), accept(entries.slice(0, midpoint), base));
 	};
-	const baseline = new Map([...proposed.keys()].map((f) => [f, original.get(f)!]));
 	return {
 		accepted: accept(
 			[...proposed].sort(([l], [r]) => l.localeCompare(r)),
-			baseline,
+			new Map([...proposed.keys()].map(f => [f, original.get(f)!])),
 		),
 		rejected,
 	};
 }
 
+// terra-quality-ignore single-use -- Keep the documented runDeadCode declaration so its parameter and return contract remains attached.
 /**
  * Runs every dead-code detector through one fix-and-verify boundary.
  *
@@ -2708,7 +2737,8 @@ function runDeadCode(cfg: QualityCfg, fix: boolean, all: boolean, verify = true,
 		if (emit) qualityHeader('dead-code/verification', 'Verify remaining unused files, exports, declarations, and single-use code');
 	};
 	const changedFiles = new Set<string>();
-	const srcSnapshot = fix ? new Map(filesFor(cfg, true).map((f) => [f, readFileSync(f, 'utf8')])) : new Map<string, string>();
+	const srcSnapshot = fix ? new Map(filesFor(cfg, true).map(f => [f, readFileSync(f, 'utf8')])) : new Map<string, string>();
+	// terra-quality-ignore single-use -- Snapshot the initial file inventory before autofixes can create or remove sources.
 	const initialInventory = fix ? new Set(srcSnapshot.keys()) : new Set<string>();
 	if (fix && emit && !outputPhase) console.error(`  Preparing TypeScript baseline for ${srcSnapshot.size} configured source files...`);
 	const typeProgram = fix ? deadCodeTypeProgram(cfg) : null;
@@ -2754,7 +2784,7 @@ function runDeadCode(cfg: QualityCfg, fix: boolean, all: boolean, verify = true,
 			if (emit) qualityHeader('dead-code/eslint-fix', 'Scan configured files and apply only safe unused-declaration fixes');
 			let reportsToFix = scanEslint();
 			for (let round = 0; round < 5; round++) {
-				if (!reportsToFix.some((r) => r.messages.some((m) => m.ruleId === 'unused-imports/no-unused-vars'))) break;
+				if (!reportsToFix.some(r => r.messages.some(m => m.ruleId === 'unused-imports/no-unused-vars'))) break;
 				if (emit && !outputPhase) console.error(`  ESLint unused-declaration pass ${round + 1}/5...`);
 				const passChangedFiles = new Set<string>();
 				if (!fixUnusedDeclarations(cfg, reportsToFix, passChangedFiles, importedConsumersForRun)) break;
@@ -2775,7 +2805,7 @@ function runDeadCode(cfg: QualityCfg, fix: boolean, all: boolean, verify = true,
 		for (const file of singleUseChangedFiles) changedFiles.add(file);
 		const currInventory = new Set(filesFor(cfg, true));
 		const trackedInitialInventory = [...initialInventory];
-		if ([...currInventory].length !== trackedInitialInventory.length || trackedInitialInventory.some((f) => !currInventory.has(f)))
+		if ([...currInventory].length !== trackedInitialInventory.length || trackedInitialInventory.some(f => !currInventory.has(f)))
 			throw new Error('Dead-code autofix changed the configured source inventory; file creation or deletion is not an automatic dead-code fix.');
 		const proposed = new Map<string, string>();
 		for (const file of changedFiles) {
@@ -2817,23 +2847,29 @@ function runDeadCode(cfg: QualityCfg, fix: boolean, all: boolean, verify = true,
 						if (kind === 'file') continue;
 						for (const i of flattenKnipItems(val) as { name: string; line?: number }[]) {
 							if (kind === 'exports' && isFrameworkEntryExport(cfg, issue.file, i.name)) continue;
-							const location = kind === 'files' ? i.name : issue.file;
 							const autoFixable = (kind === 'exports' || kind === 'types') && !hasImportedExportConsumer(importedConsumers, filePath, i.name) && knipExportCanBeMadePrivate(filePath, i.name);
-							const reason = autoFixable
-								? 'Knip identifies an unconsumed named export with a direct, unambiguous declaration.'
-								: kind === 'files'
-									? 'Knip considers this file unreachable; file deletion can affect dynamic, generated, or framework references.'
-									: hasImportedExportConsumer(importedConsumers, filePath, i.name)
-										? 'Knip reports this export as unused, but a configured source consumer was found.'
-										: `Knip reports an unused ${kind} that the safe export rewrite cannot identify unambiguously.`;
-							const agentAction = autoFixable
-								? 'Run the canonical dead-code autofix; it should remove only this export modifier, then verify the declaration and its local uses remain intact.'
-								: kind === 'files'
-									? 'Inspect imports, dynamic loading, framework discovery, generated inventories, and tests. Delete this file only if those checks prove it unreachable; otherwise correct the explicit entry-point or source-discovery model.'
-									: hasImportedExportConsumer(importedConsumers, filePath, i.name)
-										? 'Reconcile the reported consumer with Knip configuration and module resolution. Preserve the export while it has a real consumer; do not add a broad ignore.'
-										: `Inspect the exact ${kind} and its consumers. Remove it only if it is truly unused; otherwise add the concrete framework/public contract to the explicit entry model.`;
-							findings.push({ rule: `knip/${kind}`, file: location, line: i.line ?? 1, name: i.name, severity: 'error', autofixable: autoFixable, reason, agentAction });
+							findings.push({
+								rule: `knip/${kind}`,
+								file: kind === 'files' ? i.name : issue.file,
+								line: i.line ?? 1,
+								name: i.name,
+								severity: 'error',
+								autofixable: autoFixable,
+								reason: autoFixable
+									? 'Knip identifies an unconsumed named export with a direct, unambiguous declaration.'
+									: kind === 'files'
+										? 'Knip considers this file unreachable; file deletion can affect dynamic, generated, or framework references.'
+										: hasImportedExportConsumer(importedConsumers, filePath, i.name)
+											? 'Knip reports this export as unused, but a configured source consumer was found.'
+											: `Knip reports an unused ${kind} that the safe export rewrite cannot identify unambiguously.`,
+								agentAction: autoFixable
+									? 'Run the canonical dead-code autofix; it should remove only this export modifier, then verify the declaration and its local uses remain intact.'
+									: kind === 'files'
+										? 'Inspect imports, dynamic loading, framework discovery, generated inventories, and tests. Delete this file only if those checks prove it unreachable; otherwise correct the explicit entry-point or source-discovery model.'
+										: hasImportedExportConsumer(importedConsumers, filePath, i.name)
+											? 'Reconcile the reported consumer with Knip configuration and module resolution. Preserve the export while it has a real consumer; do not add a broad ignore.'
+											: `Inspect the exact ${kind} and its consumers. Remove it only if it is truly unused; otherwise add the concrete framework/public contract to the explicit entry model.`,
+							});
 						}
 					}
 				}
@@ -2858,7 +2894,7 @@ function runDeadCode(cfg: QualityCfg, fix: boolean, all: boolean, verify = true,
 			agentAction: single.agentAction,
 		});
 	}
-	for (const finding of documentationFindings(scopedCfg(cfg, true)).filter((i) => i.kind === 'orphan'))
+	for (const finding of documentationFindings(scopedCfg(cfg, true)).filter(i => i.kind === 'orphan'))
 		findings.push({
 			rule: 'tsdoc/detached',
 			file: finding.file,
@@ -2870,7 +2906,7 @@ function runDeadCode(cfg: QualityCfg, fix: boolean, all: boolean, verify = true,
 			agentAction:
 				'Attach this TSDoc to the declaration it describes when that relationship is clear; otherwise remove only this detached block. Preserve meaningful constraints and do not move it across unrelated code.',
 		});
-	const finalFindings = findings.map((f) =>
+	const finalFindings = findings.map(f =>
 		typeRejectedFiles.has(f.file) && f.autofixable
 			? {
 					...f,
@@ -2899,8 +2935,7 @@ function runDeadCode(cfg: QualityCfg, fix: boolean, all: boolean, verify = true,
 			for (const finding of [...findings].sort((l, r) => l.file.localeCompare(r.file) || l.line - r.line || l.rule.localeCompare(r.rule) || l.name.localeCompare(r.name))) {
 				lines.push(`  - [ERROR] ${finding.rule}: ${finding.file}:${finding.line} ${finding.name}`);
 				lines.push(`      Reason: ${finding.reason}`);
-				const autofix = !finding.autofixable ? 'not safe or not supported' : typeSafetyVerified ? 'available' : 'candidate; fix mode checks TypeScript before writing';
-				lines.push(`      Autofix: ${autofix}`);
+				lines.push(`      Autofix: ${!finding.autofixable ? 'not safe or not supported' : typeSafetyVerified ? 'available' : 'candidate; fix mode checks TypeScript before writing'}`);
 				lines.push(`      Agent action: ${finding.agentAction}`);
 			}
 			lines.push(`  ${errs.length} error${errs.length === 1 ? '' : 's'}.`);
@@ -2928,8 +2963,7 @@ function runDeadCode(cfg: QualityCfg, fix: boolean, all: boolean, verify = true,
  */
 function runDeadCodeCmd(cfg: QualityCfg, fix: boolean, all: boolean): string[] {
 	const changedFiles = new Set<string>();
-	const findings = runDeadCode(cfg, fix, all, true, true, fix ? changedFiles : undefined);
-	printCheckStatus('dead-code', findings.length);
+	printCheckStatus('dead-code', runDeadCode(cfg, fix, all, true, true, fix ? changedFiles : undefined).length);
 	return [...changedFiles];
 }
 
@@ -2957,7 +2991,7 @@ function printFindings<T>(findings: readonly T[], fmt: (finding: T) => string, a
 	if (outputPhase) {
 		for (const finding of findings) recordQualityDetail(fmt(finding));
 	} else {
-		const lines = findings.map((f) => `  - ${compactOutput(fmt(f)).join(' ')}`);
+		const lines = findings.map(f => `  - ${compactOutput(fmt(f)).join(' ')}`);
 		console.error(`  ${findings.length} ${advisory ? 'advisory finding' : 'error'}${findings.length === 1 ? '' : 's'}:`);
 		for (const line of lines) console.error(line);
 	}
@@ -3023,10 +3057,10 @@ function runGitHubCheck(cfg: QualityCfg, repos: string[] = [], explicit = false,
 	}
 	try {
 		reportGitHubData = buildGitHubReport(tgts, cfg.github?.requiredFeatures);
-		const findings = reportGitHubData.repositories.flatMap((r) => r.findings);
+		const findings = reportGitHubData.repositories.flatMap(r => r.findings);
 		const failed = reportGitHubData.state === 'partial';
 		updateGitHubStage(failed ? 'failed' : findings.length ? 'findings' : 'passed', findings.length);
-		const blockingFindings = findings.some((f) => f.category !== 'issue' && f.category !== 'setting');
+		const blockingFindings = findings.some(f => f.category !== 'issue' && f.category !== 'setting');
 		if (outputPhase) for (const line of formatGitHubReport(reportGitHubData)) recordQualityDetail(line);
 		else for (const line of formatGitHubReport(reportGitHubData)) console.warn(`  ${line}`);
 		if (!warn && blockingFindings) process.exitCode = 1;
@@ -3057,6 +3091,7 @@ function updateGitHubStage(status: QualityJsonReport['checks'][number]['status']
 	}
 }
 
+// terra-quality-ignore single-use -- Keep the documented inferGitHubRepo declaration so its parameter and return contract remains attached.
 /**
  * Infer the current repository slug from its GitHub origin remote.
  *
@@ -3070,6 +3105,7 @@ function inferGitHubRepo(root: string): string | undefined {
 		.match(/(?:github\.com[:/])([^/]+\/[^/]+?)(?:\.git)?$/i)?.[1];
 }
 
+// terra-quality-ignore single-use -- Keep the documented runGenericChecks declaration so its parameter and return contract remains attached.
 /**
  * Runs configured generic repository checks as part of the full quality command.
  *
@@ -3096,7 +3132,7 @@ function runGenericChecks(cfg: QualityCfg, analysis?: QualityAnalysis): void {
 			const advisory = name === 'performance-patterns';
 			printFindings(
 				findings,
-				(f) =>
+				f =>
 					`${'file' in f ? `${f.file}: ` : ''}${'message' in f ? `${'line' in f ? `${f.line}:${f.column} ` : ''}${f.message}` : 'component' in f ? `${f.line}:${f.column} ${f.component}: ${f.recommendation}` : 'method' in f ? `${f.line}:${f.column} ${f.method}(${f.receiver}): ${f.recommendation}` : 'command' in f ? `${f.line}: ${f.recommendation} (${f.command})` : 'value' in f ? `${f.count}x ${f.value} (${f.locations.join(', ')})` : 'source' in f ? `${f.count}x ${f.source} (${f.locations.join(', ')})` : f.pattern}`,
 				advisory,
 			);
@@ -3150,9 +3186,9 @@ function runTailwindCanonicalCheck(cfg: QualityCfg, fix: boolean): Promise<void>
 function fixNames(cfg: QualityCfg, all: boolean): void {
 	// TypeScript's parser does not understand Astro frontmatter. Keep Astro in
 	// reporting/import scope, but never apply symbol renames to it.
-	const allowed = new Set(filesFor(cfg, all).filter((file) => !isProtectedPath(file) && !file.endsWith('.astro') && !hasGeneratedSourceHeader(readFileSync(file, 'utf8'))));
+	const allowed = new Set(filesFor(cfg, all).filter(file => !isProtectedPath(file) && !file.endsWith('.astro') && !hasGeneratedSourceHeader(readFileSync(file, 'utf8'))));
 	let program = ts.createProgram({
-		rootNames: srcFiles(cfg).filter((f) => C_M_JS_TS_X_CLASS_2.test(f)),
+		rootNames: srcFiles(cfg).filter(f => C_M_JS_TS_X_CLASS_2.test(f)),
 		options: {
 			allowNonTsExtensions: true,
 			allowJs: true,
@@ -3169,7 +3205,7 @@ function fixNames(cfg: QualityCfg, all: boolean): void {
 	// subsequent text span is anchored to the current file contents.
 	repairMissingImports(cfg, program, checker);
 	program = ts.createProgram({
-		rootNames: srcFiles(cfg).filter((f) => C_M_JS_TS_X_CLASS_2.test(f)),
+		rootNames: srcFiles(cfg).filter(f => C_M_JS_TS_X_CLASS_2.test(f)),
 		options: {
 			allowNonTsExtensions: true,
 			allowJs: true,
@@ -3192,6 +3228,7 @@ function fixNames(cfg: QualityCfg, all: boolean): void {
 	const isIntrinsicJsxTag = (n: ts.Identifier): boolean => {
 		return (ts.isJsxOpeningLikeElement(n.parent) || ts.isJsxClosingElement(n.parent)) && n.parent.tagName === n && n.text.length > 0 && n.text[0] === n.text[0]!.toLowerCase();
 	};
+	// terra-quality-ignore single-use -- Keep the documented canonical declaration so its parameter and return contract remains attached.
 	/**
 	 * Resolves an aliased symbol to its underlying declaration symbol.
 	 *
@@ -3229,6 +3266,7 @@ function fixNames(cfg: QualityCfg, all: boolean): void {
 	 */
 	const hasInitShadow = (n: ts.Identifier): boolean => {
 		if (!ts.isVariableDeclaration(n.parent) || !n.parent.initializer) return false;
+		// terra-quality-ignore single-use -- Resolve the declared symbol once before recursively inspecting initializer references.
 		const tgt = checker.getSymbolAtLocation(n);
 		let found = false;
 		/**
@@ -3253,6 +3291,7 @@ function fixNames(cfg: QualityCfg, all: boolean): void {
 	 */
 	const hasInitReferenceToOtherSymbol = (n: ts.Identifier): boolean => {
 		if (!ts.isVariableDeclaration(n.parent) || !n.parent.initializer) return false;
+		// terra-quality-ignore single-use -- Resolve the declared symbol once before recursively checking differently bound references.
 		const tgt = checker.getSymbolAtLocation(n);
 		let found = false;
 		/**
@@ -3415,16 +3454,19 @@ function fixNames(cfg: QualityCfg, all: boolean): void {
 		const inspect = (n: ts.Node): void => {
 			if (ts.isIdentifier(n) && !isIntrinsicJsxTag(n)) {
 				const replacement = replacements.get(identifierSymbol(n) as ts.Symbol);
-				const astroAttrName = src.fileName.endsWith('.astro') && src.text.slice(n.end, n.end + 2) === '={' && src.text.lastIndexOf('---', n.getStart(src)) >= 0;
-				if (replacement && !astroAttrName) {
-					const shorthandBinding = ts.isBindingElement(n.parent) && n.parent.name === n && !n.parent.dotDotDotToken && !n.parent.propertyName && ts.isObjectBindingPattern(n.parent.parent);
+				if (replacement && !(src.fileName.endsWith('.astro') && src.text.slice(n.end, n.end + 2) === '={' && src.text.lastIndexOf('---', n.getStart(src)) >= 0)) {
 					const fileEdits = edits.get(src.fileName) ?? [];
 					fileEdits.push({
 						// Identifier `pos` can include a preceding delimiter (for example the
 						// opening parenthesis of a call argument). Anchor edits from `end` so
 						// expanding a shorthand binding cannot consume adjacent punctuation.
 						span: { start: n.getStart(src), length: n.text.length },
-						newText: !src.fileName.endsWith('.astro') && (ts.isShorthandPropertyAssignment(n.parent) || shorthandBinding) ? `${n.text}: ${replacement}` : replacement,
+						newText:
+							!src.fileName.endsWith('.astro') &&
+							(ts.isShorthandPropertyAssignment(n.parent) ||
+								(ts.isBindingElement(n.parent) && n.parent.name === n && !n.parent.dotDotDotToken && !n.parent.propertyName && ts.isObjectBindingPattern(n.parent.parent)))
+								? `${n.text}: ${replacement}`
+								: replacement,
 					});
 					if (ts.isParameter(n.parent) && n.parent.name === n) {
 						const docStart = n.parent.parent.getFullStart();
@@ -3448,7 +3490,7 @@ function fixNames(cfg: QualityCfg, all: boolean): void {
 	// inspecting import spans. Otherwise an import edit can land in the wrong
 	// token when a declaration changed length.
 	program = ts.createProgram({
-		rootNames: srcFiles(cfg).filter((f) => C_M_JS_TS_X_CLASS_2.test(f)),
+		rootNames: srcFiles(cfg).filter(f => C_M_JS_TS_X_CLASS_2.test(f)),
 		options: {
 			allowNonTsExtensions: true,
 			allowJs: true,
@@ -3475,7 +3517,7 @@ function fixNames(cfg: QualityCfg, all: boolean): void {
 		const visit = (node: ts.Node): void => {
 			if (ts.isImportDeclaration(node) && ts.isStringLiteral(node.moduleSpecifier) && node.importClause?.namedBindings && ts.isNamedImports(node.importClause.namedBindings)) {
 				const module = checker.getSymbolAtLocation(node.moduleSpecifier);
-				const exportsByName = new Map((module ? checker.getExportsOfModule(module) : []).map((s) => [s.name, s]));
+				const exportsByName = new Map((module ? checker.getExportsOfModule(module) : []).map(s => [s.name, s]));
 				for (const specifier of node.importClause.namedBindings.elements) {
 					const oldName = specifier.propertyName?.text ?? specifier.name.text;
 					if (exportsByName.has(oldName)) continue;
@@ -3536,7 +3578,7 @@ export function runQuality(
 		let findings = 0;
 		try {
 			result.imports = checkImports(scoped);
-			printFindings(result.imports, (f) => `Unresolved import: ${f.importer} -> ${f.specifier}`);
+			printFindings(result.imports, f => `Unresolved import: ${f.importer} -> ${f.specifier}`);
 			findings += result.imports.length;
 		} catch (error) {
 			recordQualityFailure('imports', error);
@@ -3544,7 +3586,7 @@ export function runQuality(
 		}
 		try {
 			duplicateImports = duplicateImportFindings(ctx?.files ?? filesFor(scoped, true));
-			printFindings(duplicateImports, (f) => `Duplicate named import: ${f.file}:${f.line} repeats an import from ${f.module}`);
+			printFindings(duplicateImports, f => `Duplicate named import: ${f.file}:${f.line} repeats an import from ${f.module}`);
 			findings += duplicateImports.length;
 		} catch (error) {
 			recordQualityFailure('imports', error);
@@ -3557,28 +3599,28 @@ export function runQuality(
 			'naming',
 			'Checking concise, consistent symbol names',
 			() => namingFindings(scoped, ctx),
-			(f) => `Naming error: ${f.file}: ${f.name} -> ${f.suggestion}${f.reason ? `; ${f.reason}` : ''}`,
+			f => `Naming error: ${f.file}: ${f.name} -> ${f.suggestion}${f.reason ? `; ${f.reason}` : ''}`,
 		);
 	if (qualityCheckEnabled(cfg, 'alias'))
 		result.aliases = runFindingCheck(
 			'aliases',
 			'Checking for unnecessary compatibility aliases',
 			() => aliasFindings(scoped, ctx),
-			(f) => `Alias: ${f.file}:${f.line} ${f.kind} ${f.name} -> ${f.replacement}`,
+			f => `Alias: ${f.file}:${f.line} ${f.kind} ${f.name} -> ${f.replacement}`,
 		);
 	if (qualityCheckEnabled(cfg, 'forward'))
 		result.forwarding = runFindingCheck(
 			'forwarding',
 			'Checking object-forwarding opportunities',
 			() => objectForwardingFindings(scoped, ctx),
-			(f) => `Forwarding error: ${f.file}:${f.line}:${f.column} ${f.callee} repeats ${f.source}.${f.properties.join(', ')}; ${f.recommendation}.`,
+			f => `Forwarding error: ${f.file}:${f.line}:${f.column} ${f.callee} repeats ${f.source}.${f.properties.join(', ')}; ${f.recommendation}.`,
 		);
 	if (qualityCheckEnabled(cfg, 'document'))
 		result.documentation = runFindingCheck(
 			'documentation',
 			'Checking meaningful file, function, and parameter documentation',
 			() => documentationFindings(scoped, ctx),
-			(f) => `Documentation error: ${f.file}:${f.line}:${f.column} ${f.name}; ${f.reason}.`,
+			f => `Documentation error: ${f.file}:${f.line}:${f.column} ${f.name}; ${f.reason}.`,
 		);
 	if (result.imports.length || duplicateImports.length || result.aliases.length || result.documentation.length > 0 || result.naming.length > 0 || result.forwarding.length > 0) process.exitCode = 1;
 	return result;
@@ -3621,10 +3663,16 @@ export function runQualityCli(cfg: QualityCfg, args = process.argv.slice(2)): vo
 	 *
 	 */
 	const writeReport = (): void => {
-		const executed = [...(reportStages?.values() ?? [])].filter((s) => {
+		const executed = [...(reportStages?.values() ?? [])].filter(s => {
 			if (s.name.includes('/') || s.name.startsWith('recommendation:')) return false;
-			const names: Record<string, QualityCheckName> = { imports: 'import', naming: 'name', aliases: 'alias', forwarding: 'forward', documentation: 'document', typecheck: 'type' };
-			if (!qualityCheckEnabled(cfg, names[s.name] ?? ((s.name.startsWith('command:') ? 'command' : s.name) as QualityCheckName))) return false;
+			if (
+				!qualityCheckEnabled(
+					cfg,
+					({ imports: 'import', naming: 'name', aliases: 'alias', forwarding: 'forward', documentation: 'document', typecheck: 'type' } as Record<string, QualityCheckName>)[s.name] ??
+						((s.name.startsWith('command:') ? 'command' : s.name) as QualityCheckName),
+				)
+			)
+				return false;
 			if (s.name === 'security' && !cfg.security) return false;
 			if (s.name === 'repeated-classes' && !cfg.repeatedClasses) return false;
 			if (s.name === 'tailwind-canonical' && !cfg.tailwindCanonical) return false;
@@ -3632,41 +3680,51 @@ export function runQualityCli(cfg: QualityCfg, args = process.argv.slice(2)): vo
 			if (s.name === 'ui-patterns' && !cfg.uiPatterns) return false;
 			return true;
 		});
-		const standard = [
-			'documentation',
-			'format',
-			'imports',
-			'naming',
-			'forwarding',
-			'lint',
-			'dead-code',
-			'typecheck',
-			'diff',
-			'aliases',
-			'security',
-			'repeated-classes',
-			'tailwind-canonical',
-			'regex-dedup',
-			'ui-patterns',
-			'github',
-		];
 		const capabilities = Object.entries(LANGUAGE_CAPABILITIES).flatMap(([l, c]) => [
 			...Object.entries(c.checks).map(([n, i]) => ({ language: l, kind: 'check' as const, name: n, ...i })),
 			...Object.entries(c.autofixes).map(([n, i]) => ({ language: l, kind: 'autofix' as const, name: n, ...i })),
 		]);
-		const notApplicableChecks = capabilities
-			.filter((i) => i.kind === 'check' && i.status === 'not-applicable')
-			.map((i) => ({ name: `${i.language}:${i.name}`, status: 'not-applicable' as const, findings: 0, reason: i.reason }));
-		const report: QualityJsonReport = {
-			schemaVersion: 1,
-			generatedAt: new Date().toISOString(),
-			command: cmdArgs.find((a) => !a.startsWith('-')) ?? 'quality',
-			scope: cmdArgs.includes('--all') || cmdArgs.includes('quality:all') ? 'all' : 'changed',
-			checks: [...executed, ...standard.filter((n) => !executed.some((s) => s.name === n)).map((n) => ({ name: n, status: 'skipped' as const, findings: 0 })), ...notApplicableChecks],
-			capabilities,
-			...(reportGitHubData ? { github: reportGitHubData } : {}),
-		};
-		writeFileSync(resolve(cfg.root, reportPath), `${JSON.stringify(report, null, 2)}\n`);
+		writeFileSync(
+			resolve(cfg.root, reportPath),
+			`${JSON.stringify(
+				{
+					schemaVersion: 1,
+					generatedAt: new Date().toISOString(),
+					command: cmdArgs.find(a => !a.startsWith('-')) ?? 'quality',
+					scope: cmdArgs.includes('--all') || cmdArgs.includes('quality:all') ? 'all' : 'changed',
+					checks: [
+						...executed,
+						...[
+							'documentation',
+							'format',
+							'imports',
+							'naming',
+							'forwarding',
+							'lint',
+							'dead-code',
+							'typecheck',
+							'diff',
+							'aliases',
+							'security',
+							'repeated-classes',
+							'tailwind-canonical',
+							'regex-dedup',
+							'ui-patterns',
+							'github',
+						]
+							.filter(n => !executed.some(s => s.name === n))
+							.map(n => ({ name: n, status: 'skipped' as const, findings: 0 })),
+						...capabilities
+							.filter(i => i.kind === 'check' && i.status === 'not-applicable')
+							.map(i => ({ name: `${i.language}:${i.name}`, status: 'not-applicable' as const, findings: 0, reason: i.reason })),
+					],
+					capabilities,
+					...(reportGitHubData ? { github: reportGitHubData } : {}),
+				} satisfies QualityJsonReport,
+				null,
+				2,
+			)}\n`,
+		);
 		reportStages = undefined;
 		reportStageName = undefined;
 	};
@@ -3680,6 +3738,7 @@ export function runQualityCli(cfg: QualityCfg, args = process.argv.slice(2)): vo
 	writeReport();
 }
 
+// terra-quality-ignore single-use -- Keep the documented runFullQuality declaration so its parameter and return contract remains attached.
 /**
  * Runs the full quality matrix in package-owned phase order.
  *
@@ -3768,8 +3827,7 @@ function runFullQuality(cfg: QualityCfg, args: string[], opts: QualityOptions): 
 			if (opts.fix && qualityAutofixEnabled(cfg, 'document', opts.fix)) {
 				if (filesFor(cfg, opts.all).length) runDocumentation(cfg, opts, true);
 			} else {
-				const documentationIssues = documentationFindings(scopedCfg(cfg, opts.all)).filter((f) => f.severity === 'error');
-				if (documentationIssues.length) runDocumentation(cfg, opts, true);
+				if (documentationFindings(scopedCfg(cfg, opts.all)).some(f => f.severity === 'error')) runDocumentation(cfg, opts, true);
 			}
 		});
 	if (fix('errorBoundaries'))
@@ -3777,7 +3835,7 @@ function runFullQuality(cfg: QualityCfg, args: string[], opts: QualityOptions): 
 			const fixed = fixErrorBoundaries(scopedCfg(cfg, opts.all));
 			if (fixed) console.info(`Error-boundary autofix: guarded React roots in ${fixed} file${fixed === 1 ? '' : 's'}.`);
 		});
-	if (opts.fix && !opts.skipCommands && profileResolution.checks.some((c) => c.autofix)) sFix('native language fixes', () => runLangProfileFixes(cfg, profileResolution.checks, profileToolResults));
+	if (opts.fix && !opts.skipCommands && profileResolution.checks.some(c => c.autofix)) sFix('native language fixes', () => runLangProfileFixes(cfg, profileResolution.checks, profileToolResults));
 	if (opts.fix) {
 		stopQualitySpinner();
 		console.error(`  ${sFixFailed ? '✗' : '✓'} Safe Fixes`);
@@ -3799,6 +3857,7 @@ function runFullQuality(cfg: QualityCfg, args: string[], opts: QualityOptions): 
 				deadCodeChangedFiles = runDeadCodeCmd(cfg, qualityAutofixEnabled(cfg, 'dead-code', opts.fix), opts.all);
 			});
 			if (deadCodeChangedFiles.length && qualityCheckEnabled(cfg, 'format')) {
+				// terra-quality-ignore single-use -- Snapshot the earlier format failure before rerunning format after dead-code fixes.
 				const fmtFailedBeforeDeadCode = reportStages?.get('format')?.status === 'failed';
 				continueAfterFailure('format', () => runFormatter(cfg, { ...opts, fix: true }, deadCodeChangedFiles));
 				if (fmtFailedBeforeDeadCode) {
@@ -3868,8 +3927,7 @@ function runFullQuality(cfg: QualityCfg, args: string[], opts: QualityOptions): 
 function dispatchQualityCli(cfg: QualityCfg, args: string[]): void | Promise<void> {
 	validCliArgs(args);
 	if (args.includes('--version') || args.includes('-v')) {
-		const pkg = JSON.parse(readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), '../../package.json'), 'utf8')) as { version: string };
-		console.info(pkg.version);
+		console.info((JSON.parse(readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), '../../package.json'), 'utf8')) as { version: string }).version);
 		return;
 	}
 	if (args.includes('--help') || args.includes('-h')) {
@@ -3882,7 +3940,7 @@ function dispatchQualityCli(cfg: QualityCfg, args: string[]): void | Promise<voi
 		);
 		return;
 	}
-	const cmd = args.find((a) => !a.startsWith('-')) ?? 'quality';
+	const cmd = args.find(a => !a.startsWith('-')) ?? 'quality';
 	const opts: QualityOptions = {
 		fix: !args.includes('--warn') && (args.includes('--fix') || args.includes('--safe-fix')),
 		all: args.includes('--all') || cmd === 'quality:all',
@@ -3925,8 +3983,7 @@ function dispatchQualityCli(cfg: QualityCfg, args: string[]): void | Promise<voi
 	}
 	if (cmd === 'format') {
 		if (!qualityCheckEnabled(cfg, 'format')) return;
-		const cmdOpts = { ...opts, fix: fix('format') };
-		if (qualityCheckEnabled(cfg, 'format')) runFormatter(cfg, cmdOpts, args.slice(1));
+		runFormatter(cfg, { ...opts, fix: fix('format') }, args.slice(1));
 		return;
 	}
 	if (cmd === 'naming') {
@@ -3966,7 +4023,7 @@ function dispatchQualityCli(cfg: QualityCfg, args: string[]): void | Promise<voi
 			qualityHeader(cmd, `Checking ${cmd.replace(G_REGEX(), ' ')}`);
 			printFindings(
 				findings as readonly GenericFinding[],
-				(f) =>
+				f =>
 					`${'file' in f ? `${f.file}: ` : ''}${'message' in f ? f.message : 'component' in f ? `${f.line}:${f.column} ${f.component}: ${f.recommendation}` : 'method' in f ? `${f.line}:${f.column} ${f.method}(${f.receiver}): ${f.recommendation}` : 'command' in f ? `${f.line}: ${f.recommendation} (${f.command})` : 'value' in f ? `${f.count}x ${f.value} (${f.locations.join(', ')})` : 'source' in f ? `${f.count}x ${f.source} (${f.locations.join(', ')})` : f.pattern}`,
 			);
 			if (findings.length) process.exitCode = 1;
@@ -3976,7 +4033,7 @@ function dispatchQualityCli(cfg: QualityCfg, args: string[]): void | Promise<voi
 		qualityHeader(cmd, `Checking ${cmd.replace(G_REGEX(), ' ')}`);
 		printFindings(
 			findings as readonly GenericFinding[],
-			(f) =>
+			f =>
 				`${'file' in f ? `${f.file}: ` : ''}${'message' in f ? f.message : 'component' in f ? `${f.line}:${f.column} ${f.component}: ${f.recommendation}` : 'method' in f ? `${f.line}:${f.column} ${f.method}(${f.receiver}): ${f.recommendation}` : 'command' in f ? `${f.line}: ${f.recommendation} (${f.command})` : 'value' in f ? `${f.count}x ${f.value} (${f.locations.join(', ')})` : 'source' in f ? `${f.count}x ${f.source} (${f.locations.join(', ')})` : f.pattern}`,
 		);
 		if (findings.length) process.exitCode = 1;
@@ -3986,8 +4043,9 @@ function dispatchQualityCli(cfg: QualityCfg, args: string[]): void | Promise<voi
 		const findings = uiComponentRecommendations(cfg);
 		console.error(`UI component findings (${findings.length})`);
 		for (const finding of findings) {
-			const component = finding.variant ? `<${finding.component} variant="${finding.variant}">` : `<${finding.component}>`;
-			console.error(`  [ERROR] ${finding.file}:${finding.line}:${finding.column} <${finding.element}> should use ${component} (import from '${finding.import}') — ${finding.reason}`);
+			console.error(
+				`  [ERROR] ${finding.file}:${finding.line}:${finding.column} <${finding.element}> should use ${finding.variant ? `<${finding.component} variant="${finding.variant}">` : `<${finding.component}>`} (import from '${finding.import}') — ${finding.reason}`,
+			);
 		}
 		if (findings.length) process.exitCode = 1;
 		return;
@@ -4003,7 +4061,7 @@ function dispatchQualityCli(cfg: QualityCfg, args: string[]): void | Promise<voi
 		if (findings.length) process.exitCode = 1;
 		return;
 	}
-	if (cfg.qualityCommands?.some((c) => c.name === cmd)) {
+	if (cfg.qualityCommands?.some(c => c.name === cmd)) {
 		runCfgdCmd(cfg, cmd);
 		return;
 	}
@@ -4025,6 +4083,80 @@ function dispatchQualityCli(cfg: QualityCfg, args: string[]): void | Promise<voi
 	if (cmd === 'quality' || cmd === 'quality:all' || cmd === 'quality:baseline') return runFullQuality(cfg, args, opts);
 }
 
+// terra-quality-ignore single-use -- Keep the documented acquireQualityLock declaration so its parameter and return contract remains attached.
+/**
+ * Prevents two fixing runs from writing the same checkout at once.
+ *
+ * @param root Repository root to lock.
+ *
+ * @return A callback that releases the lock.
+ */
+function acquireQualityLock(root: string): () => void {
+	const lockDir = join(tmpdir(), `terra-quality-${createHash('sha256').update(root).digest('hex').slice(0, 24)}.lock`);
+	for (let attempt = 0; attempt < 2; attempt++) {
+		try {
+			mkdirSync(lockDir);
+			writeFileSync(join(lockDir, 'pid'), String(process.pid));
+			return () => {
+				const ownerFile = join(lockDir, 'pid');
+				if (existsSync(ownerFile) && readFileSync(ownerFile, 'utf8') === String(process.pid)) rmSync(lockDir, { recursive: true, force: true });
+			};
+		} catch (err) {
+			if ((err as NodeJS.ErrnoException).code !== 'EEXIST') throw err;
+			let owner: number;
+			try {
+				owner = Number(readFileSync(join(lockDir, 'pid'), 'utf8'));
+				if (owner > 0) process.kill(owner, 0);
+			} catch (probe) {
+				if ((probe as NodeJS.ErrnoException).code !== 'ESRCH') throw new Error(`Quality is already running for ${root}.`, { cause: probe });
+				rmSync(lockDir, { recursive: true, force: true });
+				continue;
+			}
+			throw new Error(`Quality is already running for ${root} (PID ${owner}).`, { cause: err });
+		}
+	}
+	throw new Error(`Could not acquire the Quality lock for ${root}.`);
+}
+
+/**
+ * Captures new parser errors and restores only files damaged by an autofix.
+ *
+ * @param cfg Quality configuration whose source files need protection.
+ *
+ * @return A callback that checks and restores damaged files.
+ */
+export function syntaxGuard(cfg: QualityCfg): () => void {
+	const exts = /\.(?:cjs|cts|js|jsx|mjs|mts|ts|tsx)$/;
+	const before = snapshotFiles(
+		cfg,
+		srcFiles(cfg).filter(path => exts.test(path)),
+	);
+	const errs = (path: string, source: string): string[] => {
+		return (
+			ts.createSourceFile(
+				path,
+				source,
+				ts.ScriptTarget.Latest,
+				true,
+				/\.tsx$/.test(path) ? ts.ScriptKind.TSX : /\.jsx$/.test(path) ? ts.ScriptKind.JSX : /\.[cm]?ts$/.test(path) ? ts.ScriptKind.TS : ts.ScriptKind.JS,
+			) as ts.SourceFile & { parseDiagnostics: readonly ts.Diagnostic[] }
+		).parseDiagnostics.map(d => `${d.code}:${ts.flattenDiagnosticMessageText(d.messageText, ' ')}`);
+	};
+	return () => {
+		for (const [path, original] of before) {
+			if (!existsSync(path)) continue;
+			const current = readFileSync(path, 'utf8');
+			if (current === original) continue;
+			const prior = errs(path, original);
+			const introduced = errs(path, current).filter(message => !prior.includes(message));
+			if (!introduced.length) continue;
+			writeFileSync(path, original);
+			process.exitCode = 1;
+			console.error(`Quality restored ${relative(cfg.root, path)} after an autofix introduced syntax errors: ${introduced.join('; ')}`);
+		}
+	};
+}
+
 /**
  * Loads the repository configuration and runs the CLI in one boundary call.
  *
@@ -4035,7 +4167,7 @@ function dispatchQualityCli(cfg: QualityCfg, args: string[]): void | Promise<voi
  */
 export function runQualityFromCfg(file?: string, args = process.argv.slice(2)): void | Promise<void> {
 	validCliArgs(args);
-	if (args.some((a) => ['--version', '-v', '--help', '-h'].includes(a))) {
+	if (args.some(a => ['--version', '-v', '--help', '-h'].includes(a))) {
 		runQualityCli({} as QualityCfg, args);
 		return;
 	}
@@ -4056,7 +4188,35 @@ export function runQualityFromCfg(file?: string, args = process.argv.slice(2)): 
 				`ESLint flat config is required for ${cmd}. Add eslint.config.js, eslint.config.mjs, or eslint.config.ts at ${cfg.root} or ${cfg.configRoot ?? resolve(cfg.root, 'config')} before running Terra Quality.`,
 			);
 	}
-	return runQualityCli(cfg, args);
+	if (args.includes('--warn')) {
+		const result = runQualityCli(cfg, args);
+		if (result instanceof Promise)
+			return result.finally(() => {
+				process.exitCode = 0;
+			});
+		process.exitCode = 0;
+		return;
+	}
+	if (!new Set(['quality', 'quality:all', 'quality:baseline']).has(cmd)) return runQualityCli(cfg, args);
+	const release = acquireQualityLock(cfg.root);
+	let valid: () => void;
+	try {
+		valid = syntaxGuard(cfg);
+		const result = runQualityCli(cfg, args);
+		const finish = (): void => {
+			try {
+				valid();
+			} finally {
+				release();
+			}
+		};
+		if (result instanceof Promise) return result.finally(finish);
+		finish();
+		return;
+	} catch (err) {
+		release();
+		throw err;
+	}
 }
 
 /**
@@ -4076,8 +4236,8 @@ function validCliArgs(args: string[]): void {
 		} else if (idx >= 0 && (!args[idx + 1] || args[idx + 1].startsWith('-') || args.lastIndexOf(flag) !== idx)) throw new Error(`${flag} requires one value.`);
 	}
 	const cmdArgs = args.filter((_, i) => i !== reportIdx + 1 || reportIdx < 0);
-	const cmd = cmdArgs.find((a) => !a.startsWith('-')) ?? 'quality';
-	const unknownFlags = cmdArgs.filter((a) => a.startsWith('-') && !CLI_FLAGS.has(a));
+	const cmd = cmdArgs.find(a => !a.startsWith('-')) ?? 'quality';
+	const unknownFlags = cmdArgs.filter(a => a.startsWith('-') && !CLI_FLAGS.has(a));
 	if (!CLI_CMDS.has(cmd) || unknownFlags.length) throw new Error(`Unknown quality CLI arguments: ${[...(!CLI_CMDS.has(cmd) ? [cmd] : []), ...unknownFlags].join(', ')}`);
 }
 
@@ -4106,46 +4266,39 @@ function optVal(args: string[], flag: string): string | undefined {
 export function runFormatter(cfg: QualityCfg, optsOrArgs: QualityOptions | string[] = { fix: true, all: false, strict: false }, args: string[] = []): void {
 	const legacyArgs = Array.isArray(optsOrArgs);
 	const opts = legacyArgs ? { fix: optsOrArgs.includes('--write') || !optsOrArgs.includes('--check'), all: optsOrArgs.includes('--all'), strict: false } : optsOrArgs;
-	const suppliedArgs = (legacyArgs ? optsOrArgs : args).filter((a) => !['--all', '--warn', '--fix', '--safe-fix', '--strict'].includes(a));
-	const hasMode = suppliedArgs.includes('--write') || suppliedArgs.includes('--check');
-	const hasIgnoreMode = suppliedArgs.some((a) => a.startsWith('--ignore-unknown'));
-	const hasLogLevel = suppliedArgs.includes('--log-level') || suppliedArgs.some((a) => a.startsWith('--log-level='));
-	const suppliedTgts = suppliedArgs.filter((a, i) => a !== 'warn' || suppliedArgs[i - 1] !== '--log-level').filter((a) => !a.startsWith('-'));
+	const suppliedArgs = (legacyArgs ? optsOrArgs : args).filter(a => !['--all', '--warn', '--fix', '--safe-fix', '--strict'].includes(a));
+	const suppliedTgts = suppliedArgs.filter((a, i) => a !== 'warn' || suppliedArgs[i - 1] !== '--log-level').filter(a => !a.startsWith('-'));
 	const authoredTargets = (targets: string[]): string[] =>
-		targets.filter((target) => {
+		targets.filter(target => {
 			const file = resolve(cfg.root, target);
 			return !existsSync(file) || !statSync(file).isFile() || !hasGeneratedSourceHeader(readFileSync(file, 'utf8'));
 		});
-	const fmtSuppliedTgts = suppliedTgts.flatMap((target) => {
+	const fmtSuppliedTgts = suppliedTgts.flatMap(target => {
 		if (/[?*{}[\]!]/u.test(target)) return [target];
 		const absolute = resolve(cfg.root, target);
-		if (existsSync(absolute) && statSync(absolute).isDirectory()) return authoredTargets(filesFor(cfg, opts.all).filter((file) => resolve(file).startsWith(`${absolute}${sep}`)));
+		if (existsSync(absolute) && statSync(absolute).isDirectory()) return authoredTargets(filesFor(cfg, opts.all).filter(file => resolve(file).startsWith(`${absolute}${sep}`)));
 		return authoredTargets([target]);
 	});
-	const fmtSuppliedArgs = suppliedArgs.filter((arg) => !suppliedTgts.includes(arg));
-	const discoveredTgts = suppliedTgts.length ? [] : authoredTargets(filesFor(cfg, opts.all));
-	const tgts = authoredTargets(fmtSuppliedTgts.length > 0 || suppliedTgts.length > 0 ? fmtSuppliedTgts : discoveredTgts);
+	const tgts = authoredTargets(fmtSuppliedTgts.length > 0 || suppliedTgts.length > 0 ? fmtSuppliedTgts : authoredTargets(filesFor(cfg, opts.all)));
 	if (!tgts.length) return;
-	const fmtArgs = [
-		...(hasMode ? [] : [opts.fix ? '--write' : '--check']),
-		...(hasIgnoreMode ? [] : ['--ignore-unknown']),
-		...(opts.fix && !hasLogLevel ? ['--log-level=warn'] : []),
-		...fmtSuppliedArgs,
+	const flags = [
+		...(suppliedArgs.includes('--write') || suppliedArgs.includes('--check') ? [] : [opts.fix ? '--write' : '--check']),
+		...(suppliedArgs.some(a => a.startsWith('--ignore-unknown')) ? [] : ['--ignore-unknown']),
+		...(opts.fix && !(suppliedArgs.includes('--log-level') || suppliedArgs.some(a => a.startsWith('--log-level='))) ? ['--log-level=warn'] : []),
+		...suppliedArgs.filter(arg => !suppliedTgts.includes(arg)),
 		...tgts,
-	];
-	const flags = fmtArgs.filter((a) => a.startsWith('-'));
+	].filter(a => a.startsWith('-'));
 	qualityHeader('format', `${opts.fix ? 'Fixing' : 'Checking'} formatting in ${tgts.length} source files`);
 	const before = opts.fix ? snapshotFiles(cfg, tgts) : undefined;
 	const fmt = toolPath(cfg, cfg.tools?.prettier, 'prettier');
-	const fmtAvailable = !opts.fix || spawnSync(fmt, ['--version'], { cwd: cfg.root, stdio: 'ignore', env: process.env }).status === 0;
-	if (opts.fix && fmtAvailable) {
+	if (opts.fix && spawnSync(fmt, ['--version'], { cwd: cfg.root, stdio: 'ignore', env: process.env }).status === 0) {
 		// Explicit formatter targets are already the authoritative scope. Avoid
 		// querying Git for a temporary/non-repository fixture when collapsing its
 		// structural sources before Prettier.
 		// Generated files stay out of Prettier and its structural rewrites.
-		const knownFiles = (fmtSuppliedTgts.length ? srcFiles(cfg) : filesFor(cfg, opts.all)).filter((file) => !hasGeneratedSourceHeader(readFileSync(file, 'utf8')));
-		const directTgts = fmtSuppliedTgts.map((t) => resolve(cfg.root, t));
-		const collapseTgts = directTgts.length ? knownFiles.filter((f) => directTgts.some((t) => resolve(f) === t || resolve(f).startsWith(`${t}${sep}`))) : knownFiles;
+		const knownFiles = (fmtSuppliedTgts.length ? srcFiles(cfg) : filesFor(cfg, opts.all)).filter(file => !hasGeneratedSourceHeader(readFileSync(file, 'utf8')));
+		const directTgts = fmtSuppliedTgts.map(t => resolve(cfg.root, t));
+		const collapseTgts = directTgts.length ? knownFiles.filter(f => directTgts.some(t => resolve(f) === t || resolve(f).startsWith(`${t}${sep}`))) : knownFiles;
 		for (const file of collapseTgts) {
 			if (!C_M_JS_TS_REGEX.test(file)) continue;
 			collapseInlineIfs(file);
@@ -4170,12 +4323,13 @@ export function runFormatter(cfg: QualityCfg, optsOrArgs: QualityOptions | strin
 		'prettier.config.mjs',
 		'prettier.config.cjs',
 	]
-		.flatMap((n) => [resolve(cfg.configRoot ?? resolve(cfg.root, 'config'), n), resolve(cfg.root, n)])
-		.find((p) => existsSync(p));
-	const prettierIgnore = [resolve(cfg.configRoot ?? resolve(cfg.root, 'config'), '.prettierignore'), resolve(cfg.root, '.prettierignore')].find((p) => existsSync(p));
-	const explicitConfig = flags.some((f) => f === '--config' || f.startsWith('--config='));
-	const explicitIgnore = flags.some((f) => f === '--ignore-path' || f.startsWith('--ignore-path='));
-	const configArgs = [...(!explicitConfig && prettierConfig ? ['--config', prettierConfig] : []), ...(!explicitIgnore && prettierIgnore ? ['--ignore-path', prettierIgnore] : [])];
+		.flatMap(n => [resolve(cfg.configRoot ?? resolve(cfg.root, 'config'), n), resolve(cfg.root, n)])
+		.find(p => existsSync(p));
+	const prettierIgnore = [resolve(cfg.configRoot ?? resolve(cfg.root, 'config'), '.prettierignore'), resolve(cfg.root, '.prettierignore')].find(p => existsSync(p));
+	const configArgs = [
+		...(!flags.some(f => f === '--config' || f.startsWith('--config=')) && prettierConfig ? ['--config', prettierConfig] : []),
+		...(!flags.some(f => f === '--ignore-path' || f.startsWith('--ignore-path=')) && prettierIgnore ? ['--ignore-path', prettierIgnore] : []),
+	];
 	const targetBatches = argumentBatches(tgts);
 	for (const tgtBatch of targetBatches) {
 		const status = run(cfg, fmt, [...flags, ...configArgs, ...tgtBatch], { quietSuccess: true });
@@ -4187,7 +4341,7 @@ export function runFormatter(cfg: QualityCfg, optsOrArgs: QualityOptions | strin
 		}
 	}
 	if (opts.fix && !failed && !flags.includes('--check')) {
-		const checkFlags = [...flags.filter((flag) => flag !== '--write'), '--check'];
+		const checkFlags = [...flags.filter(flag => flag !== '--write'), '--check'];
 		for (const tgtBatch of targetBatches) {
 			const checkArgs = [...checkFlags, ...configArgs, ...tgtBatch];
 			const check = spawnSync(fmt, checkArgs, { cwd: cfg.root, stdio: 'ignore', env: process.env, maxBuffer: TOOL_OUTPUT_MAX_BUFFER });
@@ -4242,17 +4396,28 @@ export function runTypecheck(cfg: QualityCfg, args: string[] = []): void {
 	const typecheckFiles = cfg.typecheckExtensions?.length
 		? srcFiles(cfg).filter((f) => cfg.typecheckExtensions?.includes(f.slice(f.lastIndexOf('.'))) && (!cfg.typecheckRoots?.length || cfg.typecheckRoots.some((r) => f.startsWith(`${r}/`) || f.startsWith(`${r}\\`))),)
 		: [];
-	// prettier-ignore
-	const compilerArgs = typecheckFiles.length
-		? [
-				'--noEmit', '--allowJs', '--checkJs',          '--strict', '--skipLibCheck',
-				'--module', 'ESNext',    '--moduleResolution', 'Bundler',  '--target',
-        'ESNext', '--allowImportingTsExtensions',
-        ...(args.length ? suppliedFiles : typecheckFiles),
-			]
-		: ['--noEmit', '-p', projectTsconfig(cfg)];
 	qualityHeader('typecheck', `Checking ${args.length ? 'the selected source files' : 'the configured TypeScript project'}`);
-	const result = spawnSync(toolPath(cfg, tsc, 'tsc'), compilerArgs, { cwd: cfg.root, stdio: ['inherit', 'pipe', 'pipe'], maxBuffer: TOOL_OUTPUT_MAX_BUFFER });
+	const result = spawnSync(
+		toolPath(cfg, tsc, 'tsc'),
+		typecheckFiles.length
+			? [
+					'--noEmit',
+					'--allowJs',
+					'--checkJs',
+					'--strict',
+					'--skipLibCheck',
+					'--module',
+					'ESNext',
+					'--moduleResolution',
+					'Bundler',
+					'--target',
+					'ESNext',
+					'--allowImportingTsExtensions',
+					...(args.length ? suppliedFiles : typecheckFiles),
+				]
+			: ['--noEmit', '-p', projectTsconfig(cfg)],
+		{ cwd: cfg.root, stdio: ['inherit', 'pipe', 'pipe'], maxBuffer: TOOL_OUTPUT_MAX_BUFFER },
+	);
 	const status = result.status ?? 1;
 	if (status) {
 		const output = [...compactOutput(result.stdout?.toString() ?? ''), ...compactOutput(result.stderr?.toString() ?? '')];

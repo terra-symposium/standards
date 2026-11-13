@@ -9,7 +9,7 @@ description: Analyze forwarding, single-use declarations, and dead code with con
 
 ```sh
 pnpm add -D @terra-symposium/standards-refactoring
-pnpm exec terra-refactoring --all --warn
+pnpm exec terra-refactoring --all
 ```
 
 The CLI reads the shared Quality config and scope. `--warn` performs a read-only analysis; default fix mode can apply supported safe fixes. A finding may remain even when no automatic edit is offered.

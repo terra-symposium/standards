@@ -30,7 +30,7 @@ const skipNames = new Set(
 	(options.get('--skip') ?? '')
 		.split(',')
 		.filter(Boolean)
-		.map((name) => name.toLowerCase()),
+		.map(name => name.toLowerCase()),
 );
 
 if (!envId || !skillFile || roots.length === 0) {
@@ -83,7 +83,7 @@ async function discover(path, repos = new Map()) {
 
 const repos = new Map();
 for (const root of roots) await discover(resolve(root), repos);
-const targets = [...repos.keys()].filter((path) => !skipNames.has(basename(path).toLowerCase())).sort();
+const targets = [...repos.keys()].filter(path => !skipNames.has(basename(path).toLowerCase())).sort();
 if (targets.length === 0) {
 	console.error('No Git repositories found after exclusions.');
 	process.exit(1);
@@ -104,7 +104,7 @@ try {
  * @returns {Promise<{repo: string, code: number, stdout: string, stderr: string}>} Submission result.
  */
 async function run(repo) {
-	return await new Promise((resolveResult) => {
+	return await new Promise(resolveResult => {
 		const child = spawn(
 			'codex',
 			[
@@ -120,18 +120,18 @@ async function run(repo) {
 		);
 		let stdout = '';
 		let stderr = '';
-		child.stdout.setEncoding('utf8').on('data', (chunk) => {
+		child.stdout.setEncoding('utf8').on('data', chunk => {
 			stdout += chunk;
 		});
-		child.stderr.setEncoding('utf8').on('data', (chunk) => {
+		child.stderr.setEncoding('utf8').on('data', chunk => {
 			stderr += chunk;
 		});
-		child.on('error', (err) => {
+		child.on('error', err => {
 			const result = { repo, code: 127, stdout, stderr: `${stderr}${err.message}` };
 			console.log(`\n### ${basename(repo)} (submit exit ${result.code})\n${result.stderr.trim()}`);
 			resolveResult(result);
 		});
-		child.on('close', (code) => {
+		child.on('close', code => {
 			const result = { repo, code: code ?? 1, stdout, stderr };
 			console.log(`\n### ${basename(repo)} (submit exit ${result.code})\n${result.stdout.trim()}${result.stderr ? `\n${result.stderr.trim()}` : ''}`);
 			resolveResult(result);
@@ -140,4 +140,4 @@ async function run(repo) {
 }
 
 console.log(`Submitting all ${targets.length} ${basename(resolve(skillFile))} Cloud tasks in one parallel batch; excluding: ${[...skipNames].join(', ') || 'none'}`);
-if ((await Promise.all(targets.map(run))).some((result) => result.code !== 0)) process.exitCode = 1;
+if ((await Promise.all(targets.map(run))).some(result => result.code !== 0)) process.exitCode = 1;

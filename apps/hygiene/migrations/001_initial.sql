@@ -1,77 +1,86 @@
 CREATE TABLE IF NOT EXISTS repositories (
-  id BIGINT PRIMARY KEY,
-  installation_id BIGINT NOT NULL,
-  owner TEXT NOT NULL,
-  name TEXT NOT NULL,
-  private BOOLEAN NOT NULL,
-  active BOOLEAN NOT NULL DEFAULT TRUE,
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+	id bigint PRIMARY KEY,
+	installation_id bigint NOT NULL,
+	owner TEXT NOT NULL,
+	name text NOT NULL,
+	private boolean NOT NULL,
+	active boolean NOT NULL DEFAULT TRUE,
+	updated_at timestamptz NOT NULL DEFAULT now()
 );
+
 CREATE TABLE IF NOT EXISTS branches (
-  repository_id BIGINT NOT NULL REFERENCES repositories(id) ON DELETE CASCADE,
-  name TEXT NOT NULL,
-  enabled BOOLEAN NOT NULL DEFAULT TRUE,
-  history_head TEXT,
-  history_count INTEGER NOT NULL DEFAULT 0,
-  history_status TEXT NOT NULL DEFAULT 'pending',
-  history_updated_at TIMESTAMPTZ,
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  PRIMARY KEY (repository_id, name)
+	repository_id bigint NOT NULL REFERENCES repositories (id) ON DELETE CASCADE,
+	name text NOT NULL,
+	enabled boolean NOT NULL DEFAULT TRUE,
+	history_head text,
+	history_count integer NOT NULL DEFAULT 0,
+	history_status text NOT NULL DEFAULT 'pending',
+	history_updated_at timestamptz,
+	updated_at timestamptz NOT NULL DEFAULT now(),
+	PRIMARY KEY (repository_id, name)
 );
+
 CREATE TABLE IF NOT EXISTS runs (
-  repository_id BIGINT NOT NULL REFERENCES repositories(id) ON DELETE CASCADE,
-  branch TEXT NOT NULL,
-  run_id BIGINT NOT NULL,
-  run_attempt INTEGER NOT NULL,
-  head_sha TEXT NOT NULL,
-  completed_at TIMESTAMPTZ NOT NULL,
-  conclusion TEXT NOT NULL,
-  tests_passed INTEGER,
-  tests_failed INTEGER,
-  tests_skipped INTEGER,
-  checks_enabled INTEGER,
-  checks_total INTEGER,
-  checks_clean INTEGER,
-  quality_findings INTEGER,
-  processed_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  PRIMARY KEY (repository_id, run_id, run_attempt)
+	repository_id bigint NOT NULL REFERENCES repositories (id) ON DELETE CASCADE,
+	branch text NOT NULL,
+	run_id bigint NOT NULL,
+	run_attempt integer NOT NULL,
+	head_sha text NOT NULL,
+	completed_at timestamptz NOT NULL,
+	conclusion text NOT NULL,
+	tests_passed integer,
+	tests_failed integer,
+	tests_skipped integer,
+	checks_enabled integer,
+	checks_total integer,
+	checks_clean integer,
+	quality_findings integer,
+	processed_at timestamptz NOT NULL DEFAULT now(),
+	PRIMARY KEY (repository_id, run_id, run_attempt)
 );
-CREATE INDEX IF NOT EXISTS runs_branch_time ON runs(repository_id, branch, completed_at);
+
+CREATE INDEX IF NOT EXISTS runs_branch_time ON runs (repository_id, branch, completed_at);
+
 CREATE TABLE IF NOT EXISTS commits (
-  repository_id BIGINT NOT NULL REFERENCES repositories(id) ON DELETE CASCADE,
-  branch TEXT NOT NULL,
-  position INTEGER NOT NULL,
-  sha TEXT NOT NULL,
-  committed_at TIMESTAMPTZ NOT NULL,
-  additions INTEGER NOT NULL,
-  deletions INTEGER NOT NULL,
-  source_lines INTEGER NOT NULL,
-  PRIMARY KEY (repository_id, branch, sha)
+	repository_id bigint NOT NULL REFERENCES repositories (id) ON DELETE CASCADE,
+	branch text NOT NULL,
+	position integer NOT NULL,
+	sha text NOT NULL,
+	committed_at timestamptz NOT NULL,
+	additions integer NOT NULL,
+	deletions integer NOT NULL,
+	source_lines integer NOT NULL,
+	PRIMARY KEY (repository_id, branch, sha)
 );
-CREATE INDEX IF NOT EXISTS commits_branch_position ON commits(repository_id, branch, position);
+
+CREATE INDEX IF NOT EXISTS commits_branch_position ON commits (repository_id, branch, position);
+
 CREATE TABLE IF NOT EXISTS commit_queue (
-  repository_id BIGINT NOT NULL REFERENCES repositories(id) ON DELETE CASCADE,
-  branch TEXT NOT NULL,
-  position INTEGER NOT NULL,
-  sha TEXT NOT NULL,
-  PRIMARY KEY (repository_id, branch, position)
+	repository_id bigint NOT NULL REFERENCES repositories (id) ON DELETE CASCADE,
+	branch text NOT NULL,
+	position integer NOT NULL,
+	sha text NOT NULL,
+	PRIMARY KEY (repository_id, branch, position)
 );
+
 CREATE TABLE IF NOT EXISTS blob_lines (
-  repository_id BIGINT NOT NULL REFERENCES repositories(id) ON DELETE CASCADE,
-  sha TEXT NOT NULL,
-  lines INTEGER NOT NULL,
-  PRIMARY KEY (repository_id, sha)
+	repository_id bigint NOT NULL REFERENCES repositories (id) ON DELETE CASCADE,
+	sha text NOT NULL,
+	lines integer NOT NULL,
+	PRIMARY KEY (repository_id, sha)
 );
+
 CREATE TABLE IF NOT EXISTS sessions (
-  token_hash TEXT PRIMARY KEY,
-  github_user_id BIGINT NOT NULL,
-  github_login TEXT NOT NULL,
-  access_token_ciphertext TEXT NOT NULL,
-  refresh_token_ciphertext TEXT,
-  token_expires_at TIMESTAMPTZ,
-  expires_at TIMESTAMPTZ NOT NULL
+	token_hash text PRIMARY KEY,
+	github_user_id bigint NOT NULL,
+	github_login text NOT NULL,
+	access_token_ciphertext text NOT NULL,
+	refresh_token_ciphertext text,
+	token_expires_at timestamptz,
+	expires_at timestamptz NOT NULL
 );
+
 CREATE TABLE IF NOT EXISTS deliveries (
-  id TEXT PRIMARY KEY,
-  received_at TIMESTAMPTZ NOT NULL DEFAULT now()
+	id text PRIMARY KEY,
+	received_at timestamptz NOT NULL DEFAULT now()
 );

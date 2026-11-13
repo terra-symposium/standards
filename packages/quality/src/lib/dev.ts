@@ -17,14 +17,17 @@ import { spawn, spawnSync } from 'node:child_process';
 HELPERS
 //////////////////////////////////////////////////*/
 
+// terra-quality-ignore single-use -- Keep the documented applyErrBoundaries declaration so its parameter and return contract remains attached.
 /**
  * Applies mandatory React and Astro boundaries before a configured JS/TS app starts.
  *
  */
 function applyErrBoundaries(): void {
 	if (!existsSync('quality.json') && !existsSync('config/quality.json')) return;
-	const runner = fileURLToPath(new URL('./runner.js', import.meta.url));
-	if (spawnSync(process.execPath, [runner, 'error-boundaries', '--all', '--safe-fix'], { cwd: process.cwd(), env: process.env, stdio: 'inherit' }).status !== 0)
+	if (
+		spawnSync(process.execPath, [fileURLToPath(new URL('./runner.js', import.meta.url)), 'error-boundaries', '--all', '--safe-fix'], { cwd: process.cwd(), env: process.env, stdio: 'inherit' })
+			.status !== 0
+	)
 		throw new Error('Could not apply the configured application error boundaries.');
 }
 
@@ -48,6 +51,7 @@ function readPortOption(values: string[]): number | undefined {
 	return undefined;
 }
 
+// terra-quality-ignore single-use -- Keep the documented defaultPort declaration so its parameter and return contract remains attached.
 /**
  * Selects the conventional local port for the configured development server.
  *
@@ -60,6 +64,7 @@ function defaultPort(cmdName: string): number {
 	return executable === 'vite' || executable.startsWith('vite.') ? 5173 : 4321;
 }
 
+// terra-quality-ignore single-use -- Keep the documented run declaration so its parameter and return contract remains attached.
 /**
  * Runs the development server while forwarding termination signals to its child process.
  *
@@ -67,7 +72,7 @@ function defaultPort(cmdName: string): number {
  * @param executableArgs Arguments passed to the development server.
  */
 function run(executable: string, executableArgs: string[]): Promise<void> {
-	return new Promise((resolve) => {
+	return new Promise(resolve => {
 		const child = spawn(executable, executableArgs, { cwd: process.cwd(), env: process.env, stdio: 'inherit' });
 		let finished = false;
 		const finish = (code: number | null, signal: NodeJS.Signals | null) => {
@@ -82,13 +87,14 @@ function run(executable: string, executableArgs: string[]): Promise<void> {
 		const forwardTerminate = () => child.kill('SIGTERM');
 		process.once('SIGINT', forwardInterrupt);
 		process.once('SIGTERM', forwardTerminate);
-		child.once('error', (e) => {
+		child.once('error', e => {
 			console.error('[terra-quality-dev] Could not start the dev server: ' + e.message);
 			finish(1, null);
 		});
 		child.once('exit', finish);
 	});
 }
+// terra-quality-ignore single-use -- Keep the documented main declaration so its parameter and return contract remains attached.
 /**
  * Parses wrapper and child ports, acquires the requested port, and starts the dev server.
  *
@@ -98,10 +104,10 @@ async function main(): Promise<void> {
 	const args = process.argv.slice(2);
 	const separator = args.indexOf('--');
 	if (separator < 0 || separator === args.length - 1) throw new Error('Usage: terra-quality-dev [--port PORT] -- <dev-server> [arguments...]');
-	const wrapperArgs = args.slice(0, separator);
 	const cmd = args[separator + 1];
 	const cmdArgs = args.slice(separator + 2);
-	const wrapperPort = readPortOption(wrapperArgs);
+	// terra-quality-ignore single-use -- Parse the wrapper port before the child port so validation keeps its error order.
+	const wrapperPort = readPortOption(args.slice(0, separator));
 	const childPort = readPortOption(cmdArgs);
 	const configuredPort = process.env.DOCS_DEV_PORT ?? process.env.TERRA_DEV_PORT ?? process.env.PORT;
 	const port = configuredPort !== undefined ? Number(configuredPort) : (wrapperPort ?? childPort ?? defaultPort(cmd));
@@ -115,7 +121,7 @@ async function main(): Promise<void> {
 	await run(cmd, finalArgs);
 }
 
-main().catch((e) => {
+main().catch(e => {
 	console.error('[terra-quality-dev] ' + (e instanceof Error ? e.message : String(e)));
 	process.exitCode = 1;
 });

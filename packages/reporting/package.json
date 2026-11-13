@@ -29,8 +29,10 @@
 		"dist"
 	],
 	"scripts": {
+		"quality": "node \"$(git rev-parse --show-toplevel)/scripts/quality-runner.mjs\" quality",
+		"quality:all": "node \"$(git rev-parse --show-toplevel)/scripts/quality-runner.mjs\" quality --all",
 		"build": "tsc -p config/tsconfig.json",
-		"test": "npm run build && node --test test/*.test.mjs",
+		"test": "npm run build && mkdir -p tests/results && node --test --test-reporter=spec --test-reporter-destination=stdout --test-reporter=junit --test-reporter-destination=tests/results/junit.xml tests/*.test.mjs",
 		"prepare": "npm run build",
 		"typecheck": "tsc --noEmit -p config/tsconfig.json"
 	},

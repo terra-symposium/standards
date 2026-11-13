@@ -1,456 +1,456 @@
 [build]
-  command = "pnpm run docs:build"
-  publish = "dist/docs"
+command = "pnpm run docs:build"
+publish = "dist/docs"
 
 [build.environment]
-  NODE_VERSION = "24"
+NODE_VERSION = "24"
 
 [[headers]]
-  for = "/*"
-  [headers.values]
-    X-Robots-Tag = "noindex, nofollow"
+for = "/*"
+[headers.values]
+X-Robots-Tag = "noindex, nofollow"
 
 [[redirects]]
-  from = "/getting-started"
-  to = "/quality/0-getting-started/setup/"
-  status = 301
+from = "/getting-started"
+to = "/quality/0-getting-started/setup/"
+status = 301
 
 [[redirects]]
-  from = "/quality/overview"
-  to = "/quality/0-getting-started/overview/"
-  status = 301
+from = "/quality/overview"
+to = "/quality/0-getting-started/overview/"
+status = 301
 
 [[redirects]]
-  from = "/quality/configuration"
-  to = "/quality/2-configuration/quality-json/"
-  status = 301
+from = "/quality/configuration"
+to = "/quality/2-configuration/quality-json/"
+status = 301
 
 [[redirects]]
-  from = "/quality/commands"
-  to = "/quality/4-workflows/cli-and-ci/"
-  status = 301
+from = "/quality/commands"
+to = "/quality/4-workflows/cli-and-ci/"
+status = 301
 
 [[redirects]]
-  from = "/quality/troubleshooting"
-  to = "/quality/5-operations/troubleshooting/"
-  status = 301
+from = "/quality/troubleshooting"
+to = "/quality/5-operations/troubleshooting/"
+status = 301
 
 [[redirects]]
-  from = "/quality/checks"
-  to = "/quality/3-checks/check-reference/"
-  status = 301
+from = "/quality/checks"
+to = "/quality/3-checks/check-reference/"
+status = 301
 
 [[redirects]]
-  from = "/quality/checks/alias"
-  to = "/quality/3-checks/refactoring-checks/#alias"
-  status = 301
+from = "/quality/checks/alias"
+to = "/quality/3-checks/refactoring-checks/#alias"
+status = 301
 
 [[redirects]]
-  from = "/quality/checks/command"
-  to = "/quality/3-checks/tooling-checks/#command"
-  status = 301
+from = "/quality/checks/command"
+to = "/quality/3-checks/tooling-checks/#command"
+status = 301
 
 [[redirects]]
-  from = "/quality/checks/dead-code"
-  to = "/quality/3-checks/refactoring-checks/#dead-code"
-  status = 301
+from = "/quality/checks/dead-code"
+to = "/quality/3-checks/refactoring-checks/#dead-code"
+status = 301
 
 [[redirects]]
-  from = "/quality/checks/diff"
-  to = "/quality/3-checks/tooling-checks/#diff"
-  status = 301
+from = "/quality/checks/diff"
+to = "/quality/3-checks/tooling-checks/#diff"
+status = 301
 
 [[redirects]]
-  from = "/quality/checks/document"
-  to = "/quality/3-checks/source-checks/#document"
-  status = 301
+from = "/quality/checks/document"
+to = "/quality/3-checks/source-checks/#document"
+status = 301
 
 [[redirects]]
-  from = "/quality/checks/format"
-  to = "/quality/3-checks/source-checks/#format"
-  status = 301
+from = "/quality/checks/format"
+to = "/quality/3-checks/source-checks/#format"
+status = 301
 
 [[redirects]]
-  from = "/quality/checks/forward"
-  to = "/quality/3-checks/refactoring-checks/#object-forwarding"
-  status = 301
+from = "/quality/checks/forward"
+to = "/quality/3-checks/refactoring-checks/#object-forwarding"
+status = 301
 
 [[redirects]]
-  from = "/quality/checks/import"
-  to = "/quality/3-checks/source-checks/#import-validation"
-  status = 301
+from = "/quality/checks/import"
+to = "/quality/3-checks/source-checks/#import-validation"
+status = 301
 
 [[redirects]]
-  from = "/quality/checks/knip"
-  to = "/quality/3-checks/tooling-checks/#knip"
-  status = 301
+from = "/quality/checks/knip"
+to = "/quality/3-checks/tooling-checks/#knip"
+status = 301
 
 [[redirects]]
-  from = "/quality/checks/lint"
-  to = "/quality/3-checks/tooling-checks/#lint"
-  status = 301
+from = "/quality/checks/lint"
+to = "/quality/3-checks/tooling-checks/#lint"
+status = 301
 
 [[redirects]]
-  from = "/quality/checks/name"
-  to = "/quality/3-checks/source-checks/#name"
-  status = 301
+from = "/quality/checks/name"
+to = "/quality/3-checks/source-checks/#name"
+status = 301
 
 [[redirects]]
-  from = "/quality/checks/recommend"
-  to = "/quality/3-checks/tooling-checks/#recommend"
-  status = 301
+from = "/quality/checks/recommend"
+to = "/quality/3-checks/tooling-checks/#recommend"
+status = 301
 
 [[redirects]]
-  from = "/quality/checks/regex-dedup"
-  to = "/quality/3-checks/repository-patterns/#regex-deduplication"
-  status = 301
+from = "/quality/checks/regex-dedup"
+to = "/quality/3-checks/repository-patterns/#regex-deduplication"
+status = 301
 
 [[redirects]]
-  from = "/quality/checks/repeated-classes"
-  to = "/quality/3-checks/repository-patterns/#repeated-classes"
-  status = 301
+from = "/quality/checks/repeated-classes"
+to = "/quality/3-checks/repository-patterns/#repeated-classes"
+status = 301
 
 [[redirects]]
-  from = "/quality/checks/security"
-  to = "/quality/3-checks/repository-patterns/#security"
-  status = 301
+from = "/quality/checks/security"
+to = "/quality/3-checks/repository-patterns/#security"
+status = 301
 
 [[redirects]]
-  from = "/quality/checks/single-use"
-  to = "/quality/3-checks/refactoring-checks/#single-use-declarations"
-  status = 301
+from = "/quality/checks/single-use"
+to = "/quality/3-checks/refactoring-checks/#single-use-declarations"
+status = 301
 
 [[redirects]]
-  from = "/quality/checks/type"
-  to = "/quality/3-checks/tooling-checks/#type"
-  status = 301
+from = "/quality/checks/type"
+to = "/quality/3-checks/tooling-checks/#type"
+status = 301
 
 [[redirects]]
-  from = "/quality/checks/ui-patterns"
-  to = "/quality/3-checks/repository-patterns/#ui-patterns"
-  status = 301
+from = "/quality/checks/ui-patterns"
+to = "/quality/3-checks/repository-patterns/#ui-patterns"
+status = 301
 
 [[redirects]]
-  from = "/standards/contributing/guide/"
-  to = "/contributing/0-workspace/getting-started/"
-  status = 301
+from = "/standards/contributing/guide/"
+to = "/contributing/0-workspace/getting-started/"
+status = 301
 
 [[redirects]]
-  from = "/standards/error-boundaries/guide/"
-  to = "/error-boundaries/1-react/react-boundaries/"
-  status = 301
+from = "/standards/error-boundaries/guide/"
+to = "/error-boundaries/1-react/react-boundaries/"
+status = 301
 
 [[redirects]]
-  from = "/standards/quality/overview/"
-  to = "/quality/0-getting-started/overview/"
-  status = 301
+from = "/standards/quality/overview/"
+to = "/quality/0-getting-started/overview/"
+status = 301
 
 [[redirects]]
-  from = "/standards/quality/setup/"
-  to = "/quality/0-getting-started/setup/"
-  status = 301
+from = "/standards/quality/setup/"
+to = "/quality/0-getting-started/setup/"
+status = 301
 
 [[redirects]]
-  from = "/standards/quality/configuration/"
-  to = "/quality/2-configuration/quality-json/"
-  status = 301
+from = "/standards/quality/configuration/"
+to = "/quality/2-configuration/quality-json/"
+status = 301
 
 [[redirects]]
-  from = "/standards/quality/workflows/"
-  to = "/quality/4-workflows/cli-and-ci/"
-  status = 301
+from = "/standards/quality/workflows/"
+to = "/quality/4-workflows/cli-and-ci/"
+status = 301
 
 [[redirects]]
-  from = "/standards/quality/troubleshooting/"
-  to = "/quality/5-operations/troubleshooting/"
-  status = 301
+from = "/standards/quality/troubleshooting/"
+to = "/quality/5-operations/troubleshooting/"
+status = 301
 
 [[redirects]]
-  from = "/standards/reporting/overview/"
-  to = "/reporting/0-getting-started/overview/"
-  status = 301
+from = "/standards/reporting/overview/"
+to = "/reporting/0-getting-started/overview/"
+status = 301
 
 [[redirects]]
-  from = "/standards/reporting/artifacts/"
-  to = "/reporting/4-artifacts/artifacts/"
-  status = 301
+from = "/standards/reporting/artifacts/"
+to = "/reporting/4-artifacts/artifacts/"
+status = 301
 
 [[redirects]]
-  from = "/standards/reporting/load-testing/"
-  to = "/reporting/3-load-testing/load-testing/"
-  status = 301
+from = "/standards/reporting/load-testing/"
+to = "/reporting/3-load-testing/load-testing/"
+status = 301
 
 [[redirects]]
-  from = "/standards/reporting/playwright/"
-  to = "/reporting/2-playwright/playwright-evidence/"
-  status = 301
+from = "/standards/reporting/playwright/"
+to = "/reporting/2-playwright/playwright-evidence/"
+status = 301
 
 [[redirects]]
-  from = "/packages/quality/"
-  to = "/quality/0-getting-started/overview/"
-  status = 301
+from = "/packages/quality/"
+to = "/quality/0-getting-started/overview/"
+status = 301
 
 [[redirects]]
-  from = "/packages/quality/setup/"
-  to = "/quality/0-getting-started/setup/"
-  status = 301
+from = "/packages/quality/setup/"
+to = "/quality/0-getting-started/setup/"
+status = 301
 
 [[redirects]]
-  from = "/packages/quality/configuration/"
-  to = "/quality/2-configuration/quality-json/"
-  status = 301
+from = "/packages/quality/configuration/"
+to = "/quality/2-configuration/quality-json/"
+status = 301
 
 [[redirects]]
-  from = "/packages/quality/workflows/"
-  to = "/quality/4-workflows/cli-and-ci/"
-  status = 301
+from = "/packages/quality/workflows/"
+to = "/quality/4-workflows/cli-and-ci/"
+status = 301
 
 [[redirects]]
-  from = "/packages/quality/checks/"
-  to = "/quality/3-checks/check-reference/"
-  status = 301
+from = "/packages/quality/checks/"
+to = "/quality/3-checks/check-reference/"
+status = 301
 
 [[redirects]]
-  from = "/packages/quality/troubleshooting/"
-  to = "/quality/5-operations/troubleshooting/"
-  status = 301
+from = "/packages/quality/troubleshooting/"
+to = "/quality/5-operations/troubleshooting/"
+status = 301
 
 [[redirects]]
-  from = "/packages/error-boundaries/"
-  to = "/error-boundaries/1-react/react-boundaries/"
-  status = 301
+from = "/packages/error-boundaries/"
+to = "/error-boundaries/1-react/react-boundaries/"
+status = 301
 
 [[redirects]]
-  from = "/error-boundaries/analytics/production-telemetry/"
-  to = "/error-boundaries/3-analytics/production-telemetry/"
-  status = 301
+from = "/error-boundaries/analytics/production-telemetry/"
+to = "/error-boundaries/3-analytics/production-telemetry/"
+status = 301
 
 [[redirects]]
-  from = "/error-boundaries/demos/interactive-lab/"
-  to = "/error-boundaries/3-analytics/sanity-error-analysis/"
-  status = 301
+from = "/error-boundaries/demos/interactive-lab/"
+to = "/error-boundaries/3-analytics/sanity-error-analysis/"
+status = 301
 
 [[redirects]]
-  from = "/error-boundaries/react/overview/"
-  to = "/error-boundaries/1-react/react-boundaries/"
-  status = 301
+from = "/error-boundaries/react/overview/"
+to = "/error-boundaries/1-react/react-boundaries/"
+status = 301
 
 [[redirects]]
-  from = "/error-boundaries/react/integration/"
-  to = "/error-boundaries/1-react/react-boundaries/"
-  status = 301
+from = "/error-boundaries/react/integration/"
+to = "/error-boundaries/1-react/react-boundaries/"
+status = 301
 
 [[redirects]]
-  from = "/error-boundaries/react/error-reporting/"
-  to = "/error-boundaries/1-react/error-reporting/"
-  status = 301
+from = "/error-boundaries/react/error-reporting/"
+to = "/error-boundaries/1-react/error-reporting/"
+status = 301
 
 [[redirects]]
-  from = "/error-boundaries/concepts/boundary-model/"
-  to = "/error-boundaries/0-concepts/boundary-model/"
-  status = 301
+from = "/error-boundaries/concepts/boundary-model/"
+to = "/error-boundaries/0-concepts/boundary-model/"
+status = 301
 
 [[redirects]]
-  from = "/error-boundaries/astro/hydration/"
-  to = "/error-boundaries/2-frameworks/hydration/"
-  status = 301
+from = "/error-boundaries/astro/hydration/"
+to = "/error-boundaries/2-frameworks/hydration/"
+status = 301
 
 [[redirects]]
-  from = "/error-boundaries/astro/route-errors/"
-  to = "/error-boundaries/2-frameworks/route-errors/"
-  status = 301
+from = "/error-boundaries/astro/route-errors/"
+to = "/error-boundaries/2-frameworks/route-errors/"
+status = 301
 
 [[redirects]]
-  from = "/error-boundaries/packages/package-api/"
-  to = "/error-boundaries/4-packages/package-api/"
-  status = 301
+from = "/error-boundaries/packages/package-api/"
+to = "/error-boundaries/4-packages/package-api/"
+status = 301
 
 [[redirects]]
-  from = "/packages/reporting/"
-  to = "/reporting/0-getting-started/overview/"
-  status = 301
+from = "/packages/reporting/"
+to = "/reporting/0-getting-started/overview/"
+status = 301
 
 [[redirects]]
-  from = "/contributing/workspace/guide/"
-  to = "/contributing/0-workspace/getting-started/"
-  status = 301
+from = "/contributing/workspace/guide/"
+to = "/contributing/0-workspace/getting-started/"
+status = 301
 
 [[redirects]]
-  from = "/contributing/workspace/setup/"
-  to = "/contributing/0-workspace/getting-started/"
-  status = 301
+from = "/contributing/workspace/setup/"
+to = "/contributing/0-workspace/getting-started/"
+status = 301
 
 [[redirects]]
-  from = "/contributing/quality/change-validation/"
-  to = "/contributing/1-quality/change-validation/"
-  status = 301
+from = "/contributing/quality/change-validation/"
+to = "/contributing/1-quality/change-validation/"
+status = 301
 
 [[redirects]]
-  from = "/contributing/authoring/docs-structure/"
-  to = "/contributing/2-authoring/authoring/"
-  status = 301
+from = "/contributing/authoring/docs-structure/"
+to = "/contributing/2-authoring/authoring/"
+status = 301
 
 [[redirects]]
-  from = "/contributing/authoring/industry-practice/"
-  to = "/contributing/2-authoring/authoring/"
-  status = 301
+from = "/contributing/authoring/industry-practice/"
+to = "/contributing/2-authoring/authoring/"
+status = 301
 
 [[redirects]]
-  from = "/contributing/releases/package-release/"
-  to = "/contributing/3-releases/package-release/"
-  status = 301
+from = "/contributing/releases/package-release/"
+to = "/contributing/3-releases/package-release/"
+status = 301
 
 [[redirects]]
-  from = "/quality/getting-started/overview/"
-  to = "/quality/0-getting-started/overview/"
-  status = 301
+from = "/quality/getting-started/overview/"
+to = "/quality/0-getting-started/overview/"
+status = 301
 
 [[redirects]]
-  from = "/quality/getting-started/setup/"
-  to = "/quality/0-getting-started/setup/"
-  status = 301
+from = "/quality/getting-started/setup/"
+to = "/quality/0-getting-started/setup/"
+status = 301
 
 [[redirects]]
-  from = "/quality/packages/index/"
-  to = "/quality/1-packages/package-map/"
-  status = 301
+from = "/quality/packages/index/"
+to = "/quality/1-packages/package-map/"
+status = 301
 
 [[redirects]]
-  from = "/quality/1-packages/"
-  to = "/quality/1-packages/package-map/"
-  status = 301
+from = "/quality/1-packages/"
+to = "/quality/1-packages/package-map/"
+status = 301
 
 [[redirects]]
-  from = "/quality/1-packages/index/"
-  to = "/quality/1-packages/package-map/"
-  status = 301
+from = "/quality/1-packages/index/"
+to = "/quality/1-packages/package-map/"
+status = 301
 
 [[redirects]]
-  from = "/quality/configuration/quality-json/"
-  to = "/quality/2-configuration/quality-json/"
-  status = 301
+from = "/quality/configuration/quality-json/"
+to = "/quality/2-configuration/quality-json/"
+status = 301
 
 [[redirects]]
-  from = "/quality/checks/check-reference/"
-  to = "/quality/3-checks/check-reference/"
-  status = 301
+from = "/quality/checks/check-reference/"
+to = "/quality/3-checks/check-reference/"
+status = 301
 
 [[redirects]]
-  from = "/quality/workflows/cli-and-ci/"
-  to = "/quality/4-workflows/cli-and-ci/"
-  status = 301
+from = "/quality/workflows/cli-and-ci/"
+to = "/quality/4-workflows/cli-and-ci/"
+status = 301
 
 [[redirects]]
-  from = "/quality/operations/troubleshooting/"
-  to = "/quality/5-operations/troubleshooting/"
-  status = 301
+from = "/quality/operations/troubleshooting/"
+to = "/quality/5-operations/troubleshooting/"
+status = 301
 
 [[redirects]]
-  from = "/reporting/getting-started/overview/"
-  to = "/reporting/0-getting-started/overview/"
-  status = 301
+from = "/reporting/getting-started/overview/"
+to = "/reporting/0-getting-started/overview/"
+status = 301
 
 [[redirects]]
-  from = "/reporting/packages/standards-reporting/"
-  to = "/reporting/1-packages/standards-reporting/"
-  status = 301
+from = "/reporting/packages/standards-reporting/"
+to = "/reporting/1-packages/standards-reporting/"
+status = 301
 
 [[redirects]]
-  from = "/reporting/playwright/responsive-playwright/"
-  to = "/reporting/2-playwright/playwright-evidence/"
-  status = 301
+from = "/reporting/playwright/responsive-playwright/"
+to = "/reporting/2-playwright/playwright-evidence/"
+status = 301
 
 [[redirects]]
-  from = "/reporting/playwright/diagnostics/"
-  to = "/reporting/2-playwright/playwright-evidence/"
-  status = 301
+from = "/reporting/playwright/diagnostics/"
+to = "/reporting/2-playwright/playwright-evidence/"
+status = 301
 
 [[redirects]]
-  from = "/reporting/load-testing/load-testing/"
-  to = "/reporting/3-load-testing/load-testing/"
-  status = 301
+from = "/reporting/load-testing/load-testing/"
+to = "/reporting/3-load-testing/load-testing/"
+status = 301
 
 [[redirects]]
-  from = "/reporting/artifacts/artifacts/"
-  to = "/reporting/4-artifacts/artifacts/"
-  status = 301
+from = "/reporting/artifacts/artifacts/"
+to = "/reporting/4-artifacts/artifacts/"
+status = 301
 
 [[redirects]]
-  from = "/reporting/operations/retention-and-data/"
-  to = "/reporting/4-artifacts/artifacts/"
-  status = 301
+from = "/reporting/operations/retention-and-data/"
+to = "/reporting/4-artifacts/artifacts/"
+status = 301
 
 [[redirects]]
-  from = "/testing/getting-started/runner/"
-  to = "/testing/0-getting-started/test-plan/"
-  status = 301
+from = "/testing/getting-started/runner/"
+to = "/testing/0-getting-started/test-plan/"
+status = 301
 
 [[redirects]]
-  from = "/testing/getting-started/manifest/"
-  to = "/testing/0-getting-started/test-plan/"
-  status = 301
+from = "/testing/getting-started/manifest/"
+to = "/testing/0-getting-started/test-plan/"
+status = 301
 
 [[redirects]]
-  from = "/testing/ci/shared-checks/"
-  to = "/testing/1-ci/ci-integration/"
-  status = 301
+from = "/testing/ci/shared-checks/"
+to = "/testing/1-ci/ci-integration/"
+status = 301
 
 [[redirects]]
-  from = "/testing/ci/github-action/"
-  to = "/testing/1-ci/ci-integration/"
-  status = 301
+from = "/testing/ci/github-action/"
+to = "/testing/1-ci/ci-integration/"
+status = 301
 
 [[redirects]]
-  from = "/testing/coverage/ownership/"
-  to = "/testing/0-getting-started/test-plan/#file-ownership"
-  status = 301
+from = "/testing/coverage/ownership/"
+to = "/testing/0-getting-started/test-plan/#file-ownership"
+status = 301
 
 [[redirects]]
-  from = "/testing/coverage/browser-evidence/"
-  to = "/testing/2-coverage/browser-evidence/"
-  status = 301
+from = "/testing/coverage/browser-evidence/"
+to = "/testing/2-coverage/browser-evidence/"
+status = 301
 
 [[redirects]]
-  from = "/error-boundaries/0-overview/overview/"
-  to = "/error-boundaries/1-react/react-boundaries/"
-  status = 301
+from = "/error-boundaries/0-overview/overview/"
+to = "/error-boundaries/1-react/react-boundaries/"
+status = 301
 
 [[redirects]]
-  from = "/error-boundaries/0-overview/integration/"
-  to = "/error-boundaries/1-react/react-boundaries/"
-  status = 301
+from = "/error-boundaries/0-overview/integration/"
+to = "/error-boundaries/1-react/react-boundaries/"
+status = 301
 
 [[redirects]]
-  from = "/error-boundaries/0-overview/error-reporting/"
-  to = "/error-boundaries/1-react/error-reporting/"
-  status = 301
+from = "/error-boundaries/0-overview/error-reporting/"
+to = "/error-boundaries/1-react/error-reporting/"
+status = 301
 
 [[redirects]]
-  from = "/error-boundaries/0-overview/boundary-model/"
-  to = "/error-boundaries/0-concepts/boundary-model/"
-  status = 301
+from = "/error-boundaries/0-overview/boundary-model/"
+to = "/error-boundaries/0-concepts/boundary-model/"
+status = 301
 
 [[redirects]]
-  from = "/error-boundaries/1-implementation/hydration/"
-  to = "/error-boundaries/2-frameworks/hydration/"
-  status = 301
+from = "/error-boundaries/1-implementation/hydration/"
+to = "/error-boundaries/2-frameworks/hydration/"
+status = 301
 
 [[redirects]]
-  from = "/error-boundaries/1-implementation/route-errors/"
-  to = "/error-boundaries/2-frameworks/route-errors/"
-  status = 301
+from = "/error-boundaries/1-implementation/route-errors/"
+to = "/error-boundaries/2-frameworks/route-errors/"
+status = 301
 
 [[redirects]]
-  from = "/error-boundaries/1-implementation/package-api/"
-  to = "/error-boundaries/4-packages/package-api/"
-  status = 301
+from = "/error-boundaries/1-implementation/package-api/"
+to = "/error-boundaries/4-packages/package-api/"
+status = 301
 
 [[redirects]]
-  from = "/error-boundaries/2-analytics/production-telemetry/"
-  to = "/error-boundaries/3-analytics/production-telemetry/"
-  status = 301
+from = "/error-boundaries/2-analytics/production-telemetry/"
+to = "/error-boundaries/3-analytics/production-telemetry/"
+status = 301
 
 [[redirects]]
-  from = "/error-boundaries/2-analytics/sanity-error-analysis/"
-  to = "/error-boundaries/3-analytics/sanity-error-analysis/"
-  status = 301
+from = "/error-boundaries/2-analytics/sanity-error-analysis/"
+to = "/error-boundaries/3-analytics/sanity-error-analysis/"
+status = 301

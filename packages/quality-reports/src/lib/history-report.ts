@@ -33,9 +33,11 @@ export type HistoryReport = {
 	generatedAt: string;
 	commits: HistoryCommitReport[];
 };
+// terra-quality-ignore single-use -- Compile the source-extension matcher once for every history entry.
 const SRC_EXT = /\.(?:astro|c|cc|cpp|cs|css|go|html|java|js|jsx|jsonl|kt|less|m|mdx|php|py|rb|rs|scss|sh|sql|svelte|swift|ts|tsx|vue)$/i;
 const EXCLUDED_DIR =
 	/^(?:\.git|\.github|\.next|\.nuxt|\.output|\.turbo|\.vercel|\.netlify|\.astro|\.cache|build|coverage|dist|docs?|documentation|generated|vendor|node_modules|bower_components|target|out|public|static|storybook-static|test-results|results)$/i;
+// terra-quality-ignore single-use -- Compile the excluded-file matcher once for every history entry.
 const EXCLUDED_FILE =
 	/^(?:package(?:-lock)?\.json|pnpm-lock\.yaml|yarn\.lock|tsconfig(?:\.[^.]+)?\.json|(?:astro|eslint|prettier|vite|vitest|webpack|rollup|tailwind|postcss|jest|playwright|babel|next|netlify)\.config\.[^.]+|Dockerfile|Makefile)$/i;
 const HISTORY_BATCH_SIZE = 50;
@@ -51,8 +53,8 @@ const GIT_OUTPUT_LIMIT = 128 * 1024 * 1024;
  */
 export function isHistorySourcePath(path: string): boolean {
 	const parts = path.split('/');
-	if (!parts.length || parts.some((p) => p === '..' || p === '')) return false;
-	if (parts.slice(0, -1).some((p) => EXCLUDED_DIR.test(p))) return false;
+	if (!parts.length || parts.some(p => p === '..' || p === '')) return false;
+	if (parts.slice(0, -1).some(p => EXCLUDED_DIR.test(p))) return false;
 	const file = parts.at(-1) ?? '';
 	return SRC_EXT.test(file) && !EXCLUDED_FILE.test(file) && !/\.(?:config|generated|gen|min|map|snap|lock)\.[^.]+$/i.test(file) && !/^\./.test(file);
 }
@@ -83,6 +85,7 @@ function gitBuffer(root: string, args: string[], input: string): Buffer {
 	return execFileSync('git', args, { cwd: root, input, maxBuffer: GIT_OUTPUT_LIMIT, stdio: ['pipe', 'pipe', 'pipe'] });
 }
 
+// terra-quality-ignore single-use -- Keep the documented pushBase declaration so its parameter and return contract remains attached.
 /**
  * Read the before SHA from a GitHub push event when it is available.
  *
@@ -115,15 +118,14 @@ function srcChanges(root: string, head: string, parents: string[], stats: Map<st
 		const secondTab = line.indexOf('\t', firstTab + 1);
 		if (firstTab < 0 || secondTab < 0) continue;
 		if (!isHistorySourcePath(line.slice(secondTab + 1))) continue;
-		const additions = line.slice(0, firstTab) === '-' ? 0 : Number(line.slice(0, firstTab));
-		const deletions = line.slice(firstTab + 1, secondTab) === '-' ? 0 : Number(line.slice(firstTab + 1, secondTab));
 		const curr = stats.get(head) ?? { additions: 0, deletions: 0 };
-		curr.additions += additions;
-		curr.deletions += deletions;
+		curr.additions += line.slice(0, firstTab) === '-' ? 0 : Number(line.slice(0, firstTab));
+		curr.deletions += line.slice(firstTab + 1, secondTab) === '-' ? 0 : Number(line.slice(firstTab + 1, secondTab));
 		stats.set(head, curr);
 	}
 }
 
+// terra-quality-ignore single-use -- Keep the documented readNumstatLog declaration so its parameter and return contract remains attached.
 /**
  * Read source-line stats for each commit and return merge commits for first-parent handling.
  *
@@ -175,12 +177,12 @@ function parseTree(root: string, sha: string): string[] {
 		const tab = entry.indexOf('\t');
 		if (tab < 0) continue;
 		const [mode, type, blob] = entry.slice(0, tab).split(' ');
-		const path = entry.slice(tab + 1);
-		if (type === 'blob' && mode !== '120000' && isHistorySourcePath(path)) blobs.push(blob);
+		if (type === 'blob' && mode !== '120000' && isHistorySourcePath(entry.slice(tab + 1))) blobs.push(blob);
 	}
 	return blobs;
 }
 
+// terra-quality-ignore single-use -- Keep the documented isAncestor declaration so its parameter and return contract remains attached.
 /**
  * Check whether a push base is reachable from the checked-out head.
  *
@@ -219,7 +221,7 @@ export function createHistoryReport(root: string, opts: { repository?: string; b
 			.trim()
 			.split('\n')
 			.filter(Boolean)
-			.map((l) => {
+			.map(l => {
 				const [sha, authorDate, parents = ''] = l.split('\x00');
 				if (!A_F_D_40_I_REGEX.test(sha) || !Number.isFinite(Date.parse(authorDate))) throw new Error('Git returned invalid commit metadata.');
 				return { sha, authorDate, parents: parents.trim().split(S_REGEX).filter(Boolean) };
@@ -231,9 +233,9 @@ export function createHistoryReport(root: string, opts: { repository?: string; b
 	const lineCounts = new Map<string, number>();
 	const reportCommits: HistoryCommitReport[] = [];
 	for (let start = 0; start < commits.length; start += HISTORY_BATCH_SIZE) {
-		const batch = commits.slice(start, start + HISTORY_BATCH_SIZE).map((c) => ({ commit: c, blobs: parseTree(root, c.sha) }));
+		const batch = commits.slice(start, start + HISTORY_BATCH_SIZE).map(c => ({ commit: c, blobs: parseTree(root, c.sha) }));
 		(function blobLineCounts(root: string, blobs: string[], cache: Map<string, number>): void {
-			const unknown = [...new Set(blobs)].filter((s) => !cache.has(s));
+			const unknown = [...new Set(blobs)].filter(s => !cache.has(s));
 			for (let start = 0; start < unknown.length; start += BLOB_BATCH_SIZE) {
 				const batch = unknown.slice(start, start + BLOB_BATCH_SIZE);
 				const output = gitBuffer(root, ['cat-file', '--batch'], `${batch.join('\n')}\n`);
@@ -243,9 +245,8 @@ export function createHistoryReport(root: string, opts: { repository?: string; b
 					if (headerEnd < 0) throw new Error(`Git did not return blob ${sha}.`);
 					const header = output.toString('utf8', offset, headerEnd).split(' ');
 					if (header[0] !== sha || header[1] !== 'blob') throw new Error(`Git returned an invalid object for ${sha}.`);
-					const size = Number(header[2]);
 					const contentStart = headerEnd + 1;
-					const contentEnd = contentStart + size;
+					const contentEnd = contentStart + Number(header[2]);
 					cache.set(
 						sha,
 						(function lineCount(content: Uint8Array): number {
@@ -260,7 +261,7 @@ export function createHistoryReport(root: string, opts: { repository?: string; b
 			}
 		})(
 			root,
-			batch.flatMap((i) => i.blobs),
+			batch.flatMap(i => i.blobs),
 			lineCounts,
 		);
 		for (const { commit, blobs } of batch) {

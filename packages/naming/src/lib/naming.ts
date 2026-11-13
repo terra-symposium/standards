@@ -156,7 +156,7 @@ HELPERS
  * @return Immutable replacement map including supported plural forms.
  */
 function replacementMap(groups: readonly [names: string | readonly string[], replacement: string][], pluralReplacements = true): Readonly<Record<string, string>> {
-	const explicit = new Map(groups.flatMap(([n, r]) => (typeof n === 'string' ? [n] : n).map((n) => [n, r] as const)));
+	const explicit = new Map(groups.flatMap(([n, r]) => (typeof n === 'string' ? [n] : n).map(n => [n, r] as const)));
 	/**
 	 * Infers the plural spelling used for replacement-map lookup keys.
 	 *
@@ -187,7 +187,7 @@ function replacementMap(groups: readonly [names: string | readonly string[], rep
 export function identifierTokens(name: string): string[] {
 	return name
 		.split(/[_-]/)
-		.flatMap((p) => p.match(/[A-Z]+(?=[A-Z][a-z]|\d|$)|[A-Z]?[a-z]+|\d+/g) ?? [p])
+		.flatMap(p => p.match(/[A-Z]+(?=[A-Z][a-z]|\d|$)|[A-Z]?[a-z]+|\d+/g) ?? [p])
 		.filter(Boolean);
 }
 
@@ -221,12 +221,12 @@ export function renameId(name: string, kind: RenameKind = {}): string {
 		if (alias !== name) return alias;
 	}
 	const tokens = identifierTokens(name);
-	if (!tokens.some((t) => Object.hasOwn(IDENTIFIER_REPLACEMENTS, t.toLowerCase()) || Object.hasOwn(PREFIX_REPLACEMENTS, t.toLowerCase()))) return name;
+	if (!tokens.some(t => Object.hasOwn(IDENTIFIER_REPLACEMENTS, t.toLowerCase()) || Object.hasOwn(PREFIX_REPLACEMENTS, t.toLowerCase()))) return name;
 	const replacement = (function renderIdentifier(original: string, tokens: string[]): string {
 		if (/^[A-Z][A-Z0-9_]*$/.test(original)) return tokens.join(original.includes('_') ? '_' : '').toUpperCase();
 		if (original.includes('_')) return tokens.join('_');
 		if (original.includes('-')) return tokens.join('-');
-		if (A_Z_REGEX.test(original)) return tokens.map((t) => t.charAt(0).toUpperCase() + t.slice(1)).join('');
+		if (A_Z_REGEX.test(original)) return tokens.map(t => t.charAt(0).toUpperCase() + t.slice(1)).join('');
 		return tokens.map((t, i) => (i === 0 ? t.toLowerCase() : t.charAt(0).toUpperCase() + t.slice(1))).join('');
 	})(
 		name,
@@ -268,22 +268,28 @@ function callbackKind(n: ts.Identifier): RenameKind | undefined {
 		(n): n is ts.ArrowFunction | ts.FunctionExpression | ts.FunctionDeclaration => ts.isArrowFunction(n) || ts.isFunctionExpression(n) || ts.isFunctionDeclaration(n),
 	);
 	if (!callback) return undefined;
-	const isInlineCallback = !ts.isFunctionDeclaration(callback) && ts.isCallExpression(callback.parent) && callback.parent.arguments.includes(callback as ts.Expression);
-	const isObjectPropertyCallback = !ts.isFunctionDeclaration(callback) && ts.isPropertyAssignment(callback.parent) && callback.parent.initializer === callback;
 	let isNamedCallback = false;
 	if (ts.isFunctionDeclaration(callback) && callback.name) {
 		const scan = (n: ts.Node): void => {
 			if (isNamedCallback) return;
 			const jsxAttr = ts.isJsxAttribute(n) ? n : undefined;
 			const jsxExpr = jsxAttr?.initializer && ts.isJsxExpression(jsxAttr.initializer) ? jsxAttr.initializer.expression : undefined;
-			const isJsxHandler =
-				!!jsxAttr &&
+			if (
+				ts.isCallExpression(n) &&
+				ts.isPropertyAccessExpression(n.expression) &&
+				CALLBACK_METHODS.has(n.expression.name.text) &&
+				n.arguments.some(a => ts.isIdentifier(a) && a.text === callback.name?.text)
+			) {
+				isNamedCallback = true;
+				return;
+			}
+			if (
+				jsxAttr &&
 				ts.isIdentifier(jsxAttr.name) &&
 				/^on[A-Z]/.test(jsxAttr.name.text) &&
-				!!jsxExpr &&
+				jsxExpr &&
 				(() => {
 					let refs = false;
-
 					const findRef = (c: ts.Node): void => {
 						if (refs) return;
 						if (ts.isIdentifier(c) && c.text === callback.name?.text) {
@@ -294,17 +300,8 @@ function callbackKind(n: ts.Identifier): RenameKind | undefined {
 					};
 					findRef(jsxExpr);
 					return refs;
-				})();
-			if (
-				ts.isCallExpression(n) &&
-				ts.isPropertyAccessExpression(n.expression) &&
-				CALLBACK_METHODS.has(n.expression.name.text) &&
-				n.arguments.some((a) => ts.isIdentifier(a) && a.text === callback.name?.text)
+				})()
 			) {
-				isNamedCallback = true;
-				return;
-			}
-			if (isJsxHandler) {
 				isNamedCallback = true;
 				return;
 			}
@@ -312,14 +309,21 @@ function callbackKind(n: ts.Identifier): RenameKind | undefined {
 		};
 		scan(callback.parent);
 	}
-	const isJsxCallback = ts.isJsxExpression(callback.parent) && callback.parent.expression === callback && ts.isJsxAttribute(callback.parent.parent);
-	if (!isInlineCallback && !isNamedCallback && !isJsxCallback && !isObjectPropertyCallback) return undefined;
+	if (
+		!(!ts.isFunctionDeclaration(callback) && ts.isCallExpression(callback.parent) && callback.parent.arguments.includes(callback as ts.Expression)) &&
+		!isNamedCallback &&
+		!(ts.isJsxExpression(callback.parent) && callback.parent.expression === callback && ts.isJsxAttribute(callback.parent.parent)) &&
+		!(!ts.isFunctionDeclaration(callback) && ts.isPropertyAssignment(callback.parent) && callback.parent.initializer === callback)
+	)
+		return undefined;
 	for (let parent = callback.parent; parent; parent = parent.parent) {
 		if (!ts.isArrowFunction(parent) && !ts.isFunctionExpression(parent)) continue;
-		const parentIsInline = ts.isCallExpression(parent.parent) && parent.parent.arguments.includes(parent);
-		const parentIsProperty = ts.isPropertyAssignment(parent.parent) && parent.parent.initializer === parent;
-		const parentIsJsx = ts.isJsxExpression(parent.parent) && parent.parent.expression === parent && ts.isJsxAttribute(parent.parent.parent);
-		if (parentIsInline || parentIsProperty || parentIsJsx) return { disabled: true };
+		if (
+			(ts.isCallExpression(parent.parent) && parent.parent.arguments.includes(parent)) ||
+			(ts.isPropertyAssignment(parent.parent) && parent.parent.initializer === parent) ||
+			(ts.isJsxExpression(parent.parent) && parent.parent.expression === parent && ts.isJsxAttribute(parent.parent.parent))
+		)
+			return { disabled: true };
 	}
 	const declarations: ts.Identifier[] = [];
 
@@ -328,7 +332,8 @@ function callbackKind(n: ts.Identifier): RenameKind | undefined {
 		else for (const element of name.elements) if (ts.isBindingElement(element)) collectBinding(element.name);
 	};
 	for (const p of callback.parameters) collectBinding(p.name);
-	const declarationNames = new Set(declarations.map((d) => d.text));
+	// terra-quality-ignore single-use -- Build declaration names once before the recursive reserved-name visitor runs.
+	const declarationNames = new Set(declarations.map(d => d.text));
 	const reserved = new Set<string>();
 
 	const collect = (child: ts.Node): void => {
@@ -343,7 +348,7 @@ function callbackKind(n: ts.Identifier): RenameKind | undefined {
 	const initialAlias = (declaration: ts.Identifier): string => renameId(declaration.text, { callback: true, numericIndex: parameterIndex(declaration) });
 	// Keep unshortened names and names already used in the callback body available
 	// before assigning initials, so collisions are resolved consistently by order.
-	const fixedDeclarations = new Set(declarations.filter((d) => initialAlias(d) === d.text));
+	const fixedDeclarations = new Set(declarations.filter(d => initialAlias(d) === d.text));
 	for (const declaration of fixedDeclarations) reserved.add(declaration.text);
 	for (const declaration of declarations) {
 		const numericIndex = parameterIndex(declaration);
@@ -397,6 +402,7 @@ export function parameterRenameCapturesDefault(declaration: ts.Identifier, sugge
 		}
 		return false;
 	};
+	// terra-quality-ignore single-use -- Reuse the property-name classifier across every identifier visited below.
 	const isPropertyName = (node: ts.Identifier): boolean =>
 		(ts.isPropertyAccessExpression(node.parent) && node.parent.name === node) ||
 		(ts.isQualifiedName(node.parent) && node.parent.right === node) ||
@@ -409,7 +415,7 @@ export function parameterRenameCapturesDefault(declaration: ts.Identifier, sugge
 		if (ts.isIdentifier(node) && node.text === suggestion && !isPropertyName(node) && !ts.findAncestor(node.parent, ts.isTypeNode)) {
 			const symbol = ts.isShorthandPropertyAssignment(node.parent) ? checker.getShorthandAssignmentValueSymbol(node.parent) : checker.getSymbolAtLocation(node);
 			const declarations = symbol?.declarations ?? [];
-			if (!symbol || !declarations.length || declarations.some((sourceDeclaration) => !withinInit(sourceDeclaration))) captures = true;
+			if (!symbol || !declarations.length || declarations.some(sourceDeclaration => !withinInit(sourceDeclaration))) captures = true;
 		}
 		ts.forEachChild(node, visit);
 	};
@@ -439,7 +445,7 @@ export function isProtectedPath(fileName: string): boolean {
 	const norm = fileName.replaceAll('\\', '/');
 	return (
 		norm.endsWith('.d.ts') ||
-		[...PROTECTED_PATH_PARTS].some((p) => (p.includes('/') ? norm === p || norm.endsWith(`/${p}`) || norm.startsWith(`${p}/`) || norm.includes(`/${p}/`) : norm.split('/').includes(p)))
+		[...PROTECTED_PATH_PARTS].some(p => (p.includes('/') ? norm === p || norm.endsWith(`/${p}`) || norm.startsWith(`${p}/`) || norm.includes(`/${p}/`) : norm.split('/').includes(p)))
 	);
 }
 
@@ -476,7 +482,7 @@ export function isApprovedId(name: string, kind: RenameKind = {}): boolean {
 export function isRenamableDeclaration(n: ts.Identifier): boolean {
 	if (
 		ts.isParameter(n.parent) &&
-		n.parent.modifiers?.some((m) => [ts.SyntaxKind.PublicKeyword, ts.SyntaxKind.PrivateKeyword, ts.SyntaxKind.ProtectedKeyword, ts.SyntaxKind.ReadonlyKeyword].includes(m.kind))
+		n.parent.modifiers?.some(m => [ts.SyntaxKind.PublicKeyword, ts.SyntaxKind.PrivateKeyword, ts.SyntaxKind.ProtectedKeyword, ts.SyntaxKind.ReadonlyKeyword].includes(m.kind))
 	)
 		return false;
 	const declaration = ts.findAncestor(n.parent, (a): a is ts.VariableDeclaration | ts.ParameterDeclaration => ts.isVariableDeclaration(a) || ts.isParameter(a));
@@ -485,15 +491,15 @@ export function isRenamableDeclaration(n: ts.Identifier): boolean {
 			? declaration.parent.parent
 			: undefined;
 	return (
-		(ts.isVariableDeclaration(n.parent) && n.parent.name === n && !varStatement?.modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword)) ||
+		(ts.isVariableDeclaration(n.parent) && n.parent.name === n && !varStatement?.modifiers?.some(m => m.kind === ts.SyntaxKind.ExportKeyword)) ||
 		(ts.isParameter(n.parent) && n.parent.name === n) ||
-		(ts.isBindingElement(n.parent) && n.parent.name === n && !!declaration && !varStatement?.modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword)) ||
-		(ts.isFunctionDeclaration(n.parent) && n.parent.name === n && !n.parent.modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword)) ||
+		(ts.isBindingElement(n.parent) && n.parent.name === n && !!declaration && !varStatement?.modifiers?.some(m => m.kind === ts.SyntaxKind.ExportKeyword)) ||
+		(ts.isFunctionDeclaration(n.parent) && n.parent.name === n && !n.parent.modifiers?.some(m => m.kind === ts.SyntaxKind.ExportKeyword)) ||
 		(ts.isFunctionExpression(n.parent) && n.parent.name === n) ||
-		(ts.isClassDeclaration(n.parent) && n.parent.name === n && !n.parent.modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword)) ||
+		(ts.isClassDeclaration(n.parent) && n.parent.name === n && !n.parent.modifiers?.some(m => m.kind === ts.SyntaxKind.ExportKeyword)) ||
 		(ts.isClassExpression(n.parent) && n.parent.name === n) ||
-		(ts.isInterfaceDeclaration(n.parent) && n.parent.name === n && !n.parent.modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword)) ||
-		(ts.isTypeAliasDeclaration(n.parent) && n.parent.name === n && !n.parent.modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword))
+		(ts.isInterfaceDeclaration(n.parent) && n.parent.name === n && !n.parent.modifiers?.some(m => m.kind === ts.SyntaxKind.ExportKeyword)) ||
+		(ts.isTypeAliasDeclaration(n.parent) && n.parent.name === n && !n.parent.modifiers?.some(m => m.kind === ts.SyntaxKind.ExportKeyword))
 	);
 }
 
@@ -536,11 +542,11 @@ export function declarationScope(n: ts.Identifier): ts.Node {
 export function namingFindings(cfg: QualityCfg, analysis?: QualityAnalysis): NamingFinding[] {
 	const protectedNames = new Set([...PROTECTED_IDENTIFIERS, ...(cfg.protectedIdentifiers ?? [])]);
 	const findings: NamingFinding[] = [];
-	const files = (analysis?.files ?? srcFiles(cfg)).filter((file) => C_M_JS_JSX_TS_TSX_U_REGEX.test(file));
+	const files = (analysis?.files ?? srcFiles(cfg)).filter(file => C_M_JS_JSX_TS_TSX_U_REGEX.test(file));
 	const program =
 		analysis?.program ??
 		ts.createProgram({
-			rootNames: files.filter((file) => CODE_EXTS.has(file.slice(file.lastIndexOf('.')))),
+			rootNames: files.filter(file => CODE_EXTS.has(file.slice(file.lastIndexOf('.')))),
 			options: {
 				allowNonTsExtensions: true,
 				allowJs: true,
@@ -562,8 +568,9 @@ export function namingFindings(cfg: QualityCfg, analysis?: QualityAnalysis): Nam
 			? ts.createSourceFile(f, frontmatter.source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS)
 			: (analysis?.sources.get(f) ?? program.getSourceFile(f) ?? ts.createSourceFile(f, sourceText, ts.ScriptTarget.Latest, true, f.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS));
 		const sourceOffset = frontmatter?.offset ?? 0;
+		// terra-quality-ignore single-use -- Build the exported-name set once before visiting each declaration in this file.
 		const exportedNames = new Set(
-			file.statements.flatMap((s) => (ts.isExportDeclaration(s) && s.exportClause && ts.isNamedExports(s.exportClause) ? s.exportClause.elements.map((e) => (e.propertyName ?? e.name).text) : [])),
+			file.statements.flatMap(s => (ts.isExportDeclaration(s) && s.exportClause && ts.isNamedExports(s.exportClause) ? s.exportClause.elements.map(e => (e.propertyName ?? e.name).text) : [])),
 		);
 		const safetyByScope = new Map<ts.Node, { declared: Set<string>; proposals: Map<string, number> }>();
 		const declaredNames = new Set<string>();
@@ -586,8 +593,7 @@ export function namingFindings(cfg: QualityCfg, analysis?: QualityAnalysis): Nam
 			if (ts.isIdentifier(n) && isRenamableDeclaration(n) && !n.text.startsWith('_') && !protectedNames.has(n.text) && !exportedNames.has(n.text)) {
 				const suggestion = renameDeclaration(n);
 				const safety = safetyByScope.get(declarationScope(n));
-				const collision = parameterRenameCapturesDefault(n, suggestion, checker);
-				if (suggestion !== n.text && collision) {
+				if (suggestion !== n.text && parameterRenameCapturesDefault(n, suggestion, checker)) {
 					findings.push({
 						file: displayPath(cfg, f),
 						name: n.text,
@@ -623,8 +629,13 @@ function astroFrontmatter(source: string): { offset: number; source: string } | 
 	let lineStart = offset;
 	while (lineStart <= source.length) {
 		const nextLineEnd = source.indexOf('\n', lineStart);
-		const lineEnd = nextLineEnd < 0 ? source.length : nextLineEnd;
-		if (source.slice(lineStart, lineEnd).replace(R_U_REGEX, '').trim() === '---') return { offset, source: source.slice(offset, lineStart) };
+		if (
+			source
+				.slice(lineStart, nextLineEnd < 0 ? source.length : nextLineEnd)
+				.replace(R_U_REGEX, '')
+				.trim() === '---'
+		)
+			return { offset, source: source.slice(offset, lineStart) };
 		if (nextLineEnd < 0) break;
 		lineStart = nextLineEnd + 1;
 	}
@@ -659,27 +670,27 @@ function isAstroCallbackFinding(file: string, source: string, start: number): bo
  * @return Number of source files whose declarations or parameter documentation changed.
  */
 export function fixNaming(cfg: QualityCfg): number {
-	const files = srcFiles(cfg).filter((f) => C_M_JS_JSX_TS_TSX_U_REGEX.test(f));
-	const findings = namingFindings(cfg).filter((f) => f.safe !== false && C_M_JS_JSX_TS_TSX_U_REGEX.test(f.file));
+	const files = srcFiles(cfg).filter(f => C_M_JS_JSX_TS_TSX_U_REGEX.test(f));
+	const findings = namingFindings(cfg).filter(f => f.safe !== false && C_M_JS_JSX_TS_TSX_U_REGEX.test(f.file));
 	if (!findings.length) return 0;
 	const astroByFile = new Map<string, { file: string; virtualFile: string; offset: number; source: string }>();
 	const virtualFiles = new Map<string, { file: string; offset: number; source: string }>();
-	for (const file of files.filter((f) => f.endsWith('.astro'))) {
+	for (const file of files.filter(f => f.endsWith('.astro'))) {
 		const absoluteFile = resolve(cfg.root, file);
 		const frontmatter = astroFrontmatter(readFileSync(absoluteFile, 'utf8'));
 		if (!frontmatter) continue;
 		const virtualFile = `${absoluteFile}.__terra_astro_frontmatter__.ts`;
-		const entry = { file: absoluteFile, virtualFile, offset: frontmatter.offset, source: frontmatter.source };
-		astroByFile.set(absoluteFile, entry);
+		astroByFile.set(absoluteFile, { file: absoluteFile, virtualFile, offset: frontmatter.offset, source: frontmatter.source });
 		virtualFiles.set(resolve(virtualFile), { file: absoluteFile, offset: frontmatter.offset, source: frontmatter.source });
 	}
 	const virtualSources = new Map([...virtualFiles].map(([file, entry]) => [file, entry.source]));
 	const fileNames = new Set(
-		files.map((file) => {
+		files.map(file => {
 			const absoluteFile = resolve(cfg.root, file);
 			return astroByFile.get(absoluteFile)?.virtualFile ?? absoluteFile;
 		}),
 	);
+	// terra-quality-ignore single-use -- Keep one compiler-options object for every language-service host callback.
 	const options: ts.CompilerOptions = {
 		allowJs: true,
 		checkJs: false,
@@ -689,21 +700,23 @@ export function fixNaming(cfg: QualityCfg): number {
 		skipLibCheck: true,
 		target: ts.ScriptTarget.ESNext,
 	};
-	const host: ts.LanguageServiceHost = {
-		getCompilationSettings: () => options,
-		getScriptFileNames: () => [...fileNames],
-		getScriptVersion: () => '0',
-		getScriptSnapshot: (f) => {
-			const text = virtualSources.get(resolve(f)) ?? ts.sys.readFile(f);
-			return text === undefined ? undefined : ts.ScriptSnapshot.fromString(text);
-		},
-		getCurrentDirectory: () => cfg.root,
-		getDefaultLibFileName: ts.getDefaultLibFilePath,
-		fileExists: (f) => virtualSources.has(resolve(f)) || ts.sys.fileExists(f),
-		readFile: (f) => virtualSources.get(resolve(f)) ?? ts.sys.readFile(f),
-		readDirectory: ts.sys.readDirectory,
-	};
-	const service = ts.createLanguageService(host, ts.createDocumentRegistry());
+	const service = ts.createLanguageService(
+		{
+			getCompilationSettings: () => options,
+			getScriptFileNames: () => [...fileNames],
+			getScriptVersion: () => '0',
+			getScriptSnapshot: f => {
+				const text = virtualSources.get(resolve(f)) ?? ts.sys.readFile(f);
+				return text === undefined ? undefined : ts.ScriptSnapshot.fromString(text);
+			},
+			getCurrentDirectory: () => cfg.root,
+			getDefaultLibFileName: ts.getDefaultLibFilePath,
+			fileExists: f => virtualSources.has(resolve(f)) || ts.sys.fileExists(f),
+			readFile: f => virtualSources.get(resolve(f)) ?? ts.sys.readFile(f),
+			readDirectory: ts.sys.readDirectory,
+		} satisfies ts.LanguageServiceHost,
+		ts.createDocumentRegistry(),
+	);
 	const edits = new Map<string, Map<string, { start: number; length: number; text: string }>>();
 	const identifiersByFile = new Map<string, Set<string>>();
 	for (const finding of findings) {
@@ -721,10 +734,14 @@ export function fixNaming(cfg: QualityCfg): number {
 			const file = virtual?.file ?? locationFile;
 			let identifierSpans = identifiersByFile.get(locationFile);
 			if (!identifierSpans) {
-				const sourceText = virtual?.source ?? readFileSync(file, 'utf8');
 				identifierSpans = new Set<string>();
-				const kind = /\.(?:tsx|jsx)$/u.test(locationFile) ? ts.ScriptKind.TSX : /\.(?:mjs|cjs|js)$/u.test(locationFile) ? ts.ScriptKind.JS : ts.ScriptKind.TS;
-				const source = ts.createSourceFile(locationFile, sourceText, ts.ScriptTarget.Latest, true, kind);
+				const source = ts.createSourceFile(
+					locationFile,
+					virtual?.source ?? readFileSync(file, 'utf8'),
+					ts.ScriptTarget.Latest,
+					true,
+					/\.(?:tsx|jsx)$/u.test(locationFile) ? ts.ScriptKind.TSX : /\.(?:mjs|cjs|js)$/u.test(locationFile) ? ts.ScriptKind.JS : ts.ScriptKind.TS,
+				);
 				const collectIdentifiers = (node: ts.Node): void => {
 					if (ts.isJSDoc(node)) return;
 					if (ts.isIdentifier(node)) {
@@ -767,8 +784,8 @@ export function fixNaming(cfg: QualityCfg): number {
  */
 export function aliasFindings(cfg: QualityCfg, analysisOrFix: QualityAnalysis | boolean = false, legacyFix = false): AliasFinding[] {
 	const analysis = typeof analysisOrFix === 'object' ? analysisOrFix : undefined;
-	const files = (analysis?.files ?? srcFiles(cfg)).filter((f) => /\.(?:c|m)?(?:js|ts)x?$/.test(f));
-	const srcTexts = analysis?.texts ?? new Map(files.map((f) => [f, readFileSync(f, 'utf8')]));
+	const files = (analysis?.files ?? srcFiles(cfg)).filter(f => /\.(?:c|m)?(?:js|ts)x?$/.test(f));
+	const srcTexts = analysis?.texts ?? new Map(files.map(f => [f, readFileSync(f, 'utf8')]));
 	const program =
 		analysis?.program ??
 		ts.createProgram(files, {
@@ -826,7 +843,7 @@ export function aliasFindings(cfg: QualityCfg, analysisOrFix: QualityAnalysis | 
 					isStableLocalBinding(targetSymbol) &&
 					!exportedSymbols.has(symbol) &&
 					!exportedNames.has(name.text) &&
-					!node.modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword)
+					!node.modifiers?.some(m => m.kind === ts.SyntaxKind.ExportKeyword)
 				)
 					aliases.push({ statement: node, name, symbol, replacement: tgt.getText(src), kind: 'const', targetSymbol, targetName: tgt.text });
 			}
@@ -841,7 +858,7 @@ export function aliasFindings(cfg: QualityCfg, analysisOrFix: QualityAnalysis | 
 					!exportedNames.has(node.name.text) &&
 					!(function externallyReferenced(files: string[], srcTexts: Map<string, string>, src: string, name: string): boolean {
 						const pattern = new RegExp(`\\b${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`);
-						return files.some((f) => f !== src && pattern.test(srcTexts.get(f) ?? ''));
+						return files.some(f => f !== src && pattern.test(srcTexts.get(f) ?? ''));
 					})(files, srcTexts, src.fileName, node.name.text)
 				)
 					aliases.push({ statement: node, name: node.name, symbol, replacement: node.type.getText(src), kind: 'type', targetSymbol, targetName: node.type.typeName.getText(src) });
@@ -851,7 +868,7 @@ export function aliasFindings(cfg: QualityCfg, analysisOrFix: QualityAnalysis | 
 		inspect(src);
 		if (!aliases.length) continue;
 		const edits: Array<{ start: number; end: number; text: string; alias: (typeof aliases)[number] }> = [];
-		const symbols = new Map(aliases.map((a) => [a.symbol, a]));
+		const symbols = new Map(aliases.map(a => [a.symbol, a]));
 		const shadowed = new Set<(typeof aliases)[number]>();
 		const chained = new Set<(typeof aliases)[number]>();
 		for (const alias of aliases) {
@@ -863,16 +880,15 @@ export function aliasFindings(cfg: QualityCfg, analysisOrFix: QualityAnalysis | 
 		}
 
 		const visit = (node: ts.Node): void => {
-			if (aliases.some((a) => a.statement === node)) return;
+			if (aliases.some(a => a.statement === node)) return;
 			if (ts.isIdentifier(node)) {
-				const symbol =
-					ts.isShorthandPropertyAssignment(node.parent) && node.parent.name === node
+				const alias = symbols.get(
+					(ts.isShorthandPropertyAssignment(node.parent) && node.parent.name === node
 						? (checker.getShorthandAssignmentValueSymbol(node.parent) ?? checker.getSymbolAtLocation(node))
-						: checker.getSymbolAtLocation(node);
-				const alias = symbols.get(symbol as ts.Symbol);
+						: checker.getSymbolAtLocation(node)) as ts.Symbol,
+				);
 				if (alias && node !== alias.name) {
-					const visibleTgt = checker.getSymbolsInScope(node, ts.SymbolFlags.Type | ts.SymbolFlags.Value).find((c) => c.name === alias.targetName);
-					if (alias.targetSymbol && visibleTgt !== alias.targetSymbol) {
+					if (alias.targetSymbol && checker.getSymbolsInScope(node, ts.SymbolFlags.Type | ts.SymbolFlags.Value).find(c => c.name === alias.targetName) !== alias.targetSymbol) {
 						shadowed.add(alias);
 						return;
 					}
@@ -887,11 +903,10 @@ export function aliasFindings(cfg: QualityCfg, analysisOrFix: QualityAnalysis | 
 			ts.forEachChild(node, visit);
 		};
 		visit(src);
-		const sAliases = aliases.filter((a) => !shadowed.has(a) && !chained.has(a));
+		const sAliases = aliases.filter(a => !shadowed.has(a) && !chained.has(a));
 		if (!sAliases.length) continue;
 		const sAliasSet = new Set(sAliases);
-		const sEdits = edits.filter((e) => sAliasSet.has(e.alias));
-		edits.splice(0, edits.length, ...sEdits);
+		edits.splice(0, edits.length, ...edits.filter(e => sAliasSet.has(e.alias)));
 		for (const alias of sAliases) {
 			findings.push({
 				file: displayPath(cfg, src.fileName),

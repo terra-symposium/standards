@@ -8,7 +8,7 @@ Run focused checks while editing, then validate the complete change before reque
 ## Validation sequence
 
 <Nodes
-	direction="LR"
+	direction='LR'
 	nodes={[
 		{ id: 'package', type: 'origin', data: { title: 'Build affected package' } },
 		{ id: 'tests', type: 'process', data: { title: 'Run focused tests' } },
@@ -35,8 +35,7 @@ pnpm run test
 pnpm run quality -- --all
 ```
 
-The workspace test command follows `config/terra-tests.json`. Quality uses its configured source scope; build and test remain separate steps.
-|||
+The workspace test command follows `config/terra-tests.json`. Quality uses its configured source scope; build and test remain separate steps. |||
 
 ||| [Documentation or visual change]
 
@@ -47,8 +46,7 @@ pnpm run docs:build
 pnpm exec docs preview --port 2050
 ```
 
-Use the Docs preview after a build. Rebuild after every content, route, or asset edit; it does not hot-reload.
-|||
+Use the Docs preview after a build. Rebuild after every content, route, or asset edit; it does not hot-reload. |||
 
 ## Review effects
 

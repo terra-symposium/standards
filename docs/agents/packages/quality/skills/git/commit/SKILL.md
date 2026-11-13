@@ -11,18 +11,15 @@ Use only when the user explicitly authorizes commits. Otherwise, propose the gro
 
 1. **Inspect state**
 
-Read `git status --short`, staged and unstaged diffs, current branch, and divergence from its
-upstream.
+Read `git status --short`, staged and unstaged diffs, current branch, and divergence from its upstream.
 
 - Treat staged, unstaged, and untracked files as separate evidence; preserve unrelated work.
 
 2. **Update safely**
 
-Never make task changes directly on `main` or `development`; use a dedicated
-`automation/<agent>/<area>-<change>` branch by default.
+Never make task changes directly on `main` or `development`; use a dedicated `automation/<agent>/<area>-<change>` branch by default.
 
-If behind, protect local work including untracked files, then fast-forward. If diverged, protect
-work before merging and resolve against current architecture.
+If behind, protect local work including untracked files, then fast-forward. If diverged, protect work before merging and resolve against current architecture.
 
 - Restore and verify protected work before dropping the temporary stash.
 - Do not discard, reset, or overwrite local changes.
@@ -30,8 +27,7 @@ work before merging and resolve against current architecture.
 3. **Plan groups**
    - Group independently reviewable behavior in dependency order.
 
-Keep implementation, direct tests, and required documentation together. Keep unrelated cleanup
-separate.
+Keep implementation, direct tests, and required documentation together. Keep unrelated cleanup separate.
 
 - Check each group with `git diff --check` and the narrowest relevant validation.
 
@@ -39,8 +35,7 @@ separate.
    - Stage exact files or hunks; never use `git add -A` or reset unrelated changes.
    - Review the staged diff before each commit.
 
-Use `type(scope): imperative summary`. The body states the observable change and validation; omit
-filler.
+Use `type(scope): imperative summary`. The body states the observable change and validation; omit filler.
 
 5. **Review boundary**
    - Push task work to the dedicated branch and create the corresponding GitHub PR for review.

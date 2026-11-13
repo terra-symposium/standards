@@ -5,19 +5,19 @@ description: Compare React render recovery with Astro hydration recovery and ser
 
 A boundary replaces one failed region with recovery UI. It does not make the failed operation succeed, repair data, or retry external work. This comparison shows which layer owns each failure.
 
-| Failure point                                               | React boundary                        | Astro boundary                                                            | Owner when not caught                                |
-| ----------------------------------------------------------- | ------------------------------------- | ------------------------------------------------------------------------- | ---------------------------------------------------- |
-| Descendant client render, constructor, or lifecycle failure | Catches and renders a React fallback. | React boundary can catch after hydration begins.                          | Application fallback and callback.                   |
-| Framework island fails before hydration completes           | Not active until React renders.       | The wrapper or page integration can reveal server-rendered fallback HTML. | Astro page integration or page-level error handling. |
-| Server render fails before HTML is sent                     | Does not catch.                       | Browser-side wrapper cannot run.                                          | Server/framework error response.                     |
-| Event handler, timer, or unrelated async callback fails     | Usually does not catch.               | Does not catch.                                                           | Local error handling or global application handler.  |
+| Failure point | React boundary | Astro boundary | Owner when not caught |
+| --- | --- | --- | --- |
+| Descendant client render, constructor, or lifecycle failure | Catches and renders a React fallback. | React boundary can catch after hydration begins. | Application fallback and callback. |
+| Framework island fails before hydration completes | Not active until React renders. | The wrapper or page integration can reveal server-rendered fallback HTML. | Astro page integration or page-level error handling. |
+| Server render fails before HTML is sent | Does not catch. | Browser-side wrapper cannot run. | Server/framework error response. |
+| Event handler, timer, or unrelated async callback fails | Usually does not catch. | Does not catch. | Local error handling or global application handler. |
 
 ## Client rendering and hydration
 
 React boundaries switch to fallback output when a descendant render path fails. Astro produces initial HTML and starts framework hydration only where a client directive is configured. If an island fails before React starts, an Astro event listener must own the fallback.
 
 <Nodes
-	direction="TB"
+	direction='TB'
 	nodes={[
 		{ id: 'request', type: 'origin', data: { title: 'Astro sends HTML' } },
 		{ id: 'hydration', type: 'process', data: { title: 'Hydrate client island' } },
@@ -38,12 +38,10 @@ React boundaries switch to fallback output when a descendant render path fails. 
 
 ||| [React-rendered region]
 
-Wrap a panel, route region, or repeated item when that region can fail independently. Keep unrelated controls outside the boundary and make the fallback action match a real recovery path.
-|||
+Wrap a panel, route region, or repeated item when that region can fail independently. Keep unrelated controls outside the boundary and make the fallback action match a real recovery path. |||
 
 ||| [Astro island startup]
 
-Use the package’s Astro wrapper around an island or install the page-level integration when one fallback should cover multiple islands. It cannot repair a server failure that prevented HTML from reaching the browser.
-|||
+Use the package’s Astro wrapper around an island or install the page-level integration when one fallback should cover multiple islands. It cannot repair a server failure that prevented HTML from reaching the browser. |||
 
 For installation, see [React boundary integration](/error-boundaries/1-react/react-boundaries/) and [Astro hydration recovery](/error-boundaries/2-frameworks/hydration/). The [route helper reference](/error-boundaries/2-frameworks/route-errors/) covers HTTP status responses.

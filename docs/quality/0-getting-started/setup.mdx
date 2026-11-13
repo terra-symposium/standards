@@ -48,7 +48,7 @@ Start with a source scope and disable optional external tools until they are ins
 The flow shows the distinction between the default local fix run and a complete read-only review.
 
 <Nodes
-	direction="LR"
+	direction='LR'
 	nodes={[
 		{ id: 'install', type: 'origin', data: { title: 'Install package' } },
 		{ id: 'config', type: 'process', data: { title: 'Add quality.json' } },
@@ -69,20 +69,17 @@ The flow shows the distinction between the default local fix run and a complete 
 pnpm exec terra-quality
 ```
 
-The normal run selects changed and untracked source files and applies enabled autofixes. Configured repository commands also run unless skipped.
-|||
+The normal run selects changed and untracked source files and applies enabled autofixes. Configured repository commands also run unless skipped. |||
 
 ||| [Full read-only run]
 
 ```sh
-pnpm exec terra-quality quality --all --warn
+pnpm exec terra-quality quality --all
 ```
 
-`--all` selects the full configured source scope. `--warn` disables autofixes for review and CI. Add `--skip-commands` only when build and test commands run in separate workflow steps.
-|||
+`--all` selects the full configured source scope. `--warn` disables autofixes for review and CI. Add `--skip-commands` only when build and test commands run in separate workflow steps. |||
 
-=== [Optional external tools]
-Formatting requires an installed Prettier. Install and configure it in the consuming repository before setting `enabledChecks.format` to true. Linting requires ESLint and its flat configuration. Knip and TypeScript checks likewise use repository-installed tools and project files.
+=== [Optional external tools] Formatting requires an installed Prettier. Install and configure it in the consuming repository before setting `enabledChecks.format` to true. Linting requires ESLint and its flat configuration. Knip and TypeScript checks likewise use repository-installed tools and project files.
 
 # Keep native configuration such as `eslint.config.mjs`, `tsconfig.json`, and Prettier settings in the consuming project. Terra Quality passes the selected files or configured project to the tool; it does not replace that tool’s rule model.
 

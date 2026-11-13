@@ -23,12 +23,13 @@ HELPERS
 export default async function handler(request: Request): Promise<Response> {
 	const url = new URL(request.url);
 	const state = url.searchParams.get('state') ?? '';
+	// terra-quality-ignore single-use -- Read the cookie before the short-circuit check, even when the state parameter is absent.
 	const saved =
 		request.headers
 			.get('cookie')
 			?.split(';')
-			.map((p) => p.trim())
-			.find((p) => p.startsWith('terra_hygiene_state='))
+			.map(p => p.trim())
+			.find(p => p.startsWith('terra_hygiene_state='))
 			?.split('=')[1] ?? '';
 	if (!state || !equalSecret(state, saved)) return new Response('Invalid sign-in state', { status: 400 });
 	const code = url.searchParams.get('code');

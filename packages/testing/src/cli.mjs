@@ -12,6 +12,7 @@ import { runTestPlan } from './index.mjs';
 HELPERS
 //////////////////////////////////////////////////*/
 
+// terra-quality-ignore single-use -- Keep the documented parseArgs declaration so its parameter and return contract remains attached.
 /**
  * Parses the workspace test-runner command-line options.
  *
@@ -35,7 +36,7 @@ function parseArgs(args) {
 		} else if (flag === '--suites' && value) {
 			options.suites = value
 				.split(',')
-				.map((name) => name.trim())
+				.map(name => name.trim())
 				.filter(Boolean);
 			index++;
 		} else if (flag === '--shared-only') {

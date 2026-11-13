@@ -26,14 +26,11 @@ Mirror the source and route tree beneath the test root, and assign each behavior
 
 Map each material behavior to an observable assertion or a documented gap. Track:
 
-behavior/route and risk: correctness, authorization, integrity, security, accessibility, responsive
-layout, diagnostics, or performance;
+behavior/route and risk: correctness, authorization, integrity, security, accessibility, responsive layout, diagnostics, or performance;
 
-lifecycle states that apply: initial, valid, invalid, loading, empty, partial, success, failure,
-retry, cleanup;
+lifecycle states that apply: initial, valid, invalid, loading, empty, partial, success, failure, retry, cleanup;
 
-proof context: source, unit/integration, public/authenticated browser, mutation fixture, or deployed
-target;
+proof context: source, unit/integration, public/authenticated browser, mutation fixture, or deployed target;
 
 - viewport for rendered behavior and fixture owner/isolation/cleanup.
 

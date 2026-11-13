@@ -9,7 +9,7 @@ description: TSDoc, JSDoc, Doxygen, and documented-command checks.
 
 ```sh
 pnpm add -D @terra-symposium/standards-documentation
-pnpm exec terra-documentation --config config/quality.json --all --warn
+pnpm exec terra-documentation --config config/quality.json --all
 ```
 
 The CLI reads the same `quality.json` as the aggregate runner. With no explicit files, it checks changed and untracked source files. `--all` scans configured source roots; `--warn` is read-only. Findings are JSON lines and make the command fail.

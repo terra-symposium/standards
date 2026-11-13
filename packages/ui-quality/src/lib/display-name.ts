@@ -63,6 +63,7 @@ function isForwardRef(init: ts.Expression | undefined): init is ts.CallExpressio
 	return ts.isPropertyAccessExpression(callee) && !callee.questionDotToken && ts.isIdentifier(callee.expression) && callee.expression.text === 'React' && callee.name.text === 'forwardRef';
 }
 
+// terra-quality-ignore single-use -- Keep the documented assignedComponent declaration so its parameter and return contract remains attached.
 /**
  * Returns the component name targeted by a displayName assignment expression.
  *
@@ -123,6 +124,7 @@ function declarationScope(declaration: ts.VariableDeclaration): ts.Node {
 	return declaration.getSourceFile();
 }
 
+// terra-quality-ignore single-use -- Keep the documented candidatesForAssignment declaration so its parameter and return contract remains attached.
 /**
  * Resolves a component property assignment to the nearest same-named candidate binding.
  *
@@ -137,7 +139,7 @@ function candidatesForAssignment(node: ts.Node, name: string, byName: Map<string
 	if (!candidates) return [];
 	for (let current: ts.Node | undefined = node.parent; current; current = current.parent) {
 		if (!isBindingScope(current)) continue;
-		const matches = candidates.filter((c) => c.scope === current);
+		const matches = candidates.filter(c => c.scope === current);
 		if (matches.length) return matches;
 	}
 	return [];
@@ -152,8 +154,7 @@ function candidatesForAssignment(node: ts.Node, name: string, byName: Map<string
  * @return Eligible named declarations, including whether an existing assignment is matching or conflicting.
  */
 function candidatesForFile(file: string, analysis?: QualityAnalysis): Candidate[] {
-	const src = analysis?.texts.get(file) ?? readFileSync(file, 'utf8');
-	const parsed = analysis?.sources.get(file) ?? ts.createSourceFile(file, src, ts.ScriptTarget.Latest, true, scriptKind(file));
+	const parsed = analysis?.sources.get(file) ?? ts.createSourceFile(file, analysis?.texts.get(file) ?? readFileSync(file, 'utf8'), ts.ScriptTarget.Latest, true, scriptKind(file));
 	if ((parsed as ts.SourceFile & { parseDiagnostics?: readonly ts.Diagnostic[] }).parseDiagnostics?.length) return [];
 	const candidates: Candidate[] = [];
 	const byName = new Map<string, Candidate[]>();
@@ -176,8 +177,9 @@ function candidatesForFile(file: string, analysis?: QualityAnalysis): Candidate[
 			const name = assignedComponent(node.left);
 			const targets = name ? candidatesForAssignment(node, name, byName) : undefined;
 			if (targets) {
-				const inheritsDisplayName = ts.isPropertyAccessExpression(node.right) && !node.right.questionDotToken && node.right.name.text === 'displayName';
-				const exact = node.operatorToken.kind === ts.SyntaxKind.EqualsToken && ((ts.isStringLiteralLike(node.right) && node.right.text === name) || inheritsDisplayName);
+				const exact =
+					node.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
+					((ts.isStringLiteralLike(node.right) && node.right.text === name) || (ts.isPropertyAccessExpression(node.right) && !node.right.questionDotToken && node.right.name.text === 'displayName'));
 				for (const target of targets) {
 					if (target.assignment === 'missing' || !exact) target.assignment = exact ? 'matching' : 'conflicting';
 				}
@@ -228,7 +230,7 @@ function findingsForFile(cfg: QualityCfg, file: string, analysis?: QualityAnalys
  * @return Missing or conflicting displayName recommendations.
  */
 export function displayNameFindings(cfg: QualityCfg, analysis?: QualityAnalysis): DisplayNameFinding[] {
-	return (analysis?.files ?? srcFiles(cfg)).flatMap((f) => findingsForFile(cfg, f, analysis));
+	return (analysis?.files ?? srcFiles(cfg)).flatMap(f => findingsForFile(cfg, f, analysis));
 }
 
 /**
@@ -259,12 +261,10 @@ export function fixDisplayNames(cfg: QualityCfg, analysis?: QualityAnalysis): { 
 			}
 			const statement = candidate.statement;
 			const start = statement.getStart(parsed);
-			const lineStart = src.lastIndexOf('\n', start - 1) + 1;
-			const indent = src.slice(lineStart, start);
+			const indent = src.slice(src.lastIndexOf('\n', start - 1) + 1, start);
 			const lineEnd = src.indexOf('\n', statement.end);
 			const insertAt = lineEnd < 0 ? src.length : lineEnd > 0 && src[lineEnd - 1] === '\r' ? lineEnd - 1 : lineEnd;
-			const tail = src.slice(statement.end, insertAt);
-			if (!S_REGEX.test(indent) || !S_REGEX.test(tail)) {
+			if (!S_REGEX.test(indent) || !S_REGEX.test(src.slice(statement.end, insertAt))) {
 				skipped++;
 				continue;
 			}
@@ -276,7 +276,7 @@ export function fixDisplayNames(cfg: QualityCfg, analysis?: QualityAnalysis): { 
 		let updated = src;
 		const lineBreak = src.includes('\r\n') ? '\r\n' : '\n';
 		for (const [at, edit] of [...edits.entries()].sort((a, b) => b[0] - a[0])) {
-			updated = `${updated.slice(0, at)}${lineBreak}${edit.names.map((n) => `${edit.indent}${n}.displayName = '${n}';`).join(lineBreak)}${updated.slice(at)}`;
+			updated = `${updated.slice(0, at)}${lineBreak}${edit.names.map(n => `${edit.indent}${n}.displayName = '${n}';`).join(lineBreak)}${updated.slice(at)}`;
 			fixed += edit.names.length;
 		}
 		if ((ts.createSourceFile(file, updated, ts.ScriptTarget.Latest, true, scriptKind(file)) as ts.SourceFile & { parseDiagnostics?: readonly ts.Diagnostic[] }).parseDiagnostics?.length) {

@@ -85,8 +85,7 @@ void (async (): Promise<void> => {
 	try {
 		git(checkout, ['worktree', 'add', '--detach', worktree, revision]);
 		const history = parseHistoryReport(createHistoryReport(worktree, { repository: repo, branch, baseSha: null }));
-		const report = parseHistoryReport(history);
-		await ingestHistoryReport(repoRow.id, report);
+		await ingestHistoryReport(repoRow.id, parseHistoryReport(history));
 		console.info(`Imported ${history.commits.length.toLocaleString()} commits for ${repo} (${branch}) through ${history.headSha.slice(0, 9)}.`);
 	} finally {
 		try {

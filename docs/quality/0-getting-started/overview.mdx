@@ -21,7 +21,7 @@ The aggregate package coordinates built-in JavaScript and TypeScript checks with
 A full run selects a repository scope, performs the enabled check phases, and produces findings and an exit status. Fix mode may write eligible source changes; `--warn` is read-only. Configured commands remain in the aggregate runner's fixed order.
 
 <Nodes
-	direction="LR"
+	direction='LR'
 	nodes={[
 		{ id: 'config', type: 'origin', data: { title: 'Read quality.json' } },
 		{ id: 'scope', type: 'process', data: { title: 'Select changed files or --all' } },

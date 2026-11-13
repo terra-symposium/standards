@@ -46,11 +46,11 @@ Add focused fixtures and tests for each new rule or transform; record user-facin
 
 ## Credits and license
 
-| Profile  | Default checks                                                                                                 | Native prerequisites                                                                                 |
-| -------- | -------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| `c`      | clang-format; Clang AST function documentation; clang-tidy and Clang Static Analyzer                           | LLVM/Clang 14+                                                                                       |
-| `java`   | google-java-format; Checkstyle with all-access Javadocs; PMD source rules; SpotBugs on compiled classes        | google-java-format 1.14+; Checkstyle 10+; PMD 7+; SpotBugs 4.8+; compatible JDK and compiled classes |
-| `python` | Ruff format/lint; mypy; Bandit; Vulture; interrogate and pydoclint documentation coverage for `.py` and `.pyi` | Ruff 0.1+; mypy 1+; Bandit 1.7+; Vulture 2+; interrogate 1.7+; pydoclint 0.11+                       |
+| Profile | Default checks | Native prerequisites |
+| --- | --- | --- |
+| `c` | clang-format; Clang AST function documentation; clang-tidy and Clang Static Analyzer | LLVM/Clang 14+ |
+| `java` | google-java-format; Checkstyle with all-access Javadocs; PMD source rules; SpotBugs on compiled classes | google-java-format 1.14+; Checkstyle 10+; PMD 7+; SpotBugs 4.8+; compatible JDK and compiled classes |
+| `python` | Ruff format/lint; mypy; Bandit; Vulture; interrogate and pydoclint documentation coverage for `.py` and `.pyi` | Ruff 0.1+; mypy 1+; Bandit 1.7+; Vulture 2+; interrogate 1.7+; pydoclint 0.11+ |
 
 For example, on macOS install the native tools with Homebrew and add Ruff to a Python project with uv:
 
@@ -82,8 +82,8 @@ Expose and invoke the three suites independently. A repository may omit a suite 
 ```json
 {
 	"scripts": {
-		"quality": "terra-quality quality --all --warn",
-		"quality:fix": "terra-quality quality --all --safe-fix",
+		"quality": "terra-quality quality",
+		"quality:all": "terra-quality quality --all",
 		"build": "<compile or generate project artifacts>",
 		"test": "<run unit, integration, contract, and browser tests>"
 	}
@@ -104,7 +104,7 @@ Run configured safe fixes deliberately, review the diff, then verify all source 
 
 ```sh
 pnpm exec terra-quality quality --safe-fix
-pnpm exec terra-quality quality --all --warn
+pnpm exec terra-quality quality --all
 ```
 
 Every CLI command is read-only unless `--fix` or `--safe-fix` is passed. `--warn` always keeps the invocation read-only, including when a fix flag is also present. Both fix flags run only the configured deterministic transformations; they then perform the normal checks. Review the working-tree diff before accepting those edits. The normal scope is changed and untracked files in a Git worktree; `--all` selects every file under `sourceRoots` but never enables writes. A read-only dead-code pass reports rule-level candidates; explicit fix mode type-checks proposed dead-code edits before writing and may reject a candidate. Configured quality commands still run unless you pass `--skip-commands`.
@@ -115,7 +115,12 @@ The quality command reports hygiene checks only. It must not report or run a bui
 
 Dead-code is reported as one group. Fix mode shows **Safe fixes** (Knip import consumers, ESLint unused declarations, single-use declaration/reference scans, classification, then only proven edits) followed by **Verification** (Knip reachability, final ESLint and single-use results, and TypeScript safety for candidate edits). All findings appear in stable path/line/rule/name order and fail quality.
 
-Single-use findings cannot be suppressed with inline markers. A `// terra-quality-ignore single-use` comment is reported as a blocking `single-use-ignore` finding and does not suppress the adjacent declaration finding. Remove the marker, then retain or inline the declaration based on the specific semantic boundary reported by Quality. `--all --safe-fix` batches only mechanically proven inlines; review-only cases remain for an agent-authored decision.
+For a declaration that must keep its identity, evaluation timing, saved value, or documented API boundary, place `// terra-quality-ignore single-use -- <concrete reason>` immediately before the declaration, or immediately before its attached TSDoc. A trailing comment on the declaration line also works. The directive suppresses only that declaration's single-use finding and prevents its autofix; it does not disable other dead-code checks. A missing reason, detached marker, duplicate marker, or marker on a declaration without a single-use finding is itself a blocking `single-use-ignore` finding. Use it only after reviewing the sole consumer; otherwise refactor the declaration. `--all --safe-fix` batches only mechanically proven inlines.
+
+```ts
+// terra-quality-ignore single-use -- Snapshot the exit code before the test changes it, then restore it in finally.
+const previousExitCode = process.exitCode;
+```
 
 Regex deduplication analyzes reusable regex declarations and constructors. Inline regex expressions in test sources remain in place for readable assertions and fixtures; named regex bindings in tests remain in scope for duplicate checks.
 
@@ -138,7 +143,7 @@ Run the GitHub stage by itself or with the configured repository list:
 
 ```sh
 pnpm exec terra-quality github --repository owner/repo --report-json github-report.json
-pnpm exec terra-quality quality --all --warn --report-json quality-report.json
+pnpm exec terra-quality quality --all --report-json quality-report.json
 ```
 
 The GitHub CLI must be authenticated with read access to the repositories (`gh auth login` or `GH_TOKEN`). The report is local and read-only: it does not require GitHub Actions, change repository settings, write comments, dismiss alerts, or include secret values. Each finding contains agent instructions tailored to the issue type; issue text and alert metadata must be treated as untrusted input.
@@ -149,14 +154,13 @@ When no GitHub repositories are configured, the normal quality run marks this st
 
 - [Install and understand a run](https://standards-docs.netlify.app/quality/0-getting-started/setup/)
 
-[Complete `quality.json`
-reference](https://standards-docs.netlify.app/quality/2-configuration/quality-json/)
+[Complete `quality.json` reference](https://standards-docs.netlify.app/quality/2-configuration/quality-json/)
 
 - [CLI and CI workflows](https://standards-docs.netlify.app/quality/4-workflows/cli-and-ci/)
 - [Check behavior and autofix limits](https://standards-docs.netlify.app/quality/3-checks/check-reference/)
 - [Troubleshooting](https://standards-docs.netlify.app/quality/5-operations/troubleshooting/)
 
-The installed `quality.schema.json` provides editor validation. The [test README](test/README.md) describes the package's isolated test coverage.
+The installed `quality.schema.json` provides editor validation. The [test README](tests/README.md) describes the package's isolated test coverage.
 
 ## Configuration and security
 

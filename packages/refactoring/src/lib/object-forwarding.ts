@@ -35,8 +35,7 @@ HELPERS
  * @return `true` when the callee name indicates a payload boundary that should be ignored.
  */
 function isIgnoredCallee(expr: ts.Expression): boolean {
-	const text = expr.getText();
-	return /\.(?:insert|upsert|update|set|push|add|append|assign)$/.test(text);
+	return /\.(?:insert|upsert|update|set|push|add|append|assign)$/.test(expr.getText());
 }
 
 /**
@@ -49,6 +48,7 @@ function isIgnoredCallee(expr: ts.Expression): boolean {
  * @return Object-forwarding findings discovered in the file.
  */
 function findingsForFile(cfg: QualityCfg, file: string, analysis?: QualityAnalysis): ObjectForwardingFinding[] {
+	// terra-quality-ignore single-use -- Read source text before selecting a cached parse tree so analysis sees the current file.
 	const src = analysis?.texts.get(file) ?? readFileSync(file, 'utf8');
 	const parsed = analysis?.sources.get(file) ?? ts.createSourceFile(file, src, ts.ScriptTarget.Latest, true, sourceKind(file));
 	const findings: ObjectForwardingFinding[] = [];
@@ -74,12 +74,11 @@ function findingsForFile(cfg: QualityCfg, file: string, analysis?: QualityAnalys
 				for (const [srcName, properties] of bySrc) {
 					if (!properties.length) continue;
 					const pos = parsed.getLineAndCharacterOfPosition(argument.getStart(parsed));
-					const callee = node.expression.getText(parsed);
 					findings.push({
 						file: displayPath(cfg, file),
 						line: pos.line + 1,
 						column: pos.character + 1,
-						callee,
+						callee: node.expression.getText(parsed),
 						source: srcName,
 						properties,
 						recommendation: `remove exact properties already supplied by ...${srcName}`,
@@ -105,7 +104,7 @@ function findingsForFile(cfg: QualityCfg, file: string, analysis?: QualityAnalys
  * @return Object-forwarding errors.
  */
 export function objectForwardingFindings(cfg: QualityCfg, analysis?: QualityAnalysis): ObjectForwardingFinding[] {
-	return (analysis?.files ?? srcFiles(cfg)).flatMap((f) => findingsForFile(cfg, f, analysis));
+	return (analysis?.files ?? srcFiles(cfg)).flatMap(f => findingsForFile(cfg, f, analysis));
 }
 
 /**
@@ -123,6 +122,7 @@ export function fixObjectForwarding(cfg: QualityCfg, analysis?: QualityAnalysis)
 	for (const file of analysis?.files ?? srcFiles(cfg)) {
 		if (!/\.[cm]?(?:js|jsx|ts|tsx)$/.test(file)) continue;
 		const src = analysis?.texts.get(file) ?? readFileSync(file, 'utf8');
+		// terra-quality-ignore single-use -- Parse once before collecting candidate edits from this file.
 		const parsed = analysis?.sources.get(file) ?? ts.createSourceFile(file, src, ts.ScriptTarget.Latest, true, sourceKind(file));
 		const edits: Array<{ start: number; end: number }> = [];
 

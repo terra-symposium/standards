@@ -91,6 +91,6 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
 	render(): React.ReactNode {
 		if (!this.state.error) return this.props.children;
 		if (this.props.fallback) return this.props.fallback(this.state.error);
-		return <div role="alert">An unexpected error occurred while rendering this section.</div>;
+		return <div role='alert'>An unexpected error occurred while rendering this section.</div>;
 	}
 }

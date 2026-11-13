@@ -14,13 +14,29 @@ The CLI reads `quality.json` from the current working directory. Use `pnpm exec 
 The phase diagram makes the aggregate contract visible: select scope and checks, run in fixed phase order, then report all findings and the final status.
 
 <Nodes
-	direction="LR"
+	direction='LR'
 	nodes={[
-		{ id: 'scope', type: 'origin', data: { title: 'Select changed files or --all' } },
-		{ id: 'format', type: 'process', data: { title: 'Format and static checks' } },
+		{
+			id: 'scope',
+			type: 'origin',
+			data: { title: 'Select changed files or --all' },
+		},
+		{
+			id: 'format',
+			type: 'process',
+			data: { title: 'Format and static checks' },
+		},
 		{ id: 'tests', type: 'process', data: { title: 'Tests and type checks' } },
-		{ id: 'build', type: 'process', data: { title: 'Build and repository health' } },
-		{ id: 'report', type: 'terminal', data: { title: 'Findings and exit status' } },
+		{
+			id: 'build',
+			type: 'process',
+			data: { title: 'Build and repository health' },
+		},
+		{
+			id: 'report',
+			type: 'terminal',
+			data: { title: 'Findings and exit status' },
+		},
 	]}
 	edges={[
 		{ id: 'scope-format', source: 'scope', target: 'format' },
@@ -35,13 +51,13 @@ The phase diagram makes the aggregate contract visible: select scope and checks,
 
 File scope and write behavior are independent. The default scope is changed and untracked source files in the current Git worktree. `--all` expands the scope to every configured source file. Fixes are enabled by default; `--warn` disables them for that run.
 
-| Invocation                                                                            | Scope                       | Applies autofixes? | Runs configured commands? |
-| ------------------------------------------------------------------------------------- | --------------------------- | ------------------ | ------------------------- |
-| `pnpm exec terra-quality`                                                             | Changed and untracked files | Yes, when enabled  | Yes                       |
-| `pnpm exec terra-quality quality --warn`                                              | Changed and untracked files | No                 | Yes                       |
-| `pnpm exec terra-quality quality --all`                                               | All configured source files | Yes, when enabled  | Yes                       |
-| `pnpm exec terra-quality quality --all --warn`                                        | All configured source files | No                 | Yes                       |
-| `pnpm exec terra-quality quality --all --warn --skip-commands --skip-recommendations` | All configured source files | No                 | No                        |
+| Invocation                                                                     | Scope                       | Applies autofixes? | Runs configured commands? |
+| ------------------------------------------------------------------------------ | --------------------------- | ------------------ | ------------------------- |
+| `pnpm exec terra-quality`                                                      | Changed and untracked files | Yes, when enabled  | Yes                       |
+| `pnpm exec terra-quality quality --warn`                                       | Changed and untracked files | No                 | Yes                       |
+| `pnpm exec terra-quality quality --all`                                        | All configured source files | Yes, when enabled  | Yes                       |
+| `pnpm exec terra-quality quality --all`                                        | All configured source files | No                 | Yes                       |
+| `pnpm exec terra-quality quality --all --skip-commands --skip-recommendations` | All configured source files | No                 | No                        |
 
 Every naming finding fails the run. To disable one fixer for every run, set its entry under `autofix` to `false`. Commands and recommendations can also be selected by name in `quality.json`.
 
@@ -75,8 +91,7 @@ Terra Quality owns the full-run order: **Format → Static quality → Tests →
 
 In interactive terminals, each full-run check shows an animated spinner while work is in progress. After completion, its findings appear as a bullet list directly beneath its status.
 
-=== [Dead-code safety details]
-The dead-code phase keeps edits and verification separate. Safe fixes scan Knip import consumers, ESLint unused declarations, and single-use declarations/references, classify candidates, and apply only proven changes. Verification checks unused-file/export/dependency reachability, final ESLint and single-use findings, and TypeScript safety.
+=== [Dead-code safety details] The dead-code phase keeps edits and verification separate. Safe fixes scan Knip import consumers, ESLint unused declarations, and single-use declarations/references, classify candidates, and apply only proven changes. Verification checks unused-file/export/dependency reachability, final ESLint and single-use findings, and TypeScript safety.
 
 # All findings are listed in stable order and fail quality; later configured checks still run before the command returns failure.
 
@@ -101,10 +116,10 @@ Use one of these patterns:
 
 ```sh
 # Terra Quality owns the complete command set.
-pnpm exec terra-quality quality --all --warn
+pnpm exec terra-quality quality --all
 
 # Build and tests run in separate workflow steps.
-pnpm exec terra-quality quality --all --warn --skip-commands --skip-recommendations
+pnpm exec terra-quality quality --all --skip-commands --skip-recommendations
 ```
 
 Keep the package's source scope and native tool configuration consistent with the CI checkout. Do not rely on changed-file mode for a complete CI check.
@@ -115,7 +130,7 @@ Keep the package's source scope and native tool configuration consistent with th
 
 ```yaml
 - name: Terra Quality
-  run: pnpm exec terra-quality quality --all --warn --skip-commands --skip-recommendations --report-json terra-quality.json
+  run: pnpm exec terra-quality quality --all --skip-commands --skip-recommendations --report-json terra-quality.json
 
 - name: Tests
   if: always()

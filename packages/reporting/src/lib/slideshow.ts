@@ -124,7 +124,7 @@ const officeColor = (value: string): string => value.replace(/^#/, '').toUpperCa
 const hexColor = (channels: string): string =>
 	`#${channels
 		.split(' ')
-		.map((c) => Math.round(Number(c)).toString(16).padStart(2, '0'))
+		.map(c => Math.round(Number(c)).toString(16).padStart(2, '0'))
 		.join('')}`;
 /**
  * Creates the low-saturation report palette from Styling's shared hue generator.
@@ -226,9 +226,8 @@ const fitImg = (width: number, height: number, x: number, y: number, maxWidth: n
 const previewImg = async (file: string, viewportSize: string): Promise<{ data: string; height: number; width: number }> => {
 	const metadata = await sharp(file).metadata();
 	const width = metadata.width || 1;
-	const [viewportWidth, viewportHeight] = viewportSize.split('×').map((v) => Number.parseInt(v, 10));
-	const viewportPreviewHeight = viewportWidth && viewportHeight ? Math.round((width * viewportHeight) / viewportWidth) : Math.round(width / 0.38);
-	const height = Math.min(metadata.height || 1, Math.max(1, viewportPreviewHeight));
+	const [viewportWidth, viewportHeight] = viewportSize.split('×').map(v => Number.parseInt(v, 10));
+	const height = Math.min(metadata.height || 1, Math.max(1, viewportWidth && viewportHeight ? Math.round((width * viewportHeight) / viewportWidth) : Math.round(width / 0.38)));
 	return { data: `data:image/png;base64,${(await sharp(file).extract({ height, left: 0, top: 0, width }).png().toBuffer()).toString('base64')}`, height, width };
 };
 /**
@@ -260,14 +259,13 @@ const resultLoadGrade = (r: VisualResult): string => {
  */
 const slideCopy = (r: VisualResult, review: ImgReview): string => {
 	const grade = resultLoadGrade(r);
-	const measurements = r.loadMeasurements || [];
 	const lines = [
 		`${r.project} · ${r.viewport} · ${r.viewportSize}`,
 		r.groups || r.file,
 		`Status: ${r.status}${r.duration ? ` · ${r.duration} ms` : ''}${grade ? ` · Load: ${grade}` : ''}`,
-		...measurements.map((i) => `Load ${i.kind}: ${i.name} — ${i.durationMs.toFixed(1)} ms (${i.grade}; warn ${i.budget.warnMs} / fail ${i.budget.failMs} ms)`),
+		...(r.loadMeasurements || []).map(i => `Load ${i.kind}: ${i.name} — ${i.durationMs.toFixed(1)} ms (${i.grade}; warn ${i.budget.warnMs} / fail ${i.budget.failMs} ms)`),
 		'',
-		...review.cues.map((c) => `• ${c}`),
+		...review.cues.map(c => `• ${c}`),
 	];
 	if (r.error) lines.push('', `Test error: ${r.error}`);
 	if (r.browserErrors) lines.push('', `Browser: ${r.browserErrors}`);
@@ -308,9 +306,8 @@ const addResponsiveSlide = async (presentation: Presentation, group: readonly Vi
 	const width = (12.55 - gap * (cols - 1)) / cols;
 	const height = (5.86 - gap * (rows - 1)) / rows;
 	for (const [idx, r] of group.entries()) {
-		const row = Math.floor(idx / cols);
 		const x = 0.38 + (idx % cols) * (width + gap);
-		const y = 1.22 + row * (height + gap);
+		const y = 1.22 + Math.floor(idx / cols) * (height + gap);
 		slide.addShape(presentation.ShapeType.roundRect, { fill: { color: colors.surface }, line: { color: colors.line, width: 1 }, x, y, w: width, h: height, rectRadius: 0.04 });
 		const loadGrade = resultLoadGrade(r);
 		slide.addText(`${r.viewport} · ${r.viewportSize} · ${r.status}${loadGrade ? ` · Load ${loadGrade}` : ''}`, {
@@ -324,6 +321,7 @@ const addResponsiveSlide = async (presentation: Presentation, group: readonly Vi
 			h: 0.2,
 		});
 		if (r.screenshot && fs.existsSync(r.screenshot)) {
+			// terra-quality-ignore single-use -- Finish screenshot review before loading the preview image.
 			const review = await reviewImg(r.screenshot, r);
 			const preview = await previewImg(r.screenshot, r.viewportSize);
 			slide.addImage({ data: preview.data, ...fitImg(preview.width, preview.height, x + 0.08, y + 0.38, width - 0.16, height - 0.46) });
@@ -361,7 +359,7 @@ export const readScreenshotCapturesFromDirectory = (dir: string, currentRunId?: 
 		if (currentRunIds.has(run.runId) && Array.isArray(run.expectedCaptureGroups))
 			currentCaptureGroups = new Map(
 				run.expectedCaptureGroups
-					.filter((i) => i && typeof i.group === 'string' && Array.isArray(i.viewports) && i.viewports.every((viewport) => typeof viewport === 'string'))
+					.filter(i => i && typeof i.group === 'string' && Array.isArray(i.viewports) && i.viewports.every(viewport => typeof viewport === 'string'))
 					.map(({ group: g, viewports: v }) => [g, new Set(v)]),
 			);
 	} catch {
@@ -386,7 +384,7 @@ export const readScreenshotCapturesFromDirectory = (dir: string, currentRunId?: 
 			const viewport = capture.viewport;
 			const screenshot = path.isAbsolute(capture.screenshot)
 				? capture.screenshot
-				: [path.resolve(dir, capture.screenshot), path.resolve(capture.screenshot)].find((candidate) => fs.existsSync(candidate));
+				: [path.resolve(dir, capture.screenshot), path.resolve(capture.screenshot)].find(candidate => fs.existsSync(candidate));
 			if (!screenshot || !fs.existsSync(screenshot)) return [];
 			const captureRunId = typeof capture.runId === 'string' ? capture.runId : undefined;
 			const currentTest =
@@ -415,6 +413,7 @@ export const readScreenshotCapturesFromDirectory = (dir: string, currentRunId?: 
 		}
 	});
 };
+// terra-quality-ignore single-use -- Keep the documented addLoadSummarySlide declaration so its parameter and return contract remains attached.
 /**
  * Adds a run-level load summary slide and names the slowest measurements.
  *
@@ -423,7 +422,7 @@ export const readScreenshotCapturesFromDirectory = (dir: string, currentRunId?: 
  * @param colors Palette used for the summary slide's background and text.
  */
 const addLoadSummarySlide = (presentation: Presentation, results: readonly VisualResult[], colors: ReportColors): void => {
-	const measurements: LoadRow[] = results.flatMap((r) => (r.loadMeasurements || []).map((measurement) => ({ result: r, measurement })));
+	const measurements: LoadRow[] = results.flatMap(r => (r.loadMeasurements || []).map(measurement => ({ result: r, measurement })));
 	const counts = loadGradeCounts(measurements.map(({ measurement: m }) => m));
 	const slowest = [...measurements].sort((a, b) => b.measurement.durationMs - a.measurement.durationMs).slice(0, 6);
 	const slide = presentation.addSlide();
@@ -446,6 +445,7 @@ const addLoadSummarySlide = (presentation: Presentation, results: readonly Visua
 		{ color: colors.ink, fontFace: 'Authentic Sans', fontSize: 13, fit: 'shrink', margin: 0.08, valign: 'mid', x: 0.58, y: 2.05, w: 12.1, h: 4.3 },
 	);
 };
+// terra-quality-ignore single-use -- Keep the documented addLoadDetailSlides declaration so its parameter and return contract remains attached.
 /**
  * Adds paginated slides containing every individual test, page, and operation measurement.
  *
@@ -456,10 +456,11 @@ const addLoadSummarySlide = (presentation: Presentation, results: readonly Visua
  * @return Number of detail slides added.
  */
 const addLoadDetailSlides = (presentation: Presentation, results: readonly VisualResult[], colors: ReportColors): number => {
-	const measurements: LoadRow[] = results.flatMap((r) => (r.loadMeasurements || []).map((measurement) => ({ result: r, measurement })));
+	const measurements: LoadRow[] = results.flatMap(r => (r.loadMeasurements || []).map(measurement => ({ result: r, measurement })));
 	const pageSize = 12;
 	const pages = Math.max(1, Math.ceil(measurements.length / pageSize));
 	for (let page = 0; page < pages; page += 1) {
+		// terra-quality-ignore single-use -- Render measurement text before adding a slide so formatting errors leave the deck unchanged.
 		const lines = measurements
 			.slice(page * pageSize, (page + 1) * pageSize)
 			.map(
@@ -494,7 +495,7 @@ const addLoadDetailSlides = (presentation: Presentation, results: readonly Visua
  * @return A promise that resolves after the slideshow has been written.
  */
 export const writeSlideshow = async (file: string, results: readonly VisualResult[], opts: SlideshowOptions = {}): Promise<void> => {
-	const loadEnabled = opts.loadTestingEnabled ?? results.some((r) => !!r.loadMeasurements?.length);
+	const loadEnabled = opts.loadTestingEnabled ?? results.some(r => !!r.loadMeasurements?.length);
 	const brand = createDocumentBrand();
 	const colors = reportColors(brand);
 	const presentation = new /* The runtime package is CommonJS while NodeNext exposes its constructor through a namespace type. */ (require('pptxgenjs') as new () => Presentation)();
@@ -580,9 +581,9 @@ export const writeScreenshotSlideshow = async (file: string, captures: readonly 
 		const byViewport = new Map<string, ScreenshotCapture>();
 		for (const capture of group) {
 			const previous = byViewport.get(capture.viewport);
-			const sameRun = previous && capture.runId === previous.runId;
 			const isNewer = (Date.parse(capture.capturedAt || '') || 0) >= (Date.parse(previous?.capturedAt || '') || 0);
-			if (!previous || (sameRun ? (capture.retry || 0) > (previous.retry || 0) || ((capture.retry || 0) === (previous.retry || 0) && isNewer) : isNewer)) byViewport.set(capture.viewport, capture);
+			if (!previous || (capture.runId === previous.runId ? (capture.retry || 0) > (previous.retry || 0) || ((capture.retry || 0) === (previous.retry || 0) && isNewer) : isNewer))
+				byViewport.set(capture.viewport, capture);
 		}
 		const ordered = [...byViewport.values()].sort((f, s) => {
 			const firstIndex = knownViewports.indexOf(f.viewport);
@@ -609,7 +610,6 @@ export const writeScreenshotSlideshow = async (file: string, captures: readonly 
 		});
 		for (const [index, capture] of ordered.entries()) {
 			if (!fs.existsSync(capture.screenshot)) throw new Error(`Screenshot is missing for ${capture.key} (${capture.viewport}): ${capture.screenshot}`);
-			const row = Math.floor(index / cols);
 			const { data, info } = await sharp(capture.screenshot)
 				.rotate()
 				.resize({ width: 720, height: 405, fit: 'inside', withoutEnlargement: true })
@@ -617,7 +617,7 @@ export const writeScreenshotSlideshow = async (file: string, captures: readonly 
 				.toBuffer({ resolveWithObject: true });
 			slide.addImage({
 				data: `data:image/jpeg;base64,${data.toString('base64')}`,
-				...fitImg(info.width, info.height, margin + (index % cols) * (cellWidth + gap), margin + 0.22 + row * (cellHeight + gap), cellWidth, cellHeight),
+				...fitImg(info.width, info.height, margin + (index % cols) * (cellWidth + gap), margin + 0.22 + Math.floor(index / cols) * (cellHeight + gap), cellWidth, cellHeight),
 			});
 		}
 	}
@@ -625,6 +625,7 @@ export const writeScreenshotSlideshow = async (file: string, captures: readonly 
 	await presentation.writeFile({ fileName: file });
 	await neutralizeApplicationMetadata(file);
 };
+// terra-quality-ignore single-use -- Keep the documented readScreenshotCapturesFromDirTree declaration so its parameter and return contract remains attached.
 /**
  * Reads current and historical screenshots beneath a folder, with stable source names for multi-repository reports.
  *
@@ -653,25 +654,26 @@ const readScreenshotCapturesFromDirTree = (root: string, opts: ScreenshotSlidesh
 		const sourcePath = path.relative(root, dir);
 		const sourceName = sourcePath ? sourcePath.split(path.sep)[0] : '';
 		const prefix = sourceName ? `${sourceName} · ` : '';
-		const local = readScreenshotCapturesFromDirectory(dir, isRoot ? opts.currentRunId : opts.currentRunIdsBySource?.[sourceName]).map((c) => ({
-			...c,
-			group: `${prefix}${c.group}`,
-			key: sourceName ? `${sourceName}:${c.key}` : c.key,
-			title: `${prefix}${c.title}`,
-		}));
-		const nested = entries
-			.filter((e) => !['.git', 'node_modules'].includes(e.name))
-			.filter((e) => e.isDirectory() || e.isSymbolicLink())
-			.sort((f, s) => f.name.localeCompare(s.name))
-			.flatMap((e) => {
-				const child = path.join(dir, e.name);
-				try {
-					return fs.statSync(child).isDirectory() ? read(child) : [];
-				} catch {
-					return [];
-				}
-			});
-		return [...local, ...nested];
+		return [
+			...readScreenshotCapturesFromDirectory(dir, isRoot ? opts.currentRunId : opts.currentRunIdsBySource?.[sourceName]).map(c => ({
+				...c,
+				group: `${prefix}${c.group}`,
+				key: sourceName ? `${sourceName}:${c.key}` : c.key,
+				title: `${prefix}${c.title}`,
+			})),
+			...entries
+				.filter(e => !['.git', 'node_modules'].includes(e.name))
+				.filter(e => e.isDirectory() || e.isSymbolicLink())
+				.sort((f, s) => f.name.localeCompare(s.name))
+				.flatMap(e => {
+					const child = path.join(dir, e.name);
+					try {
+						return fs.statSync(child).isDirectory() ? read(child) : [];
+					} catch {
+						return [];
+					}
+				}),
+		];
 	};
 	return read(root);
 };
@@ -683,10 +685,9 @@ const readScreenshotCapturesFromDirTree = (root: string, opts: ScreenshotSlidesh
  * @param opts Presentation metadata and optional run selection.
  */
 export const writeScreenshotSlideshowFromDirectory = async (dir: string, file: string, opts: ScreenshotSlideshowOptions = {}): Promise<void> => {
-	const captures = readScreenshotCapturesFromDirTree(dir, opts).filter((c) => {
+	const captures = readScreenshotCapturesFromDirTree(dir, opts).filter(c => {
 		if (opts.currentRunId) return c.runId === opts.currentRunId && !c.historical;
-		const sourceName = c.group.includes(' · ') ? c.group.slice(0, c.group.indexOf(' · ')) : '';
-		const currentRunIds = opts.currentRunIdsBySource?.[sourceName];
+		const currentRunIds = opts.currentRunIdsBySource?.[c.group.includes(' · ') ? c.group.slice(0, c.group.indexOf(' · ')) : ''];
 		const selectedRunIds = typeof currentRunIds === 'string' ? [currentRunIds] : currentRunIds;
 		return !selectedRunIds?.length || (c.runId !== undefined && selectedRunIds.includes(c.runId) && !c.historical);
 	});
@@ -700,10 +701,13 @@ export const writeScreenshotSlideshowFromDirectory = async (dir: string, file: s
  * @param opts Presentation metadata applied to the aggregate deck.
  */
 export const writeScreenshotSlideshowFromDirectories = async (file: string, sources: readonly ScreenshotDirectorySource[], opts: ScreenshotSlideshowOptions = {}): Promise<void> => {
-	const captures = sources.flatMap(({ label: l, directory: d, runId: r }) =>
-		readScreenshotCapturesFromDirectory(d, r)
-			.filter((capture) => !r || capture.runId === r)
-			.map((capture) => ({ ...capture, group: `${l}/${capture.group}`, key: `${l}/${capture.key}`, title: `${l} · ${capture.title}` })),
+	await writeScreenshotSlideshow(
+		file,
+		sources.flatMap(({ label: l, directory: d, runId: r }) =>
+			readScreenshotCapturesFromDirectory(d, r)
+				.filter(capture => !r || capture.runId === r)
+				.map(capture => ({ ...capture, group: `${l}/${capture.group}`, key: `${l}/${capture.key}`, title: `${l} · ${capture.title}` })),
+		),
+		opts,
 	);
-	await writeScreenshotSlideshow(file, captures, opts);
 };

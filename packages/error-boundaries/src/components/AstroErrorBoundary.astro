@@ -6,16 +6,12 @@ type Props = {
 	reloadLabel?: string;
 };
 
-const {
-	title = 'This section could not load',
-	description = 'The interactive interface failed to start. The error has been recorded for diagnosis.',
-	reloadLabel = 'Reload page',
-} = Astro.props;
+const { title = 'This section could not load', description = 'The interactive interface failed to start. The error has been recorded for diagnosis.', reloadLabel = 'Reload page' } = Astro.props;
 ---
 
 <terra-error-boundary data-terra-error-boundary>
 	<slot />
-	<section class="terra-error-boundary-fallback" data-terra-hydration-fallback hidden role="alert">
+	<section class='terra-error-boundary-fallback' data-terra-hydration-fallback hidden role='alert'>
 		<div>
 			<h1>{title}</h1>
 			<p>{description}</p>
@@ -26,7 +22,7 @@ const {
 
 <script is:inline>
 	(() => {
-		document.addEventListener('astro:hydration-error', (event) => {
+		document.addEventListener('astro:hydration-error', event => {
 			if (event.defaultPrevented) return;
 			const island = event.target;
 			if (!(island instanceof Element)) return;

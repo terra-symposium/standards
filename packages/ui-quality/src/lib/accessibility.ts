@@ -46,8 +46,11 @@ CONSTANTS
 //////////////////////////////////////////////////*/
 
 const JSX_EXTS = /\.(?:jsx|tsx|js|ts)$/i;
+// terra-quality-ignore single-use -- Reuse the native labelable set across every inspected JSX element.
 const NATIVE_LABELABLE = new Set(['button', 'input', 'select', 'textarea']);
+// terra-quality-ignore single-use -- Reuse the input button type set across every inspected JSX element.
 const INPUT_BUTTON_TYPES = new Set(['button', 'submit', 'reset']);
+// terra-quality-ignore single-use -- Reuse the interactive role set across every inspected JSX element.
 const INTERACTIVE_ROLES = new Set([
 	'button',
 	'checkbox',
@@ -75,6 +78,7 @@ const INTERACTIVE_NATIVE = new Set(['button', 'input', 'select', 'textarea', 'su
 HELPERS
 //////////////////////////////////////////////////*/
 
+// terra-quality-ignore single-use -- Keep the documented scriptKind declaration so its parameter and return contract remains attached.
 /**
  * Selects a TypeScript parser mode for a JSX-capable source path.
  *
@@ -186,6 +190,7 @@ function meaningful(value: string): boolean {
 	return value.replace(/[\s\u00a0\u200b\ufeff]/g, '').replace(/&(?:nbsp|#0*160|#x0*a0);/gi, '').length > 0;
 }
 
+// terra-quality-ignore single-use -- Keep the documented hiddenAttrState declaration so its parameter and return contract remains attached.
 /**
  * Returns whether the HTML hidden attribute is present, false, or uncertain.
  *
@@ -258,7 +263,7 @@ function combine(states: NameState[]): NameState {
 function contentState(element: ElementRef, forLabel = false): NameState {
 	const children = childrenOf(element);
 	if (!children.length) return 'empty';
-	return combine(children.map((c) => childContentState(c, forLabel)));
+	return combine(children.map(c => childContentState(c, forLabel)));
 }
 
 /**
@@ -280,7 +285,7 @@ function childContentState(child: ts.JsxChild, forLabel: boolean): NameState {
 	}
 	if (ts.isJsxElement(child)) return elementContentState(child, forLabel);
 	if (ts.isJsxSelfClosingElement(child)) return elementContentState(child, forLabel);
-	if (ts.isJsxFragment(child)) return combine(child.children.map((n) => childContentState(n, forLabel)));
+	if (ts.isJsxFragment(child)) return combine(child.children.map(n => childContentState(n, forLabel)));
 	return 'unknown';
 }
 
@@ -327,6 +332,7 @@ function ariaNameState(element: ElementRef): NameState {
 	return 'empty';
 }
 
+// terra-quality-ignore single-use -- Keep the documented idContentStates declaration so its parameter and return contract remains attached.
 /**
  * Builds conservative source evidence for literal JSX ids and their referenced text.
  *
@@ -357,7 +363,7 @@ function idContentStates(source: ts.SourceFile): Map<string, NameState> {
 								return alt.state === 'static' ? 'named' : alt.state === 'unknown' ? 'unknown' : 'empty';
 							}
 							if (staticAttr(attrOf(element, 'aria-labelledby')).state !== 'empty') return 'unknown';
-							return combine(childrenOf(element).map((c) => childContentState(c, false)));
+							return combine(childrenOf(element).map(c => childContentState(c, false)));
 						})(node),
 					);
 			}
@@ -369,6 +375,7 @@ function idContentStates(source: ts.SourceFile): Map<string, NameState> {
 	return ids;
 }
 
+// terra-quality-ignore single-use -- Keep the documented associatedLabels declaration so its parameter and return contract remains attached.
 /**
  * Finds labels associated by a literal id and records whether each label has meaningful text.
  *
@@ -391,13 +398,15 @@ function associatedLabels(source: ts.SourceFile): Map<string, NameState> {
 				}
 			}
 		}
+		// terra-quality-ignore single-use -- Compute inherited hidden state once before visiting each child.
 		const currentHidden = hidden || ((ts.isJsxElement(node) || ts.isJsxSelfClosingElement(node)) && hiddenState(node) !== 'empty');
-		ts.forEachChild(node, (c) => visit(c, currentHidden));
+		ts.forEachChild(node, c => visit(c, currentHidden));
 	};
 	visit(source, false);
 	return labels;
 }
 
+// terra-quality-ignore single-use -- Keep the documented elementNameState declaration so its parameter and return contract remains attached.
 /**
  * Returns accessible-name evidence for one control, including nested and id-associated labels.
  *
@@ -469,12 +478,15 @@ function decorativeIcons(element: ElementRef): ElementRef[] {
 		}
 		const tag = tagOf(node);
 		if (tag === 'svg') {
-			const role = staticAttr(attrOf(node, 'role'));
-			const ownName = ariaNameState(node);
-			const title = literalTitle(attrOf(node, 'title'));
-			const hidden = hiddenState(node);
-			const hasUncertainAttrs = attrsOf(node).properties.some(ts.isJsxSpreadAttribute) || ['focusable', 'tabIndex'].some((n) => attrOf(node, n));
-			if (role.state === 'empty' && ownName === 'empty' && title.state === 'empty' && contentState(node) === 'empty' && hidden === 'empty' && !hasUncertainAttrs) icons.push(node);
+			if (
+				staticAttr(attrOf(node, 'role')).state === 'empty' &&
+				ariaNameState(node) === 'empty' &&
+				literalTitle(attrOf(node, 'title')).state === 'empty' &&
+				contentState(node) === 'empty' &&
+				hiddenState(node) === 'empty' &&
+				!(attrsOf(node).properties.some(ts.isJsxSpreadAttribute) || ['focusable', 'tabIndex'].some(n => attrOf(node, n)))
+			)
+				icons.push(node);
 			return;
 		}
 		if (!A_Z_A_Z_D_REGEX.test(tag) || hiddenState(node) !== 'empty') return;
@@ -495,7 +507,9 @@ function decorativeIcons(element: ElementRef): ElementRef[] {
  */
 function inspectFile(cfg: QualityCfg, file: string, parsed: ts.SourceFile): { findings: AccessibilityFinding[]; candidates: NameCandidate[]; decorativeCandidates: DecorativeIconCandidate[] } {
 	if ((parsed as ts.SourceFile & { parseDiagnostics?: readonly ts.Diagnostic[] }).parseDiagnostics?.length) return { findings: [], candidates: [], decorativeCandidates: [] };
+	// terra-quality-ignore single-use -- Build the label map once before the JSX visitor looks up each element.
 	const labels = associatedLabels(parsed);
+	// terra-quality-ignore single-use -- Build the ID map once before the JSX visitor resolves labelled-by references.
 	const ids = idContentStates(parsed);
 	const findings: AccessibilityFinding[] = [];
 	const candidates: NameCandidate[] = [];
@@ -503,11 +517,11 @@ function inspectFile(cfg: QualityCfg, file: string, parsed: ts.SourceFile): { fi
 
 	const visit = (node: ts.Node, hidden: boolean, nestedLabel: NameState): void => {
 		if (ts.isJsxElement(node) || ts.isJsxSelfClosingElement(node)) {
+			// terra-quality-ignore single-use -- Inspect this element even when an ancestor is already hidden.
 			const elementHidden = hiddenState(node);
 			const currentHidden = hidden || elementHidden !== 'empty';
-			const tag = tagOf(node);
 			let childLabel = nestedLabel;
-			if (tag === 'label') childLabel = contentState(node, true);
+			if (tagOf(node) === 'label') childLabel = contentState(node, true);
 			const kind = (function targetKind(element: ElementRef): { element: string; labelable: boolean } | undefined {
 				const tag = tagOf(element);
 				if (A_Z_A_Z_D_REGEX.test(tag) && (INTERACTIVE_NATIVE.has(tag) || tag === 'progress')) {
@@ -532,24 +546,28 @@ function inspectFile(cfg: QualityCfg, file: string, parsed: ts.SourceFile): { fi
 								if (value.state !== 'static') return value.state;
 								const references = value.value.trim().split(/\s+/).filter(Boolean);
 								if (!references.length) return 'empty';
-								return combine(references.map((i) => ids.get(i) ?? 'empty'));
+								return combine(references.map(i => ids.get(i) ?? 'empty'));
 							})(node, ids)
 						: ariaLabel;
 				const name = ariaName === 'empty' ? elementNameState(node, kind, labels, nestedLabel) : { state: ariaName, iconOnly: false };
 				if (name.state === 'empty') {
 					const titleCanFix = name.title?.state === 'static' && name.iconOnly;
 					const position = parsed.getLineAndCharacterOfPosition(node.getStart(parsed));
-					const message = titleCanFix
-						? `${kind.element} has no accessible name; copy its non-empty title into aria-label.`
-						: `${kind.element} has no accessible name; add static text, an ARIA name, or an associated label.`;
-					findings.push({ file: displayPath(cfg, file), line: position.line + 1, column: position.character + 1, element: kind.element, message, fixable: titleCanFix });
+					findings.push({
+						file: displayPath(cfg, file),
+						line: position.line + 1,
+						column: position.character + 1,
+						element: kind.element,
+						message: titleCanFix
+							? `${kind.element} has no accessible name; copy its non-empty title into aria-label.`
+							: `${kind.element} has no accessible name; add static text, an ARIA name, or an associated label.`,
+						fixable: titleCanFix,
+					});
 					if (name.title?.state === 'static') {
-						const opening = ts.isJsxElement(node) ? node.openingElement : node;
-						candidates.push({ parsed, opening, title: name.title, emptyAriaLabel: name.emptyAriaLabel });
+						candidates.push({ parsed, opening: ts.isJsxElement(node) ? node.openingElement : node, title: name.title, emptyAriaLabel: name.emptyAriaLabel });
 					}
 				} else if (name.state === 'named') {
 					for (const icon of decorativeIcons(node)) {
-						const opening = ts.isJsxElement(icon) ? icon.openingElement : icon;
 						const position = parsed.getLineAndCharacterOfPosition(icon.getStart(parsed));
 						findings.push({
 							file: displayPath(cfg, file),
@@ -559,14 +577,14 @@ function inspectFile(cfg: QualityCfg, file: string, parsed: ts.SourceFile): { fi
 							message: 'Decorative SVG inside an already named control is exposed to assistive technology; add aria-hidden="true".',
 							fixable: true,
 						});
-						decorativeCandidates.push({ parsed, opening });
+						decorativeCandidates.push({ parsed, opening: ts.isJsxElement(icon) ? icon.openingElement : icon });
 					}
 				}
 			}
-			ts.forEachChild(node, (c) => visit(c, currentHidden, childLabel));
+			ts.forEachChild(node, c => visit(c, currentHidden, childLabel));
 			return;
 		}
-		ts.forEachChild(node, (c) => visit(c, hidden, nestedLabel));
+		ts.forEachChild(node, c => visit(c, hidden, nestedLabel));
 	};
 	visit(parsed, false, 'empty');
 	return { findings, candidates, decorativeCandidates };
@@ -581,7 +599,7 @@ function inspectFile(cfg: QualityCfg, file: string, parsed: ts.SourceFile): { fi
  * @return Configured source files whose extensions support JSX parsing.
  */
 function sourceFiles(cfg: QualityCfg, analysis?: QualityAnalysis): string[] {
-	return (analysis?.files ?? srcFiles(cfg)).filter((f) => JSX_EXTS.test(f));
+	return (analysis?.files ?? srcFiles(cfg)).filter(f => JSX_EXTS.test(f));
 }
 
 /**
@@ -611,7 +629,7 @@ PUBLIC API
  * @return Accessible-name findings with a flag for title-based fixes that can be applied safely.
  */
 export function accessibilityFindings(cfg: QualityCfg, analysis?: QualityAnalysis): AccessibilityFinding[] {
-	return sourceFiles(cfg, analysis).flatMap((f) => {
+	return sourceFiles(cfg, analysis).flatMap(f => {
 		const { parsed } = sourceFor(f, analysis);
 		return inspectFile(cfg, f, parsed).findings;
 	});
@@ -631,7 +649,7 @@ export function fixAccessibleNames(cfg: QualityCfg): { fixed: number } {
 		const { text, parsed } = sourceFor(file);
 		const { candidates, decorativeCandidates } = inspectFile(cfg, file, parsed);
 		if (!candidates.length && !decorativeCandidates.length) continue;
-		const edits: { start: number; end: number; text: string }[] = candidates.map((c) => {
+		const edits: { start: number; end: number; text: string }[] = candidates.map(c => {
 			const text = `aria-label=${c.title.source}`;
 			if (c.emptyAriaLabel) return { start: c.emptyAriaLabel.getStart(c.parsed), end: c.emptyAriaLabel.end, text };
 			const attrs = c.opening.attributes;

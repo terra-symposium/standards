@@ -11,7 +11,7 @@ Keep the callback synchronous, bounded, and nonthrowing. Map the captured failur
 
 ```tsx
 <ErrorBoundary
-	name="Search results"
+	name='Search results'
 	onError={(error, { name, componentStack }) => {
 		telemetry.captureException(error, {
 			boundary: name,
@@ -31,18 +31,16 @@ Treat both the Error and component stack as untrusted values. Depending on sourc
 
 ||| [Package callback]
 
-For a consumer application, apply consent, redaction, sampling, access control, and retention before sending error content to a provider. Group incidents by stable fingerprints or boundary plus release, not by raw message alone.
-|||
+For a consumer application, apply consent, redaction, sampling, access control, and retention before sending error content to a provider. Group incidents by stable fingerprints or boundary plus release, not by raw message alone. |||
 
 ||| [Terra Website adapter]
 
-The Website logs locally and sends only category, component, and sanitized route to its Astro collector. Server code validates the payload and derives build and environment metadata; raw message and component stack are not persisted in Error Analysis.
-|||
+The Website logs locally and sends only category, component, and sanitized route to its Astro collector. Server code validates the payload and derives build and environment metadata; raw message and component stack are not persisted in Error Analysis. |||
 
 The event path below is specific to the Terra Website, not behavior implemented by the shared boundary package.
 
 <Nodes
-	direction="LR"
+	direction='LR'
 	nodes={[
 		{ id: 'boundary', type: 'origin', data: { title: 'React boundary' } },
 		{ id: 'callback', type: 'process', data: { title: 'Application onError' } },

@@ -70,6 +70,7 @@ function key(): Buffer {
 function encrypt(value: string): string {
 	const iv = randomBytes(12);
 	const cipher = createCipheriv('aes-256-gcm', key(), iv);
+	// terra-quality-ignore single-use -- Finish encryption before assembling the IV, tag, and ciphertext buffer.
 	const data = Buffer.concat([cipher.update(value, 'utf8'), cipher.final()]);
 	return Buffer.concat([iv, cipher.getAuthTag(), data]).toString('base64url');
 }
@@ -101,11 +102,12 @@ function sessionToken(request: Request): string | undefined {
 	return request.headers
 		.get('cookie')
 		?.split(';')
-		.map((p) => p.trim())
-		.find((p) => p.startsWith(`${COOKIE}=`))
+		.map(p => p.trim())
+		.find(p => p.startsWith(`${COOKIE}=`))
 		?.slice(COOKIE.length + 1);
 }
 
+// terra-quality-ignore single-use -- Keep the documented session-creation function exported for other server entry points.
 /**
  * Creates a random session token and stores its hash and encrypted GitHub credentials.
  *
@@ -173,6 +175,7 @@ export async function session(request: Request): Promise<Session | null> {
 	return { github_user_id: Number(row.github_user_id), github_login: row.github_login, access_token: accessToken };
 }
 
+// terra-quality-ignore single-use -- Keep session removal exported as a server API even when this repository has one caller.
 /**
  * Deletes the current session from the database when its cookie contains a token.
  *
@@ -195,6 +198,7 @@ export async function canReadRepository(user: Session, repo: { owner: string; na
 	return repositoryAdmin(repo.owner, repo.name, user.github_login, user.access_token);
 }
 
+// terra-quality-ignore single-use -- Keep constant-time comparison exported as the authentication API boundary.
 /**
  * Compares secret strings without returning early for matching prefixes.
  *

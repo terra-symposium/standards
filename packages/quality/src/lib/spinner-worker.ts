@@ -18,6 +18,7 @@ CONFIG
 const { label, sharedBuffer } = workerData as { label: string; sharedBuffer: SharedArrayBuffer };
 const state = new Int32Array(sharedBuffer);
 const frames = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
+// terra-quality-ignore single-use -- This counter must persist across draw calls to advance the spinner.
 let frame = 0;
 /** Draws spinner frames until the parent worker signals completion. */
 function draw(): void {

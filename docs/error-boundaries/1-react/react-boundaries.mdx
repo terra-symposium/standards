@@ -21,14 +21,14 @@ The fallback should identify the user-facing problem and offer only an action th
 import { ErrorBoundary } from '@terra-symposium/standards-error-boundaries/react';
 
 <ErrorBoundary
-	name="Usage report"
+	name='Usage report'
 	resetKey={workspaceId}
 	onError={(error, context) => reportBoundaryError(error, context)}
 	fallback={() => (
-		<section role="alert" aria-labelledby="usage-error-title">
-			<h2 id="usage-error-title">Usage data could not be shown</h2>
+		<section role='alert' aria-labelledby='usage-error-title'>
+			<h2 id='usage-error-title'>Usage data could not be shown</h2>
 			<p>Your workspace and other reports are still available.</p>
-			<button onClick={reloadUsage} type="button">
+			<button onClick={reloadUsage} type='button'>
 				Retry this report
 			</button>
 		</section>
@@ -41,7 +41,7 @@ import { ErrorBoundary } from '@terra-symposium/standards-error-boundaries/react
 The diagram traces the render path. A successful child render stays in place; a caught error switches only that boundary to its fallback and invokes the application callback.
 
 <Nodes
-	direction="LR"
+	direction='LR'
 	nodes={[
 		{ id: 'children', type: 'origin', data: { title: 'Render descendants' } },
 		{ id: 'success', type: 'process', data: { title: 'Render normally' } },
@@ -85,8 +85,7 @@ Have the fallback call an application action that changes the key or input passe
 
 The package root re-exports the React API. Prefer the explicit `/react` subpath in application components.
 
-=== [What React does not catch]
-React boundaries catch descendant render, constructor, and lifecycle failures. React also documents errors thrown inside a `startTransition` action as boundary-caught. They do not catch ordinary event-handler exceptions, most asynchronous callbacks such as timers, server-rendering failures, errors in the boundary itself, or failures before React starts.
+=== [What React does not catch] React boundaries catch descendant render, constructor, and lifecycle failures. React also documents errors thrown inside a `startTransition` action as boundary-caught. They do not catch ordinary event-handler exceptions, most asynchronous callbacks such as timers, server-rendering failures, errors in the boundary itself, or failures before React starts.
 
 # Use normal `try`/`catch` and rejected-promise handling for imperative work. Add browser coverage for the user-visible fallback and verify that an independent sibling remains available.
 

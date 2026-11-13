@@ -17,6 +17,7 @@ import { errorStatusCopy } from '@terra-symposium/standards-error-boundaries/ast
 
 const { title, description } = errorStatusCopy(Astro.response.status);
 ---
+
 <main>
 	<h1>{title}</h1>
 	<p>{description}</p>
@@ -39,7 +40,7 @@ import type { NextRouteErrorProps } from '@terra-symposium/standards-error-bound
 
 export default function ErrorPage({ error }: NextRouteErrorProps) {
 	const digest = errorDigest(error);
-	return <p role="alert">Reference: {digest ?? 'unavailable'}</p>;
+	return <p role='alert'>Reference: {digest ?? 'unavailable'}</p>;
 }
 ```
 

@@ -28,7 +28,9 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: uv sync --locked --group dev
       - name: Verify full-repository quality
-        run: pnpm run quality --all --warn
+        run: pnpm run quality:all
+      - name: Require committed Quality fixes
+        run: git diff --exit-code
       - run: pnpm --filter @terra-symposium/standards-quality test
       - uses: changesets/action@v2
         with:

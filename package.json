@@ -5,11 +5,15 @@
 	"scripts": {
 		"build": "pnpm --dir config run build",
 		"test": "pnpm --dir config run test",
-		"quality": "pnpm --dir config run quality",
-		"quality:fix": "pnpm --dir config run quality:fix",
-		"quality:check": "pnpm --dir config run quality:check",
+		"quality:all": "node \"$(git rev-parse --show-toplevel)/scripts/quality-runner.mjs\" quality --all",
+		"quality": "node \"$(git rev-parse --show-toplevel)/scripts/quality-runner.mjs\" quality",
+		"health:github": "node \"$(git rev-parse --show-toplevel)/scripts/quality-runner.mjs\" github",
 		"docs": "pnpm --dir config run docs",
 		"docs:build": "pnpm --dir config run docs:build",
-		"prepare": "pnpm --dir config run prepare"
+		"prepare": "pnpm --dir config run prepare",
+		"verify": "pnpm run quality:all && pnpm run test && pnpm run build && pnpm run docs:build"
+	},
+	"devDependencies": {
+		"prettier-plugin-astro": "^1.1.2"
 	}
 }
