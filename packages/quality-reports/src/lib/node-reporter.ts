@@ -187,6 +187,7 @@ export async function* qualityNodeReporter(src: AsyncIterable<NodeTestE>, opts?:
 		const data = e.data;
 		if (isFileSuite(data)) continue;
 		const details = data?.details;
+		// terra-quality-ignore single-use -- Classify the event before identity and pending-state updates.
 		const isSuite = details?.type === 'suite' || data?.type === 'suite';
 		const terminalKey = identity(data, true);
 		if (seenTerminal.has(terminalKey)) continue;
@@ -204,17 +205,18 @@ export async function* qualityNodeReporter(src: AsyncIterable<NodeTestE>, opts?:
 		liveProgress();
 		hasProgress = true;
 		const failed = e.type === 'test:fail' || (e.type === 'test:complete' && details?.passed === false);
+		// terra-quality-ignore single-use -- Read skip before todo even when skip alone determines the status.
 		const skip = details?.skip ?? data?.skip;
+		// terra-quality-ignore single-use -- Read todo before status selection even when skip is already set.
 		const todo = details?.todo ?? data?.todo;
 		const status = skip || (todo && failed) ? 'SKIP' : failed ? 'FAIL' : 'PASS';
 		counts[status] += 1;
 		if (status !== 'PASS')
 			yield (function fmtNodeResult(e: NodeTestE, status: 'PASS' | 'FAIL' | 'SKIP'): string {
 				const data = e.data;
-				const nesting = Math.max(0, data?.nesting ?? 0);
 				const err = data?.details?.error;
 				const msg = typeof err === 'string' ? err : err?.message;
-				return `${'  '.repeat(nesting)}[${status}] ${data?.name ?? 'unnamed test'}${status === 'FAIL' && msg ? ` — ${msg.replace(/\s+/gu, ' ').trim()}` : ''}\n`;
+				return `${'  '.repeat(Math.max(0, data?.nesting ?? 0))}[${status}] ${data?.name ?? 'unnamed test'}${status === 'FAIL' && msg ? ` — ${msg.replace(/\s+/gu, ' ').trim()}` : ''}\n`;
 			})(e, status);
 	}
 	const total = summaryCounts?.tests ?? enqueued;
@@ -246,6 +248,7 @@ export async function* qualityNodeReporter(src: AsyncIterable<NodeTestE>, opts?:
  */
 async function* defaultQualityNodeReporter(src: AsyncIterable<NodeTestE>, opts?: unknown): AsyncGenerator<string> {
 	const isTestWorker = process.env.NODE_TEST_CONTEXT === 'child-v8';
+	// terra-quality-ignore single-use -- Capture ownership before clearing the environment marker in test workers.
 	const ownsReporter = process.env.TERRA_QUALITY_NODE_REPORTER_OWNER === '1' && !isTestWorker;
 	if (isTestWorker) delete process.env.TERRA_QUALITY_NODE_REPORTER_OWNER;
 	if (!ownsReporter) {

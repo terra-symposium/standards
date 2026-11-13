@@ -179,9 +179,10 @@ export const withResponsivePlaywright = <T extends PlaywrightTestConfig>(cfg: T,
 		path.resolve(process.cwd(), 'packages/reporting/dist'),
 	];
 	const sharedDist = sharedDistCandidates.find(c => fs.existsSync(c)) || sharedDistCandidates[0];
-	const resolvedSharedDist = fs.existsSync(sharedDist) ? fs.realpathSync(sharedDist) : sharedDist;
-	const external = [...(cfg.build?.external || []), path.join(resolvedSharedDist, '**')];
+	// terra-quality-ignore single-use -- Snapshot build externals before expanding project and reporter configuration.
+	const external = [...(cfg.build?.external || []), path.join(fs.existsSync(sharedDist) ? fs.realpathSync(sharedDist) : sharedDist, '**')];
 	const projects = (cfg.projects || []) as Array<{ dependencies?: readonly string[]; name?: string; testMatch?: unknown; grep?: unknown; use?: Record<string, unknown> }>;
+	// terra-quality-ignore single-use -- Build the dependency set once before testing each project for setup status.
 	const dependencyProjects = new Set(projects.flatMap(p => p.dependencies || []));
 	const singleRun = new Set(opts.singleRunProjects || []);
 	/**
@@ -194,9 +195,13 @@ export const withResponsivePlaywright = <T extends PlaywrightTestConfig>(cfg: T,
 	 */
 	const isSetup = (project: (typeof projects)[number], idx: number): boolean => {
 		const name = project.name || `project-${idx + 1}`;
-		const matchText = (Array.isArray(project.testMatch) ? project.testMatch : [project.testMatch]).map(e => (e instanceof RegExp ? e.source : String(e || ''))).join(' ');
-		return dependencyProjects.has(name) || /setup/i.test(name) || /\.setup\.[cm]?[jt]sx?/i.test(matchText);
+		return (
+			dependencyProjects.has(name) ||
+			/setup/i.test(name) ||
+			/\.setup\.[cm]?[jt]sx?/i.test((Array.isArray(project.testMatch) ? project.testMatch : [project.testMatch]).map(e => (e instanceof RegExp ? e.source : String(e || ''))).join(' '))
+		);
 	};
+	// terra-quality-ignore single-use -- Expand project variants before building reporter configuration from the original config.
 	const responsiveProjects = projects.flatMap((p, i) => {
 		const baseName = p.name || `project-${i + 1}`;
 		if (isSetup(p, i) || singleRun.has(baseName)) return [p];
@@ -216,7 +221,7 @@ export const withResponsivePlaywright = <T extends PlaywrightTestConfig>(cfg: T,
 			use: { ...(p.use || {}), viewport: { width: v.width, height: v.height }, screenshot: { mode: 'on', fullPage: true, caret: 'initial' } },
 		}));
 	});
-	const cfgdReporters = cfg.reporter ? (Array.isArray(cfg.reporter) ? cfg.reporter : [cfg.reporter]) : [];
+	// terra-quality-ignore single-use -- Capture reporting options before filtering configured reporters.
 	const reportingOpts = {
 		viewportCatalog: opts.viewportCatalog,
 		outputRoot: opts.outputRoot,
@@ -226,8 +231,9 @@ export const withResponsivePlaywright = <T extends PlaywrightTestConfig>(cfg: T,
 		loadTesting,
 		screenshotOnlySlideshow: opts.screenshotOnlySlideshow ?? process.env.TERRA_SCREENSHOT_ONLY_SLIDESHOW !== '0',
 	};
+	// terra-quality-ignore single-use -- Assemble reporters before spreading the returned Playwright configuration.
 	const reporters = [
-		...cfgdReporters.filter(r => {
+		...(cfg.reporter ? (Array.isArray(cfg.reporter) ? cfg.reporter : [cfg.reporter]) : []).filter(r => {
 			const name = Array.isArray(r) ? r[0] : r;
 			return !(typeof name === 'string' && name.includes('@terra-symposium/standards-reporting/playwright'));
 		}),

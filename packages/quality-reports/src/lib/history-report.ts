@@ -33,9 +33,11 @@ export type HistoryReport = {
 	generatedAt: string;
 	commits: HistoryCommitReport[];
 };
+// terra-quality-ignore single-use -- Compile the source-extension matcher once for every history entry.
 const SRC_EXT = /\.(?:astro|c|cc|cpp|cs|css|go|html|java|js|jsx|jsonl|kt|less|m|mdx|php|py|rb|rs|scss|sh|sql|svelte|swift|ts|tsx|vue)$/i;
 const EXCLUDED_DIR =
 	/^(?:\.git|\.github|\.next|\.nuxt|\.output|\.turbo|\.vercel|\.netlify|\.astro|\.cache|build|coverage|dist|docs?|documentation|generated|vendor|node_modules|bower_components|target|out|public|static|storybook-static|test-results|results)$/i;
+// terra-quality-ignore single-use -- Compile the excluded-file matcher once for every history entry.
 const EXCLUDED_FILE =
 	/^(?:package(?:-lock)?\.json|pnpm-lock\.yaml|yarn\.lock|tsconfig(?:\.[^.]+)?\.json|(?:astro|eslint|prettier|vite|vitest|webpack|rollup|tailwind|postcss|jest|playwright|babel|next|netlify)\.config\.[^.]+|Dockerfile|Makefile)$/i;
 const HISTORY_BATCH_SIZE = 50;
@@ -116,11 +118,9 @@ function srcChanges(root: string, head: string, parents: string[], stats: Map<st
 		const secondTab = line.indexOf('\t', firstTab + 1);
 		if (firstTab < 0 || secondTab < 0) continue;
 		if (!isHistorySourcePath(line.slice(secondTab + 1))) continue;
-		const additions = line.slice(0, firstTab) === '-' ? 0 : Number(line.slice(0, firstTab));
-		const deletions = line.slice(firstTab + 1, secondTab) === '-' ? 0 : Number(line.slice(firstTab + 1, secondTab));
 		const curr = stats.get(head) ?? { additions: 0, deletions: 0 };
-		curr.additions += additions;
-		curr.deletions += deletions;
+		curr.additions += line.slice(0, firstTab) === '-' ? 0 : Number(line.slice(0, firstTab));
+		curr.deletions += line.slice(firstTab + 1, secondTab) === '-' ? 0 : Number(line.slice(firstTab + 1, secondTab));
 		stats.set(head, curr);
 	}
 }
@@ -245,9 +245,8 @@ export function createHistoryReport(root: string, opts: { repository?: string; b
 					if (headerEnd < 0) throw new Error(`Git did not return blob ${sha}.`);
 					const header = output.toString('utf8', offset, headerEnd).split(' ');
 					if (header[0] !== sha || header[1] !== 'blob') throw new Error(`Git returned an invalid object for ${sha}.`);
-					const size = Number(header[2]);
 					const contentStart = headerEnd + 1;
-					const contentEnd = contentStart + size;
+					const contentEnd = contentStart + Number(header[2]);
 					cache.set(
 						sha,
 						(function lineCount(content: Uint8Array): number {

@@ -203,17 +203,18 @@ function sourceCandidates(cfg: QualityCfg): string[] {
 	const gitPaths = candidates.map(file => relative(cfg.root, file)).filter(file => file && file !== '..' && !file.startsWith(`..${sep}`));
 	if (!gitPaths.length) return candidates;
 	try {
-		const ignored = execFileSync('git', ['check-ignore', '--stdin', '-z'], {
-			cwd: cfg.root,
-			encoding: 'utf8',
-			input: `${gitPaths.join('\0')}\0`,
-			maxBuffer: 32 * 1024 * 1024,
-			stdio: ['pipe', 'pipe', 'ignore'],
-		})
-			.split('\0')
-			.filter(Boolean)
-			.map(file => resolve(cfg.root, file));
-		const ignoredPaths = new Set(ignored);
+		const ignoredPaths = new Set(
+			execFileSync('git', ['check-ignore', '--stdin', '-z'], {
+				cwd: cfg.root,
+				encoding: 'utf8',
+				input: `${gitPaths.join('\0')}\0`,
+				maxBuffer: 32 * 1024 * 1024,
+				stdio: ['pipe', 'pipe', 'ignore'],
+			})
+				.split('\0')
+				.filter(Boolean)
+				.map(file => resolve(cfg.root, file)),
+		);
 		return candidates.filter(file => !ignoredPaths.has(resolve(file)));
 	} catch (err) {
 		const status = err && typeof err === 'object' && 'status' in err ? err.status : undefined;

@@ -197,9 +197,8 @@ export const visualTest = loadTest.extend<{ visuals: VisualCaptureController }>(
 					caret: 'hide' as const,
 					...options.screenshot,
 				};
-				const ext = screenshotOptions.type === 'png' ? 'png' : 'jpg';
 				const contentType = screenshotOptions.type === 'png' ? 'image/png' : 'image/jpeg';
-				const screenshotPath = i.outputPath(`${attachmentName}.${ext}`);
+				const screenshotPath = i.outputPath(`${attachmentName}.${screenshotOptions.type === 'png' ? 'png' : 'jpg'}`);
 				await fs.promises.writeFile(screenshotPath, await p.screenshot(screenshotOptions));
 				await i.attach(attachmentName, { path: screenshotPath, contentType });
 				captures.push({ attachmentName, contentType, key: normKey, title: options.title?.trim() || normKey });
@@ -330,8 +329,7 @@ const screenshotAttachment = (attachments: readonly ReporterAttachment[]): Repor
 const persistScreenshotCapture = (dir: string, capture: ScreenshotCapture): ScreenshotCapture => {
 	if (!capture.screenshot || !fs.existsSync(capture.screenshot)) return capture;
 	const key = createHash('sha256').update([capture.group, capture.key, capture.viewport].join('\0')).digest('hex');
-	const ext = path.extname(capture.screenshot) || '.png';
-	const screenshot = path.join(dir, `${key}${ext}`);
+	const screenshot = path.join(dir, `${key}${path.extname(capture.screenshot) || '.png'}`);
 	const recordFile = path.join(dir, `${key}.json`);
 	fs.mkdirSync(dir, { recursive: true });
 	if (fs.existsSync(recordFile)) {
@@ -391,8 +389,7 @@ const readScreenshotRun = (dir: string): ScreenshotRun | undefined => {
 						if (!i || typeof i !== 'object') return [];
 						const row = i as Record<string, unknown>;
 						if (typeof row.group !== 'string' || !Array.isArray(row.viewports)) return [];
-						const viewports = row.viewports.filter((viewport): viewport is string => typeof viewport === 'string');
-						return [{ group: row.group, viewports }];
+						return [{ group: row.group, viewports: row.viewports.filter((viewport): viewport is string => typeof viewport === 'string') }];
 					})
 				: undefined,
 			finishedAt: typeof value.finishedAt === 'string' ? value.finishedAt : undefined,
@@ -453,6 +450,7 @@ const loadAttachment = (attachments: readonly ReporterAttachment[]): { measureme
 	if (!attachment) return { measurements: [] };
 	try {
 		const parsed = JSON.parse(readAttachment(attachment)) as Record<string, unknown>;
+		// terra-quality-ignore single-use -- Validate each measurement before validating the separate test budget.
 		const measurements = Array.isArray(parsed.measurements)
 			? parsed.measurements.flatMap((v): LoadMeasurementInput[] => {
 					if (!v || typeof v !== 'object') return [];
@@ -490,6 +488,7 @@ const addLoadMeasurements = (
 	cfg: ReturnType<typeof readLoadTestingConfig>,
 ): VisualResult => {
 	if (!cfg.enabled) return result;
+	// terra-quality-ignore single-use -- Grade measurements before copying result fields into the returned record.
 	const measurements: LoadMeasurement[] = [
 		gradeLoadMeasurement({ name: 'test duration', kind: 'test', durationMs: result.duration, ...(testBudget ? { budget: testBudget } : {}) }, cfg, id),
 		...inputs.map(i => gradeLoadMeasurement(i, cfg, id)),
@@ -732,8 +731,10 @@ export default class ProgressReporter {
 			fs.mkdirSync(path.dirname(screenshot), { recursive: true });
 			fs.writeFileSync(screenshot, attachment.body);
 		}
+		// terra-quality-ignore single-use -- Resolve the test ID before parsing attachments and assembling the result.
 		const testId = loadTestId(test.location.file, testTitleParts(test), this.options.loadTesting.root);
 		const attachedLoad = loadAttachment(result.attachments);
+		// terra-quality-ignore single-use -- Capture the visual result before adding graded load measurements and mutating results.
 		const norm: VisualResult = {
 			...testIdentity(test, test.parent.project()?.name || test.titlePath().find(v => v.startsWith('root-')) || 'unknown', this.options.viewportCatalog),
 			browserErrors: redactEvidence(diagnosticText(result.attachments, 'browser-diagnostics').join('\n')),
@@ -944,6 +945,7 @@ export default class ProgressReporter {
 				}
 			}
 		}
+		// terra-quality-ignore single-use -- Snapshot combined results before asynchronous report writes and final budget grading.
 		const results = [...browserResults, ...supplemental.results];
 		const spreadsheet = path.join(runDir, this.options.reportFile);
 		const slideshow = path.join(runDir, this.options.slideshowFile);
