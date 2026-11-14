@@ -1,5 +1,11 @@
 # @terra-symposium/standards-patterns
 
+## 0.2.2
+
+### Patch Changes
+
+- fd7c500: Preserve shared regex exports used by unchanged source files when Quality fixes a changed-file scope.
+
 ## 0.2.1
 
 ### Patch Changes
