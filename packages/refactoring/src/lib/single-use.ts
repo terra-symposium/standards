@@ -1269,8 +1269,13 @@ function findingsFromAnalysis(
 	reportProgress('Single-use classification:', 0, candidates.length);
 	candidateLoop: for (const [candidateIdx, c] of candidates.entries()) {
 		reportProgress('Single-use classification:', candidateIdx + 1, candidates.length);
-		if (isCfgdPublicContract(cfg, c, checker) || isPackageEntryExport(cfg, c, checker, program)) continue;
+		const directive = byCandidate.get(`${c.file}:${c.name.getStart(c.source)}`);
+		const publicContract = isCfgdPublicContract(cfg, c, checker) || isPackageEntryExport(cfg, c, checker, program);
 		const uses = c.kind === 'type' || c.kind === 'interface' ? typeReferences(c, references) : (references.get(c.symbol) ?? []).filter(r => !isImportNode(r.node) && !isExportSpecifierReference(r));
+		// A package-local scan can have one consumer while the repository scan sees more.
+		// Keep that declaration's specific, reasoned marker valid when another source file consumes its exported boundary.
+		if (directive?.reason && uses.some(use => use.file !== c.file) && (uses.length > 1 || publicContract)) usedDirectives.add(directive);
+		if (publicContract) continue;
 		if (uses.length !== 1) continue;
 		const use = uses[0]!;
 		if (isRuntimeRepeatedReference(c, use, checker)) continue;
@@ -1284,7 +1289,6 @@ function findingsFromAnalysis(
 				}
 			}
 		}
-		const directive = byCandidate.get(`${c.file}:${c.name.getStart(c.source)}`);
 		if (directive?.reason) {
 			usedDirectives.add(directive);
 			continue;

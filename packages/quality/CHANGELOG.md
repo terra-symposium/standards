@@ -1,5 +1,13 @@
 # @terra-symposium/standards-quality
 
+## 2.3.4
+
+### Patch Changes
+
+- 62bfc19: Keep a reasoned, declaration-local single-use marker valid when a repository-wide scan sees additional consumers in another module. Package scans still enforce the marker for a sole consumer, and malformed, detached, duplicate, or genuinely stale markers remain errors.
+- Updated dependencies [62bfc19]
+  - @terra-symposium/standards-refactoring@0.2.3
+
 ## 2.3.3
 
 ### Patch Changes
