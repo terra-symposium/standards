@@ -5,6 +5,7 @@ packages:
 
 lockfileDir: config
 virtualStoreDir: node_modules/.pnpm
+linkWorkspacePackages: true
 
 allowBuilds:
   esbuild: true

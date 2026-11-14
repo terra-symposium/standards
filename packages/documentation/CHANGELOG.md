@@ -1,5 +1,12 @@
 # @terra-symposium/standards-documentation
 
+## 0.2.2
+
+### Patch Changes
+
+- Updated dependencies
+  - @terra-symposium/standards-quality-core@0.2.1
+
 ## 0.2.1
 
 ### Patch Changes

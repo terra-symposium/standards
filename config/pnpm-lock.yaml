@@ -89,7 +89,7 @@ importers:
     devDependencies:
       '@astrojs/check':
         specifier: ^0.9.12
-        version: 0.9.12(prettier@3.9.10)(typescript@6.0.3)
+        version: 0.9.12(prettier-plugin-astro@1.1.2(prettier@3.9.10))(prettier@3.9.10)(typescript@6.0.3)
       '@terra-symposium/standards-quality':
         specifier: workspace:*
         version: link:../../packages/quality
@@ -218,8 +218,8 @@ importers:
         specifier: workspace:*
         version: link:../documentation
       '@terra-symposium/standards-error-boundaries':
-        specifier: ^0.1.2
-        version: 0.1.2(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
+        specifier: workspace:*
+        version: link:../error-boundaries
       '@terra-symposium/standards-formatting':
         specifier: workspace:*
         version: link:../formatting
@@ -343,8 +343,8 @@ importers:
   ../packages/ui-quality:
     dependencies:
       '@terra-symposium/standards-error-boundaries':
-        specifier: ^0.1.2
-        version: 0.1.2(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
+        specifier: ^0.1.3
+        version: link:../error-boundaries
       '@terra-symposium/standards-quality-core':
         specifier: workspace:*
         version: link:../quality-core
@@ -5362,9 +5362,9 @@ snapshots:
       '@emnapi/runtime': 1.11.3
       '@napi-rs/wasm-runtime': 1.2.4(@emnapi/core@1.11.3)(@emnapi/runtime@1.11.3)
 
-  '@astrojs/check@0.9.12(prettier@3.9.10)(typescript@6.0.3)':
+  '@astrojs/check@0.9.12(prettier-plugin-astro@1.1.2(prettier@3.9.10))(prettier@3.9.10)(typescript@6.0.3)':
     dependencies:
-      '@astrojs/language-server': 2.17.3(prettier@3.9.10)(typescript@6.0.3)
+      '@astrojs/language-server': 2.17.3(prettier-plugin-astro@1.1.2(prettier@3.9.10))(prettier@3.9.10)(typescript@6.0.3)
       chokidar: 5.0.0
       kleur: 4.1.5
       typescript: 6.0.3
@@ -5486,7 +5486,7 @@ snapshots:
       unified: 11.0.5
       yaml: 2.9.1
 
-  '@astrojs/language-server@2.17.3(prettier@3.9.10)(typescript@6.0.3)':
+  '@astrojs/language-server@2.17.3(prettier-plugin-astro@1.1.2(prettier@3.9.10))(prettier@3.9.10)(typescript@6.0.3)':
     dependencies:
       '@astrojs/astro2tsx': 0.1.4
       '@astrojs/yaml2ts': 0.2.4
@@ -5507,6 +5507,7 @@ snapshots:
       vscode-uri: 3.2.0
     optionalDependencies:
       prettier: 3.9.10
+      prettier-plugin-astro: 1.1.2(prettier@3.9.10)
     transitivePeerDependencies:
       - typescript
 

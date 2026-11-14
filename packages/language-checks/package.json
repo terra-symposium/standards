@@ -1,6 +1,6 @@
 {
 	"name": "@terra-symposium/standards-language-checks",
-	"version": "0.2.0",
+	"version": "0.2.1",
 	"description": "Native language quality profiles and tool discovery.",
 	"type": "module",
 	"engines": {

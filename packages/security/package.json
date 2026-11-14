@@ -1,6 +1,6 @@
 {
 	"name": "@terra-symposium/standards-security",
-	"version": "0.2.0",
+	"version": "0.2.1",
 	"description": "Repository source security policy checks.",
 	"type": "module",
 	"engines": {
