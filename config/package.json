@@ -19,7 +19,7 @@
 		"docs:build": "cd .. && node config/scripts/build-docs.mjs",
 		"prepare": "cd .. && husky config/husky",
 		"changeset": "changeset",
-		"release": "changeset publish"
+		"release": "cd .. && pnpm exec changeset publish"
 	},
 	"devDependencies": {
 		"@changesets/cli": "^3.0.3",

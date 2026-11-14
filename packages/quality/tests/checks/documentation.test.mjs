@@ -398,6 +398,14 @@ test('documentation errors identify detached TSDoc without rewriting it', () => 
 	assert.equal(removeNonCodeComments(file), false);
 	assert.equal(fixtureText(root, 'src/main.ts'), original);
 });
+test('documentation recognizes an inline JSDoc expression cast', () => {
+	const root = fixtureRoot('terra-quality-inline-jsdoc-cast-');
+	fixtureFile(root, 'src/main.mjs', '/** src/main.mjs */\nconst ids = values.map(value => /** @type {{ id: string }} */ (value).id);\n');
+	assert.deepEqual(
+		documentationFindings(createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.mjs'] })).filter(f => f.kind === 'orphan'),
+		[],
+	);
+});
 test('documentation recognizes standalone JSDoc typedef declarations and audits their summaries', () => {
 	const root = fixtureRoot('terra-quality-jsdoc-typedef-');
 	fixtureFile(

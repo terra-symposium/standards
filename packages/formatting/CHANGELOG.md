@@ -1,5 +1,12 @@
 # @terra-symposium/standards-formatting
 
+## 0.2.2
+
+### Patch Changes
+
+- Updated dependencies
+  - @terra-symposium/standards-documentation@0.2.1
+
 ## 0.2.1
 
 ### Patch Changes
