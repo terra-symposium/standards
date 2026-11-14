@@ -2,28 +2,92 @@
 
 Shared error-page copy and adapters for React, Next.js route boundaries, and Astro status responses.
 
-## Getting started
+## What it does
 
-### Commands
+Not applicable.
+
+## Prerequisites
+
+Not applicable.
+
+## Get started
+
+### Install
+
+```sh
+pnpm add @terra-symposium/standards-error-boundaries
+```
 
 From `standards/main/`, run `pnpm install`, then `pnpm --filter @terra-symposium/standards-error-boundaries build`. Validate adapter changes with `pnpm --filter @terra-symposium/standards-error-boundaries test`.
 
-## Security and Limitations
+## Usage
 
-These helpers provide copy and adapter components; framework routing and error lifecycle behavior remain the host app’s responsibility.
+### Catch React render failures
+
+````tsx
+import { ErrorBoundary } from '@terra-symposium/standards-error-boundaries/react';
 
 ## Structure
 
-- See [src](src/), [package.json](package.json), and `test/`.
+- See [src](src/), [package.json](package.json), and `tests/`.
 
 ## References
 
-See the [public exports](src/index.ts), [manifest](package.json), and [adapter tests](test/).
+### Catch Astro island hydration failures
+Wrap hydrated islands in the shared Astro boundary to show a static fallback if a client module fails before React can render:
+
+```astro
+---
+import AstroErrorBoundary from '@terra-symposium/standards-error-boundaries/astro-boundary';
+---
+
+<AstroErrorBoundary title="Workspace unavailable" description="Reload to try the workspace again.">
+	<Workspace client:load />
+</AstroErrorBoundary>
+````
+
+The Astro wrapper listens for Astro's cancelable `astro:hydration-error` event and reveals its fallback without depending on the failed island's JavaScript. It complements the React `ErrorBoundary`; it cannot render a fallback if the server fails before sending HTML.
+
+### Other entry points
+
+`@terra-symposium/standards-error-boundaries/astro` exports status-copy helpers for 400, 401, 403, 404, 500, 502, and 503 responses.
+
+`@terra-symposium/standards-error-boundaries/astro-boundary` exports the reusable static Astro island guard.
+
+`@terra-symposium/standards-error-boundaries/next` exports types and `errorDigest(error)` for framework-provided route-error digests.
+
+- The package root re-exports all entry-point APIs.
+
+See the [package guide](https://standards-docs.netlify.app/error-boundaries/1-react/react-boundaries/) for prop behavior and usage details.
+
+## Configuration and security
+
+Not applicable.
+
+## Development and structure
+
+Not applicable.
+
+## Validation
+
+Not applicable.
+
+## Deployment and operations
+
+Not applicable.
+
+## Data, privacy, and limitations
+
+Not applicable.
+
+## References
+
+Not applicable.
 
 ## Contributing
 
-Add regression coverage for each affected framework adapter under `test/`.
+Not applicable.
 
 ## Credits and license
 
-No package license is declared in its manifest and no root license is present; ask maintainers before reuse.
+Not applicable.

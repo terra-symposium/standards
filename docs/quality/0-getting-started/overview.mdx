@@ -1,0 +1,45 @@
+---
+title: Terra Quality
+description: Install, configure, and run Terra Quality across built-in checks and repository tools.
+---
+
+The aggregate package coordinates built-in JavaScript and TypeScript checks with repository-configured tools and commands. Capability packages expose reusable check families and focused CLIs. All packages read the same `quality.json` policy.
+
+## Choose a starting point
+
+| Need                                             | Start here                                                                                            |
+| ------------------------------------------------ | ----------------------------------------------------------------------------------------------------- |
+| Install and run the aggregate CLI                | [Setup and first run](/quality/0-getting-started/setup/)                                              |
+| Select source roots, checks, tools, and commands | [Configuration reference](/quality/2-configuration/quality-json/)                                     |
+| Understand findings and fix limits               | [Source checks](/quality/3-checks/source-checks/) or [tool checks](/quality/3-checks/tooling-checks/) |
+| Use one public capability directly               | [Package map](/quality/1-packages/package-map/)                                                       |
+| Run locally or in CI                             | [CLI and CI workflows](/quality/4-workflows/cli-and-ci/)                                              |
+| Diagnose a failed run                            | [Troubleshooting](/quality/5-operations/troubleshooting/)                                             |
+
+## Run lifecycle
+
+A full run selects a repository scope, performs the enabled check phases, and produces findings and an exit status. Fix mode may write eligible source changes; `--warn` is read-only. Configured commands remain in the aggregate runner's fixed order.
+
+<Nodes
+	direction='LR'
+	nodes={[
+		{ id: 'config', type: 'origin', data: { title: 'Read quality.json' } },
+		{ id: 'scope', type: 'process', data: { title: 'Select changed files or --all' } },
+		{ id: 'checks', type: 'process', data: { title: 'Run enabled checks' } },
+		{ id: 'fix', type: 'process', data: { title: 'Apply eligible fixes' } },
+		{ id: 'result', type: 'terminal', data: { title: 'Report findings' } },
+	]}
+	edges={[
+		{ id: 'config-scope', source: 'config', target: 'scope' },
+		{ id: 'scope-checks', source: 'scope', target: 'checks' },
+		{ id: 'checks-fix', source: 'checks', target: 'fix' },
+		{ id: 'fix-result', source: 'fix', target: 'result' },
+	]}
+	height={230}
+/>
+
+:::note[Read-only mode]
+
+Use `--warn` for review and CI. It disables autofixes while keeping configured checks and failure behavior.
+
+:::

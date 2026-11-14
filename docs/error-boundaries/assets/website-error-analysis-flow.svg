@@ -1,0 +1,65 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="360" viewBox="0 0 1400 360" role="img" aria-labelledby="title description">
+	<title id="title">Terra Website error analysis data flow</title>
+	<desc id="description">A React render failure is caught by the Website boundary. The adapter sends a minimal payload to an Astro endpoint, which validates and sanitizes it before storing metadata in Netlify Blobs for the Sanity Error Analysis dashboard.</desc>
+	<defs>
+		<marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto" markerUnits="strokeWidth">
+			<path d="M0 0 L10 5 L0 10 z" fill="#4f7169" />
+		</marker>
+		<style>
+			.title { font: 700 18px system-ui, sans-serif; fill: #17312e; }
+			.body { font: 14px system-ui, sans-serif; fill: #38534e; }
+			.note { font: 12px system-ui, sans-serif; fill: #506762; }
+			.box { fill: #f4faf7; stroke: #8caea5; stroke-width: 2; rx: 14; }
+			.api { fill: #eef6fb; stroke: #85a9c1; }
+			.store { fill: #f8f4eb; stroke: #c6a66b; }
+			.dash { fill: #f2f2fb; stroke: #9694bd; }
+			.arrow { stroke: #4f7169; stroke-width: 2.5; fill: none; marker-end: url(#arrow); }
+		</style>
+	</defs>
+	<rect width="1400" height="360" fill="#ffffff" />
+	<g transform="translate(24 48)">
+		<rect class="box" width="232" height="170" />
+		<text class="title" x="18" y="34">React boundary</text>
+		<text class="body" x="18" y="66">Catches descendant render</text>
+		<text class="body" x="18" y="88">failure and keeps the</text>
+		<text class="body" x="18" y="110">product fallback visible.</text>
+		<text class="note" x="18" y="144">astro/src/components/ErrorBoundary.tsx</text>
+	</g>
+	<path class="arrow" d="M260 133 H300" />
+	<g transform="translate(312 48)">
+		<rect class="box" width="232" height="170" />
+		<text class="title" x="18" y="34">Website adapter</text>
+		<text class="body" x="18" y="66">Sends category, stable</text>
+		<text class="body" x="18" y="88">component name, and</text>
+		<text class="body" x="18" y="110">sanitized route only.</text>
+		<text class="note" x="18" y="144">No cookie or raw stack</text>
+	</g>
+	<path class="arrow" d="M548 133 H588" />
+	<g transform="translate(600 48)">
+		<rect class="box api" width="232" height="170" />
+		<text class="title" x="18" y="34">Astro collector</text>
+		<text class="body" x="18" y="66">Checks origin, payload</text>
+		<text class="body" x="18" y="88">shape and rate, then</text>
+		<text class="body" x="18" y="110">derives trusted metadata.</text>
+		<text class="note" x="18" y="144">/api/error-report</text>
+	</g>
+	<path class="arrow" d="M836 133 H876" />
+	<g transform="translate(888 48)">
+		<rect class="box store" width="220" height="170" />
+		<text class="title" x="18" y="34">Netlify Blobs</text>
+		<text class="body" x="18" y="66">Stores redacted records</text>
+		<text class="body" x="18" y="88">with a 30-day expiry.</text>
+		<text class="body" x="18" y="110">No message or stack.</text>
+		<text class="note" x="18" y="144">error-reports</text>
+	</g>
+	<path class="arrow" d="M1112 133 H1152" />
+	<g transform="translate(1164 48)">
+		<rect class="box dash" width="212" height="170" />
+		<text class="title" x="18" y="34">Sanity Analytics</text>
+		<text class="body" x="18" y="66">Admin-only Error</text>
+		<text class="body" x="18" y="88">Analysis dashboard for</text>
+		<text class="body" x="18" y="110">trends and breakdowns.</text>
+		<text class="note" x="18" y="144">Read-only view</text>
+	</g>
+	<text class="note" x="24" y="270">Events are metadata-only. Production screenshots and reports must not contain real user identifiers, request payloads, secrets, or unredacted exceptions.</text>
+</svg>

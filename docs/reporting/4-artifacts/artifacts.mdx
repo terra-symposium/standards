@@ -1,0 +1,57 @@
+---
+title: Report artifacts and data handling
+description: Understand workbook and slideshow outputs, review sensitive evidence, and set repository-owned retention.
+---
+
+The reporting package writes local evidence and review artifacts. The consuming repository decides which data may be captured, who can access it, where it is uploaded, and how long it remains available.
+
+## Artifact map
+
+A normal Playwright report contains structured results and visual evidence. This table identifies the generated files and the main use of each.
+
+| Artifact                          | Contents                                                                                       | Typical use                                    |
+| --------------------------------- | ---------------------------------------------------------------------------------------------- | ---------------------------------------------- |
+| `report.xlsx`                     | Run summary, result sheets by test file, project metadata, diagnostics, optional load timings. | Filter, sort, and compare test outcomes.       |
+| `report.pptx`                     | Screenshot-backed slides grouped by logical test; responsive or diagnostic context.            | Review user-visible states as a presentation.  |
+| `images/` and screenshot metadata | Copies of attachments and keyed captures with normalized metadata.                             | Rebuild or inspect a deck after a partial run. |
+| Supplemental result JSON          | Structured `complete`, `results`, and `runDiagnostics` fields.                                 | Add another runner’s results to the workbook.  |
+
+The lifecycle below separates generation from publication. Local output does not itself imply secure storage or configured expiry.
+
+<Nodes
+	direction='LR'
+	nodes={[
+		{ id: 'run', type: 'origin', data: { title: 'Run tests and capture' } },
+		{ id: 'local', type: 'process', data: { title: 'Write local evidence' } },
+		{ id: 'review', type: 'process', data: { title: 'Review content and audience' } },
+		{ id: 'publish', type: 'process', data: { title: 'Upload via repository CI' } },
+		{ id: 'expire', type: 'terminal', data: { title: 'Apply repository retention' } },
+	]}
+	edges={[
+		{ id: 'run-local', source: 'run', target: 'local' },
+		{ id: 'local-review', source: 'local', target: 'review' },
+		{ id: 'review-publish', source: 'review', target: 'publish' },
+		{ id: 'publish-expire', source: 'publish', target: 'expire' },
+	]}
+	height={230}
+/>
+
+## Generate reports
+
+Use the responsive helper or Playwright reporter to create a timestamped run directory. Set `outputRoot` to change the parent directory. Direct API callers can use `writeSpreadsheet()` and `writeSlideshow()` with a normalized `ReportRun`; `writeScreenshotSlideshowFromDirectory()` can rebuild a deck from persisted capture metadata.
+
+The persistent screenshot folder may include captures from earlier, interrupted, or partial viewport runs. Pass a current run ID to limit a deck to one run; omit it when intentionally rebuilding the accumulated folder. Repeated test/viewport captures replace their matching image.
+
+## Review data before upload
+
+=== [Privacy and access checklist]
+
+- Prefer synthetic accounts and data when real values are unnecessary.
+- Inspect screenshots for names, email addresses, tokens, internal URLs, customer content, and hidden panels.
+- Inspect console, page, and request diagnostics before making a broad CI artifact audience able to download them.
+- Keep authentication state and service credentials in the approved secret manager, not in screenshots, report JSON, or test manifests.
+- # Use the shortest retention period that still supports review and diagnosis.
+
+The package does not upload, encrypt, redact, or delete prior output. Configure CI artifact access and expiry, or use repository-owned cleanup. Keep only the artifacts required to explain a run and support its follow-up.
+
+See [Playwright evidence](/reporting/2-playwright/playwright-evidence/) for capture setup and [load testing](/reporting/3-load-testing/load-testing/) for timing data.

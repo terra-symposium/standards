@@ -1,18 +1,48 @@
+# Dependencies
 node_modules/
+
+# Build and generated output
 dist/
-coverage/
+dist/.docs/
 **/.astro/
-/docs/src/generated/skills.json
+
+# Test artifacts
+coverage/
+tests/results/
+
+# Local environment and credentials
+**/.venv/
+**/__pycache__/
+**/.ruff_cache/
+**/.mypy_cache/
+**/.env
+**/.env.local
+
+# Quality runner artifacts
 /.quality-test-tmp/
 /.quality-github-report.json
+
+# Changesets
 .changeset/*.md
 !.changeset/README.md
 !.changeset/tidy-repos-report.md
 !.changeset/github-analytics-report.md
 
-# Local Netlify folder
+# Local deployment state
 .netlify
+!docs/.netlify
 
-# Local environment credentials
-**/.env
-**/.env.local
+# Vendored dependencies
+vendor/
+**/vendor/
+
+# Local error logs
+error.log
+
+# Generated test reports
+**/tests/results/
+
+# Generated cache links
+**/.astro
+**/.ruff_cache
+**/.venv

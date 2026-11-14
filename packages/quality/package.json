@@ -1,6 +1,6 @@
 {
 	"name": "@terra-symposium/standards-quality",
-	"version": "2.0.6",
+	"version": "2.3.7",
 	"description": "Configurable quality checks and maintenance tooling for software repositories",
 	"homepage": "https://standards-docs.netlify.app/",
 	"type": "module",
@@ -10,7 +10,8 @@
 	"main": "./dist/index.js",
 	"types": "./dist/index.d.ts",
 	"bin": {
-		"terra-quality": "dist/lib/runner.js"
+		"terra-quality": "dist/lib/runner.js",
+		"terra-quality-dev": "dist/lib/dev.js"
 	},
 	"publishConfig": {
 		"registry": "https://registry.npmjs.org",
@@ -22,11 +23,21 @@
 	},
 	"exports": {
 		".": "./dist/index.js",
+		"./error-boundaries/react": "./dist/lib/error-boundaries-react.js",
+		"./astro-integration": "./dist/lib/error-boundaries-astro.js",
 		"./cli": "./dist/lib/runner.js",
 		"./naming": "./dist/lib/naming.js",
 		"./object-forwarding": "./dist/lib/object-forwarding.js",
 		"./single-use": "./dist/lib/single-use.js",
-		"./port": "./dist/lib/port.js"
+		"./port": "./dist/lib/port.js",
+		"./documentation": "./dist/lib/documentation.js",
+		"./formatting": "./dist/lib/formatting.js",
+		"./imports": "./dist/lib/imports.js",
+		"./patterns": "./dist/lib/patterns.js",
+		"./security": "./dist/lib/security.js",
+		"./ui-quality": "./dist/lib/ui-quality.js",
+		"./language-checks": "./dist/lib/language-checks.js",
+		"./reports": "./dist/lib/reports.js"
 	},
 	"files": [
 		"dist",
@@ -34,13 +45,35 @@
 		"quality-configs"
 	],
 	"scripts": {
-		"build": "tsc -p tsconfig.json",
+		"quality": "node \"$(git rev-parse --show-toplevel)/scripts/quality-runner.mjs\" quality",
+		"quality:all": "node \"$(git rev-parse --show-toplevel)/scripts/quality-runner.mjs\" quality --all",
+		"build": "tsc -p config/tsconfig.json",
+		"test": "npm run build && mkdir -p tests/results && node --test --test-reporter=spec --test-reporter-destination=stdout --test-reporter=junit --test-reporter-destination=tests/results/junit.xml",
 		"prepare": "npm run build",
-		"pretest": "npm run build",
-		"test": "node --test"
+		"typecheck": "tsc --noEmit -p config/tsconfig.json"
 	},
 	"dependencies": {
-		"typescript": "^5.0.0"
+		"@terra-symposium/standards-error-boundaries": "workspace:*",
+		"typescript": "^5.0.0",
+		"@terra-symposium/standards-quality-core": "workspace:*",
+		"@terra-symposium/standards-documentation": "workspace:*",
+		"@terra-symposium/standards-formatting": "workspace:*",
+		"@terra-symposium/standards-imports": "workspace:*",
+		"@terra-symposium/standards-naming": "workspace:*",
+		"@terra-symposium/standards-refactoring": "workspace:*",
+		"@terra-symposium/standards-security": "workspace:*",
+		"@terra-symposium/standards-ui-quality": "workspace:*",
+		"@terra-symposium/standards-patterns": "workspace:*",
+		"@terra-symposium/standards-language-checks": "workspace:*",
+		"@terra-symposium/standards-quality-reports": "workspace:*"
+	},
+	"peerDependencies": {
+		"eslint": ">=9"
+	},
+	"peerDependenciesMeta": {
+		"eslint": {
+			"optional": true
+		}
 	},
 	"devDependencies": {
 		"@types/node": "^26.6.5"

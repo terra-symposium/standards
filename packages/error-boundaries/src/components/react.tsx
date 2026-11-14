@@ -36,11 +36,11 @@ HELPERS
  */
 export function withErrorBoundary<P extends object>(ComponentToWrap: React.ComponentType<P>, name: string, onErr?: ErrorReporter): React.ComponentType<P> {
 	/**
-	 * Renders the wrapped component inside a boundary configured with the supplied metadata.
+	 * Renders the wrapped component inside the configured boundary.
 	 *
 	 * @param props Props forwarded unchanged to the wrapped component.
 	 *
-	 * @returns The wrapped component as a React element under the error boundary.
+	 * @return The wrapped component as a React element under the error boundary.
 	 */
 	function BoundedComponent(props: P): React.JSX.Element {
 		return (
@@ -57,40 +57,40 @@ export function withErrorBoundary<P extends object>(ComponentToWrap: React.Compo
 export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
 	state: ErrorBoundaryState = { error: null };
 	/**
-	 * Stores a descendant render error in boundary state so rendering switches to its fallback.
+	 * Stores a descendant render error so the boundary switches to its fallback.
 	 *
-	 * @param err The render error caught by the boundary.
+	 * @param err Error caught while rendering a child.
 	 *
-	 * @returns The next state containing the render error.
+	 * @return State containing the captured error.
 	 */
 	static getDerivedStateFromError(err: Error): ErrorBoundaryState {
 		return { error: err };
 	}
 	/**
-	 * Reports a caught descendant render error with the boundary name and component stack.
+	 * Reports a captured render error with its component stack when a callback is configured.
 	 *
-	 * @param err The render error caught by the boundary.
-	 * @param info React metadata for the failed descendant component.
+	 * @param err Error caught while rendering a child.
+	 * @param info React component stack captured for the failed render.
 	 */
 	componentDidCatch(err: Error, info: React.ErrorInfo): void {
 		this.props.onError?.(err, { name: this.props.name ?? 'Component', componentStack: info.componentStack ?? null });
 	}
 	/**
-	 * Clears a stored render error when the reset key changes.
+	 * Clears the captured error when the boundary receives a new reset key.
 	 *
-	 * @param prev The boundary props from the previous render.
+	 * @param prev Props from the previous render, used to detect reset-key changes.
 	 */
 	componentDidUpdate(prev: ErrorBoundaryProps): void {
 		if (prev.resetKey !== this.props.resetKey && this.state.error) this.setState({ error: null });
 	}
 	/**
-	 * Renders children normally, or the configured fallback or default alert after an error.
+	 * Renders the children until an error is captured, then renders fallback content.
 	 *
-	 * @returns The boundary's children or error fallback.
+	 * @return The children, configured fallback, or default alert.
 	 */
 	render(): React.ReactNode {
 		if (!this.state.error) return this.props.children;
 		if (this.props.fallback) return this.props.fallback(this.state.error);
-		return <div role="alert">An unexpected error occurred while rendering this section.</div>;
+		return <div role='alert'>An unexpected error occurred while rendering this section.</div>;
 	}
 }

@@ -20,7 +20,7 @@ CONFIG
 /**
  * Replaces library-generated application labels with neutral evidence metadata.
  *
- * @param file Path to the presentation file whose metadata will be updated.
+ * @param file Open XML artifact whose application metadata should be neutralized.
  */
 export const neutralizeApplicationMetadata = async (file: string): Promise<void> => {
 	const archive = await JSZip.loadAsync(await fs.readFile(file));

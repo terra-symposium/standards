@@ -1,5 +1,61 @@
 # @terra-symposium/standards-reporting
 
+## 0.7.0
+
+### Minor Changes
+
+- bb23d8e: Allow browser suites to collect only explicitly tagged viewport scenarios from a custom viewport catalog.
+- d00b64a: Persist Playwright screenshots across runs and rebuild the default PowerPoint from the accumulated evidence folder.
+
+### Patch Changes
+
+- dba6980: Aggregate expected and completed screenshot coverage across sequential viewport processes that share one logical run ID.
+- c88abb6: Combine repository Reporting workbooks into one workbook while preserving each repository's detailed sheets and screenshot evidence.
+- f7eb164: Keep current screenshot decks aligned with the test and viewport inventory while labeling retired captures as historical.
+- dba6980: Build finalized screenshot decks from the current logical run while preserving full-folder regeneration for historical and subset captures.
+- 2e1bf7f: Select multiple active Playwright runs per repository when rebuilding a screenshot deck, preserving older captures as historical.
+- 69891cf: Rebuild screenshot-only PowerPoints from nested repository capture folders and keep the newest screenshot for repeated scenario/viewport runs.
+- 9e726b3: Select the latest captured Playwright run independently for each repository when building a multi-repository screenshot deck.
+- dba6980: Defer screenshot-only slideshow rebuilds until the final viewport process in a shared matrix run.
+- dba6980: Mark screenshots from prior Playwright runs as historical in regenerated slideshow decks.
+
+## 0.6.2
+
+### Patch Changes
+
+- fc41d9a: Persist stable screenshot and run identities across partial viewport processes, label prior captures as historical, and defer screenshot deck generation until the matrix is finalized.
+
+## 0.6.1
+
+### Patch Changes
+
+- 4486044: Aggregate expected and completed screenshot coverage across sequential viewport processes that share one logical run ID.
+- 27167fa: Compose existing Playwright project filters with declared viewport tags so ownership filters and viewport selection can be used together.
+- 7770132: Defer screenshot-only slideshow rebuilds until the final viewport process in a shared matrix run.
+- b369903: Mark screenshots from prior Playwright runs as historical in regenerated slideshow decks.
+
+## 0.6.0
+
+### Minor Changes
+
+- 3375c1d: Allow Playwright scenarios to declare their selected viewport projects and supply a custom viewport catalog while preserving the existing all-viewport default.
+
+### Patch Changes
+
+- 59196ba: Resolve screenshot sidecar paths relative to the capture directory when regenerating a slideshow.
+
+## 0.5.0
+
+### Minor Changes
+
+- d00b64a: Persist Playwright screenshots across runs and rebuild the default PowerPoint from the accumulated evidence folder.
+
+## 0.4.0
+
+### Minor Changes
+
+- Add keyed screenshot capture fixtures and responsive screenshot-only slideshow output.
+
 ## 0.3.0
 
 ### Minor Changes

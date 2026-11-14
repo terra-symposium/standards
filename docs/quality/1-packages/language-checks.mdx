@@ -1,0 +1,33 @@
+---
+title: standards-language-checks
+description: Resolve optional C, Java, and Python quality profiles and run their native tools.
+---
+
+`@terra-symposium/standards-language-checks` supplies optional profile resolution and command execution for C, Java, and Python. JavaScript and TypeScript remain handled by the other Quality capabilities.
+
+## Install and run
+
+```sh
+pnpm add -D @terra-symposium/standards-language-checks
+pnpm exec terra-language-checks --all
+```
+
+Select profiles in the shared `quality.json`. A profile only runs checks when matching source files are present. If a required native tool is missing or below the tested minimum, the runner reports the requirement and installation guidance. It never installs toolchains.
+
+## Profiles and prerequisites
+
+| Profile  | Typical tools                                                        | Notes                                                                                          |
+| -------- | -------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `c`      | LLVM/Clang formatting, AST documentation, clang-tidy/static analysis | C and header sources use Doxygen requirements.                                                 |
+| `java`   | google-java-format, Checkstyle, PMD, SpotBugs                        | SpotBugs requires compatible compiled classes from the repository build.                       |
+| `python` | Ruff, mypy, Bandit, Vulture, interrogate, pydoclint                  | Python source and stubs use profile-specific lint, type, security, dead-code, and docs checks. |
+
+Pin native tools in the consumer repository or CI image for reproducible behavior. Repository-owned build and test commands remain under `qualityCommands`; the profile runner does not provision services or compile application code itself.
+
+## API
+
+```ts
+import { resolveLanguageProfiles, inspectLanguageProfileTool, runLanguageChecks } from '@terra-symposium/standards-language-checks';
+```
+
+The package also exports profile IDs, capability maps, resolved check types, and profile definitions. Its `./cli` export and `terra-language-checks` bin are both public. See [profile configuration](/quality/2-configuration/quality-json/) for exact option names.

@@ -1,0 +1,59 @@
+---
+title: Validate a change
+description: Choose the focused and workspace checks needed before review.
+---
+
+Run focused checks while editing, then validate the complete change before requesting review. Choose the scope based on the files and behavior you changed.
+
+## Validation sequence
+
+<Nodes
+	direction='LR'
+	nodes={[
+		{ id: 'package', type: 'origin', data: { title: 'Build affected package' } },
+		{ id: 'tests', type: 'process', data: { title: 'Run focused tests' } },
+		{ id: 'workspace', type: 'process', data: { title: 'Run workspace plan and quality' } },
+		{ id: 'docs', type: 'process', data: { title: 'Build and inspect Docs' } },
+		{ id: 'review', type: 'terminal', data: { title: 'Review full diff' } },
+	]}
+	edges={[
+		{ id: 'package-tests', source: 'package', target: 'tests' },
+		{ id: 'tests-workspace', source: 'tests', target: 'workspace' },
+		{ id: 'workspace-docs', source: 'workspace', target: 'docs' },
+		{ id: 'docs-review', source: 'docs', target: 'review' },
+	]}
+	height={230}
+/>
+
+||| [Package or behavior change]
+
+Run the owning package checks first, then validate the workspace:
+
+```sh
+pnpm run build
+pnpm run test
+pnpm run quality -- --all
+```
+
+The workspace test command follows `config/terra-tests.json`. Quality uses its configured source scope; build and test remain separate steps. |||
+
+||| [Documentation or visual change]
+
+Build the Docs site and inspect the affected page and image at the generated route:
+
+```sh
+pnpm run docs:build
+pnpm exec docs preview --port 2050
+```
+
+Use the Docs preview after a build. Rebuild after every content, route, or asset edit; it does not hot-reload. |||
+
+## Review effects
+
+- Inspect every changed and generated file. Remove only unintended reports, test output, and temporary captures.
+- Confirm configuration keys and CLI examples match the package schema and public declarations.
+- Test an autofix twice when it writes files; the second run should make no additional changes.
+- For user-facing layout, inspect the built page at desktop and narrow widths and operate every interactive block with a keyboard.
+- Add a Changeset only if a published package’s behavior or metadata changed.
+
+The [CLI workflow guide](/quality/4-workflows/cli-and-ci/) explains scope, read-only mode, and skip controls.

@@ -1,5 +1,140 @@
 # @terra-symposium/standards-quality
 
+## 2.3.7
+
+### Patch Changes
+
+- 5bc2ec1: Keep shared regex exports referenced outside changed-file source roots during safe autofix.
+- Updated dependencies [5bc2ec1]
+  - @terra-symposium/standards-patterns@0.2.3
+
+## 2.3.6
+
+### Patch Changes
+
+- fd7c500: Preserve shared regex exports used by unchanged source files when Quality fixes a changed-file scope.
+- Updated dependencies [fd7c500]
+  - @terra-symposium/standards-patterns@0.2.2
+
+## 2.3.5
+
+### Patch Changes
+
+- 622d20e: Keep a declaration-specific single-use comment valid when a package-only scan has no local consumer of an exported declaration and the repository scan checks its external consumer.
+- Updated dependencies [622d20e]
+  - @terra-symposium/standards-refactoring@0.2.4
+
+## 2.3.4
+
+### Patch Changes
+
+- 62bfc19: Keep a reasoned, declaration-local single-use marker valid when a repository-wide scan sees additional consumers in another module. Package scans still enforce the marker for a sole consumer, and malformed, detached, duplicate, or genuinely stale markers remain errors.
+- Updated dependencies [62bfc19]
+  - @terra-symposium/standards-refactoring@0.2.3
+
+## 2.3.3
+
+### Patch Changes
+
+- Updated dependencies
+  - @terra-symposium/standards-error-boundaries@0.1.3
+  - @terra-symposium/standards-language-checks@0.2.1
+  - @terra-symposium/standards-naming@0.2.1
+  - @terra-symposium/standards-patterns@0.2.1
+  - @terra-symposium/standards-quality-core@0.2.1
+  - @terra-symposium/standards-quality-reports@0.2.1
+  - @terra-symposium/standards-security@0.2.1
+  - @terra-symposium/standards-ui-quality@0.2.1
+  - @terra-symposium/standards-documentation@0.2.2
+  - @terra-symposium/standards-formatting@0.2.3
+  - @terra-symposium/standards-imports@0.2.2
+  - @terra-symposium/standards-refactoring@0.2.2
+
+## 2.3.2
+
+### Patch Changes
+
+- Updated dependencies
+  - @terra-symposium/standards-documentation@0.2.1
+  - @terra-symposium/standards-formatting@0.2.2
+  - @terra-symposium/standards-imports@0.2.1
+
+## 2.3.1
+
+### Patch Changes
+
+- 8e9ae0e: Resolve Knip's working directory from flat configuration entry paths when the configuration file is nested under `config/`. This keeps repository source files and their dependencies in the same Knip workspace.
+
+## 2.3.0
+
+### Minor Changes
+
+- 6cdc7c1: Add explicit `configRoot` support for discovering centralized ESLint, Prettier, Knip, and TypeScript configuration while keeping source paths and subprocesses rooted at the repository.
+
+### Patch Changes
+
+- 51eac04: Discover ESLint flat configs from `config/` after all conventional root config filenames.
+- c35b7f2: Discover quality configuration and tool configs from the repository config directory.
+- 38157d8: Prevent overlapping Quality fix runs and restore files if an autofix introduces syntax errors. Reject token-changing object layout rewrites. Support reasoned, declaration-specific single-use exceptions.
+- c435ddf: Discover `config/tsconfig.json` when a repository has no root TypeScript project config.
+- 62b2b08: Order test suites by scope, preserve recommendation command exit codes, and clarify malformed ESLint report errors.
+- Updated dependencies [38157d8]
+  - @terra-symposium/standards-formatting@0.2.1
+  - @terra-symposium/standards-refactoring@0.2.1
+
+## 2.2.0
+
+### Minor Changes
+
+- Publish quality checks by capability family while keeping the aggregate CLI and compatibility exports.
+
+### Patch Changes
+
+- Updated dependencies
+  - @terra-symposium/standards-quality-core@0.2.0
+  - @terra-symposium/standards-documentation@0.2.0
+  - @terra-symposium/standards-formatting@0.2.0
+  - @terra-symposium/standards-imports@0.2.0
+  - @terra-symposium/standards-naming@0.2.0
+  - @terra-symposium/standards-refactoring@0.2.0
+  - @terra-symposium/standards-security@0.2.0
+  - @terra-symposium/standards-ui-quality@0.2.0
+  - @terra-symposium/standards-patterns@0.2.0
+  - @terra-symposium/standards-language-checks@0.2.0
+  - @terra-symposium/standards-quality-reports@0.2.0
+
+## 2.1.2
+
+### Patch Changes
+
+- Publish the error-boundaries package as a normal semver dependency instead of leaking the workspace protocol into the npm package.
+
+## 2.1.1
+
+### Patch Changes
+
+- Make React application root boundaries mandatory and automatically wrap unguarded JSX and JavaScript roots during Quality fixes.
+- Export the shared React boundary through the Quality package so consumers need only depend on `@terra-symposium/standards-quality`.
+- Run focused commands such as `error-boundaries` without incorrectly applying the full Quality lint-config preflight.
+
+## 2.1.0
+
+### Minor Changes
+
+- Add the `terra-quality-dev` launcher so repositories share Quality's port acquisition and dev-server startup behavior.
+
+## 2.0.8
+
+### Patch Changes
+
+- Autofix arbitrary length utilities to Tailwind spacing utilities when the generated declarations match.
+
+## 2.0.7
+
+### Patch Changes
+
+- Load Tailwind v4 design systems through Tailwind's Node runtime so canonical checks can read legacy configuration and plugin modules.
+
 ## 2.0.6
 
 ### Patch Changes

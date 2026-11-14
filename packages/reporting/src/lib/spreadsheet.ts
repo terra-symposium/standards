@@ -26,6 +26,7 @@ import type { ReportRun, VisualResult } from './core.js';
 CONFIG
 //////////////////////////////////////////////////*/
 
+// STATUS AND TIMING STYLES
 const STATUS_STYLES: Record<string, { fill: string; font: string }> = {
 	passed: { fill: 'FFDCEFE0', font: 'FF166534' },
 	failed: { fill: 'FFFEE2E2', font: 'FF991B1B' },
@@ -38,6 +39,8 @@ const LOAD_STYLES: Record<string, { fill: string; font: string }> = {
 	warning: { fill: 'FFFEF3C7', font: 'FF92400E' },
 	fail: { fill: 'FFFEE2E2', font: 'FF991B1B' },
 };
+
+// CELL FORMATTING
 /**
  * Applies the shared header layout to a worksheet.
  *
@@ -54,12 +57,10 @@ const styleHeader = (sheet: ExcelJS.Worksheet): void => {
 	sheet.getRow(1).height = 22;
 };
 /**
- * Applies the timing grade label and matching color treatment to a cell.
+ * Applies a timing grade and its semantic color treatment to a cell.
  *
- * @param cell Worksheet cell to update.
- * @param grade Timing grade to display.
- *
- * @return Nothing; the cell is mutated in place.
+ * @param cell Cell that will display the timing grade.
+ * @param grade Grade key used to select the timing color treatment.
  */
 const styleLoadGrade = (cell: ExcelJS.Cell, grade: string): void => {
 	const style = LOAD_STYLES[grade] || LOAD_STYLES.fail;
@@ -69,16 +70,25 @@ const styleLoadGrade = (cell: ExcelJS.Cell, grade: string): void => {
 	cell.alignment = { horizontal: 'center', vertical: 'middle' };
 };
 /**
- * Chooses the highest severity grade present in a visual result's measurements.
+ * Reads the populated cell values in worksheet order, including empty positions within the row.
  *
- * @param val Visual result whose load measurements are summarized.
+ * @param row Worksheet row whose values are copied into the aggregate summary.
  *
- * @return `fail`, `warning`, `pass`, or an empty string when no measurements exist.
+ * @return Cell values from the first column through the row's last populated cell.
+ */
+const valuesForRow = (row: ExcelJS.Row): (ExcelJS.CellValue | null)[] => Array.from({ length: row.cellCount }, (_, i) => row.getCell(i + 1).value);
+/**
+ * Chooses the worst timing grade recorded for one test result.
+ *
+ * @param val Result whose timing measurements contribute to the displayed grade.
+ *
+ * @return `fail`, `warning`, `pass`, or an empty string when the result has no timing samples.
  */
 const resultLoadGrade = (val: VisualResult): string => {
 	const counts = loadGradeCounts(val.loadMeasurements || []);
 	return counts.fail ? 'fail' : counts.warning ? 'warning' : counts.pass ? 'pass' : '';
 };
+
 /**
  * Writes the neutral spreadsheet artifact for a normalized report run.
  *
@@ -88,38 +98,37 @@ const resultLoadGrade = (val: VisualResult): string => {
  * @return A promise that resolves after the workbook has been written.
  */
 export const writeSpreadsheet = async (file: string, run: ReportRun): Promise<void> => {
-	const loadEnabled = run.loadTestingEnabled ?? run.results.some((r) => !!r.loadMeasurements?.length);
+	const loadEnabled = run.loadTestingEnabled ?? run.results.some(r => !!r.loadMeasurements?.length);
 	const book = new ExcelJS.Workbook();
 	book.creator = 'Test evidence reporter';
 	book.lastModifiedBy = 'Test evidence reporter';
 	book.title = 'Test evidence spreadsheet';
 	book.subject = 'Test evidence and diagnostics';
 	book.description = 'Spreadsheet evidence from an automated test run.';
-	const summarySheet = book.addWorksheet('Summary');
-	summarySheet.addRow(['File', 'Passed', 'Failed', 'Timed out', 'Skipped', 'Interrupted', 'Total', ...(loadEnabled ? ['Load passes', 'Load warnings', 'Load failures'] : [])]);
-	for (const fileName of orderedFiles(run)) {
-		const fileResults = resultsForFile(run, fileName);
-		const counts = statusCounts(fileResults);
-		const loadCounts = loadGradeCounts(fileResults.flatMap((result) => result.loadMeasurements || []));
-		summarySheet.addRow([
-			fileName,
-			...VISUAL_STATUSES.map((status) => counts[status]),
-			VISUAL_STATUSES.reduce((total, status) => total + counts[status], 0),
-			...(loadEnabled ? [loadCounts.pass, loadCounts.warning, loadCounts.fail] : []),
-		]);
+	{
+		const sheet = book.addWorksheet('Summary');
+		sheet.addRow(['File', 'Passed', 'Failed', 'Timed out', 'Skipped', 'Interrupted', 'Total', ...(loadEnabled ? ['Load passes', 'Load warnings', 'Load failures'] : [])]);
+		for (const file of orderedFiles(run)) {
+			const vals = resultsForFile(run, file);
+			const counts = statusCounts(vals);
+			const loadCounts = loadGradeCounts(vals.flatMap(r => r.loadMeasurements || []));
+			sheet.addRow([file, ...VISUAL_STATUSES.map(s => counts[s]), VISUAL_STATUSES.reduce((t, s) => t + counts[s], 0), ...(loadEnabled ? [loadCounts.pass, loadCounts.warning, loadCounts.fail] : [])]);
+		}
+		styleHeader(sheet);
+		sheet.columns = [{ width: 32 }, ...Array.from({ length: loadEnabled ? 9 : 6 }, () => ({ width: 14 }))];
 	}
-	styleHeader(summarySheet);
-	summarySheet.columns = [{ width: 32 }, ...Array.from({ length: loadEnabled ? 9 : 6 }, () => ({ width: 14 }))];
 	for (const fileName of orderedFiles(run)) {
 		const base =
 			[...fileName]
-				.map((character) => ('\\/:*?[]'.includes(character) ? '_' : character))
+				.map(c => ('\\/:*?[]'.includes(c) ? '_' : c))
 				.join('')
 				.replace(/^'+|'+$/g, '')
 				.slice(0, 31) || 'Results';
 		let sheetName = base;
-		for (let suffix = 2; [...book.worksheets.map((sheet) => sheet.name.toLowerCase()), 'summary', 'projects', 'run diagnostics'].includes(sheetName.toLowerCase()); suffix++) {
+		let suffix = 2;
+		while (new Set([...book.worksheets.map(s => s.name.toLowerCase()), ...['summary', 'projects', 'run diagnostics']]).has(sheetName.toLowerCase())) {
 			const label = ` (${suffix})`;
+			suffix += 1;
 			sheetName = `${base.slice(0, 31 - label.length)}${label}`;
 		}
 		const sheet = book.addWorksheet(sheetName);
@@ -175,16 +184,17 @@ export const writeSpreadsheet = async (file: string, run: ReportRun): Promise<vo
 			row.getCell(loadEnabled ? 8 : 7).numFmt = '0';
 			row.getCell(loadEnabled ? 9 : 8).numFmt = '0';
 			const statusCell = row.getCell(6);
-			const statusStyle = STATUS_STYLES[val.status] || STATUS_STYLES.failed;
-			statusCell.value = statusLabel(val.status);
-			statusCell.fill = { fgColor: { argb: statusStyle.fill }, pattern: 'solid', type: 'pattern' };
-			statusCell.font = { bold: true, color: { argb: statusStyle.font } };
+			const status = val.status;
+			const style = STATUS_STYLES[status] || STATUS_STYLES.failed;
+			statusCell.value = statusLabel(status as VisualResult['status']);
+			statusCell.fill = { fgColor: { argb: style.fill }, pattern: 'solid', type: 'pattern' };
+			statusCell.font = { bold: true, color: { argb: style.font } };
 			statusCell.alignment = { horizontal: 'center', vertical: 'middle' };
 			statusCell.border = {
-				bottom: { color: { argb: statusStyle.font }, style: 'thin' },
-				left: { color: { argb: statusStyle.font }, style: 'thin' },
-				right: { color: { argb: statusStyle.font }, style: 'thin' },
-				top: { color: { argb: statusStyle.font }, style: 'thin' },
+				bottom: { color: { argb: style.font }, style: 'thin' },
+				left: { color: { argb: style.font }, style: 'thin' },
+				right: { color: { argb: style.font }, style: 'thin' },
+				top: { color: { argb: style.font }, style: 'thin' },
 			};
 			if (loadEnabled && resultLoadGrade(val)) styleLoadGrade(row.getCell(7), resultLoadGrade(val));
 			if (val.browserErrors) row.getCell(loadEnabled ? 11 : 10).note = val.browserErrors;
@@ -200,11 +210,11 @@ export const writeSpreadsheet = async (file: string, run: ReportRun): Promise<vo
 		}
 	}
 	if (loadEnabled) {
-		const loadSheet = book.addWorksheet('Load timings');
-		loadSheet.addRow(['File', 'Test title', 'Project', 'Viewport', 'Kind', 'Measurement', 'Duration (ms)', 'Warn at (ms)', 'Fail at (ms)', 'Grade']);
+		const sheet = book.addWorksheet('Load timings');
+		sheet.addRow(['File', 'Test title', 'Project', 'Viewport', 'Kind', 'Measurement', 'Duration (ms)', 'Warn at (ms)', 'Fail at (ms)', 'Grade']);
 		for (const result of run.results) {
 			for (const measurement of result.loadMeasurements || []) {
-				const row = loadSheet.addRow([
+				const row = sheet.addRow([
 					result.file,
 					result.title,
 					result.project,
@@ -223,26 +233,134 @@ export const writeSpreadsheet = async (file: string, run: ReportRun): Promise<vo
 				row.alignment = { vertical: 'top' };
 			}
 		}
-		loadSheet.columns = [{ width: 32 }, { width: 42 }, { width: 24 }, { width: 12 }, { width: 14 }, { width: 42 }, { width: 16 }, { width: 16 }, { width: 16 }, { width: 14 }];
-		styleHeader(loadSheet);
+		sheet.columns = [{ width: 32 }, { width: 42 }, { width: 24 }, { width: 12 }, { width: 14 }, { width: 42 }, { width: 16 }, { width: 16 }, { width: 16 }, { width: 14 }];
+		styleHeader(sheet);
 	}
-	const projectsSheet = book.addWorksheet('Projects');
-	projectsSheet.addRow(['Project', 'Configured files', 'Passed', 'Failed', 'Timed out', 'Skipped', 'Interrupted', 'Total']);
-	for (const project of run.projects) {
-		const counts = statusCounts(run.results.filter((result) => result.project === project.name));
-		projectsSheet.addRow([project.name, project.configuredFiles.join(', '), ...VISUAL_STATUSES.map((status) => counts[status]), VISUAL_STATUSES.reduce((total, status) => total + counts[status], 0)]);
+	{
+		const sheet = book.addWorksheet('Projects');
+		sheet.addRow(['Project', 'Configured files', 'Passed', 'Failed', 'Timed out', 'Skipped', 'Interrupted', 'Total']);
+		for (const project of run.projects) {
+			const counts = statusCounts(run.results.filter(r => r.project === project.name));
+			sheet.addRow([project.name, project.configuredFiles.join(', '), ...VISUAL_STATUSES.map(s => counts[s]), VISUAL_STATUSES.reduce((t, s) => t + counts[s], 0)]);
+		}
+		sheet.columns = [{ width: 30 }, { width: 48 }, ...Array.from({ length: 6 }, () => ({ width: 14 }))];
+		styleHeader(sheet);
+		for (const row of sheet.getRows(2, sheet.rowCount) || []) row.alignment = { vertical: 'top', wrapText: true };
 	}
-	projectsSheet.columns = [{ width: 30 }, { width: 48 }, ...Array.from({ length: 6 }, () => ({ width: 14 }))];
-	styleHeader(projectsSheet);
-	for (const row of projectsSheet.getRows(2, projectsSheet.rowCount) || []) row.alignment = { vertical: 'top', wrapText: true };
-	const diagnosticsSheet = book.addWorksheet('Run diagnostics');
-	diagnosticsSheet.addRow(['Source', 'Message']);
-	for (const diagnostic of run.runDiagnostics) diagnosticsSheet.addRow(['Terminal', diagnostic]);
-	if (!run.runDiagnostics.length) diagnosticsSheet.addRow(['Run', 'No run-level diagnostics captured.']);
-	diagnosticsSheet.columns = [{ width: 18 }, { width: 120 }];
-	styleHeader(diagnosticsSheet);
-	for (const row of diagnosticsSheet.getRows(2, diagnosticsSheet.rowCount) || []) row.alignment = { vertical: 'top', wrapText: true };
+	{
+		const sheet = book.addWorksheet('Run diagnostics');
+		sheet.addRow(['Source', 'Message']);
+		for (const val of run.runDiagnostics) sheet.addRow(['Terminal', val]);
+		if (!run.runDiagnostics.length) sheet.addRow(['Run', 'No run-level diagnostics captured.']);
+		sheet.columns = [{ width: 18 }, { width: 120 }];
+		styleHeader(sheet);
+		for (const row of sheet.getRows(2, sheet.rowCount) || []) row.alignment = { vertical: 'top', wrapText: true };
+	}
 	book.views = [{ x: 0, y: 0, width: 19200, height: 10800, visibility: 'visible', activeTab: 0, firstSheet: 0 }];
 	await book.xlsx.writeFile(file);
+	await neutralizeApplicationMetadata(file);
+};
+/** A report workbook and its repository label for an aggregate evidence workbook. */
+export type SpreadsheetSource = { label: string; file: string };
+
+// AGGREGATE WORKBOOK
+/**
+ * Copies tabular content, cell styling, merges, and embedded images into one named worksheet.
+ *
+ * @param source Worksheet whose cells, formatting, merges, and images are copied.
+ * @param target Empty destination worksheet receiving the copied content.
+ * @param sourceBook Workbook that owns image references in the source worksheet.
+ * @param targetBook Workbook that receives cloned image references.
+ */
+const copyWorksheet = (source: ExcelJS.Worksheet, target: ExcelJS.Worksheet, sourceBook: ExcelJS.Workbook, targetBook: ExcelJS.Workbook): void => {
+	target.properties = structuredClone(source.properties);
+	target.views = structuredClone(source.views);
+	target.pageSetup = structuredClone(source.pageSetup);
+	target.headerFooter = structuredClone(source.headerFooter);
+	target.state = source.state;
+	target.columns = source.columns.map(c => ({ width: c.width, hidden: c.hidden, outlineLevel: c.outlineLevel, style: structuredClone(c.style), header: structuredClone(c.header), key: c.key }));
+	source.eachRow({ includeEmpty: true }, (r, v) => {
+		const targetRow = target.getRow(v);
+		targetRow.height = r.height;
+		targetRow.hidden = r.hidden;
+		targetRow.outlineLevel = r.outlineLevel;
+		r.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+			const targetCell = targetRow.getCell(colNumber);
+			targetCell.value = structuredClone(cell.value);
+			targetCell.style = structuredClone(cell.style);
+			if (cell.note) targetCell.note = structuredClone(cell.note);
+			if (cell.dataValidation) targetCell.dataValidation = structuredClone(cell.dataValidation);
+		});
+	});
+	for (const range of source.model.merges || []) target.mergeCells(range);
+	for (const { imageId: imgId, range } of source.getImages()) {
+		target.addImage(targetBook.addImage(sourceBook.getImage(Number(imgId))), structuredClone(range));
+	}
+};
+/**
+ * Combines per-repository Reporting workbooks into an all-tests workbook.
+ *
+ * @param file Output path for the aggregate workbook.
+ * @param sources Repository labels and source report.xlsx paths.
+ *
+ * @return A promise that resolves after summaries, detailed rows, and screenshot images are copied.
+ */
+export const mergeSpreadsheets = async (file: string, sources: readonly SpreadsheetSource[]): Promise<void> => {
+	if (!sources.length) throw new Error('At least one Reporting workbook is required to create an aggregate spreadsheet.');
+	const aggregate = new ExcelJS.Workbook();
+	aggregate.creator = 'Test evidence reporter';
+	aggregate.lastModifiedBy = 'Test evidence reporter';
+	aggregate.title = 'Aggregate test evidence spreadsheet';
+	aggregate.subject = 'Cross-repository Playwright results and screenshots';
+	aggregate.description = 'Programmatically combined repository test evidence.';
+	const summary = aggregate.addWorksheet('All tests');
+	let summaryHeader: ExcelJS.CellValue[] | undefined;
+	const usedSheetNames = new Set(['all tests']);
+	for (const { label, file: sourceFile } of sources) {
+		const sourceBook = new ExcelJS.Workbook();
+		await sourceBook.xlsx.readFile(sourceFile);
+		const sourceSummary = sourceBook.getWorksheet('Summary');
+		if (!sourceSummary) throw new Error(`Reporting workbook has no Summary worksheet: ${sourceFile}`);
+		const header = valuesForRow(sourceSummary.getRow(1)) as ExcelJS.CellValue[];
+		if (!summaryHeader) {
+			summaryHeader = ['Repository', ...header];
+			summary.addRow(summaryHeader);
+		} else if (header.length !== summaryHeader.length - 1 || header.some((v, i) => v !== summaryHeader?.[i + 1])) {
+			throw new Error(`Reporting workbook Summary columns do not match the aggregate contract: ${sourceFile}`);
+		}
+		for (let rowNumber = 2; rowNumber <= sourceSummary.rowCount; rowNumber++) {
+			const row = sourceSummary.getRow(rowNumber);
+			if (!row.hasValues) continue;
+			// terra-quality-ignore single-use -- Keep this new row so each copied cell style targets the same aggregate row.
+			const aggregateRow = summary.addRow([label, ...valuesForRow(row)]);
+			row.eachCell({ includeEmpty: true }, (s, c) => {
+				aggregateRow.getCell(c + 1).style = structuredClone(s.style);
+			});
+		}
+		for (const sourceSheet of sourceBook.worksheets) {
+			if (sourceSheet.name === 'Summary') continue;
+			const base =
+				`${label} ${sourceSheet.name}`
+					.replace(/[\\/*?:[\]]/gu, '_')
+					.replace(/^'+|'+$/gu, '')
+					.slice(0, 31) || 'Results';
+			let sheetName = base;
+			let suffix = 2;
+			while (usedSheetNames.has(sheetName.toLowerCase())) {
+				const postfix = ` (${suffix++})`;
+				sheetName = `${base.slice(0, 31 - postfix.length)}${postfix}`;
+			}
+			usedSheetNames.add(sheetName.toLowerCase());
+			copyWorksheet(sourceSheet, aggregate.addWorksheet(sheetName), sourceBook, aggregate);
+		}
+	}
+	if (!summaryHeader) throw new Error('No summary rows were available in the Reporting workbooks.');
+	summary.columns = [{ width: 18 }, ...summaryHeader.slice(1).map(() => ({ width: 18 }))];
+	summary.views = [{ showGridLines: false, state: 'frozen', ySplit: 1 }];
+	summary.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
+	summary.getRow(1).fill = { fgColor: { argb: 'FF1F4E78' }, pattern: 'solid', type: 'pattern' };
+	for (const row of summary.getRows(2, summary.rowCount) || []) row.alignment = { vertical: 'top', wrapText: true };
+	aggregate.views = [{ x: 0, y: 0, width: 19200, height: 10800, visibility: 'visible', activeTab: 0, firstSheet: 0 }];
+	await aggregate.xlsx.writeFile(file);
 	await neutralizeApplicationMetadata(file);
 };

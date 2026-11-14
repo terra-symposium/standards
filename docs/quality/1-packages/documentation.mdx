@@ -1,0 +1,29 @@
+---
+title: standards-documentation
+description: TSDoc, JSDoc, Doxygen, and documented-command checks.
+---
+
+`@terra-symposium/standards-documentation` checks declaration documentation across JavaScript, TypeScript, C, Java, and Python sources and validates configured Markdown shell examples. It reports missing prose for an author to write after reviewing the implementation and callers.
+
+## Install and CLI
+
+```sh
+pnpm add -D @terra-symposium/standards-documentation
+pnpm exec terra-documentation --config config/quality.json --all
+```
+
+The CLI reads the same `quality.json` as the aggregate runner. With no explicit files, it checks changed and untracked source files. `--all` scans configured source roots; `--warn` is read-only. Findings are JSON lines and make the command fail.
+
+## Check behavior
+
+The `documentation.required` policy controls types, named functions, exported functions, and inline functions. C and header declaration requirements include Doxygen summaries, parameter descriptions and order, returns, and configured authors. `documentation.commandRoots` opts Markdown command examples into checks for supported pnpm flags. Duplicate imported bindings are also exported for use by focused import checkers.
+
+Documentation findings are diagnostic only. The compatibility `documentSrcFile` API is a no-op; no command creates comment scaffolds or placeholders. Keep comments agent-authored and implementation-specific.
+
+## API
+
+```ts
+import { documentationFindings, documentSrcFile, documentedCommandFindings, fixDocumentedCommands } from '@terra-symposium/standards-documentation';
+```
+
+The root API includes TypeScript declarations. `./cli` is a public CLI module export. See [configuration](/quality/2-configuration/quality-json/) for policy fields and [built-in checks](/quality/3-checks/check-reference/) for neighboring capabilities.

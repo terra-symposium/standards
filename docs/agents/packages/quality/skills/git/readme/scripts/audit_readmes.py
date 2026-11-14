@@ -8,7 +8,6 @@ import re
 import sys
 from pathlib import Path
 
-
 EXPECTED_H2 = [
     "Getting started",
     "Security and Limitations",
@@ -20,12 +19,21 @@ EXPECTED_H2 = [
 LIST_ITEM = re.compile(r"^\s*(?:[-*+]\s+|\d+[.)]\s+)")
 LINK = re.compile(r"!?\[[^\]]*\]\(([^)]+)\)")
 PLACEHOLDER = re.compile(
-    r"\b(?:TODO|TBD|FIXME|Not applicable)\b|<\s*(?:project|command|path|variable|url)\b",
+    r"\b(?:TODO|TBD|FIXME|Not applicable)\b|"
+    r"<\s*(?:project|command|path|variable|url)\b",
     re.IGNORECASE,
 )
 
 
 def readmes(paths: list[Path]) -> list[Path]:
+    """Expand README paths into a stable, de-duplicated file list.
+
+    Args:
+        paths (list[Path]): README files or directories to search recursively.
+
+    Returns:
+        list[Path]: Existing README.md paths in sorted order.
+    """
     found: set[Path] = set()
     for path in paths:
         if path.is_dir():
@@ -38,6 +46,17 @@ def readmes(paths: list[Path]) -> list[Path]:
 
 
 def check(path: Path) -> list[str]:
+    """Find README structure, placeholder, fence, and local-link violations.
+
+    Code-fenced examples are excluded from Markdown structure checks, and
+    relative links are resolved from the README's containing directory.
+
+    Args:
+        path (Path): README file whose content should be audited.
+
+    Returns:
+        list[str]: Human-readable violations in discovery order.
+    """
     errors: list[str] = []
     text = path.read_text(encoding="utf-8")
     lines = text.splitlines()
@@ -62,7 +81,9 @@ def check(path: Path) -> list[str]:
     elif not any(
         markdown_lines[i] == "## Getting started"
         and i < command_lines[0]
-        and not any(markdown_lines[j].startswith("## ") for j in range(i + 1, command_lines[0]))
+        and not any(
+            markdown_lines[j].startswith("## ") for j in range(i + 1, command_lines[0])
+        )
         for i in range(len(markdown_lines))
     ):
         errors.append("`### Commands` is not inside `## Getting started`")
@@ -79,9 +100,15 @@ def check(path: Path) -> list[str]:
     if len(fences) % 2:
         errors.append("unclosed fenced code block")
 
-    for heading_index in (i for i, line in enumerate(markdown_lines) if line.startswith("## ")):
+    for heading_index in (
+        i for i, line in enumerate(markdown_lines) if line.startswith("## ")
+    ):
         end = next(
-            (i for i in range(heading_index + 1, len(markdown_lines)) if markdown_lines[i].startswith("## ")),
+            (
+                i
+                for i in range(heading_index + 1, len(markdown_lines))
+                if markdown_lines[i].startswith("## ")
+            ),
             len(markdown_lines),
         )
         if not any(line.strip() for line in markdown_lines[heading_index + 1 : end]):
@@ -110,7 +137,9 @@ def check(path: Path) -> list[str]:
             continue
         for raw_target in LINK.findall(line):
             target = raw_target.strip().split()[0].strip("<>").split("#", 1)[0]
-            if not target or re.match(r"^(?:https?:|mailto:|data:)", target, re.I):
+            if not target or re.match(
+                r"^(?:https?:|mailto:|data:)", target, re.IGNORECASE
+            ):
                 continue
             if not (path.parent / target).exists():
                 errors.append(f"line {index + 1}: broken local link {target}")
@@ -119,8 +148,16 @@ def check(path: Path) -> list[str]:
 
 
 def main() -> int:
+    """Audit command-line README targets and return a process exit status.
+
+    Returns:
+        int: Zero when every discovered README passes, one when any fail, or
+        two when the command-line targets contain no README files.
+    """
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("paths", nargs="+", type=Path, help="README files or directories")
+    parser.add_argument(
+        "paths", nargs="+", type=Path, help="README files or directories"
+    )
     args = parser.parse_args()
     targets = readmes(args.paths)
     if not targets:

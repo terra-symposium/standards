@@ -18,16 +18,9 @@ CONFIG
 const { label, sharedBuffer } = workerData as { label: string; sharedBuffer: SharedArrayBuffer };
 const state = new Int32Array(sharedBuffer);
 const frames = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
-
-/*//////////////////////////////////////////////////
-HELPERS
-//////////////////////////////////////////////////*/
-
-/**
- * Draws the next spinner frame until the parent stops the check.
- *
- * @return Nothing; frames are written directly to standard error.
- */
+// terra-quality-ignore single-use -- This counter must persist across draw calls to advance the spinner.
+let frame = 0;
+/** Draws spinner frames until the parent worker signals completion. */
 function draw(): void {
 	if (Atomics.load(state, 0)) {
 		writeSync(2, '\r\u001b[2K');
@@ -35,9 +28,10 @@ function draw(): void {
 		Atomics.notify(state, 2);
 		return;
 	}
-	writeSync(2, `\r  ${frames[Atomics.add(state, 3, 1) % frames.length]} ${label}`);
+	writeSync(2, `\r  ${frames[frame++ % frames.length]} ${label}`);
 	Atomics.store(state, 1, 1);
 	Atomics.notify(state, 1);
 	setTimeout(draw, 90);
 }
+
 draw();

@@ -1,0 +1,33 @@
+---
+title: standards-quality
+description: Aggregate CLI, compatibility API, phase ordering, orchestration, and combined reports.
+---
+
+`@terra-symposium/standards-quality` is the aggregate package for a complete ordered run. It coordinates the capability packages, external tools, repository commands, combined reports, progress output, and development-server helpers. It also preserves the established root, subpath, and CLI entry points for existing consumers.
+
+## Install and run
+
+```sh
+pnpm add -D @terra-symposium/standards-quality
+pnpm exec terra-quality quality --all
+```
+
+The package requires Node.js `>=18.18`. Its normal run selects changed and untracked source files; `--all` selects all configured source roots. `--warn` disables automatic edits. The configured `quality.json` is the single policy file: `--config PATH` selects a different file, and `config/quality.json` is discovered when no root-level file is present.
+
+The `error-boundaries` source check is mandatory. It checks React mount roots and Astro configuration for the shared failure handling integrations, then applies supported wrappers in fix mode. Pass `--warn` to inspect without edits. Static analysis does not test whether the chosen fallback works at runtime; use an application browser test for that behavior.
+
+## Responsibilities
+
+- Validate and normalize the full `quality.json` schema.
+- Run phases in fixed order: Format → Static quality → Tests → Framework/type checks → Build → Repository health.
+- Invoke capability APIs and configured repository tools or commands.
+- Preserve JSON reports, failure exit codes, findings, and progress behavior used by the existing CLI.
+- Provide GitHub reporting, the `terra-quality-dev` port launcher, and existing compatibility subpaths.
+
+The aggregate package owns orchestration, not each individual rule implementation. Focused packages can run their own capability CLI or API. Start with [the package map](/quality/1-packages/package-map/) and [the CLI workflow](/quality/4-workflows/cli-and-ci/).
+
+## Existing executables and API
+
+The package publishes `terra-quality` and `terra-quality-dev`. The root export and documented subpaths, including `/cli`, `/naming`, `/object-forwarding`, `/single-use`, and `/port`, remain available for compatibility. Prefer the owning capability package for new direct dependencies when only one capability is needed.
+
+`quality.json` contains source scope, check toggles, autofix policy, tool locations, command arrays, and report options. See [the schema-backed configuration reference](/quality/2-configuration/quality-json/); do not add a second configuration file for a focused check.

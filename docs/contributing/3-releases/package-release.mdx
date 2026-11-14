@@ -1,0 +1,46 @@
+---
+title: Release a package
+description: Version and publish a public Standards package through Changesets.
+---
+
+Use Changesets for public package behavior and metadata changes. Choose the release level from the compatibility impact, then verify the package as an independent consumer.
+
+## Release sequence
+
+<Nodes
+	direction='LR'
+	nodes={[
+		{ id: 'change', type: 'origin', data: { title: 'Implement API change' } },
+		{ id: 'verify', type: 'process', data: { title: 'Build and test package' } },
+		{ id: 'changefile', type: 'process', data: { title: 'Add Changeset' } },
+		{ id: 'review', type: 'process', data: { title: 'Review exports and package' } },
+		{ id: 'publish', type: 'terminal', data: { title: 'Publish in dependency order' } },
+	]}
+	edges={[
+		{ id: 'change-verify', source: 'change', target: 'verify' },
+		{ id: 'verify-changefile', source: 'verify', target: 'changefile' },
+		{ id: 'changefile-review', source: 'changefile', target: 'review' },
+		{ id: 'review-publish', source: 'review', target: 'publish' },
+	]}
+	height={230}
+/>
+
+1. Update implementation, declarations, README, tests, and package metadata together.
+2. Build and test the package, then run the workspace build and test plan.
+3. Run `pnpm changeset` and review the generated Markdown under `.changeset/`.
+4. Use patch for a compatible fix, minor for a compatible public addition, and major for a breaking change.
+5. Confirm internal dependencies can publish in dependency order and the lockfile is current.
+
+Documentation-only changes do not need a package changeset. A README correction that does not change the published contract remains documentation-only.
+
+## Review the consumer contract
+
+| Field                 | Verify                                                                             |
+| --------------------- | ---------------------------------------------------------------------------------- |
+| `exports` and `types` | Every documented root and subpath resolves to shipped declarations.                |
+| `files`               | The tarball contains runtime files, schema, CLI, and README required by consumers. |
+| `bin`                 | Each executable is declared and works without monorepo-only imports.               |
+| Dependencies          | Package consumers install the required runtime dependencies and peer dependencies. |
+| Release note          | The Changeset names every affected public package and the correct semver impact.   |
+
+A successful workspace build alone does not prove a tarball is self-contained. Review the package’s published files and consumer-facing documentation. See the [Quality package map](/quality/1-packages/package-map/) for package boundaries.

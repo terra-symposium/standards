@@ -1,0 +1,52 @@
+{
+	"name": "@terra-symposium/standards-formatting",
+	"version": "0.2.3",
+	"description": "Terra source layout maintenance and syntax-safe formatting transforms.",
+	"type": "module",
+	"engines": {
+		"node": ">=18.18"
+	},
+	"main": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js"
+		},
+		"./cli": {
+			"types": "./dist/cli.d.ts",
+			"import": "./dist/cli.js"
+		}
+	},
+	"files": [
+		"dist",
+		"README.md"
+	],
+	"publishConfig": {
+		"registry": "https://registry.npmjs.org",
+		"access": "public"
+	},
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/Terra-Symposium/standards.git"
+	},
+	"scripts": {
+		"quality": "node \"$(git rev-parse --show-toplevel)/scripts/quality-runner.mjs\" quality",
+		"quality:all": "node \"$(git rev-parse --show-toplevel)/scripts/quality-runner.mjs\" quality --all",
+		"build": "tsc -p config/tsconfig.json",
+		"test": "npm run build && mkdir -p tests/results && node --test --test-reporter=spec --test-reporter-destination=stdout --test-reporter=junit --test-reporter-destination=tests/results/junit.xml",
+		"prepare": "npm run build",
+		"typecheck": "tsc --noEmit -p config/tsconfig.json"
+	},
+	"dependencies": {
+		"@terra-symposium/standards-quality-core": "workspace:*",
+		"typescript": "^5.0.0",
+		"@terra-symposium/standards-documentation": "workspace:*"
+	},
+	"devDependencies": {
+		"@types/node": "^26.6.5"
+	},
+	"bin": {
+		"terra-formatting": "dist/cli.js"
+	}
+}

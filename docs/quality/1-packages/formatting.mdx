@@ -1,0 +1,25 @@
+---
+title: standards-formatting
+description: Source headers, import and section layout, syntax-safe transforms, and Prettier integration.
+---
+
+`@terra-symposium/standards-formatting` maintains Terra source layout and exposes conservative syntax-aware transforms. It integrates a repository-installed Prettier executable when that check is configured; it does not install Prettier or choose the consuming repository's native rules.
+
+## Install and run
+
+```sh
+pnpm add -D @terra-symposium/standards-formatting
+pnpm exec terra-formatting --all
+```
+
+The CLI uses the shared Quality config and file scopes. `--warn` reports without editing. The normal capability run selects changed and untracked files; `--all` scans all configured sources.
+
+## Responsibilities and API
+
+The package maintains source headers, import grouping, section layout, whitespace, long-import protection, and safe transforms that collapse supported inline conditionals or type/object shapes. It re-exports `maintainSrcFile`, `protectLongImports`, and comment cleanup helpers from the Documentation capability to preserve a single implementation.
+
+```ts
+import { runFormatting, maintainSrcFile, collapseInlineIfs, collapseTypesAndObjects, protectLongImports } from '@terra-symposium/standards-formatting';
+```
+
+Only syntax-safe patterns are changed automatically. Ambiguous structures remain for review. Configure `tools.prettier`, `prettierPrintWidth`, and `oneLineImports` in [`quality.json`](/quality/2-configuration/quality-json/); install and configure Prettier and any framework plugin in the consuming repository.

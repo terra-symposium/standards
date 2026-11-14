@@ -1,0 +1,88 @@
+---
+title: Setup and first run
+description: Install the aggregate CLI, create a minimal policy, and choose a safe initial run.
+---
+
+Terra Quality supports Node.js `>=18.18`. The aggregate package coordinates built-in checks and repository-configured tools; it does not install or configure those native tools for you.
+
+## Install the aggregate runner
+
+Choose the package manager already used by the repository.
+
+||| [pnpm]
+
+```sh
+pnpm add -D @terra-symposium/standards-quality
+```
+
+|||
+
+||| [npm]
+
+```sh
+npm install --save-dev @terra-symposium/standards-quality
+```
+
+|||
+
+## Add a minimal quality.json
+
+Start with a source scope and disable optional external tools until they are installed and configured. The schema path below is relative to this file.
+
+```json
+{
+	"$schema": "./node_modules/@terra-symposium/standards-quality/quality.schema.json",
+	"sourceRoots": ["src"],
+	"extensions": [".js", ".jsx", ".ts", ".tsx"],
+	"enabledChecks": {
+		"format": false,
+		"lint": false,
+		"knip": false,
+		"dead-code": false
+	}
+}
+```
+
+## Choose the first run
+
+The flow shows the distinction between the default local fix run and a complete read-only review.
+
+<Nodes
+	direction='LR'
+	nodes={[
+		{ id: 'install', type: 'origin', data: { title: 'Install package' } },
+		{ id: 'config', type: 'process', data: { title: 'Add quality.json' } },
+		{ id: 'local', type: 'process', data: { title: 'Changed-file fix run' } },
+		{ id: 'review', type: 'terminal', data: { title: 'Full read-only run' } },
+	]}
+	edges={[
+		{ id: 'install-config', source: 'install', target: 'config' },
+		{ id: 'config-local', source: 'config', target: 'local' },
+		{ id: 'local-review', source: 'local', target: 'review' },
+	]}
+	height={220}
+/>
+
+||| [Local fix run]
+
+```sh
+pnpm exec terra-quality
+```
+
+The normal run selects changed and untracked source files and applies enabled autofixes. Configured repository commands also run unless skipped. |||
+
+||| [Full read-only run]
+
+```sh
+pnpm exec terra-quality quality --all
+```
+
+`--all` selects the full configured source scope. `--warn` disables autofixes for review and CI. Add `--skip-commands` only when build and test commands run in separate workflow steps. |||
+
+=== [Optional external tools] Formatting requires an installed Prettier. Install and configure it in the consuming repository before setting `enabledChecks.format` to true. Linting requires ESLint and its flat configuration. Knip and TypeScript checks likewise use repository-installed tools and project files.
+
+# Keep native configuration such as `eslint.config.mjs`, `tsconfig.json`, and Prettier settings in the consuming project. Terra Quality passes the selected files or configured project to the tool; it does not replace that tool’s rule model.
+
+React and TSX projects should use a valid JSX option in the effective TypeScript configuration, commonly `"jsx": "react-jsx"`. Restart the TypeScript language service after changing the project settings.
+
+For every `quality.json` field, see the [configuration reference](/quality/2-configuration/quality-json/). For run modes, see [CLI and CI workflows](/quality/4-workflows/cli-and-ci/).

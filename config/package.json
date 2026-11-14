@@ -1,0 +1,37 @@
+{
+	"name": "@terra-symposium/standards",
+	"private": true,
+	"version": "0.1.0",
+	"packageManager": "pnpm@10.30.3",
+	"type": "module",
+	"docs": {
+		"title": "Standards",
+		"description": "Documentation for shared Terra Symposium packages and tools.",
+		"site": "https://standards-docs.netlify.app",
+		"out": "dist/docs"
+	},
+	"scripts": {
+		"build": "cd .. && pnpm -r --filter '!@terra-symposium/standards' --filter '!standards-workspace-adapter' build",
+		"test": "cd .. && node packages/testing/src/cli.mjs run --manifest config/terra-tests.json",
+		"quality": "node \"$(git rev-parse --show-toplevel)/scripts/quality-runner.mjs\" quality",
+		"quality:all": "node \"$(git rev-parse --show-toplevel)/scripts/quality-runner.mjs\" quality --all",
+		"docs": "cd .. && node config/scripts/build-docs.mjs --dev",
+		"docs:build": "cd .. && node config/scripts/build-docs.mjs",
+		"prepare": "cd .. && husky config/husky",
+		"changeset": "changeset",
+		"release": "cd .. && pnpm exec changeset publish"
+	},
+	"devDependencies": {
+		"@changesets/cli": "^3.0.3",
+		"@eslint/js": "^10.0.1",
+		"@terra-symposium/docs": "^0.4.14",
+		"@types/node": "^26.6.5",
+		"eslint": "^10.13.0",
+		"globals": "^17.13.0",
+		"husky": "^9.1.7",
+		"knip": "^6.41.0",
+		"prettier": "^3.9.10",
+		"typescript": "^6.0.3",
+		"typescript-eslint": "^8.71.2"
+	}
+}

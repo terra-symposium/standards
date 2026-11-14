@@ -1,0 +1,32 @@
+# @terra-symposium/standards-patterns
+
+## 0.2.3
+
+### Patch Changes
+
+- 5bc2ec1: Keep shared regex exports referenced outside changed-file source roots during safe autofix.
+
+## 0.2.2
+
+### Patch Changes
+
+- fd7c500: Preserve shared regex exports used by unchanged source files when Quality fixes a changed-file scope.
+
+## 0.2.1
+
+### Patch Changes
+
+- Publish the current built artifacts for these packages. The previously published versions did not match the release tree, including the Quality Core export required by Formatting.
+- Updated dependencies
+  - @terra-symposium/standards-quality-core@0.2.1
+
+## 0.2.0
+
+### Minor Changes
+
+- Publish quality checks by capability family while keeping the aggregate CLI and compatibility exports.
+
+### Patch Changes
+
+- Updated dependencies
+  - @terra-symposium/standards-quality-core@0.2.0

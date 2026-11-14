@@ -1,0 +1,78 @@
+---
+/** Keeps Astro island hydration failures inside a visible, recoverable boundary. */
+type Props = {
+	title?: string;
+	description?: string;
+	reloadLabel?: string;
+};
+
+const { title = 'This section could not load', description = 'The interactive interface failed to start. The error has been recorded for diagnosis.', reloadLabel = 'Reload page' } = Astro.props;
+---
+
+<terra-error-boundary data-terra-error-boundary>
+	<slot />
+	<section class='terra-error-boundary-fallback' data-terra-hydration-fallback hidden role='alert'>
+		<div>
+			<h1>{title}</h1>
+			<p>{description}</p>
+			<a href={Astro.url.href}>{reloadLabel}</a>
+		</div>
+	</section>
+</terra-error-boundary>
+
+<script is:inline>
+	(() => {
+		document.addEventListener('astro:hydration-error', event => {
+			if (event.defaultPrevented) return;
+			const island = event.target;
+			if (!(island instanceof Element)) return;
+			const boundary = island.closest('terra-error-boundary[data-terra-error-boundary]');
+			const fallback = boundary?.querySelector('[data-terra-hydration-fallback]');
+			if (!boundary || !fallback) return;
+
+			// Astro emits this cancelable event before logging a failed island import.
+			event.preventDefault();
+			console.error('[Terra error boundary] island hydration failed', event.detail?.error);
+			island.setAttribute('hidden', '');
+			fallback.removeAttribute('hidden');
+		});
+	})();
+</script>
+
+<style>
+	terra-error-boundary {
+		display: contents;
+	}
+
+	.terra-error-boundary-fallback {
+		box-sizing: border-box;
+		max-width: 42rem;
+		margin: 3rem auto;
+		padding: 1.5rem;
+		color: var(--foreground, #171717);
+		background: var(--background, #fff);
+		border: 1px solid var(--border, #d1d5db);
+		border-radius: 0.75rem;
+		font: inherit;
+	}
+
+	.terra-error-boundary-fallback h1 {
+		margin: 0 0 0.5rem;
+		font-size: 1.25rem;
+		font-weight: 600;
+	}
+
+	.terra-error-boundary-fallback p {
+		margin: 0 0 1rem;
+	}
+
+	.terra-error-boundary-fallback a {
+		color: var(--primary, #2563eb);
+		text-decoration: underline;
+		text-underline-offset: 0.2em;
+	}
+
+	.terra-error-boundary-fallback[hidden] {
+		display: none !important;
+	}
+</style>

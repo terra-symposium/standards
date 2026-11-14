@@ -1,0 +1,25 @@
+---
+title: Error-boundaries package reference
+description: Install, exports, peer requirements, and behavior owned by the error-boundaries package.
+---
+
+`@terra-symposium/standards-error-boundaries` is a framework-light runtime package for reusable React error boundaries and small Astro/Next.js helpers. The consumer supplies fallback UI, telemetry, routing, retry policy, and deployment configuration.
+
+## Package contract
+
+| Import path                                   | Exports                                                                                            |
+| --------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| `@terra-symposium/standards-error-boundaries` | Re-exports React boundary, Astro status copy, Next digest, and Astro integration APIs.             |
+| `/react`                                      | `ErrorBoundary`, `ErrorBoundaryProps`, `ErrorBoundaryState`, `ErrorReporter`, `withErrorBoundary`. |
+| `/astro`                                      | `ErrorStatus`, `ErrorStatusCopy`, `ERROR_STATUS_COPY`, `errorStatusCopy`.                          |
+| `/astro-integration`                          | `terraErrorBoundaryIntegration()`.                                                                 |
+| `/astro-boundary`                             | `AstroErrorBoundary.astro` wrapper for island hydration errors.                                    |
+| `/next`                                       | `NextRouteError`, `NextRouteErrorProps`, `errorDigest`.                                            |
+
+React and React DOM `>=18` are peer dependencies. The Astro component is exported as a direct package subpath so Astro applications can import it in a `.astro` file.
+
+## Behavior and data
+
+The React component uses React's class error-boundary lifecycle. Its callback receives an error and `{ name, componentStack }`. The package does not make network requests, persist callback data, or decide log retention. The Astro wrapper and integration display a static retry/reload fallback for the hydration event they handle. The HTTP status and Next digest helpers only return values; they do not create framework routes.
+
+See [React API](/error-boundaries/1-react/react-boundaries/), [Astro hydration handling](/error-boundaries/2-frameworks/hydration/), [route helpers](/error-boundaries/2-frameworks/route-errors/), and [production telemetry guidance](/error-boundaries/3-analytics/production-telemetry/).

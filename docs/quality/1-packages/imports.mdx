@@ -1,0 +1,27 @@
+---
+title: standards-imports
+description: Resolve local imports and detect repeated imports using the shared Quality scope.
+---
+
+`@terra-symposium/standards-imports` checks source imports against repository paths, configured aliases, and configured external prefixes. It also finds duplicate imported bindings through its dependency on the shared Documentation implementation.
+
+## Install and run
+
+```sh
+pnpm add -D @terra-symposium/standards-imports
+pnpm exec terra-imports --all
+```
+
+The CLI reads root `quality.json` or `config/quality.json`; `--config PATH` chooses explicitly. Changed and untracked files are the default scope. `--all` scans the configured source roots, and `--warn` disables fixes.
+
+## Configuration
+
+`sourceRoots`, `includeRoots`, `extensions`, `skippedDirectories`, and `skippedFiles` determine what is scanned. `aliases` maps internal import prefixes to repository paths, such as `@/` to `src/`. `externalPrefixes` marks import prefixes that should not be treated as unresolved local files. The checker does not rewrite package exports or resolve arbitrary custom runtime loaders.
+
+## API
+
+```ts
+import { checkImports, duplicateImportFindings } from '@terra-symposium/standards-imports';
+```
+
+Both APIs are available from the declared root export with TypeScript declarations; `./cli` is also exported. See [the config reference](/quality/2-configuration/quality-json/) for path semantics and [CLI workflows](/quality/4-workflows/cli-and-ci/) for common scope choices.

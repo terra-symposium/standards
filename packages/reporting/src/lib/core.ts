@@ -86,12 +86,11 @@ HELPERS
 /**
  * Converts an external status into the normalized reporting status set.
  *
- * @param val External status value to normalize.
  * @param value External status value.
  *
  * @return A supported reporting status, defaulting to `failed` for unknown values.
  */
-export const normalizeVisualStatus = (val: string): VisualStatus => (VISUAL_STATUSES.includes(val as VisualStatus) ? (val as VisualStatus) : 'failed');
+export const normalizeVisualStatus = (value: string): VisualStatus => (VISUAL_STATUSES.includes(value as VisualStatus) ? (value as VisualStatus) : 'failed');
 
 /**
  * Converts internal status casing into the label shown in artifacts.
@@ -105,12 +104,11 @@ export const statusLabel = (status: VisualStatus): string => (status === 'timedO
 /**
  * Counts newline-delimited diagnostic messages while treating an empty value as zero.
  *
- * @param val Newline-delimited diagnostic text.
  * @param value Newline-delimited diagnostic text.
  *
  * @return The number of non-empty diagnostic lines.
  */
-export const diagnosticCount = (val: string): number => (val ? val.split('\n').filter(Boolean).length : 0);
+export const diagnosticCount = (value: string): number => (value ? value.split('\n').filter(Boolean).length : 0);
 
 /**
  * Returns one count for every supported status, including statuses absent from the run.
@@ -120,7 +118,7 @@ export const diagnosticCount = (val: string): number => (val ? val.split('\n').f
  * @return A complete status-to-count map.
  */
 export const statusCounts = (results: readonly VisualResult[]): Record<VisualStatus, number> => {
-	const counts = Object.fromEntries(VISUAL_STATUSES.map((s) => [s, 0])) as Record<VisualStatus, number>;
+	const counts = Object.fromEntries(VISUAL_STATUSES.map(s => [s, 0])) as Record<VisualStatus, number>;
 	for (const result of results) counts[result.status] += 1;
 	return counts;
 };
@@ -133,10 +131,10 @@ export const statusCounts = (results: readonly VisualResult[]): Record<VisualSta
  * @return Unique feature-file names in report order.
  */
 export const orderedFiles = (run: ReportRun): string[] => [
-	...run.featureFiles.filter((f) => run.results.some((r) => r.file === f)),
+	...run.featureFiles.filter(f => run.results.some(r => r.file === f)),
 	...run.results
-		.map((r) => r.file)
-		.filter((f) => !run.featureFiles.includes(f))
+		.map(r => r.file)
+		.filter(f => !run.featureFiles.includes(f))
 		.filter((f, i, v) => v.indexOf(f) === i),
 ];
 
@@ -148,4 +146,4 @@ export const orderedFiles = (run: ReportRun): string[] => [
  *
  * @return Results associated with the requested feature file.
  */
-export const resultsForFile = (run: ReportRun, file: string): VisualResult[] => run.results.filter((r) => r.file === file);
+export const resultsForFile = (run: ReportRun, file: string): VisualResult[] => run.results.filter(r => r.file === file);

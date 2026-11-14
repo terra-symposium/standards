@@ -1,0 +1,201 @@
+---
+title: Repository pattern checks
+description: Reference source security, repeated classes, regular expressions, Tailwind, and UI-pattern checks.
+---
+
+These checks report or normalize repository-specific source conventions. Most require an explicit policy block and do not establish runtime security or design intent.
+
+## Repository policies and patterns
+
+### Security
+
+Portable checks for environment files, client secrets, imports, terms, and runtime boundaries.
+
+**Toggle:** `enabledChecks.security` plus a `security` config object · **Fix:** none · **Command:** `security`
+
+Reports committed or root-level environment files, environment-file loaders, secret-shaped environment access in client roots, forbidden imports and terms, and process-environment access outside configured Node runtime roots. Security findings fail the run.
+
+Configure `security.forbiddenTerms`, `security.forbiddenImports`, `security.clientRoots`, and `security.runtimeRoots`; roots are repository paths for Node-only server, tooling, and test code. `allowProcessEnvRoots` remains a compatibility alias. This portable guardrail does not prove an application is secure.
+
+**Before** — client code reads a secret-shaped variable:
+
+```ts
+const token = import.meta.env.API_SECRET;
+```
+
+**After** — keep the secret on the server and expose only the operation the client needs:
+
+```ts
+const response = await fetch('/api/account');
+const account = await response.json();
+```
+
+Server/API design depends on the application; the check reports the boundary violation without rewriting it.
+
+### Repeated classes
+
+Detect and optionally extract repeated static class strings.
+
+**Toggle:** `enabledChecks.repeated-classes` plus `repeatedClasses` config · **Fix:** `autofix.repeatedClasses` · **Command:** `repeated-classes`
+
+Counts repeated static class strings in configured extensions. Safe fixes extract repeated file-local literals into `CONFIG` or `CLASSES` constants; dynamic class expressions and cross-file design decisions are excluded.
+
+Configure `minimumCount` and `extensions`. Move repetition that indicates a shared UI primitive into the appropriate component or design-system abstraction.
+
+**Before** — the same static classes appear in several JSX nodes:
+
+```tsx
+<section className="rounded-xl border p-4">A</section>
+<section className="rounded-xl border p-4">B</section>
+<section className="rounded-xl border p-4">C</section>
+```
+
+**After** — a supported file-local autofix adds a constant in the existing `CONFIG` group and references it:
+
+```tsx
+const ROUNDED_XL_BORDER_P_4_CLASS = 'rounded-xl border p-4';
+
+<section className={ROUNDED_XL_BORDER_P_4_CLASS}>A</section>
+<section className={ROUNDED_XL_BORDER_P_4_CLASS}>B</section>
+<section className={ROUNDED_XL_BORDER_P_4_CLASS}>C</section>
+```
+
+### Regex deduplication
+
+Detect duplicate regular-expression sources and consolidate supported literals.
+
+**Toggle:** `enabledChecks.regex-dedup` plus `regexDedup` config · **Fix:** `autofix.regexDedup` · **Command:** `regex-dedup`
+
+Detects duplicate regex literals and supported constructors. Safe fixes extract file-local, non-stateful duplicates into `CONFIG` or `REGEX` constants. Set `sharedModule` to a repository-relative `.mjs` path and provide a matching `.d.mts` declaration to enable cross-file ESM factories; otherwise fixes stay file-local.
+
+Configure `minimumCount`, `extensions`, and `ignoredFiles`. Stateful regex flags and incompatible CommonJS consumers are excluded because sharing may change behavior.
+
+**Before** — the same non-stateful expression is constructed twice:
+
+```ts
+const first = /^terra-[a-z]+$/;
+const second = /^terra-[a-z]+$/;
+```
+
+**After** — a supported local autofix creates one constant and reuses it:
+
+```ts
+const TERRA_A_Z_REGEX = /^terra-[a-z]+$/;
+const first = TERRA_A_Z_REGEX;
+const second = TERRA_A_Z_REGEX;
+```
+
+Exact generated identifiers depend on the pattern and names already used in the file.
+
+### UI patterns
+
+Report configured UI patterns that should use shared primitives.
+
+**Toggle:** `enabledChecks.ui-patterns` plus `uiPatterns` config · **Fix:** none · **Command:** `ui-patterns`
+
+Searches configured extensions for forbidden UI pattern strings and reports matches; it does not rewrite components because choosing the shared primitive requires design judgment.
+
+Configure `uiPatterns.forbidden` and `extensions`. Keep patterns specific enough to catch duplication.
+
+For example, configure a repeated bespoke button class as a forbidden pattern:
+
+```json
+{ "uiPatterns": { "forbidden": ["className=\\\"legacy-button\\\""] } }
+```
+
+**Before** — the flagged pattern appears in the source:
+
+```tsx
+<button className='legacy-button'>Save</button>
+```
+
+**After** — replace it with the repository's approved shared primitive (illustrative API):
+
+```tsx
+<PrimaryButton>Save</PrimaryButton>
+```
+
+### UI component recommendations
+
+Find native JSX controls that likely have a shared component equivalent. Run this report when reviewing a repository; it does not run in the normal test or quality workflow and never edits files:
+
+```sh
+pnpm exec terra-quality ui-recommendations --all
+```
+
+The default rules recommend `Button` for native buttons, `Input` for common text and file inputs, and `Button` for input-based submit/reset actions. They recommend `ButtonLink` for anchors with static button-like classes and styled text links, while leaving plain anchors alone. The scan parses `.astro`, `.jsx`, and `.tsx`, skips `components/ui` primitive implementations, and reports a source line, replacement name, import path, reason, and inferred link variant when available. Treat every result as a review suggestion because native controls can be intentional.
+
+The default names and imports follow the common shadcn layout. Configure `uiRecommendations.rules` to match a repository's designated components, input types, and exceptions:
+
+```json
+{
+	"uiRecommendations": {
+		"rules": [
+			{ "element": "button", "component": "Button", "import": "@/components/ui/button" },
+			{
+				"element": "input",
+				"component": "Input",
+				"import": "@/components/ui/input",
+				"types": ["text", "search", "email"]
+			},
+			{
+				"element": "a",
+				"component": "ButtonLink",
+				"import": "@/components/ui/button",
+				"when": "button-like"
+			},
+			{
+				"element": "a",
+				"component": "ButtonLink",
+				"import": "@/components/ui/button",
+				"when": "text-link"
+			}
+		],
+		"ignoredDirectories": ["src/components/ui"]
+	}
+}
+```
+
+Configured rules replace the defaults. Omit `types` to match every instance of an element, or set it to limit input rules to specific `type` values. `when: "button-like"` limits anchor recommendations to static classes with button-like padding, shape, and action styling. `when: "text-link"` matches static anchor classes with a recognized text color and underline treatment, then infers the matching underline variant such as `primary-underline`. A rule's explicit `variant` takes precedence over inference.
+
+### Tailwind canonical classes
+
+The `tailwind-canonical` check asks the consuming repository's Tailwind CSS v4 design system for canonical class names, matching the editor's canonical-class suggestions. Configure a stylesheet and, optionally, source roots:
+
+```json
+{
+	"tailwindCanonical": {
+		"stylesheet": "src/styles/global.css",
+		"sourceRoots": ["src"]
+	}
+}
+```
+
+The normal `terra-quality quality` command applies these replacements before the other checks. Use `--warn` for a read-only check, or run this check by itself:
+
+```sh
+terra-quality tailwind-canonical --warn
+terra-quality tailwind-canonical
+```
+
+For example, `border-[var(--color-border)]` becomes `border-(--color-border)`. Disable the check with `enabledChecks["tailwind-canonical"]: false`, or keep diagnostics while disabling writes with `autofix.tailwindCanonical: false`.
+
+The package API is also available:
+
+```ts
+import { loadQualityCfg, runTailwindCanonical } from '@terra-symposium/standards-quality';
+
+const cfg = loadQualityCfg();
+await runTailwindCanonical(cfg); // Read-only; rejects when suggestions are found.
+```
+
+On a separate run, pass `true` to apply the replacements:
+
+```ts
+import { loadQualityCfg, runTailwindCanonical } from '@terra-symposium/standards-quality';
+
+const cfg = loadQualityCfg();
+await runTailwindCanonical(cfg, true);
+```
+
+The repository must provide Tailwind CSS v4 and a valid stylesheet. The check uses Tailwind's unstable design-system API and reports a skip when the installed package does not expose that API. Review the check when upgrading Tailwind.

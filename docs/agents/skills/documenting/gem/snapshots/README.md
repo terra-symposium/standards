@@ -1,29 +1,51 @@
 # Documenting Gem Snapshots
 
-Reserved destination for documenting gem snapshots. This nested checkout contains no snapshot payload; the separate captured revision is indexed under `docs/.agents/skills/documenting/gem/snapshots/`.
+Archived revisions of the documenting gem skill’s captured knowledge. Use these files as historical reference, not as current policy.
 
-## Getting started
+## What it does
 
-### Commands
+Not applicable.
 
-No validation command applies because no snapshot payload is present. The parent Standards docs site can be built with `pnpm docs:build` from `standards/main/`.
+## Prerequisites
 
-## Security and Limitations
+Not applicable.
 
-- Treat snapshots as reference material, not live policy.
+## Get started
 
-## Structure
+Not applicable.
 
-This directory contains only this guide. The captured revision available elsewhere in this checkout is not copied into this reserved path.
+## Usage
+
+The `b2b810394d61` folder currently contains a partial capture based on earlier in-app observations. Its exact saved instruction, citation setting, and persistent knowledge list still require live verification. Conversation uploads are listed separately and are not asserted to be Gem knowledge.
+
+## Configuration and security
+
+Not applicable.
+
+## Development and structure
+
+Not applicable.
+
+## Validation
+
+Not applicable.
+
+## Deployment and operations
+
+Not applicable.
+
+## Data, privacy, and limitations
+
+Not applicable.
 
 ## References
 
-No revision folder or snapshot payload is present in this checkout; this README is the only local reference.
+Not applicable.
 
 ## Contributing
 
-Keep captured content with its metadata and instructions; route changes through the owning skill maintainer.
+Not applicable.
 
 ## Credits and license
 
-These captured files have no local license notice; the Standards root has no license file. Ask the skill owner before reuse.
+Not applicable.
