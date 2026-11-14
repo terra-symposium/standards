@@ -1275,6 +1275,17 @@ function findingsFromAnalysis(
 		// A package-local scan can have one consumer while the repository scan sees more.
 		// Keep that declaration's specific, reasoned marker valid when another source file consumes its exported boundary.
 		if (directive?.reason && uses.some(use => use.file !== c.file) && (uses.length > 1 || publicContract)) usedDirectives.add(directive);
+		// A package-only scan also misses consumers outside its sole source root. The
+		// repository scan validates the same exported declaration against those consumers.
+		if (
+			directive?.reason &&
+			uses.length === 0 &&
+			cfg.sourceRoots.length === 1 &&
+			(cfg.includeRoots?.length ?? 0) === 0 &&
+			resolve(cfg.root, cfg.sourceRoots[0]!) !== cfg.root &&
+			isModuleExport(c, checker)
+		)
+			usedDirectives.add(directive);
 		if (publicContract) continue;
 		if (uses.length !== 1) continue;
 		const use = uses[0]!;

@@ -1,6 +1,6 @@
 {
 	"name": "@terra-symposium/standards-quality",
-	"version": "2.3.4",
+	"version": "2.3.5",
 	"description": "Configurable quality checks and maintenance tooling for software repositories",
 	"homepage": "https://standards-docs.netlify.app/",
 	"type": "module",

@@ -1,5 +1,11 @@
 # @terra-symposium/standards-refactoring
 
+## 0.2.4
+
+### Patch Changes
+
+- 622d20e: Keep a declaration-specific single-use comment valid when a package-only scan has no local consumer of an exported declaration and the repository scan checks its external consumer.
+
 ## 0.2.3
 
 ### Patch Changes

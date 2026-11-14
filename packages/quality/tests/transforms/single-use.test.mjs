@@ -1220,6 +1220,21 @@ test('a package-local single-use exception remains valid when a repository scan 
 		);
 	}
 });
+test('a package-local exception remains valid when its only consumer is outside the package scan', () => {
+	const root = fixtureRoot('terra-quality-single-use-external-only-ignore-');
+	fixtureFile(root, 'src/helper.ts', '// terra-quality-ignore single-use -- Keep the helper as a named API for the root integration test.\nexport function helper() { return 1; }\n');
+	fixtureFile(root, 'tests/remote.ts', "import { helper } from '../src/helper';\nexport const result = helper();\n");
+	for (const sourceRoots of [['src'], ['src', 'tests']]) {
+		assert.ok(
+			!singleUseFindings(createQualityCfg({ root, sourceRoots, extensions: ['.ts'] })).some(f => f.name === 'helper' || f.name === 'single-use-ignore'),
+			`the marker must remain attached in ${sourceRoots.join(', ')}`,
+		);
+	}
+	const staleRoot = fixtureRoot('terra-quality-single-use-truly-unused-export-ignore-');
+	fixtureFile(staleRoot, 'src/helper.ts', '// terra-quality-ignore single-use -- Stale reason without any consumer.\nexport function helper() { return 1; }\n');
+	fixtureFile(staleRoot, 'tests/other.ts', 'export const other = 1;\n');
+	assert.ok(singleUseFindings(createQualityCfg({ root: staleRoot, sourceRoots: ['src', 'tests'], extensions: ['.ts'] })).some(f => f.name === 'single-use-ignore'));
+});
 test('a single-use exception before TSDoc preserves the documented declaration', () => {
 	const root = fixtureRoot('terra-quality-single-use-tsdoc-ignore-');
 	const original = `// terra-quality-ignore single-use -- Keep the named helper and its documented parameter contract.\n/** Reads the value.\n * @param value Input value.\n * @return The same value.\n */\nfunction readValue(value: number): number { return value; }\nexport const result = readValue(1);\n`;
