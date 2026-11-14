@@ -1208,6 +1208,18 @@ test('a single-use exception applies only to its adjacent declaration', () => {
 	assert.ok(!findings.some(f => f.name === 'keep' || f.name === 'single-use-ignore'));
 	assert.ok(findings.some(f => f.name === 'inline'));
 });
+test('a package-local single-use exception remains valid when a repository scan finds another module consumer', () => {
+	const root = fixtureRoot('terra-quality-single-use-cross-scope-ignore-');
+	fixtureFile(root, 'src/helper.ts', '// terra-quality-ignore single-use -- Keep the exported helper as a named boundary for both callers.\nexport function helper() { return 1; }\n');
+	fixtureFile(root, 'src/local.ts', "import { helper } from './helper';\nexport const local = helper();\n");
+	fixtureFile(root, 'tests/remote.ts', "import { helper } from '../src/helper';\nexport const remote = helper();\n");
+	for (const sourceRoots of [['src'], ['src', 'tests']]) {
+		assert.ok(
+			!singleUseFindings(createQualityCfg({ root, sourceRoots, extensions: ['.ts'] })).some(f => f.name === 'helper' || f.name === 'single-use-ignore'),
+			`marker should remain specific in ${sourceRoots.join(', ')}`,
+		);
+	}
+});
 test('a single-use exception before TSDoc preserves the documented declaration', () => {
 	const root = fixtureRoot('terra-quality-single-use-tsdoc-ignore-');
 	const original = `// terra-quality-ignore single-use -- Keep the named helper and its documented parameter contract.\n/** Reads the value.\n * @param value Input value.\n * @return The same value.\n */\nfunction readValue(value: number): number { return value; }\nexport const result = readValue(1);\n`;
