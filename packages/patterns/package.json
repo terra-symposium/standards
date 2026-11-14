@@ -1,6 +1,6 @@
 {
 	"name": "@terra-symposium/standards-patterns",
-	"version": "0.2.1",
+	"version": "0.2.2",
 	"description": "Performance, CSS, Tailwind, regex, and UI source-pattern checks.",
 	"type": "module",
 	"engines": {
