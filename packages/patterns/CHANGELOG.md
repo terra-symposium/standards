@@ -1,5 +1,11 @@
 # @terra-symposium/standards-patterns
 
+## 0.2.3
+
+### Patch Changes
+
+- 5bc2ec1: Keep shared regex exports referenced outside changed-file source roots during safe autofix.
+
 ## 0.2.2
 
 ### Patch Changes

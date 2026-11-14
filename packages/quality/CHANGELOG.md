@@ -1,5 +1,13 @@
 # @terra-symposium/standards-quality
 
+## 2.3.7
+
+### Patch Changes
+
+- 5bc2ec1: Keep shared regex exports referenced outside changed-file source roots during safe autofix.
+- Updated dependencies [5bc2ec1]
+  - @terra-symposium/standards-patterns@0.2.3
+
 ## 2.3.6
 
 ### Patch Changes
