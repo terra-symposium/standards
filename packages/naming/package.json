@@ -1,6 +1,6 @@
 {
 	"name": "@terra-symposium/standards-naming",
-	"version": "0.2.0",
+	"version": "0.2.1",
 	"description": "Terra identifier naming and alias checks.",
 	"type": "module",
 	"engines": {

@@ -1,6 +1,6 @@
 {
 	"name": "@terra-symposium/standards-quality-core",
-	"version": "0.2.0",
+	"version": "0.2.1",
 	"description": "Shared source-scope and analysis utilities for Terra quality capabilities.",
 	"type": "module",
 	"engines": {

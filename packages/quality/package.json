@@ -1,6 +1,6 @@
 {
 	"name": "@terra-symposium/standards-quality",
-	"version": "2.3.2",
+	"version": "2.3.3",
 	"description": "Configurable quality checks and maintenance tooling for software repositories",
 	"homepage": "https://standards-docs.netlify.app/",
 	"type": "module",
@@ -53,7 +53,7 @@
 		"typecheck": "tsc --noEmit -p config/tsconfig.json"
 	},
 	"dependencies": {
-		"@terra-symposium/standards-error-boundaries": "^0.1.2",
+		"@terra-symposium/standards-error-boundaries": "workspace:*",
 		"typescript": "^5.0.0",
 		"@terra-symposium/standards-quality-core": "workspace:*",
 		"@terra-symposium/standards-documentation": "workspace:*",

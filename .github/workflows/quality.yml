@@ -97,4 +97,5 @@ jobs:
           cache: pnpm
           cache-dependency-path: config/pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter @terra-symposium/standards-testing pack --dry-run
+      - run: pnpm -r build
+      - run: python3 config/scripts/verify-publish-graph.py

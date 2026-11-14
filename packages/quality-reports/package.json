@@ -1,6 +1,6 @@
 {
 	"name": "@terra-symposium/standards-quality-reports",
-	"version": "0.2.0",
+	"version": "0.2.1",
 	"description": "GitHub, history, and test-runner reporting APIs.",
 	"type": "module",
 	"engines": {

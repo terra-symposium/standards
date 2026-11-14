@@ -1,5 +1,23 @@
 # @terra-symposium/standards-quality
 
+## 2.3.3
+
+### Patch Changes
+
+- Updated dependencies
+  - @terra-symposium/standards-error-boundaries@0.1.3
+  - @terra-symposium/standards-language-checks@0.2.1
+  - @terra-symposium/standards-naming@0.2.1
+  - @terra-symposium/standards-patterns@0.2.1
+  - @terra-symposium/standards-quality-core@0.2.1
+  - @terra-symposium/standards-quality-reports@0.2.1
+  - @terra-symposium/standards-security@0.2.1
+  - @terra-symposium/standards-ui-quality@0.2.1
+  - @terra-symposium/standards-documentation@0.2.2
+  - @terra-symposium/standards-formatting@0.2.3
+  - @terra-symposium/standards-imports@0.2.2
+  - @terra-symposium/standards-refactoring@0.2.2
+
 ## 2.3.2
 
 ### Patch Changes
