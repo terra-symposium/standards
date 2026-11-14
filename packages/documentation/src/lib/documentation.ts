@@ -856,6 +856,8 @@ function descriptionFindingsForFile(cfg: QualityCfg, file: string, src: string, 
 	}
 	for (const block of blocks) {
 		if (block === header) continue;
+		// JSDoc's parenthesized expression cast is part of the expression, not a detached declaration comment.
+		if (/@type\s*\{/u.test(block.text) && /^[ \t]*\(/u.test(src.slice(block.end))) continue;
 		if (!attached.has(block.start)) {
 			findings.push(documentationCommentReport(file, parsed, block.start, '<detached TSDoc>', 'orphan', 'remove or attach this TSDoc to a declaration', cfg));
 			continue;

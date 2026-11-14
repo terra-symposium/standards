@@ -1,5 +1,11 @@
 # @terra-symposium/standards-documentation
 
+## 0.2.1
+
+### Patch Changes
+
+- Recognize inline JSDoc expression casts as part of their expression instead of reporting them as detached documentation.
+
 ## 0.2.0
 
 ### Minor Changes

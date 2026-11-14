@@ -12,7 +12,7 @@
 		"docs:build": "pnpm --dir config run docs:build",
 		"prepare": "pnpm --dir config run prepare",
 		"verify": "pnpm run quality:all && pnpm run test && pnpm run build && pnpm run docs:build",
-		"release": "pnpm --dir config run release"
+		"release": "pnpm exec changeset publish"
 	},
 	"devDependencies": {
 		"@changesets/cli": "^3.0.3",

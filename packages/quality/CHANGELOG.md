@@ -1,5 +1,14 @@
 # @terra-symposium/standards-quality
 
+## 2.3.2
+
+### Patch Changes
+
+- Updated dependencies
+  - @terra-symposium/standards-documentation@0.2.1
+  - @terra-symposium/standards-formatting@0.2.2
+  - @terra-symposium/standards-imports@0.2.1
+
 ## 2.3.1
 
 ### Patch Changes

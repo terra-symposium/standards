@@ -1,6 +1,6 @@
 {
 	"name": "@terra-symposium/standards-documentation",
-	"version": "0.2.0",
+	"version": "0.2.1",
 	"description": "TSDoc, JSDoc, Doxygen, and documented-command checks.",
 	"type": "module",
 	"engines": {
