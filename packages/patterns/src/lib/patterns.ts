@@ -948,9 +948,9 @@ function resolvesRegexModule(cfg: QualityCfg, importer: string, specifier: strin
 function referencedRegexExports(cfg: QualityCfg, modulePath: string, names: Set<string>, analysis?: QualityAnalysis): Set<string> {
 	const referenced = new Set<string>();
 	const exts = cfg.regexDedup?.extensions ?? ['.js', '.jsx', '.mjs', '.ts', '.tsx', '.mts', '.cts'];
-	// Registry exports can be used by unchanged files during a changed-file run.
-	// Discover the full configured source scope before pruning any export.
-	for (const discoveredFile of srcFiles({ ...cfg, extensions: exts })) {
+	// A changed-file run narrows cfg.sourceRoots to changed paths. Registry exports
+	// can still be used by any unchanged source in the repository.
+	for (const discoveredFile of srcFiles({ ...cfg, sourceRoots: [cfg.root], includeRoots: [], extensions: exts })) {
 		const file = resolve(discoveredFile);
 		if (file === modulePath || file.endsWith('.d.mts')) continue;
 		const ast =
