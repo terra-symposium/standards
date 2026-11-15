@@ -33,7 +33,7 @@
 		"typecheck": "tsc --noEmit -p config/tsconfig.json"
 	},
 	"dependencies": {
-		"typescript": "^5.0.0"
+		"typescript": "^7.0.2"
 	},
 	"devDependencies": {
 		"@types/node": "^26.6.5"

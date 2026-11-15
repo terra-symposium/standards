@@ -52,7 +52,7 @@
 	},
 	"dependencies": {
 		"@terra-symposium/standards-error-boundaries": "^0.1.2",
-		"typescript": "^5.0.0",
+		"typescript": "^7.0.2",
 		"@terra-symposium/standards-quality-core": "workspace:*",
 		"@terra-symposium/standards-documentation": "workspace:*",
 		"@terra-symposium/standards-formatting": "workspace:*",
