@@ -41,7 +41,7 @@
 	},
 	"devDependencies": {
 		"@types/node": "^26.6.5",
-		"typescript": "^5.0.0"
+		"typescript": "^7.0.2"
 	},
 	"bin": {
 		"terra-language-checks": "dist/cli.js"

@@ -38,7 +38,7 @@
 	},
 	"dependencies": {
 		"@terra-symposium/standards-quality-core": "workspace:*",
-		"typescript": "^5.0.0",
+		"typescript": "^7.0.2",
 		"@terra-symposium/standards-documentation": "workspace:*"
 	},
 	"devDependencies": {
