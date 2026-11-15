@@ -34,9 +34,9 @@ const LOAD_TIMING_SUMMARY_REGEX = /Load timing summary/;
 
 // PROCESS HELPER AND REPORTING PACKAGE API
 const execFileAsync = promisify(execFile);
-const { diagnosticCount, normalizeVisualStatus: normVisualStatus, orderedFiles, statusCounts } = await import('@terra-symposium/standards-reporting/core');
-const { parseDiagnostics, stripAnsi, default: ProgressReporter } = await import('@terra-symposium/standards-reporting/playwright');
-const { baseVisualProjectName, projectViewportName, resolveVisualViewports, visualProjectName, withResponsivePlaywright } = await import('@terra-symposium/standards-reporting/viewports');
+const { diagnosticCount, normalizeVisualStatus: normVisualStatus, orderedFiles, statusCounts } = await import('@terra-symposium/reporting/core');
+const { parseDiagnostics, stripAnsi, default: ProgressReporter } = await import('@terra-symposium/reporting/playwright');
+const { baseVisualProjectName, projectViewportName, resolveVisualViewports, visualProjectName, withResponsivePlaywright } = await import('@terra-symposium/reporting/viewports');
 const {
 	DEFAULT_LOAD_BUDGET,
 	gradeLoad,
@@ -44,15 +44,15 @@ const {
 	normalizeLoadTestingConfig: normLoadTestingCfg,
 	readLoadTestingConfig: readLoadTestingCfg,
 	timeLoadOperation: timeLoadOp,
-} = await import('@terra-symposium/standards-reporting/load-testing');
-const { mergeSpreadsheets, writeSpreadsheet } = await import('@terra-symposium/standards-reporting/spreadsheet');
+} = await import('@terra-symposium/reporting/load-testing');
+const { mergeSpreadsheets, writeSpreadsheet } = await import('@terra-symposium/reporting/spreadsheet');
 const {
 	readScreenshotCapturesFromDirectory: readScreenshotCapturesFromDir,
 	writeScreenshotSlideshow,
 	writeScreenshotSlideshowFromDirectories: writeScreenshotSlideshowFromDirs,
 	writeScreenshotSlideshowFromDirectory: writeScreenshotSlideshowFromDir,
 	writeSlideshow,
-} = await import('@terra-symposium/standards-reporting/slideshow');
+} = await import('@terra-symposium/reporting/slideshow');
 
 /*//////////////////////////////////////////////////
 HELPERS
@@ -132,7 +132,7 @@ test('captures page navigation for tests that do not destructure the load fixtur
 	);
 	try {
 		try {
-			await execFileAsync('pnpm', ['--filter', '@terra-symposium/standards-reporting', 'exec', 'playwright', 'test', '--config', cfgFile], {
+			await execFileAsync('pnpm', ['--filter', '@terra-symposium/reporting', 'exec', 'playwright', 'test', '--config', cfgFile], {
 				cwd: path.resolve(path.dirname(new URL(import.meta.url).pathname), '../../..'),
 				timeout: 60000,
 			});
@@ -193,10 +193,10 @@ test('expands regular Playwright projects and preserves single-run setup/capture
 	assert.deepEqual(cfg.use.screenshot, { mode: 'on', fullPage: true, caret: 'initial' });
 	assert.deepEqual(cfg.projects.find(({ name: n }) => n === 'app-mobile').dependencies, ['auth-setup']);
 	assert.equal(cfg.projects.find(({ name: n }) => n === 'browser-mobile').use.viewport.width, 390);
-	assert.ok(cfg.reporter.some(r => Array.isArray(r) && r[0] === '@terra-symposium/standards-reporting/playwright'));
+	assert.ok(cfg.reporter.some(r => Array.isArray(r) && r[0] === '@terra-symposium/reporting/playwright'));
 	// terra-quality-ignore single-use -- Keep the screenshot-only configuration distinct from the default browser projects.
 	const screenshotsOnly = withResponsivePlaywright({ projects: [{ name: 'browser' }] }, { screenshotOnlySlideshow: true });
-	assert.equal(screenshotsOnly.reporter.find(r => Array.isArray(r) && r[0] === '@terra-symposium/standards-reporting/playwright')[1].screenshotOnlySlideshow, true);
+	assert.equal(screenshotsOnly.reporter.find(r => Array.isArray(r) && r[0] === '@terra-symposium/reporting/playwright')[1].screenshotOnlySlideshow, true);
 	process.env.PW_VIEWPORTS = 'md,xl';
 	assert.deepEqual(
 		resolveVisualViewports().map(({ name: n }) => n),
@@ -208,7 +208,7 @@ test('expands regular Playwright projects and preserves single-run setup/capture
 		['browser-md', 'browser-xl'],
 	);
 	assert.equal(focused.metadata.terraLoadTestingEnabled, true);
-	assert.equal(focused.reporter.find(r => Array.isArray(r) && r[0] === '@terra-symposium/standards-reporting/playwright')[1].screenshotOnlySlideshow, true);
+	assert.equal(focused.reporter.find(r => Array.isArray(r) && r[0] === '@terra-symposium/reporting/playwright')[1].screenshotOnlySlideshow, true);
 	if (original === undefined) delete process.env.PW_VIEWPORTS;
 	else process.env.PW_VIEWPORTS = original;
 });
@@ -221,7 +221,7 @@ test('collects only declared viewport scenarios and passes custom dimensions to 
 	);
 	assert.match('@viewport:compact', config.projects[0].grep);
 	assert.doesNotMatch('@viewport:expanded', config.projects[0].grep);
-	assert.deepEqual(config.reporter.find(entry => Array.isArray(entry) && entry[0] === '@terra-symposium/standards-reporting/playwright')[1].viewportCatalog, viewportCatalog);
+	assert.deepEqual(config.reporter.find(entry => Array.isArray(entry) && entry[0] === '@terra-symposium/reporting/playwright')[1].viewportCatalog, viewportCatalog);
 	const filtered = withResponsivePlaywright({ projects: [{ name: 'dashboard', grep: /@sanity-studio/u }] }, { viewportPolicy: 'declared', viewportCatalog });
 	assert.match('@sanity-studio @viewport:compact', filtered.projects[0].grep);
 	assert.doesNotMatch('@sanity-studio @viewport:expanded', filtered.projects[0].grep);
@@ -460,7 +460,7 @@ test('aggregates shared screenshot runs across viewport subprocesses and restart
 		});
 		// terra-quality-ignore single-use -- Keep the reporter program fixture text separate from the command that executes it.
 		const reporterProgram = `
-			import ProgressReporter from '@terra-symposium/standards-reporting/playwright';
+			import ProgressReporter from '@terra-symposium/reporting/playwright';
 			const reporter = new ProgressReporter({ outputRoot: process.env.OUTPUT_ROOT, loadTesting: { enabled: false } });
 			const selectedTest = {
 				id: process.env.TEST_ID,

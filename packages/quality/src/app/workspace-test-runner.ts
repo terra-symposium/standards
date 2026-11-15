@@ -10,21 +10,15 @@ IMPORTS
 // API
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { qualityNodeReporterOptions } from '@terra-symposium/standards-quality-reports';
-import { qualityProgress } from '@terra-symposium/standards-quality-core';
+import { qualityNodeReporterOptions } from '@terra-symposium/quality/reports';
+import { qualityProgress } from '@terra-symposium/quality/core';
 import { spawnSync } from 'node:child_process';
 
 /*//////////////////////////////////////////////////
 RUNNER
 //////////////////////////////////////////////////*/
 
-const suites = [
-	'@terra-symposium/standards-error-boundaries',
-	'@terra-symposium/standards-quality',
-	'@terra-symposium/standards-reporting',
-	'@terra-symposium/standards-testing',
-	'@terra-symposium/hygiene-dashboard',
-];
+const suites = ['@terra-symposium/boundaries', '@terra-symposium/quality', '@terra-symposium/reporting', '@terra-symposium/testing', '@terra-symposium/hygiene-dashboard'];
 let failed = false;
 console.error('\nTESTS\n  Unit / Contract · Standards workspace');
 qualityProgress('Test suites', 0, suites.length);

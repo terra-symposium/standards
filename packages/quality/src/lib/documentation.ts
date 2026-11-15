@@ -2,4 +2,4 @@
  * packages/quality/src/lib/documentation.ts
  */
 
-export * from '@terra-symposium/standards-documentation';
+export * from '@terra-symposium/quality/documentation';

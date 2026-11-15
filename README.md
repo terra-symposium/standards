@@ -20,10 +20,10 @@ Not applicable.
 
 | Package | Purpose | Runtime requirements |
 | --- | --- | --- |
-| [`@terra-symposium/standards-quality`](https://www.npmjs.com/package/@terra-symposium/standards-quality) | Configurable JavaScript and TypeScript quality checks, safe maintenance, and the `terra-quality` CLI. | Node.js `>=18.18` |
-| [`@terra-symposium/standards-error-boundaries`](https://www.npmjs.com/package/@terra-symposium/standards-error-boundaries) | React error boundaries plus status-copy and route-error helpers. | React and React DOM `>=18` |
-| [`@terra-symposium/standards-reporting`](https://www.npmjs.com/package/@terra-symposium/standards-reporting) | Responsive Playwright evidence, diagnostics, spreadsheets, slideshows, and load timings. | Node.js `>=18.18`; `@playwright/test >=1.52.0 <2` for Playwright integration |
-| [`@terra-symposium/standards-testing`](packages/testing/) | Standards-owned shared CI checks plus serial execution of repository-specific test suites. | Node.js `>=20` |
+| [`@terra-symposium/quality`](https://www.npmjs.com/package/@terra-symposium/quality) | Configurable JavaScript and TypeScript quality checks, safe maintenance, and the `terra-quality` CLI. | Node.js `>=18.18` |
+| [`@terra-symposium/boundaries`](https://www.npmjs.com/package/@terra-symposium/boundaries) | React error boundaries plus status-copy and route-error helpers. | React and React DOM `>=18` |
+| [`@terra-symposium/reporting`](https://www.npmjs.com/package/@terra-symposium/reporting) | Responsive Playwright evidence, diagnostics, spreadsheets, slideshows, and load timings. | Node.js `>=18.18`; `@playwright/test >=1.52.0 <2` for Playwright integration |
+| [`@terra-symposium/testing`](packages/testing/) | Standards-owned shared CI checks plus serial execution of repository-specific test suites. | Node.js `>=20` |
 
 All four packages are configured for public npm publication. Consumers install them from npm without a Terra registry token. The CI release workflow uses the repository's `NPM_TOKEN` secret to publish versions.
 
@@ -37,23 +37,23 @@ Install only the package your application uses:
 
 ```sh
 # Terra Quality
-pnpm add -D @terra-symposium/standards-quality
+pnpm add -D @terra-symposium/quality
 
 # React boundary helpers
-pnpm add @terra-symposium/standards-error-boundaries
+pnpm add @terra-symposium/boundaries
 
 # Playwright reporting
-pnpm add -D @terra-symposium/standards-reporting @playwright/test
+pnpm add -D @terra-symposium/reporting @playwright/test
 
 # Shared CI checks and the local test-plan runner
-pnpm add -D @terra-symposium/standards-testing
+pnpm add -D @terra-symposium/testing
 ```
 
 For Terra Quality, add a `quality.json` in the repository root and start with:
 
 ```json
 {
-	"$schema": "./node_modules/@terra-symposium/standards-quality/quality.schema.json",
+	"$schema": "./node_modules/@terra-symposium/quality/quality.schema.json",
 	"sourceRoots": ["src"],
 	"extensions": [".js", ".jsx", ".ts", ".tsx"],
 	"enabledChecks": {
@@ -65,7 +65,7 @@ For Terra Quality, add a `quality.json` in the repository root and start with:
 }
 ```
 
-Then run `pnpm exec terra-quality`. See the [quality setup guide](https://standards-docs.netlify.app/quality/0-getting-started/setup/) for the full workflow.
+Then run `pnpm exec terra-quality`. See the [quality setup guide](https://standards-docs.netlify.app/quality/0-getting-started/overview/) for the full workflow.
 
 ### Project boundaries
 
@@ -73,7 +73,7 @@ These packages provide reusable primitives. Each consuming repository remains re
 
 ### Skills
 
-#### `@terra-symposium/standards-quality`
+#### `@terra-symposium/quality`
 
 [`hygiene`](docs/agents/packages/quality/skills/hygiene/SKILL.md) (`environment-hardening`) — Audit repository health, improve source clarity and documentation, and compact files without changing behavior.
 
@@ -109,7 +109,7 @@ These packages provide reusable primitives. Each consuming repository remains re
 
 [`standards`](docs/agents/packages/quality/skills/standards/SKILL.md) (`standards`) — Apply shared Terra coding and review conventions.
 
-#### `@terra-symposium/standards-reporting`
+#### `@terra-symposium/reporting`
 
 [`test/cloud`](docs/agents/packages/reporting/skills/test/cloud/SKILL.md) (`cloud-playwright`) — Run Playwright suites in Terra Cloud tasks.
 

@@ -17,4 +17,4 @@ description: Diagnose common Terra Quality installation, scope, and tool failure
 | TypeScript reports that JSX is disabled | Set `compilerOptions.jsx` in the effective `tsconfig.json` (React projects generally use `react-jsx`) and run `tsc --noEmit -p tsconfig.json` so the project configuration is applied. Restart the editor's TypeScript language server if diagnostics remain stale. |
 | A changed-file run fails outside a Git worktree | Run with `--all` or create a Git worktree so the CLI can determine the changed-file set. |
 
-See the [configuration reference](/quality/2-configuration/quality-json/) for every scope, tool, and policy field. Use [CLI workflows](/quality/4-workflows/cli-and-ci/) to choose a run mode.
+See the [configuration reference](/quality/0-getting-started/overview/) for every scope, tool, and policy field. Use [CLI workflows](/quality/0-getting-started/overview/) to choose a run mode.

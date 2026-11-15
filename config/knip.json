@@ -8,7 +8,8 @@
 		},
 		"config": {
 			"entry": ["scripts/build-docs.mjs", "scripts/typecheck.mjs"],
-			"project": ["scripts/**/*.mjs"]
+			"project": ["scripts/**/*.mjs"],
+			"ignoreBinaries": ["patch"]
 		},
 		"packages/braces": {
 			"entry": ["index.js", "tests/**/*.test.mjs"],
@@ -48,7 +49,9 @@
 				"src/lib/single-use.ts",
 				"src/lib/port.ts",
 				"src/lib/ui-quality.ts",
-				"tests/**/*.test.mjs"
+				"tests/**/*.test.mjs",
+				"src/capabilities/*/index.ts",
+				"src/capabilities/*/cli.ts"
 			],
 			"project": ["src/**/*.ts", "tests/**/*.mjs"]
 		},
@@ -60,50 +63,6 @@
 		"apps/hygiene": {
 			"entry": ["src/pages/index.astro", "config/**/*.mjs", "netlify/functions/*.mts", "scripts/*.ts", "tests/*.test.ts"],
 			"project": ["src/**/*.ts", "src/**/*.tsx", "config/**/*.mjs", "netlify/functions/**/*.mts", "scripts/**/*.ts", "tests/**/*.ts"]
-		},
-		"packages/quality-core": {
-			"entry": ["src/index.ts", "tests/**/*.test.mjs"],
-			"project": ["src/**/*.ts", "tests/**/*.mjs"]
-		},
-		"packages/documentation": {
-			"entry": ["src/index.ts", "src/cli.ts", "tests/**/*.test.mjs"],
-			"project": ["src/**/*.ts", "tests/**/*.mjs"]
-		},
-		"packages/formatting": {
-			"entry": ["src/index.ts", "src/cli.ts", "tests/**/*.test.mjs"],
-			"project": ["src/**/*.ts", "tests/**/*.mjs"]
-		},
-		"packages/imports": {
-			"entry": ["src/index.ts", "src/cli.ts", "tests/**/*.test.mjs"],
-			"project": ["src/**/*.ts", "tests/**/*.mjs"]
-		},
-		"packages/naming": {
-			"entry": ["src/index.ts", "src/cli.ts", "tests/**/*.test.mjs"],
-			"project": ["src/**/*.ts", "tests/**/*.mjs"]
-		},
-		"packages/refactoring": {
-			"entry": ["src/index.ts", "src/cli.ts", "tests/**/*.test.mjs"],
-			"project": ["src/**/*.ts", "tests/**/*.mjs"]
-		},
-		"packages/security": {
-			"entry": ["src/index.ts", "src/cli.ts", "tests/**/*.test.mjs"],
-			"project": ["src/**/*.ts", "tests/**/*.mjs"]
-		},
-		"packages/ui-quality": {
-			"entry": ["src/index.ts", "src/cli.ts", "tests/**/*.test.mjs"],
-			"project": ["src/**/*.ts", "tests/**/*.mjs"]
-		},
-		"packages/patterns": {
-			"entry": ["src/index.ts", "src/cli.ts", "tests/**/*.test.mjs"],
-			"project": ["src/**/*.ts", "tests/**/*.mjs"]
-		},
-		"packages/language-checks": {
-			"entry": ["src/index.ts", "src/cli.ts", "tests/**/*.test.mjs"],
-			"project": ["src/**/*.ts", "tests/**/*.mjs"]
-		},
-		"packages/quality-reports": {
-			"entry": ["src/index.ts", "src/cli.ts", "tests/**/*.test.mjs"],
-			"project": ["src/**/*.ts", "tests/**/*.mjs"]
 		}
 	},
 	"ignoreDependencies": ["pptxgenjs", "prettier"],

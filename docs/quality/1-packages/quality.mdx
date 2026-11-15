@@ -1,14 +1,14 @@
 ---
-title: standards-quality
+title: Quality
 description: Aggregate CLI, compatibility API, phase ordering, orchestration, and combined reports.
 ---
 
-`@terra-symposium/standards-quality` is the aggregate package for a complete ordered run. It coordinates the capability packages, external tools, repository commands, combined reports, progress output, and development-server helpers. It also preserves the established root, subpath, and CLI entry points for existing consumers.
+`@terra-symposium/quality` is the aggregate package for a complete ordered run. It coordinates its focused subpaths, external tools, repository commands, combined reports, progress output, and development-server helpers. It also preserves the established root, subpath, and CLI entry points for existing consumers.
 
 ## Install and run
 
 ```sh
-pnpm add -D @terra-symposium/standards-quality
+pnpm add -D @terra-symposium/quality
 pnpm exec terra-quality quality --all
 ```
 
@@ -24,10 +24,10 @@ The `error-boundaries` source check is mandatory. It checks React mount roots an
 - Preserve JSON reports, failure exit codes, findings, and progress behavior used by the existing CLI.
 - Provide GitHub reporting, the `terra-quality-dev` port launcher, and existing compatibility subpaths.
 
-The aggregate package owns orchestration, not each individual rule implementation. Focused packages can run their own capability CLI or API. Start with [the package map](/quality/1-packages/package-map/) and [the CLI workflow](/quality/4-workflows/cli-and-ci/).
+The aggregate package owns orchestration, not each individual rule implementation. Focused packages can run their own capability CLI or API. Start with [the package map](/quality/1-packages/package-map/) and [the CLI workflow](/quality/0-getting-started/overview/).
 
 ## Existing executables and API
 
-The package publishes `terra-quality` and `terra-quality-dev`. The root export and documented subpaths, including `/cli`, `/naming`, `/object-forwarding`, `/single-use`, and `/port`, remain available for compatibility. Prefer the owning capability package for new direct dependencies when only one capability is needed.
+The package publishes `terra-quality` and `terra-quality-dev`. The root export and documented subpaths, including `/cli`, `/naming`, `/object-forwarding`, `/single-use`, and `/port`, remain available for compatibility. Import a focused subpath when only one capability is needed.
 
-`quality.json` contains source scope, check toggles, autofix policy, tool locations, command arrays, and report options. See [the schema-backed configuration reference](/quality/2-configuration/quality-json/); do not add a second configuration file for a focused check.
+`quality.json` contains source scope, check toggles, autofix policy, tool locations, command arrays, and report options. See [the schema-backed configuration reference](/quality/0-getting-started/overview/); do not add a second configuration file for a focused check.

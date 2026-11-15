@@ -1,5 +1,12 @@
 # @terra-symposium/standards-testing
 
+## 0.3.0
+
+### Minor Changes
+
+- Consolidate Quality capabilities under one package with named subpath exports and publish the separate runtime, reporting, and testing packages under one-word names.
+- Add a shared linear-history check and an extensible test-plan runner and GitHub Action for Terra repositories.
+
 ## 0.2.0
 
 ### Minor Changes

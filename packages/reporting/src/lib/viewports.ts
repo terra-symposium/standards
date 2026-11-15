@@ -174,7 +174,7 @@ export const withResponsivePlaywright = <T extends PlaywrightTestConfig>(cfg: T,
 	const viewports = resolveVisualViewports(process.env.PW_VIEWPORTS, opts.viewportCatalog);
 	const loadTesting = readLoadTestingConfig(opts.qualityConfigFile, opts.loadTesting);
 	const sharedDistCandidates = [
-		path.resolve(process.cwd(), 'node_modules/@terra-symposium/standards-reporting/dist'),
+		path.resolve(process.cwd(), 'node_modules/@terra-symposium/reporting/dist'),
 		path.resolve(process.cwd(), 'dist'),
 		path.resolve(process.cwd(), 'packages/reporting/dist'),
 	];
@@ -235,9 +235,9 @@ export const withResponsivePlaywright = <T extends PlaywrightTestConfig>(cfg: T,
 	const reporters = [
 		...(cfg.reporter ? (Array.isArray(cfg.reporter) ? cfg.reporter : [cfg.reporter]) : []).filter(r => {
 			const name = Array.isArray(r) ? r[0] : r;
-			return !(typeof name === 'string' && name.includes('@terra-symposium/standards-reporting/playwright'));
+			return !(typeof name === 'string' && name.includes('@terra-symposium/reporting/playwright'));
 		}),
-		['@terra-symposium/standards-reporting/playwright', reportingOpts],
+		['@terra-symposium/reporting/playwright', reportingOpts],
 	];
 	return {
 		...cfg,

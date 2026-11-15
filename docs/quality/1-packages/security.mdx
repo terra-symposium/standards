@@ -1,14 +1,14 @@
 ---
-title: standards-security
+title: Security
 description: Detect configured forbidden source patterns, environment files, and client-side secret access.
 ---
 
-`@terra-symposium/standards-security` applies repository source-security policy using the shared Quality source scope. It complements code review, dependency analysis, secret scanning, runtime controls, and platform security features; it is not a security certification.
+`@terra-symposium/quality/security` applies repository source-security policy using the shared Quality source scope. It complements code review, dependency analysis, secret scanning, runtime controls, and platform security features; it is not a security certification.
 
 ## Install and run
 
 ```sh
-pnpm add -D @terra-symposium/standards-security
+pnpm add -D @terra-symposium/quality
 pnpm exec terra-security --all
 ```
 
@@ -20,4 +20,4 @@ pnpm exec terra-security --all
 
 Set `security.runtimeRoots` to repository-relative files or directories containing Node-only server, tooling, or test code that owns environment access. The legacy `security.allowProcessEnvRoots` field remains accepted for existing configurations; migrate it to `runtimeRoots` when updating the shared package.
 
-The scanner is source-based and pattern-based. It cannot establish whether a value is truly secret, discover every dynamic loader or alias, prove data flow through all runtime paths, or replace a dependency audit. Keep secret values out of reports, docs, test fixtures, and screenshots. See [the exact configuration fields](/quality/2-configuration/quality-json/) and [security/limits on built-in checks](/quality/3-checks/check-reference/).
+The scanner is source-based and pattern-based. It cannot establish whether a value is truly secret, discover every dynamic loader or alias, prove data flow through all runtime paths, or replace a dependency audit. Keep secret values out of reports, docs, test fixtures, and screenshots. See [the exact configuration fields](/quality/0-getting-started/overview/) and [security/limits on built-in checks](/quality/3-checks/check-reference/).

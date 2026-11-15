@@ -2,4 +2,4 @@
  * packages/quality/src/lib/object-forwarding.ts
  */
 
-export * from '@terra-symposium/standards-refactoring';
+export * from '@terra-symposium/quality/refactoring';

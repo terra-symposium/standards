@@ -1,5 +1,13 @@
 # @terra-symposium/standards-reporting
 
+## 0.8.0
+
+### Minor Changes
+
+- Consolidate Quality capabilities under one package with named subpath exports and publish the separate runtime, reporting, and testing packages under one-word names.
+- Use the shared Styling hue palette and Authentic Sans in generated screenshot and test-report slideshows.
+- Add configurable test, page, and operation timing budgets to shared Playwright evidence reporting and expose the settings through `quality.json`.
+
 ## 0.7.0
 
 ### Minor Changes

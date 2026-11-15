@@ -27,7 +27,7 @@ Not applicable.
 ### Install
 
 ```sh
-pnpm add -D @terra-symposium/standards-quality
+pnpm add -D @terra-symposium/quality
 ```
 
 ## Security and Limitations
@@ -152,11 +152,11 @@ When no GitHub repositories are configured, the normal quality run marks this st
 
 ### Configuration and guides
 
-- [Install and understand a run](https://standards-docs.netlify.app/quality/0-getting-started/setup/)
+- [Install and understand a run](https://standards-docs.netlify.app/quality/0-getting-started/overview/)
 
-[Complete `quality.json` reference](https://standards-docs.netlify.app/quality/2-configuration/quality-json/)
+[Complete `quality.json` reference](https://standards-docs.netlify.app/quality/0-getting-started/overview/)
 
-- [CLI and CI workflows](https://standards-docs.netlify.app/quality/4-workflows/cli-and-ci/)
+- [CLI and CI workflows](https://standards-docs.netlify.app/quality/0-getting-started/overview/)
 - [Check behavior and autofix limits](https://standards-docs.netlify.app/quality/3-checks/check-reference/)
 - [Troubleshooting](https://standards-docs.netlify.app/quality/5-operations/troubleshooting/)
 
@@ -184,7 +184,7 @@ Create `quality.json` in the repository root:
 
 ```json
 {
-	"$schema": "./node_modules/@terra-symposium/standards-quality/quality.schema.json",
+	"$schema": "./node_modules/@terra-symposium/quality/quality.schema.json",
 	"sourceRoots": ["src"],
 	"extensions": [".js", ".jsx", ".ts", ".tsx"],
 	"enabledChecks": {
@@ -200,7 +200,7 @@ Every quality finding is an error. The runner completes the remaining checks and
 
 This starting configuration uses the built-in checks without requiring external tools. Enable integrations as you install and configure the corresponding repository tools. When lint is enabled, add an ESLint flat config such as `eslint.config.mjs` at the repository root or under `configRoot`.
 
-Terra Quality always checks React `createRoot()` and `hydrateRoot()` mounts for a top-level error boundary and installs Astro's hydration fallback in Astro configs. `terra-quality-dev` applies these safe fixes before starting a configured development server. A normal quality check reports missing boundaries; `terra-quality error-boundaries --all` applies them explicitly, while `--warn` inspects without writing. The check cannot be disabled in `quality.json`. React roots import the boundary from `@terra-symposium/standards-error-boundaries/react`.
+Terra Quality always checks React `createRoot()` and `hydrateRoot()` mounts for a top-level error boundary and installs Astro's hydration fallback in Astro configs. `terra-quality-dev` applies these safe fixes before starting a configured development server. A normal quality check reports missing boundaries; `terra-quality error-boundaries --all` applies them explicitly, while `--warn` inspects without writing. The check cannot be disabled in `quality.json`. React roots import the boundary from `@terra-symposium/boundaries/react`.
 
 ## Validation
 
@@ -226,24 +226,22 @@ Not applicable.
 
 Not applicable.
 
-## Capability packages
+## Capability exports
 
-The aggregate `@terra-symposium/standards-quality` package remains the compatibility CLI and full workflow. The check implementations are also published by capability family, so consumers can import a focused API or run a focused CLI without installing the aggregate package. All capability CLIs use the repository's existing `quality.json` (or `config/quality.json`), source roots, changed-file default, `--all`, and read-only `--warn` behavior.
+Install `@terra-symposium/quality` once. Its root export provides the ordered Quality workflow, and its subpaths expose focused APIs. The existing `terra-*` commands are bins of the same package. They use the repository's `quality.json` (or `config/quality.json`), changed-file default, `--all`, and read-only `--warn` behavior.
 
-| Package                                      | CLI                     | Capability                                                       |
-| -------------------------------------------- | ----------------------- | ---------------------------------------------------------------- |
-| `@terra-symposium/standards-quality-core`    | API only                | Shared config, source scope, analysis context, and CLI contracts |
-| `@terra-symposium/standards-documentation`   | `terra-documentation`   | TSDoc/JSDoc and C Doxygen diagnostics, documented commands       |
-| `@terra-symposium/standards-formatting`      | `terra-formatting`      | Source layout, safe transforms, and Prettier integration         |
-| `@terra-symposium/standards-imports`         | `terra-imports`         | Import resolution and duplicate imports                          |
-| `@terra-symposium/standards-naming`          | `terra-naming`          | Identifier and alias naming checks                               |
-| `@terra-symposium/standards-refactoring`     | `terra-refactoring`     | Forwarding and single-use/dead-code analysis                     |
-| `@terra-symposium/standards-security`        | `terra-security`        | Built-in security findings                                       |
-| `@terra-symposium/standards-ui-quality`      | `terra-ui-quality`      | Accessibility, display names, boundaries, UI recommendations     |
-| `@terra-symposium/standards-patterns`        | `terra-patterns`        | Performance, repeated classes, Tailwind, regex, UI patterns      |
-| `@terra-symposium/standards-language-checks` | `terra-language-checks` | C, Java, and Python profiles and tool detection                  |
-| `@terra-symposium/standards-quality-reports` | `terra-quality-reports` | GitHub/history reports and test reporters                        |
+| Export                                   | CLI                     | Capability                                                       |
+| ---------------------------------------- | ----------------------- | ---------------------------------------------------------------- |
+| `@terra-symposium/quality/core`          | API only                | Shared config, source scope, analysis context, and CLI contracts |
+| `@terra-symposium/quality/documentation` | `terra-documentation`   | TSDoc/JSDoc and C Doxygen diagnostics, documented commands       |
+| `@terra-symposium/quality/formatting`    | `terra-formatting`      | Source layout, safe transforms, and Prettier integration         |
+| `@terra-symposium/quality/imports`       | `terra-imports`         | Import resolution and duplicate imports                          |
+| `@terra-symposium/quality/naming`        | `terra-naming`          | Identifier and alias naming checks                               |
+| `@terra-symposium/quality/refactoring`   | `terra-refactoring`     | Forwarding and single-use/dead-code analysis                     |
+| `@terra-symposium/quality/security`      | `terra-security`        | Built-in security findings                                       |
+| `@terra-symposium/quality/ui`            | `terra-ui-quality`      | Accessibility, display names, boundaries, UI recommendations     |
+| `@terra-symposium/quality/patterns`      | `terra-patterns`        | Performance, repeated classes, Tailwind, regex, UI patterns      |
+| `@terra-symposium/quality/languages`     | `terra-language-checks` | C, Java, and Python profiles and tool detection                  |
+| `@terra-symposium/quality/reports`       | `terra-quality-reports` | GitHub/history reports and test reporters                        |
 
-Each capability package root exports its API and TypeScript declarations; its `./cli` subpath exposes the command entry point. The aggregate package keeps the existing `terra-quality` and `terra-quality-dev` bins and legacy subpath imports as compatibility facades. Use the aggregate for the ordered Format → Static quality → Tests → Framework/type checks → Build → Repository health workflow, configured commands, progress, and combined reports.
-
-The capability packages are grouped by reusable areas of behavior rather than by individual rules. This keeps the public dependency graph useful without requiring a separate release for every check. Changesets records the new packages and aggregate compatibility release together.
+Each subpath exports its API and TypeScript declarations; its `./cli` subpath exposes the command entry point. The root package retains `terra-quality`, `terra-quality-dev`, and useful existing subpaths. Builds and functional tests remain separate from Quality.

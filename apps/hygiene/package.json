@@ -14,7 +14,7 @@
 	"dependencies": {
 		"@astrojs/react": "^7.1.0",
 		"@neondatabase/serverless": "^1.0.2",
-		"@terra-symposium/standards-error-boundaries": "workspace:*",
+		"@terra-symposium/boundaries": "workspace:*",
 		"astro": "^7.4.0",
 		"fast-xml-parser": "^5.2.5",
 		"react": "^19.3.1",
@@ -22,7 +22,7 @@
 	},
 	"devDependencies": {
 		"@astrojs/check": "^0.9.12",
-		"@terra-symposium/standards-quality": "workspace:*",
+		"@terra-symposium/quality": "workspace:*",
 		"@types/node": "^26.6.5",
 		"@types/react": "^19.3.0",
 		"tsx": "^4.20.6",

@@ -1,5 +1,27 @@
 # @terra-symposium/standards-quality
 
+## 2.4.0
+
+### Minor Changes
+
+- Audit C function documentation from Clang's AST, including declaration parameters, return contracts, and configurable author ownership.
+- Consolidate Quality capabilities under one package with named subpath exports and publish the separate runtime, reporting, and testing packages under one-word names.
+- Keep Knip's project scan aligned with Quality's shared source classifier, map imported dependencies to their declaring package manifest through a temporary overlay, account for configured tools, and resolve nested package executables before changing the working directory.
+- Support reasoned inline markers for review-only single-use boundaries, report stale or malformed markers, avoid recommending that inline test regexes move to the shared runtime registry, and keep transitive generated files outside single-use source scope.
+- Add configurable test, page, and operation timing budgets to shared Playwright evidence reporting and expose the settings through `quality.json`.
+
+### Patch Changes
+
+- Fix the published error-boundary dependency range for clean consumer installs.
+- Keep generated-header files out of formatting and lint checks while continuing to check authored source files.
+- Keep comment and TSDoc diagnostics read-only, resolve the ESLint progress module through the package dependency graph, and restrict callback shortening to explicit aliases.
+- Keep regex deduplication free of generated comment prose, preserve authored TSDoc when applying safe single-use fixes, and retain explicit annotations when inlining could change overload or generic call resolution.
+- Treat Rust `target` directories as generated output during root-wide quality discovery and workspace scanning.
+- Ignore inherited Object prototype properties when resolving identifier replacement words.
+- Updated dependencies
+- Updated dependencies
+  - @terra-symposium/boundaries@0.2.0
+
 ## 2.3.7
 
 ### Patch Changes

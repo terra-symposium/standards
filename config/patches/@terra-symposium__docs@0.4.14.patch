@@ -1,0 +1,98 @@
+diff --git a/dist/lib/components/blocks.js b/dist/lib/components/blocks.js
+index ef58ec0012bff007d52e91b783a245d32178b7c1..812c3243cf579f3306841aa43fa1176d378fce7b 100644
+--- a/dist/lib/components/blocks.js
++++ b/dist/lib/components/blocks.js
+@@ -12,6 +12,9 @@ import { docsValueToMarkdown } from '../lib/markdown-model.js';
+ import * as TerraQualityRegex from '../lib/terra/regex.mjs';
+ import { DocsQuizBlock } from './quiz.js';
+ import { DocsMarkdown } from './MarkdownContent.js';
++import { DataTableContent } from '@terra-symposium/styling/ui';
++import { CodeBlock } from './terra/editor/docs/_CodeBlock.js';
++import { NodesBlock } from './terra/editor/docs/_Nodes.js';
+ // DATA
+ import { DOCS_BLOCK_TYPES } from '../lib/block-types.js';
+ /*//////////////////////////////////////////////////
+@@ -228,16 +231,22 @@ export function DocsRichBlock({ block, options, }) {
+     switch (block._type) {
+         case 'block':
+             return _jsx(PortableTextBlockView, { block: block });
+-        case 'table':
+-            return (_jsxs("section", { className: "docs-table", children: [_jsx("strong", { children: text(block.header) }), _jsx("table", { children: _jsx("tbody", { children: (Array.isArray(block.rows) ? block.rows : []).map((r, i) => (_jsx("tr", { children: (Array.isArray(r.cells)
+-                                    ? r.cells
+-                                    : []).map((cell, j) => (_jsx("td", { children: _jsx(NestedContent, { value: cell, options: options }) }, j))) }, i))) }) })] }));
++        case 'table': {
++            const rows = Array.isArray(block.rows) ? block.rows : [];
++            const headerCells = Array.isArray(rows[0]?.cells) ? rows[0].cells : [];
++            const columns = headerCells.map((cell, index) => ({
++                key: String(index),
++                label: _jsx(NestedContent, { value: cell, options }),
++                render: (row) => _jsx(NestedContent, { value: Array.isArray(row.cells) ? row.cells[index] : '', options }),
++            }));
++            return _jsxs("section", { children: [block.header && block.header !== 'Table' ? _jsx("strong", { children: text(block.header) }) : null, _jsx(DataTableContent, { columns, rows: rows.slice(1), variant: 'default' })] });
++        }
+         case 'callout': {
+             const content = Array.isArray(block.content) ? block.content : [];
+             return (_jsxs("aside", { className: `docs-callout docs-callout-${text(block.kind).replace(TerraQualityRegex.REGEX_A_Z0_9_GI_REGEX(), '') || 'info'}`, children: [_jsx("strong", { children: text(block.title) }), _jsx("div", { children: _jsx(NestedContent, { value: content.length ? content : typeof block.markdown === 'string' ? block.markdown : '', options: options }) })] }));
+         }
+         case 'code':
+-            return (_jsx("pre", { className: "docs-code", children: _jsx("code", { "data-language": text(block.language), children: text(block.value) }) }));
++            return _jsx(CodeBlock, { code: text(block.value), language: text(block.language), tone: 'view' });
+         case 'docImage':
+             return sUrl(block.url) ? (_jsxs("figure", { children: [_jsx("img", { src: sUrl(block.url), alt: text(block.alt) }), _jsx("figcaption", { children: text(block.title) })] })) : (_jsx("p", { children: "Image URL unavailable" }));
+         case 'embed':
+@@ -253,6 +262,7 @@ export function DocsRichBlock({ block, options, }) {
+             return block.inline ? (_jsx("span", { className: "docs-math", "aria-label": code, dangerouslySetInnerHTML: { __html: html } })) : (_jsx("div", { className: "docs-math", "aria-label": code, dangerouslySetInnerHTML: { __html: html } }));
+         }
+         case 'nodes': {
++            return _jsx(NodesBlock, { block });
+             /**
+              * Renders a simple flow diagram from the node and edge data stored in a rich block.
+              * @param block Rich block containing optional nodes, edges, direction, and label fields.
+diff --git a/dist/lib/components/terra/editor/docs/_CodeBlock.js b/dist/lib/components/terra/editor/docs/_CodeBlock.js
+index 96587e302d8f2c8c39f7fb448a1b3ba3f8ca6a01..f150242af8caee5110ae4d125642551809234231 100644
+--- a/dist/lib/components/terra/editor/docs/_CodeBlock.js
++++ b/dist/lib/components/terra/editor/docs/_CodeBlock.js
+@@ -231,8 +231,6 @@ export function CodeBlock(blockOptions) {
+         };
+     }, [docsSrc, blockOptions.code, blockOptions.source, src]);
+     useEffect(() => {
+-        if (blockOptions.tone === 'view')
+-            return;
+         let a = true;
+         let aEnterHandler;
+         $hydrating.set($hydrating.get() + 1);
+diff --git a/dist/lib/components/terra/editor/docs/_Table.js b/dist/lib/components/terra/editor/docs/_Table.js
+index 57557e940535b9ff847093f9dce03ccc10d78c76..af50d0086b33e3a555327cd1e0bb0b9a0553d91e 100644
+--- a/dist/lib/components/terra/editor/docs/_Table.js
++++ b/dist/lib/components/terra/editor/docs/_Table.js
+@@ -11,7 +11,7 @@ import { isRec } from '../../../../lib/terra/runtime/runtime.js';
+ import { useEditor } from '@portabletext/editor';
+ // COMPONENTS
+ import { Add as AddIcon, TrashCan as TrashIcon } from '@carbon/icons-react';
+-import { Button, Input } from '@terra-symposium/styling/ui';
++import { Button, DataTableContent, Input } from '@terra-symposium/styling/ui';
+ import { ErrorBoundary } from '../../ui.js';
+ import { TerraContentEditor } from './_editor.js';
+ /**
+@@ -66,15 +66,13 @@ HELPERS
+ function Table({ block }) {
+     const rows = (block.rows ?? []);
+     const count = rows.reduce((m, r) => Math.max(m, Array.isArray(r.cells) ? r.cells.length : 0), 0);
+-    /**
+-     * Renders a cell's nested Portable Text with attachments disabled in read-only mode.
+-     * @param c Optional cell value at the current row and column.
+-     * @returns The nested cell editor, or `null` for a padded empty cell.
+-     */
+     const renderCell = (c) => c ? (_jsx(TerraContentEditor, { content: (Array.isArray(c.content) ? c.content : []), docsAttachments: [], nested: true, readOnly: true })) : null;
+-    return (_jsx(ErrorBoundary, { name: "TableBlock", children: _jsxs("section", { className: "my-6 overflow-x-auto", "data-docs-editor-block": "DocsTable", children: [block.header && block.header !== 'Table' && _jsx("h3", { className: "sr-only", children: block.header }), _jsxs("table", { children: [_jsx("thead", { children: _jsx("tr", { children: cells(Array.isArray(rows[0]?.cells) ? rows[0].cells : [], count).map((c, i) => (_jsx("th", { children: renderCell(c) }, c ? key(c, `${i}`) : i))) }) }), _jsx("tbody", { children: rows.slice(1).map((r, v) => {
+-                                return (_jsx("tr", { children: cells(Array.isArray(r.cells) ? r.cells : [], count).map((c, i) => (_jsx("td", { children: renderCell(c) }, c ? key(c, `${i}`) : i))) }, key(r, `${v}`)));
+-                            }) })] })] }) }));
++    const columns = Array.from({ length: count }, (_cell, i) => ({
++        key: String(i),
++        label: renderCell(rows[0]?.cells?.[i]),
++        render: (row) => renderCell(row.cells?.[i]),
++    }));
++    return (_jsx(ErrorBoundary, { name: "TableBlock", children: _jsxs("section", { "data-docs-editor-block": "DocsTable", children: [block.header && block.header !== 'Table' && _jsx("h3", { className: "sr-only", children: block.header }), _jsx(DataTableContent, { columns, rows: rows.slice(1), variant: "default" })] }) }));
+ }
+ /**
+  * Renders editable Docs table controls and cells.

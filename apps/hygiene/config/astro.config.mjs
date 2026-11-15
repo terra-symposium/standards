@@ -1,4 +1,4 @@
-import { terraErrorBoundaryIntegration as __terraErrorBoundaryIntegration } from '@terra-symposium/standards-error-boundaries/astro-integration';
+import { terraErrorBoundaryIntegration as __terraErrorBoundaryIntegration } from '@terra-symposium/boundaries/astro-integration';
 
 /*//////////////////////////////////////////////////
 IMPORTS

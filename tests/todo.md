@@ -457,38 +457,38 @@ This checklist inventories repository-owned functions, documents, and configurat
 
 ### `packages/braces/tests/public.test.mjs`
 
-- [ ] `callback@5` (line 5): Run this test and verify its assertions cover the helper, failure path, and relevant fixture. Candidate coverage: [`packages/documentation/tests/public.test.mjs`](../packages/documentation/tests/public.test.mjs).
-- [ ] `callback@9` (line 9): Run this test and verify its assertions cover the helper, failure path, and relevant fixture. Candidate coverage: [`packages/documentation/tests/public.test.mjs`](../packages/documentation/tests/public.test.mjs).
-- [ ] `callback@11` (line 11): Run this test and verify its assertions cover the helper, failure path, and relevant fixture. Candidate coverage: [`packages/documentation/tests/public.test.mjs`](../packages/documentation/tests/public.test.mjs).
-- [ ] `callback@14` (line 14): Run this test and verify its assertions cover the helper, failure path, and relevant fixture. Candidate coverage: [`packages/documentation/tests/public.test.mjs`](../packages/documentation/tests/public.test.mjs).
-- [ ] `callback@18` (line 18): Run this test and verify its assertions cover the helper, failure path, and relevant fixture. Candidate coverage: [`packages/documentation/tests/public.test.mjs`](../packages/documentation/tests/public.test.mjs).
-- [ ] `pattern` (line 23): Run this test and verify its assertions cover the helper, failure path, and relevant fixture. Candidate coverage: [`packages/documentation/tests/public.test.mjs`](../packages/documentation/tests/public.test.mjs).
-- [ ] `callback@24` (line 24): Run this test and verify its assertions cover the helper, failure path, and relevant fixture. Candidate coverage: [`packages/documentation/tests/public.test.mjs`](../packages/documentation/tests/public.test.mjs).
-- [ ] `callback@25` (line 25): Run this test and verify its assertions cover the helper, failure path, and relevant fixture. Candidate coverage: [`packages/documentation/tests/public.test.mjs`](../packages/documentation/tests/public.test.mjs).
-- [ ] `callback@29` (line 29): Run this test and verify its assertions cover the helper, failure path, and relevant fixture. Candidate coverage: [`packages/documentation/tests/public.test.mjs`](../packages/documentation/tests/public.test.mjs).
-- [ ] `callback@32` (line 32): Run this test and verify its assertions cover the helper, failure path, and relevant fixture. Candidate coverage: [`packages/documentation/tests/public.test.mjs`](../packages/documentation/tests/public.test.mjs).
-- [ ] `callback@33` (line 33): Run this test and verify its assertions cover the helper, failure path, and relevant fixture. Candidate coverage: [`packages/documentation/tests/public.test.mjs`](../packages/documentation/tests/public.test.mjs).
-- [ ] `callback@34` (line 34): Run this test and verify its assertions cover the helper, failure path, and relevant fixture. Candidate coverage: [`packages/documentation/tests/public.test.mjs`](../packages/documentation/tests/public.test.mjs).
-- [ ] `callback@35` (line 35): Run this test and verify its assertions cover the helper, failure path, and relevant fixture. Candidate coverage: [`packages/documentation/tests/public.test.mjs`](../packages/documentation/tests/public.test.mjs).
-- [ ] `callback@36` (line 36): Run this test and verify its assertions cover the helper, failure path, and relevant fixture. Candidate coverage: [`packages/documentation/tests/public.test.mjs`](../packages/documentation/tests/public.test.mjs).
-- [ ] `callback@37` (line 37): Run this test and verify its assertions cover the helper, failure path, and relevant fixture. Candidate coverage: [`packages/documentation/tests/public.test.mjs`](../packages/documentation/tests/public.test.mjs).
-- [ ] `callback@38` (line 38): Run this test and verify its assertions cover the helper, failure path, and relevant fixture. Candidate coverage: [`packages/documentation/tests/public.test.mjs`](../packages/documentation/tests/public.test.mjs).
-- [ ] `callback@40` (line 40): Run this test and verify its assertions cover the helper, failure path, and relevant fixture. Candidate coverage: [`packages/documentation/tests/public.test.mjs`](../packages/documentation/tests/public.test.mjs).
-- [ ] `callback@44` (line 44): Run this test and verify its assertions cover the helper, failure path, and relevant fixture. Candidate coverage: [`packages/documentation/tests/public.test.mjs`](../packages/documentation/tests/public.test.mjs).
-- [ ] `pattern` (line 45): Run this test and verify its assertions cover the helper, failure path, and relevant fixture. Candidate coverage: [`packages/documentation/tests/public.test.mjs`](../packages/documentation/tests/public.test.mjs).
-- [ ] `callback@46` (line 46): Run this test and verify its assertions cover the helper, failure path, and relevant fixture. Candidate coverage: [`packages/documentation/tests/public.test.mjs`](../packages/documentation/tests/public.test.mjs).
-- [ ] `callback@47` (line 47): Run this test and verify its assertions cover the helper, failure path, and relevant fixture. Candidate coverage: [`packages/documentation/tests/public.test.mjs`](../packages/documentation/tests/public.test.mjs).
-- [ ] `callback@48` (line 48): Run this test and verify its assertions cover the helper, failure path, and relevant fixture. Candidate coverage: [`packages/documentation/tests/public.test.mjs`](../packages/documentation/tests/public.test.mjs).
+- [ ] `callback@5` (line 5): Run this test and verify its assertions cover the helper, failure path, and relevant fixture. Candidate coverage: [`packages/quality/tests/capabilities/documentation/public.test.mjs`](../packages/quality/tests/capabilities/documentation/public.test.mjs).
+- [ ] `callback@9` (line 9): Run this test and verify its assertions cover the helper, failure path, and relevant fixture. Candidate coverage: [`packages/quality/tests/capabilities/documentation/public.test.mjs`](../packages/quality/tests/capabilities/documentation/public.test.mjs).
+- [ ] `callback@11` (line 11): Run this test and verify its assertions cover the helper, failure path, and relevant fixture. Candidate coverage: [`packages/quality/tests/capabilities/documentation/public.test.mjs`](../packages/quality/tests/capabilities/documentation/public.test.mjs).
+- [ ] `callback@14` (line 14): Run this test and verify its assertions cover the helper, failure path, and relevant fixture. Candidate coverage: [`packages/quality/tests/capabilities/documentation/public.test.mjs`](../packages/quality/tests/capabilities/documentation/public.test.mjs).
+- [ ] `callback@18` (line 18): Run this test and verify its assertions cover the helper, failure path, and relevant fixture. Candidate coverage: [`packages/quality/tests/capabilities/documentation/public.test.mjs`](../packages/quality/tests/capabilities/documentation/public.test.mjs).
+- [ ] `pattern` (line 23): Run this test and verify its assertions cover the helper, failure path, and relevant fixture. Candidate coverage: [`packages/quality/tests/capabilities/documentation/public.test.mjs`](../packages/quality/tests/capabilities/documentation/public.test.mjs).
+- [ ] `callback@24` (line 24): Run this test and verify its assertions cover the helper, failure path, and relevant fixture. Candidate coverage: [`packages/quality/tests/capabilities/documentation/public.test.mjs`](../packages/quality/tests/capabilities/documentation/public.test.mjs).
+- [ ] `callback@25` (line 25): Run this test and verify its assertions cover the helper, failure path, and relevant fixture. Candidate coverage: [`packages/quality/tests/capabilities/documentation/public.test.mjs`](../packages/quality/tests/capabilities/documentation/public.test.mjs).
+- [ ] `callback@29` (line 29): Run this test and verify its assertions cover the helper, failure path, and relevant fixture. Candidate coverage: [`packages/quality/tests/capabilities/documentation/public.test.mjs`](../packages/quality/tests/capabilities/documentation/public.test.mjs).
+- [ ] `callback@32` (line 32): Run this test and verify its assertions cover the helper, failure path, and relevant fixture. Candidate coverage: [`packages/quality/tests/capabilities/documentation/public.test.mjs`](../packages/quality/tests/capabilities/documentation/public.test.mjs).
+- [ ] `callback@33` (line 33): Run this test and verify its assertions cover the helper, failure path, and relevant fixture. Candidate coverage: [`packages/quality/tests/capabilities/documentation/public.test.mjs`](../packages/quality/tests/capabilities/documentation/public.test.mjs).
+- [ ] `callback@34` (line 34): Run this test and verify its assertions cover the helper, failure path, and relevant fixture. Candidate coverage: [`packages/quality/tests/capabilities/documentation/public.test.mjs`](../packages/quality/tests/capabilities/documentation/public.test.mjs).
+- [ ] `callback@35` (line 35): Run this test and verify its assertions cover the helper, failure path, and relevant fixture. Candidate coverage: [`packages/quality/tests/capabilities/documentation/public.test.mjs`](../packages/quality/tests/capabilities/documentation/public.test.mjs).
+- [ ] `callback@36` (line 36): Run this test and verify its assertions cover the helper, failure path, and relevant fixture. Candidate coverage: [`packages/quality/tests/capabilities/documentation/public.test.mjs`](../packages/quality/tests/capabilities/documentation/public.test.mjs).
+- [ ] `callback@37` (line 37): Run this test and verify its assertions cover the helper, failure path, and relevant fixture. Candidate coverage: [`packages/quality/tests/capabilities/documentation/public.test.mjs`](../packages/quality/tests/capabilities/documentation/public.test.mjs).
+- [ ] `callback@38` (line 38): Run this test and verify its assertions cover the helper, failure path, and relevant fixture. Candidate coverage: [`packages/quality/tests/capabilities/documentation/public.test.mjs`](../packages/quality/tests/capabilities/documentation/public.test.mjs).
+- [ ] `callback@40` (line 40): Run this test and verify its assertions cover the helper, failure path, and relevant fixture. Candidate coverage: [`packages/quality/tests/capabilities/documentation/public.test.mjs`](../packages/quality/tests/capabilities/documentation/public.test.mjs).
+- [ ] `callback@44` (line 44): Run this test and verify its assertions cover the helper, failure path, and relevant fixture. Candidate coverage: [`packages/quality/tests/capabilities/documentation/public.test.mjs`](../packages/quality/tests/capabilities/documentation/public.test.mjs).
+- [ ] `pattern` (line 45): Run this test and verify its assertions cover the helper, failure path, and relevant fixture. Candidate coverage: [`packages/quality/tests/capabilities/documentation/public.test.mjs`](../packages/quality/tests/capabilities/documentation/public.test.mjs).
+- [ ] `callback@46` (line 46): Run this test and verify its assertions cover the helper, failure path, and relevant fixture. Candidate coverage: [`packages/quality/tests/capabilities/documentation/public.test.mjs`](../packages/quality/tests/capabilities/documentation/public.test.mjs).
+- [ ] `callback@47` (line 47): Run this test and verify its assertions cover the helper, failure path, and relevant fixture. Candidate coverage: [`packages/quality/tests/capabilities/documentation/public.test.mjs`](../packages/quality/tests/capabilities/documentation/public.test.mjs).
+- [ ] `callback@48` (line 48): Run this test and verify its assertions cover the helper, failure path, and relevant fixture. Candidate coverage: [`packages/quality/tests/capabilities/documentation/public.test.mjs`](../packages/quality/tests/capabilities/documentation/public.test.mjs).
 
-### `packages/documentation/src/cli.ts`
+### `packages/quality/src/capabilities/documentation/cli.ts`
 
 - [ ] `callback@10` (line 10): Test expected input/output, empty and boundary cases, and a relevant failure path. No direct test file is linked yet.
 
-### `packages/documentation/src/index.ts`
+### `packages/quality/src/capabilities/documentation/index.ts`
 
 - [ ] File behavior: execute or compile this source, including expected output and failure handling. No direct test file is linked yet.
 
-### `packages/documentation/src/lib/documentation.ts`
+### `packages/quality/src/capabilities/documentation/lib/documentation.ts`
 
 - [ ] `S_S_G_REGEX` (line 49): Test expected input/output, empty and boundary cases, and a relevant failure path. Candidate coverage: [`packages/quality/tests/checks/documentation.test.mjs`](../packages/quality/tests/checks/documentation.test.mjs).
 - [ ] `documentedCommandFindings` (line 79): Test found, missing, unauthorized, and upstream-failure results. Candidate coverage: [`packages/quality/tests/checks/documentation.test.mjs`](../packages/quality/tests/checks/documentation.test.mjs).
@@ -579,7 +579,7 @@ This checklist inventories repository-owned functions, documents, and configurat
 - [ ] `callback@998` (line 998): Test expected input/output, empty and boundary cases, and a relevant failure path. Candidate coverage: [`packages/quality/tests/checks/documentation.test.mjs`](../packages/quality/tests/checks/documentation.test.mjs).
 - [ ] `documentSrcFile` (line 1015): Test expected input/output, empty and boundary cases, and a relevant failure path. Candidate coverage: [`packages/quality/tests/checks/documentation.test.mjs`](../packages/quality/tests/checks/documentation.test.mjs).
 
-### `packages/documentation/tests/public.test.mjs`
+### `packages/quality/tests/capabilities/documentation/public.test.mjs`
 
 - [ ] `callback@17` (line 17): Run this test and verify its assertions cover the helper, failure path, and relevant fixture. Candidate coverage: [`packages/braces/tests/public.test.mjs`](../packages/braces/tests/public.test.mjs).
 - [ ] `callback@22` (line 22): Run this test and verify its assertions cover the helper, failure path, and relevant fixture. Candidate coverage: [`packages/braces/tests/public.test.mjs`](../packages/braces/tests/public.test.mjs).
@@ -630,15 +630,15 @@ This checklist inventories repository-owned functions, documents, and configurat
 - [ ] `onError` (line 44): Run this test and verify its assertions cover the helper, failure path, and relevant fixture. Candidate coverage: [`packages/quality/tests/checks/error-boundaries.test.mjs`](../packages/quality/tests/checks/error-boundaries.test.mjs).
 - [ ] `Panel` (line 55): Run this test and verify its assertions cover the helper, failure path, and relevant fixture. Candidate coverage: [`packages/quality/tests/checks/error-boundaries.test.mjs`](../packages/quality/tests/checks/error-boundaries.test.mjs).
 
-### `packages/formatting/src/cli.ts`
+### `packages/quality/src/capabilities/formatting/cli.ts`
 
 - [ ] `callback@10` (line 10): Test expected input/output, empty and boundary cases, and a relevant failure path. No direct test file is linked yet.
 
-### `packages/formatting/src/index.ts`
+### `packages/quality/src/capabilities/formatting/index.ts`
 
 - [ ] File behavior: execute or compile this source, including expected output and failure handling. No direct test file is linked yet.
 
-### `packages/formatting/src/lib/collapse.ts`
+### `packages/quality/src/capabilities/formatting/lib/collapse.ts`
 
 - [ ] `candidateSpan` (line 34): Test expected input/output, empty and boundary cases, and a relevant failure path. Candidate coverage: [`packages/quality/tests/transforms/collapse.test.mjs`](../packages/quality/tests/transforms/collapse.test.mjs).
 - [ ] `findJsx` (line 38): Test found, missing, unauthorized, and upstream-failure results. Candidate coverage: [`packages/quality/tests/transforms/collapse.test.mjs`](../packages/quality/tests/transforms/collapse.test.mjs).
@@ -651,27 +651,27 @@ This checklist inventories repository-owned functions, documents, and configurat
 - [ ] `callback@152` (line 152): Test expected input/output, empty and boundary cases, and a relevant failure path. Candidate coverage: [`packages/quality/tests/transforms/collapse.test.mjs`](../packages/quality/tests/transforms/collapse.test.mjs).
 - [ ] `callback@152` (line 152): Test expected input/output, empty and boundary cases, and a relevant failure path. Candidate coverage: [`packages/quality/tests/transforms/collapse.test.mjs`](../packages/quality/tests/transforms/collapse.test.mjs).
 
-### `packages/formatting/src/lib/inline-if.ts`
+### `packages/quality/src/capabilities/formatting/lib/inline-if.ts`
 
 - [ ] `collapseInlineIfs` (line 25): Test expected input/output, empty and boundary cases, and a relevant failure path. Candidate coverage: [`packages/quality/tests/transforms/inline-if.test.mjs`](../packages/quality/tests/transforms/inline-if.test.mjs).
 - [ ] `visit` (line 30): Test expected input/output, empty and boundary cases, and a relevant failure path. Candidate coverage: [`packages/quality/tests/transforms/inline-if.test.mjs`](../packages/quality/tests/transforms/inline-if.test.mjs).
 - [ ] `callback@47` (line 47): Test expected input/output, empty and boundary cases, and a relevant failure path. Candidate coverage: [`packages/quality/tests/transforms/inline-if.test.mjs`](../packages/quality/tests/transforms/inline-if.test.mjs).
 - [ ] `callback@47` (line 47): Test expected input/output, empty and boundary cases, and a relevant failure path. Candidate coverage: [`packages/quality/tests/transforms/inline-if.test.mjs`](../packages/quality/tests/transforms/inline-if.test.mjs).
 
-### `packages/formatting/src/lib/run-formatting.ts`
+### `packages/quality/src/capabilities/formatting/lib/run-formatting.ts`
 
-- [ ] `runFormatting` (line 49): Render each state; check interactions, accessibility, loading, and error behavior. Candidate coverage: [`packages/formatting/tests/run-formatting.test.mjs`](../packages/formatting/tests/run-formatting.test.mjs).
-- [ ] `callback@50` (line 50): Test expected input/output, empty and boundary cases, and a relevant failure path. Candidate coverage: [`packages/formatting/tests/run-formatting.test.mjs`](../packages/formatting/tests/run-formatting.test.mjs).
-- [ ] `callback@54` (line 54): Test expected input/output, empty and boundary cases, and a relevant failure path. Candidate coverage: [`packages/formatting/tests/run-formatting.test.mjs`](../packages/formatting/tests/run-formatting.test.mjs).
-- [ ] `callback@67` (line 67): Test expected input/output, empty and boundary cases, and a relevant failure path. Candidate coverage: [`packages/formatting/tests/run-formatting.test.mjs`](../packages/formatting/tests/run-formatting.test.mjs).
+- [ ] `runFormatting` (line 49): Render each state; check interactions, accessibility, loading, and error behavior. Candidate coverage: [`packages/quality/tests/capabilities/formatting/run-formatting.test.mjs`](../packages/quality/tests/capabilities/formatting/run-formatting.test.mjs).
+- [ ] `callback@50` (line 50): Test expected input/output, empty and boundary cases, and a relevant failure path. Candidate coverage: [`packages/quality/tests/capabilities/formatting/run-formatting.test.mjs`](../packages/quality/tests/capabilities/formatting/run-formatting.test.mjs).
+- [ ] `callback@54` (line 54): Test expected input/output, empty and boundary cases, and a relevant failure path. Candidate coverage: [`packages/quality/tests/capabilities/formatting/run-formatting.test.mjs`](../packages/quality/tests/capabilities/formatting/run-formatting.test.mjs).
+- [ ] `callback@67` (line 67): Test expected input/output, empty and boundary cases, and a relevant failure path. Candidate coverage: [`packages/quality/tests/capabilities/formatting/run-formatting.test.mjs`](../packages/quality/tests/capabilities/formatting/run-formatting.test.mjs).
 
-### `packages/formatting/tests/public.test.mjs`
+### `packages/quality/tests/capabilities/formatting/public.test.mjs`
 
 - [ ] `callback@15` (line 15): Run this test and verify its assertions cover the helper, failure path, and relevant fixture. Candidate coverage: [`packages/braces/tests/public.test.mjs`](../packages/braces/tests/public.test.mjs).
 - [ ] `callback@22` (line 22): Run this test and verify its assertions cover the helper, failure path, and relevant fixture. Candidate coverage: [`packages/braces/tests/public.test.mjs`](../packages/braces/tests/public.test.mjs).
 - [ ] `callback@28` (line 28): Run this test and verify its assertions cover the helper, failure path, and relevant fixture. Candidate coverage: [`packages/braces/tests/public.test.mjs`](../packages/braces/tests/public.test.mjs).
 
-### `packages/formatting/tests/run-formatting.test.mjs`
+### `packages/quality/tests/capabilities/formatting/run-formatting.test.mjs`
 
 - [ ] `callback@21` (line 21): Run this test and verify its assertions cover the helper, failure path, and relevant fixture. No direct test file is linked yet.
 - [ ] `callback@23` (line 23): Run this test and verify its assertions cover the helper, failure path, and relevant fixture. No direct test file is linked yet.
@@ -686,15 +686,15 @@ This checklist inventories repository-owned functions, documents, and configurat
 - [ ] `callback@105` (line 105): Run this test and verify its assertions cover the helper, failure path, and relevant fixture. No direct test file is linked yet.
 - [ ] `callback@107` (line 107): Run this test and verify its assertions cover the helper, failure path, and relevant fixture. No direct test file is linked yet.
 
-### `packages/imports/src/cli.ts`
+### `packages/quality/src/capabilities/imports/cli.ts`
 
 - [ ] `callback@10` (line 10): Test expected input/output, empty and boundary cases, and a relevant failure path. No direct test file is linked yet.
 
-### `packages/imports/src/index.ts`
+### `packages/quality/src/capabilities/imports/index.ts`
 
 - [ ] File behavior: execute or compile this source, including expected output and failure handling. No direct test file is linked yet.
 
-### `packages/imports/src/lib/imports.ts`
+### `packages/quality/src/capabilities/imports/lib/imports.ts`
 
 - [ ] `resolveImport` (line 40): Test expected input/output, empty and boundary cases, and a relevant failure path. Candidate coverage: [`packages/quality/tests/checks/imports.test.mjs`](../packages/quality/tests/checks/imports.test.mjs).
 - [ ] `callback@41` (line 41): Test expected input/output, empty and boundary cases, and a relevant failure path. Candidate coverage: [`packages/quality/tests/checks/imports.test.mjs`](../packages/quality/tests/checks/imports.test.mjs).
@@ -704,21 +704,21 @@ This checklist inventories repository-owned functions, documents, and configurat
 - [ ] `callback@85` (line 85): Test expected input/output, empty and boundary cases, and a relevant failure path. Candidate coverage: [`packages/quality/tests/checks/imports.test.mjs`](../packages/quality/tests/checks/imports.test.mjs).
 - [ ] `callback@86` (line 86): Test expected input/output, empty and boundary cases, and a relevant failure path. Candidate coverage: [`packages/quality/tests/checks/imports.test.mjs`](../packages/quality/tests/checks/imports.test.mjs).
 
-### `packages/imports/tests/public.test.mjs`
+### `packages/quality/tests/capabilities/imports/public.test.mjs`
 
 - [ ] `callback@15` (line 15): Run this test and verify its assertions cover the helper, failure path, and relevant fixture. Candidate coverage: [`packages/braces/tests/public.test.mjs`](../packages/braces/tests/public.test.mjs).
 - [ ] `callback@19` (line 19): Run this test and verify its assertions cover the helper, failure path, and relevant fixture. Candidate coverage: [`packages/braces/tests/public.test.mjs`](../packages/braces/tests/public.test.mjs).
 - [ ] `callback@25` (line 25): Run this test and verify its assertions cover the helper, failure path, and relevant fixture. Candidate coverage: [`packages/braces/tests/public.test.mjs`](../packages/braces/tests/public.test.mjs).
 
-### `packages/language-checks/src/cli.ts`
+### `packages/quality/src/capabilities/languages/cli.ts`
 
 - [ ] `callback@10` (line 10): Test expected input/output, empty and boundary cases, and a relevant failure path. No direct test file is linked yet.
 
-### `packages/language-checks/src/index.ts`
+### `packages/quality/src/capabilities/languages/index.ts`
 
 - [ ] File behavior: execute or compile this source, including expected output and failure handling. No direct test file is linked yet.
 
-### `packages/language-checks/src/lib/language-profiles.ts`
+### `packages/quality/src/capabilities/languages/lib/language-profiles.ts`
 
 - [ ] `shared` (line 111): Test expected input/output, empty and boundary cases, and a relevant failure path. Candidate coverage: [`packages/quality/tests/runner/language-profiles.test.mjs`](../packages/quality/tests/runner/language-profiles.test.mjs).
 - [ ] `native` (line 119): Test expected input/output, empty and boundary cases, and a relevant failure path. Candidate coverage: [`packages/quality/tests/runner/language-profiles.test.mjs`](../packages/quality/tests/runner/language-profiles.test.mjs).
@@ -747,7 +747,7 @@ This checklist inventories repository-owned functions, documents, and configurat
 - [ ] `parseVersion` (line 549): Test valid, malformed, empty, and boundary input; assert exact output or error. Candidate coverage: [`packages/quality/tests/runner/language-profiles.test.mjs`](../packages/quality/tests/runner/language-profiles.test.mjs).
 - [ ] `compVersions` (line 556): Test expected input/output, empty and boundary cases, and a relevant failure path. Candidate coverage: [`packages/quality/tests/runner/language-profiles.test.mjs`](../packages/quality/tests/runner/language-profiles.test.mjs).
 
-### `packages/language-checks/src/lib/run-language-checks.ts`
+### `packages/quality/src/capabilities/languages/lib/run-language-checks.ts`
 
 - [ ] `runLanguageChecks` (line 35): Test expected input/output, empty and boundary cases, and a relevant failure path. No direct test file is linked yet.
 - [ ] `callback@48` (line 48): Test expected input/output, empty and boundary cases, and a relevant failure path. No direct test file is linked yet.
@@ -759,21 +759,21 @@ This checklist inventories repository-owned functions, documents, and configurat
 - [ ] `callback@92` (line 92): Test expected input/output, empty and boundary cases, and a relevant failure path. No direct test file is linked yet.
 - [ ] `callback@94` (line 94): Test expected input/output, empty and boundary cases, and a relevant failure path. No direct test file is linked yet.
 
-### `packages/language-checks/tests/public.test.mjs`
+### `packages/quality/tests/capabilities/languages/public.test.mjs`
 
 - [ ] `callback@15` (line 15): Run this test and verify its assertions cover the helper, failure path, and relevant fixture. Candidate coverage: [`packages/braces/tests/public.test.mjs`](../packages/braces/tests/public.test.mjs).
 - [ ] `callback@19` (line 19): Run this test and verify its assertions cover the helper, failure path, and relevant fixture. Candidate coverage: [`packages/braces/tests/public.test.mjs`](../packages/braces/tests/public.test.mjs).
 - [ ] `callback@25` (line 25): Run this test and verify its assertions cover the helper, failure path, and relevant fixture. Candidate coverage: [`packages/braces/tests/public.test.mjs`](../packages/braces/tests/public.test.mjs).
 
-### `packages/naming/src/cli.ts`
+### `packages/quality/src/capabilities/naming/cli.ts`
 
 - [ ] `callback@10` (line 10): Test expected input/output, empty and boundary cases, and a relevant failure path. No direct test file is linked yet.
 
-### `packages/naming/src/index.ts`
+### `packages/quality/src/capabilities/naming/index.ts`
 
 - [ ] File behavior: execute or compile this source, including expected output and failure handling. No direct test file is linked yet.
 
-### `packages/naming/src/lib/naming.ts`
+### `packages/quality/src/capabilities/naming/lib/naming.ts`
 
 - [ ] `aliasTgt` (line 123): Test expected input/output, empty and boundary cases, and a relevant failure path. Candidate coverage: [`packages/quality/tests/transforms/naming.test.mjs`](../packages/quality/tests/transforms/naming.test.mjs).
 - [ ] `isStableLocalBinding` (line 133): Test expected input/output, empty and boundary cases, and a relevant failure path. Candidate coverage: [`packages/quality/tests/transforms/naming.test.mjs`](../packages/quality/tests/transforms/naming.test.mjs).
@@ -867,7 +867,7 @@ This checklist inventories repository-owned functions, documents, and configurat
 - [ ] `callback@921` (line 921): Test expected input/output, empty and boundary cases, and a relevant failure path. Candidate coverage: [`packages/quality/tests/transforms/naming.test.mjs`](../packages/quality/tests/transforms/naming.test.mjs).
 - [ ] `callback@921` (line 921): Test expected input/output, empty and boundary cases, and a relevant failure path. Candidate coverage: [`packages/quality/tests/transforms/naming.test.mjs`](../packages/quality/tests/transforms/naming.test.mjs).
 
-### `packages/naming/tests/public.test.mjs`
+### `packages/quality/tests/capabilities/naming/public.test.mjs`
 
 - [ ] `callback@17` (line 17): Run this test and verify its assertions cover the helper, failure path, and relevant fixture. Candidate coverage: [`packages/braces/tests/public.test.mjs`](../packages/braces/tests/public.test.mjs).
 - [ ] `callback@23` (line 23): Run this test and verify its assertions cover the helper, failure path, and relevant fixture. Candidate coverage: [`packages/braces/tests/public.test.mjs`](../packages/braces/tests/public.test.mjs).
@@ -883,15 +883,15 @@ This checklist inventories repository-owned functions, documents, and configurat
 - [ ] `callback@129` (line 129): Run this test and verify its assertions cover the helper, failure path, and relevant fixture. Candidate coverage: [`packages/braces/tests/public.test.mjs`](../packages/braces/tests/public.test.mjs).
 - [ ] `callback@134` (line 134): Run this test and verify its assertions cover the helper, failure path, and relevant fixture. Candidate coverage: [`packages/braces/tests/public.test.mjs`](../packages/braces/tests/public.test.mjs).
 
-### `packages/patterns/src/cli.ts`
+### `packages/quality/src/capabilities/patterns/cli.ts`
 
 - [ ] `callback@10` (line 10): Test expected input/output, empty and boundary cases, and a relevant failure path. No direct test file is linked yet.
 
-### `packages/patterns/src/index.ts`
+### `packages/quality/src/capabilities/patterns/index.ts`
 
 - [ ] File behavior: execute or compile this source, including expected output and failure handling. No direct test file is linked yet.
 
-### `packages/patterns/src/lib/patterns.ts`
+### `packages/quality/src/capabilities/patterns/lib/patterns.ts`
 
 - [ ] `S_S_G_REGEX` (line 27): Test expected input/output, empty and boundary cases, and a relevant failure path. Candidate coverage: [`packages/quality/tests/checks/patterns.test.mjs`](../packages/quality/tests/checks/patterns.test.mjs).
 - [ ] `A_ZA_Z0_9_G_REGEX` (line 36): Test expected input/output, empty and boundary cases, and a relevant failure path. Candidate coverage: [`packages/quality/tests/checks/patterns.test.mjs`](../packages/quality/tests/checks/patterns.test.mjs).
@@ -1036,13 +1036,13 @@ This checklist inventories repository-owned functions, documents, and configurat
 - [ ] `callback@1506` (line 1506): Test expected input/output, empty and boundary cases, and a relevant failure path. Candidate coverage: [`packages/quality/tests/checks/patterns.test.mjs`](../packages/quality/tests/checks/patterns.test.mjs).
 - [ ] `callback@1506` (line 1506): Test expected input/output, empty and boundary cases, and a relevant failure path. Candidate coverage: [`packages/quality/tests/checks/patterns.test.mjs`](../packages/quality/tests/checks/patterns.test.mjs).
 
-### `packages/patterns/tests/public.test.mjs`
+### `packages/quality/tests/capabilities/patterns/public.test.mjs`
 
 - [ ] `callback@15` (line 15): Run this test and verify its assertions cover the helper, failure path, and relevant fixture. Candidate coverage: [`packages/braces/tests/public.test.mjs`](../packages/braces/tests/public.test.mjs).
 - [ ] `callback@21` (line 21): Run this test and verify its assertions cover the helper, failure path, and relevant fixture. Candidate coverage: [`packages/braces/tests/public.test.mjs`](../packages/braces/tests/public.test.mjs).
 - [ ] `callback@27` (line 27): Run this test and verify its assertions cover the helper, failure path, and relevant fixture. Candidate coverage: [`packages/braces/tests/public.test.mjs`](../packages/braces/tests/public.test.mjs).
 
-### `packages/quality-core/src/analysis.ts`
+### `packages/quality/src/capabilities/core/analysis.ts`
 
 - [ ] `createQualityAnalysis` (line 35): Test successful mutation, duplicate/conflict, validation, and failed-write behavior. No direct test file is linked yet.
 - [ ] `callback@38` (line 38): Test expected input/output, empty and boundary cases, and a relevant failure path. No direct test file is linked yet.
@@ -1050,11 +1050,11 @@ This checklist inventories repository-owned functions, documents, and configurat
 - [ ] `callback@53` (line 53): Test expected input/output, empty and boundary cases, and a relevant failure path. No direct test file is linked yet.
 - [ ] `callback@53` (line 53): Test expected input/output, empty and boundary cases, and a relevant failure path. No direct test file is linked yet.
 
-### `packages/quality-core/src/cli.ts`
+### `packages/quality/src/capabilities/core/cli.ts`
 
 - [ ] `runCapabilityCli` (line 28): Test expected input/output, empty and boundary cases, and a relevant failure path. No direct test file is linked yet.
 
-### `packages/quality-core/src/config.ts`
+### `packages/quality/src/capabilities/core/config.ts`
 
 - [ ] `loadQualityConfig` (line 27): Test found, missing, unauthorized, and upstream-failure results. No direct test file is linked yet.
 - [ ] `callback@38` (line 38): Test expected input/output, empty and boundary cases, and a relevant failure path. No direct test file is linked yet.
@@ -1064,11 +1064,11 @@ This checklist inventories repository-owned functions, documents, and configurat
 - [ ] `capabilityAutofixEnabled` (line 108): Test expected input/output, empty and boundary cases, and a relevant failure path. No direct test file is linked yet.
 - [ ] `capabilityCommandEnabled` (line 140): Test expected input/output, empty and boundary cases, and a relevant failure path. No direct test file is linked yet.
 
-### `packages/quality-core/src/index.ts`
+### `packages/quality/src/capabilities/core/index.ts`
 
 - [ ] File behavior: execute or compile this source, including expected output and failure handling. No direct test file is linked yet.
 
-### `packages/quality-core/src/lib/files.ts`
+### `packages/quality/src/capabilities/core/lib/files.ts`
 
 - [ ] `hasGeneratedSourceHeader` (line 66): Run on clean input; verify deterministic output and a useful failure on invalid input. Candidate coverage: [`packages/quality/tests/checks/files.test.mjs`](../packages/quality/tests/checks/files.test.mjs).
 - [ ] `withoutStaticImports` (line 79): Test expected input/output, empty and boundary cases, and a relevant failure path. Candidate coverage: [`packages/quality/tests/checks/files.test.mjs`](../packages/quality/tests/checks/files.test.mjs).
@@ -1093,21 +1093,21 @@ This checklist inventories repository-owned functions, documents, and configurat
 - [ ] `displayPath` (line 266): Test expected input/output, empty and boundary cases, and a relevant failure path. Candidate coverage: [`packages/quality/tests/checks/files.test.mjs`](../packages/quality/tests/checks/files.test.mjs).
 - [ ] `isFile` (line 277): Test expected input/output, empty and boundary cases, and a relevant failure path. Candidate coverage: [`packages/quality/tests/checks/files.test.mjs`](../packages/quality/tests/checks/files.test.mjs).
 
-### `packages/quality-core/src/lib/progress.ts`
+### `packages/quality/src/capabilities/core/lib/progress.ts`
 
 - [ ] `setQualityProgressSuppressed` (line 18): Test expected input/output, empty and boundary cases, and a relevant failure path. Candidate coverage: [`packages/quality/tests/runner/progress.test.mjs`](../packages/quality/tests/runner/progress.test.mjs).
 - [ ] `qualityProgress` (line 37): Test expected input/output, empty and boundary cases, and a relevant failure path. Candidate coverage: [`packages/quality/tests/runner/progress.test.mjs`](../packages/quality/tests/runner/progress.test.mjs).
 - [ ] `callback@37` (line 37): Test expected input/output, empty and boundary cases, and a relevant failure path. Candidate coverage: [`packages/quality/tests/runner/progress.test.mjs`](../packages/quality/tests/runner/progress.test.mjs).
 
-### `packages/quality-core/src/lib/source-kind.ts`
+### `packages/quality/src/capabilities/core/lib/source-kind.ts`
 
 - [ ] `sourceKind` (line 24): Test expected input/output, empty and boundary cases, and a relevant failure path. No direct test file is linked yet.
 
-### `packages/quality-core/src/types.ts`
+### `packages/quality/src/capabilities/core/types.ts`
 
 - [ ] File behavior: execute or compile this source, including expected output and failure handling. No direct test file is linked yet.
 
-### `packages/quality-core/tests/public.test.mjs`
+### `packages/quality/tests/capabilities/core/public.test.mjs`
 
 - [ ] `callback@17` (line 17): Run this test and verify its assertions cover the helper, failure path, and relevant fixture. Candidate coverage: [`packages/braces/tests/public.test.mjs`](../packages/braces/tests/public.test.mjs).
 - [ ] `callback@24` (line 24): Run this test and verify its assertions cover the helper, failure path, and relevant fixture. Candidate coverage: [`packages/braces/tests/public.test.mjs`](../packages/braces/tests/public.test.mjs).
@@ -1115,15 +1115,15 @@ This checklist inventories repository-owned functions, documents, and configurat
 - [ ] `runGit` (line 36): Run this test and verify its assertions cover the helper, failure path, and relevant fixture. Candidate coverage: [`packages/braces/tests/public.test.mjs`](../packages/braces/tests/public.test.mjs).
 - [ ] `callback@52` (line 52): Run this test and verify its assertions cover the helper, failure path, and relevant fixture. Candidate coverage: [`packages/braces/tests/public.test.mjs`](../packages/braces/tests/public.test.mjs).
 
-### `packages/quality-reports/src/cli.ts`
+### `packages/quality/src/capabilities/reports/cli.ts`
 
 - [ ] `callback@23` (line 23): Test expected input/output, empty and boundary cases, and a relevant failure path. No direct test file is linked yet.
 
-### `packages/quality-reports/src/index.ts`
+### `packages/quality/src/capabilities/reports/index.ts`
 
 - [ ] File behavior: execute or compile this source, including expected output and failure handling. No direct test file is linked yet.
 
-### `packages/quality-reports/src/lib/github-report.ts`
+### `packages/quality/src/capabilities/reports/lib/github-report.ts`
 
 - [ ] `rec` (line 93): Test expected input/output, empty and boundary cases, and a relevant failure path. Candidate coverage: [`packages/quality/tests/reports/github-report.test.mjs`](../packages/quality/tests/reports/github-report.test.mjs).
 - [ ] `text` (line 104): Test expected input/output, empty and boundary cases, and a relevant failure path. Candidate coverage: [`packages/quality/tests/reports/github-report.test.mjs`](../packages/quality/tests/reports/github-report.test.mjs).
@@ -1157,7 +1157,7 @@ This checklist inventories repository-owned functions, documents, and configurat
 - [ ] `callback@541` (line 541): Test expected input/output, empty and boundary cases, and a relevant failure path. Candidate coverage: [`packages/quality/tests/reports/github-report.test.mjs`](../packages/quality/tests/reports/github-report.test.mjs).
 - [ ] `callback@541` (line 541): Test expected input/output, empty and boundary cases, and a relevant failure path. Candidate coverage: [`packages/quality/tests/reports/github-report.test.mjs`](../packages/quality/tests/reports/github-report.test.mjs).
 
-### `packages/quality-reports/src/lib/history-report.ts`
+### `packages/quality/src/capabilities/reports/lib/history-report.ts`
 
 - [ ] `isHistorySourcePath` (line 52): Test expected input/output, empty and boundary cases, and a relevant failure path. Candidate coverage: [`packages/quality/tests/reports/history-report.test.mjs`](../packages/quality/tests/reports/history-report.test.mjs).
 - [ ] `callback@54` (line 54): Test expected input/output, empty and boundary cases, and a relevant failure path. Candidate coverage: [`packages/quality/tests/reports/history-report.test.mjs`](../packages/quality/tests/reports/history-report.test.mjs).
@@ -1181,7 +1181,7 @@ This checklist inventories repository-owned functions, documents, and configurat
 - [ ] `repoName` (line 281): Test expected input/output, empty and boundary cases, and a relevant failure path. Candidate coverage: [`packages/quality/tests/reports/history-report.test.mjs`](../packages/quality/tests/reports/history-report.test.mjs).
 - [ ] `writeHistoryReport` (line 307): Test successful mutation, duplicate/conflict, validation, and failed-write behavior. Candidate coverage: [`packages/quality/tests/reports/history-report.test.mjs`](../packages/quality/tests/reports/history-report.test.mjs).
 
-### `packages/quality-reports/src/lib/node-reporter.ts`
+### `packages/quality/src/capabilities/reports/lib/node-reporter.ts`
 
 - [ ] `qualityNodeReporterOptions` (line 49): Test expected input/output, empty and boundary cases, and a relevant failure path. Candidate coverage: [`packages/quality/tests/reports/node-reporter.test.mjs`](../packages/quality/tests/reports/node-reporter.test.mjs).
 - [ ] `qualityNodeReporter` (line 88): Test expected input/output, empty and boundary cases, and a relevant failure path. Candidate coverage: [`packages/quality/tests/reports/node-reporter.test.mjs`](../packages/quality/tests/reports/node-reporter.test.mjs).
@@ -1195,7 +1195,7 @@ This checklist inventories repository-owned functions, documents, and configurat
 - [ ] `fmtNodeResult` (line 212): Test expected input/output, empty and boundary cases, and a relevant failure path. Candidate coverage: [`packages/quality/tests/reports/node-reporter.test.mjs`](../packages/quality/tests/reports/node-reporter.test.mjs).
 - [ ] `defaultQualityNodeReporter` (line 246): Test expected input/output, empty and boundary cases, and a relevant failure path. Candidate coverage: [`packages/quality/tests/reports/node-reporter.test.mjs`](../packages/quality/tests/reports/node-reporter.test.mjs).
 
-### `packages/quality-reports/src/lib/playwright-reporter.ts`
+### `packages/quality/src/capabilities/reports/lib/playwright-reporter.ts`
 
 - [ ] `constructor` (line 64): Test expected input/output, empty and boundary cases, and a relevant failure path. Candidate coverage: [`packages/quality/tests/reports/playwright-reporter.test.mjs`](../packages/quality/tests/reports/playwright-reporter.test.mjs).
 - [ ] `callback@65` (line 65): Test expected input/output, empty and boundary cases, and a relevant failure path. Candidate coverage: [`packages/quality/tests/reports/playwright-reporter.test.mjs`](../packages/quality/tests/reports/playwright-reporter.test.mjs).
@@ -1209,7 +1209,7 @@ This checklist inventories repository-owned functions, documents, and configurat
 - [ ] `printsToStdio` (line 150): Test expected input/output, empty and boundary cases, and a relevant failure path. Candidate coverage: [`packages/quality/tests/reports/playwright-reporter.test.mjs`](../packages/quality/tests/reports/playwright-reporter.test.mjs).
 - [ ] `finish` (line 159): Test expected input/output, empty and boundary cases, and a relevant failure path. Candidate coverage: [`packages/quality/tests/reports/playwright-reporter.test.mjs`](../packages/quality/tests/reports/playwright-reporter.test.mjs).
 
-### `packages/quality-reports/tests/public.test.mjs`
+### `packages/quality/tests/capabilities/reports/public.test.mjs`
 
 - [ ] `callback@15` (line 15): Run this test and verify its assertions cover the helper, failure path, and relevant fixture. Candidate coverage: [`packages/braces/tests/public.test.mjs`](../packages/braces/tests/public.test.mjs).
 - [ ] `callback@21` (line 21): Run this test and verify its assertions cover the helper, failure path, and relevant fixture. Candidate coverage: [`packages/braces/tests/public.test.mjs`](../packages/braces/tests/public.test.mjs).
@@ -1282,7 +1282,7 @@ This checklist inventories repository-owned functions, documents, and configurat
 
 ### `packages/quality/src/lib/formatting.ts`
 
-- [ ] File behavior: execute or compile this source, including expected output and failure handling. Candidate coverage: [`packages/formatting/tests/run-formatting.test.mjs`](../packages/formatting/tests/run-formatting.test.mjs).
+- [ ] File behavior: execute or compile this source, including expected output and failure handling. Candidate coverage: [`packages/quality/tests/capabilities/formatting/run-formatting.test.mjs`](../packages/quality/tests/capabilities/formatting/run-formatting.test.mjs).
 
 ### `packages/quality/src/lib/imports.ts`
 
@@ -2474,15 +2474,15 @@ This checklist inventories repository-owned functions, documents, and configurat
 - [ ] `callback@1243` (line 1243): Run this test and verify its assertions cover the helper, failure path, and relevant fixture. No direct test file is linked yet.
 - [ ] `callback@1246` (line 1246): Run this test and verify its assertions cover the helper, failure path, and relevant fixture. No direct test file is linked yet.
 
-### `packages/refactoring/src/cli.ts`
+### `packages/quality/src/capabilities/refactoring/cli.ts`
 
 - [ ] `callback@10` (line 10): Test expected input/output, empty and boundary cases, and a relevant failure path. No direct test file is linked yet.
 
-### `packages/refactoring/src/index.ts`
+### `packages/quality/src/capabilities/refactoring/index.ts`
 
 - [ ] File behavior: execute or compile this source, including expected output and failure handling. No direct test file is linked yet.
 
-### `packages/refactoring/src/lib/object-forwarding.ts`
+### `packages/quality/src/capabilities/refactoring/lib/object-forwarding.ts`
 
 - [ ] `isIgnoredCallee` (line 37): Test expected input/output, empty and boundary cases, and a relevant failure path. Candidate coverage: [`packages/quality/tests/transforms/object-forwarding.test.mjs`](../packages/quality/tests/transforms/object-forwarding.test.mjs).
 - [ ] `findingsForFile` (line 51): Test found, missing, unauthorized, and upstream-failure results. Candidate coverage: [`packages/quality/tests/transforms/object-forwarding.test.mjs`](../packages/quality/tests/transforms/object-forwarding.test.mjs).
@@ -2493,7 +2493,7 @@ This checklist inventories repository-owned functions, documents, and configurat
 - [ ] `visit` (line 129): Test expected input/output, empty and boundary cases, and a relevant failure path. Candidate coverage: [`packages/quality/tests/transforms/object-forwarding.test.mjs`](../packages/quality/tests/transforms/object-forwarding.test.mjs).
 - [ ] `callback@157` (line 157): Test expected input/output, empty and boundary cases, and a relevant failure path. Candidate coverage: [`packages/quality/tests/transforms/object-forwarding.test.mjs`](../packages/quality/tests/transforms/object-forwarding.test.mjs).
 
-### `packages/refactoring/src/lib/single-use.ts`
+### `packages/quality/src/capabilities/refactoring/lib/single-use.ts`
 
 - [ ] `reportProgress` (line 56): Test expected input/output, empty and boundary cases, and a relevant failure path. Candidate coverage: [`packages/quality/tests/transforms/single-use.test.mjs`](../packages/quality/tests/transforms/single-use.test.mjs).
 - [ ] `hasMeaningfulLeadingTSDoc` (line 70): Test expected input/output, empty and boundary cases, and a relevant failure path. Candidate coverage: [`packages/quality/tests/transforms/single-use.test.mjs`](../packages/quality/tests/transforms/single-use.test.mjs).
@@ -2642,7 +2642,7 @@ This checklist inventories repository-owned functions, documents, and configurat
 - [ ] `callback@1719` (line 1719): Test expected input/output, empty and boundary cases, and a relevant failure path. Candidate coverage: [`packages/quality/tests/transforms/single-use.test.mjs`](../packages/quality/tests/transforms/single-use.test.mjs).
 - [ ] `fixSingleUseTypes` (line 1755): Test expected input/output, empty and boundary cases, and a relevant failure path. Candidate coverage: [`packages/quality/tests/transforms/single-use.test.mjs`](../packages/quality/tests/transforms/single-use.test.mjs).
 
-### `packages/refactoring/tests/public.test.mjs`
+### `packages/quality/tests/capabilities/refactoring/public.test.mjs`
 
 - [ ] `callback@18` (line 18): Run this test and verify its assertions cover the helper, failure path, and relevant fixture. Candidate coverage: [`packages/braces/tests/public.test.mjs`](../packages/braces/tests/public.test.mjs).
 - [ ] `callback@23` (line 23): Run this test and verify its assertions cover the helper, failure path, and relevant fixture. Candidate coverage: [`packages/braces/tests/public.test.mjs`](../packages/braces/tests/public.test.mjs).
@@ -2974,15 +2974,15 @@ This checklist inventories repository-owned functions, documents, and configurat
 - [ ] `callback@939` (line 939): Run this test and verify its assertions cover the helper, failure path, and relevant fixture. No direct test file is linked yet.
 - [ ] `callback@941` (line 941): Run this test and verify its assertions cover the helper, failure path, and relevant fixture. No direct test file is linked yet.
 
-### `packages/security/src/cli.ts`
+### `packages/quality/src/capabilities/security/cli.ts`
 
 - [ ] `callback@10` (line 10): Test expected input/output, empty and boundary cases, and a relevant failure path. No direct test file is linked yet.
 
-### `packages/security/src/index.ts`
+### `packages/quality/src/capabilities/security/index.ts`
 
 - [ ] File behavior: execute or compile this source, including expected output and failure handling. No direct test file is linked yet.
 
-### `packages/security/src/lib/security.ts`
+### `packages/quality/src/capabilities/security/lib/security.ts`
 
 - [ ] `securityFindings` (line 43): Test found, missing, unauthorized, and upstream-failure results. Candidate coverage: [`packages/quality/tests/checks/security.test.mjs`](../packages/quality/tests/checks/security.test.mjs).
 - [ ] `callback@47` (line 47): Test expected input/output, empty and boundary cases, and a relevant failure path. Candidate coverage: [`packages/quality/tests/checks/security.test.mjs`](../packages/quality/tests/checks/security.test.mjs).
@@ -2998,7 +2998,7 @@ This checklist inventories repository-owned functions, documents, and configurat
 - [ ] `stringValue` (line 108): Test expected input/output, empty and boundary cases, and a relevant failure path. Candidate coverage: [`packages/quality/tests/checks/security.test.mjs`](../packages/quality/tests/checks/security.test.mjs).
 - [ ] `visit` (line 109): Test expected input/output, empty and boundary cases, and a relevant failure path. Candidate coverage: [`packages/quality/tests/checks/security.test.mjs`](../packages/quality/tests/checks/security.test.mjs).
 
-### `packages/security/tests/public.test.mjs`
+### `packages/quality/tests/capabilities/security/public.test.mjs`
 
 - [ ] `callback@15` (line 15): Run this test and verify its assertions cover the helper, failure path, and relevant fixture. Candidate coverage: [`packages/braces/tests/public.test.mjs`](../packages/braces/tests/public.test.mjs).
 - [ ] `callback@18` (line 18): Run this test and verify its assertions cover the helper, failure path, and relevant fixture. Candidate coverage: [`packages/braces/tests/public.test.mjs`](../packages/braces/tests/public.test.mjs).
@@ -3058,15 +3058,15 @@ This checklist inventories repository-owned functions, documents, and configurat
 - [ ] `callback@219` (line 219): Run this test and verify its assertions cover the helper, failure path, and relevant fixture. Candidate coverage: [`packages/quality/tests/runner/runner.test.mjs`](../packages/quality/tests/runner/runner.test.mjs).
 - [ ] `callback@230` (line 230): Run this test and verify its assertions cover the helper, failure path, and relevant fixture. Candidate coverage: [`packages/quality/tests/runner/runner.test.mjs`](../packages/quality/tests/runner/runner.test.mjs).
 
-### `packages/ui-quality/src/cli.ts`
+### `packages/quality/src/capabilities/ui/cli.ts`
 
 - [ ] `callback@10` (line 10): Test expected input/output, empty and boundary cases, and a relevant failure path. No direct test file is linked yet.
 
-### `packages/ui-quality/src/index.ts`
+### `packages/quality/src/capabilities/ui/index.ts`
 
 - [ ] File behavior: execute or compile this source, including expected output and failure handling. No direct test file is linked yet.
 
-### `packages/ui-quality/src/lib/accessibility.ts`
+### `packages/quality/src/capabilities/ui/lib/accessibility.ts`
 
 - [ ] `scriptKind` (line 85): Test expected input/output, empty and boundary cases, and a relevant failure path. No direct test file is linked yet.
 - [ ] `attrsOf` (line 97): Test expected input/output, empty and boundary cases, and a relevant failure path. No direct test file is linked yet.
@@ -3114,7 +3114,7 @@ This checklist inventories repository-owned functions, documents, and configurat
 - [ ] `callback@638` (line 638): Test expected input/output, empty and boundary cases, and a relevant failure path. No direct test file is linked yet.
 - [ ] `callback@651` (line 651): Test expected input/output, empty and boundary cases, and a relevant failure path. No direct test file is linked yet.
 
-### `packages/ui-quality/src/lib/display-name.ts`
+### `packages/quality/src/capabilities/ui/lib/display-name.ts`
 
 - [ ] `scriptKind` (line 45): Test expected input/output, empty and boundary cases, and a relevant failure path. No direct test file is linked yet.
 - [ ] `isForwardRef` (line 59): Test expected input/output, empty and boundary cases, and a relevant failure path. No direct test file is linked yet.
@@ -3134,7 +3134,7 @@ This checklist inventories repository-owned functions, documents, and configurat
 - [ ] `callback@277` (line 277): Test expected input/output, empty and boundary cases, and a relevant failure path. No direct test file is linked yet.
 - [ ] `callback@281` (line 281): Test expected input/output, empty and boundary cases, and a relevant failure path. No direct test file is linked yet.
 
-### `packages/ui-quality/src/lib/error-boundaries.ts`
+### `packages/quality/src/capabilities/ui/lib/error-boundaries.ts`
 
 - [ ] `exprName` (line 47): Test expected input/output, empty and boundary cases, and a relevant failure path. Candidate coverage: [`packages/error-boundaries/tests/error-boundaries.test.mjs`](../packages/error-boundaries/tests/error-boundaries.test.mjs).
 - [ ] `unwrap` (line 61): Test expected input/output, empty and boundary cases, and a relevant failure path. Candidate coverage: [`packages/error-boundaries/tests/error-boundaries.test.mjs`](../packages/error-boundaries/tests/error-boundaries.test.mjs).
@@ -3166,7 +3166,7 @@ This checklist inventories repository-owned functions, documents, and configurat
 - [ ] `callback@380` (line 380): Test expected input/output, empty and boundary cases, and a relevant failure path. Candidate coverage: [`packages/error-boundaries/tests/error-boundaries.test.mjs`](../packages/error-boundaries/tests/error-boundaries.test.mjs).
 - [ ] `callback@384` (line 384): Test expected input/output, empty and boundary cases, and a relevant failure path. Candidate coverage: [`packages/error-boundaries/tests/error-boundaries.test.mjs`](../packages/error-boundaries/tests/error-boundaries.test.mjs).
 
-### `packages/ui-quality/src/lib/ui-recommendations.ts`
+### `packages/quality/src/capabilities/ui/lib/ui-recommendations.ts`
 
 - [ ] `staticAttrValue` (line 64): Test expected input/output, empty and boundary cases, and a relevant failure path. Candidate coverage: [`packages/quality/tests/checks/ui-recommendations.test.mjs`](../packages/quality/tests/checks/ui-recommendations.test.mjs).
 - [ ] `jsxAttr` (line 82): Test expected input/output, empty and boundary cases, and a relevant failure path. Candidate coverage: [`packages/quality/tests/checks/ui-recommendations.test.mjs`](../packages/quality/tests/checks/ui-recommendations.test.mjs).
@@ -3188,7 +3188,7 @@ This checklist inventories repository-owned functions, documents, and configurat
 - [ ] `callback@178` (line 178): Test expected input/output, empty and boundary cases, and a relevant failure path. Candidate coverage: [`packages/quality/tests/checks/ui-recommendations.test.mjs`](../packages/quality/tests/checks/ui-recommendations.test.mjs).
 - [ ] `callback@205` (line 205): Test expected input/output, empty and boundary cases, and a relevant failure path. Candidate coverage: [`packages/quality/tests/checks/ui-recommendations.test.mjs`](../packages/quality/tests/checks/ui-recommendations.test.mjs).
 
-### `packages/ui-quality/tests/public.test.mjs`
+### `packages/quality/tests/capabilities/ui/public.test.mjs`
 
 - [ ] `callback@20` (line 20): Run this test and verify its assertions cover the helper, failure path, and relevant fixture. Candidate coverage: [`packages/braces/tests/public.test.mjs`](../packages/braces/tests/public.test.mjs).
 - [ ] `callback@29` (line 29): Run this test and verify its assertions cover the helper, failure path, and relevant fixture. Candidate coverage: [`packages/braces/tests/public.test.mjs`](../packages/braces/tests/public.test.mjs).
@@ -3292,7 +3292,6 @@ This checklist inventories repository-owned functions, documents, and configurat
 - [ ] [`docs/error-boundaries/3-analytics/sanity-error-analysis.mdx`](../docs/error-boundaries/3-analytics/sanity-error-analysis.mdx): Render, check links and examples, then review each factual claim and instruction against the current implementation.
 - [ ] [`docs/error-boundaries/4-packages/package-api.mdx`](../docs/error-boundaries/4-packages/package-api.mdx): Render, check links and examples, then review each factual claim and instruction against the current implementation.
 - [ ] [`docs/quality/0-getting-started/overview.mdx`](../docs/quality/0-getting-started/overview.mdx): Render, check links and examples, then review each factual claim and instruction against the current implementation.
-- [ ] [`docs/quality/0-getting-started/setup.mdx`](../docs/quality/0-getting-started/setup.mdx): Render, check links and examples, then review each factual claim and instruction against the current implementation.
 - [ ] [`docs/quality/1-packages/documentation.mdx`](../docs/quality/1-packages/documentation.mdx): Render, check links and examples, then review each factual claim and instruction against the current implementation.
 - [ ] [`docs/quality/1-packages/formatting.mdx`](../docs/quality/1-packages/formatting.mdx): Render, check links and examples, then review each factual claim and instruction against the current implementation.
 - [ ] [`docs/quality/1-packages/imports.mdx`](../docs/quality/1-packages/imports.mdx): Render, check links and examples, then review each factual claim and instruction against the current implementation.
@@ -3306,17 +3305,15 @@ This checklist inventories repository-owned functions, documents, and configurat
 - [ ] [`docs/quality/1-packages/refactoring.mdx`](../docs/quality/1-packages/refactoring.mdx): Render, check links and examples, then review each factual claim and instruction against the current implementation.
 - [ ] [`docs/quality/1-packages/security.mdx`](../docs/quality/1-packages/security.mdx): Render, check links and examples, then review each factual claim and instruction against the current implementation.
 - [ ] [`docs/quality/1-packages/ui-quality.mdx`](../docs/quality/1-packages/ui-quality.mdx): Render, check links and examples, then review each factual claim and instruction against the current implementation.
-- [ ] [`docs/quality/2-configuration/quality-json.mdx`](../docs/quality/2-configuration/quality-json.mdx): Render, check links and examples, then review each factual claim and instruction against the current implementation.
 - [ ] [`docs/quality/3-checks/check-reference.mdx`](../docs/quality/3-checks/check-reference.mdx): Render, check links and examples, then review each factual claim and instruction against the current implementation.
 - [ ] [`docs/quality/3-checks/refactoring-checks.mdx`](../docs/quality/3-checks/refactoring-checks.mdx): Render, check links and examples, then review each factual claim and instruction against the current implementation.
 - [ ] [`docs/quality/3-checks/repository-patterns.mdx`](../docs/quality/3-checks/repository-patterns.mdx): Render, check links and examples, then review each factual claim and instruction against the current implementation.
 - [ ] [`docs/quality/3-checks/source-checks.mdx`](../docs/quality/3-checks/source-checks.mdx): Render, check links and examples, then review each factual claim and instruction against the current implementation.
 - [ ] [`docs/quality/3-checks/tooling-checks.mdx`](../docs/quality/3-checks/tooling-checks.mdx): Render, check links and examples, then review each factual claim and instruction against the current implementation.
-- [ ] [`docs/quality/4-workflows/cli-and-ci.mdx`](../docs/quality/4-workflows/cli-and-ci.mdx): Render, check links and examples, then review each factual claim and instruction against the current implementation.
 - [ ] [`docs/quality/5-operations/npm-publishing.mdx`](../docs/quality/5-operations/npm-publishing.mdx): Render, check links and examples, then review each factual claim and instruction against the current implementation.
 - [ ] [`docs/quality/5-operations/troubleshooting.mdx`](../docs/quality/5-operations/troubleshooting.mdx): Render, check links and examples, then review each factual claim and instruction against the current implementation.
 - [ ] [`docs/reporting/0-getting-started/overview.mdx`](../docs/reporting/0-getting-started/overview.mdx): Render, check links and examples, then review each factual claim and instruction against the current implementation.
-- [ ] [`docs/reporting/1-packages/standards-reporting.mdx`](../docs/reporting/1-packages/standards-reporting.mdx): Render, check links and examples, then review each factual claim and instruction against the current implementation.
+- [ ] [`docs/reporting/1-packages/reporting.mdx`](../docs/reporting/1-packages/reporting.mdx): Render, check links and examples, then review each factual claim and instruction against the current implementation.
 - [ ] [`docs/reporting/2-playwright/playwright-evidence.mdx`](../docs/reporting/2-playwright/playwright-evidence.mdx): Render, check links and examples, then review each factual claim and instruction against the current implementation.
 - [ ] [`docs/reporting/3-load-testing/load-testing.mdx`](../docs/reporting/3-load-testing/load-testing.mdx): Render, check links and examples, then review each factual claim and instruction against the current implementation.
 - [ ] [`docs/reporting/4-artifacts/artifacts.mdx`](../docs/reporting/4-artifacts/artifacts.mdx): Render, check links and examples, then review each factual claim and instruction against the current implementation.

@@ -3,25 +3,7 @@ title: Load testing
 description: Capture page and operation timings and apply configurable budgets.
 ---
 
-`@terra-symposium/standards-reporting` can attach timing measurements to Playwright results and grade each measurement against warning and failure budgets.
-
-A load budget defines the allowed duration for one test or named operation. Measurements flow from the test fixture through the configured budget and into the report.
-
-<Nodes
-	direction='LR'
-	nodes={[
-		{ id: 'measure', type: 'origin', data: { title: 'Capture duration' } },
-		{ id: 'budget', type: 'process', data: { title: 'Resolve budget' } },
-		{ id: 'grade', type: 'process', data: { title: 'Compare with limits' } },
-		{ id: 'report', type: 'terminal', data: { title: 'Add timing result' } },
-	]}
-	edges={[
-		{ id: 'measure-budget', source: 'measure', target: 'budget' },
-		{ id: 'budget-grade', source: 'budget', target: 'grade' },
-		{ id: 'grade-report', source: 'grade', target: 'report' },
-	]}
-	height={220}
-/>
+`@terra-symposium/reporting` can attach timing measurements to Playwright results and grade each measurement against warning and failure budgets.
 
 ## Configure budgets
 
@@ -52,7 +34,7 @@ A test key uses `<repo-relative test file>::<full title path>`. Operation keys m
 Import `loadTest` for suites that need page-load and operation timings:
 
 ```ts
-import { loadTest as test, expect } from '@terra-symposium/standards-reporting/playwright';
+import { loadTest as test, expect } from '@terra-symposium/reporting/playwright';
 
 test('account summary loads', async ({ load, page }) => {
 	load.setTestBudget({ warnMs: 4000, failMs: 8000 });

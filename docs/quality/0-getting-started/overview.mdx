@@ -1,45 +1,115 @@
 ---
-title: Terra Quality
-description: Install, configure, and run Terra Quality across built-in checks and repository tools.
+title: Get started with Terra Quality
+description: Install, configure, and run Terra Quality locally and in CI.
 ---
 
-The aggregate package coordinates built-in JavaScript and TypeScript checks with repository-configured tools and commands. Capability packages expose reusable check families and focused CLIs. All packages read the same `quality.json` policy.
+Terra Quality checks changed and untracked files by default. `--all` scans the configured source scope; `--warn` disables autofixes. Builds and functional tests remain separate.
 
-## Choose a starting point
+## Install and run
 
-| Need                                             | Start here                                                                                            |
-| ------------------------------------------------ | ----------------------------------------------------------------------------------------------------- |
-| Install and run the aggregate CLI                | [Setup and first run](/quality/0-getting-started/setup/)                                              |
-| Select source roots, checks, tools, and commands | [Configuration reference](/quality/2-configuration/quality-json/)                                     |
-| Understand findings and fix limits               | [Source checks](/quality/3-checks/source-checks/) or [tool checks](/quality/3-checks/tooling-checks/) |
-| Use one public capability directly               | [Package map](/quality/1-packages/package-map/)                                                       |
-| Run locally or in CI                             | [CLI and CI workflows](/quality/4-workflows/cli-and-ci/)                                              |
-| Diagnose a failed run                            | [Troubleshooting](/quality/5-operations/troubleshooting/)                                             |
+Requires Node.js `>=18.18`. Install the aggregate runner with your repository's package manager:
 
-## Run lifecycle
+||| [pnpm]
 
-A full run selects a repository scope, performs the enabled check phases, and produces findings and an exit status. Fix mode may write eligible source changes; `--warn` is read-only. Configured commands remain in the aggregate runner's fixed order.
+```sh
+pnpm add -D @terra-symposium/quality
+```
 
-<Nodes
-	direction='LR'
-	nodes={[
-		{ id: 'config', type: 'origin', data: { title: 'Read quality.json' } },
-		{ id: 'scope', type: 'process', data: { title: 'Select changed files or --all' } },
-		{ id: 'checks', type: 'process', data: { title: 'Run enabled checks' } },
-		{ id: 'fix', type: 'process', data: { title: 'Apply eligible fixes' } },
-		{ id: 'result', type: 'terminal', data: { title: 'Report findings' } },
-	]}
-	edges={[
-		{ id: 'config-scope', source: 'config', target: 'scope' },
-		{ id: 'scope-checks', source: 'scope', target: 'checks' },
-		{ id: 'checks-fix', source: 'checks', target: 'fix' },
-		{ id: 'fix-result', source: 'fix', target: 'result' },
-	]}
-	height={230}
-/>
+|||
 
-:::note[Read-only mode]
+||| [npm]
 
-Use `--warn` for review and CI. It disables autofixes while keeping configured checks and failure behavior.
+```sh
+npm install --save-dev @terra-symposium/quality
+```
 
-:::
+|||
+
+Add `quality.json` at the repository root or in `config/`:
+
+```json
+{
+	"$schema": "./node_modules/@terra-symposium/quality/quality.schema.json",
+	"sourceRoots": ["src"],
+	"extensions": [".js", ".jsx", ".ts", ".tsx"],
+	"enabledChecks": { "format": false, "lint": false, "knip": false, "dead-code": false }
+}
+```
+
+Adjust `$schema` relative to the file. Enable Prettier, ESLint, Knip, and TypeScript checks only after installing and configuring those tools in the consumer repository. Quality does not supply their native configuration.
+
+```sh
+pnpm exec terra-quality                         # changed files, fixes enabled
+pnpm exec terra-quality quality --all --warn     # full read-only review
+```
+
+A root `quality.json` uses its directory as the project root and `<root>/config` as `configRoot`. A `config/quality.json` uses its parent as the project root and its own directory as `configRoot`. Set `root` or `configRoot` explicitly to override these defaults.
+
+## Configure quality.json
+
+| Field                                                                   | Purpose                                                                             |
+| ----------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| `sourceRoots`, `includeRoots`, `extensions`                             | Select source files.                                                                |
+| `aliases`, `externalPrefixes`                                           | Classify internal and external imports.                                             |
+| `frameworkEntryExports`                                                 | Keep framework-discovered exports in Knip.                                          |
+| `protectedIdentifiers`, `renameExports`                                 | Control naming maintenance. Export renames default to off.                          |
+| `tools.prettier`, `tools.eslint`, `tools.knip`, `tools.tsc`             | Select installed executables. Local `node_modules/.bin` takes priority over `PATH`. |
+| `tsconfig`, `typecheckRoots`, `typecheckExtensions`, `typecheckCommand` | Configure TypeScript checks.                                                        |
+| `enabledChecks`, `autofix`                                              | Enable checks and individual safe fixers.                                           |
+| `qualityCommands`, `recommendationCommands`                             | Run repository-owned static checks without a native equivalent.                     |
+| `github`                                                                | Include read-only repository health analytics.                                      |
+
+The [check map](/quality/3-checks/check-reference/) describes each check; the [package map](/quality/1-packages/package-map/) identifies its owner. The installed `quality.schema.json` lists all fields and valid values. Quality excludes dependencies and generated output through its shared classifier. Do not add consumer-specific skipped directories, files, or single-use exclusions; correct the classifier or generation boundary instead.
+
+### Checks and fixes
+
+Most checks are enabled unless `enabledChecks.<name>` is `false`. `accessibility`, `display-name`, and `documented-commands` require an explicit `true` during rollout. `error-boundaries` is mandatory. `performance-patterns` is advisory and runs only when `performancePatterns` is configured.
+
+Normal runs apply eligible fixes; `--warn` is read-only. Set `autofix.<name>` to `false` to disable one fixer. Fixer keys use camel case (`displayName`, `documentedCommands`, `repeatedClasses`, `regexDedup`, `tailwindCanonical`); check keys use kebab case. Ambiguous changes remain findings for review. The [source](/quality/3-checks/source-checks/), [refactoring](/quality/3-checks/refactoring-checks/), [repository pattern](/quality/3-checks/repository-patterns/), and [tooling](/quality/3-checks/tooling-checks/) guides cover behavior and policy examples.
+
+For declaration documentation, `documentation.required` supports `types`, `functions`, `exportedFunctions`, and `noInlineFunctions`. Documentation findings are read-only; Quality does not invent descriptions. Set `documentation.commandRoots` to check Markdown command examples.
+
+### Repository commands
+
+Use `qualityCommands` only for static checks without a native Quality equivalent. Keep builds and functional tests in separate scripts and CI steps. Each entry has a unique lowercase `name`, a `command`, and optional string-array `args`:
+
+```json
+{
+	"qualityCommands": [{ "name": "c-doc-params", "command": "make", "args": ["check-doc-params"] }],
+	"enabledCommands": { "c-doc-params": true }
+}
+```
+
+`recommendationCommands` uses the same shape and `enabledRecommendations` toggle. Commands run from `root`, inherit the environment, and are not limited to changed files. A nonzero exit fails Quality. Use `--skip-commands` or `--skip-recommendations` for one run; `enabledChecks.command` and `enabledChecks.recommend` disable those categories.
+
+### GitHub analytics and load timing
+
+`github.repositories` accepts `owner/name` slugs. With authenticated `gh` read access, the report checks issues, pull requests, alerts, and available repository settings. `github.requiredFeatures` can require `dependencyGraph`, `dependabotAlerts`, `malwareAlerts`, `securityUpdates`, `versionUpdates`, `groupedUpdates`, `secretScanning`, `pushProtection`, or `codeScanning`. Unavailable data is reported as unknown, never zero. The check reads but does not change GitHub state.
+
+`loadTesting` belongs to `@terra-symposium/reporting`. Its default warning and failure budgets are 2,000 ms and 5,000 ms. Override with `defaultBudget`, `testBudgets` keyed by `<file>::<full title>`, or `operationBudgets` keyed by measurement name. Test-local overrides take precedence. See [load testing](/reporting/3-load-testing/load-testing/) for examples.
+
+## Run locally and in CI
+
+| Command                                        | Scope                       | Writes?        |
+| ---------------------------------------------- | --------------------------- | -------------- |
+| `pnpm exec terra-quality`                      | Changed and untracked files | Eligible fixes |
+| `pnpm exec terra-quality quality --warn`       | Changed and untracked files | No             |
+| `pnpm exec terra-quality quality --all`        | Full configured scope       | Eligible fixes |
+| `pnpm exec terra-quality quality --all --warn` | Full configured scope       | No             |
+
+Changed-file mode needs a Git worktree. Use `--all` for archives and complete CI scans. Configured commands still run under `--warn` and may have their own side effects. Quality runs **Format → Static quality → Framework and type checks → Repository health**. Findings fail the command after all enabled checks finish. Review autofixes and the full diff; run builds and functional tests separately.
+
+Give repositories the same two scripts:
+
+```json
+{
+	"scripts": {
+		"quality": "node \"$(git rev-parse --show-toplevel)/scripts/quality-runner.mjs\" quality",
+		"quality:all": "node \"$(git rev-parse --show-toplevel)/scripts/quality-runner.mjs\" quality --all"
+	}
+}
+```
+
+In CI, run `pnpm exec terra-quality quality --all --warn`. If static commands already run in separate workflow steps, add `--skip-commands --skip-recommendations`. `--report-json <path>` writes a versioned report without changing the exit status. Upload it even on failure; the Hygiene dashboard expects a `terra-hygiene` artifact with `terra-quality.json` and available JUnit files. Run history reporting only from a full Git checkout and outside pull requests.
+
+For a failure, record the command, scope, exit status, findings, warnings, and fixes. Fix the owning source or policy, rerun the affected check, then run the repository's build and tests. See [troubleshooting](/quality/5-operations/troubleshooting/) and [change validation](/contributing/1-quality/change-validation/).

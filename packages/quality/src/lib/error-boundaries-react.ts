@@ -3,4 +3,4 @@
  * Public boundary entrypoint used by Terra Quality's root-boundary autofix.
  */
 
-export { ErrorBoundary } from '@terra-symposium/standards-error-boundaries/react';
+export { ErrorBoundary } from '@terra-symposium/boundaries/react';

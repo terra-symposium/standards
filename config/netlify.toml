@@ -12,7 +12,7 @@ X-Robots-Tag = "noindex, nofollow"
 
 [[redirects]]
 from = "/getting-started"
-to = "/quality/0-getting-started/setup/"
+to = "/quality/0-getting-started/overview/"
 status = 301
 
 [[redirects]]
@@ -22,12 +22,12 @@ status = 301
 
 [[redirects]]
 from = "/quality/configuration"
-to = "/quality/2-configuration/quality-json/"
+to = "/quality/0-getting-started/overview/"
 status = 301
 
 [[redirects]]
 from = "/quality/commands"
-to = "/quality/4-workflows/cli-and-ci/"
+to = "/quality/0-getting-started/overview/"
 status = 301
 
 [[redirects]]
@@ -147,17 +147,17 @@ status = 301
 
 [[redirects]]
 from = "/standards/quality/setup/"
-to = "/quality/0-getting-started/setup/"
+to = "/quality/0-getting-started/overview/"
 status = 301
 
 [[redirects]]
 from = "/standards/quality/configuration/"
-to = "/quality/2-configuration/quality-json/"
+to = "/quality/0-getting-started/overview/"
 status = 301
 
 [[redirects]]
 from = "/standards/quality/workflows/"
-to = "/quality/4-workflows/cli-and-ci/"
+to = "/quality/0-getting-started/overview/"
 status = 301
 
 [[redirects]]
@@ -192,17 +192,17 @@ status = 301
 
 [[redirects]]
 from = "/packages/quality/setup/"
-to = "/quality/0-getting-started/setup/"
+to = "/quality/0-getting-started/overview/"
 status = 301
 
 [[redirects]]
 from = "/packages/quality/configuration/"
-to = "/quality/2-configuration/quality-json/"
+to = "/quality/0-getting-started/overview/"
 status = 301
 
 [[redirects]]
 from = "/packages/quality/workflows/"
-to = "/quality/4-workflows/cli-and-ci/"
+to = "/quality/0-getting-started/overview/"
 status = 301
 
 [[redirects]]
@@ -307,7 +307,7 @@ status = 301
 
 [[redirects]]
 from = "/quality/getting-started/setup/"
-to = "/quality/0-getting-started/setup/"
+to = "/quality/0-getting-started/overview/"
 status = 301
 
 [[redirects]]
@@ -327,7 +327,7 @@ status = 301
 
 [[redirects]]
 from = "/quality/configuration/quality-json/"
-to = "/quality/2-configuration/quality-json/"
+to = "/quality/0-getting-started/overview/"
 status = 301
 
 [[redirects]]
@@ -337,7 +337,7 @@ status = 301
 
 [[redirects]]
 from = "/quality/workflows/cli-and-ci/"
-to = "/quality/4-workflows/cli-and-ci/"
+to = "/quality/0-getting-started/overview/"
 status = 301
 
 [[redirects]]
@@ -352,7 +352,7 @@ status = 301
 
 [[redirects]]
 from = "/reporting/packages/standards-reporting/"
-to = "/reporting/1-packages/standards-reporting/"
+to = "/reporting/1-packages/reporting/"
 status = 301
 
 [[redirects]]
@@ -453,4 +453,31 @@ status = 301
 [[redirects]]
 from = "/error-boundaries/2-analytics/sanity-error-analysis/"
 to = "/error-boundaries/3-analytics/sanity-error-analysis/"
+status = 301
+
+# Consolidated Quality guide legacy routes.
+
+[[redirects]]
+from = "/quality/0-getting-started/setup/"
+to = "/quality/0-getting-started/overview/"
+status = 301
+
+[[redirects]]
+from = "/quality/0-getting-started/quality-json/"
+to = "/quality/0-getting-started/overview/"
+status = 301
+
+[[redirects]]
+from = "/quality/0-getting-started/cli-and-ci/"
+to = "/quality/0-getting-started/overview/"
+status = 301
+
+[[redirects]]
+from = "/quality/2-configuration/quality-json/"
+to = "/quality/0-getting-started/overview/"
+status = 301
+
+[[redirects]]
+from = "/quality/4-workflows/cli-and-ci/"
+to = "/quality/0-getting-started/overview/"
 status = 301

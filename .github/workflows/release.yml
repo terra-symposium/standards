@@ -31,7 +31,7 @@ jobs:
         run: pnpm run quality:all
       - name: Require committed Quality fixes
         run: git diff --exit-code
-      - run: pnpm --filter @terra-symposium/standards-quality test
+      - run: pnpm --filter @terra-symposium/quality test
       - uses: changesets/action@v2
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}

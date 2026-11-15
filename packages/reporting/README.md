@@ -15,10 +15,10 @@ Not applicable.
 ### Install
 
 ```sh
-pnpm add -D @terra-symposium/standards-reporting @playwright/test
+pnpm add -D @terra-symposium/reporting @playwright/test
 ```
 
-From `standards/main/`, run `pnpm install`, then `pnpm --filter @terra-symposium/standards-reporting test` to validate the reporting package.
+From `standards/main/`, run `pnpm install`, then `pnpm --filter @terra-symposium/reporting test` to validate the reporting package.
 
 ## Usage
 
@@ -26,7 +26,7 @@ From `standards/main/`, run `pnpm install`, then `pnpm --filter @terra-symposium
 
 ```ts
 import { defineConfig } from '@playwright/test';
-import { withResponsivePlaywright } from '@terra-symposium/standards-reporting/viewports';
+import { withResponsivePlaywright } from '@terra-symposium/reporting/viewports';
 
 ## Structure
 

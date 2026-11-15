@@ -28,7 +28,7 @@ Use this skill to implement or review changes across Terra repositories, includi
 
 ## Shared quality package
 
-`packages/quality` is the source for `@terra-symposium/standards-quality`. Change and test reusable checks here rather than copying their implementation or policy into a consumer repository.
+`packages/quality` is the source for `@terra-symposium/quality`. Change and test reusable checks here rather than copying their implementation or policy into a consumer repository.
 
 Add focused tests under `packages/quality/test`; exercise the public package boundary and assert autofix idempotence when relevant.
 
@@ -47,7 +47,7 @@ When working in `terra-symposium-website`, read the root `README.md` and `docs/a
 - Use `pnpm run quality` for the working changes or `pnpm run quality -- --all` for the configured source tree. Choose a focused quality command when the task needs one.
 - Run `pnpm run maintain` after adding or renaming supported source files, or when headers and fences may drift.
 - Use the Standards CLI workflow for finding triage, autofix review, complete-diff review, and reporting. Keep website-specific configuration in `quality.json`.
-- When a rule should apply across Terra repositories, implement it in the shared `@terra-symposium/standards-quality` package; keep one-off website rules in this repository's configuration.
+- When a rule should apply across Terra repositories, implement it in the shared `@terra-symposium/quality` package; keep one-off website rules in this repository's configuration.
 - Reuse website domain types from `@lib/types` and established local helpers.
 
 Use complete, minimal names and Terra filename conventions: underscore private files, uppercase components, and lowercase structural files. Follow the local comment hierarchy and section fences; document exported declarations as repository rules require.

@@ -7,13 +7,15 @@ The package includes small helpers for framework error routes. These helpers pro
 
 ||| [Astro status page]
 
+|||
+
 ## Status copy
 
 Import `errorStatusCopy` from the `/astro` entry point:
 
 ```astro
 ---
-import { errorStatusCopy } from '@terra-symposium/standards-error-boundaries/astro';
+import { errorStatusCopy } from '@terra-symposium/boundaries/astro';
 
 const { title, description } = errorStatusCopy(Astro.response.status);
 ---
@@ -32,11 +34,13 @@ The same entry point exports `ErrorStatus`, `ErrorStatusCopy`, and `ERROR_STATUS
 
 ||| [Next.js route error]
 
+|||
+
 ## Error digest
 
 ```tsx
-import { errorDigest } from '@terra-symposium/standards-error-boundaries/next';
-import type { NextRouteErrorProps } from '@terra-symposium/standards-error-boundaries/next';
+import { errorDigest } from '@terra-symposium/boundaries/next';
+import type { NextRouteErrorProps } from '@terra-symposium/boundaries/next';
 
 export default function ErrorPage({ error }: NextRouteErrorProps) {
 	const digest = errorDigest(error);

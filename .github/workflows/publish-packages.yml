@@ -34,28 +34,28 @@ jobs:
         working-directory: packages/quality
         run: |
           version=$(node -p "require('./package.json').version")
-          if ! npm view "@terra-symposium/standards-quality@$version" version >/dev/null 2>&1; then npm publish --access public; fi
+          if ! npm view "@terra-symposium/quality@$version" version >/dev/null 2>&1; then npm publish --access public; fi
         env:
           NODE_AUTH_TOKEN: ${{ secrets.PACKAGES_TOKEN }}
       - name: Publish error boundaries when missing
         working-directory: packages/error-boundaries
         run: |
           version=$(node -p "require('./package.json').version")
-          if ! npm view "@terra-symposium/standards-error-boundaries@$version" version >/dev/null 2>&1; then npm publish --access public; fi
+          if ! npm view "@terra-symposium/boundaries@$version" version >/dev/null 2>&1; then npm publish --access public; fi
         env:
           NODE_AUTH_TOKEN: ${{ secrets.PACKAGES_TOKEN }}
       - name: Publish reporting when missing
         working-directory: packages/reporting
         run: |
           version=$(node -p "require('./package.json').version")
-          if ! npm view "@terra-symposium/standards-reporting@$version" version >/dev/null 2>&1; then npm publish --access public; fi
+          if ! npm view "@terra-symposium/reporting@$version" version >/dev/null 2>&1; then npm publish --access public; fi
         env:
           NODE_AUTH_TOKEN: ${{ secrets.PACKAGES_TOKEN }}
       - name: Publish testing when missing
         working-directory: packages/testing
         run: |
           version=$(node -p "require('./package.json').version")
-          if ! npm view "@terra-symposium/standards-testing@$version" version >/dev/null 2>&1; then npm publish --access public; fi
+          if ! npm view "@terra-symposium/testing@$version" version >/dev/null 2>&1; then npm publish --access public; fi
         env:
           NODE_AUTH_TOKEN: ${{ secrets.PACKAGES_TOKEN }}
       - name: Validate Docs source ref

@@ -13,7 +13,7 @@ IMPORTS
 import ts from 'typescript';
 import { createHash } from 'node:crypto';
 // prettier-ignore
-import { accessibilityFindings, displayNameFindings, errorBoundaryFindings, fixAccessibleNames, fixDisplayNames, fixErrorBoundaries, uiComponentRecommendations } from '@terra-symposium/standards-ui-quality';
+import { accessibilityFindings, displayNameFindings, errorBoundaryFindings, fixAccessibleNames, fixDisplayNames, fixErrorBoundaries, uiComponentRecommendations } from '@terra-symposium/quality/ui';
 import {
 	aliasFindings,
 	declarationScope,
@@ -24,11 +24,11 @@ import {
 	parameterRenameCapturesDefault,
 	renameDeclaration,
 	renameId,
-} from '@terra-symposium/standards-naming';
+} from '@terra-symposium/quality/naming';
 import { basename, dirname, extname, isAbsolute, join, relative, resolve, sep } from 'node:path';
-import { buildGitHubReport, formatGitHubReport, hasGitHubAuth, qualityNodeReporterOptions, writeHistoryReport } from '@terra-symposium/standards-quality-reports';
-import { checkImports, duplicateImportFindings, fixDuplicateImports } from '@terra-symposium/standards-imports';
-import { collapseInlineIfs, collapseTypesAndObjects } from '@terra-symposium/standards-formatting';
+import { buildGitHubReport, formatGitHubReport, hasGitHubAuth, qualityNodeReporterOptions, writeHistoryReport } from '@terra-symposium/quality/reports';
+import { checkImports, duplicateImportFindings, fixDuplicateImports } from '@terra-symposium/quality/imports';
+import { collapseInlineIfs, collapseTypesAndObjects } from '@terra-symposium/quality/formatting';
 import {
 	createQualityAnalysis,
 	hasGeneratedSourceHeader,
@@ -38,31 +38,31 @@ import {
 	setQualityProgressSuppressed,
 	srcFiles,
 	workingSrcFiles,
-} from '@terra-symposium/standards-quality-core';
+} from '@terra-symposium/quality/core';
 // prettier-ignore
-import { deadCodeEditsIntroduceTypeErrors, deadCodeTypeProgram, fixObjectForwarding, fixSingleUseDeclarations, objectForwardingFindings, singleUseFindings } from '@terra-symposium/standards-refactoring';
-import { documentationFindings, documentedCommandFindings, fixDocumentedCommands } from '@terra-symposium/standards-documentation';
+import { deadCodeEditsIntroduceTypeErrors, deadCodeTypeProgram, fixObjectForwarding, fixSingleUseDeclarations, objectForwardingFindings, singleUseFindings } from '@terra-symposium/quality/refactoring';
+import { documentationFindings, documentedCommandFindings, fixDocumentedCommands } from '@terra-symposium/quality/documentation';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { isBuiltin } from 'node:module';
 import { tmpdir } from 'node:os';
-import { fixRegexDedup, fixRepeatedClasses, performancePatternFindings, regexFindings, repeatedClassFindings, runTailwindCanonical, uiPatternFindings } from '@terra-symposium/standards-patterns';
-import { inspectLanguageProfileTool, isLanguageProfileId, resolveLanguageProfiles } from '@terra-symposium/standards-language-checks';
-import { securityFindings } from '@terra-symposium/standards-security';
+import { fixRegexDedup, fixRepeatedClasses, performancePatternFindings, regexFindings, repeatedClassFindings, runTailwindCanonical, uiPatternFindings } from '@terra-symposium/quality/patterns';
+import { inspectLanguageProfileTool, isLanguageProfileId, resolveLanguageProfiles } from '@terra-symposium/quality/languages';
+import { securityFindings } from '@terra-symposium/quality/security';
 import { spawnSync } from 'node:child_process';
 
 // COMPONENTS
 import { Worker } from 'node:worker_threads';
 
 // DATA
-import { LANGUAGE_CAPABILITIES } from '@terra-symposium/standards-language-checks';
-import { PROTECTED_IDENTIFIERS } from '@terra-symposium/standards-naming';
+import { LANGUAGE_CAPABILITIES } from '@terra-symposium/quality/languages';
+import { PROTECTED_IDENTIFIERS } from '@terra-symposium/quality/naming';
 
 // TYPES
 import type { Dirent } from 'node:fs';
-import type { GitHubReport } from '@terra-symposium/standards-quality-reports';
-import type { LanguageProfileTool, LanguageQualityPhase, ResolvedLanguageCheck, SkippedLanguageCheck } from '@terra-symposium/standards-language-checks';
-import type { QualityAnalysis, QualityAutofixName, QualityCfg, QualityCheckName, QualityOptions } from '@terra-symposium/standards-quality-core';
+import type { GitHubReport } from '@terra-symposium/quality/reports';
+import type { LanguageProfileTool, LanguageQualityPhase, ResolvedLanguageCheck, SkippedLanguageCheck } from '@terra-symposium/quality/languages';
+import type { QualityAnalysis, QualityAutofixName, QualityCfg, QualityCheckName, QualityOptions } from '@terra-symposium/quality/core';
 const BPLAYWRIGHT_B_U_REGEX = /\bplaywright\b/u;
 
 /*//////////////////////////////////////////////////
@@ -226,7 +226,7 @@ REGEX
 
 const C_M_JS_TS_X_REGEX = /\.(?:c|m)?(?:js|ts)x?$/;
 const C_M_JS_TS_X_CLASS_2 = /\.(?:(?:c|m)?(?:js|ts)x?)$/;
-export type { QualityAutofixName, QualityCfg, QualityCheckName, QualityAnalysis, QualityOptions } from '@terra-symposium/standards-quality-core';
+export type { QualityAutofixName, QualityCfg, QualityCheckName, QualityAnalysis, QualityOptions } from '@terra-symposium/quality/core';
 /**
  * Normalized shape for one configured quality command.
  */

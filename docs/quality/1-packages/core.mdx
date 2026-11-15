@@ -1,0 +1,26 @@
+---
+title: Core
+description: Shared source scope, configuration, analysis, CLI flags, types, and progress utilities.
+---
+
+`@terra-symposium/quality/core` is the API-only foundation shared by the Quality subpath APIs. It owns contracts and common analysis behavior, not individual findings or aggregate phase orchestration.
+
+## Install and imports
+
+```sh
+pnpm add -D @terra-symposium/quality
+```
+
+```ts
+import { loadQualityConfig, qualityScope, createQualityAnalysis, srcFiles, workingSrcFiles } from '@terra-symposium/quality/core';
+```
+
+## Public surface
+
+The root export ships JavaScript and TypeScript declarations for `QualityCfg`, `QualityScope`, `QualityOptions`, `CapabilityOptions`, check and autofix names, config toggle helpers, source-kind helpers, progress utilities, and file-scope functions.
+
+`loadQualityConfig()` reads the existing root `quality.json` or its `config/quality.json` fallback and resolves project roots and scope. `createQualityAnalysis()` builds a shared TypeScript program and file cache. `srcFiles()` selects the configured source set; `workingSrcFiles()` applies the normal changed/untracked worktree scope.
+
+## Package boundary
+
+This subpath has no CLI. Use a capability subpath to run a focused check. A feature package should depend on Core for its shared contract and must not import its check implementation from the root runner. Install [Quality](/quality/1-packages/quality/) when you need ordered phases, the full schema, repository commands, or combined output.

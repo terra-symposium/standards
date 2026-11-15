@@ -3,7 +3,22 @@
 	"compilerOptions": {
 		"types": ["node"],
 		"rootDir": "../src",
-		"outDir": "../dist"
+		"outDir": "../dist",
+		"baseUrl": "..",
+		"paths": {
+			"@terra-symposium/quality/core": ["src/capabilities/core/index.ts"],
+			"@terra-symposium/quality/reports": ["src/capabilities/reports/index.ts"],
+			"@terra-symposium/quality/ui": ["src/capabilities/ui/index.ts"],
+			"@terra-symposium/quality/languages": ["src/capabilities/languages/index.ts"],
+			"@terra-symposium/quality/documentation": ["src/capabilities/documentation/index.ts"],
+			"@terra-symposium/quality/formatting": ["src/capabilities/formatting/index.ts"],
+			"@terra-symposium/quality/imports": ["src/capabilities/imports/index.ts"],
+			"@terra-symposium/quality/naming": ["src/capabilities/naming/index.ts"],
+			"@terra-symposium/quality/patterns": ["src/capabilities/patterns/index.ts"],
+			"@terra-symposium/quality/refactoring": ["src/capabilities/refactoring/index.ts"],
+			"@terra-symposium/quality/security": ["src/capabilities/security/index.ts"],
+			"@terra-symposium/quality/reports/node-reporter": ["src/capabilities/reports/lib/node-reporter.ts"]
+		}
 	},
 	"include": ["../src"]
 }

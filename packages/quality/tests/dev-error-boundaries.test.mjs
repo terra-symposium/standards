@@ -24,13 +24,13 @@ test('development startup applies React and Astro boundaries before launching th
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-dev-boundaries-'));
 	const src = join(root, 'src');
 	mkdirSync(src);
-	mkdirSync(join(root, 'node_modules/@terra-symposium/standards-error-boundaries/dist/lib'), { recursive: true });
-	writeFileSync(join(root, 'package.json'), JSON.stringify({ dependencies: { '@terra-symposium/standards-error-boundaries': '^0.1.2' } }));
+	mkdirSync(join(root, 'node_modules/@terra-symposium/boundaries/dist/lib'), { recursive: true });
+	writeFileSync(join(root, 'package.json'), JSON.stringify({ dependencies: { '@terra-symposium/boundaries': '^0.1.2' } }));
 	writeFileSync(
-		join(root, 'node_modules/@terra-symposium/standards-error-boundaries/package.json'),
-		JSON.stringify({ name: '@terra-symposium/standards-error-boundaries', exports: { './astro-integration': './dist/lib/error-boundaries-astro.js' } }),
+		join(root, 'node_modules/@terra-symposium/boundaries/package.json'),
+		JSON.stringify({ name: '@terra-symposium/boundaries', exports: { './astro-integration': './dist/lib/error-boundaries-astro.js' } }),
 	);
-	writeFileSync(join(root, 'node_modules/@terra-symposium/standards-error-boundaries/dist/lib/error-boundaries-astro.js'), 'export default {}');
+	writeFileSync(join(root, 'node_modules/@terra-symposium/boundaries/dist/lib/error-boundaries-astro.js'), 'export default {}');
 	const app = join(src, 'main.tsx');
 	writeFileSync(app, "import { createRoot } from 'react-dom/client';\nconst root = createRoot(document.getElementById('root')!);\nroot.render(<App />);\n");
 	const astroConfig = join(root, 'astro.config.mjs');
@@ -42,5 +42,5 @@ test('development startup applies React and Astro boundaries before launching th
 	const result = spawnSync(process.execPath, [fileURLToPath(new URL('../dist/lib/dev.js', import.meta.url)), '--port', '43891', '--', server], { cwd: root, encoding: 'utf8', timeout: 10000 });
 	assert.equal(result.status, 0, result.stderr);
 	assert.match(readFileSync(app, 'utf8'), /<TerraRootErrorBoundary name="Application root"><App \/><\/TerraRootErrorBoundary>/u);
-	assert.match(readFileSync(astroConfig, 'utf8'), /@terra-symposium\/standards-error-boundaries\/astro-integration/u);
+	assert.match(readFileSync(astroConfig, 'utf8'), /@terra-symposium\/boundaries\/astro-integration/u);
 });

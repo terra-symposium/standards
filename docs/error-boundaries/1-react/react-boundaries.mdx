@@ -8,7 +8,7 @@ Use this guide when a client-rendered React region needs a local fallback after 
 ## Install and choose a recovery region
 
 ```sh
-pnpm add @terra-symposium/standards-error-boundaries
+pnpm add @terra-symposium/boundaries
 ```
 
 Wrap a useful recovery unit, such as one report panel or route region. Keep independent content outside the boundary so one rendering failure does not remove working navigation or sibling panels.
@@ -18,7 +18,7 @@ Wrap a useful recovery unit, such as one report panel or route region. Keep inde
 The fallback should identify the user-facing problem and offer only an action the application can perform. Do not show raw exception text or a component stack.
 
 ```tsx
-import { ErrorBoundary } from '@terra-symposium/standards-error-boundaries/react';
+import { ErrorBoundary } from '@terra-symposium/boundaries/react';
 
 <ErrorBoundary
 	name='Usage report'
@@ -43,17 +43,63 @@ The diagram traces the render path. A successful child render stays in place; a 
 <Nodes
 	direction='LR'
 	nodes={[
-		{ id: 'children', type: 'origin', data: { title: 'Render descendants' } },
-		{ id: 'success', type: 'process', data: { title: 'Render normally' } },
-		{ id: 'boundary', type: 'process', data: { title: 'Boundary captures error' } },
-		{ id: 'fallback', type: 'process', data: { title: 'Show local fallback' } },
-		{ id: 'callback', type: 'terminal', data: { title: 'Call onError' } },
+		{
+			id: 'children',
+			type: 'origin',
+			data: {
+				title: 'Render descendants',
+			},
+		},
+		{
+			id: 'success',
+			type: 'process',
+			data: {
+				title: 'Render normally',
+			},
+		},
+		{
+			id: 'boundary',
+			type: 'process',
+			data: {
+				title: 'Boundary captures error',
+			},
+		},
+		{
+			id: 'fallback',
+			type: 'process',
+			data: {
+				title: 'Show local fallback',
+			},
+		},
+		{
+			id: 'callback',
+			type: 'terminal',
+			data: {
+				title: 'Call onError',
+			},
+		},
 	]}
 	edges={[
-		{ id: 'render-success', source: 'children', target: 'success' },
-		{ id: 'render-caught', source: 'children', target: 'boundary' },
-		{ id: 'boundary-fallback', source: 'boundary', target: 'fallback' },
-		{ id: 'fallback-callback', source: 'fallback', target: 'callback' },
+		{
+			id: 'render-success',
+			source: 'children',
+			target: 'success',
+		},
+		{
+			id: 'render-caught',
+			source: 'children',
+			target: 'boundary',
+		},
+		{
+			id: 'boundary-fallback',
+			source: 'boundary',
+			target: 'fallback',
+		},
+		{
+			id: 'fallback-callback',
+			source: 'fallback',
+			target: 'callback',
+		},
 	]}
 	height={230}
 />
@@ -65,6 +111,8 @@ The package clears its captured error when the configured reset input changes. C
 ||| [Reset when inputs change]
 
 Pass a stable identity such as the selected account or workspace as `resetKey`. A new identity retries the child tree automatically.
+
+|||
 
 ||| [Explicit retry]
 
@@ -85,9 +133,13 @@ Have the fallback call an application action that changes the key or input passe
 
 The package root re-exports the React API. Prefer the explicit `/react` subpath in application components.
 
-=== [What React does not catch] React boundaries catch descendant render, constructor, and lifecycle failures. React also documents errors thrown inside a `startTransition` action as boundary-caught. They do not catch ordinary event-handler exceptions, most asynchronous callbacks such as timers, server-rendering failures, errors in the boundary itself, or failures before React starts.
+=== [What React does not catch]
 
-# Use normal `try`/`catch` and rejected-promise handling for imperative work. Add browser coverage for the user-visible fallback and verify that an independent sibling remains available.
+React boundaries catch descendant render, constructor, and lifecycle failures. React also documents errors thrown inside a `startTransition` action as boundary-caught. They do not catch ordinary event-handler exceptions, most asynchronous callbacks such as timers, server-rendering failures, errors in the boundary itself, or failures before React starts.
+
+Use normal `try`/`catch` and rejected-promise handling for imperative work. Add browser coverage for the user-visible fallback and verify that an independent sibling remains available.
+
+===
 
 :::note[Application-owned behavior]
 

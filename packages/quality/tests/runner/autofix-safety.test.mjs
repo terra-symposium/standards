@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 import { runQualityFromCfg } from '../../dist/lib/runner.js';
-import { QUALITY_CHECK_NAMES } from '../../../quality-core/dist/index.js';
+import { QUALITY_CHECK_NAMES } from '../../dist/capabilities/core/index.js';
 
 test('autofix restores a file when a formatter introduces syntax errors', async () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-safety-'));

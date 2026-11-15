@@ -14,7 +14,7 @@ IMPORTS
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import test from 'node:test';
-import { QUALITY_CHECK_NAMES } from '@terra-symposium/standards-quality-core';
+import { QUALITY_CHECK_NAMES } from '@terra-symposium/quality/core';
 // prettier-ignore
 import { createQualityAnalysis, createQualityCfg, loadQualityCfg, qualityAutofixEnabled, qualityCheckEnabled, qualityCmdEnabled, qualityRecommendationEnabled, runFormatter, runQuality, runQualityCli, runQualityFromCfg, runTypecheck } from '../../dist/index.js';
 import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, readlinkSync, realpathSync, symlinkSync } from 'node:fs';
@@ -562,21 +562,17 @@ test('nested consumer ESLint runs do not require CommonJS access to Quality Core
 	fixtureFile(root, 'package.json', '{"type":"module"}\n');
 	mkdirSync(join(root, 'node_modules'), { recursive: true });
 	symlinkSync(resolve(fileURLToPath(new URL('../../../../', import.meta.url)), 'config/node_modules/eslint'), join(root, 'node_modules/eslint'), 'dir');
-	fixtureFile(
-		root,
-		'node_modules/@terra-symposium/standards-quality-core/package.json',
-		JSON.stringify({ name: '@terra-symposium/standards-quality-core', exports: { '.': { import: './dist/index.js' } } }),
-	);
-	fixtureFile(root, 'node_modules/@terra-symposium/standards-quality-core/dist/index.js', 'export const qualityProgress = () => {};\n');
+	fixtureFile(root, 'node_modules/@terra-symposium/quality/package.json', JSON.stringify({ name: '@terra-symposium/quality', exports: { './core': { import: './dist/core.js' } } }));
+	fixtureFile(root, 'node_modules/@terra-symposium/quality/dist/core.js', 'export const qualityProgress = () => {};\n');
 	fixtureFile(root, 'quality.json', JSON.stringify({ sourceRoots: ['src'], extensions: ['.ts'] }));
 	fixtureFile(root, 'config/eslint.config.mjs', 'export default [];\n');
 	fixtureFile(root, 'src/main.ts', 'export const value = true;\n');
 	// terra-quality-ignore single-use -- Keep the nested consumer require function tied to its package manifest.
 	const consumerRequire = createRequire(join(root, 'package.json'));
-	assert.throws(() => consumerRequire.resolve('@terra-symposium/standards-quality-core'), { code: 'ERR_PACKAGE_PATH_NOT_EXPORTED' });
+	assert.throws(() => consumerRequire.resolve('@terra-symposium/quality/core'), { code: 'ERR_PACKAGE_PATH_NOT_EXPORTED' });
 	const result = spawnSync(process.execPath, [fileURLToPath(new URL('../../dist/lib/runner.js', import.meta.url)), 'lint', '--all'], { cwd: root, encoding: 'utf8' });
 	assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
-	assert.equal(existsSync(join(root, 'node_modules/@terra-symposium/standards-quality-core/dist/index.js')), true);
+	assert.equal(existsSync(join(root, 'node_modules/@terra-symposium/quality/dist/core.js')), true);
 });
 test('the executable loads ESLint flat config from configured configRoot', { skip: !ESLINT_AVAILABLE }, () => {
 	const root = fixtureRoot('terra-quality-eslint-config-root-');

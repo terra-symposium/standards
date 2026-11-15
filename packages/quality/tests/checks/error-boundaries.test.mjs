@@ -18,8 +18,7 @@ import { tmpdir } from 'node:os';
 /*//////////////////////////////////////////////////
 REGEX
 //////////////////////////////////////////////////*/
-const IMPORT_ERRORBOUNDARY_AS_TERRAROOTERRORBOUNDARY_FROM_TERRA_SYMPOSIUM_ST_LTL59V =
-	/import \{ ErrorBoundary as TerraRootErrorBoundary \} from '@terra-symposium\/standards-error-boundaries\/react'/u;
+const IMPORT_ERRORBOUNDARY_AS_TERRAROOTERRORBOUNDARY_FROM_TERRA_SYMPOSIUM_ST_LTL59V = /import \{ ErrorBoundary as TerraRootErrorBoundary \} from '@terra-symposium\/boundaries\/react'/u;
 
 /*//////////////////////////////////////////////////
 TESTS
@@ -61,8 +60,8 @@ test('automatically wraps JavaScript createElement roots without breaking direct
 test('automatically installs the shared hydration boundary in Astro configs', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-astro-boundary-'));
 	const config = join(root, 'astro.config.mjs');
-	writeFileSync(join(root, 'package.json'), JSON.stringify({ devDependencies: { '@terra-symposium/standards-error-boundaries': '0.1.0' } }));
-	const packageRoot = join(root, 'node_modules/@terra-symposium/standards-error-boundaries');
+	writeFileSync(join(root, 'package.json'), JSON.stringify({ devDependencies: { '@terra-symposium/boundaries': '0.1.0' } }));
+	const packageRoot = join(root, 'node_modules/@terra-symposium/boundaries');
 	mkdirSync(join(packageRoot, 'dist/lib'), { recursive: true });
 	writeFileSync(join(packageRoot, 'package.json'), JSON.stringify({ exports: { './astro-integration': './dist/lib/astro-integration.js' } }));
 	writeFileSync(join(packageRoot, 'dist/lib/astro-integration.js'), 'export const terraErrorBoundaryIntegration = () => ({});\n');
@@ -71,7 +70,7 @@ test('automatically installs the shared hydration boundary in Astro configs', ()
 	assert.equal(errorBoundaryFindings(cfg).length, 1);
 	assert.equal(fixErrorBoundaries(cfg), 1);
 	const output = readFileSync(config, 'utf8');
-	assert.match(output, /@terra-symposium\/standards-error-boundaries\/astro-integration/u);
+	assert.match(output, /@terra-symposium\/boundaries\/astro-integration/u);
 	assert.match(output, /integrations: \[__terraErrorBoundaryIntegration\(\), \]/u);
 	assert.deepEqual(errorBoundaryFindings(cfg), []);
 	assert.equal(fixErrorBoundaries(cfg), 0);
@@ -93,7 +92,7 @@ test('accepts an existing top-level boundary, including a local alias', () => {
 	mkdirSync(join(root, 'src'));
 	writeFileSync(
 		join(root, 'src', 'main.tsx'),
-		"import { ErrorBoundary as AppBoundary } from '@terra-symposium/standards-error-boundaries/react';\nimport { createRoot } from 'react-dom/client';\nconst root = createRoot(document.getElementById('root')!);\nroot.render(<AppBoundary><App /></AppBoundary>);\n",
+		"import { ErrorBoundary as AppBoundary } from '@terra-symposium/boundaries/react';\nimport { createRoot } from 'react-dom/client';\nconst root = createRoot(document.getElementById('root')!);\nroot.render(<AppBoundary><App /></AppBoundary>);\n",
 	);
 	// terra-quality-ignore single-use -- Keep this test configuration named so its fixture scope is established before the check under test runs.
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.tsx'] });
@@ -103,7 +102,7 @@ test('recognizes the Quality compatibility re-export for existing Astro configs'
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-astro-boundary-compat-'));
 	writeFileSync(
 		join(root, 'astro.config.mjs'),
-		"import { terraErrorBoundaryIntegration } from '@terra-symposium/standards-quality/astro-integration';\nexport default { integrations: [terraErrorBoundaryIntegration()] };\n",
+		"import { terraErrorBoundaryIntegration } from '@terra-symposium/quality/astro-integration';\nexport default { integrations: [terraErrorBoundaryIntegration()] };\n",
 	);
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts', '.tsx'] });
 	assert.deepEqual(errorBoundaryFindings(cfg), []);

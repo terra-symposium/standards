@@ -184,6 +184,17 @@ def verify_isolated_install(destination: pathlib.Path) -> None:
         archive = packs / filename
         if not archive.is_file():
             raise RuntimeError(f"Missing packed artifact: {archive}")
+        if package["name"] == "@terra-symposium/quality":
+            with tarfile.open(archive) as contents:
+                packed = set(contents.getnames())
+            required = {"package/quality.schema.json"}
+            required.update(f"package/{path}" for path in package["bin"].values())
+            for target in package["exports"].values():
+                if isinstance(target, dict) and "types" in target:
+                    required.add(f"package/{target['types'].removeprefix('./')}")
+            missing = sorted(required - packed)
+            if missing:
+                raise RuntimeError(f"Quality tarball lacks required files: {missing}")
         dependencies[package["name"]] = f"file:{archive}"
 
     consumer = destination / "consumer"
@@ -209,11 +220,18 @@ def verify_isolated_install(destination: pathlib.Path) -> None:
             f"Isolated package install failed: {install.stdout}\n{install.stderr}"
         )
     imports = [
-        "@terra-symposium/standards-quality/cli",
-        "@terra-symposium/standards-formatting",
-        "@terra-symposium/standards-quality-core",
-        "@terra-symposium/standards-quality-reports",
-        "@terra-symposium/standards-documentation",
+        "@terra-symposium/quality/cli",
+        "@terra-symposium/quality/core",
+        "@terra-symposium/quality/reports",
+        "@terra-symposium/quality/ui",
+        "@terra-symposium/quality/languages",
+        "@terra-symposium/quality/documentation",
+        "@terra-symposium/quality/formatting",
+        "@terra-symposium/quality/imports",
+        "@terra-symposium/quality/naming",
+        "@terra-symposium/quality/patterns",
+        "@terra-symposium/quality/refactoring",
+        "@terra-symposium/quality/security",
     ]
     program = (
         "for (const name of "

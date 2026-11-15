@@ -2,4 +2,4 @@
  * packages/quality/src/lib/ui-quality.ts
  */
 
-export * from '@terra-symposium/standards-ui-quality';
+export * from '@terra-symposium/quality/ui';

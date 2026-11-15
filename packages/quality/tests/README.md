@@ -20,7 +20,7 @@ Not applicable.
 
 `pnpm run test` runs `node --test`. Node discovers the test files recursively under this directory exactly once. The folders below separate checks, transforms, runner behavior, and reports; shared fixture helpers live outside discovery in `support/fixtures.mjs`.
 
-From `standards/main/`, run `pnpm --filter @terra-symposium/standards-quality test` to validate quality package tests.
+From `standards/main/`, run `pnpm --filter @terra-symposium/quality test` to validate quality package tests.
 
 ### Dead-code output contract
 

@@ -15,17 +15,17 @@ Not applicable.
 ### Install
 
 ```sh
-pnpm add @terra-symposium/standards-error-boundaries
+pnpm add @terra-symposium/boundaries
 ```
 
-From `standards/main/`, run `pnpm install`, then `pnpm --filter @terra-symposium/standards-error-boundaries build`. Validate adapter changes with `pnpm --filter @terra-symposium/standards-error-boundaries test`.
+From `standards/main/`, run `pnpm install`, then `pnpm --filter @terra-symposium/boundaries build`. Validate adapter changes with `pnpm --filter @terra-symposium/boundaries test`.
 
 ## Usage
 
 ### Catch React render failures
 
 ````tsx
-import { ErrorBoundary } from '@terra-symposium/standards-error-boundaries/react';
+import { ErrorBoundary } from '@terra-symposium/boundaries/react';
 
 ## Structure
 
@@ -38,7 +38,7 @@ Wrap hydrated islands in the shared Astro boundary to show a static fallback if 
 
 ```astro
 ---
-import AstroErrorBoundary from '@terra-symposium/standards-error-boundaries/astro-boundary';
+import AstroErrorBoundary from '@terra-symposium/boundaries/astro-boundary';
 ---
 
 <AstroErrorBoundary title="Workspace unavailable" description="Reload to try the workspace again.">
@@ -50,11 +50,11 @@ The Astro wrapper listens for Astro's cancelable `astro:hydration-error` event a
 
 ### Other entry points
 
-`@terra-symposium/standards-error-boundaries/astro` exports status-copy helpers for 400, 401, 403, 404, 500, 502, and 503 responses.
+`@terra-symposium/boundaries/astro` exports status-copy helpers for 400, 401, 403, 404, 500, 502, and 503 responses.
 
-`@terra-symposium/standards-error-boundaries/astro-boundary` exports the reusable static Astro island guard.
+`@terra-symposium/boundaries/astro-boundary` exports the reusable static Astro island guard.
 
-`@terra-symposium/standards-error-boundaries/next` exports types and `errorDigest(error)` for framework-provided route-error digests.
+`@terra-symposium/boundaries/next` exports types and `errorDigest(error)` for framework-provided route-error digests.
 
 - The package root re-exports all entry-point APIs.
 

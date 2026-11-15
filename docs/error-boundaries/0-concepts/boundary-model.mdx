@@ -19,17 +19,63 @@ React boundaries switch to fallback output when a descendant render path fails. 
 <Nodes
 	direction='TB'
 	nodes={[
-		{ id: 'request', type: 'origin', data: { title: 'Astro sends HTML' } },
-		{ id: 'hydration', type: 'process', data: { title: 'Hydrate client island' } },
-		{ id: 'react', type: 'process', data: { title: 'React descendant render' } },
-		{ id: 'fallback', type: 'terminal', data: { title: 'React fallback' } },
-		{ id: 'astro', type: 'terminal', data: { title: 'Astro hydration fallback' } },
+		{
+			id: 'request',
+			type: 'origin',
+			data: {
+				title: 'Astro sends HTML',
+			},
+		},
+		{
+			id: 'hydration',
+			type: 'process',
+			data: {
+				title: 'Hydrate client island',
+			},
+		},
+		{
+			id: 'react',
+			type: 'process',
+			data: {
+				title: 'React descendant render',
+			},
+		},
+		{
+			id: 'fallback',
+			type: 'terminal',
+			data: {
+				title: 'React fallback',
+			},
+		},
+		{
+			id: 'astro',
+			type: 'terminal',
+			data: {
+				title: 'Astro hydration fallback',
+			},
+		},
 	]}
 	edges={[
-		{ id: 'request-hydration', source: 'request', target: 'hydration' },
-		{ id: 'hydration-react', source: 'hydration', target: 'react' },
-		{ id: 'react-failure', source: 'react', target: 'fallback' },
-		{ id: 'hydration-failure', source: 'hydration', target: 'astro' },
+		{
+			id: 'request-hydration',
+			source: 'request',
+			target: 'hydration',
+		},
+		{
+			id: 'hydration-react',
+			source: 'hydration',
+			target: 'react',
+		},
+		{
+			id: 'react-failure',
+			source: 'react',
+			target: 'fallback',
+		},
+		{
+			id: 'hydration-failure',
+			source: 'hydration',
+			target: 'astro',
+		},
 	]}
 	height={300}
 />
@@ -38,10 +84,14 @@ React boundaries switch to fallback output when a descendant render path fails. 
 
 ||| [React-rendered region]
 
-Wrap a panel, route region, or repeated item when that region can fail independently. Keep unrelated controls outside the boundary and make the fallback action match a real recovery path. |||
+Wrap a panel, route region, or repeated item when that region can fail independently. Keep unrelated controls outside the boundary and make the fallback action match a real recovery path.
+
+|||
 
 ||| [Astro island startup]
 
-Use the package’s Astro wrapper around an island or install the page-level integration when one fallback should cover multiple islands. It cannot repair a server failure that prevented HTML from reaching the browser. |||
+Use the package’s Astro wrapper around an island or install the page-level integration when one fallback should cover multiple islands. It cannot repair a server failure that prevented HTML from reaching the browser.
+
+|||
 
 For installation, see [React boundary integration](/error-boundaries/1-react/react-boundaries/) and [Astro hydration recovery](/error-boundaries/2-frameworks/hydration/). The [route helper reference](/error-boundaries/2-frameworks/route-errors/) covers HTTP status responses.

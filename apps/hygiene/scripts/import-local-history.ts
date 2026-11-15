@@ -8,7 +8,7 @@ IMPORTS
 
 // API
 import { basename, join, resolve } from 'node:path';
-import { createHistoryReport } from '@terra-symposium/standards-quality/reports';
+import { createHistoryReport } from '@terra-symposium/quality/reports';
 import { db } from '../src/lib/server/db.js';
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdtempSync, rmSync } from 'node:fs';

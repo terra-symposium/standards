@@ -18,7 +18,7 @@ FUNCTIONS
  */
 export function terraErrorBoundaryIntegration() {
 	return {
-		name: '@terra-symposium/standards-error-boundaries',
+		name: '@terra-symposium/boundaries',
 		hooks: {
 			'astro:config:setup': ({ injectScript }: { injectScript: (stage: 'before-hydration', content: string) => void }) => {
 				injectScript(
