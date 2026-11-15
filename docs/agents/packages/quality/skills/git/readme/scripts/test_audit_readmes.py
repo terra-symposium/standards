@@ -42,7 +42,7 @@ class ReadmeDiscoveryTests(unittest.TestCase):
 
 
 class ReadmeCheckTests(unittest.TestCase):
-    """Check valid README structure and actionable violations."""
+    """Check valid README mechanics and actionable violations."""
 
     def test_valid_document_ignores_fenced_examples_and_accepts_local_links(
         self,
@@ -55,61 +55,58 @@ class ReadmeCheckTests(unittest.TestCase):
             readme.write_text(
                 """# Example
 
-## Getting started
-### Commands
 Run `pnpm test`.
 ```md
 # Not a document heading
 TODO remains literal in code.
 ```
 
-## Security and Limitations
-Review credentials before use.
-
-## Structure
-The package keeps its source under `src/`.
-
-## References
 See [the guide](guide.md).
-
-## Contributing
-Run the checks before submitting a change.
-
-## Credits and license
-See the license file.
 """,
                 encoding="utf-8",
             )
 
             self.assertEqual(audit_readmes.check(readme), [])
 
-    def test_invalid_document_reports_structure_placeholders_and_broken_links(
+    def test_invalid_document_reports_placeholders_and_broken_links(
         self,
     ) -> None:
-        """Malformed sections, placeholders, long lists, and broken links surface."""
+        """Empty sections, placeholders, and broken links surface."""
         with tempfile.TemporaryDirectory() as directory:
             readme = Path(directory) / "README.md"
             readme.write_text(
                 """# Example
 
 ## Structure
-- """
-                + "x" * 101
-                + "\n"
-                + "See [missing](missing.md).\n<project> TODO\n"
-                + "## Getting started\n### Empty\n"
-                + "```\ncode\n",
+See [missing](missing.md).
+<project> TODO
+## Getting started
+### Empty
+```
+code
+""",
                 encoding="utf-8",
             )
 
             errors = audit_readmes.check(readme)
 
-        self.assertTrue(any("H2 headings" in error for error in errors))
-        self.assertTrue(any("expected one `### Commands`" in error for error in errors))
-        self.assertTrue(any("list item is" in error for error in errors))
+        self.assertTrue(any("empty H3 section" in error for error in errors))
         self.assertTrue(any("unresolved placeholder" in error for error in errors))
         self.assertTrue(any("broken local link" in error for error in errors))
         self.assertIn("unclosed fenced code block", errors)
+
+    def test_encoded_links_and_todo_paths_are_not_placeholders(self) -> None:
+        """Link targets are decoded and excluded from placeholder prose checks."""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "test plan.md").write_text("# Plan\n", encoding="utf-8")
+            (root / "todo.md").write_text("# Tasks\n", encoding="utf-8")
+            readme = root / "README.md"
+            readme.write_text(
+                "# Example\n\nSee [test plan](test%20plan.md) and [tasks](todo.md).\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(audit_readmes.check(readme), [])
 
 
 class ReadmeCommandTests(unittest.TestCase):
@@ -119,7 +116,7 @@ class ReadmeCommandTests(unittest.TestCase):
         """A README violation makes the command fail and names the file."""
         with tempfile.TemporaryDirectory() as directory:
             readme = Path(directory) / "README.md"
-            readme.write_text("# Missing required sections\n", encoding="utf-8")
+            readme.write_text("# Project\n\n## Empty\n", encoding="utf-8")
             output = io.StringIO()
             with (
                 patch.object(sys, "argv", ["audit_readmes.py", str(readme)]),

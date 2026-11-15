@@ -1,16 +1,14 @@
 # Testing
 
-A manifest-driven CLI and GitHub Action for ordered, repository-owned test suites.
+Testing helps teams run a repository’s checks in a predictable order.
 
-## What it does
-
-The `terra-test` runner executes Standards shared checks and the suites declared in a repository test plan. It checks that each test file has one owning suite and rejects duplicate suite commands.
-
-## Prerequisites
-
-Node.js `>=20`. The runner invokes the tools named in the consumer's manifest; install them in that repository.
+The `terra-test` runner executes Standards shared checks and the suites declared in a repository
+test plan. It checks that each test file has one owning suite and rejects duplicate suite commands.
 
 ## Get started
+
+Node.js `>=20`. The runner invokes the tools named in the consumer's manifest; install them in that
+repository.
 
 ```sh
 pnpm add -D @terra-symposium/testing
@@ -40,40 +38,50 @@ Run the plan from the consuming repository root:
 pnpm exec terra-test run --manifest config/terra-tests.json
 ```
 
-`--suites unit,contracts` selects named local suites while retaining shared checks. `--shared-only` runs Standards checks without local suites. The runner discovers `config/terra-tests.json`, then `tests/terra-tests.json`, then legacy `.terra-tests.json` when no manifest is specified. A repository with no custom suites may omit the manifest.
+`--suites unit,contracts` selects named local suites while retaining shared checks. `--shared-only`
+runs Standards checks without local suites. The runner discovers `config/terra-tests.json`, then
+`tests/terra-tests.json`, then legacy `.terra-tests.json` when no manifest is specified. A
+repository with no custom suites may omit the manifest.
 
-## Configuration and security
+## Configuration
 
-Each suite declares one command and an `owns` list of repository-relative test globs. Review commands and working directories before running a plan from an unfamiliar repository. Do not place secrets in the manifest.
-
-## Development and structure
-
-`src/` owns the CLI and public API. `action.yml` exposes the GitHub Action. Standards is the source of truth; update the public Action mirror when publishing an implementation change.
+Each suite declares one command and an `owns` list of repository-relative test globs. Review
+commands and working directories before running a plan from an unfamiliar repository. Do not place
+secrets in the manifest.
 
 ## Validation
 
-```sh
-pnpm --filter @terra-symposium/testing build
-pnpm --filter @terra-symposium/testing test
-pnpm --filter @terra-symposium/testing quality:all
-```
+| Command                | Checks                        |
+| ---------------------- | ----------------------------- |
+| `pnpm run quality:all` | Full configured Quality scope |
+| `pnpm run test`        | Unit or project tests         |
+| `pnpm run build`       | Build output                  |
 
-## Deployment and operations
-
-Publish the npm package through the Standards Changesets workflow. Pin the Action to a reviewed commit SHA in consumer workflows and pass its `manifest` input. The Action runs one plan in one job.
-
-## Data, privacy, and limitations
-
-The runner executes the configured commands and does not provide their credentials, browsers, databases, or other services. Its ownership check maps test files to suites; it does not prove assertion quality.
-
-## References
-
-See [test plans and ownership](../../docs/testing/0-getting-started/test-plan.mdx) and [CI integration](../../docs/testing/1-ci/ci-integration.mdx).
+Quality can apply safe fixes; review the diff before committing. No separate browser or Playwright
+test command is defined here.
 
 ## Contributing
 
-Keep the manifest as the single suite inventory. When reorganizing tests, account for moved, merged, or retired assertions and update the guide. Add a Changeset for a published behavior change.
+`src/` owns the CLI and public API. `action.yml` exposes the GitHub Action. Standards is the source
+of truth; update the public Action mirror when publishing an implementation change.
 
-## Credits and license
+Keep the manifest as the single suite inventory. When reorganizing tests, account for moved, merged,
+or retired assertions and update the guide. Add a Changeset for a published behavior change.
+
+Open changes through the repository pull-request workflow; see the [root README](../../README.md).
+
+## Documentation
+
+Publish the npm package through the Standards Changesets workflow. Pin the Action to a reviewed
+commit SHA in consumer workflows and pass its `manifest` input. The Action runs one plan in one job.
+
+The runner executes the configured commands and does not provide their credentials, browsers,
+databases, or other services. Its ownership check maps test files to suites; it does not prove
+assertion quality.
+
+See [test plans and ownership](../../docs/testing/0-getting-started/test-plan.mdx) and
+[CI integration](../../docs/testing/1-ci/ci-integration.mdx).
+
+## License
 
 Apache-2.0. See the repository [LICENSE](../../LICENSE).

@@ -1,16 +1,17 @@
 # Terra Symposium Standards
 
-Shared packages and documentation for Terra Symposium projects.
+Terra Symposium Standards gives project teams shared tools and guidance for reliable development.
 
-## What it does
-
-This workspace publishes [Quality](packages/quality/README.md), [Boundaries](packages/error-boundaries/README.md), [Reporting](packages/reporting/README.md), and [Testing](packages/testing/README.md). Quality provides the repository checker and focused APIs through one package with named subpath exports. The other packages provide React error boundaries, Playwright evidence, and test orchestration.
-
-## Prerequisites
-
-Use Node.js 22.19.0 and pnpm 10.30.3 for workspace development. Individual package runtime requirements are documented in their READMEs.
+This workspace publishes [Quality](packages/quality/README.md),
+[Boundaries](packages/error-boundaries/README.md), [Reporting](packages/reporting/README.md), and
+[Testing](packages/testing/README.md). Quality provides the repository checker and focused APIs
+through one package with named subpath exports. The other packages provide React error boundaries,
+Playwright evidence, and test orchestration.
 
 ## Get started
+
+Use Node.js 22.19.0 and pnpm 10.30.3 for workspace development. Individual package runtime
+requirements are documented in their READMEs.
 
 ```sh
 corepack enable
@@ -30,7 +31,8 @@ pnpm add -D @terra-symposium/reporting @playwright/test
 pnpm add -D @terra-symposium/testing
 ```
 
-Quality runs on changed and untracked files by default. Use `--all` for the configured full scope and `--warn` for a read-only run:
+Quality runs on changed and untracked files by default. Use `--all` for the configured full scope
+and `--warn` for a read-only run:
 
 ```sh
 pnpm exec terra-quality
@@ -38,50 +40,65 @@ pnpm exec terra-quality quality --all
 pnpm exec terra-quality quality --all --warn
 ```
 
-See the [Quality setup guide](https://standards-docs.netlify.app/quality/0-getting-started/overview/) for configuration and the [package migration guide](docs/quality/5-operations/migration.mdx) for the former `standards-*` names.
+See the
+[Quality setup guide](https://standards-docs.netlify.app/quality/0-getting-started/overview/) for
+configuration and the [package migration guide](docs/quality/5-operations/migration.mdx) for the
+former `standards-*` names.
 
-## Configuration and security
+## Configuration
 
-Each consumer owns its `quality.json`, native tool settings, application policy, credentials, and test services. Keep secrets in the consuming environment; do not put values in package configuration or documentation. The [configuration reference](https://standards-docs.netlify.app/quality/0-getting-started/overview/) describes available checks and autofixes.
-
-## Development and structure
-
-`packages/` contains publishable code. `config/` contains workspace scripts and tool settings. `docs/` contains the site and agent guidance. `tests/` contains the shared test plan and integration coverage. Generated output belongs in `dist/`.
-
-Start the documentation site with `pnpm run docs`; build static output with `pnpm run docs:build`. The [agent guides](docs/agents/) provide task-specific repository workflows.
+Each consumer owns its `quality.json`, native tool settings, application policy, credentials, and
+test services. Keep secrets in the consuming environment; do not put values in package configuration
+or documentation. The
+[configuration reference](https://standards-docs.netlify.app/quality/0-getting-started/overview/)
+describes available checks and autofixes.
 
 ## Validation
 
-Run the full workspace checks before review:
+| Command                | Checks                        |
+| ---------------------- | ----------------------------- |
+| `pnpm run quality`     | Changed and untracked files   |
+| `pnpm run quality:all` | Full configured Quality scope |
+| `pnpm run test`        | Project test suite            |
+| `pnpm run build`       | Build output                  |
+| `pnpm run docs:build`  | Documentation build           |
 
-```sh
-pnpm run quality:all
-pnpm run test
-pnpm run build
-pnpm run docs:build
-git diff --check
-```
+Quality can apply safe fixes; review the diff before committing. No separate browser or Playwright
+test command is defined here.
 
-`pnpm run verify` runs Quality, tests, build, and the docs build in sequence. Quality applies supported safe fixes by default, so review its diff before committing.
+## Contributing
 
-## Deployment and operations
+`packages/` contains publishable code. `config/` contains workspace scripts and tool settings.
+`docs/` contains the site and agent guidance. `tests/` contains the shared test plan and integration
+coverage. Generated output belongs in `dist/`.
 
-Published package changes use Changesets and the development-branch release workflow. The documentation site is built from `docs/`. See the [release guide](docs/contributing/3-releases/package-release.mdx) for versioning and publication.
+Start the documentation site with `pnpm run docs`; build static output with `pnpm run docs:build`.
+The [agent guides](docs/agents/) provide task-specific repository workflows.
 
-## Data, privacy, and limitations
+`pnpm run verify` runs Quality, tests, build, and the docs build in sequence. Quality applies
+supported safe fixes by default, so review its diff before committing.
 
-The packages do not provision application credentials, external tools, databases, or browser services. A successful static Quality run does not establish runtime correctness; run the consuming project's builds and functional tests separately.
+Read [Contribute to Standards](docs/contributing/0-workspace/getting-started.mdx). Update public
+APIs, package READMEs, and site guidance together when a contract changes.
 
-## References
+Open a pull request against `development` and review the results of
+[`quality.yml`](.github/workflows/quality.yml) before merging. Keep unrelated changes out of the
+pull request.
+
+## Documentation
+
+Published package changes use Changesets and the development-branch release workflow. The
+documentation site is built from `docs/`. See the
+[release guide](docs/contributing/3-releases/package-release.mdx) for versioning and publication.
+
+The packages do not provision application credentials, external tools, databases, or browser
+services. A successful static Quality run does not establish runtime correctness; run the consuming
+project's builds and functional tests separately.
 
 - [Standards documentation](https://standards-docs.netlify.app/)
 - [Quality package map](docs/quality/1-packages/package-map.mdx)
 - [Test plan](config/terra-tests.json)
 
-## Contributing
-
-Read [Contribute to Standards](docs/contributing/0-workspace/getting-started.mdx). Update public APIs, package READMEs, and site guidance together when a contract changes.
-
-## Credits and license
+## License
 
 Maintained by Terra Symposium. See [LICENSE](LICENSE) for license terms.

@@ -1,73 +1,72 @@
 ---
 name: readme-standardisation
-description: Create, audit, or standardise repository README files with a reusable structure while preserving every useful fact, command, constraint, and reference from the source documentation.
+description: Write consistent, reader-first repository, package, and folder READMEs.
 ---
 
 # README standardisation
 
-Use when asked to create, review, or standardise a repository README. The companion [`README.template.md`](README.template.md) is the literal structure for every README. Keep every standard heading, in the exact order below, even when a section is not relevant. Write `Not applicable.` under an empty section. Do not add or remove H2 headings; use H3 or lower for subsections.
+Use the [template](README.template.md). Its section names and order are the default for repository
+and package READMEs; include a section only when it has useful content. A folder README follows the
+smaller rule below.
 
-## Goals
+## 1. Establish scope and reader
 
-- Make a reader understand what the repository is, whether it is relevant, and how to get a useful result.
-- Put information in a predictable order across repositories.
-- Preserve all unique, current information from existing README files, including details that do not fit the common sections.
-- Keep instructions accurate, executable, and safe. Do not invent features, commands, prerequisites, URLs, credentials, supported environments, or guarantees.
-- Keep every complete bullet item at or below 100 characters, including its marker. Turn longer material into prose or tables, or divide it without losing meaning.
+- Read the existing README, linked guides, applicable `AGENTS.md`, manifests, scripts, and
+  configuration before rewriting claims or commands. Inventory root and nested READMEs for a
+  multi-repository task.
+- **Repository root:** state the project's purpose and the quickest way to run or use it. In a
+  monorepo, add a short package/app map linking to the owning READMEs; do not copy their API guides.
+- **Published package:** state the package name, supported runtime, installation command, and one
+  working public API or CLI example. Treat the README as the landing page on the package registry.
+- **Folder:** keep a README only when the folder needs distinct context or instructions. Use an H1
+  and a plain-language purpose statement. Link to the root README for validation and contribution;
+  do not pad the folder file with repository sections.
 
-## Workflow
+## 2. Follow the content hierarchy
 
-1. **Establish scope.** Confirm the repository root, read applicable `AGENTS.md` files, and inspect the current README files, package manifests, scripts, configuration, deployment files, and directly referenced documentation. For a cross-repository request, identify every repository and README in scope, including nested packages, tests, examples, and operational folders.
-2. **Inventory information before editing.** Capture each source README's claims, setup and run commands, environment variables (names and meanings only), architecture, ownership boundaries, test commands, deployment steps, data handling, limitations, accessibility or privacy behavior, credits, licenses, references, and any specialized tables or examples. Check whether duplicate READMEs contain distinct information before consolidating them.
-3. **Verify current instructions.** Compare commands and configuration names with the repository. Mark environment-specific values clearly. Never copy secret values, credentials, tokens, or private browser state. Preserve public URLs and IDs only when they are intentional documentation and safe to publish.
-4. **Map content to the template.** Use the standard order below. Put package-, application-, data-, test-, operations-, or policy-specific details in the matching optional section or a clearly named subsection. Keep detailed guides in their owning documents and link to them from the README when appropriate; do not silently discard their unique content.
-5. **Write for the intended reader.** Put the shortest path to install, run, or use the project early. Use headings that describe the content, concise prose, copyable commands, and tables only for genuine comparisons or mappings. Explain command working directories and prerequisites. Use relative links for files in the repository.
-6. **Review completeness and accuracy.** Recheck every inventoried fact against the final README or a working link. Remove stale, duplicated, empty, and placeholder sections only after confirming their information is preserved elsewhere. Check links, heading hierarchy, fenced-code languages, and command consistency. Follow the user's requested verification scope; do not run tests unless asked.
-7. **Report the result.** Name the README files created or changed, describe any consolidation or retained specialized sections, and state what was checked. Call out unresolved or unverifiable instructions instead of presenting them as confirmed.
+1. **H1 and lead:** use the project or package name, followed by one or two plain-language sentences
+   saying what it does, for whom, and why it is useful. Avoid a second heading that merely repeats
+   the lead.
+2. **Get started:** give the shortest working path from a named directory. State only necessary
+   prerequisites; provide copyable commands and the expected result or next action. Choose one
+   default path before listing alternatives.
+3. **Usage:** show one representative task or public API example when the quick start does not
+   already show ordinary use. Add a small command table only when several commands serve distinct
+   purposes.
+4. **Configuration:** include only the settings needed for first use or a consequential choice. Link
+   to the full configuration and security reference; never publish secret values.
+5. **Validation:** distinguish changed-file Quality, full Quality, unit tests, browser or
+   Playwright tests, and builds when those commands exist. Name the exact scripts and note when
+   a category has no separate command. Do not imply that Quality runs functional tests.
+6. **Contributing:** say where changes belong, which branch receives pull requests when verified,
+   and what review or CI gate applies. Link to longer contribution and release guidance.
+7. **Documentation and license:** link to canonical guides near the relevant instructions or in a
+   short `Documentation` section. Add `License` only when a verified license file or statement
+   exists.
 
-## Required H2 headings
+Use these H2 names and this order for the sections you include: `Get started`, `Usage`,
+`Configuration`, `Validation`, `Contributing`, `Documentation`, `License`. Use H3s for
+substantial subsections
+only. Omit sections with no useful content; never write `Not applicable.` or placeholder prose. Add
+a domain-specific H2 only when the standard sections cannot express an essential reader task.
 
-Every README must contain exactly these H2 headings, once each and in this order:
+## 3. Reduce without losing useful information
 
-- `## What it does`
-- `## Prerequisites`
-- `## Get started`
-- `## Usage`
-- `## Configuration and security`
-- `## Development and structure`
-- `## Validation`
-- `## Deployment and operations`
-- `## Data, privacy, and limitations`
-- `## References`
-- `## Contributing`
-- `## Credits and license`
+- Keep the README focused on choosing, starting, and commonly using the project. Move long API
+  reference, architecture, data policy, deployment, troubleshooting, test matrices, and tutorials to
+  their owning documents, then link to them. Preserve unique current facts at the destination;
+  remove duplicated, stale, and generated filler.
+- Put shared setup in the root README and package-specific setup beside the package. Repeat a short
+  command only when it makes that package independently usable.
+- Prefer prose for explanations, lists for steps, tables for real comparisons or mappings, and
+  fenced code with a language for executable examples. Do not add badges, status claims, version
+  numbers, or benchmarks without a maintained source.
+- Keep Markdown source lines at or below 100 characters. Reflow prose and use reference links for
+  long URLs; do not split executable commands merely to meet the width.
 
-Keep the H1 title, badges, and short summary before the standard H2s. Put specialist content under the closest matching H2 and retain its precise detail in H3/H4 subsections, such as API or CLI contracts, schema domains, test matrices, migration safety checks, benchmark methodology/results, icon or design systems, accessibility, privacy, content layouts, and asset provenance. Retain useful examples and tables.
+## 4. Verify the result
 
-## Placement rules
-
-- A repository-root README introduces the repository and directs readers to subprojects. A nested README documents its local package, test area, asset, or procedure.
-- Keep each instruction at its natural level: shared prerequisites at the root; package-specific commands and API details beside the package; test contracts beside the test suite; deployment runbooks in operations documentation.
-- A local README may repeat a short command when that makes the folder independently usable, but keep canonical details in one place and link to them.
-- For monorepos, use a concise contents table with purpose and path. Do not turn the root README into an exhaustive catalog of every internal file.
-- Environment variable tables must describe names, purpose, required/optional status, and safe source. Do not include values for secrets. Use `.env.example` only for non-secret placeholders and follow repository policy.
-- Distinguish local/demo behavior from production behavior. State when an account, external service, network connection, or manual operator action is required.
-- Dates, versions, benchmark numbers, deployment identifiers, and status claims can go stale. Include a source or date where needed, or explain how to obtain the current value.
-- Link to detailed policy, API, migration, test, and contribution documents rather than copying long material that will drift independently.
-- Keep each bullet item at or below 100 characters. Count the marker and text; prose and tables can carry longer details.
-
-## Completeness check
-
-Before finishing, verify that the new structure accounts for all unique source material:
-
-- identity, purpose, audience, features, badges, and project status;
-- repository/package inventory, source ownership, and architecture;
-- prerequisites, installation, local execution, usage examples, and interface controls;
-- configuration, environment setup, authentication, permissions, and secret handling;
-- tests, commands, ordering, ownership, coverage, quality checks, and build steps;
-- deployment targets, release procedure, runtime behavior, backups, migrations, and maintenance;
-- data sources, provenance, limitations, demo behavior, privacy, and sharing;
-- design/icon systems, generated artifacts, file formats, and asset credits;
-- references, support, contribution, authorship, and licensing.
-
-If an item does not apply, omit it. If it applies but cannot be verified, preserve it with an explicit note or report it as unresolved rather than removing or guessing.
+Check every command, package name, path, relative link, prerequisite, and license claim against the
+repository. Review the first screen as a new reader: purpose and first action must be clear without
+scrolling through policy. Run the optional [audit](scripts/audit_readmes.py) for broken links, empty
+sections, placeholders, and code-fence errors; it does not judge content completeness.
