@@ -1,18 +1,12 @@
-# standards documentation
+# Standards documentation
 
-Terra standards packages, applications, and agent guidance.
+Start with the [repository overview](../README.md), then choose the guide for your task:
 
-Start with the [repository overview](../README.md). Configuration lives in `config/`, authored implementation stays in its owning source tree, test plans and source are in `tests/`, and generated output belongs in `dist/`.
+- [Quality](quality/0-getting-started/overview.mdx): install, configure, and run repository checks.
+- [Boundaries](error-boundaries/): use React error boundaries and framework integrations.
+- [Reporting](reporting/): collect and review test evidence.
+- [Testing](testing/): define and run repository test plans.
+- [Contributing](contributing/0-workspace/getting-started.mdx): work on and release Standards packages.
+- [Agent guides](agents/): task-specific repository workflows.
 
-## Contents
-
-- `agents/`: agents documentation.
-- `contributing/`: contributing documentation.
-- `error-boundaries/`: error boundaries documentation.
-- `node_modules/`: node_modules documentation.
-- `quality/`: quality documentation.
-- `reporting/`: reporting documentation.
-- `src/`: src documentation.
-- `testing/`: testing documentation.
-
-The [test plan](../tests/todo.md) inventories repository-owned functions and documents.
+For renamed packages, follow the [migration guide](quality/5-operations/migration.mdx).

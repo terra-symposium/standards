@@ -1,10 +1,22 @@
-# Standards Test Runner
+# Testing
 
-Manifest-driven runner and CLI for repository-owned test suites, plus a GitHub Action. A versioned manifest declares commands, working directories, and suite-owned files.
+A manifest-driven CLI and GitHub Action for ordered, repository-owned test suites.
 
 ## What it does
 
-Add `config/terra-tests.json` as the canonical ordered test plan. The runner also discovers `tests/terra-tests.json` and the legacy `.terra-tests.json` root path for existing consumers when the config path is absent:
+The `terra-test` runner executes Standards shared checks and the suites declared in a repository test plan. It checks that each test file has one owning suite and rejects duplicate suite commands.
+
+## Prerequisites
+
+Node.js `>=20`. The runner invokes the tools named in the consumer's manifest; install them in that repository.
+
+## Get started
+
+```sh
+pnpm add -D @terra-symposium/testing
+```
+
+Create `config/terra-tests.json`:
 
 ```json
 {
@@ -13,53 +25,55 @@ Add `config/terra-tests.json` as the canonical ordered test plan. The runner als
 		{
 			"name": "unit",
 			"command": "pnpm",
-			"args": ["run", "test"],
+			"args": ["run", "test:unit"],
 			"owns": ["tests/unit/**/*.test.ts"]
 		}
 	]
 }
 ```
 
-Each suite has one command. `owns` is required and lists repository-relative file globs for the test files that command executes. The runner expands these globs against files in `test` or `tests` directories and `*.test.*` or `*.spec.*` files, rejecting files claimed by multiple suites or left out of every suite. Duplicate command, arguments, and working-directory combinations are also rejected when the plan is loaded. The manifest is optional when a repository has no custom suites.
+## Usage
 
-Keep this canonical manifest as the ordered mapping of suite commands and file ownership; do not repeat the suite inventory in another runner or documentation list. Within those files, place each assertion with the source module, route, or domain it proves. When reorganizing tests, map each old file and case to its new owner and mark it as moved, merged, or retired; a retired assertion needs a reason and a surviving proof or an explicit coverage gap.
-
-The runner executes commands declared by the selected manifest. Review the manifest’s commands and working directories before running an unfamiliar plan.
+Run the plan from the consuming repository root:
 
 ```sh
 pnpm exec terra-test run --manifest config/terra-tests.json
 ```
 
-Select custom suites with `--suites unit,contracts`; shared checks still run. Use `--shared-only` for workflows that should run the Standards checks without local suites. The GitHub Action is published as a public distribution mirror so public repositories can consume the Standards-owned implementation:
+`--suites unit,contracts` selects named local suites while retaining shared checks. `--shared-only` runs Standards checks without local suites. The runner discovers `config/terra-tests.json`, then `tests/terra-tests.json`, then legacy `.terra-tests.json` when no manifest is specified. A repository with no custom suites may omit the manifest.
 
-```yaml
-- uses: Terra-Symposium/standards/packages/testing@3f9b31323d3617d6b565770880865ec7cf1a9704
-  with:
-    manifest: config/terra-tests.json
+## Configuration and security
+
+Each suite declares one command and an `owns` list of repository-relative test globs. Review commands and working directories before running a plan from an unfamiliar repository. Do not place secrets in the manifest.
+
+## Development and structure
+
+`src/` owns the CLI and public API. `action.yml` exposes the GitHub Action. Standards is the source of truth; update the public Action mirror when publishing an implementation change.
+
+## Validation
+
+```sh
+pnpm --filter @terra-symposium/testing build
+pnpm --filter @terra-symposium/testing test
+pnpm --filter @terra-symposium/testing quality:all
 ```
-
-For responsive Playwright coverage, declare `PW_VIEWPORTS` from the layout risk in each scenario and record the selected names and dimensions in the report. Include widths around relevant breakpoints; use all configured viewports for broad responsive coverage. Reports should distinguish the selected inventory from the full configured inventory.
-
-Standards remains the source of truth for changes under `packages/testing`; update the public mirror when publishing an implementation change.
-
-The Action executes one plan in one job, so repositories can expose one test check even when the plan has several suites.
 
 ## Deployment and operations
 
-Not applicable.
+Publish the npm package through the Standards Changesets workflow. Pin the Action to a reviewed commit SHA in consumer workflows and pass its `manifest` input. The Action runs one plan in one job.
 
 ## Data, privacy, and limitations
 
-Not applicable.
+The runner executes the configured commands and does not provide their credentials, browsers, databases, or other services. Its ownership check maps test files to suites; it does not prove assertion quality.
 
 ## References
 
-Not applicable.
+See [test plans and ownership](../../docs/testing/0-getting-started/test-plan.mdx) and [CI integration](../../docs/testing/1-ci/ci-integration.mdx).
 
 ## Contributing
 
-Not applicable.
+Keep the manifest as the single suite inventory. When reorganizing tests, account for moved, merged, or retired assertions and update the guide. Add a Changeset for a published behavior change.
 
 ## Credits and license
 
-Not applicable.
+Apache-2.0. See the repository [LICENSE](../../LICENSE).

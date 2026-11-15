@@ -1,93 +1,73 @@
-# Error Boundaries
+# Boundaries
 
-Shared error-page copy and adapters for React, Next.js route boundaries, and Astro status responses.
+Reusable React error boundaries and Astro and Next.js error helpers for Terra applications.
 
 ## What it does
 
-Not applicable.
+The package exports a React render boundary, an Astro island hydration fallback, status-page copy, and a Next.js route-error digest helper. Applications own their fallback UI, telemetry, routing, and retry policy.
 
 ## Prerequisites
 
-Not applicable.
+React and React DOM `>=18` are peer dependencies when using the React boundary.
 
 ## Get started
-
-### Install
 
 ```sh
 pnpm add @terra-symposium/boundaries
 ```
 
-From `standards/main/`, run `pnpm install`, then `pnpm --filter @terra-symposium/boundaries build`. Validate adapter changes with `pnpm --filter @terra-symposium/boundaries test`.
-
 ## Usage
 
-### Catch React render failures
+Import the entry point for your framework:
 
-````tsx
+```tsx
 import { ErrorBoundary } from '@terra-symposium/boundaries/react';
-
-## Structure
-
-- See [src](src/), [package.json](package.json), and `tests/`.
-
-## References
-
-### Catch Astro island hydration failures
-Wrap hydrated islands in the shared Astro boundary to show a static fallback if a client module fails before React can render:
+```
 
 ```astro
 ---
 import AstroErrorBoundary from '@terra-symposium/boundaries/astro-boundary';
 ---
 
-<AstroErrorBoundary title="Workspace unavailable" description="Reload to try the workspace again.">
-	<Workspace client:load />
+<AstroErrorBoundary title="Workspace unavailable" description="Reload to try again.">
+  <Workspace client:load />
 </AstroErrorBoundary>
-````
+```
 
-The Astro wrapper listens for Astro's cancelable `astro:hydration-error` event and reveals its fallback without depending on the failed island's JavaScript. It complements the React `ErrorBoundary`; it cannot render a fallback if the server fails before sending HTML.
-
-### Other entry points
-
-`@terra-symposium/boundaries/astro` exports status-copy helpers for 400, 401, 403, 404, 500, 502, and 503 responses.
-
-`@terra-symposium/boundaries/astro-boundary` exports the reusable static Astro island guard.
-
-`@terra-symposium/boundaries/next` exports types and `errorDigest(error)` for framework-provided route-error digests.
-
-- The package root re-exports all entry-point APIs.
-
-See the [package guide](https://standards-docs.netlify.app/error-boundaries/1-react/react-boundaries/) for prop behavior and usage details.
+`/astro` supplies status copy for 400, 401, 403, 404, 500, 502, and 503 responses. `/next` supplies `errorDigest(error)` and route-error types. `/astro-integration` supplies the Astro integration. The package root re-exports the public APIs.
 
 ## Configuration and security
 
-Not applicable.
+Choose fallback text and telemetry in the consuming application. Keep private error details out of user-visible fallback content.
 
 ## Development and structure
 
-Not applicable.
+`src/components/` contains the React and Astro boundaries; `src/lib/` contains framework helpers. From the Standards repository root, install workspace dependencies before changing the package.
 
 ## Validation
 
-Not applicable.
+```sh
+pnpm --filter @terra-symposium/boundaries build
+pnpm --filter @terra-symposium/boundaries test
+pnpm --filter @terra-symposium/boundaries quality:all
+```
 
 ## Deployment and operations
 
-Not applicable.
+The package is published through the Standards Changesets release workflow. Applications deploy their own error pages and telemetry.
 
 ## Data, privacy, and limitations
 
-Not applicable.
+The Astro wrapper reacts to `astro:hydration-error` after HTML has reached the browser. It cannot display a fallback for a server failure before HTML is sent. The package does not transmit telemetry.
 
 ## References
 
-Not applicable.
+See the [boundary guide](../../docs/error-boundaries/1-react/react-boundaries.mdx) and [package API](../../docs/error-boundaries/4-packages/package-api.mdx).
 
 ## Contributing
 
-Not applicable.
+Update the public API guide and tests when changing a framework adapter. Add a Changeset for a published behavior change.
 
 ## Credits and license
 
-Not applicable.
+Maintained by Terra Symposium. See the repository [LICENSE](../../LICENSE).

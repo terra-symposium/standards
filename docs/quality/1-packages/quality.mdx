@@ -19,12 +19,12 @@ The `error-boundaries` source check is mandatory. It checks React mount roots an
 ## Responsibilities
 
 - Validate and normalize the full `quality.json` schema.
-- Run phases in fixed order: Format → Static quality → Tests → Framework/type checks → Build → Repository health.
+- Run phases in fixed order: Format → Static quality → Framework and type checks → Repository health.
 - Invoke capability APIs and configured repository tools or commands.
 - Preserve JSON reports, failure exit codes, findings, and progress behavior used by the existing CLI.
 - Provide GitHub reporting, the `terra-quality-dev` port launcher, and existing compatibility subpaths.
 
-The aggregate package owns orchestration, not each individual rule implementation. Focused packages can run their own capability CLI or API. Start with [the package map](/quality/1-packages/package-map/) and [the CLI workflow](/quality/0-getting-started/overview/).
+The root entry point owns orchestration. Focused subpaths expose each capability's CLI or API from the same package. Start with [the package map](/quality/1-packages/package-map/) and [the CLI workflow](/quality/0-getting-started/overview/).
 
 ## Existing executables and API
 
