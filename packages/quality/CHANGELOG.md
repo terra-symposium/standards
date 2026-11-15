@@ -1,4 +1,10 @@
-# @terra-symposium/standards-quality
+# @terra-symposium/quality
+
+## 2.4.1
+
+### Patch Changes
+
+- Replace the published package README with the concise Quality setup, usage, validation, and contribution guide.
 
 ## 2.4.0
 
