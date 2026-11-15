@@ -73,7 +73,7 @@ test command is defined here.
 coverage. Generated output belongs in `dist/`.
 
 Start the documentation site with `pnpm run docs`; build static output with `pnpm run docs:build`.
-The [agent guides](docs/agents/) provide task-specific repository workflows.
+The [agent skills](.agents/README.md) provide task-specific repository workflows.
 
 `pnpm run verify` runs Quality, tests, build, and the docs build in sequence. Quality applies
 supported safe fixes by default, so review its diff before committing.

@@ -1,0 +1,20 @@
+{
+  "name": "terra-skills-local",
+  "interface": {
+    "displayName": "Terra Skills"
+  },
+  "plugins": [
+    {
+      "name": "terra-skills",
+      "source": {
+        "source": "local",
+        "path": "./dist/terra-skills-plugin"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
+}

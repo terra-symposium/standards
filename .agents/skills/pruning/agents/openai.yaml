@@ -1,0 +1,3 @@
+interface:
+  display_name: 'Pruning'
+  short_description: 'Prune repository files, Git branches, or local Codex storage'

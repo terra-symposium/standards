@@ -300,13 +300,13 @@ This checklist inventories repository-owned functions, documents, and configurat
 - [ ] `runTypecheckTargets` (line 78): Test found, missing, unauthorized, and upstream-failure results. Candidate coverage: [`packages/quality/tests/runner/typecheck-discovery.test.mjs`](../packages/quality/tests/runner/typecheck-discovery.test.mjs).
 - [ ] `main` (line 95): Test expected input/output, empty and boundary cases, and a relevant failure path. Candidate coverage: [`packages/quality/tests/runner/typecheck-discovery.test.mjs`](../packages/quality/tests/runner/typecheck-discovery.test.mjs).
 
-### `docs/agents/packages/quality/skills/git/readme/scripts/audit_readmes.py`
+### `.agents/skills/readme-standardisation/scripts/audit_readmes.py`
 
 - [ ] `readmes` (line 28): Test found, missing, unauthorized, and upstream-failure results. No direct test file is linked yet.
 - [ ] `check` (line 48): Test expected input/output, empty and boundary cases, and a relevant failure path. No direct test file is linked yet.
 - [ ] `main` (line 150): Test expected input/output, empty and boundary cases, and a relevant failure path. No direct test file is linked yet.
 
-### `docs/agents/packages/quality/skills/git/readme/scripts/test_audit_readmes.py`
+### `.agents/skills/readme-standardisation/scripts/test_audit_readmes.py`
 
 - [ ] `test_directory_and_explicit_file_return_unique_sorted_readmes` (line 19): Test found, missing, unauthorized, and upstream-failure results. No direct test file is linked yet.
 - [ ] `test_invalid_target_is_reported_without_becoming_a_readme` (line 31): Test valid, malformed, empty, and boundary input; assert exact output or error. No direct test file is linked yet.
@@ -314,7 +314,7 @@ This checklist inventories repository-owned functions, documents, and configurat
 - [ ] `test_invalid_document_reports_structure_placeholders_and_broken_links` (line 86): Test valid, malformed, empty, and boundary input; assert exact output or error. No direct test file is linked yet.
 - [ ] `test_main_reports_a_failed_readme_with_exit_code_one` (line 118): Test found, missing, unauthorized, and upstream-failure results. No direct test file is linked yet.
 
-### `docs/agents/packages/quality/skills/quality/scripts/provision-quality-chats.mjs`
+### `.agents/skills/quality-cloud/scripts/provision-quality-chats.mjs`
 
 - [ ] `options` (line 18): Test expected input/output, empty and boundary cases, and a relevant failure path. No direct test file is linked yet.
 - [ ] `findRepos` (line 53): Test found, missing, unauthorized, and upstream-failure results. No direct test file is linked yet.
@@ -337,7 +337,7 @@ This checklist inventories repository-owned functions, documents, and configurat
 - [ ] `callback@142` (line 142): Test expected input/output, empty and boundary cases, and a relevant failure path. No direct test file is linked yet.
 - [ ] `callback@149` (line 149): Test expected input/output, empty and boundary cases, and a relevant failure path. No direct test file is linked yet.
 
-### `docs/agents/packages/reporting/skills/review/weekly/scripts/generate-weekly-review.mjs`
+### `.agents/skills/review/scripts/generate-weekly-review.mjs`
 
 - [ ] `git` (line 39): Test expected input/output, empty and boundary cases, and a relevant failure path. No direct test file is linked yet.
 - [ ] `hue` (line 48): Test expected input/output, empty and boundary cases, and a relevant failure path. No direct test file is linked yet.
@@ -1215,7 +1215,7 @@ This checklist inventories repository-owned functions, documents, and configurat
 - [ ] `callback@21` (line 21): Run this test and verify its assertions cover the helper, failure path, and relevant fixture. Candidate coverage: [`packages/braces/tests/public.test.mjs`](../packages/braces/tests/public.test.mjs).
 - [ ] `callback@27` (line 27): Run this test and verify its assertions cover the helper, failure path, and relevant fixture. Candidate coverage: [`packages/braces/tests/public.test.mjs`](../packages/braces/tests/public.test.mjs).
 
-### `packages/quality/.agents/skills/quality/scripts/create-quality-chats.mjs`
+### `.agents/skills/quality/scripts/create-quality-chats.mjs`
 
 - [ ] `parseArgs` (line 21): Test valid, malformed, empty, and boundary input; assert exact output or error. No direct test file is linked yet.
 - [ ] `callback@49` (line 49): Test expected input/output, empty and boundary cases, and a relevant failure path. No direct test file is linked yet.
@@ -3232,53 +3232,44 @@ This checklist inventories repository-owned functions, documents, and configurat
 - [ ] [`README.md`](../README.md): Render, check links and examples, then review each factual claim and instruction against the current implementation.
 - [ ] [`apps/hygiene/README.md`](../apps/hygiene/README.md): Render, check links and examples, then review each factual claim and instruction against the current implementation.
 - [ ] [`docs/index.md`](../docs/index.md): Render, check links and examples, then review each factual claim and instruction against the current implementation.
-- [ ] [`docs/agents/packages/quality/skills/compact-files/SKILL.md`](../docs/agents/packages/quality/skills/compact-files/SKILL.md): Render, check links and examples, then review each factual claim and instruction against the current implementation.
-- [ ] [`docs/agents/packages/quality/skills/git/branches/jules/SKILL.md`](../docs/agents/packages/quality/skills/git/branches/jules/SKILL.md): Render, check links and examples, then review each factual claim and instruction against the current implementation.
-- [ ] [`docs/agents/packages/quality/skills/git/branches/prune-device/SKILL.md`](../docs/agents/packages/quality/skills/git/branches/prune-device/SKILL.md): Render, check links and examples, then review each factual claim and instruction against the current implementation.
-- [ ] [`docs/agents/packages/quality/skills/git/branches/prune/SKILL.md`](../docs/agents/packages/quality/skills/git/branches/prune/SKILL.md): Render, check links and examples, then review each factual claim and instruction against the current implementation.
-- [ ] [`docs/agents/packages/quality/skills/git/branches/review/SKILL.md`](../docs/agents/packages/quality/skills/git/branches/review/SKILL.md): Render, check links and examples, then review each factual claim and instruction against the current implementation.
-- [ ] [`docs/agents/packages/quality/skills/git/commit/SKILL.md`](../docs/agents/packages/quality/skills/git/commit/SKILL.md): Render, check links and examples, then review each factual claim and instruction against the current implementation.
-- [ ] [`docs/agents/packages/quality/skills/git/deploy/SKILL.md`](../docs/agents/packages/quality/skills/git/deploy/SKILL.md): Render, check links and examples, then review each factual claim and instruction against the current implementation.
-- [ ] [`docs/agents/packages/quality/skills/git/history/SKILL.md`](../docs/agents/packages/quality/skills/git/history/SKILL.md): Render, check links and examples, then review each factual claim and instruction against the current implementation.
-- [ ] [`docs/agents/packages/quality/skills/git/issues/audit/SKILL.md`](../docs/agents/packages/quality/skills/git/issues/audit/SKILL.md): Render, check links and examples, then review each factual claim and instruction against the current implementation.
-- [ ] [`docs/agents/packages/quality/skills/git/issues/complete/SKILL.md`](../docs/agents/packages/quality/skills/git/issues/complete/SKILL.md): Render, check links and examples, then review each factual claim and instruction against the current implementation.
-- [ ] [`docs/agents/packages/quality/skills/git/npm/SKILL.md`](../docs/agents/packages/quality/skills/git/npm/SKILL.md): Render, check links and examples, then review each factual claim and instruction against the current implementation.
-- [ ] [`docs/agents/packages/quality/skills/git/package-scripts/SKILL.md`](../docs/agents/packages/quality/skills/git/package-scripts/SKILL.md): Render, check links and examples, then review each factual claim and instruction against the current implementation.
-- [ ] [`docs/agents/packages/quality/skills/git/packages/SKILL.md`](../docs/agents/packages/quality/skills/git/packages/SKILL.md): Render, check links and examples, then review each factual claim and instruction against the current implementation.
-- [ ] [`docs/agents/packages/quality/skills/git/port/SKILL.md`](../docs/agents/packages/quality/skills/git/port/SKILL.md): Render, check links and examples, then review each factual claim and instruction against the current implementation.
-- [ ] [`docs/agents/packages/quality/skills/git/readme/README.template.md`](../docs/agents/packages/quality/skills/git/readme/README.template.md): Render, check links and examples, then review each factual claim and instruction against the current implementation.
-- [ ] [`docs/agents/packages/quality/skills/git/readme/SKILL.md`](../docs/agents/packages/quality/skills/git/readme/SKILL.md): Render, check links and examples, then review each factual claim and instruction against the current implementation.
-- [ ] [`docs/agents/packages/quality/skills/hygiene/SKILL.md`](../docs/agents/packages/quality/skills/hygiene/SKILL.md): Render, check links and examples, then review each factual claim and instruction against the current implementation.
-- [ ] [`docs/agents/packages/quality/skills/hygiene/initialisation/SKILL.md`](../docs/agents/packages/quality/skills/hygiene/initialisation/SKILL.md): Render, check links and examples, then review each factual claim and instruction against the current implementation.
-- [ ] [`docs/agents/packages/quality/skills/hygiene/references/conventions.md`](../docs/agents/packages/quality/skills/hygiene/references/conventions.md): Render, check links and examples, then review each factual claim and instruction against the current implementation.
-- [ ] [`docs/agents/packages/quality/skills/hygiene/references/ui-matrix.md`](../docs/agents/packages/quality/skills/hygiene/references/ui-matrix.md): Render, check links and examples, then review each factual claim and instruction against the current implementation.
-- [ ] [`docs/agents/packages/quality/skills/package-update/SKILL.md`](../docs/agents/packages/quality/skills/package-update/SKILL.md): Render, check links and examples, then review each factual claim and instruction against the current implementation.
-- [ ] [`docs/agents/packages/quality/skills/quality/SKILL.md`](../docs/agents/packages/quality/skills/quality/SKILL.md): Render, check links and examples, then review each factual claim and instruction against the current implementation.
-- [ ] [`docs/agents/packages/quality/skills/repo-file-audit/SKILL.md`](../docs/agents/packages/quality/skills/repo-file-audit/SKILL.md): Render, check links and examples, then review each factual claim and instruction against the current implementation.
-- [ ] [`docs/agents/packages/quality/skills/standards/SKILL.md`](../docs/agents/packages/quality/skills/standards/SKILL.md): Render, check links and examples, then review each factual claim and instruction against the current implementation.
-- [ ] [`docs/agents/packages/quality/skills/standards/references/workflow-efficiency.md`](../docs/agents/packages/quality/skills/standards/references/workflow-efficiency.md): Render, check links and examples, then review each factual claim and instruction against the current implementation.
-- [ ] [`docs/agents/packages/reporting/skills/review/daily/SKILL.md`](../docs/agents/packages/reporting/skills/review/daily/SKILL.md): Render, check links and examples, then review each factual claim and instruction against the current implementation.
-- [ ] [`docs/agents/packages/reporting/skills/review/standup/SKILL.md`](../docs/agents/packages/reporting/skills/review/standup/SKILL.md): Render, check links and examples, then review each factual claim and instruction against the current implementation.
-- [ ] [`docs/agents/packages/reporting/skills/review/weekly/SKILL.md`](../docs/agents/packages/reporting/skills/review/weekly/SKILL.md): Render, check links and examples, then review each factual claim and instruction against the current implementation.
-- [ ] [`docs/agents/packages/reporting/skills/test/SKILL.md`](../docs/agents/packages/reporting/skills/test/SKILL.md): Render, check links and examples, then review each factual claim and instruction against the current implementation.
-- [ ] [`docs/agents/packages/reporting/skills/test/cloud/SKILL.md`](../docs/agents/packages/reporting/skills/test/cloud/SKILL.md): Render, check links and examples, then review each factual claim and instruction against the current implementation.
-- [ ] [`docs/agents/packages/reporting/skills/test/fixing/SKILL.md`](../docs/agents/packages/reporting/skills/test/fixing/SKILL.md): Render, check links and examples, then review each factual claim and instruction against the current implementation.
-- [ ] [`docs/agents/packages/reporting/skills/test/fixing/references/cloud-workflow.md`](../docs/agents/packages/reporting/skills/test/fixing/references/cloud-workflow.md): Render, check links and examples, then review each factual claim and instruction against the current implementation.
-- [ ] [`docs/agents/packages/reporting/skills/test/ordering/SKILL.md`](../docs/agents/packages/reporting/skills/test/ordering/SKILL.md): Render, check links and examples, then review each factual claim and instruction against the current implementation.
-- [ ] [`docs/agents/packages/reporting/skills/test/references/test-structure-and-responsive-evidence.md`](../docs/agents/packages/reporting/skills/test/references/test-structure-and-responsive-evidence.md): Render, check links and examples, then review each factual claim and instruction against the current implementation.
-- [ ] [`docs/agents/packages/reporting/skills/test/represent/SKILL.md`](../docs/agents/packages/reporting/skills/test/represent/SKILL.md): Render, check links and examples, then review each factual claim and instruction against the current implementation.
-- [ ] [`docs/agents/packages/reporting/skills/test/writing/SKILL.md`](../docs/agents/packages/reporting/skills/test/writing/SKILL.md): Render, check links and examples, then review each factual claim and instruction against the current implementation.
-- [ ] [`docs/agents/skills/README.md`](../docs/agents/skills/README.md): Render, check links and examples, then review each factual claim and instruction against the current implementation.
-- [ ] [`docs/agents/skills/agents/SKILL.md`](../docs/agents/skills/agents/SKILL.md): Render, check links and examples, then review each factual claim and instruction against the current implementation.
-- [ ] [`docs/agents/skills/documenting/align/SKILL.md`](../docs/agents/skills/documenting/align/SKILL.md): Render, check links and examples, then review each factual claim and instruction against the current implementation.
-- [ ] [`docs/agents/skills/documenting/author/journal.md`](../docs/agents/skills/documenting/author/journal.md): Render, check links and examples, then review each factual claim and instruction against the current implementation.
-- [ ] [`docs/agents/skills/documenting/gem/SKILL.md`](../docs/agents/skills/documenting/gem/SKILL.md): Render, check links and examples, then review each factual claim and instruction against the current implementation.
-- [ ] [`docs/agents/skills/documenting/gem/content/SKILL.md`](../docs/agents/skills/documenting/gem/content/SKILL.md): Render, check links and examples, then review each factual claim and instruction against the current implementation.
-- [ ] [`docs/agents/skills/documenting/gem/metadata/SKILL.md`](../docs/agents/skills/documenting/gem/metadata/SKILL.md): Render, check links and examples, then review each factual claim and instruction against the current implementation.
-- [ ] [`docs/agents/skills/documenting/gem/references/provider-modes.md`](../docs/agents/skills/documenting/gem/references/provider-modes.md): Render, check links and examples, then review each factual claim and instruction against the current implementation.
-- [ ] [`docs/agents/skills/documenting/gem/snapshots/README.md`](../docs/agents/skills/documenting/gem/snapshots/README.md): Render, check links and examples, then review each factual claim and instruction against the current implementation.
-- [ ] [`docs/agents/skills/documenting/gem/snapshots/b2b810394d61/instructions.md`](../docs/agents/skills/documenting/gem/snapshots/b2b810394d61/instructions.md): Render, check links and examples, then review each factual claim and instruction against the current implementation.
-- [ ] [`docs/agents/skills/generation/authoring/SKILL.md`](../docs/agents/skills/generation/authoring/SKILL.md): Render, check links and examples, then review each factual claim and instruction against the current implementation.
+- [ ] [`.agents/skills/pruning/references/repository-output.md`](../.agents/skills/pruning/references/repository-output.md): Render, check links and examples, then review each factual claim and instruction against the current implementation.
+- [ ] [`.agents/skills/jules/SKILL.md`](../.agents/skills/jules/SKILL.md): Render, check links and examples, then review each factual claim and instruction against the current implementation.
+- [ ] [`.agents/skills/pruning/SKILL.md`](../.agents/skills/pruning/SKILL.md): Render, check links and examples, then review each factual claim and instruction against the current implementation.
+- [ ] [`.agents/skills/pr-review/SKILL.md`](../.agents/skills/pr-review/SKILL.md): Render, check links and examples, then review each factual claim and instruction against the current implementation.
+- [ ] [`.agents/skills/commit/SKILL.md`](../.agents/skills/commit/SKILL.md): Render, check links and examples, then review each factual claim and instruction against the current implementation.
+- [ ] [`.agents/skills/deploy/SKILL.md`](../.agents/skills/deploy/SKILL.md): Render, check links and examples, then review each factual claim and instruction against the current implementation.
+- [ ] [`.agents/skills/semver-retcon/SKILL.md`](../.agents/skills/semver-retcon/SKILL.md): Render, check links and examples, then review each factual claim and instruction against the current implementation.
+- [ ] [`.agents/skills/issues/SKILL.md`](../.agents/skills/issues/SKILL.md): Render, check links and examples, then review each factual claim and instruction against the current implementation.
+- [ ] [`.agents/skills/issues/references/completion.md`](../.agents/skills/issues/references/completion.md): Render, check links and examples, then review each factual claim and instruction against the current implementation.
+- [ ] [`.agents/skills/package/references/npm.md`](../.agents/skills/package/references/npm.md): Render, check links and examples, then review each factual claim and instruction against the current implementation.
+- [ ] [`.agents/skills/package/references/scripts.md`](../.agents/skills/package/references/scripts.md): Render, check links and examples, then review each factual claim and instruction against the current implementation.
+- [ ] [`.agents/skills/dependabot-remediation/SKILL.md`](../.agents/skills/dependabot-remediation/SKILL.md): Render, check links and examples, then review each factual claim and instruction against the current implementation.
+- [ ] [`.agents/skills/port/SKILL.md`](../.agents/skills/port/SKILL.md): Render, check links and examples, then review each factual claim and instruction against the current implementation.
+- [ ] [`.agents/skills/readme-standardisation/README.template.md`](../.agents/skills/readme-standardisation/README.template.md): Render, check links and examples, then review each factual claim and instruction against the current implementation.
+- [ ] [`.agents/skills/readme-standardisation/SKILL.md`](../.agents/skills/readme-standardisation/SKILL.md): Render, check links and examples, then review each factual claim and instruction against the current implementation.
+- [ ] [`.agents/skills/hygiene/SKILL.md`](../.agents/skills/hygiene/SKILL.md): Render, check links and examples, then review each factual claim and instruction against the current implementation.
+- [ ] [`.agents/skills/initialisation/SKILL.md`](../.agents/skills/initialisation/SKILL.md): Render, check links and examples, then review each factual claim and instruction against the current implementation.
+- [ ] [`.agents/skills/hygiene/references/conventions.md`](../.agents/skills/hygiene/references/conventions.md): Render, check links and examples, then review each factual claim and instruction against the current implementation.
+- [ ] [`.agents/skills/hygiene/references/ui-matrix.md`](../.agents/skills/hygiene/references/ui-matrix.md): Render, check links and examples, then review each factual claim and instruction against the current implementation.
+- [ ] [`.agents/skills/package/references/update.md`](../.agents/skills/package/references/update.md): Render, check links and examples, then review each factual claim and instruction against the current implementation.
+- [ ] [`.agents/skills/quality-cloud/SKILL.md`](../.agents/skills/quality-cloud/SKILL.md): Render, check links and examples, then review each factual claim and instruction against the current implementation.
+- [ ] [`.agents/skills/pruning/references/repository-files.md`](../.agents/skills/pruning/references/repository-files.md): Render, check links and examples, then review each factual claim and instruction against the current implementation.
+- [ ] [`.agents/skills/standards/SKILL.md`](../.agents/skills/standards/SKILL.md): Render, check links and examples, then review each factual claim and instruction against the current implementation.
+- [ ] [`.agents/skills/standards/references/workflow-efficiency.md`](../.agents/skills/standards/references/workflow-efficiency.md): Render, check links and examples, then review each factual claim and instruction against the current implementation.
+- [ ] [`.agents/skills/review/references/daily.md`](../.agents/skills/review/references/daily.md): Render, check links and examples, then review each factual claim and instruction against the current implementation.
+- [ ] [`.agents/skills/standup/SKILL.md`](../.agents/skills/standup/SKILL.md): Render, check links and examples, then review each factual claim and instruction against the current implementation.
+- [ ] [`.agents/skills/review/references/weekly.md`](../.agents/skills/review/references/weekly.md): Render, check links and examples, then review each factual claim and instruction against the current implementation.
+- [ ] [`.agents/skills/test/SKILL.md`](../.agents/skills/test/SKILL.md): Render, check links and examples, then review each factual claim and instruction against the current implementation.
+- [ ] [`.agents/skills/test/references/cloud-playwright.md`](../.agents/skills/test/references/cloud-playwright.md): Render, check links and examples, then review each factual claim and instruction against the current implementation.
+- [ ] [`.agents/skills/test/references/fixing.md`](../.agents/skills/test/references/fixing.md): Render, check links and examples, then review each factual claim and instruction against the current implementation.
+- [ ] [`.agents/skills/test/references/cloud-workflow.md`](../.agents/skills/test/references/cloud-workflow.md): Render, check links and examples, then review each factual claim and instruction against the current implementation.
+- [ ] [`.agents/skills/test/references/ordering.md`](../.agents/skills/test/references/ordering.md): Render, check links and examples, then review each factual claim and instruction against the current implementation.
+- [ ] [`.agents/skills/test/references/test-structure-and-responsive-evidence.md`](../.agents/skills/test/references/test-structure-and-responsive-evidence.md): Render, check links and examples, then review each factual claim and instruction against the current implementation.
+- [ ] [`.agents/skills/test/references/evidence.md`](../.agents/skills/test/references/evidence.md): Render, check links and examples, then review each factual claim and instruction against the current implementation.
+- [ ] [`.agents/skills/test/references/writing.md`](../.agents/skills/test/references/writing.md): Render, check links and examples, then review each factual claim and instruction against the current implementation.
+- [ ] [`.agents/README.md`](../.agents/README.md): Render, check links and examples, then review each factual claim and instruction against the current implementation.
+- [ ] [`.agents/skills/agents/SKILL.md`](../.agents/skills/agents/SKILL.md): Render, check links and examples, then review each factual claim and instruction against the current implementation.
+- [ ] [`.agents/skills/align/SKILL.md`](../.agents/skills/align/SKILL.md): Render, check links and examples, then review each factual claim and instruction against the current implementation.
 - [ ] [`docs/contributing/0-workspace/getting-started.mdx`](../docs/contributing/0-workspace/getting-started.mdx): Render, check links and examples, then review each factual claim and instruction against the current implementation.
 - [ ] [`docs/contributing/1-quality/change-validation.mdx`](../docs/contributing/1-quality/change-validation.mdx): Render, check links and examples, then review each factual claim and instruction against the current implementation.
 - [ ] [`docs/contributing/2-authoring/authoring.mdx`](../docs/contributing/2-authoring/authoring.mdx): Render, check links and examples, then review each factual claim and instruction against the current implementation.
@@ -3339,7 +3330,7 @@ This checklist inventories repository-owned functions, documents, and configurat
 - [ ] [`packages/quality-core/README.md`](../packages/quality-core/README.md): Render, check links and examples, then review each factual claim and instruction against the current implementation.
 - [ ] [`packages/quality-reports/CHANGELOG.md`](../packages/quality-reports/CHANGELOG.md): Render, check links and examples, then review each factual claim and instruction against the current implementation.
 - [ ] [`packages/quality-reports/README.md`](../packages/quality-reports/README.md): Render, check links and examples, then review each factual claim and instruction against the current implementation.
-- [ ] [`packages/quality/.agents/skills/quality/SKILL.md`](../packages/quality/.agents/skills/quality/SKILL.md): Render, check links and examples, then review each factual claim and instruction against the current implementation.
+- [ ] [`.agents/skills/quality/SKILL.md`](../.agents/skills/quality/SKILL.md): Render, check links and examples, then review each factual claim and instruction against the current implementation.
 - [ ] [`packages/quality/.changeset/c-documentation-coverage.md`](../packages/quality/.changeset/c-documentation-coverage.md): Render, check links and examples, then review each factual claim and instruction against the current implementation.
 - [ ] [`packages/quality/CHANGELOG.md`](../packages/quality/CHANGELOG.md): Render, check links and examples, then review each factual claim and instruction against the current implementation.
 - [ ] [`packages/quality/README.md`](../packages/quality/README.md): Render, check links and examples, then review each factual claim and instruction against the current implementation.
@@ -3381,28 +3372,20 @@ This checklist inventories repository-owned functions, documents, and configurat
 - [ ] `config/quality.json`: validate syntax or schema, exercise its owning tool, and check references to this file.
 - [ ] `config/terra-tests.json`: validate syntax or schema, exercise its owning tool, and check references to this file.
 - [ ] `config/tsconfig.base.json`: validate syntax or schema, exercise its owning tool, and check references to this file.
-- [ ] `docs/agents/packages/quality/skills/git/branches/jules/agents/openai.yaml`: validate syntax or schema, exercise its owning tool, and check references to this file.
-- [ ] `docs/agents/packages/quality/skills/git/branches/prune-device/agents/openai.yaml`: validate syntax or schema, exercise its owning tool, and check references to this file.
-- [ ] `docs/agents/packages/quality/skills/git/branches/review/agents/openai.yaml`: validate syntax or schema, exercise its owning tool, and check references to this file.
-- [ ] `docs/agents/packages/quality/skills/git/deploy/agents/openai.yaml`: validate syntax or schema, exercise its owning tool, and check references to this file.
-- [ ] `docs/agents/packages/quality/skills/git/issues/audit/agents/openai.yaml`: validate syntax or schema, exercise its owning tool, and check references to this file.
-- [ ] `docs/agents/packages/quality/skills/git/issues/complete/agents/openai.yaml`: validate syntax or schema, exercise its owning tool, and check references to this file.
-- [ ] `docs/agents/packages/quality/skills/git/packages/agents/openai.yaml`: validate syntax or schema, exercise its owning tool, and check references to this file.
-- [ ] `docs/agents/packages/quality/skills/hygiene/agents/openai.yaml`: validate syntax or schema, exercise its owning tool, and check references to this file.
-- [ ] `docs/agents/packages/quality/skills/hygiene/initialisation/agents/openai.yaml`: validate syntax or schema, exercise its owning tool, and check references to this file.
-- [ ] `docs/agents/packages/quality/skills/package-update/agents/openai.yaml`: validate syntax or schema, exercise its owning tool, and check references to this file.
-- [ ] `docs/agents/packages/quality/skills/quality/agents/openai.yaml`: validate syntax or schema, exercise its owning tool, and check references to this file.
-- [ ] `docs/agents/packages/quality/skills/standards/agents/openai.yaml`: validate syntax or schema, exercise its owning tool, and check references to this file.
-- [ ] `docs/agents/packages/reporting/skills/review/daily/agents/openai.yaml`: validate syntax or schema, exercise its owning tool, and check references to this file.
-- [ ] `docs/agents/packages/reporting/skills/review/standup/agents/openai.yaml`: validate syntax or schema, exercise its owning tool, and check references to this file.
-- [ ] `docs/agents/packages/reporting/skills/review/weekly/agents/openai.yaml`: validate syntax or schema, exercise its owning tool, and check references to this file.
-- [ ] `docs/agents/packages/reporting/skills/review/weekly/examples/weekly-review-2026-08-24.json`: validate syntax or schema, exercise its owning tool, and check references to this file.
-- [ ] `docs/agents/packages/reporting/skills/test/agents/openai.yaml`: validate syntax or schema, exercise its owning tool, and check references to this file.
-- [ ] `docs/agents/packages/reporting/skills/test/cloud/agents/openai.yaml`: validate syntax or schema, exercise its owning tool, and check references to this file.
-- [ ] `docs/agents/skills/agents/agents/openai.yaml`: validate syntax or schema, exercise its owning tool, and check references to this file.
-- [ ] `docs/agents/skills/documenting/gem/agents/openai.yaml`: validate syntax or schema, exercise its owning tool, and check references to this file.
-- [ ] `docs/agents/skills/documenting/gem/snapshots/b2b810394d61/knowledge/manifest.json`: validate syntax or schema, exercise its owning tool, and check references to this file.
-- [ ] `docs/agents/skills/documenting/gem/snapshots/b2b810394d61/metadata.json`: validate syntax or schema, exercise its owning tool, and check references to this file.
+- [ ] `.agents/skills/jules/agents/openai.yaml`: validate syntax or schema, exercise its owning tool, and check references to this file.
+- [ ] `.agents/skills/pr-review/agents/openai.yaml`: validate syntax or schema, exercise its owning tool, and check references to this file.
+- [ ] `.agents/skills/deploy/agents/openai.yaml`: validate syntax or schema, exercise its owning tool, and check references to this file.
+- [ ] `.agents/skills/issues/agents/openai.yaml`: validate syntax or schema, exercise its owning tool, and check references to this file.
+- [ ] `.agents/skills/dependabot-remediation/agents/openai.yaml`: validate syntax or schema, exercise its owning tool, and check references to this file.
+- [ ] `.agents/skills/hygiene/agents/openai.yaml`: validate syntax or schema, exercise its owning tool, and check references to this file.
+- [ ] `.agents/skills/initialisation/agents/openai.yaml`: validate syntax or schema, exercise its owning tool, and check references to this file.
+- [ ] `.agents/skills/quality-cloud/agents/openai.yaml`: validate syntax or schema, exercise its owning tool, and check references to this file.
+- [ ] `.agents/skills/standards/agents/openai.yaml`: validate syntax or schema, exercise its owning tool, and check references to this file.
+- [ ] `.agents/skills/standup/agents/openai.yaml`: validate syntax or schema, exercise its owning tool, and check references to this file.
+- [ ] `.agents/skills/review/examples/weekly-review-2026-08-24.json`: validate syntax or schema, exercise its owning tool, and check references to this file.
+- [ ] `.agents/skills/test/agents/openai.yaml`: validate syntax or schema, exercise its owning tool, and check references to this file.
+- [ ] `.agents/skills/test/agents/openai.yaml`: validate syntax or schema, exercise its owning tool, and check references to this file.
+- [ ] `.agents/skills/agents/agents/openai.yaml`: validate syntax or schema, exercise its owning tool, and check references to this file.
 - [ ] `docs/error-boundaries/assets/sanity-error-analysis.png`: render or load this asset and inspect the visual or byte-level result.
 - [ ] `docs/error-boundaries/assets/website-error-analysis-flow.svg`: render or load this asset and inspect the visual or byte-level result.
 - [ ] `docs/src/generated/skills.json`: validate syntax or schema, exercise its owning tool, and check references to this file.
@@ -3427,7 +3410,7 @@ This checklist inventories repository-owned functions, documents, and configurat
 - [ ] `packages/quality-core/package.json`: validate syntax or schema, exercise its owning tool, and check references to this file.
 - [ ] `packages/quality-reports/config/tsconfig.json`: validate syntax or schema, exercise its owning tool, and check references to this file.
 - [ ] `packages/quality-reports/package.json`: validate syntax or schema, exercise its owning tool, and check references to this file.
-- [ ] `packages/quality/.agents/skills/quality/agents/openai.yaml`: validate syntax or schema, exercise its owning tool, and check references to this file.
+- [ ] `.agents/skills/quality/agents/openai.yaml`: validate syntax or schema, exercise its owning tool, and check references to this file.
 - [ ] `packages/quality/config/tsconfig.json`: validate syntax or schema, exercise its owning tool, and check references to this file.
 - [ ] `packages/quality/package.json`: validate syntax or schema, exercise its owning tool, and check references to this file.
 - [ ] `packages/quality/quality-configs/checkstyle.xml`: validate syntax or schema, exercise its owning tool, and check references to this file.

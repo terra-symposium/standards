@@ -1,3 +1,0 @@
-interface:
-  display_name: 'Prune Device'
-  short_description: 'Prune Codex storage and deduplicate repo skills'
