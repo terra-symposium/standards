@@ -9,8 +9,7 @@ metadata:
 
 # Test
 
-Use for work that creates, expands, orders, repairs, evaluates, or represents Terra test coverage.
-Read the relevant procedure completely before acting:
+Use for work that creates, expands, orders, repairs, evaluates, or represents Terra test coverage. Read the relevant procedure completely before acting:
 
 For repository-wide restructuring or responsive suite design, read [test ownership, structure, and viewport selection](references/test-structure-and-responsive-evidence.md) before choosing files or projects.
 
@@ -53,9 +52,4 @@ Exhaustiveness means each material state and risk has an owner at the cheapest r
 
 Avoid duplicating lower-level contracts in expensive browser tests unless they prove an additional user or integration boundary. Add source-contract tests when they provide the cheapest reliable proof, not as a blanket prerequisite for every change. Assert observable outcomes rather than incidental implementation details.
 
-For a Quality public API test, build its package before running focused Node
-tests such as `node --test packages/quality/tests/runner/quality.test.mjs`.
-Verify
-`packages/quality/package.json` runtime and types exports and use an isolated
-package-name consumer import and type-resolution fixture; a direct `dist`
-import or TypeScript alias alone does not prove the published interface.
+For a Quality public API test, build its package before running focused Node tests such as `node --test packages/quality/tests/runner/quality.test.mjs`. Verify `packages/quality/package.json` runtime and types exports and use an isolated package-name consumer import and type-resolution fixture; a direct `dist` import or TypeScript alias alone does not prove the published interface.

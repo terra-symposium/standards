@@ -108,17 +108,17 @@ test('ui-recommendations reports errors and fails when findings remain', async (
 	// terra-quality-ignore single-use -- Keep this test configuration named so its fixture scope is established before the check under test runs.
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.tsx'] });
 	// terra-quality-ignore single-use -- Snapshot console.info before replacing it so cleanup restores the original logger.
-	const originalInfo = console.info;
+	const origInfo = console.info;
 	// terra-quality-ignore single-use -- Snapshot console.error before replacing it so cleanup restores the original logger.
-	const originalErr = console.error;
+	const origErr = console.error;
 	const output = [];
 	console.error = (...values) => output.push(values.join(' '));
 	process.exitCode = 0;
 	try {
 		await runQualityCli(cfg, ['ui-recommendations', '--all']);
 	} finally {
-		console.info = originalInfo;
-		console.error = originalErr;
+		console.info = origInfo;
+		console.error = origErr;
 	}
 	assert.match(output.join('\n'), /\[ERROR\] src\/view\.tsx:1:\d+ <button> should use <Button>/u);
 	assert.match(output.join('\n'), /\[ERROR\] src\/view\.tsx:1:\d+ <a> should use <ButtonLink variant="primary-underline">/u);

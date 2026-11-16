@@ -128,7 +128,7 @@ test('Node reporter options replace inherited reporters and preserve unrelated r
 test('Node reporter ignores reporter API context values that are not progress writers', async () => {
 	const stderr = [];
 	// terra-quality-ignore single-use -- Snapshot stderr.write before replacing it so cleanup restores the original writer.
-	const originalWrite = process.stderr.write;
+	const origWrite = process.stderr.write;
 	process.stderr.write = chunk => {
 		stderr.push(String(chunk));
 		return true;
@@ -138,11 +138,11 @@ test('Node reporter ignores reporter API context values that are not progress wr
 			assert.equal(typeof chunk, 'string');
 		}
 	} finally {
-		process.stderr.write = originalWrite;
+		process.stderr.write = origWrite;
 	}
 	assert.match(stderr.join(''), /Cases .*0\/0/u);
 	const nestedOutput = [];
-	const originalReporterState = process.env.TERRA_QUALITY_NODE_REPORTER_OWNER;
+	const origReporterState = process.env.TERRA_QUALITY_NODE_REPORTER_OWNER;
 	process.env.TERRA_QUALITY_NODE_REPORTER_OWNER = '1';
 	try {
 		for await (const chunk of defaultQualityNodeReporter(eSrc([{ type: 'test:fail', data: { name: 'nested child failure', nesting: 0, details: { error: 'failure' } } }]), chunk =>
@@ -150,8 +150,8 @@ test('Node reporter ignores reporter API context values that are not progress wr
 		))
 			void chunk;
 	} finally {
-		if (originalReporterState === undefined) delete process.env.TERRA_QUALITY_NODE_REPORTER_OWNER;
-		else process.env.TERRA_QUALITY_NODE_REPORTER_OWNER = originalReporterState;
+		if (origReporterState === undefined) delete process.env.TERRA_QUALITY_NODE_REPORTER_OWNER;
+		else process.env.TERRA_QUALITY_NODE_REPORTER_OWNER = origReporterState;
 	}
 	assert.deepEqual(nestedOutput, []);
 });

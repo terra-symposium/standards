@@ -480,12 +480,12 @@ export function resolveLanguageProfiles(cfg: QualityCfg): LanguageProfileResolut
 	for (const profileId of cfg.languageProfiles ?? []) {
 		const profile = LANGUAGE_PROFILES.find(c => c.id === profileId);
 		if (!profile) continue;
-		const sourceFiles = srcFiles({
+		const candidateFiles = srcFiles({
 			...cfg,
 			extensions: profile.sourceExtensions,
 			skippedDirectories: [...new Set([...(cfg.skippedDirectories ?? []), '.venv', 'venv', '__pycache__', '.tox', '.ruff_cache', '.pytest_cache', '.gradle', 'target', 'vendor', 'generated', 'out'])],
 		});
-		if (!sourceFiles.length) {
+		if (!candidateFiles.length) {
 			for (const check of profile.checks) result.skipped.push({ name: check.name, profileId, reason: `no ${profileId} source files were found` });
 			continue;
 		}
@@ -495,7 +495,7 @@ export function resolveLanguageProfiles(cfg: QualityCfg): LanguageProfileResolut
 				result.failed.push({ name: check.name, profileId, reason: `required configuration ${check.requiredFile} is absent` });
 				continue;
 			}
-			const files = check.fileExtensions ? sourceFiles.filter(f => check.fileExtensions!.some(ext => f.endsWith(ext))) : sourceFiles;
+			const files = check.fileExtensions ? candidateFiles.filter(f => check.fileExtensions!.some(ext => f.endsWith(ext))) : candidateFiles;
 			if (check.args.includes('{files}') && !files.length) {
 				result.skipped.push({ name: check.name, profileId, reason: 'no files matched this check' });
 				continue;
@@ -561,9 +561,9 @@ export function inspectLanguageProfileTool(tool: LanguageProfileTool, cwd: strin
 	})(`${result.stdout ?? ''}\n${result.stderr ?? ''}`);
 	if (!detected) return { error: `Could not parse the version reported by "${tool.command}". ${tool.install}` };
 	if (
-		(function compVersions(detected: [number, number, number], minimum: [number, number, number]): number {
+		(function compVersions(detected: [number, number, number], min: [number, number, number]): number {
 			for (let index = 0; index < detected.length; index++) {
-				if (detected[index] !== minimum[index]) return detected[index]! - minimum[index]!;
+				if (detected[index] !== min[index]) return detected[index]! - min[index]!;
 			}
 			return 0;
 		})(detected, tool.minimumVersion) < 0

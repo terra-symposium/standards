@@ -39,18 +39,9 @@ If a failure is pre-application, repair install/config/toolchain first. If it re
 
 For each actionable issue, identify its owner, make the smallest complete fix, run the narrowest proof, then rerun the affected workspace or provider check. Inspect lockfile/package changes and avoid unrelated refactors or dependency churn. Record external blockers and required sign-in.
 
-When a task calls for the repository's deterministic Quality transformations,
-run its `quality:all` script across the full configured scope, then inspect the
-resulting diff. Normal runs apply configured safe fixes; pass `--warn` for a
-read-only verification pass. Preserve pre-existing edits and review every
-changed hunk.
+When a task calls for the repository's deterministic Quality transformations, run its `quality:all` script across the full configured scope, then inspect the resulting diff. Normal runs apply configured safe fixes; pass `--warn` for a read-only verification pass. Preserve pre-existing edits and review every changed hunk.
 
-After making an agent-authored repair, inspect the diff for a recurring,
-deterministic transformation within the requested scope. Propose a shared
-Quality rule only when repeated examples and safety boundaries justify it;
-implement it when the task authorizes that package work. Keep semantic
-judgments and all comments, TSDoc, and other prose agent-authored. Test the
-focused rule and inspect any fixer output before considering a full-scope run.
+After making an agent-authored repair, inspect the diff for a recurring, deterministic transformation within the requested scope. Propose a shared Quality rule only when repeated examples and safety boundaries justify it; implement it when the task authorizes that package work. Keep semantic judgments and all comments, TSDoc, and other prose agent-authored. Test the focused rule and inspect any fixer output before considering a full-scope run.
 
 Do not end an authorized remediation after producing a diagnosis or findings list. Apply safe fixes in the owning worktree, rerun the same checks, and iterate until they pass with no actionable findings. If credentials, permissions, upstream patches, or a live provider prevent completion, report that precise blocker and leave the remediation explicitly incomplete.
 
@@ -209,18 +200,9 @@ See [Terra conventions](conventions.md) for the repository-derived rules and qua
 
 ## Prevent recurring manual fixes
 
-After repeated code repairs, inspect the diff for a deterministic pattern and
-its safety boundaries. Propose a shared rule only when multiple examples show
-it would help and the owner package can express it safely. Implement package
-automation only when the task includes that scope.
+After repeated code repairs, inspect the diff for a deterministic pattern and its safety boundaries. Propose a shared rule only when multiple examples show it would help and the owner package can express it safely. Implement package automation only when the task includes that scope.
 
-When implementing a rule, prefer an idempotent fixer in the owning package's
-normal Quality workflow. Add focused positive and negative tests, apply it to
-the relevant eligible files, run it twice, and inspect every edit. Preserve
-literals, generated content, public contracts, and behavior. Keep comments,
-TSDoc, documentation prose, and other explanations agent-authored after
-inspecting the implementation. Record what was automated, its coverage and
-scope, and what still needs contextual judgment.
+When implementing a rule, prefer an idempotent fixer in the owning package's normal Quality workflow. Add focused positive and negative tests, apply it to the relevant eligible files, run it twice, and inspect every edit. Preserve literals, generated content, public contracts, and behavior. Keep comments, TSDoc, documentation prose, and other explanations agent-authored after inspecting the implementation. Record what was automated, its coverage and scope, and what still needs contextual judgment.
 
 ## Behavior-preserving compaction
 

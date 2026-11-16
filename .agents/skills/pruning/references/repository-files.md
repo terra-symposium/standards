@@ -1,4 +1,3 @@
-
 # Repository file audit
 
 Treat every file as a cost that must justify its existence. A file stays only when it has one identifiable owner, one active purpose, and one canonical location. When asked to run this skill, make the clear moves, merges, and deletions; do not stop at recommendations. Work read-only only when the user explicitly asks for a report.

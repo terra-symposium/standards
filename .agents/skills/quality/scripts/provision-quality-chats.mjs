@@ -19,18 +19,18 @@ const PRUNED_DIRS = new Set(['.cache', '.git', '.next', '.playwright-mcp', '.pnp
 function options(args) {
 	const values = { root: join(homedir(), 'Desktop'), environment: 'kai-macann-all', exclude: new Set(['compression']), dryRun: false, push: true };
 	for (let index = 0; index < args.length; index += 1) {
-		const argument = args[index];
-		if (argument === '--root') values.root = args[++index];
-		else if (argument === '--env') values.environment = args[++index];
-		else if (argument === '--exclude-repo') values.exclude.add(args[++index].toLowerCase());
-		else if (argument === '--dry-run') values.dryRun = true;
-		else if (argument === '--push') values.push = true;
-		else if (argument === '--no-push') values.push = false;
-		else if (argument === '--help') {
+		const arg = args[index];
+		if (arg === '--root') values.root = args[++index];
+		else if (arg === '--env') values.environment = args[++index];
+		else if (arg === '--exclude-repo') values.exclude.add(args[++index].toLowerCase());
+		else if (arg === '--dry-run') values.dryRun = true;
+		else if (arg === '--push') values.push = true;
+		else if (arg === '--no-push') values.push = false;
+		else if (arg === '--help') {
 			console.log('Usage: provision-quality-chats.mjs [--root DIR] [--env ID] [--exclude-repo NAME] [--no-push] [--dry-run]');
 			process.exit(0);
 		} else {
-			throw new Error(`Unknown option: ${argument}`);
+			throw new Error(`Unknown option: ${arg}`);
 		}
 	}
 	values.root = resolve(values.root);
@@ -83,15 +83,15 @@ function promptFor(repo, options) {
  * Starts one Cloud task and captures its process result.
  *
  * @param repo Repository record being submitted.
- * @param environment Cloud environment selected by the caller.
+ * @param env Cloud environment selected by the caller.
  * @param prompt Task instructions scoped to this repository.
  *
  * @return Promise resolving with the child process result.
  */
-function submit(repo, environment, prompt) {
+function submit(repo, env, prompt) {
 	return new Promise(resolveTask => {
 		console.log(`[${repo.name}] submitting`);
-		const child = spawn('codex', ['cloud', 'exec', '-c', 'model="gpt-6-luna"', '--env', environment, prompt], { stdio: ['ignore', 'pipe', 'pipe'] });
+		const child = spawn('codex', ['cloud', 'exec', '-c', 'model="gpt-6-luna"', '--env', env, prompt], { stdio: ['ignore', 'pipe', 'pipe'] });
 		let output = '';
 		child.stdout.setEncoding('utf8').on('data', chunk => (output += chunk));
 		child.stderr.setEncoding('utf8').on('data', chunk => (output += chunk));

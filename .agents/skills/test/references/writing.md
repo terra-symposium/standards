@@ -35,10 +35,7 @@ Use table-driven tests for equivalent cases and named tests for distinct journey
 
 ## 4. Maintain and validate
 
-Place tests under `tests/<product-domain>/` to mirror the repository source area.
-Check the owning repository's test manifest and scripts before moving a case;
-Standards uses `config/terra-tests.json`. Preserve the declared runner context
-and run the actual manifest validation command when one is defined.
+Place tests under `tests/<product-domain>/` to mirror the repository source area. Check the owning repository's test manifest and scripts before moving a case; Standards uses `config/terra-tests.json`. Preserve the declared runner context and run the actual manifest validation command when one is defined.
 
 Keep registration-time fixtures before tests and runtime-only helpers after the last test under `/* HELPERS */`. Promote helpers only after real reuse.
 

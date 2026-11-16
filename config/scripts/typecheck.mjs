@@ -26,7 +26,7 @@ function childDirs(dir) {
  *
  * @return Whether the workspace contains a source file that needs a typecheck.
  */
-function hasTypeScriptSource(dir) {
+function hasTypeScriptSrc(dir) {
 	const pending = [dir];
 	while (pending.length) {
 		const current = pending.pop();
@@ -56,7 +56,7 @@ export function discoverTypecheckTargets(repoRoot = root) {
 			if (!statSync(manifestPath, { throwIfNoEntry: false })?.isFile()) continue;
 			const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
 			const tsconfigPath = [join(dir, 'config', 'tsconfig.json'), join(dir, 'tsconfig.json')].find(path => statSync(path, { throwIfNoEntry: false })?.isFile());
-			if (!tsconfigPath && !hasTypeScriptSource(dir)) continue;
+			if (!tsconfigPath && !hasTypeScriptSrc(dir)) continue;
 			if (!tsconfigPath) throw new Error(`${relative(repoRoot, dir)} has TypeScript source but no tsconfig.json`);
 			if (typeof manifest.scripts?.typecheck !== 'string' || !manifest.scripts.typecheck.trim())
 				throw new Error(`${relative(repoRoot, dir)} has a TypeScript project but no package.json typecheck script`);

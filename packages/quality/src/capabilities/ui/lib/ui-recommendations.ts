@@ -76,13 +76,13 @@ function staticAttrValue(attr: ts.JsxAttribute | undefined): string | undefined 
 /**
  * Returns one JSX attribute by its exact lower-case name.
  *
- * @param element JSX opening element to inspect.
+ * @param el JSX opening element to inspect.
  * @param name Attribute name to find.
  *
  * @return Matching attribute when present.
  */
-function jsxAttr(element: ts.JsxOpeningLikeElement, name: string): ts.JsxAttribute | undefined {
-	return element.attributes.properties.find((p): p is ts.JsxAttribute => ts.isJsxAttribute(p) && ts.isIdentifier(p.name) && p.name.text === name);
+function jsxAttr(el: ts.JsxOpeningLikeElement, name: string): ts.JsxAttribute | undefined {
+	return el.attributes.properties.find((p): p is ts.JsxAttribute => ts.isJsxAttribute(p) && ts.isIdentifier(p.name) && p.name.text === name);
 }
 
 /**
@@ -110,12 +110,12 @@ function textLinkVariant(value: string | undefined): string | undefined {
 /**
  * Reads static classes from JSX/TSX or Astro's `class` attribute.
  *
- * @param element JSX opening element to inspect.
+ * @param el JSX opening element to inspect.
  *
  * @return Static class string when available.
  */
-function staticClasses(element: ts.JsxOpeningLikeElement): string | undefined {
-	return staticAttrValue(jsxAttr(element, 'className')) ?? staticAttrValue(jsxAttr(element, 'class'));
+function staticClasses(el: ts.JsxOpeningLikeElement): string | undefined {
+	return staticAttrValue(jsxAttr(el, 'className')) ?? staticAttrValue(jsxAttr(el, 'class'));
 }
 
 /*//////////////////////////////////////////////////
@@ -159,13 +159,13 @@ export function uiComponentRecommendations(cfg: QualityCfg): UiComponentRecommen
 
 		const visit = (node: ts.Node): void => {
 			if ((ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) && ts.isIdentifier(node.tagName)) {
-				const element = node.tagName.text;
-				if (element === element.toLowerCase()) {
+				const el = node.tagName.text;
+				if (el === el.toLowerCase()) {
 					const rule = rules.find(
 						c =>
-							c.element === element &&
-							(function ruleMatches(rule: UiRecommendationRule, element: ts.JsxOpeningLikeElement): boolean {
-								const type = jsxAttr(element, 'type');
+							c.element === el &&
+							(function ruleMatches(rule: UiRecommendationRule, el: ts.JsxOpeningLikeElement): boolean {
+								const type = jsxAttr(el, 'type');
 								if (rule.types) {
 									const typeValue = type ? staticAttrValue(type) : 'text';
 									if (typeValue === undefined || !rule.types.includes(typeValue.toLowerCase())) return false;
@@ -179,23 +179,23 @@ export function uiComponentRecommendations(cfg: QualityCfg): UiComponentRecommen
 											[...classes].some(c => c === 'border' || c === 'inline-flex' || c === 'flex' || c.startsWith('rounded')) &&
 											[...classes].some(c => c === 'font-medium' || c === 'no-underline' || c.startsWith('bg-'))
 										);
-									})(staticClasses(element));
-								if (rule.when === 'text-link') return Boolean(textLinkVariant(staticClasses(element)));
+									})(staticClasses(el));
+								if (rule.when === 'text-link') return Boolean(textLinkVariant(staticClasses(el)));
 								return true;
 							})(c, node),
 					);
 					if (rule) {
 						const { line, character } = parsed.getLineAndCharacterOfPosition(node.getStart(parsed));
-						const variant = rule.variant ?? (element === 'a' && rule.when === 'text-link' ? textLinkVariant(staticClasses(node)) : undefined);
+						const variant = rule.variant ?? (el === 'a' && rule.when === 'text-link' ? textLinkVariant(staticClasses(node)) : undefined);
 						findings.push({
 							file: relativeFile,
 							line: line + 1,
 							column: character + 1,
-							element,
+							element: el,
 							component: rule.component,
 							import: rule.import,
 							...(variant ? { variant } : {}),
-							reason: rule.reason ?? `Review whether this native <${element}> should use the shared ${rule.component} component.`,
+							reason: rule.reason ?? `Review whether this native <${el}> should use the shared ${rule.component} component.`,
 						});
 					}
 				}

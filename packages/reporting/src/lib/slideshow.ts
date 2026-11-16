@@ -48,7 +48,7 @@ type Presentation = {
 	writeFile: (options: { fileName: string }) => Promise<string>;
 };
 /** Styling tokens translated to the format expected by the PowerPoint writer. */
-type TerraDocumentBrand = { colors: { ink: string; line: string; muted: string; paper: string; primaryStrong: string; primarySoft: string; secondary: string }; fonts: { body: string } };
+type TerraDocBrand = { colors: { ink: string; line: string; muted: string; paper: string; primaryStrong: string; primarySoft: string; secondary: string }; fonts: { body: string } };
 /** Office-compatible hex colors used to keep slide layout code independent of brand tokens. */
 type ReportColors = { accent: string; ink: string; line: string; muted: string; surface: string; secondary: string; selected: string };
 
@@ -131,7 +131,7 @@ const hexColor = (channels: string): string =>
  *
  * @return A randomized Terra palette and body font for one generated presentation.
  */
-const createDocumentBrand = (): TerraDocumentBrand => {
+const createDocBrand = (): TerraDocBrand => {
 	const hue = Math.random() * 300;
 	const options = { accentChroma: 0.04 };
 	const [primary] = terraColors(hue, options);
@@ -156,7 +156,7 @@ const createDocumentBrand = (): TerraDocumentBrand => {
  *
  * @return Palette entries normalized for the Office presentation API.
  */
-const reportColors = (brand: TerraDocumentBrand): ReportColors => ({
+const reportColors = (brand: TerraDocBrand): ReportColors => ({
 	accent: officeColor(brand.colors.primaryStrong),
 	ink: officeColor(brand.colors.ink),
 	line: officeColor(brand.colors.line),
@@ -277,17 +277,17 @@ const slideCopy = (r: VisualResult, review: ImgReview): string => {
  *
  * @param presentation Presentation receiving the slide.
  * @param group Results for the same test across one or more viewports.
- * @param slideNumber One-based slide number shown in the title.
+ * @param slideNum One-based slide number shown in the title.
  * @param colors Palette used for slide surfaces, labels, and separators.
  *
  * @return A promise that resolves after the comparison slide is added.
  */
-const addResponsiveSlide = async (presentation: Presentation, group: readonly VisualResult[], slideNumber: number, colors: ReportColors): Promise<void> => {
+const addResponsiveSlide = async (presentation: Presentation, group: readonly VisualResult[], slideNum: number, colors: ReportColors): Promise<void> => {
 	const first = group[0];
 	if (!first) return;
 	const slide = presentation.addSlide();
 	slide.background = { color: colors.surface };
-	addReportTitle(slide, `${String(slideNumber).padStart(3, '0')}  ${first.title}`, colors);
+	addReportTitle(slide, `${String(slideNum).padStart(3, '0')}  ${first.title}`, colors);
 	slide.addText(`${first.project} · responsive comparison · ${first.groups || first.file}`, {
 		color: colors.muted,
 		fontFace: 'Authentic Sans',
@@ -496,7 +496,7 @@ const addLoadDetailSlides = (presentation: Presentation, results: readonly Visua
  */
 export const writeSlideshow = async (file: string, results: readonly VisualResult[], opts: SlideshowOptions = {}): Promise<void> => {
 	const loadEnabled = opts.loadTestingEnabled ?? results.some(r => !!r.loadMeasurements?.length);
-	const brand = createDocumentBrand();
+	const brand = createDocBrand();
 	const colors = reportColors(brand);
 	const presentation = new /* The runtime package is CommonJS while NodeNext exposes its constructor through a namespace type. */ (require('pptxgenjs') as new () => Presentation)();
 	presentation.layout = 'LAYOUT_WIDE';
@@ -505,10 +505,10 @@ export const writeSlideshow = async (file: string, results: readonly VisualResul
 	presentation.company = opts.company || 'Test evidence';
 	presentation.subject = opts.subject || 'Screenshot evidence and UI review prompts';
 	presentation.title = opts.title || 'Test evidence slideshow';
-	let slideNumber = 0;
+	let slideNum = 0;
 	if (loadEnabled) {
 		addLoadSummarySlide(presentation, results, colors);
-		slideNumber += 1;
+		slideNum += 1;
 	}
 
 	// GROUP RESULTS BY TEST IDENTITY AND SELECT THE FINAL RETRY PER VIEWPORT
@@ -526,13 +526,13 @@ export const writeSlideshow = async (file: string, results: readonly VisualResul
 		await addResponsiveSlide(
 			presentation,
 			[...byViewport.values()].sort((a, b) => viewportWidth(a) - viewportWidth(b)),
-			++slideNumber,
+			++slideNum,
 			colors,
 		);
 	}
 
 	// ENSURE EMPTY RUNS STILL PRODUCE A REVIEWABLE DECK
-	if (!slideNumber) {
+	if (!slideNum) {
 		const slide = presentation.addSlide();
 		slide.background = { color: colors.surface };
 		addReportTitle(slide, 'Test evidence slideshow', colors);
@@ -555,7 +555,7 @@ export const writeSlideshow = async (file: string, results: readonly VisualResul
  */
 export const writeScreenshotSlideshow = async (file: string, captures: readonly ScreenshotCapture[], opts: ScreenshotSlideshowOptions = {}): Promise<void> => {
 	if (!captures.length) throw new Error('No keyed Playwright screenshots were captured for the screenshot slideshow.');
-	const brand = createDocumentBrand();
+	const brand = createDocBrand();
 	const colors = reportColors(brand);
 	const presentation = new /* The runtime package is CommonJS while NodeNext exposes its constructor through a namespace type. */ (require('pptxgenjs') as new () => Presentation)();
 	presentation.layout = 'LAYOUT_WIDE';
@@ -580,9 +580,9 @@ export const writeScreenshotSlideshow = async (file: string, captures: readonly 
 	for (const [, group] of orderedGroups) {
 		const byViewport = new Map<string, ScreenshotCapture>();
 		for (const capture of group) {
-			const previous = byViewport.get(capture.viewport);
-			const isNewer = (Date.parse(capture.capturedAt || '') || 0) >= (Date.parse(previous?.capturedAt || '') || 0);
-			if (!previous || (capture.runId === previous.runId ? (capture.retry || 0) > (previous.retry || 0) || ((capture.retry || 0) === (previous.retry || 0) && isNewer) : isNewer))
+			const prev = byViewport.get(capture.viewport);
+			const isNewer = (Date.parse(capture.capturedAt || '') || 0) >= (Date.parse(prev?.capturedAt || '') || 0);
+			if (!prev || (capture.runId === prev.runId ? (capture.retry || 0) > (prev.retry || 0) || ((capture.retry || 0) === (prev.retry || 0) && isNewer) : isNewer))
 				byViewport.set(capture.viewport, capture);
 		}
 		const ordered = [...byViewport.values()].sort((f, s) => {
@@ -651,14 +651,14 @@ const readScreenshotCapturesFromDirTree = (root: string, opts: ScreenshotSlidesh
 		} catch {
 			return [];
 		}
-		const sourcePath = path.relative(root, dir);
-		const sourceName = sourcePath ? sourcePath.split(path.sep)[0] : '';
-		const prefix = sourceName ? `${sourceName} · ` : '';
+		const srcPath = path.relative(root, dir);
+		const srcName = srcPath ? srcPath.split(path.sep)[0] : '';
+		const prefix = srcName ? `${srcName} · ` : '';
 		return [
-			...readScreenshotCapturesFromDirectory(dir, isRoot ? opts.currentRunId : opts.currentRunIdsBySource?.[sourceName]).map(c => ({
+			...readScreenshotCapturesFromDirectory(dir, isRoot ? opts.currentRunId : opts.currentRunIdsBySource?.[srcName]).map(c => ({
 				...c,
 				group: `${prefix}${c.group}`,
-				key: sourceName ? `${sourceName}:${c.key}` : c.key,
+				key: srcName ? `${srcName}:${c.key}` : c.key,
 				title: `${prefix}${c.title}`,
 			})),
 			...entries
@@ -697,13 +697,13 @@ export const writeScreenshotSlideshowFromDirectory = async (dir: string, file: s
  * Builds one screenshot-only deck from any completed or partial set of repository capture folders.
  *
  * @param file Destination PowerPoint file path.
- * @param sources Repository labels, capture directories, and optional run IDs to include.
+ * @param srcs Repository labels, capture directories, and optional run IDs to include.
  * @param opts Presentation metadata applied to the aggregate deck.
  */
-export const writeScreenshotSlideshowFromDirectories = async (file: string, sources: readonly ScreenshotDirectorySource[], opts: ScreenshotSlideshowOptions = {}): Promise<void> => {
+export const writeScreenshotSlideshowFromDirectories = async (file: string, srcs: readonly ScreenshotDirectorySource[], opts: ScreenshotSlideshowOptions = {}): Promise<void> => {
 	await writeScreenshotSlideshow(
 		file,
-		sources.flatMap(({ label: l, directory: d, runId: r }) =>
+		srcs.flatMap(({ label: l, directory: d, runId: r }) =>
 			readScreenshotCapturesFromDirectory(d, r)
 				.filter(capture => !r || capture.runId === r)
 				.map(capture => ({ ...capture, group: `${l}/${capture.group}`, key: `${l}/${capture.key}`, title: `${l} · ${capture.title}` })),

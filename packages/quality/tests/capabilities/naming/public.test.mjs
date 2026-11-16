@@ -73,9 +73,9 @@ test('parameter shortening preserves free identifiers in default initializers', 
 	try {
 		mkdirSync(join(root, 'src'));
 		const file = join(root, 'src/main.ts');
-		const original = `const lang = 'en';\nconst update = (language = lang) => language;\nvoid update;\n`;
+		const orig = `const lang = 'en';\nconst update = (language = lang) => language;\nvoid update;\n`;
 		const safeFile = join(root, 'src/safe.ts');
-		writeFileSync(file, original);
+		writeFileSync(file, orig);
 		writeFileSync(safeFile, "const settings = { lang: 'fr' };\nconst read = (language = settings.lang) => language;\nvoid read;\n");
 		const cfg = { root, sourceRoots: [join(root, 'src')], extensions: ['.ts'] };
 		const findings = api.namingFindings(cfg);
@@ -88,7 +88,7 @@ test('parameter shortening preserves free identifiers in default initializers', 
 		assert.equal(safe?.name, 'language');
 		assert.equal(safe?.safe, undefined);
 		assert.equal(api.fixNaming(cfg), 1);
-		assert.equal(readFileSync(file, 'utf8'), original);
+		assert.equal(readFileSync(file, 'utf8'), orig);
 		assert.equal(readFileSync(safeFile, 'utf8'), "const settings = { lang: 'fr' };\nconst read = (lang = settings.lang) => lang;\nvoid read;\n");
 	} finally {
 		rmSync(root, { recursive: true, force: true });
@@ -104,12 +104,12 @@ test('callback shortening follows explicit aliases and preserves descriptive par
 	try {
 		mkdirSync(join(root, 'src'));
 		const file = join(root, 'src/main.ts');
-		const original = 'const values = [{ href: "#" }];\nvalues.map((patient) => patient.href);\n';
-		writeFileSync(file, original);
+		const orig = 'const values = [{ href: "#" }];\nvalues.map((patient) => patient.href);\n';
+		writeFileSync(file, orig);
 		// terra-quality-ignore single-use -- Keep this test configuration named so its fixture scope is established before the check under test runs.
 		const cfg = { root, sourceRoots: [join(root, 'src')], extensions: ['.ts'] };
 		assert.equal(api.fixNaming(cfg), 0);
-		assert.equal(readFileSync(file, 'utf8'), original);
+		assert.equal(readFileSync(file, 'utf8'), orig);
 	} finally {
 		rmSync(root, { recursive: true, force: true });
 	}

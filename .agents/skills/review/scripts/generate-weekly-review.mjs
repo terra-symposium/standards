@@ -341,15 +341,15 @@ function planDay(date, plan) {
  *
  * @param plan Contributor plan object to validate.
  * @param contributor Contributor whose name appears in validation errors.
- * @param requirePreviousObjective Whether a prior-week objective is required.
+ * @param requirePrevObjective Whether a prior-week objective is required.
  * @param allowUnknownProgress Whether an unverified milestone may use `null` progress.
  *
  * @return Whether a plan object was supplied and passed validation.
  */
-function validPlan(plan, contributor, { requirePreviousObjective = true, allowUnknownProgress = false } = {}) {
+function validPlan(plan, contributor, { requirePreviousObjective: requirePrevObjective = true, allowUnknownProgress = false } = {}) {
 	if (!plan) return false;
-	if (![plan.source, plan.start, plan.end, plan.asOf, plan.outcome, ...(requirePreviousObjective ? [plan.previousObjective] : [])].every(value => typeof value === 'string' && value.length))
-		throw new Error(`${contributor.name}: plan requires source, start, end, asOf, outcome${requirePreviousObjective ? ', and previousObjective' : ''}.`);
+	if (![plan.source, plan.start, plan.end, plan.asOf, plan.outcome, ...(requirePrevObjective ? [plan.previousObjective] : [])].every(value => typeof value === 'string' && value.length))
+		throw new Error(`${contributor.name}: plan requires source, start, end, asOf, outcome${requirePrevObjective ? ', and previousObjective' : ''}.`);
 	if (!Array.isArray(plan.milestones) || !plan.milestones.length || plan.milestones.length > 6) throw new Error(`${contributor.name}: plan requires one to six milestones.`);
 	const planStart = new Date(`${plan.start}T00:00:00Z`);
 	const planEnd = new Date(`${plan.end}T00:00:00Z`);
@@ -437,9 +437,9 @@ function assessBigFiveTimeline(plan, historyCommits) {
  * @param goal Optional goal matching this contributor's recorded identity.
  * @param colors Section palette for the overview slide.
  * @param page One-based slide number.
- * @param sources Repository and reporting-window source notes.
+ * @param srcs Repository and reporting-window source notes.
  */
-function addContributorSummary(deck, section, goal, colors, page, sources) {
+function addContributorSummary(deck, section, goal, colors, page, srcs) {
 	const slide = deck.slides.add();
 	slide.background.fill = colors.surface;
 	header(slide, `${section.name} · summary`, page, colors);
@@ -474,7 +474,7 @@ function addContributorSummary(deck, section, goal, colors, page, sources) {
 	);
 	addText(slide, goal?.status ?? 'Attribution not verified', { left: 796, top: 476, width: 400, height: 28 }, { fontSize: 15, color: colors.muted, maxChars: 44 }, `contribution-status-${page}`);
 	footer(slide, `${section.commitCount} commits · ${identity.toLowerCase()} · branch evidence only`, page, colors);
-	notes(slide, [...sources, ...(goal ? [`${goal.source} · ${goal.status}`] : []), ...section.slides.flatMap(i => i.sources ?? [])]);
+	notes(slide, [...srcs, ...(goal ? [`${goal.source} · ${goal.status}`] : []), ...section.slides.flatMap(i => i.sources ?? [])]);
 }
 
 // terra-quality-ignore single-use -- Keep the documented main declaration so its parameter and return contract remains attached.
@@ -502,7 +502,7 @@ async function main() {
 		});
 	const mergeCount = Number(git(['rev-list', '--count', ...refs, `--since=${report.since}`, `--until=${report.until}`, '--merges']));
 	const counts = new Map(commits.map(commit => [commit.author, commits.filter(other => other.author === commit.author).length]));
-	const sources = [
+	const srcs = [
 		`Refs: ${refs.join(', ')}`,
 		`Window: ${report.since} through ${report.until} (${report.timezone})`,
 		`Non-merge commits: ${commits.length}; merge commits: ${mergeCount}`,
@@ -525,7 +525,7 @@ async function main() {
 			{ fontSize: 16, color: '#F2F8F1', maxChars: 56 },
 			'cover-window',
 		);
-		notes(slide, sources);
+		notes(slide, srcs);
 		page += 1;
 	}
 	if (report.goals?.length) {
@@ -542,7 +542,7 @@ async function main() {
 			addText(slide, goal.status, { left: left + 24, top: top + 140, width: 304, height: 20 }, { fontSize: 13, color: colors.muted, maxChars: 42 }, `goal-status-${i}`);
 		});
 		footer(slide, 'Planning context informs the review; repo evidence remains the implementation source of truth.', page, colors);
-		notes(slide, [...sources, ...report.goals.map(goal => `${goal.source} · ${goal.status}`)]);
+		notes(slide, [...srcs, ...report.goals.map(goal => `${goal.source} · ${goal.status}`)]);
 		page += 1;
 	}
 	if (report.access?.columns?.length) {
@@ -557,7 +557,7 @@ async function main() {
 			addText(slide, col.body.join('\n'), { left: left + 26, top: 244, width: 292, height: 200 }, { fontSize: 16, color: colors.muted, maxChars: 38 }, `access-body-${i}`);
 		});
 		footer(slide, report.access.footer, page, colors);
-		notes(slide, [...sources, ...(report.access.sources ?? [])]);
+		notes(slide, [...srcs, ...(report.access.sources ?? [])]);
 		page += 1;
 	}
 	{
@@ -621,7 +621,7 @@ async function main() {
 		);
 		footer(slide, 'Git evidence measures what is in the repository; it does not prove work absent from Git.', page, colors);
 		notes(slide, [
-			...sources,
+			...srcs,
 			plan.source,
 			...plan.milestones.flatMap(milestone => [
 				`${milestone.name}: ${milestone.deliverables.map(i => `${i.name} — ${i.status}`).join('; ')}`,
@@ -647,7 +647,7 @@ async function main() {
 		});
 		addText(slide, report.overview.throughline, { left: 58, top: 340, width: 1120, height: 52 }, { fontSize: 20, color: colors.muted, maxChars: 106 }, 'overview-throughline');
 		footer(slide, `${commits.length} non-merge commits · ${counts.size} contributors · ${mergeCount} merges · no Netlify deploy spent`, page, colors);
-		notes(slide, sources);
+		notes(slide, srcs);
 		page += 1;
 	}
 	{
@@ -669,7 +669,7 @@ async function main() {
 			);
 		});
 		footer(slide, 'Repo evidence is summarized in the contributor sections and speaker notes.', page, colors);
-		notes(slide, sources);
+		notes(slide, srcs);
 		page += 1;
 	}
 	const orderedGoals = [...(report.goals ?? [])];
@@ -715,7 +715,7 @@ async function main() {
 					`no-commits-caveat-${page}`,
 				);
 				footer(slide, 'Git attribution comparison · no performance conclusion', page, colors);
-				notes(slide, [...sources, `${goal.source} · ${goal.status}`]);
+				notes(slide, [...srcs, `${goal.source} · ${goal.status}`]);
 				page += 1;
 			}
 			continue;
@@ -733,7 +733,7 @@ async function main() {
 				addText(slide, col.body.join('\n'), { left: left + 24, top: top + 58, width: 500, height: 112 }, { fontSize: 16, color: colors.muted, maxChars: 58 }, `meeting-body-${page}-${i}`);
 			});
 			footer(slide, meeting.footer ?? 'Meeting notes provide context; GitHub and Git remain the delivery evidence.', page, colors);
-			notes(slide, [...sources, ...(meeting.sources ?? [])]);
+			notes(slide, [...srcs, ...(meeting.sources ?? [])]);
 			page += 1;
 		}
 		if (validPlan(section.plan, section)) {
@@ -799,10 +799,10 @@ async function main() {
 				`plan-legend-${page}`,
 			);
 			footer(slide, `Planning context only · ${plan.source.split(' · https://')[0]}`, page, colors);
-			notes(slide, [...sources, plan.source, ...plan.milestones.map(milestone => `${milestone.name}: ${milestone.evidence}`)]);
+			notes(slide, [...srcs, plan.source, ...plan.milestones.map(milestone => `${milestone.name}: ${milestone.evidence}`)]);
 			page += 1;
 		}
-		addContributorSummary(deck, section, goal, colors, page, sources);
+		addContributorSummary(deck, section, goal, colors, page, srcs);
 		page += 1;
 		for (const item of section.slides) {
 			const slide = deck.slides.add();
@@ -811,9 +811,9 @@ async function main() {
 			addText(slide, item.lead, { left: 58, top: 164, width: 500, height: 76 }, { fontSize: 19, color: colors.muted, maxChars: 42 }, `lead-${page}`);
 			addText(slide, item.heading, { left: 58, top: 252, width: 500, height: 24 }, { fontSize: 20, color: colors.text, maxChars: 44 }, `heading-${page}`);
 			addText(slide, item.bullets.join('\n'), { left: 58, top: 292, width: 500, height: 186 }, { fontSize: 17, color: colors.text, maxChars: 56 }, `bullets-${page}`);
-			let codeSource = '';
-			if (item.screenshot) codeSource = await addScreenshot(slide, item.screenshot, { left: 590, top: 164, width: 632, height: 390 }, colors, page);
-			else if (item.code) codeSource = addCode(slide, item.code, { left: 590, top: 164, width: 632, height: 412 }, colors);
+			let codeSrc = '';
+			if (item.screenshot) codeSrc = await addScreenshot(slide, item.screenshot, { left: 590, top: 164, width: 632, height: 390 }, colors, page);
+			else if (item.code) codeSrc = addCode(slide, item.code, { left: 590, top: 164, width: 632, height: 412 }, colors);
 			else {
 				card(slide, { left: 590, top: 164, width: 632, height: 286 }, colors, `commit-panel-${page}`);
 				addText(slide, item.commitTrailTitle, { left: 620, top: 190, width: 540, height: 24 }, { fontSize: 20, color: colors.text, maxChars: 46 }, `trail-title-${page}`);
@@ -821,7 +821,7 @@ async function main() {
 			}
 			if (item.caption) addText(slide, item.caption, { left: 590, top: 572, width: 620, height: 48 }, { fontSize: 15, color: colors.muted, maxChars: 76 }, `caption-${page}`);
 			footer(slide, item.footer, page, colors);
-			notes(slide, [...sources, ...(item.sources ?? []), ...(codeSource ? [codeSource] : [])]);
+			notes(slide, [...srcs, ...(item.sources ?? []), ...(codeSrc ? [codeSrc] : [])]);
 			page += 1;
 		}
 	}
@@ -837,7 +837,7 @@ async function main() {
 			addText(slide, col.body.join('\n'), { left: left + 26, top: 244, width: 292, height: 158 }, { fontSize: 16, color: colors.muted, maxChars: 38 }, `method-body-${i}`);
 		});
 		footer(slide, report.method.footer, page, colors);
-		notes(slide, sources);
+		notes(slide, srcs);
 		page += 1;
 	}
 	await fs.mkdir(outputPath.slice(0, outputPath.lastIndexOf('/')), { recursive: true });

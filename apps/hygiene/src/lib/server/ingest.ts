@@ -112,19 +112,19 @@ export async function ingestHistoryReport(repoId: number, input: unknown): Promi
  *
  * @param repoId Database ID of the repository that owns the build report.
  * @param report Validated build report to persist.
- * @param source Origin label stored with the build record.
+ * @param src Origin label stored with the build record.
  * @param qualityPolicyBranch Branch whose quality configuration produced the report, if known.
  *
  * @throws {Error} If the report does not match an active repository or enabled branch.
  */
-export async function ingestBuildReport(repoId: number, report: BuildReport, source: 'github-actions' | 'local' = 'github-actions', qualityPolicyBranch: string | null = null): Promise<void> {
+export async function ingestBuildReport(repoId: number, report: BuildReport, src: 'github-actions' | 'local' = 'github-actions', qualityPolicyBranch: string | null = null): Promise<void> {
 	const sql = db();
 	const repo = (await sql`SELECT owner, name FROM repositories WHERE id = ${repoId} AND active`)[0] as { owner: string; name: string } | undefined;
 	if (!repo || `${repo.owner}/${repo.name}`.toLowerCase() !== report.repository.toLowerCase()) throw new Error('report does not match an active repository');
 	if (!(await sql`SELECT name FROM branches WHERE repository_id = ${repoId} AND name = ${report.branch} AND enabled`).length) throw new Error('branch is not enabled');
 	const runId = buildRunId(report);
 	await sql`INSERT INTO runs (repository_id, branch, run_id, run_attempt, head_sha, completed_at, conclusion, tests_passed, tests_failed, tests_skipped, checks_enabled, checks_total, checks_clean, quality_findings, run_source, quality_policy_branch)
-		VALUES (${repoId}, ${report.branch}, ${runId}, 1, ${report.headSha}, ${report.completedAt}, ${report.conclusion}, ${report.tests?.passed ?? null}, ${report.tests?.failed ?? null}, ${report.tests?.skipped ?? null}, ${report.quality?.enabled ?? null}, ${report.quality?.total ?? null}, ${report.quality?.clean ?? null}, ${report.quality?.findings ?? null}, ${source}, ${qualityPolicyBranch})
+		VALUES (${repoId}, ${report.branch}, ${runId}, 1, ${report.headSha}, ${report.completedAt}, ${report.conclusion}, ${report.tests?.passed ?? null}, ${report.tests?.failed ?? null}, ${report.tests?.skipped ?? null}, ${report.quality?.enabled ?? null}, ${report.quality?.total ?? null}, ${report.quality?.clean ?? null}, ${report.quality?.findings ?? null}, ${src}, ${qualityPolicyBranch})
 		ON CONFLICT (repository_id, run_id, run_attempt) DO UPDATE SET branch = excluded.branch, head_sha = excluded.head_sha, completed_at = excluded.completed_at,
 			conclusion = excluded.conclusion, tests_passed = excluded.tests_passed, tests_failed = excluded.tests_failed, tests_skipped = excluded.tests_skipped,
 			checks_enabled = excluded.checks_enabled, checks_total = excluded.checks_total, checks_clean = excluded.checks_clean,

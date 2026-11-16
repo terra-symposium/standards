@@ -2,13 +2,11 @@
 
 Testing helps teams run a repository’s checks in a predictable order.
 
-The `terra-test` runner executes Standards shared checks and the suites declared in a repository
-test plan. It checks that each test file has one owning suite and rejects duplicate suite commands.
+The `terra-test` runner executes Standards shared checks and the suites declared in a repository test plan. It checks that each test file has one owning suite and rejects duplicate suite commands.
 
 ## Get started
 
-Node.js `>=20`. The runner invokes the tools named in the consumer's manifest; install them in that
-repository.
+Node.js `>=20`. The runner invokes the tools named in the consumer's manifest; install them in that repository.
 
 ```sh
 pnpm add -D @terra-symposium/testing
@@ -38,16 +36,11 @@ Run the plan from the consuming repository root:
 pnpm exec terra-test run --manifest config/terra-tests.json
 ```
 
-`--suites unit,contracts` selects named local suites while retaining shared checks. `--shared-only`
-runs Standards checks without local suites. The runner discovers `config/terra-tests.json`, then
-`tests/terra-tests.json`, then legacy `.terra-tests.json` when no manifest is specified. A
-repository with no custom suites may omit the manifest.
+`--suites unit,contracts` selects named local suites while retaining shared checks. `--shared-only` runs Standards checks without local suites. The runner discovers `config/terra-tests.json`, then `tests/terra-tests.json`, then legacy `.terra-tests.json` when no manifest is specified. A repository with no custom suites may omit the manifest.
 
 ## Configuration
 
-Each suite declares one command and an `owns` list of repository-relative test globs. Review
-commands and working directories before running a plan from an unfamiliar repository. Do not place
-secrets in the manifest.
+Each suite declares one command and an `owns` list of repository-relative test globs. Review commands and working directories before running a plan from an unfamiliar repository. Do not place secrets in the manifest.
 
 ## Validation
 
@@ -57,30 +50,23 @@ secrets in the manifest.
 | `pnpm run test`        | Unit or project tests         |
 | `pnpm run build`       | Build output                  |
 
-Quality can apply safe fixes; review the diff before committing. No separate browser or Playwright
-test command is defined here.
+Quality can apply safe fixes; review the diff before committing. No separate browser or Playwright test command is defined here.
 
 ## Contributing
 
-`src/` owns the CLI and public API. `action.yml` exposes the GitHub Action. Standards is the source
-of truth; update the public Action mirror when publishing an implementation change.
+`src/` owns the CLI and public API. `action.yml` exposes the GitHub Action. Standards is the source of truth; update the public Action mirror when publishing an implementation change.
 
-Keep the manifest as the single suite inventory. When reorganizing tests, account for moved, merged,
-or retired assertions and update the guide. Add a Changeset for a published behavior change.
+Keep the manifest as the single suite inventory. When reorganizing tests, account for moved, merged, or retired assertions and update the guide. Add a Changeset for a published behavior change.
 
 Open changes through the repository pull-request workflow; see the [root README](../../README.md).
 
 ## Documentation
 
-Publish the npm package through the Standards Changesets workflow. Pin the Action to a reviewed
-commit SHA in consumer workflows and pass its `manifest` input. The Action runs one plan in one job.
+Publish the npm package through the Standards Changesets workflow. Pin the Action to a reviewed commit SHA in consumer workflows and pass its `manifest` input. The Action runs one plan in one job.
 
-The runner executes the configured commands and does not provide their credentials, browsers,
-databases, or other services. Its ownership check maps test files to suites; it does not prove
-assertion quality.
+The runner executes the configured commands and does not provide their credentials, browsers, databases, or other services. Its ownership check maps test files to suites; it does not prove assertion quality.
 
-See [test plans and ownership](../../docs/testing/0-getting-started/test-plan.mdx) and
-[CI integration](../../docs/testing/1-ci/ci-integration.mdx).
+See [test plans and ownership](../../docs/testing/0-getting-started/test-plan.mdx) and [CI integration](../../docs/testing/1-ci/ci-integration.mdx).
 
 ## License
 

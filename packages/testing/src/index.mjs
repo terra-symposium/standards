@@ -67,7 +67,7 @@ function listTestFiles(root) {
  * @return A regular expression that matches the complete normalized path.
  */
 function globRegex(pattern) {
-	let source = '^';
+	let src = '^';
 	for (let i = 0; i < pattern.length; i++) {
 		const char = pattern[i];
 		if (char === '*') {
@@ -75,13 +75,13 @@ function globRegex(pattern) {
 				i++;
 				if (pattern[i + 1] === '/') {
 					i++;
-					source += '(?:.*/)?';
-				} else source += '.*';
-			} else source += '[^/]*';
-		} else if (char === '?') source += '[^/]';
-		else source += char.replace(/[|\\{}()[\]^$+?.]/gu, '\\$&');
+					src += '(?:.*/)?';
+				} else src += '.*';
+			} else src += '[^/]*';
+		} else if (char === '?') src += '[^/]';
+		else src += char.replace(/[|\\{}()[\]^$+?.]/gu, '\\$&');
 	}
-	return new RegExp(`${source}$`, 'u');
+	return new RegExp(`${src}$`, 'u');
 }
 
 // terra-quality-ignore single-use -- Keep the documented runLinearHistory declaration so its parameter and return contract remains attached.
@@ -228,8 +228,8 @@ export function validateTestPlan(value, root) {
 			if (owners.has(norm)) throw new Error(`Test ownership overlaps: ${norm} is claimed by ${owners.get(norm)} and ${suite.name}.`);
 			owners.set(norm, suite.name);
 			for (const file of testFiles.filter(path => globRegex(norm).test(path))) {
-				const previous = ownedFiles.get(file);
-				if (previous) throw new Error(`Test file ownership overlaps: ${file} is claimed by ${previous} and ${suite.name}.`);
+				const prev = ownedFiles.get(file);
+				if (prev) throw new Error(`Test file ownership overlaps: ${file} is claimed by ${prev} and ${suite.name}.`);
 				ownedFiles.set(file, suite.name);
 			}
 		}

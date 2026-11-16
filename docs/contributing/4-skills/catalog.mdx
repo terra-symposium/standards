@@ -3,11 +3,7 @@ title: Agent skill catalog
 description: Find canonical agent workflows across the Desktop repositories.
 ---
 
-# Agent skill catalog
-
-This inventory is generated from repository `.agents/skills/*/SKILL.md` files.
-Edit the owning skill, then run `python3 scripts/skills_catalog.py` from Standards.
-Shared Standards skills are also packaged in the Terra skills plugin.
+This inventory is generated from repository `.agents/skills/*/SKILL.md` files. Edit the owning skill, then run `python3 scripts/skills_catalog.py` from Standards. Shared Standards skills are also packaged in the Terra skills plugin.
 
 ## Install shared skills locally
 
@@ -18,9 +14,7 @@ codex plugin marketplace add /absolute/path/to/standards
 codex plugin add terra-skills@terra-skills-local
 ```
 
-The versioned plugin is built from canonical `.agents/skills/` sources into `dist/`.
-The local marketplace uses that generated bundle. Rebuild and refresh it after edits.
-Cloud availability requires publishing the plugin to a workspace or reachable marketplace.
+The versioned plugin is built from canonical `.agents/skills/` sources into `dist/`. The local marketplace uses that generated bundle. Rebuild and refresh it after edits. Cloud availability requires publishing the plugin to a workspace or reachable marketplace.
 
 | Repository | Skill | Use it for | Canonical source | Availability |
 | --- | --- | --- | --- | --- |

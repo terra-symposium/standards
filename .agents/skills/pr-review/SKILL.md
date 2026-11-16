@@ -9,9 +9,7 @@ metadata:
 
 Use this skill for a requested branch, set of branches, or pull requests. A branch may have an open PR, a closed or merged PR, or no PR. Review each requested branch against its intended target, preserve useful work, fix actionable defects when authorized, and complete the requested integration or cleanup. Do not expand the scope to unrelated branches or PRs because they share a name prefix, age, author, or nearby commit history.
 
-If the user has not identified a branch or PR, inventory the plausible candidates
-and establish an exact identifier before a disposition. A recommendation to merge,
-close, or delete is evidence for review, not authorization to act on an unnamed ref.
+If the user has not identified a branch or PR, inventory the plausible candidates and establish an exact identifier before a disposition. A recommendation to merge, close, or delete is evidence for review, not authorization to act on an unnamed ref.
 
 For bundling Jules-created PRs, also follow [Jules bundling](references/jules.md).
 
@@ -23,12 +21,7 @@ Identify every requested branch and its exact ref and head SHA. Determine its in
 
 Find associated PRs, if any, and verify their state, author or automation metadata, base, head, and remote. Branch naming alone does not establish authorship, Jules or Codex provenance, or suitability.
 
-When the requested scope permits remote access, fetch relevant remotes before
-comparing refs. For a read-only local-artifact audit, use only supplied refs and
-label remote state unverified. Do not assume the current checkout contains the
-user's desktop branches; distinguish local-only refs, remote refs, stale
-tracking refs, and branches absent from this checkout. Never report absence as
-deletion without checking the relevant repository and namespace.
+When the requested scope permits remote access, fetch relevant remotes before comparing refs. For a read-only local-artifact audit, use only supplied refs and label remote state unverified. Do not assume the current checkout contains the user's desktop branches; distinguish local-only refs, remote refs, stale tracking refs, and branches absent from this checkout. Never report absence as deletion without checking the relevant repository and namespace.
 
 Preserve all unrelated dirty or untracked work and branches. Do not switch, reset, rebase, or remove a branch checked out in another worktree without first accounting for its state.
 
@@ -50,12 +43,7 @@ Read all available review comments and threads, including replies and resolution
 
 Inspect required and relevant check results. Distinguish passed, failed, pending, skipped, unavailable, and unrelated checks. Never describe a check as passed unless verified.
 
-Run relevant local tests, lint, type checks, builds, or other quality checks
-when the requested scope permits execution. For an artifact-only review, report
-validation as incomplete and never infer a pass. Follow explicit user
-instructions about which external statuses are relevant. Report exactly what
-ran and its result; local checks do not make a failed required check pass
-unless the user explicitly directs that policy.
+Run relevant local tests, lint, type checks, builds, or other quality checks when the requested scope permits execution. For an artifact-only review, report validation as incomplete and never infer a pass. Follow explicit user instructions about which external statuses are relevant. Report exactly what ran and its result; local checks do not make a failed required check pass unless the user explicitly directs that policy.
 
 ## 4. Fix, integrate, close, or retain
 

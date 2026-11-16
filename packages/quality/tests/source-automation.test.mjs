@@ -24,13 +24,13 @@ HELPERS
 /**
  * Creates a quality config scoped to one JSX fixture.
  *
- * @param source JSX contents written to the fixture's view component.
+ * @param src JSX contents written to the fixture's view component.
  *
  * @return Fixture root and quality configuration targeting the view component.
  */
-function fixtureConfig(source) {
+function fixtureConfig(src) {
 	const root = fixtureRoot('terra-quality-accessibility-');
-	fixtureFile(root, 'src/view.tsx', source);
+	fixtureFile(root, 'src/view.tsx', src);
 	return { root, cfg: createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.tsx'] }) };
 }
 
@@ -40,7 +40,7 @@ function fixtureConfig(source) {
  *
  * @return Nothing.
  */
-function verifySafeFixSourceOwnership() {
+function verifySafeFixSrcOwnership() {
 	const root = fixtureRoot('terra-quality-source-fix-ownership-');
 	execFileSync('git', ['init', '--quiet'], { cwd: root });
 	fixtureFile(root, 'package.json', JSON.stringify({ type: 'module' }));
@@ -123,9 +123,9 @@ export async function runQualityFromCfg(root, args) {
 	const beforeDeclaration = readFileSync(join(root, 'src/vite-env.d.ts'), 'utf8');
 	const beforeMinified = readFileSync(join(root, 'content/viewer/bundle.js'), 'utf8');
 	// terra-quality-ignore single-use -- Snapshot the workflow file before automation rewrites it for the preservation assertion.
-	const originalWorkflow = readFileSync(workflow, 'utf8');
+	const origWorkflow = readFileSync(workflow, 'utf8');
 	runQualityCli(cfg, ['quality', '--warn', '--skip-commands', '--skip-recommendations']);
-	assert.equal(readFileSync(workflow, 'utf8'), originalWorkflow, 'warning mode must not modify an untracked source');
+	assert.equal(readFileSync(workflow, 'utf8'), origWorkflow, 'warning mode must not modify an untracked source');
 	assert.equal(readFileSync(courseDataPath, 'utf8'), beforeCourseData);
 	assert.equal(readFileSync(join(root, 'src/vite-env.d.ts'), 'utf8'), beforeDeclaration);
 	assert.equal(readFileSync(join(root, 'content/viewer/bundle.js'), 'utf8'), beforeMinified);
@@ -186,7 +186,7 @@ test('new default-path checks require an explicit rollout toggle', () => {
 	assert.equal(qualityCheckEnabled(enabled, 'documented-commands'), true);
 });
 test('explicit safe fixes preserve untracked workflow semantics and leave captured assets untouched', () => {
-	verifySafeFixSourceOwnership();
+	verifySafeFixSrcOwnership();
 });
 test('aria-labelledby requires a literal reference with source-evident content', () => {
 	const { cfg } = fixtureConfig(`

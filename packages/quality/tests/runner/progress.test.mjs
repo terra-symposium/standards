@@ -23,11 +23,11 @@ test('progress updates always include a bar and rewrite one line even without a 
 	// terra-quality-ignore single-use -- Record whether the TTY flag existed before the test so cleanup restores its original presence.
 	const hadTTY = Object.hasOwn(stderr, 'isTTY');
 	// terra-quality-ignore single-use -- Snapshot the original TTY flag before the test changes it.
-	const originalTTY = stderr.isTTY;
+	const origTTY = stderr.isTTY;
 	// terra-quality-ignore single-use -- Record whether the CI variable existed before the test so cleanup restores its original presence.
 	const hadCI = Object.hasOwn(process.env, 'CI');
 	// terra-quality-ignore single-use -- Snapshot the original CI environment value before the test changes it.
-	const originalCI = process.env.CI;
+	const origCI = process.env.CI;
 	try {
 		stderr.isTTY = false;
 		process.env.CI = 'true';
@@ -39,9 +39,9 @@ test('progress updates always include a bar and rewrite one line even without a 
 		delete process.env.CI;
 		qualityProgress('TTY scan', 1, 2, capture);
 	} finally {
-		if (hadTTY) stderr.isTTY = originalTTY;
+		if (hadTTY) stderr.isTTY = origTTY;
 		else delete stderr.isTTY;
-		if (hadCI) process.env.CI = originalCI;
+		if (hadCI) process.env.CI = origCI;
 		else delete process.env.CI;
 	}
 	const updates = writes.filter(write => write.startsWith('\r'));

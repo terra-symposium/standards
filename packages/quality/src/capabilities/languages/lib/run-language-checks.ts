@@ -57,9 +57,9 @@ export function runLanguageChecks(cfg: QualityCfg, options: Pick<CapabilityOptio
 		}
 		return result.error;
 	};
-	const reportFailure = (name: string, message: string): void => {
+	const reportFailure = (name: string, msg: string): void => {
 		process.exitCode = 1;
-		console.error(`${name} failed: ${message}`);
+		console.error(`${name} failed: ${msg}`);
 	};
 	if (options.fix) {
 		for (const check of checks) {

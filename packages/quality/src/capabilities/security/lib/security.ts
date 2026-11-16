@@ -22,13 +22,13 @@ REGEX
 //////////////////////////////////////////////////*/
 
 const ENV_REGEX = /(^|\/)\.env(?:\.|$)/;
-const PROCESS_ENV_SOURCE_REGEX = /\.(?:astro|cjs|cts|js|jsx|mjs|mts|ts|tsx)$/iu;
+const PROCESS_ENV_SRC_REGEX = /\.(?:astro|cjs|cts|js|jsx|mjs|mts|ts|tsx)$/iu;
 /** A source or repository-boundary issue found by a configured security policy. */
 export type SecurityFinding = { file?: string; message: string };
 
 // terra-quality-ignore single-use -- Keep the documented EnvironmentAccess declaration so its parameter and return contract remains attached.
 /** Source-level environment behavior found outside comments and literal text. */
-type EnvironmentAccess = { readsProcessEnv: boolean; loadsEnvFile: boolean };
+type EnvAccess = { readsProcessEnv: boolean; loadsEnvFile: boolean };
 
 /*//////////////////////////////////////////////////
 HELPERS
@@ -77,8 +77,8 @@ export function securityFindings(cfg: QualityCfg): SecurityFinding[] {
 			if (new RegExp(`(?:from|import)\\s*(?:\\(\\s*)?['"]${specifier.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&')}['"]`).test(src)) findings.push({ file: name, message: `forbidden import ${specifier}` });
 		if (clientRoots.some(r => file === r || file.startsWith(`${r}${sep}`)) && /(?:SECRET|TOKEN|PASSWORD|PRIVATE_KEY|DATABASE_URL)/.test(src) && /import\.meta\.env|process\.env/.test(src))
 			findings.push({ file: name, message: 'client source references a secret-shaped environment value' });
-		if (PROCESS_ENV_SOURCE_REGEX.test(file)) {
-			const access = environmentAccess(file, src);
+		if (PROCESS_ENV_SRC_REGEX.test(file)) {
+			const access = envAccess(file, src);
 			if (access.loadsEnvFile) findings.push({ file: name, message: 'environment-file loading is forbidden' });
 			if (access.readsProcessEnv && !runtimeRoots.some(r => file === r || file.startsWith(`${r}${sep}`)))
 				findings.push({ file: name, message: 'process.env access is outside a configured runtime root' });
@@ -95,7 +95,7 @@ export function securityFindings(cfg: QualityCfg): SecurityFinding[] {
  *
  * @return Whether code reads `process.env` or loads dotenv configuration.
  */
-function environmentAccess(file: string, text: string): EnvironmentAccess {
+function envAccess(file: string, text: string): EnvAccess {
 	const ext = file.slice(file.lastIndexOf('.')).toLowerCase();
 	let readsProcessEnv = false;
 	let loadsEnvFile = false;

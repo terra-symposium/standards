@@ -28,7 +28,7 @@ const BINTEGRATIONS_S_S_U_REGEX = /\bintegrations\s*:\s*\[/u;
 export type ErrorBoundaryFinding = { file: string; line: number; column: number; message: string; fixable: boolean };
 /** Describes one JSX render call that can receive the configured boundary wrapper. */
 type RenderSite = { call: ts.CallExpression; expression: ts.Expression; index: number };
-const SOURCE_EXTS = new Set(['.js', '.jsx', '.mjs', '.cjs', '.ts', '.tsx', '.mts', '.cts']);
+const SRC_EXTS = new Set(['.js', '.jsx', '.mjs', '.cjs', '.ts', '.tsx', '.mts', '.cts']);
 const FIXABLE_EXTS = new Set(['.js', '.jsx', '.mjs', '.ts', '.tsx', '.mts']);
 const ASTRO_CONFIG = /^astro\.config\.(?:js|mjs|cjs|ts|mts|cts)$/u;
 const IGNORED_CONFIG_DIRS = new Set(['.git', '.astro', '.next', '.nuxt', '.output', '.vercel', 'coverage', 'dist', 'node_modules', 'vendor']);
@@ -68,20 +68,20 @@ function unwrap(expr: ts.Expression): ts.Expression {
 /**
  * Collects local names that refer to an imported React error boundary.
  *
- * @param source Parsed source file.
+ * @param src Parsed source file.
  *
  * @return Local identifiers usable as an ErrorBoundary JSX tag.
  */
-function importedBoundaries(source: ts.SourceFile): Set<string> {
+function importedBoundaries(src: ts.SourceFile): Set<string> {
 	const names = new Set<string>();
-	for (const statement of source.statements) {
+	for (const statement of src.statements) {
 		if (!ts.isImportDeclaration(statement) || !statement.importClause || !ts.isStringLiteral(statement.moduleSpecifier)) continue;
 		const clause = statement.importClause;
 		if (clause.name && ERR_BOUNDAR_IU_REGEX.test(statement.moduleSpecifier.text)) names.add(clause.name.text);
 		if (!clause.namedBindings || !ts.isNamedImports(clause.namedBindings)) continue;
 		for (const specifier of clause.namedBindings.elements) {
-			const original = specifier.propertyName?.text ?? specifier.name.text;
-			if (ERR_BOUNDAR_IU_REGEX.test(original) || (ERR_BOUNDAR_IU_REGEX.test(statement.moduleSpecifier.text) && original === 'default')) names.add(specifier.name.text);
+			const orig = specifier.propertyName?.text ?? specifier.name.text;
+			if (ERR_BOUNDAR_IU_REGEX.test(orig) || (ERR_BOUNDAR_IU_REGEX.test(statement.moduleSpecifier.text) && orig === 'default')) names.add(specifier.name.text);
 		}
 	}
 	return names;
@@ -109,7 +109,7 @@ function isBoundaryTag(tag: ts.JsxTagNameExpression, boundaries: Set<string>): b
  *
  * @return True when the expression names an error boundary.
  */
-function isBoundaryReference(expr: ts.Expression | undefined, boundaries: Set<string>): boolean {
+function isBoundaryRef(expr: ts.Expression | undefined, boundaries: Set<string>): boolean {
 	if (!expr) return false;
 	const node = unwrap(expr);
 	if (ts.isIdentifier(node)) return boundaries.has(node.text) || ERR_BOUNDARY_IU_REGEX.test(node.text);
@@ -128,17 +128,17 @@ function isBoundaryExpr(expr: ts.Expression, boundaries: Set<string>): boolean {
 	const node = unwrap(expr);
 	if (ts.isJsxElement(node)) return isBoundaryTag(node.openingElement.tagName, boundaries);
 	if (ts.isJsxSelfClosingElement(node)) return isBoundaryTag(node.tagName, boundaries);
-	return ts.isCallExpression(node) && /createElement$/iu.test(exprName(node.expression)) && isBoundaryReference(node.arguments[0], boundaries);
+	return ts.isCallExpression(node) && /createElement$/iu.test(exprName(node.expression)) && isBoundaryRef(node.arguments[0], boundaries);
 }
 
 /**
  * Finds direct React root renders and records their mounted element arguments.
  *
- * @param source Parsed source file.
+ * @param src Parsed source file.
  *
  * @return Root render expressions with their argument positions.
  */
-function reactRootRenders(source: ts.SourceFile): RenderSite[] {
+function reactRootRenders(src: ts.SourceFile): RenderSite[] {
 	const roots = new Set<string>();
 	const sites: RenderSite[] = [];
 	const isFactory = (expr: ts.Expression, name: 'createRoot' | 'hydrateRoot'): boolean => exprName(expr) === name;
@@ -157,7 +157,7 @@ function reactRootRenders(source: ts.SourceFile): RenderSite[] {
 		}
 		ts.forEachChild(node, visit);
 	};
-	visit(source);
+	visit(src);
 	return sites;
 }
 
@@ -168,14 +168,14 @@ function reactRootRenders(source: ts.SourceFile): RenderSite[] {
  *
  * @return Parsed source files with root render sites.
  */
-function sourceInfos(cfg: QualityCfg): { file: string; text: string; source: ts.SourceFile; boundaries: Set<string>; renderSites: RenderSite[] }[] {
+function srcInfos(cfg: QualityCfg): { file: string; text: string; source: ts.SourceFile; boundaries: Set<string>; renderSites: RenderSite[] }[] {
 	return srcFiles(cfg)
-		.filter(f => SOURCE_EXTS.has(f.slice(f.lastIndexOf('.')).toLowerCase()))
+		.filter(f => SRC_EXTS.has(f.slice(f.lastIndexOf('.')).toLowerCase()))
 		.map(f => {
 			const text = readFileSync(f, 'utf8');
 			const ext = f.slice(f.lastIndexOf('.')).toLowerCase();
-			const source = ts.createSourceFile(f, text, ts.ScriptTarget.Latest, true, ext === '.tsx' || ext === '.jsx' ? ts.ScriptKind.TSX : /\.[cm]?ts$/iu.test(ext) ? ts.ScriptKind.TS : ts.ScriptKind.JS);
-			return { file: f, text, source, boundaries: importedBoundaries(source), renderSites: reactRootRenders(source) };
+			const src = ts.createSourceFile(f, text, ts.ScriptTarget.Latest, true, ext === '.tsx' || ext === '.jsx' ? ts.ScriptKind.TSX : /\.[cm]?ts$/iu.test(ext) ? ts.ScriptKind.TS : ts.ScriptKind.JS);
+			return { file: f, text, source: src, boundaries: importedBoundaries(src), renderSites: reactRootRenders(src) };
 		});
 }
 
@@ -188,7 +188,7 @@ function sourceInfos(cfg: QualityCfg): { file: string; text: string; source: ts.
  */
 export function errorBoundaryFindings(cfg: QualityCfg): ErrorBoundaryFinding[] {
 	const findings: ErrorBoundaryFinding[] = [];
-	for (const info of sourceInfos(cfg)) {
+	for (const info of srcInfos(cfg)) {
 		for (const site of info.renderSites) {
 			if (isBoundaryExpr(site.expression, info.boundaries)) continue;
 			const point = info.source.getLineAndCharacterOfPosition(site.expression.getStart(info.source));
@@ -226,7 +226,7 @@ export function errorBoundaryFindings(cfg: QualityCfg): ErrorBoundaryFinding[] {
  */
 export function fixErrorBoundaries(cfg: QualityCfg): number {
 	let fixedFiles = fixAstroBoundaryIntegrations(cfg.root);
-	for (const info of sourceInfos(cfg)) {
+	for (const info of srcInfos(cfg)) {
 		const unguarded = info.renderSites.filter(s => !isBoundaryExpr(s.expression, info.boundaries));
 		if (!unguarded.length || !FIXABLE_EXTS.has(info.file.slice(info.file.lastIndexOf('.')).toLowerCase())) continue;
 		const ext = info.file.slice(info.file.lastIndexOf('.')).toLowerCase();
@@ -246,13 +246,13 @@ export function fixErrorBoundaries(cfg: QualityCfg): number {
 		};
 		const needsBoundaryImport = info.boundaries.size === 0;
 		const boundaryName = info.boundaries.values().next().value ?? uniqueName('TerraRootErrorBoundary');
-		const createElementName = supportsJsx ? '' : uniqueName('terraCreateElement');
+		const createElName = supportsJsx ? '' : uniqueName('terraCreateElement');
 		const edits = unguarded.map(s => ({
 			start: s.expression.getStart(info.source),
 			end: s.expression.getEnd(),
 			text: supportsJsx
 				? `<${boundaryName} name="Application root">${info.text.slice(s.expression.getStart(info.source), s.expression.getEnd())}</${boundaryName}>`
-				: `${createElementName}(${boundaryName}, { name: 'Application root' }, (${info.text.slice(s.expression.getStart(info.source), s.expression.getEnd())}))`,
+				: `${createElName}(${boundaryName}, { name: 'Application root' }, (${info.text.slice(s.expression.getStart(info.source), s.expression.getEnd())}))`,
 		}));
 		if (needsBoundaryImport || !supportsJsx) {
 			const insertion = info.source.statements.filter(s => ts.isImportDeclaration(s) || (ts.isExpressionStatement(s) && ts.isStringLiteral(s.expression))).at(-1)?.end ?? 0;
@@ -261,7 +261,7 @@ export function fixErrorBoundaries(cfg: QualityCfg): number {
 				end: insertion,
 				text: `${insertion ? '\n' : ''}${[
 					...(needsBoundaryImport ? [`import { ErrorBoundary as ${boundaryName} } from '${'@terra-symposium/boundaries/react'}';`] : []),
-					...(!supportsJsx ? [`import { createElement as ${createElementName} } from 'react';`] : []),
+					...(!supportsJsx ? [`import { createElement as ${createElName} } from 'react';`] : []),
 				].join('\n')}\n`,
 			});
 		}

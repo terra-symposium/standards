@@ -63,7 +63,7 @@ export function runFormatting(cfg: QualityCfg, options: Pick<CapabilityOptions, 
 			return available.status || 1;
 		}
 	}
-	const originals = fix ? new Map(files.map(file => [file, readFileSync(file, 'utf8')])) : undefined;
+	const origs = fix ? new Map(files.map(file => [file, readFileSync(file, 'utf8')])) : undefined;
 	if (fix) {
 		for (const file of files) {
 			if (/\.(?:c|m)?(?:js|jsx|ts|tsx)$/u.test(file)) {
@@ -117,9 +117,9 @@ export function runFormatting(cfg: QualityCfg, options: Pick<CapabilityOptions, 
 			} else if (verified.status !== 0) failed ||= verified.status ?? 1;
 		}
 	}
-	if (failed && originals) {
-		for (const [file, original] of originals) {
-			if (readFileSync(file, 'utf8') !== original) writeFileSync(file, original);
+	if (failed && origs) {
+		for (const [file, orig] of origs) {
+			if (readFileSync(file, 'utf8') !== orig) writeFileSync(file, orig);
 		}
 		console.error('Prettier failed; restored source files because formatting did not complete.');
 	}

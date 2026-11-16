@@ -35,18 +35,18 @@ test('documentation checks stay read-only in warn and fix modes', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-documentation-cli-'));
 	try {
 		mkdirSync(join(root, 'src'));
-		const source = join(root, 'src/main.ts');
-		const original = `/**\n *\n */\nexport function value(input: string): string { return input; }\n`;
-		writeFileSync(source, original);
+		const src = join(root, 'src/main.ts');
+		const orig = `/**\n *\n */\nexport function value(input: string): string { return input; }\n`;
+		writeFileSync(src, orig);
 		const config = join(root, 'quality.json');
 		writeFileSync(config, JSON.stringify({ sourceRoots: ['src'], extensions: ['.ts'] }));
 		const script = new URL('../../../dist/capabilities/documentation/cli.js', import.meta.url);
 		const warn = spawnSync(process.execPath, [script.pathname, '--config', config, '--all', '--warn'], { cwd: root, encoding: 'utf8' });
 		assert.equal(warn.status, 1, warn.stderr);
-		assert.equal(readFileSync(source, 'utf8'), original);
+		assert.equal(readFileSync(src, 'utf8'), orig);
 		const fix = spawnSync(process.execPath, [script.pathname, '--config', config, '--all'], { cwd: root, encoding: 'utf8' });
 		assert.equal(fix.status, 1, fix.stderr);
-		assert.equal(readFileSync(source, 'utf8'), original);
+		assert.equal(readFileSync(src, 'utf8'), orig);
 	} finally {
 		rmSync(root, { recursive: true, force: true });
 	}

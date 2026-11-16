@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """Bundle canonical repository skills as a portable, versioned plugin."""
 
-from pathlib import Path
 import json
 import re
 import shutil
 import sys
 import zipfile
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 SKILLS = ROOT / ".agents/skills"
@@ -27,14 +27,28 @@ def main():
         if not source.is_dir() or not (source / "SKILL.md").exists():
             continue
         shutil.copytree(
-            source, OUT / "skills" / source.name,
-            ignore=shutil.ignore_patterns("__pycache__", "*.pyc", ".DS_Store", ".ruff_cache", ".mypy_cache", "snapshots"),
+            source,
+            OUT / "skills" / source.name,
+            ignore=shutil.ignore_patterns(
+                "__pycache__",
+                "*.pyc",
+                ".DS_Store",
+                ".ruff_cache",
+                ".mypy_cache",
+                "snapshots",
+            ),
         )
     for document in (OUT / "skills").rglob("*.md"):
         for target in re.findall(r"(?<!!)\[[^\]]+\]\(([^)]+)\)", document.read_text()):
             path = target.split("#", 1)[0]
-            if path and not re.match(r"^(?:https?:|mailto:|/)", path) and not (document.parent / path).exists():
-                sys.exit(f"Broken packaged skill link: {document.relative_to(OUT)} -> {target}")
+            if (
+                path
+                and not re.match(r"^(?:https?:|mailto:|/)", path)
+                and not (document.parent / path).exists()
+            ):
+                sys.exit(
+                    f"Broken packaged skill link: {document.relative_to(OUT)} -> {target}"
+                )
     archive = OUT.parent / f"terra-skills-plugin-{manifest['version']}.zip"
     with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED) as package:
         for path in sorted(OUT.rglob("*")):

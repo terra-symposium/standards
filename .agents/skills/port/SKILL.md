@@ -46,22 +46,9 @@ Prefer the shared `terra-quality-dev` launcher when the repository provides it. 
 
 ## Change procedure
 
-1. Confirm the app has an independent local server. Use its listed port. For a new
-   app, select an unassigned port at or above 1024, check it across all Desktop
-   repositories, and add its owner to the table in this skill.
-2. Identify any current listener and its owner before running
-   `terra-quality-dev`, because its acquisition step can terminate that
-   listener. If it belongs to another app, do not terminate it: use the target
-   app's assigned port if free, or reassign one app to a checked unique port and
-   update this table. If the listener's owner is unknown, stop acquisition until
-   ownership is established. Update the server launcher/configuration and
-   enable strict handling so unowned collisions fail clearly. Standards Docs'
-   `scripts/build-docs.mjs` passes `--port 2050` directly; update it if changing
-   that server's port.
+1. Confirm the app has an independent local server. Use its listed port. For a new app, select an unassigned port at or above 1024, check it across all Desktop repositories, and add its owner to the table in this skill.
+2. Identify any current listener and its owner before running `terra-quality-dev`, because its acquisition step can terminate that listener. If it belongs to another app, do not terminate it: use the target app's assigned port if free, or reassign one app to a checked unique port and update this table. If the listener's owner is unknown, stop acquisition until ownership is established. Update the server launcher/configuration and enable strict handling so unowned collisions fail clearly. Standards Docs' `scripts/build-docs.mjs` passes `--port 2050` directly; update it if changing that server's port.
 3. Update local origins, OAuth callback examples, browser-test base URLs, and docs that name the port.
-4. Search tracked source and docs across all Desktop repositories for old and new
-   ports, including `localhost`, `127.0.0.1`, redirects, and configured origins.
-5. Start the affected server without displacing another app. Confirm the actual
-   bound port, strict collision failure, and a healthy intended URL. Check
-   dependent browser tests or callback paths when changed.
+4. Search tracked source and docs across all Desktop repositories for old and new ports, including `localhost`, `127.0.0.1`, redirects, and configured origins.
+5. Start the affected server without displacing another app. Confirm the actual bound port, strict collision failure, and a healthy intended URL. Check dependent browser tests or callback paths when changed.
 6. Review only the intended port changes before committing.

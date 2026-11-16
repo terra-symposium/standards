@@ -3,10 +3,12 @@ title: Documentation authoring
 description: Organise accurate, task-focused Docs pages with supported blocks.
 ---
 
+import { NodesBlock } from '@terra-symposium/docs';
+export const Nodes = props => <NodesBlock block={props} />;
+
 Use directories for sections and numbered groups, and Markdown or MDX files for leaves. Each leaf should answer one primary reader question. Name groups in reading order, such as `0-getting-started` and `1-packages`.
 
-For Terra Docs document blocks and Markdown conversion, use the
-[Docs authoring skill](https://github.com/Terra-Symposium/docs/blob/development/.agents/skills/docs-authoring/SKILL.md).
+For Terra Docs document blocks and Markdown conversion, use the [Docs authoring skill](https://github.com/Terra-Symposium/docs/blob/development/.agents/skills/docs-authoring/SKILL.md).
 
 ## Choose a page type
 
@@ -21,12 +23,12 @@ These are the [Diátaxis page types](https://diataxis.fr/start-here/). Split a l
 
 ## Choose a block
 
-| Relationship                    | Block                                                           |
-| ------------------------------- | --------------------------------------------------------------- |
-| Repeated properties             | Table                                                           |
-| Sequence or dependency          | `<Nodes />` diagram                                             |
-| Alternative instructions        | Tabs with `||| [Title]` sections                                |
-| Optional detail                 | Accordion with `=== [Title]` sections                           |
+| Relationship                    | Block                                                            |
+| ------------------------------- | ---------------------------------------------------------------- | --- | --- | ----------------- |
+| Repeated properties             | Table                                                            |
+| Sequence or dependency          | `<Nodes />` diagram                                              |
+| Alternative instructions        | Tabs with `                                                      |     |     | [Title]` sections |
+| Optional detail                 | Accordion with `=== [Title]` sections                            |
 | A bounded constraint or example | `:::note`, `:::tip`, `:::warning`, `:::caution`, or `:::example` |
 
 Use a diagram only when the relationship is harder to understand in prose. Give images informative alt text and a caption. Keep assets beside their owning section.

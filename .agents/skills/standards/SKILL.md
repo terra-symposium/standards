@@ -34,12 +34,7 @@ Use this skill to implement or review changes across Terra repositories, includi
 
 `packages/quality` is the source for `@terra-symposium/quality`. Change and test reusable checks here rather than copying their implementation or policy into a consumer repository.
 
-Add focused tests under `packages/quality/tests`; exercise the public package boundary and assert autofix idempotence when relevant.
-For a new public API, verify the runtime and types entries in
-`packages/quality/package.json` exports. Build the package, then test an
-isolated consumer import by package name and TypeScript type resolution so
-source aliases or direct `dist` imports cannot hide a broken export. Update
-the package map in Docs when the public surface changes.
+Add focused tests under `packages/quality/tests`; exercise the public package boundary and assert autofix idempotence when relevant. For a new public API, verify the runtime and types entries in `packages/quality/package.json` exports. Build the package, then test an isolated consumer import by package name and TypeScript type resolution so source aliases or direct `dist` imports cannot hide a broken export. Update the package map in Docs when the public surface changes.
 
 Implement behavior under `packages/quality/src` and keep runner/config normalization, schema, package documentation, and examples aligned.
 

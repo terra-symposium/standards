@@ -23,11 +23,11 @@ test('public API exports the capability contract', () => {
 test('public single-use API batches safe declaration inlining without the aggregate runner', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-refactoring-public-'));
 	try {
-		const sourceRoot = join(root, 'src');
-		mkdirSync(sourceRoot);
-		const sourcePath = join(sourceRoot, 'main.ts');
+		const srcRoot = join(root, 'src');
+		mkdirSync(srcRoot);
+		const srcPath = join(srcRoot, 'main.ts');
 		writeFileSync(
-			sourcePath,
+			srcPath,
 			`const label = 'ready';
 const retryCount = 3;
 const available = true;
@@ -39,7 +39,7 @@ export const status = [label, retryCount, available];
 		const cfg = loadQualityConfig(configPath);
 		assert.equal(api.singleUseFindings(cfg).filter(finding => finding.autofixable).length, 3);
 		assert.equal(api.fixSingleUseDeclarations(cfg), 1);
-		const updated = readFileSync(sourcePath, 'utf8');
+		const updated = readFileSync(srcPath, 'utf8');
 		assert.doesNotMatch(updated, /const (?:label|retryCount|available)\b/u);
 		assert.match(updated, /export const status = \[\('ready'\), \(3\), \(true\)\]/u);
 		assert.deepEqual(api.singleUseFindings(cfg), []);
@@ -50,11 +50,11 @@ export const status = [label, retryCount, available];
 test('public single-use API batches static literals only at the first effect-safe consumer', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-refactoring-literal-'));
 	try {
-		const sourceRoot = join(root, 'src');
-		mkdirSync(sourceRoot);
-		const sourcePath = join(sourceRoot, 'main.js');
+		const srcRoot = join(root, 'src');
+		mkdirSync(srcRoot);
+		const srcPath = join(srcRoot, 'main.js');
 		writeFileSync(
-			sourcePath,
+			srcPath,
 			`const events = [];
 function sideEffect() { events.push('effect'); return 'done'; }
 function take(value, suffix) { events.push('take'); return [value, suffix]; }
@@ -85,16 +85,16 @@ console.log(JSON.stringify({ object: runObject(), array: runArray(), delayed: ru
 		assert.equal(findings.find(finding => finding.name === 'labels')?.autofixable, true);
 		assert.equal(findings.find(finding => finding.name === 'delayedOptions')?.autofixable, false);
 		assert.equal(findings.find(finding => finding.name === 'optionalOptions')?.autofixable, false);
-		const before = spawnSync(process.execPath, [sourcePath], { encoding: 'utf8' });
+		const before = spawnSync(process.execPath, [srcPath], { encoding: 'utf8' });
 		assert.equal(before.status, 0, before.stderr);
 		assert.equal(api.fixSingleUseDeclarations(cfg), 1);
-		const updated = readFileSync(sourcePath, 'utf8');
+		const updated = readFileSync(srcPath, 'utf8');
 		assert.doesNotMatch(updated, /const (?:options|labels)\b/u);
 		assert.match(updated, /take\(\(\{ retries: 3, enabled: true \}\), sideEffect\(\)\)/u);
 		assert.match(updated, /take\(\(\['fast', 'safe'\]\), 'labels'\)/u);
 		assert.match(updated, /const delayedOptions = \{ retries: 4 \}/u);
 		assert.match(updated, /const optionalOptions = \{ retries: 5 \}/u);
-		const after = spawnSync(process.execPath, [sourcePath], { encoding: 'utf8' });
+		const after = spawnSync(process.execPath, [srcPath], { encoding: 'utf8' });
 		assert.equal(after.status, 0, after.stderr);
 		assert.deepEqual(JSON.parse(after.stdout), JSON.parse(before.stdout));
 	} finally {

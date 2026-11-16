@@ -11,11 +11,7 @@ Use for Netlify deployment, runtime verification, or a decision about deployment
 
 ## 1. Decide and identify the target
 
-In the target repository, read `README.md`, `.agents/index.md` where present,
-and the actual deployment configs. Website keeps them in `config/netlify.toml`,
-`astro/netlify.toml`, and `sanity/netlify.toml`. Record branch, status, remotes,
-commit, and Netlify site. Inspect `git remote -v` and the live Netlify project;
-never infer deployment source from a remote name or a stale site ID below.
+In the target repository, read `README.md`, `.agents/index.md` where present, and the actual deployment configs. Website keeps them in `config/netlify.toml`, `astro/netlify.toml`, and `sanity/netlify.toml`. Record branch, status, remotes, commit, and Netlify site. Inspect `git remote -v` and the live Netlify project; never infer deployment source from a remote name or a stale site ID below.
 
 Do not deploy when local/focused proof answers a source-only request, the fix is incomplete, unrelated dirty work is mixed in, an existing public development runtime answers the question, the target is unknown, or the proposed command is `netlify deploy --prod` for a development check.
 
@@ -43,12 +39,7 @@ The production sites use Netlify Git continuous deployment from the private mirr
 
 Use short branches: organization work `automation/<agent>/<area>-<change>`, integration `development` then `main`, mirror release `release/<short-sha>`. Mirror currently has only `main`; other refs may be organization/local refs.
 
-Before updating the mirror, verify the reviewed release commit is on organization
-`main`, the worktree is clean of unintended/hook changes, and both sites still use
-mirror `main`. Compare the release diff against mirror `main`, then check whether
-pushing a release branch or opening its PR triggers preview builds. Account for
-those builds before spending deploy capacity. Confirm the temporary mirror branch
-points to the reviewed commit and the PR targets `main`.
+Before updating the mirror, verify the reviewed release commit is on organization `main`, the worktree is clean of unintended/hook changes, and both sites still use mirror `main`. Compare the release diff against mirror `main`, then check whether pushing a release branch or opening its PR triggers preview builds. Account for those builds before spending deploy capacity. Confirm the temporary mirror branch points to the reviewed commit and the PR targets `main`.
 
 ## 3. Prepare and release
 
@@ -79,18 +70,7 @@ gh pr merge <MIRROR_PR_NUMBER> \
 
 Never use `--auto`, `--admin`, push directly to mirror `main`, or directly deploy production. Wait for both Netlify Git builds, then remove the temporary release branch. Do not publish the private mirror or change its GitHub plan.
 
-For a development-only request, keep the change on the organization `development`
-branch. First locate the actual development site and its Git branch/context in
-authenticated Netlify project settings; `config/netlify.toml` describes build
-behavior but does not identify a development site. If a development site is
-linked to that branch, make one reviewed change on `development` and let its Git
-deployment run. If a preview is the only available target, inspect whether a
-PR or branch push triggers a build and account for its cost before creating it.
-Do not use the production mirror or `--prod` for a development check. Record the
-target site, context, URL, and intended development commit before triggering a
-build; verify the Netlify record's `commit_ref` matches it before testing the URL.
-If no trusted development target exists, report that as a deployment blocker
-instead of substituting a production or arbitrary draft deployment.
+For a development-only request, keep the change on the organization `development` branch. First locate the actual development site and its Git branch/context in authenticated Netlify project settings; `config/netlify.toml` describes build behavior but does not identify a development site. If a development site is linked to that branch, make one reviewed change on `development` and let its Git deployment run. If a preview is the only available target, inspect whether a PR or branch push triggers a build and account for its cost before creating it. Do not use the production mirror or `--prod` for a development check. Record the target site, context, URL, and intended development commit before triggering a build; verify the Netlify record's `commit_ref` matches it before testing the URL. If no trusted development target exists, report that as a deployment blocker instead of substituting a production or arbitrary draft deployment.
 
 ### Mirror access and remote setup
 
@@ -111,8 +91,7 @@ git remote add mirror https://github.com/kaimacann/terra-symposium-website.git  
 
 ## 4. Validate without leaking secrets
 
-The Website `dev` script loads development configuration through Infisical.
-Check its current script and access requirements before running it:
+The Website `dev` script loads development configuration through Infisical. Check its current script and access requirements before running it:
 
 ```sh
 npx --yes pnpm@10.30.3 run dev

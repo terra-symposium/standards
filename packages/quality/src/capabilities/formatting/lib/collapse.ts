@@ -28,7 +28,7 @@ const SUPPORTED = new Set(['.cjs', '.cts', '.js', '.jsx', '.mjs', '.mts', '.ts',
  *
  * @return The token kinds and original token text.
  */
-function sourceTokens(text: string, variant: ts.LanguageVariant): string[] {
+function srcTokens(text: string, variant: ts.LanguageVariant): string[] {
 	const scanner = ts.createScanner(ts.ScriptTarget.Latest, false, variant, text);
 	const tokens: string[] = [];
 	for (let kind = scanner.scan(); kind !== ts.SyntaxKind.EndOfFileToken; kind = scanner.scan()) {
@@ -89,8 +89,8 @@ EXPORTS
 export function collapseTypesAndObjects(fileName: string): boolean {
 	// ENVIRONMENT
 	if (!SUPPORTED.has(extname(fileName))) return false;
-	const original = readFileSync(fileName, 'utf8');
-	const parsed = ts.createSourceFile(fileName, original, ts.ScriptTarget.Latest, true, sourceKind(fileName)) as ts.SourceFile & { parseDiagnostics: readonly ts.Diagnostic[] };
+	const orig = readFileSync(fileName, 'utf8');
+	const parsed = ts.createSourceFile(fileName, orig, ts.ScriptTarget.Latest, true, sourceKind(fileName)) as ts.SourceFile & { parseDiagnostics: readonly ts.Diagnostic[] };
 	const edits: { start: number; end: number; text: string }[] = [];
 
 	// HELPERS
@@ -158,9 +158,9 @@ export function collapseTypesAndObjects(fileName: string): boolean {
 	// ANALYSE
 
 	const visit = (n: ts.Node): void => {
-		const span = candidateSpan(n, original);
+		const span = candidateSpan(n, orig);
 		if (span) {
-			const text = collapse(n, span.start, original.slice(span.start, span.end));
+			const text = collapse(n, span.start, orig.slice(span.start, span.end));
 			if (text !== undefined) {
 				edits.push({ ...span, text });
 				return;
@@ -170,12 +170,12 @@ export function collapseTypesAndObjects(fileName: string): boolean {
 	};
 	visit(parsed);
 	if (!edits.length) return false;
-	const n = edits.sort((a, b) => b.start - a.start).reduce((t, e) => `${t.slice(0, e.start)}${e.text}${t.slice(e.end)}`, original);
-	if (n === original) return false;
-	if (JSON.stringify(sourceTokens(original, parsed.languageVariant)) !== JSON.stringify(sourceTokens(n, parsed.languageVariant))) return false;
+	const n = edits.sort((a, b) => b.start - a.start).reduce((t, e) => `${t.slice(0, e.start)}${e.text}${t.slice(e.end)}`, orig);
+	if (n === orig) return false;
+	if (JSON.stringify(srcTokens(orig, parsed.languageVariant)) !== JSON.stringify(srcTokens(n, parsed.languageVariant))) return false;
 	const diagnostics = (file: typeof parsed): string[] => file.parseDiagnostics.map(d => `${d.code}:${ts.flattenDiagnosticMessageText(d.messageText, ' ')}`);
 	const prior = diagnostics(parsed);
-	if (diagnostics(ts.createSourceFile(fileName, n, ts.ScriptTarget.Latest, true, sourceKind(fileName)) as typeof parsed).some(message => !prior.includes(message))) return false;
+	if (diagnostics(ts.createSourceFile(fileName, n, ts.ScriptTarget.Latest, true, sourceKind(fileName)) as typeof parsed).some(msg => !prior.includes(msg))) return false;
 	writeFileSync(fileName, n);
 	return true;
 }

@@ -71,7 +71,7 @@ function isForwardRef(init: ts.Expression | undefined): init is ts.CallExpressio
  *
  * @return Component identifier when the target is its displayName property.
  */
-function assignedComponent(left: ts.Expression): string | undefined {
+function assignedComp(left: ts.Expression): string | undefined {
 	if (ts.isPropertyAccessExpression(left) && !left.questionDotToken && left.name.text === 'displayName' && ts.isIdentifier(left.expression)) return left.expression.text;
 	if (
 		ts.isElementAccessExpression(left) &&
@@ -174,7 +174,7 @@ function candidatesForFile(file: string, analysis?: QualityAnalysis): Candidate[
 
 	const inspectAssignments = (node: ts.Node): void => {
 		if (ts.isBinaryExpression(node) && node.operatorToken.kind >= ts.SyntaxKind.FirstAssignment && node.operatorToken.kind <= ts.SyntaxKind.LastAssignment) {
-			const name = assignedComponent(node.left);
+			const name = assignedComp(node.left);
 			const targets = name ? candidatesForAssignment(node, name, byName) : undefined;
 			if (targets) {
 				const exact =
@@ -204,8 +204,8 @@ function findingsForFile(cfg: QualityCfg, file: string, analysis?: QualityAnalys
 	const findings: DisplayNameFinding[] = [];
 	for (const candidate of candidatesForFile(file, analysis)) {
 		if (candidate.assignment === 'matching') continue;
-		const source = candidate.declaration.getSourceFile();
-		const pos = source.getLineAndCharacterOfPosition(candidate.declaration.name.getStart(source));
+		const src = candidate.declaration.getSourceFile();
+		const pos = src.getLineAndCharacterOfPosition(candidate.declaration.name.getStart(src));
 		findings.push({
 			file: displayPath(cfg, file),
 			line: pos.line + 1,

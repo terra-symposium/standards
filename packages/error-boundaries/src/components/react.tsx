@@ -28,13 +28,13 @@ HELPERS
 /**
  * Wraps a component in a named error boundary without coupling it to application UI.
  *
- * @param ComponentToWrap Component to render inside the error boundary.
+ * @param CompToWrap Component to render inside the error boundary.
  * @param name Stable name reported when the wrapped component fails.
  * @param onErr Optional callback that receives render errors and component metadata.
  *
  * @return A component with the same props that renders through an error boundary.
  */
-export function withErrorBoundary<P extends object>(ComponentToWrap: React.ComponentType<P>, name: string, onErr?: ErrorReporter): React.ComponentType<P> {
+export function withErrorBoundary<P extends object>(CompToWrap: React.ComponentType<P>, name: string, onErr?: ErrorReporter): React.ComponentType<P> {
 	/**
 	 * Renders the wrapped component inside the configured boundary.
 	 *
@@ -42,15 +42,15 @@ export function withErrorBoundary<P extends object>(ComponentToWrap: React.Compo
 	 *
 	 * @return The wrapped component as a React element under the error boundary.
 	 */
-	function BoundedComponent(props: P): React.JSX.Element {
+	function BoundedComp(props: P): React.JSX.Element {
 		return (
 			<ErrorBoundary name={name} onError={onErr}>
-				<ComponentToWrap {...props} />
+				<CompToWrap {...props} />
 			</ErrorBoundary>
 		);
 	}
-	BoundedComponent.displayName = `withErrorBoundary(${ComponentToWrap.displayName || ComponentToWrap.name || 'Component'})`;
-	return BoundedComponent;
+	BoundedComp.displayName = `withErrorBoundary(${CompToWrap.displayName || CompToWrap.name || 'Component'})`;
+	return BoundedComp;
 }
 
 /** Catches render failures while keeping error reporting and fallback UI injectable. */

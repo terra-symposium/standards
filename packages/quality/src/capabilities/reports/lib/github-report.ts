@@ -254,22 +254,22 @@ function issueFindings(repo: string, vals: unknown[]): { findings: GitHubFinding
 	for (const val of vals) {
 		const item = rec(val);
 		if (!item || !Number.isSafeInteger(item.number)) continue;
-		const number = Number(item.number);
+		const num = Number(item.number);
 		if (rec(item.pull_request)) {
 			pulls++;
 			continue;
 		}
 		issues++;
 		// terra-quality-ignore single-use -- Capture the issue title before processing its labels and creating the finding.
-		const title = text(item.title) ?? `Open issue #${number}`;
+		const title = text(item.title) ?? `Open issue #${num}`;
 		const labels = Array.isArray(item.labels) ? item.labels.map(l => text(rec(l)?.name)).filter((l): l is string => Boolean(l)) : [];
 		findings.push({
 			repository: repo,
 			category: 'issue',
-			number,
+			number: num,
 			severity: 'info',
 			title,
-			url: `https://github.com/${repo}/issues/${number}`,
+			url: `https://github.com/${repo}/issues/${num}`,
 			...(labels.length ? { summary: `Labels: ${labels.join(', ')}` } : {}),
 			agentInstructions: ISSUE_INSTRUCTIONS,
 		});
@@ -294,7 +294,7 @@ function dependabotFindings(repo: string, vals: unknown[], cat: 'dependabot' | '
 		const advisory = rec(alert?.security_advisory);
 		const vulnerability = rec(alert?.security_vulnerability);
 		if (!alert || !Number.isSafeInteger(alert.number)) return [];
-		const number = Number(alert.number);
+		const num = Number(alert.number);
 		const name = text(pkg?.name) ?? 'unknown package';
 		const manifest = text(dependency?.manifest_path);
 		const patched = text(rec(vulnerability?.first_patched_version)?.identifier);
@@ -310,10 +310,10 @@ function dependabotFindings(repo: string, vals: unknown[], cat: 'dependabot' | '
 			{
 				repository: repo,
 				category: cat,
-				number,
+				number: num,
 				severity: text(vulnerability?.severity) ?? text(advisory?.severity) ?? 'unknown',
 				title,
-				url: `https://github.com/${repo}/security/dependabot/${number}`,
+				url: `https://github.com/${repo}/security/dependabot/${num}`,
 				...(manifest ? { location: manifest } : {}),
 				summary: [text(pkg?.ecosystem), name, affected ? `affected ${affected}` : undefined, patched ? `first patched ${patched}` : undefined].filter(Boolean).join(' · '),
 				agentInstructions: instructions,
@@ -336,17 +336,17 @@ function codeScanningFindings(repo: string, vals: unknown[]): GitHubFinding[] {
 		const rule = rec(alert?.rule);
 		const location = rec(rec(alert?.most_recent_instance)?.location);
 		if (!alert || !Number.isSafeInteger(alert.number)) return [];
-		const number = Number(alert.number);
+		const num = Number(alert.number);
 		const path = text(location?.path);
 		const line = Number.isSafeInteger(location?.start_line) ? Number(location?.start_line) : undefined;
 		return [
 			{
 				repository: repo,
 				category: 'code-scanning',
-				number,
+				number: num,
 				severity: text(rule?.security_severity_level) ?? text(rule?.severity) ?? 'unknown',
-				title: text(rule?.description) ?? `Code scanning alert #${number}`,
-				url: `https://github.com/${repo}/security/code-scanning/${number}`,
+				title: text(rule?.description) ?? `Code scanning alert #${num}`,
+				url: `https://github.com/${repo}/security/code-scanning/${num}`,
 				...(path ? { location: `${path}${line ? `:${line}` : ''}` } : {}),
 				...(text(rule?.id) ? { summary: `Rule ${text(rule?.id)}` } : {}),
 				agentInstructions:
@@ -369,17 +369,17 @@ function secretScanningFindings(repo: string, vals: unknown[]): GitHubFinding[] 
 		const alert = rec(v);
 		const instance = rec(alert?.first_location_detected);
 		if (!alert || !Number.isSafeInteger(alert.number)) return [];
-		const number = Number(alert.number);
+		const num = Number(alert.number);
 		const path = text(instance?.path);
 		const line = Number.isSafeInteger(instance?.start_line) ? Number(instance?.start_line) : undefined;
 		return [
 			{
 				repository: repo,
 				category: 'secret-scanning',
-				number,
+				number: num,
 				severity: 'critical',
 				title: `Exposed ${text(alert.secret_type_display_name) ?? text(alert.secret_type) ?? 'secret'}`,
-				url: `https://github.com/${repo}/security/secret-scanning/${number}`,
+				url: `https://github.com/${repo}/security/secret-scanning/${num}`,
 				...(path ? { location: `${path}${line ? `:${line}` : ''}` } : {}),
 				...(text(alert.validity) ? { summary: `Validity: ${text(alert.validity)}` } : {}),
 				agentInstructions:

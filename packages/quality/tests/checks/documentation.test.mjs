@@ -384,11 +384,11 @@ export function useDashboardConfigurationDialog(initialConfigure: string | undef
 });
 test('documentation errors identify detached TSDoc without rewriting it', () => {
 	const root = fixtureRoot('terra-quality-detached-tsdoc-');
-	const original = `/** src/main.ts */
+	const orig = `/** src/main.ts */
 /** Describes a declaration that was removed. */
 `;
 	// terra-quality-ignore single-use -- Keep this source fixture path named so the test can identify the exact file under inspection.
-	const file = fixtureFile(root, 'src/main.ts', original);
+	const file = fixtureFile(root, 'src/main.ts', orig);
 	// terra-quality-ignore single-use -- Keep this test configuration named so its fixture scope is established before the check under test runs.
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
 	assert.deepEqual(
@@ -396,7 +396,7 @@ test('documentation errors identify detached TSDoc without rewriting it', () => 
 		[['orphan', '<detached TSDoc>', 'error']],
 	);
 	assert.equal(removeNonCodeComments(file), false);
-	assert.equal(fixtureText(root, 'src/main.ts'), original);
+	assert.equal(fixtureText(root, 'src/main.ts'), orig);
 });
 test('documentation recognizes an inline JSDoc expression cast', () => {
 	const root = fixtureRoot('terra-quality-inline-jsdoc-cast-');
@@ -647,10 +647,10 @@ void [existing, missing, publicMissing, inline];
 	);
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], documentation: { required: { types: true, functions: true, exportedFunctions: true, noInlineFunctions: true } } });
 	// terra-quality-ignore single-use -- Capture the original fixture text before the tested transformation changes or compares it.
-	const original = fixtureText(root, 'src/main.ts');
+	const orig = fixtureText(root, 'src/main.ts');
 	assert.equal(documentSrcFile(cfg, file), false);
 	const first = fixtureText(root, 'src/main.ts');
-	assert.equal(first, original);
+	assert.equal(first, orig);
 	assert.equal(documentSrcFile(cfg, file), false);
 	assert.equal(fixtureText(root, 'src/main.ts'), first);
 	assert.equal(documentSrcFile({ ...cfg, documentation: { required: { types: true } }, root }, fixtureFile(root, 'src/notes.json', '{"value": true}\n')), false);
@@ -659,16 +659,16 @@ void [existing, missing, publicMissing, inline];
 });
 test('legacy source maintenance preserves authored comments and section labels', () => {
 	const root = fixtureRoot('terra-quality-documentation-maintenance-no-op-');
-	const original = `/** Purpose belongs to the source author. */
+	const orig = `/** Purpose belongs to the source author. */
 /*//////////////////////////////////////////////////
 CUSTOM SECTION
 //////////////////////////////////////////////////*/
 export const value = true;
 `;
 	// terra-quality-ignore single-use -- Keep this source fixture path named so the test can identify the exact file under inspection.
-	const file = fixtureFile(root, 'src/main.ts', original);
+	const file = fixtureFile(root, 'src/main.ts', orig);
 	assert.equal(maintainSrcFile(root, file), false);
-	assert.equal(fixtureText(root, 'src/main.ts'), original);
+	assert.equal(fixtureText(root, 'src/main.ts'), orig);
 });
 test('duplicate import audit reports repeated type bindings with their later source location', () => {
 	const root = fixtureRoot('terra-quality-import-audit-');
@@ -687,18 +687,17 @@ export type Result = RecordData;
 });
 test('duplicate import autofix leaves declarations with attached comments unchanged', () => {
 	const root = fixtureRoot('terra-quality-import-audit-comment-');
-	const original =
-		"import type { RecordData } from './types';\n// Keep this explanation beside the repeated declaration.\nimport type { RecordData } from './types';\nexport type Result = RecordData;\n";
-	const file = fixtureFile(root, 'src/main.ts', original);
+	const orig = "import type { RecordData } from './types';\n// Keep this explanation beside the repeated declaration.\nimport type { RecordData } from './types';\nexport type Result = RecordData;\n";
+	const file = fixtureFile(root, 'src/main.ts', orig);
 	assert.equal(fixDuplicateImports([file]), 0);
-	assert.equal(fixtureText(root, 'src/main.ts'), original);
+	assert.equal(fixtureText(root, 'src/main.ts'), orig);
 	assert.deepEqual(duplicateImportFindings([file]), [{ file, line: 3, module: './types' }]);
 });
 test('duplicate import audit and autofix inspect only Astro frontmatter', () => {
 	const root = fixtureRoot('terra-quality-astro-import-audit-');
 	// terra-quality-ignore single-use -- Capture the original fixture text before the tested transformation changes or compares it.
-	const original = `---\nimport { pageForSlug } from '../lib/catalog.js';\nimport { pageForSlug } from '../lib/catalog.js';\nconst page = pageForSlug('');\n---\n<p>{page.title}</p>\n`;
-	const file = fixtureFile(root, 'src/page.astro', original);
+	const orig = `---\nimport { pageForSlug } from '../lib/catalog.js';\nimport { pageForSlug } from '../lib/catalog.js';\nconst page = pageForSlug('');\n---\n<p>{page.title}</p>\n`;
+	const file = fixtureFile(root, 'src/page.astro', orig);
 	assert.deepEqual(duplicateImportFindings([file]), [{ file, line: 3, module: '../lib/catalog.js' }]);
 	assert.equal(fixDuplicateImports([file]), 1);
 	assert.equal(fixtureText(root, 'src/page.astro'), `---\nimport { pageForSlug } from '../lib/catalog.js';\nconst page = pageForSlug('');\n---\n<p>{page.title}</p>\n`);
