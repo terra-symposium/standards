@@ -1,5 +1,11 @@
 # @terra-symposium/quality
 
+## 2.4.3
+
+### Patch Changes
+
+- Use the published error-boundaries dependency range so consumers can install the new naming rules outside the Standards workspace.
+
 ## 2.4.2
 
 ### Patch Changes

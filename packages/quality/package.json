@@ -1,6 +1,6 @@
 {
 	"name": "@terra-symposium/quality",
-	"version": "2.4.2",
+	"version": "2.4.3",
 	"description": "Configurable quality checks and maintenance tooling for software repositories",
 	"homepage": "https://standards-docs.netlify.app/",
 	"type": "module",
@@ -145,7 +145,7 @@
 	},
 	"dependencies": {
 		"typescript": "^5.0.0",
-		"@terra-symposium/boundaries": "workspace:*"
+		"@terra-symposium/boundaries": "^0.2.0"
 	},
 	"peerDependencies": {
 		"eslint": ">=9"
