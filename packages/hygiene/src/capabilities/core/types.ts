@@ -95,7 +95,11 @@ export type QualityCfg = {
 			boolean
 		>
 	> & { document?: false };
-	documentation?: { required?: { types?: boolean; functions?: boolean; exportedFunctions?: boolean; noInlineFunctions?: boolean; importSection?: boolean }; commandRoots?: string[]; cAuthors?: Record<string, string> };
+	documentation?: {
+		required?: { types?: boolean; functions?: boolean; exportedFunctions?: boolean; noInlineFunctions?: boolean; importSection?: boolean };
+		commandRoots?: string[];
+		cAuthors?: Record<string, string>;
+	};
 	enabledCommands?: Record<string, boolean>;
 	recommendationCommands?: { name: string; command: string; args?: string[] }[];
 	enabledRecommendations?: Record<string, boolean>;
