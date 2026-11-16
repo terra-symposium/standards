@@ -267,19 +267,19 @@ export type SpreadsheetSource = { label: string; file: string };
 /**
  * Copies tabular content, cell styling, merges, and embedded images into one named worksheet.
  *
- * @param source Worksheet whose cells, formatting, merges, and images are copied.
+ * @param src Worksheet whose cells, formatting, merges, and images are copied.
  * @param target Empty destination worksheet receiving the copied content.
- * @param sourceBook Workbook that owns image references in the source worksheet.
+ * @param srcBook Workbook that owns image references in the source worksheet.
  * @param targetBook Workbook that receives cloned image references.
  */
-const copyWorksheet = (source: ExcelJS.Worksheet, target: ExcelJS.Worksheet, sourceBook: ExcelJS.Workbook, targetBook: ExcelJS.Workbook): void => {
-	target.properties = structuredClone(source.properties);
-	target.views = structuredClone(source.views);
-	target.pageSetup = structuredClone(source.pageSetup);
-	target.headerFooter = structuredClone(source.headerFooter);
-	target.state = source.state;
-	target.columns = source.columns.map(c => ({ width: c.width, hidden: c.hidden, outlineLevel: c.outlineLevel, style: structuredClone(c.style), header: structuredClone(c.header), key: c.key }));
-	source.eachRow({ includeEmpty: true }, (r, v) => {
+const copyWorksheet = (src: ExcelJS.Worksheet, target: ExcelJS.Worksheet, srcBook: ExcelJS.Workbook, targetBook: ExcelJS.Workbook): void => {
+	target.properties = structuredClone(src.properties);
+	target.views = structuredClone(src.views);
+	target.pageSetup = structuredClone(src.pageSetup);
+	target.headerFooter = structuredClone(src.headerFooter);
+	target.state = src.state;
+	target.columns = src.columns.map(c => ({ width: c.width, hidden: c.hidden, outlineLevel: c.outlineLevel, style: structuredClone(c.style), header: structuredClone(c.header), key: c.key }));
+	src.eachRow({ includeEmpty: true }, (r, v) => {
 		const targetRow = target.getRow(v);
 		targetRow.height = r.height;
 		targetRow.hidden = r.hidden;
@@ -292,21 +292,21 @@ const copyWorksheet = (source: ExcelJS.Worksheet, target: ExcelJS.Worksheet, sou
 			if (cell.dataValidation) targetCell.dataValidation = structuredClone(cell.dataValidation);
 		});
 	});
-	for (const range of source.model.merges || []) target.mergeCells(range);
-	for (const { imageId: imgId, range } of source.getImages()) {
-		target.addImage(targetBook.addImage(sourceBook.getImage(Number(imgId))), structuredClone(range));
+	for (const range of src.model.merges || []) target.mergeCells(range);
+	for (const { imageId: imgId, range } of src.getImages()) {
+		target.addImage(targetBook.addImage(srcBook.getImage(Number(imgId))), structuredClone(range));
 	}
 };
 /**
  * Combines per-repository Reporting workbooks into an all-tests workbook.
  *
  * @param file Output path for the aggregate workbook.
- * @param sources Repository labels and source report.xlsx paths.
+ * @param srcs Repository labels and source report.xlsx paths.
  *
  * @return A promise that resolves after summaries, detailed rows, and screenshot images are copied.
  */
-export const mergeSpreadsheets = async (file: string, sources: readonly SpreadsheetSource[]): Promise<void> => {
-	if (!sources.length) throw new Error('At least one Reporting workbook is required to create an aggregate spreadsheet.');
+export const mergeSpreadsheets = async (file: string, srcs: readonly SpreadsheetSource[]): Promise<void> => {
+	if (!srcs.length) throw new Error('At least one Reporting workbook is required to create an aggregate spreadsheet.');
 	const aggregate = new ExcelJS.Workbook();
 	aggregate.creator = 'Test evidence reporter';
 	aggregate.lastModifiedBy = 'Test evidence reporter';
@@ -316,20 +316,20 @@ export const mergeSpreadsheets = async (file: string, sources: readonly Spreadsh
 	const summary = aggregate.addWorksheet('All tests');
 	let summaryHeader: ExcelJS.CellValue[] | undefined;
 	const usedSheetNames = new Set(['all tests']);
-	for (const { label, file: sourceFile } of sources) {
-		const sourceBook = new ExcelJS.Workbook();
-		await sourceBook.xlsx.readFile(sourceFile);
-		const sourceSummary = sourceBook.getWorksheet('Summary');
-		if (!sourceSummary) throw new Error(`Reporting workbook has no Summary worksheet: ${sourceFile}`);
-		const header = valuesForRow(sourceSummary.getRow(1)) as ExcelJS.CellValue[];
+	for (const { label, file: srcFile } of srcs) {
+		const srcBook = new ExcelJS.Workbook();
+		await srcBook.xlsx.readFile(srcFile);
+		const srcSummary = srcBook.getWorksheet('Summary');
+		if (!srcSummary) throw new Error(`Reporting workbook has no Summary worksheet: ${srcFile}`);
+		const header = valuesForRow(srcSummary.getRow(1)) as ExcelJS.CellValue[];
 		if (!summaryHeader) {
 			summaryHeader = ['Repository', ...header];
 			summary.addRow(summaryHeader);
 		} else if (header.length !== summaryHeader.length - 1 || header.some((v, i) => v !== summaryHeader?.[i + 1])) {
-			throw new Error(`Reporting workbook Summary columns do not match the aggregate contract: ${sourceFile}`);
+			throw new Error(`Reporting workbook Summary columns do not match the aggregate contract: ${srcFile}`);
 		}
-		for (let rowNumber = 2; rowNumber <= sourceSummary.rowCount; rowNumber++) {
-			const row = sourceSummary.getRow(rowNumber);
+		for (let rowNum = 2; rowNum <= srcSummary.rowCount; rowNum++) {
+			const row = srcSummary.getRow(rowNum);
 			if (!row.hasValues) continue;
 			// terra-quality-ignore single-use -- Keep this new row so each copied cell style targets the same aggregate row.
 			const aggregateRow = summary.addRow([label, ...valuesForRow(row)]);
@@ -337,10 +337,10 @@ export const mergeSpreadsheets = async (file: string, sources: readonly Spreadsh
 				aggregateRow.getCell(c + 1).style = structuredClone(s.style);
 			});
 		}
-		for (const sourceSheet of sourceBook.worksheets) {
-			if (sourceSheet.name === 'Summary') continue;
+		for (const srcSheet of srcBook.worksheets) {
+			if (srcSheet.name === 'Summary') continue;
 			const base =
-				`${label} ${sourceSheet.name}`
+				`${label} ${srcSheet.name}`
 					.replace(/[\\/*?:[\]]/gu, '_')
 					.replace(/^'+|'+$/gu, '')
 					.slice(0, 31) || 'Results';
@@ -351,7 +351,7 @@ export const mergeSpreadsheets = async (file: string, sources: readonly Spreadsh
 				sheetName = `${base.slice(0, 31 - postfix.length)}${postfix}`;
 			}
 			usedSheetNames.add(sheetName.toLowerCase());
-			copyWorksheet(sourceSheet, aggregate.addWorksheet(sheetName), sourceBook, aggregate);
+			copyWorksheet(srcSheet, aggregate.addWorksheet(sheetName), srcBook, aggregate);
 		}
 	}
 	if (!summaryHeader) throw new Error('No summary rows were available in the Reporting workbooks.');

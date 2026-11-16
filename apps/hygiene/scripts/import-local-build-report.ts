@@ -104,9 +104,9 @@ async function main(): Promise<void> {
 	} catch {
 		revision = git(checkout, ['rev-parse', '--verify', `refs/heads/${branch}^{commit}`]);
 	}
-	const temporaryRoot = mkdtempSync(join(tmpdir(), 'terra-hygiene-report-'));
-	const worktree = join(temporaryRoot, basename(checkout) || 'checkout');
-	const reports = join(temporaryRoot, 'reports');
+	const tempRoot = mkdtempSync(join(tmpdir(), 'terra-hygiene-report-'));
+	const worktree = join(tempRoot, basename(checkout) || 'checkout');
+	const reports = join(tempRoot, 'reports');
 	const junitPath = join(reports, 'junit.xml');
 	const qualityPath = join(reports, 'terra-quality.json');
 	mkdirSync(reports);
@@ -182,7 +182,7 @@ async function main(): Promise<void> {
 		} catch {
 			/* Worktree creation may have failed. */
 		}
-		rmSync(temporaryRoot, { recursive: true, force: true });
+		rmSync(tempRoot, { recursive: true, force: true });
 	}
 }
 

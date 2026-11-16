@@ -163,7 +163,7 @@ test('captures page navigation for tests that do not destructure the load fixtur
 });
 
 test('expands regular Playwright projects and preserves single-run setup/capture projects', () => {
-	const original = process.env.PW_VIEWPORTS;
+	const orig = process.env.PW_VIEWPORTS;
 	delete process.env.PW_VIEWPORTS;
 	// terra-quality-ignore single-use -- Keep the default viewport inventory named for responsive-report assertions.
 	const defaultViewports = resolveVisualViewports();
@@ -171,8 +171,8 @@ test('expands regular Playwright projects and preserves single-run setup/capture
 		defaultViewports.map(({ name: n }) => n),
 		['mobile', 'sm', 'md', 'lg', 'xl', '2xl'],
 	);
-	if (original === undefined) delete process.env.PW_VIEWPORTS;
-	else process.env.PW_VIEWPORTS = original;
+	if (orig === undefined) delete process.env.PW_VIEWPORTS;
+	else process.env.PW_VIEWPORTS = orig;
 	const cfg = withResponsivePlaywright(
 		{
 			reporter: ['list'],
@@ -209,8 +209,8 @@ test('expands regular Playwright projects and preserves single-run setup/capture
 	);
 	assert.equal(focused.metadata.terraLoadTestingEnabled, true);
 	assert.equal(focused.reporter.find(r => Array.isArray(r) && r[0] === '@terra-symposium/reporting/playwright')[1].screenshotOnlySlideshow, true);
-	if (original === undefined) delete process.env.PW_VIEWPORTS;
-	else process.env.PW_VIEWPORTS = original;
+	if (orig === undefined) delete process.env.PW_VIEWPORTS;
+	else process.env.PW_VIEWPORTS = orig;
 });
 test('collects only declared viewport scenarios and passes custom dimensions to reporting', () => {
 	const viewportCatalog = { compact: { width: 767, height: 900 }, expanded: { width: 768, height: 900 } };
@@ -327,8 +327,8 @@ test('builds aggregate artifacts from repository screenshot folders and report w
 			.png()
 			.toFile(screenshot);
 		const repos = ['Website', 'Salesphere'];
-		const screenshotSources = [];
-		const spreadsheetSources = [];
+		const screenshotSrcs = [];
+		const spreadsheetSrcs = [];
 		for (const repo of repos) {
 			const dir = path.join(root, repo.toLowerCase(), 'screenshots');
 			await fs.mkdir(dir, { recursive: true });
@@ -339,7 +339,7 @@ test('builds aggregate artifacts from repository screenshot folders and report w
 				JSON.stringify({ group: 'shared-scenario', key: 'step-one', title: 'creates a record', viewport: 'xl', viewportSize: '1280×720', screenshot: 'capture.png', runId }),
 			);
 			await fs.writeFile(path.join(dir, '.terra-playwright-run.json'), JSON.stringify({ runId }));
-			screenshotSources.push({ label: repo, directory: dir, runId });
+			screenshotSrcs.push({ label: repo, directory: dir, runId });
 			const report = path.join(root, `${repo.toLowerCase()}.xlsx`);
 			await writeSpreadsheet(report, {
 				featureFiles: ['shared.spec.ts'],
@@ -347,10 +347,10 @@ test('builds aggregate artifacts from repository screenshot folders and report w
 				results: [result({ file: 'shared.spec.ts', project: 'root-public', screenshot, title: `${repo} creates a record` })],
 				runDiagnostics: [`${repo} diagnostic`],
 			});
-			spreadsheetSources.push({ label: repo, file: report });
+			spreadsheetSrcs.push({ label: repo, file: report });
 		}
 		const presentation = path.join(root, 'all-repositories.pptx');
-		await writeScreenshotSlideshowFromDirs(presentation, screenshotSources, { title: 'All repository screenshots' });
+		await writeScreenshotSlideshowFromDirs(presentation, screenshotSrcs, { title: 'All repository screenshots' });
 		const { stdout: deckArchive } = await execFileAsync('unzip', ['-l', presentation]);
 		assert.match(deckArchive, PPT_SLIDES_SLIDE2_XML_REGEX);
 		const { stdout: firstSlide } = await execFileAsync('unzip', ['-p', presentation, 'ppt/slides/slide1.xml']);
@@ -358,7 +358,7 @@ test('builds aggregate artifacts from repository screenshot folders and report w
 		assert.match(`${firstSlide}${secondSlide}`, /Website/);
 		assert.match(`${firstSlide}${secondSlide}`, /Salesphere/);
 		const combinedSpreadsheet = path.join(root, 'all-repositories.xlsx');
-		await mergeSpreadsheets(combinedSpreadsheet, spreadsheetSources);
+		await mergeSpreadsheets(combinedSpreadsheet, spreadsheetSrcs);
 		const workbook = new ExcelJS.Workbook();
 		await workbook.xlsx.readFile(combinedSpreadsheet);
 		const summary = workbook.getWorksheet('All tests');
@@ -586,12 +586,12 @@ test('loads and grades per-test and operation timing budgets', async () => {
 	await fs.mkdir(configDir);
 	await fs.writeFile(path.join(configDir, 'quality.json'), JSON.stringify({ loadTesting: { enabled: false } }));
 	// terra-quality-ignore single-use -- Snapshot the working directory before changing it so cleanup restores the exact path.
-	const previousCwd = process.cwd();
+	const prevCwd = process.cwd();
 	process.chdir(root);
 	try {
 		assert.equal(readLoadTestingCfg().enabled, false);
 	} finally {
-		process.chdir(previousCwd);
+		process.chdir(prevCwd);
 	}
 	assert.equal(withResponsivePlaywright({ projects: [{ name: 'browser' }] }, { qualityConfigFile: cfgFile }).metadata.terraLoadTestingEnabled, false);
 	const recorded = [];
@@ -638,12 +638,12 @@ test('writes neutral spreadsheet and slideshow artifacts', async () => {
 	await writeSlideshow(slideshow, run.results);
 	assert.ok((await fs.stat(spreadsheet)).size > 0);
 	assert.ok((await fs.stat(slideshow)).size > 0);
-	const { stdout: coreProperties } = await execFileAsync('unzip', ['-p', slideshow, 'docProps/core.xml']);
-	assert.match(coreProperties, /Test evidence slideshow/);
-	assert.doesNotMatch(coreProperties, POWERPOINT_EXCEL_TERRA_REGEX);
-	const { stdout: slideshowProperties } = await execFileAsync('unzip', ['-p', slideshow, 'docProps/app.xml']);
-	assert.match(slideshowProperties, TEST_EVIDENCE_REPORTER_REGEX);
-	assert.doesNotMatch(slideshowProperties, POWERPOINT_EXCEL_TERRA_REGEX);
+	const { stdout: coreProps } = await execFileAsync('unzip', ['-p', slideshow, 'docProps/core.xml']);
+	assert.match(coreProps, /Test evidence slideshow/);
+	assert.doesNotMatch(coreProps, POWERPOINT_EXCEL_TERRA_REGEX);
+	const { stdout: slideshowProps } = await execFileAsync('unzip', ['-p', slideshow, 'docProps/app.xml']);
+	assert.match(slideshowProps, TEST_EVIDENCE_REPORTER_REGEX);
+	assert.doesNotMatch(slideshowProps, POWERPOINT_EXCEL_TERRA_REGEX);
 	const { stdout: slideText } = await execFileAsync('unzip', ['-p', slideshow, 'ppt/slides/slide1.xml']);
 	assert.doesNotMatch(slideText, POWERPOINT_EXCEL_TERRA_REGEX);
 	const { stdout: notes } = await execFileAsync('unzip', ['-p', slideshow, 'ppt/notesSlides/notesSlide1.xml']);
@@ -652,9 +652,9 @@ test('writes neutral spreadsheet and slideshow artifacts', async () => {
 	await workbook.xlsx.readFile(spreadsheet);
 	assert.equal(workbook.creator, 'Test evidence reporter');
 	assert.equal(workbook.title, 'Test evidence spreadsheet');
-	const { stdout: spreadsheetProperties } = await execFileAsync('unzip', ['-p', spreadsheet, 'docProps/app.xml']);
-	assert.match(spreadsheetProperties, TEST_EVIDENCE_REPORTER_REGEX);
-	assert.doesNotMatch(spreadsheetProperties, POWERPOINT_EXCEL_TERRA_REGEX);
+	const { stdout: spreadsheetProps } = await execFileAsync('unzip', ['-p', spreadsheet, 'docProps/app.xml']);
+	assert.match(spreadsheetProps, TEST_EVIDENCE_REPORTER_REGEX);
+	assert.doesNotMatch(spreadsheetProps, POWERPOINT_EXCEL_TERRA_REGEX);
 	assert.deepEqual(
 		workbook.worksheets.map(s => s.name),
 		['Summary', 'example.spec.ts', 'interrupted.spec.ts', 'Projects', 'Run diagnostics'],

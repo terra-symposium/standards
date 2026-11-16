@@ -277,12 +277,12 @@ test('repository build tokens are stored and compared as repository-scoped hashe
 });
 test('repository admin check denies another repository administrator', async () => {
 	// terra-quality-ignore single-use -- Save the original fetch function so the test restores the exact global binding.
-	const previous = globalThis.fetch;
+	const prev = globalThis.fetch;
 	globalThis.fetch = async input => new Response(JSON.stringify({ permission: String(input).includes('/repos/owner/own/') ? 'admin' : 'read' }), { status: 200 });
 	try {
 		assert.equal(await repositoryAdmin('owner', 'own', 'alice', 'token'), true);
 		assert.equal(await repositoryAdmin('other', 'private', 'alice', 'token'), false);
 	} finally {
-		globalThis.fetch = previous;
+		globalThis.fetch = prev;
 	}
 });

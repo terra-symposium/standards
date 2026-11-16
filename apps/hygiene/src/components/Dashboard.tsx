@@ -145,7 +145,7 @@ export default function Dashboard() {
 	const [refreshKey, setRefreshKey] = useState(0);
 	const [detail, setDetail] = useState<Detail | null>(null);
 	const [loading, setLoading] = useState(true);
-	const [historyMessage, setHistoryMessage] = useState('');
+	const [historyMsg, setHistoryMsg] = useState('');
 	const [setupOpen, setSetupOpen] = useState(false);
 	const [err, setErr] = useState('');
 	useEffect(() => {
@@ -394,7 +394,7 @@ export default function Dashboard() {
 												setErr('Could not add branch');
 												return;
 											}
-											setHistoryMessage(`Branch ${name} added. Run a local report import to populate its history and metrics.`);
+											setHistoryMsg(`Branch ${name} added. Run a local report import to populate its history and metrics.`);
 											setBranch(name);
 											setCommitPage(1);
 											input.value = '';
@@ -475,7 +475,7 @@ export default function Dashboard() {
 												History for {branch} has not been imported. Run <code>history:import</code> from a local checkout to import the branch history.
 											</>
 										)}{' '}
-										{historyMessage}
+										{historyMsg}
 									</p>
 								)}
 								<div className='table-wrap'>

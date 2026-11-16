@@ -334,19 +334,19 @@ const persistScreenshotCapture = (dir: string, capture: ScreenshotCapture): Scre
 	fs.mkdirSync(dir, { recursive: true });
 	if (fs.existsSync(recordFile)) {
 		try {
-			const previous = JSON.parse(fs.readFileSync(recordFile, 'utf8')) as ScreenshotCapture;
-			if (previous.runId === capture.runId && (previous.retry || 0) > (capture.retry || 0)) return { ...previous, screenshot };
+			const prev = JSON.parse(fs.readFileSync(recordFile, 'utf8')) as ScreenshotCapture;
+			if (prev.runId === capture.runId && (prev.retry || 0) > (capture.retry || 0)) return { ...prev, screenshot };
 		} catch {
 			// Replace an incomplete record with the next valid result.
 		}
 	}
-	const temporaryImg = `${screenshot}.${process.pid}.tmp`;
-	fs.copyFileSync(capture.screenshot, temporaryImg);
-	fs.renameSync(temporaryImg, screenshot);
+	const tempImg = `${screenshot}.${process.pid}.tmp`;
+	fs.copyFileSync(capture.screenshot, tempImg);
+	fs.renameSync(tempImg, screenshot);
 	const persisted = { ...capture, screenshot };
-	const temporaryRecord = `${recordFile}.${process.pid}.tmp`;
-	fs.writeFileSync(temporaryRecord, JSON.stringify(persisted));
-	fs.renameSync(temporaryRecord, recordFile);
+	const tempRecord = `${recordFile}.${process.pid}.tmp`;
+	fs.writeFileSync(tempRecord, JSON.stringify(persisted));
+	fs.renameSync(tempRecord, recordFile);
 	return persisted;
 };
 const screenshotRunFile = '.terra-playwright-run.json';
@@ -408,9 +408,9 @@ const readScreenshotRun = (dir: string): ScreenshotRun | undefined => {
 const writeScreenshotRun = (dir: string, run: ScreenshotRun): void => {
 	fs.mkdirSync(dir, { recursive: true });
 	const file = path.join(dir, screenshotRunFile);
-	const temporaryFile = `${file}.${process.pid}.tmp`;
-	fs.writeFileSync(temporaryFile, JSON.stringify(run));
-	fs.renameSync(temporaryFile, file);
+	const tempFile = `${file}.${process.pid}.tmp`;
+	fs.writeFileSync(tempFile, JSON.stringify(run));
+	fs.renameSync(tempFile, file);
 };
 
 /**
@@ -626,8 +626,8 @@ export default class ProgressReporter {
 		for (const test of suite.allTests()) this.expectedTests.set(test.id, test);
 		if (!process.argv.includes('--list')) {
 			const dir = path.resolve(this.options.screenshotsDirectory);
-			const previous = readScreenshotRun(dir);
-			const sameRun = previous?.runId === this.screenshotRunId ? previous : undefined;
+			const prev = readScreenshotRun(dir);
+			const sameRun = prev?.runId === this.screenshotRunId ? prev : undefined;
 			for (const { group, viewports } of sameRun?.expectedCaptureGroups || []) this.expectedCaptureGroups.set(group, new Set(viewports));
 			for (const test of suite.allTests()) {
 				const configuredProject = test.parent.project()?.name || test.titlePath().find(v => v.startsWith('root-')) || 'unknown';
@@ -829,8 +829,8 @@ export default class ProgressReporter {
 		// UPDATE THE LOGICAL RUN MARKER BEFORE WRITING ARTIFACTS
 		if (!process.argv.includes('--list')) {
 			const dir = path.resolve(this.options.screenshotsDirectory);
-			const previous = readScreenshotRun(dir);
-			const sameRun = previous?.runId === this.screenshotRunId ? previous : undefined;
+			const prev = readScreenshotRun(dir);
+			const sameRun = prev?.runId === this.screenshotRunId ? prev : undefined;
 			const expectedTestIds = [...new Set([...(sameRun?.expectedTestIds || []), ...this.expectedTests.keys()])].sort();
 			const completedTestIds = [...new Set([...(sameRun?.completedTestIds || []), ...this.completedTests])].sort();
 			writeScreenshotRun(dir, {
@@ -850,7 +850,7 @@ export default class ProgressReporter {
 		fs.mkdirSync(path.join(runDir, 'images'), { recursive: true });
 		const browserResults = this.results.map((result, i) => {
 			if (!result.screenshot || !fs.existsSync(result.screenshot)) return result;
-			const destination = path.join(
+			const dest = path.join(
 				runDir,
 				'images',
 				`${String(i + 1).padStart(4, '0')}-${
@@ -860,8 +860,8 @@ export default class ProgressReporter {
 						.toLowerCase() || 'screenshot'
 				}.png`,
 			);
-			fs.copyFileSync(result.screenshot, destination);
-			return { ...result, screenshot: destination };
+			fs.copyFileSync(result.screenshot, dest);
+			return { ...result, screenshot: dest };
 		});
 		const supplemental: { results: VisualResult[]; diagnostics: string[] } = { results: [], diagnostics: [] };
 		if (this.options.supplementalResultsFile) {

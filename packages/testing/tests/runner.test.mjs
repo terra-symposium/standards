@@ -45,13 +45,13 @@ function git(root, ...args) {
  * Stages fixture changes, commits them, and returns the new commit SHA.
  *
  * @param root Fixture repository root.
- * @param message Commit subject used by the test.
+ * @param msg Commit subject used by the test.
  *
  * @return Full SHA of the fixture commit.
  */
-function commit(root, message) {
+function commit(root, msg) {
 	git(root, 'add', '.');
-	git(root, '-c', 'user.name=Standards Tests', '-c', 'user.email=standards-tests@example.invalid', 'commit', '-m', message);
+	git(root, '-c', 'user.name=Standards Tests', '-c', 'user.email=standards-tests@example.invalid', 'commit', '-m', msg);
 	return git(root, 'rev-parse', 'HEAD');
 }
 
@@ -68,17 +68,17 @@ function commit(root, message) {
 function withGitHubEvent(root, eventName, event, run) {
 	const eventPath = join(root, 'event.json');
 	writeFileSync(eventPath, JSON.stringify(event));
-	const previousPath = process.env.GITHUB_EVENT_PATH;
-	const previousName = process.env.GITHUB_EVENT_NAME;
+	const prevPath = process.env.GITHUB_EVENT_PATH;
+	const prevName = process.env.GITHUB_EVENT_NAME;
 	process.env.GITHUB_EVENT_PATH = eventPath;
 	process.env.GITHUB_EVENT_NAME = eventName;
 	try {
 		return run();
 	} finally {
-		if (previousPath === undefined) delete process.env.GITHUB_EVENT_PATH;
-		else process.env.GITHUB_EVENT_PATH = previousPath;
-		if (previousName === undefined) delete process.env.GITHUB_EVENT_NAME;
-		else process.env.GITHUB_EVENT_NAME = previousName;
+		if (prevPath === undefined) delete process.env.GITHUB_EVENT_PATH;
+		else process.env.GITHUB_EVENT_PATH = prevPath;
+		if (prevName === undefined) delete process.env.GITHUB_EVENT_NAME;
+		else process.env.GITHUB_EVENT_NAME = prevName;
 	}
 }
 
@@ -189,8 +189,8 @@ test('consumer-defined suites run once each in manifest order and aggregate into
 		join(root, 'tests/terra-tests.json'),
 		JSON.stringify({ version: 1, suites: names.map(name => ({ name, command: process.execPath, args: [scriptPath, name], owns: [`tests/${name}`] })) }),
 	);
-	const previousPath = process.env.GITHUB_EVENT_PATH;
-	const previousName = process.env.GITHUB_EVENT_NAME;
+	const prevPath = process.env.GITHUB_EVENT_PATH;
+	const prevName = process.env.GITHUB_EVENT_NAME;
 	delete process.env.GITHUB_EVENT_PATH;
 	delete process.env.GITHUB_EVENT_NAME;
 	try {
@@ -199,10 +199,10 @@ test('consumer-defined suites run once each in manifest order and aggregate into
 		assert.deepEqual(readFileSync(logPath, 'utf8').trim().split('\n'), names);
 		assert.deepEqual(result, { passed: names.length, failed: 0, selected: ['shared:linear-history', ...names] });
 	} finally {
-		if (previousPath === undefined) delete process.env.GITHUB_EVENT_PATH;
-		else process.env.GITHUB_EVENT_PATH = previousPath;
-		if (previousName === undefined) delete process.env.GITHUB_EVENT_NAME;
-		else process.env.GITHUB_EVENT_NAME = previousName;
+		if (prevPath === undefined) delete process.env.GITHUB_EVENT_PATH;
+		else process.env.GITHUB_EVENT_PATH = prevPath;
+		if (prevName === undefined) delete process.env.GITHUB_EVENT_NAME;
+		else process.env.GITHUB_EVENT_NAME = prevName;
 		rmSync(root, { recursive: true, force: true });
 	}
 });

@@ -6,7 +6,7 @@ type Props = {
 	reloadLabel?: string;
 };
 
-const { title = 'This section could not load', description = 'The interactive interface failed to start. The error has been recorded for diagnosis.', reloadLabel = 'Reload page' } = Astro.props;
+const { title = 'This section could not load', description: desc = 'The interactive interface failed to start. The error has been recorded for diagnosis.', reloadLabel = 'Reload page' } = Astro.props;
 ---
 
 <terra-error-boundary data-terra-error-boundary>
@@ -14,7 +14,7 @@ const { title = 'This section could not load', description = 'The interactive in
 	<section class='terra-error-boundary-fallback' data-terra-hydration-fallback hidden role='alert'>
 		<div>
 			<h1>{title}</h1>
-			<p>{description}</p>
+			<p>{desc}</p>
 			<a href={Astro.url.href}>{reloadLabel}</a>
 		</div>
 	</section>

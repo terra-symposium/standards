@@ -24,11 +24,11 @@ CONFIG
  */
 export const neutralizeApplicationMetadata = async (file: string): Promise<void> => {
 	const archive = await JSZip.loadAsync(await fs.readFile(file));
-	const applicationProperties = archive.file('docProps/app.xml');
-	if (!applicationProperties) return;
+	const appProps = archive.file('docProps/app.xml');
+	if (!appProps) return;
 	archive.file(
 		'docProps/app.xml',
-		(await applicationProperties.async('string'))
+		(await appProps.async('string'))
 			.replace(/<Application>[^<]*<\/Application>/, '<Application>Test evidence reporter</Application>')
 			.replace(/<Company>[^<]*<\/Company>/, '<Company>Test evidence</Company>'),
 	);
