@@ -33,7 +33,7 @@ const isInside = (root, path) => {
 HELPERS
 //////////////////////////////////////////////////*/
 
-// terra-quality-ignore single-use -- Keep the documented listTestFiles declaration so its parameter and return contract remains attached.
+// hygiene-ignore single-use -- Keep the documented listTestFiles declaration so its parameter and return contract remains attached.
 /**
  * Recursively lists source files under test directories and test-named files.
  *
@@ -84,7 +84,7 @@ function globRegex(pattern) {
 	return new RegExp(`${src}$`, 'u');
 }
 
-// terra-quality-ignore single-use -- Keep the documented runLinearHistory declaration so its parameter and return contract remains attached.
+// hygiene-ignore single-use -- Keep the documented runLinearHistory declaration so its parameter and return contract remains attached.
 /**
  * Checks the current GitHub event range against the shared linear-history policy.
  *
@@ -177,7 +177,7 @@ export function readTestPlan(root, manifestPath = defaultManifestPath(root)) {
 	return plan;
 }
 
-// terra-quality-ignore single-use -- Keep the documented defaultManifestPath declaration so its parameter and return contract remains attached.
+// hygiene-ignore single-use -- Keep the documented defaultManifestPath declaration so its parameter and return contract remains attached.
 /**
  * Prefer the centralized config location while retaining compatibility with existing consumers.
  * @param {string} root Repository root.
@@ -185,9 +185,9 @@ export function readTestPlan(root, manifestPath = defaultManifestPath(root)) {
  */
 function defaultManifestPath(root) {
 	const absoluteRoot = resolve(root);
-	if (existsSync(resolve(absoluteRoot, 'config/terra-tests.json'))) return 'config/terra-tests.json';
-	if (existsSync(resolve(absoluteRoot, 'tests/terra-tests.json'))) return 'tests/terra-tests.json';
-	return '.terra-tests.json';
+	if (existsSync(resolve(absoluteRoot, 'config/tests.json'))) return 'config/tests.json';
+	if (existsSync(resolve(absoluteRoot, 'tests/tests.json'))) return 'tests/tests.json';
+	return '.tests.json';
 }
 
 /**

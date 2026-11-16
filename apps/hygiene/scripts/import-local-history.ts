@@ -8,7 +8,7 @@ IMPORTS
 
 // API
 import { basename, join, resolve } from 'node:path';
-import { createHistoryReport } from '@terra-symposium/quality/reports';
+import { createHistoryReport } from '@terra-symposium/hygiene/reports';
 import { db } from '../src/lib/server/db.js';
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdtempSync, rmSync } from 'node:fs';
@@ -80,7 +80,7 @@ void (async (): Promise<void> => {
 	} catch {
 		revision = git(checkout, ['rev-parse', '--verify', `refs/heads/${branch}^{commit}`]);
 	}
-	const tempRoot = mkdtempSync(join(tmpdir(), 'terra-hygiene-history-'));
+	const tempRoot = mkdtempSync(join(tmpdir(), 'hygiene-history-'));
 	const worktree = join(tempRoot, basename(checkout) || 'checkout');
 	try {
 		git(checkout, ['worktree', 'add', '--detach', worktree, revision]);

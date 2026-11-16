@@ -1,0 +1,38 @@
+---
+title: Source checks
+description: Documentation, formatting, imports, naming, accessibility, framework boundaries, and performance.
+---
+
+These checks inspect configured source files. Use `enabledChecks.<name>` to select a check and `autofix.<name>` to control its safe fixer. `--warn` disables all Hygiene autofixes for one run.
+
+## Document
+
+`enabledChecks.document` checks declarations against `documentation.required`. The fields are `types` (classes, enums, interfaces, aliases), `functions` (named declarations), `exportedFunctions`, and `noInlineFunctions` (arrow and function expressions). The `document` command reports findings; `maintain` is its compatibility alias. There is no generated comment scaffold: write descriptions after reading the implementation and callers.
+
+## Format
+
+`enabledChecks.format` runs the configured Prettier on selected files. `autofix.format` permits writes. Install Prettier and its required plugins in the consumer repository; Hygiene uses the repository's native configuration. `tools.prettier`, `prettierPrintWidth`, and `oneLineImports` control executable selection and long import protection. Formatting does not replace lint or semantic refactoring.
+
+## Import validation
+
+`enabledChecks.import` resolves relative and aliased imports using `sourceRoots`, `extensions`, `aliases`, and `externalPrefixes`. It supports extensionless paths, index modules, and configured module forms. Unresolved local targets are findings without autofix; choose the correct module from the repository layout.
+
+## Name
+
+`enabledChecks.name` finds naming drift; `autofix.name` permits syntax-aware renames after scope, collision, protected identifier, export, shorthand property, and JSX checks. Ambiguous changes remain findings. Use `protectedIdentifiers` for stable vocabulary. Export renaming defaults to off; opt in with `renameExports`. Review API-facing changes.
+
+## Accessibility and display names
+
+`enabledChecks.accessibility: true` checks native JSX controls and interactive roles for source-evident names. It recognizes ARIA names, associated labels, static child text, and image alternatives. Its fixer may copy a literal `title` to `aria-label` when content is absent, or hide an unnamed SVG from assistive technology when its parent control already has a name. It does not invent labels or keyboard behavior.
+
+`enabledChecks.display-name: true` finds direct named `forwardRef` components without `displayName`. Its fixer adds the declared component name only when the insertion is unambiguous.
+
+## Application error boundaries
+
+The mandatory `error-boundaries` check inspects React `createRoot()` and `hydrateRoot()` entries and Astro hydration integration. Fix mode can add supported wrappers and configuration; `--warn` reports without writing. Static analysis cannot prove runtime recovery. Trigger a descendant failure in the application browser suite and check the fallback and unaffected UI. See [React](/error-boundaries/1-react/react-boundaries/) and [Astro](/error-boundaries/2-frameworks/hydration/).
+
+## Documented commands and performance
+
+`enabledChecks.documented-commands: true` scans `documentation.commandRoots` for fenced shell examples using pnpm `-C` or `--prefix`. Its fixer changes those exact forms to `--dir` and leaves prose and other executables alone.
+
+`performancePatterns` enables an advisory scan for linear lookups nested in collection callbacks. It never rewrites loops. Benchmark before indexing and preserve ordering, duplicates, and update behavior.

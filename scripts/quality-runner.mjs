@@ -78,20 +78,20 @@ const configPath = join(tempDir, 'quality.json');
 writeFileSync(configPath, JSON.stringify(raw));
 try {
 	let modulePath;
-	if (repoName === 'standards' && existsSync(join(root, 'packages/quality/dist/lib/runner.js'))) {
-		modulePath = join(root, 'packages/quality/dist/lib/runner.js');
+	if (repoName === 'standards' && existsSync(join(root, 'packages/hygiene/dist/lib/runner.js'))) {
+		modulePath = join(root, 'packages/hygiene/dist/lib/runner.js');
 	} else {
 		for (const manifest of [join(cwd, 'package.json'), join(root, 'package.json'), join(root, 'config/package.json')]) {
 			if (!existsSync(manifest)) continue;
 			try {
-				modulePath = createRequire(manifest).resolve('@terra-symposium/quality/cli');
+				modulePath = createRequire(manifest).resolve('@terra-symposium/hygiene/cli');
 				break;
 			} catch (error) {
 				if (error.code !== 'MODULE_NOT_FOUND') throw error;
 			}
 		}
 	}
-	if (!modulePath) throw new Error('Install @terra-symposium/quality in this repository before running Quality.');
+	if (!modulePath) throw new Error('Install @terra-symposium/hygiene in this repository before running Quality.');
 	if (args[0] === 'quality' && !args.includes('--warn') && !args.includes('--fix') && !args.includes('--safe-fix') && readFileSync(modulePath, 'utf8').includes('Options: --all, --warn, --fix')) args.push('--fix');
 	const { runQualityFromCfg } = await import(pathToFileURL(modulePath).href);
 	await runQualityFromCfg(configPath, args);

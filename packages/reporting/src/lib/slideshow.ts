@@ -321,7 +321,7 @@ const addResponsiveSlide = async (presentation: Presentation, group: readonly Vi
 			h: 0.2,
 		});
 		if (r.screenshot && fs.existsSync(r.screenshot)) {
-			// terra-quality-ignore single-use -- Finish screenshot review before loading the preview image.
+			// hygiene-ignore single-use -- Finish screenshot review before loading the preview image.
 			const review = await reviewImg(r.screenshot, r);
 			const preview = await previewImg(r.screenshot, r.viewportSize);
 			slide.addImage({ data: preview.data, ...fitImg(preview.width, preview.height, x + 0.08, y + 0.38, width - 0.16, height - 0.46) });
@@ -413,7 +413,7 @@ export const readScreenshotCapturesFromDirectory = (dir: string, currentRunId?: 
 		}
 	});
 };
-// terra-quality-ignore single-use -- Keep the documented addLoadSummarySlide declaration so its parameter and return contract remains attached.
+// hygiene-ignore single-use -- Keep the documented addLoadSummarySlide declaration so its parameter and return contract remains attached.
 /**
  * Adds a run-level load summary slide and names the slowest measurements.
  *
@@ -445,7 +445,7 @@ const addLoadSummarySlide = (presentation: Presentation, results: readonly Visua
 		{ color: colors.ink, fontFace: 'Authentic Sans', fontSize: 13, fit: 'shrink', margin: 0.08, valign: 'mid', x: 0.58, y: 2.05, w: 12.1, h: 4.3 },
 	);
 };
-// terra-quality-ignore single-use -- Keep the documented addLoadDetailSlides declaration so its parameter and return contract remains attached.
+// hygiene-ignore single-use -- Keep the documented addLoadDetailSlides declaration so its parameter and return contract remains attached.
 /**
  * Adds paginated slides containing every individual test, page, and operation measurement.
  *
@@ -460,7 +460,7 @@ const addLoadDetailSlides = (presentation: Presentation, results: readonly Visua
 	const pageSize = 12;
 	const pages = Math.max(1, Math.ceil(measurements.length / pageSize));
 	for (let page = 0; page < pages; page += 1) {
-		// terra-quality-ignore single-use -- Render measurement text before adding a slide so formatting errors leave the deck unchanged.
+		// hygiene-ignore single-use -- Render measurement text before adding a slide so formatting errors leave the deck unchanged.
 		const lines = measurements
 			.slice(page * pageSize, (page + 1) * pageSize)
 			.map(
@@ -625,7 +625,7 @@ export const writeScreenshotSlideshow = async (file: string, captures: readonly 
 	await presentation.writeFile({ fileName: file });
 	await neutralizeApplicationMetadata(file);
 };
-// terra-quality-ignore single-use -- Keep the documented readScreenshotCapturesFromDirTree declaration so its parameter and return contract remains attached.
+// hygiene-ignore single-use -- Keep the documented readScreenshotCapturesFromDirTree declaration so its parameter and return contract remains attached.
 /**
  * Reads current and historical screenshots beneath a folder, with stable source names for multi-repository reports.
  *

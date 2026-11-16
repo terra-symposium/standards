@@ -12,7 +12,7 @@
 	},
 	"scripts": {
 		"build": "cd .. && pnpm -r --filter '!@terra-symposium/standards' --filter '!standards-workspace-adapter' build",
-		"test": "cd .. && node packages/testing/src/cli.mjs run --manifest config/terra-tests.json",
+		"test": "cd .. && node packages/testing/src/cli.mjs run --manifest config/tests.json",
 		"quality": "node \"$(git rev-parse --show-toplevel)/scripts/quality-runner.mjs\" quality",
 		"quality:all": "node \"$(git rev-parse --show-toplevel)/scripts/quality-runner.mjs\" quality --all",
 		"docs": "cd .. && node config/scripts/build-docs.mjs --dev",

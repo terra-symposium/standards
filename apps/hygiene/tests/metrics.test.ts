@@ -223,7 +223,7 @@ test('concurrent duplicate webhook deliveries are claimed once', async () => {
 			finishProcessing = resolve;
 		});
 	};
-	// terra-quality-ignore single-use -- Start the first delivery before asserting that a concurrent duplicate is rejected.
+	// hygiene-ignore single-use -- Start the first delivery before asserting that a concurrent duplicate is rejected.
 	const first = acceptDelivery('delivery-1', claim, process, async () => {
 		claimed = false;
 	});
@@ -276,7 +276,7 @@ test('repository build tokens are stored and compared as repository-scoped hashe
 	assert.equal(matchesReportToken(token, null), false);
 });
 test('repository admin check denies another repository administrator', async () => {
-	// terra-quality-ignore single-use -- Save the original fetch function so the test restores the exact global binding.
+	// hygiene-ignore single-use -- Save the original fetch function so the test restores the exact global binding.
 	const prev = globalThis.fetch;
 	globalThis.fetch = async input => new Response(JSON.stringify({ permission: String(input).includes('/repos/owner/own/') ? 'admin' : 'read' }), { status: 200 });
 	try {

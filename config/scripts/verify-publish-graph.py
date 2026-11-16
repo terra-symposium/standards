@@ -184,7 +184,7 @@ def verify_isolated_install(destination: pathlib.Path) -> None:
         archive = packs / filename
         if not archive.is_file():
             raise RuntimeError(f"Missing packed artifact: {archive}")
-        if package["name"] == "@terra-symposium/quality":
+        if package["name"] == "@terra-symposium/hygiene":
             with tarfile.open(archive) as contents:
                 packed = set(contents.getnames())
             required = {"package/quality.schema.json"}
@@ -220,18 +220,18 @@ def verify_isolated_install(destination: pathlib.Path) -> None:
             f"Isolated package install failed: {install.stdout}\n{install.stderr}"
         )
     imports = [
-        "@terra-symposium/quality/cli",
-        "@terra-symposium/quality/core",
-        "@terra-symposium/quality/reports",
-        "@terra-symposium/quality/ui",
-        "@terra-symposium/quality/languages",
-        "@terra-symposium/quality/documentation",
-        "@terra-symposium/quality/formatting",
-        "@terra-symposium/quality/imports",
-        "@terra-symposium/quality/naming",
-        "@terra-symposium/quality/patterns",
-        "@terra-symposium/quality/refactoring",
-        "@terra-symposium/quality/security",
+        "@terra-symposium/hygiene/cli",
+        "@terra-symposium/hygiene/core",
+        "@terra-symposium/hygiene/reports",
+        "@terra-symposium/hygiene/ui",
+        "@terra-symposium/hygiene/languages",
+        "@terra-symposium/hygiene/documentation",
+        "@terra-symposium/hygiene/formatting",
+        "@terra-symposium/hygiene/imports",
+        "@terra-symposium/hygiene/naming",
+        "@terra-symposium/hygiene/patterns",
+        "@terra-symposium/hygiene/refactoring",
+        "@terra-symposium/hygiene/security",
     ]
     program = (
         "for (const name of "

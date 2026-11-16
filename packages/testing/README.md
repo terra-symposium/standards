@@ -2,7 +2,7 @@
 
 Testing helps teams run a repository’s checks in a predictable order.
 
-The `terra-test` runner executes Standards shared checks and the suites declared in a repository test plan. It checks that each test file has one owning suite and rejects duplicate suite commands.
+The `test-runner` runner executes Standards shared checks and the suites declared in a repository test plan. It checks that each test file has one owning suite and rejects duplicate suite commands.
 
 ## Get started
 
@@ -12,7 +12,7 @@ Node.js `>=20`. The runner invokes the tools named in the consumer's manifest; i
 pnpm add -D @terra-symposium/testing
 ```
 
-Create `config/terra-tests.json`:
+Create `config/tests.json`:
 
 ```json
 {
@@ -33,10 +33,10 @@ Create `config/terra-tests.json`:
 Run the plan from the consuming repository root:
 
 ```sh
-pnpm exec terra-test run --manifest config/terra-tests.json
+pnpm exec test-runner run --manifest config/tests.json
 ```
 
-`--suites unit,contracts` selects named local suites while retaining shared checks. `--shared-only` runs Standards checks without local suites. The runner discovers `config/terra-tests.json`, then `tests/terra-tests.json`, then legacy `.terra-tests.json` when no manifest is specified. A repository with no custom suites may omit the manifest.
+`--suites unit,contracts` selects named local suites while retaining shared checks. `--shared-only` runs Standards checks without local suites. The runner discovers `config/tests.json`, then `tests/tests.json`, then legacy `.tests.json` when no manifest is specified. A repository with no custom suites may omit the manifest.
 
 ## Configuration
 

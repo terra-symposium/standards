@@ -12,122 +12,122 @@ X-Robots-Tag = "noindex, nofollow"
 
 [[redirects]]
 from = "/getting-started"
-to = "/quality/0-getting-started/overview/"
+to = "/hygiene/0-getting-started/overview/"
 status = 301
 
 [[redirects]]
-from = "/quality/overview"
-to = "/quality/0-getting-started/overview/"
+from = "/hygiene/overview"
+to = "/hygiene/0-getting-started/overview/"
 status = 301
 
 [[redirects]]
-from = "/quality/configuration"
-to = "/quality/0-getting-started/overview/"
+from = "/hygiene/configuration"
+to = "/hygiene/0-getting-started/overview/"
 status = 301
 
 [[redirects]]
-from = "/quality/commands"
-to = "/quality/0-getting-started/overview/"
+from = "/hygiene/commands"
+to = "/hygiene/0-getting-started/overview/"
 status = 301
 
 [[redirects]]
-from = "/quality/troubleshooting"
-to = "/quality/5-operations/troubleshooting/"
+from = "/hygiene/troubleshooting"
+to = "/hygiene/5-operations/troubleshooting/"
 status = 301
 
 [[redirects]]
-from = "/quality/checks"
-to = "/quality/3-checks/check-reference/"
+from = "/hygiene/checks"
+to = "/hygiene/3-checks/check-reference/"
 status = 301
 
 [[redirects]]
-from = "/quality/checks/alias"
-to = "/quality/3-checks/refactoring-checks/#alias"
+from = "/hygiene/checks/alias"
+to = "/hygiene/3-checks/refactoring-checks/#alias"
 status = 301
 
 [[redirects]]
-from = "/quality/checks/command"
-to = "/quality/3-checks/tooling-checks/#command"
+from = "/hygiene/checks/command"
+to = "/hygiene/3-checks/tooling-checks/#command"
 status = 301
 
 [[redirects]]
-from = "/quality/checks/dead-code"
-to = "/quality/3-checks/refactoring-checks/#dead-code"
+from = "/hygiene/checks/dead-code"
+to = "/hygiene/3-checks/refactoring-checks/#dead-code"
 status = 301
 
 [[redirects]]
-from = "/quality/checks/diff"
-to = "/quality/3-checks/tooling-checks/#diff"
+from = "/hygiene/checks/diff"
+to = "/hygiene/3-checks/tooling-checks/#diff"
 status = 301
 
 [[redirects]]
-from = "/quality/checks/document"
-to = "/quality/3-checks/source-checks/#document"
+from = "/hygiene/checks/document"
+to = "/hygiene/3-checks/source-checks/#document"
 status = 301
 
 [[redirects]]
-from = "/quality/checks/format"
-to = "/quality/3-checks/source-checks/#format"
+from = "/hygiene/checks/format"
+to = "/hygiene/3-checks/source-checks/#format"
 status = 301
 
 [[redirects]]
-from = "/quality/checks/forward"
-to = "/quality/3-checks/refactoring-checks/#object-forwarding"
+from = "/hygiene/checks/forward"
+to = "/hygiene/3-checks/refactoring-checks/#object-forwarding"
 status = 301
 
 [[redirects]]
-from = "/quality/checks/import"
-to = "/quality/3-checks/source-checks/#import-validation"
+from = "/hygiene/checks/import"
+to = "/hygiene/3-checks/source-checks/#import-validation"
 status = 301
 
 [[redirects]]
-from = "/quality/checks/knip"
-to = "/quality/3-checks/tooling-checks/#knip"
+from = "/hygiene/checks/knip"
+to = "/hygiene/3-checks/tooling-checks/#knip"
 status = 301
 
 [[redirects]]
-from = "/quality/checks/lint"
-to = "/quality/3-checks/tooling-checks/#lint"
+from = "/hygiene/checks/lint"
+to = "/hygiene/3-checks/tooling-checks/#lint"
 status = 301
 
 [[redirects]]
-from = "/quality/checks/name"
-to = "/quality/3-checks/source-checks/#name"
+from = "/hygiene/checks/name"
+to = "/hygiene/3-checks/source-checks/#name"
 status = 301
 
 [[redirects]]
-from = "/quality/checks/recommend"
-to = "/quality/3-checks/tooling-checks/#recommend"
+from = "/hygiene/checks/recommend"
+to = "/hygiene/3-checks/tooling-checks/#recommend"
 status = 301
 
 [[redirects]]
-from = "/quality/checks/regex-dedup"
-to = "/quality/3-checks/repository-patterns/#regex-deduplication"
+from = "/hygiene/checks/regex-dedup"
+to = "/hygiene/3-checks/repository-patterns/#regex-deduplication"
 status = 301
 
 [[redirects]]
-from = "/quality/checks/repeated-classes"
-to = "/quality/3-checks/repository-patterns/#repeated-classes"
+from = "/hygiene/checks/repeated-classes"
+to = "/hygiene/3-checks/repository-patterns/#repeated-classes"
 status = 301
 
 [[redirects]]
-from = "/quality/checks/security"
-to = "/quality/3-checks/repository-patterns/#security"
+from = "/hygiene/checks/security"
+to = "/hygiene/3-checks/repository-patterns/#security"
 status = 301
 
 [[redirects]]
-from = "/quality/checks/single-use"
-to = "/quality/3-checks/refactoring-checks/#single-use-declarations"
+from = "/hygiene/checks/single-use"
+to = "/hygiene/3-checks/refactoring-checks/#single-use-declarations"
 status = 301
 
 [[redirects]]
-from = "/quality/checks/type"
-to = "/quality/3-checks/tooling-checks/#type"
+from = "/hygiene/checks/type"
+to = "/hygiene/3-checks/tooling-checks/#type"
 status = 301
 
 [[redirects]]
-from = "/quality/checks/ui-patterns"
-to = "/quality/3-checks/repository-patterns/#ui-patterns"
+from = "/hygiene/checks/ui-patterns"
+to = "/hygiene/3-checks/repository-patterns/#ui-patterns"
 status = 301
 
 [[redirects]]
@@ -141,28 +141,28 @@ to = "/error-boundaries/1-react/react-boundaries/"
 status = 301
 
 [[redirects]]
-from = "/standards/quality/overview/"
-to = "/quality/0-getting-started/overview/"
+from = "/standards/hygiene/overview/"
+to = "/hygiene/0-getting-started/overview/"
 status = 301
 
 [[redirects]]
-from = "/standards/quality/setup/"
-to = "/quality/0-getting-started/overview/"
+from = "/standards/hygiene/setup/"
+to = "/hygiene/0-getting-started/overview/"
 status = 301
 
 [[redirects]]
-from = "/standards/quality/configuration/"
-to = "/quality/0-getting-started/overview/"
+from = "/standards/hygiene/configuration/"
+to = "/hygiene/0-getting-started/overview/"
 status = 301
 
 [[redirects]]
-from = "/standards/quality/workflows/"
-to = "/quality/0-getting-started/overview/"
+from = "/standards/hygiene/workflows/"
+to = "/hygiene/0-getting-started/overview/"
 status = 301
 
 [[redirects]]
-from = "/standards/quality/troubleshooting/"
-to = "/quality/5-operations/troubleshooting/"
+from = "/standards/hygiene/troubleshooting/"
+to = "/hygiene/5-operations/troubleshooting/"
 status = 301
 
 [[redirects]]
@@ -186,33 +186,33 @@ to = "/reporting/2-playwright/playwright-evidence/"
 status = 301
 
 [[redirects]]
-from = "/packages/quality/"
-to = "/quality/0-getting-started/overview/"
+from = "/packages/hygiene/"
+to = "/hygiene/0-getting-started/overview/"
 status = 301
 
 [[redirects]]
-from = "/packages/quality/setup/"
-to = "/quality/0-getting-started/overview/"
+from = "/packages/hygiene/setup/"
+to = "/hygiene/0-getting-started/overview/"
 status = 301
 
 [[redirects]]
-from = "/packages/quality/configuration/"
-to = "/quality/0-getting-started/overview/"
+from = "/packages/hygiene/configuration/"
+to = "/hygiene/0-getting-started/overview/"
 status = 301
 
 [[redirects]]
-from = "/packages/quality/workflows/"
-to = "/quality/0-getting-started/overview/"
+from = "/packages/hygiene/workflows/"
+to = "/hygiene/0-getting-started/overview/"
 status = 301
 
 [[redirects]]
-from = "/packages/quality/checks/"
-to = "/quality/3-checks/check-reference/"
+from = "/packages/hygiene/checks/"
+to = "/hygiene/3-checks/check-reference/"
 status = 301
 
 [[redirects]]
-from = "/packages/quality/troubleshooting/"
-to = "/quality/5-operations/troubleshooting/"
+from = "/packages/hygiene/troubleshooting/"
+to = "/hygiene/5-operations/troubleshooting/"
 status = 301
 
 [[redirects]]
@@ -281,7 +281,7 @@ to = "/contributing/0-workspace/getting-started/"
 status = 301
 
 [[redirects]]
-from = "/contributing/quality/change-validation/"
+from = "/contributing/hygiene/change-validation/"
 to = "/contributing/1-quality/change-validation/"
 status = 301
 
@@ -301,48 +301,48 @@ to = "/contributing/3-releases/package-release/"
 status = 301
 
 [[redirects]]
-from = "/quality/getting-started/overview/"
-to = "/quality/0-getting-started/overview/"
+from = "/hygiene/getting-started/overview/"
+to = "/hygiene/0-getting-started/overview/"
 status = 301
 
 [[redirects]]
-from = "/quality/getting-started/setup/"
-to = "/quality/0-getting-started/overview/"
+from = "/hygiene/getting-started/setup/"
+to = "/hygiene/0-getting-started/overview/"
 status = 301
 
 [[redirects]]
-from = "/quality/packages/index/"
-to = "/quality/1-packages/package-map/"
+from = "/hygiene/packages/index/"
+to = "/hygiene/1-packages/package-map/"
 status = 301
 
 [[redirects]]
-from = "/quality/1-packages/"
-to = "/quality/1-packages/package-map/"
+from = "/hygiene/1-packages/"
+to = "/hygiene/1-packages/package-map/"
 status = 301
 
 [[redirects]]
-from = "/quality/1-packages/index/"
-to = "/quality/1-packages/package-map/"
+from = "/hygiene/1-packages/index/"
+to = "/hygiene/1-packages/package-map/"
 status = 301
 
 [[redirects]]
-from = "/quality/configuration/quality-json/"
-to = "/quality/0-getting-started/overview/"
+from = "/hygiene/configuration/quality-json/"
+to = "/hygiene/0-getting-started/overview/"
 status = 301
 
 [[redirects]]
-from = "/quality/checks/check-reference/"
-to = "/quality/3-checks/check-reference/"
+from = "/hygiene/checks/check-reference/"
+to = "/hygiene/3-checks/check-reference/"
 status = 301
 
 [[redirects]]
-from = "/quality/workflows/cli-and-ci/"
-to = "/quality/0-getting-started/overview/"
+from = "/hygiene/workflows/cli-and-ci/"
+to = "/hygiene/0-getting-started/overview/"
 status = 301
 
 [[redirects]]
-from = "/quality/operations/troubleshooting/"
-to = "/quality/5-operations/troubleshooting/"
+from = "/hygiene/operations/troubleshooting/"
+to = "/hygiene/5-operations/troubleshooting/"
 status = 301
 
 [[redirects]]
@@ -458,26 +458,26 @@ status = 301
 # Consolidated Quality guide legacy routes.
 
 [[redirects]]
-from = "/quality/0-getting-started/setup/"
-to = "/quality/0-getting-started/overview/"
+from = "/hygiene/0-getting-started/setup/"
+to = "/hygiene/0-getting-started/overview/"
 status = 301
 
 [[redirects]]
-from = "/quality/0-getting-started/quality-json/"
-to = "/quality/0-getting-started/overview/"
+from = "/hygiene/0-getting-started/quality-json/"
+to = "/hygiene/0-getting-started/overview/"
 status = 301
 
 [[redirects]]
-from = "/quality/0-getting-started/cli-and-ci/"
-to = "/quality/0-getting-started/overview/"
+from = "/hygiene/0-getting-started/cli-and-ci/"
+to = "/hygiene/0-getting-started/overview/"
 status = 301
 
 [[redirects]]
-from = "/quality/2-configuration/quality-json/"
-to = "/quality/0-getting-started/overview/"
+from = "/hygiene/2-configuration/quality-json/"
+to = "/hygiene/0-getting-started/overview/"
 status = 301
 
 [[redirects]]
-from = "/quality/4-workflows/cli-and-ci/"
-to = "/quality/0-getting-started/overview/"
+from = "/hygiene/4-workflows/cli-and-ci/"
+to = "/hygiene/0-getting-started/overview/"
 status = 301

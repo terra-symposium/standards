@@ -3,8 +3,8 @@ name: port
 description: Assign and safely acquire Terra development ports.
 metadata:
   related-files:
-    - packages/quality/src/lib/port.ts
-    - packages/quality/src/lib/dev.ts
+    - packages/hygiene/src/lib/port.ts
+    - packages/hygiene/src/lib/dev.ts
 ---
 
 # Local development port assignments
@@ -40,14 +40,14 @@ The Website Docs routes share the Astro server on port 2021. Portfolio is curren
 
 ## Port acquisition
 
-Prefer the shared `terra-quality-dev` launcher when the repository provides it. It accepts an explicit `--port`, adds strict-port handling, and calls the shared Quality `acquirePort()` helper before launch. Host Docs apps should pass `--port PORT` to `docs dev`; the Docs CLI reads that flag or `docs.port` from the host package manifest. `DOCS_DEV_PORT` is honored by `terra-quality-dev`, not by the `docs` CLI. Astro apps should use their fixed configured port and strict handling where supported.
+Prefer the shared `hygiene-dev` launcher when the repository provides it. It accepts an explicit `--port`, adds strict-port handling, and calls the shared Quality `acquirePort()` helper before launch. Host Docs apps should pass `--port PORT` to `docs dev`; the Docs CLI reads that flag or `docs.port` from the host package manifest. `DOCS_DEV_PORT` is honored by `hygiene-dev`, not by the `docs` CLI. Astro apps should use their fixed configured port and strict handling where supported.
 
 `acquirePort(port)` terminates processes listening on that port, then waits until it can bind. Use it only for ports owned by the local development workflow. Never use port `0` as a fixed assignment: it requests an OS-selected ephemeral port. Validate that configured ports are integers from 1 through 65535 and keep assignments unique across concurrently used services. Keep fixed development ports at or above 1024; ports below that may require elevated privileges on Unix-like systems. The contracting apps use ports 2000 and 2010.
 
 ## Change procedure
 
 1. Confirm the app has an independent local server. Use its listed port. For a new app, select an unassigned port at or above 1024, check it across all Desktop repositories, and add its owner to the table in this skill.
-2. Identify any current listener and its owner before running `terra-quality-dev`, because its acquisition step can terminate that listener. If it belongs to another app, do not terminate it: use the target app's assigned port if free, or reassign one app to a checked unique port and update this table. If the listener's owner is unknown, stop acquisition until ownership is established. Update the server launcher/configuration and enable strict handling so unowned collisions fail clearly. Standards Docs' `scripts/build-docs.mjs` passes `--port 2050` directly; update it if changing that server's port.
+2. Identify any current listener and its owner before running `hygiene-dev`, because its acquisition step can terminate that listener. If it belongs to another app, do not terminate it: use the target app's assigned port if free, or reassign one app to a checked unique port and update this table. If the listener's owner is unknown, stop acquisition until ownership is established. Update the server launcher/configuration and enable strict handling so unowned collisions fail clearly. Standards Docs' `scripts/build-docs.mjs` passes `--port 2050` directly; update it if changing that server's port.
 3. Update local origins, OAuth callback examples, browser-test base URLs, and docs that name the port.
 4. Search tracked source and docs across all Desktop repositories for old and new ports, including `localhost`, `127.0.0.1`, redirects, and configured origins.
 5. Start the affected server without displacing another app. Confirm the actual bound port, strict collision failure, and a healthy intended URL. Check dependent browser tests or callback paths when changed.

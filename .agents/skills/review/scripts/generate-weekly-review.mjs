@@ -40,7 +40,7 @@ function git(args) {
 	return execFileSync('git', args, { cwd: report.repo, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }).trimEnd();
 }
 
-// terra-quality-ignore single-use -- Keep the documented hue declaration so its parameter and return contract remains attached.
+// hygiene-ignore single-use -- Keep the documented hue declaration so its parameter and return contract remains attached.
 /**
  * Selects a hue that stays visually distinct from the colors already assigned.
  *
@@ -369,7 +369,7 @@ function validPlan(plan, contributor, { requirePreviousObjective: requirePrevObj
 	return true;
 }
 
-// terra-quality-ignore single-use -- Keep the documented assessBigFiveTimeline declaration so its parameter and return contract remains attached.
+// hygiene-ignore single-use -- Keep the documented assessBigFiveTimeline declaration so its parameter and return contract remains attached.
 /**
  * Validates five objectives against complete Git history and computes their evidence scores.
  *
@@ -383,7 +383,7 @@ function assessBigFiveTimeline(plan, historyCommits) {
 		throw new Error('Big Five timeline requires a source and five objectives, each assessed against the complete history of the requested refs.');
 	const historyBySha = new Map(historyCommits.map(commit => [commit.sha, commit]));
 	const progressByStatus = { complete: 1, partial: 0.5, not_found: 0 };
-	// terra-quality-ignore single-use -- Validate objective evidence before the history-date check so invalid input keeps its existing error priority.
+	// hygiene-ignore single-use -- Validate objective evidence before the history-date check so invalid input keeps its existing error priority.
 	const milestones = plan.objectives.map(objective => {
 		if (typeof objective.name !== 'string' || !objective.name.trim() || !Array.isArray(objective.deliverables) || !objective.deliverables.length)
 			throw new Error('Each Big Five objective requires a name and source-backed deliverable assessments.');
@@ -452,7 +452,7 @@ function addContributorSummary(deck, section, goal, colors, page, srcs) {
 		`contribution-meta-${page}`,
 	);
 	const outcomes = section.slides.flatMap(i => i.bullets ?? []).slice(0, 6);
-	// terra-quality-ignore single-use -- Prepare text before creating the card so text errors cannot leave a partial slide.
+	// hygiene-ignore single-use -- Prepare text before creating the card so text errors cannot leave a partial slide.
 	const body = outcomes.length ? wrapLines(outcomes.join('\n'), 64) : '• No contribution detail was supplied for this identity.';
 	card(slide, { left: 58, top: 214, width: 680, height: 332 }, colors, `contribution-outcomes-${page}`);
 	addText(slide, 'Recorded outcomes', { left: 84, top: 238, width: 600, height: 26 }, { fontSize: 20, color: colors.text, maxChars: 34 }, `contribution-heading-${page}`);
@@ -477,7 +477,7 @@ function addContributorSummary(deck, section, goal, colors, page, srcs) {
 	notes(slide, [...srcs, ...(goal ? [`${goal.source} · ${goal.status}`] : []), ...section.slides.flatMap(i => i.sources ?? [])]);
 }
 
-// terra-quality-ignore single-use -- Keep the documented main declaration so its parameter and return contract remains attached.
+// hygiene-ignore single-use -- Keep the documented main declaration so its parameter and return contract remains attached.
 /**
  * Builds the weekly review deck from a validated report and its Git evidence.
  *
@@ -585,7 +585,7 @@ async function main() {
 		const marker = timelineX(plan.asOf);
 		for (let index = 0; index <= 4; index += 1) {
 			const x = chartLeft + (index / 4) * chartWidth;
-			// terra-quality-ignore single-use -- Validate the axis date before drawing its grid line.
+			// hygiene-ignore single-use -- Validate the axis date before drawing its grid line.
 			const date = new Date(rangeStart + (range * index) / 4).toISOString().slice(0, 4);
 			rule(slide, x, chartTop - 12, 1, colors.rule, `big-five-grid-${page}-${index}`);
 			addText(

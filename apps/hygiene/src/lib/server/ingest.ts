@@ -52,7 +52,7 @@ export function buildRunId(report: Pick<BuildReport, 'repository' | 'branch' | '
  * @param completedAt Timestamp used to prevent an older snapshot replacing newer history.
  */
 async function persistHistoryReport(repoId: number, runId: number, report: HistoryReport, completedAt: string): Promise<void> {
-	// terra-quality-ignore single-use -- Open the database connection before computing snapshot state and executing the history query.
+	// hygiene-ignore single-use -- Open the database connection before computing snapshot state and executing the history query.
 	const sql = db();
 	const snapshot = report.mode === 'snapshot';
 	await sql`WITH eligible AS (
@@ -89,7 +89,7 @@ async function persistHistoryReport(repoId: number, runId: number, report: Histo
 	WHERE b.repository_id = ${repoId} AND b.name = ${report.branch} AND EXISTS (SELECT 1 FROM recorded)`;
 }
 
-// terra-quality-ignore single-use -- Keep report ingestion exported for the HTTP endpoint and future ingestion callers.
+// hygiene-ignore single-use -- Keep report ingestion exported for the HTTP endpoint and future ingestion callers.
 /**
  * Persist a local history import without presenting it as a CI build.
  *

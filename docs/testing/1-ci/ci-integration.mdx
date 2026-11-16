@@ -3,7 +3,7 @@ title: CI integration
 description: Run shared plan checks before repository suites, locally or through the public GitHub Action.
 ---
 
-Every `terra-test run` validates the test plan and file ownership before it runs the selected repository suites. A shared-check or suite failure returns a nonzero process status.
+Every `test-runner run` validates the test plan and file ownership before it runs the selected repository suites. A shared-check or suite failure returns a nonzero process status.
 
 ## Local command in CI
 
@@ -12,7 +12,7 @@ Use the npm package command in a Node workflow. Shared checks do not replace rep
 ||| [Run the npm CLI]
 
 ```sh
-pnpm exec terra-test run --manifest config/terra-tests.json
+pnpm exec test-runner run --manifest config/tests.json
 ```
 
 The shared stage runs first; selected custom suites run afterward.
@@ -26,7 +26,7 @@ Pin the mirror to an immutable commit and pass the manifest path:
 ```yaml
 - uses: Terra-Symposium/standards/packages/testing@3f9b31323d3617d6b565770880865ec7cf1a9704
   with:
-    manifest: config/terra-tests.json
+    manifest: config/tests.json
 ```
 
 The package source in this repository is canonical. A published Action change must update the public mirror as well.

@@ -3,8 +3,8 @@ name: test
 description: Create, order, run, repair, and report Terra tests.
 metadata:
   related-files:
-    - config/terra-tests.json
-    - packages/quality/package.json
+    - config/tests.json
+    - packages/hygiene/package.json
 ---
 
 # Test
@@ -25,7 +25,7 @@ This family is the canonical owner of test-policy guidance: this skill routes wo
 
 ## Test hierarchy
 
-Mirror the source and route tree beneath the test root, and assign each behavior one authoritative owner. Use `config/terra-tests.json` as the canonical suite and test-file ownership manifest where supported; do not maintain a competing inventory. Keep runner-specific files separate only when the execution boundary requires it. Follow the linked reference for the migration map and ownership checks.
+Mirror the source and route tree beneath the test root, and assign each behavior one authoritative owner. Use `config/tests.json` as the canonical suite and test-file ownership manifest where supported; do not maintain a competing inventory. Keep runner-specific files separate only when the execution boundary requires it. Follow the linked reference for the migration map and ownership checks.
 
 ## Coverage contract
 
@@ -52,4 +52,4 @@ Exhaustiveness means each material state and risk has an owner at the cheapest r
 
 Avoid duplicating lower-level contracts in expensive browser tests unless they prove an additional user or integration boundary. Add source-contract tests when they provide the cheapest reliable proof, not as a blanket prerequisite for every change. Assert observable outcomes rather than incidental implementation details.
 
-For a Quality public API test, build its package before running focused Node tests such as `node --test packages/quality/tests/runner/quality.test.mjs`. Verify `packages/quality/package.json` runtime and types exports and use an isolated package-name consumer import and type-resolution fixture; a direct `dist` import or TypeScript alias alone does not prove the published interface.
+For a Quality public API test, build its package before running focused Node tests such as `node --test packages/hygiene/tests/runner/quality.test.mjs`. Verify `packages/hygiene/package.json` runtime and types exports and use an isolated package-name consumer import and type-resolution fixture; a direct `dist` import or TypeScript alias alone does not prove the published interface.

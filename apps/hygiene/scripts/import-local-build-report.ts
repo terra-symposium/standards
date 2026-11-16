@@ -66,7 +66,7 @@ function run(cmd: string, cmdArgs: string[], cwd: string): number {
 	if (result.error) throw result.error;
 	return result.status ?? 1;
 }
-// terra-quality-ignore single-use -- Keep the documented import workflow as a named script entry point.
+// hygiene-ignore single-use -- Keep the documented import workflow as a named script entry point.
 /**
  * Imports verified local test and Quality reports into the Hygiene dashboard.
  *
@@ -104,11 +104,11 @@ async function main(): Promise<void> {
 	} catch {
 		revision = git(checkout, ['rev-parse', '--verify', `refs/heads/${branch}^{commit}`]);
 	}
-	const tempRoot = mkdtempSync(join(tmpdir(), 'terra-hygiene-report-'));
+	const tempRoot = mkdtempSync(join(tmpdir(), 'hygiene-report-'));
 	const worktree = join(tempRoot, basename(checkout) || 'checkout');
 	const reports = join(tempRoot, 'reports');
 	const junitPath = join(reports, 'junit.xml');
-	const qualityPath = join(reports, 'terra-quality.json');
+	const qualityPath = join(reports, 'hygiene.json');
 	mkdirSync(reports);
 	try {
 		git(checkout, ['worktree', 'add', '--detach', worktree, revision]);
@@ -120,7 +120,7 @@ async function main(): Promise<void> {
 		const qualityConfigPath = join(worktree, 'config/quality.json');
 		const qualityPolicyBranch = existsSync(qualityConfigPath) ? branch : 'development';
 		if (!existsSync(qualityConfigPath)) {
-			// terra-quality-ignore single-use -- Read the branch policy before creating its destination directory.
+			// hygiene-ignore single-use -- Read the branch policy before creating its destination directory.
 			const sharedPolicy = git(checkout, ['show', 'origin/development:config/quality.json']);
 			mkdirSync(join(worktree, 'config'), { recursive: true });
 			writeFileSync(qualityConfigPath, `${sharedPolicy}\n`);
@@ -137,8 +137,8 @@ async function main(): Promise<void> {
 				'--package',
 				'node@24',
 				'--package',
-				'@terra-symposium/quality@0.5.0',
-				'terra-quality',
+				'@terra-symposium/hygiene@0.5.0',
+				'hygiene',
 				'quality',
 				'--all',
 				'--warn',
@@ -149,9 +149,9 @@ async function main(): Promise<void> {
 			],
 			worktree,
 		);
-		// terra-quality-ignore single-use -- Read the JUnit artifact before resolving the checkout head and parsing the report.
+		// hygiene-ignore single-use -- Read the JUnit artifact before resolving the checkout head and parsing the report.
 		const junitXml = existsSync(junitPath) ? readFileSync(junitPath, 'utf8') : null;
-		// terra-quality-ignore single-use -- Read the Quality artifact before resolving the checkout head and parsing the report.
+		// hygiene-ignore single-use -- Read the Quality artifact before resolving the checkout head and parsing the report.
 		const quality = existsSync(qualityPath) ? (JSON.parse(readFileSync(qualityPath, 'utf8')) as unknown) : null;
 		const headSha = git(worktree, ['rev-parse', 'HEAD']);
 		const report = parseBuildReport({
@@ -166,9 +166,9 @@ async function main(): Promise<void> {
 			history: null,
 		});
 		await ingestBuildReport(Number(repoRow.id), report, 'local', qualityPolicyBranch);
-		// terra-quality-ignore single-use -- Prepare the test summary before any report lines are emitted.
+		// hygiene-ignore single-use -- Prepare the test summary before any report lines are emitted.
 		const testCounts = report.tests ? `${report.tests.passed} passed, ${report.tests.failed} failed, ${report.tests.skipped} skipped` : 'JUnit report missing';
-		// terra-quality-ignore single-use -- Prepare the Quality summary before any report lines are emitted.
+		// hygiene-ignore single-use -- Prepare the Quality summary before any report lines are emitted.
 		const qualityCounts = report.quality
 			? `${report.quality.clean}/${report.quality.enabled} clean checks, ${report.quality.findings} findings, ${report.quality.total} total checks`
 			: 'Terra Quality report missing';

@@ -93,7 +93,7 @@ function initGitFixture() {
 	git(root, 'config', 'user.name', 'Standards Tests');
 	git(root, 'config', 'user.email', 'standards-tests@example.invalid');
 	writeFileSync(join(root, 'base.txt'), 'base\n');
-	// terra-quality-ignore single-use -- Capture the base commit SHA before the test creates later commits.
+	// hygiene-ignore single-use -- Capture the base commit SHA before the test creates later commits.
 	const base = commit(root, 'base');
 	return { root, base };
 }
@@ -110,7 +110,7 @@ test('missing consumer manifests produce an empty test plan', () => {
 		rmSync(root, { recursive: true, force: true });
 	}
 });
-test('default discovery prefers config/terra-tests.json and preserves explicit manifest selection', () => {
+test('default discovery prefers config/tests.json and preserves explicit manifest selection', () => {
 	const root = fixtureRoot();
 	try {
 		const configPlan = { version: 1, suites: [{ name: 'config-plan', command: 'node', args: [], owns: ['tests/plan.test.mjs'] }] };
@@ -118,11 +118,11 @@ test('default discovery prefers config/terra-tests.json and preserves explicit m
 		mkdirTest(root, 'tests/plan.test.mjs');
 		mkdirSync(join(root, 'config'), { recursive: true });
 		mkdirSync(join(root, 'tests'), { recursive: true });
-		writeFileSync(join(root, 'config/terra-tests.json'), JSON.stringify(configPlan));
-		writeFileSync(join(root, 'tests/terra-tests.json'), JSON.stringify(testsPlan));
+		writeFileSync(join(root, 'config/tests.json'), JSON.stringify(configPlan));
+		writeFileSync(join(root, 'tests/tests.json'), JSON.stringify(testsPlan));
 
 		assert.deepEqual(readTestPlan(root), configPlan);
-		assert.deepEqual(readTestPlan(root, 'tests/terra-tests.json'), testsPlan);
+		assert.deepEqual(readTestPlan(root, 'tests/tests.json'), testsPlan);
 	} finally {
 		rmSync(root, { recursive: true, force: true });
 	}
@@ -186,7 +186,7 @@ test('consumer-defined suites run once each in manifest order and aggregate into
 	writeFileSync(scriptPath, `import { appendFileSync } from 'node:fs';\nappendFileSync(${JSON.stringify(logPath)}, process.argv[2] + '\\n');\n`);
 	const names = ['contracts', 'unit', 'custom'];
 	writeFileSync(
-		join(root, 'tests/terra-tests.json'),
+		join(root, 'tests/tests.json'),
 		JSON.stringify({ version: 1, suites: names.map(name => ({ name, command: process.execPath, args: [scriptPath, name], owns: [`tests/${name}`] })) }),
 	);
 	const prevPath = process.env.GITHUB_EVENT_PATH;
@@ -194,7 +194,7 @@ test('consumer-defined suites run once each in manifest order and aggregate into
 	delete process.env.GITHUB_EVENT_PATH;
 	delete process.env.GITHUB_EVENT_NAME;
 	try {
-		// terra-quality-ignore single-use -- Keep the test-plan result named while asserting its suite and exit status.
+		// hygiene-ignore single-use -- Keep the test-plan result named while asserting its suite and exit status.
 		const result = runTestPlan({ root });
 		assert.deepEqual(readFileSync(logPath, 'utf8').trim().split('\n'), names);
 		assert.deepEqual(result, { passed: names.length, failed: 0, selected: ['shared:linear-history', ...names] });

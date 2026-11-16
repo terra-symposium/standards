@@ -291,7 +291,7 @@ const readAttachment = (attachment: ReporterAttachment): string => {
 	return '';
 };
 
-// terra-quality-ignore single-use -- Keep the documented diagnosticText declaration so its parameter and return contract remains attached.
+// hygiene-ignore single-use -- Keep the documented diagnosticText declaration so its parameter and return contract remains attached.
 /**
  * Extracts one named JSON diagnostic attachment.
  *
@@ -307,7 +307,7 @@ const diagnosticText = (attachments: readonly ReporterAttachment[], name: string
 	return parseDiagnostics(raw);
 };
 
-// terra-quality-ignore single-use -- Keep the documented screenshotAttachment declaration so its parameter and return contract remains attached.
+// hygiene-ignore single-use -- Keep the documented screenshotAttachment declaration so its parameter and return contract remains attached.
 /**
  * Resolves the path of a captured screenshot attachment.
  *
@@ -437,7 +437,7 @@ const visualCaptureManifest = (attachments: readonly ReporterAttachment[]): Arra
 	}
 };
 
-// terra-quality-ignore single-use -- Keep the documented loadAttachment declaration so its parameter and return contract remains attached.
+// hygiene-ignore single-use -- Keep the documented loadAttachment declaration so its parameter and return contract remains attached.
 /**
  * Reads timing samples and a test override from the fixture attachment.
  *
@@ -450,7 +450,7 @@ const loadAttachment = (attachments: readonly ReporterAttachment[]): { measureme
 	if (!attachment) return { measurements: [] };
 	try {
 		const parsed = JSON.parse(readAttachment(attachment)) as Record<string, unknown>;
-		// terra-quality-ignore single-use -- Validate each measurement before validating the separate test budget.
+		// hygiene-ignore single-use -- Validate each measurement before validating the separate test budget.
 		const measurements = Array.isArray(parsed.measurements)
 			? parsed.measurements.flatMap((v): LoadMeasurementInput[] => {
 					if (!v || typeof v !== 'object') return [];
@@ -488,7 +488,7 @@ const addLoadMeasurements = (
 	cfg: ReturnType<typeof readLoadTestingConfig>,
 ): VisualResult => {
 	if (!cfg.enabled) return result;
-	// terra-quality-ignore single-use -- Grade measurements before copying result fields into the returned record.
+	// hygiene-ignore single-use -- Grade measurements before copying result fields into the returned record.
 	const measurements: LoadMeasurement[] = [
 		gradeLoadMeasurement({ name: 'test duration', kind: 'test', durationMs: result.duration, ...(testBudget ? { budget: testBudget } : {}) }, cfg, id),
 		...inputs.map(i => gradeLoadMeasurement(i, cfg, id)),
@@ -539,7 +539,7 @@ const screenshotTestGroup = (test: { location: { file: string }; title: string; 
 	return [identity.project, path.relative(process.cwd(), test.location.file), identity.groups, identity.title].join('\u0000');
 };
 
-// terra-quality-ignore single-use -- Keep the documented testTitleParts declaration so its parameter and return contract remains attached.
+// hygiene-ignore single-use -- Keep the documented testTitleParts declaration so its parameter and return contract remains attached.
 /**
  * Resolves the title path portion used by the stable test budget key.
  *
@@ -731,10 +731,10 @@ export default class ProgressReporter {
 			fs.mkdirSync(path.dirname(screenshot), { recursive: true });
 			fs.writeFileSync(screenshot, attachment.body);
 		}
-		// terra-quality-ignore single-use -- Resolve the test ID before parsing attachments and assembling the result.
+		// hygiene-ignore single-use -- Resolve the test ID before parsing attachments and assembling the result.
 		const testId = loadTestId(test.location.file, testTitleParts(test), this.options.loadTesting.root);
 		const attachedLoad = loadAttachment(result.attachments);
-		// terra-quality-ignore single-use -- Capture the visual result before adding graded load measurements and mutating results.
+		// hygiene-ignore single-use -- Capture the visual result before adding graded load measurements and mutating results.
 		const norm: VisualResult = {
 			...testIdentity(test, test.parent.project()?.name || test.titlePath().find(v => v.startsWith('root-')) || 'unknown', this.options.viewportCatalog),
 			browserErrors: redactEvidence(diagnosticText(result.attachments, 'browser-diagnostics').join('\n')),
@@ -945,7 +945,7 @@ export default class ProgressReporter {
 				}
 			}
 		}
-		// terra-quality-ignore single-use -- Snapshot combined results before asynchronous report writes and final budget grading.
+		// hygiene-ignore single-use -- Snapshot combined results before asynchronous report writes and final budget grading.
 		const results = [...browserResults, ...supplemental.results];
 		const spreadsheet = path.join(runDir, this.options.reportFile);
 		const slideshow = path.join(runDir, this.options.slideshowFile);

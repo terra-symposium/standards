@@ -2,7 +2,7 @@
 
 Use for repository hygiene across environment and security health, source readability, and behavior-preserving compaction. Apply the sections that match the requested scope and keep each change within the repository's ownership and validation rules.
 
-For first-time Husky and Changesets setup, use [Initialisation](../../quality/SKILL.md). For rolling a released Terra package through Desktop consumers and restarting their existing local servers, use [Package Update](../../package/references/update.md).
+For first-time Husky and Changesets setup, use [Initialisation](../../hygiene/SKILL.md). For rolling a released Terra package through Desktop consumers and restarting their existing local servers, use [Package Update](../../package/references/update.md).
 
 ## Repository and environment health
 
@@ -222,7 +222,7 @@ If the repository has UI controls, follow [the UI matrix process](ui-matrix.md) 
 
 #### 2.1 Use quality scans to find component migrations
 
-In a repository that installs the standards quality package, run `terra-quality ui-recommendations` (for example, `pnpm exec terra-quality ui-recommendations`) before compacting UI call sites. The inventory scans Astro, JSX, and TSX for native controls, button-like anchors, and styled text links that may have shared component equivalents; it can include a suggested variant. Review each match against its semantics, behavior, and the component matrix; the scan is a guide, not a bulk fixer. Migrate applicable call sites to the shared component and its canonical variant, then rerun the scan to find remaining candidates. An empty result confirms that this configured inventory is clear; it does not justify replacing semantic native elements or controls without a matching component.
+In a repository that installs the standards quality package, run `hygiene ui-recommendations` (for example, `pnpm exec hygiene ui-recommendations`) before compacting UI call sites. The inventory scans Astro, JSX, and TSX for native controls, button-like anchors, and styled text links that may have shared component equivalents; it can include a suggested variant. Review each match against its semantics, behavior, and the component matrix; the scan is a guide, not a bulk fixer. Migrate applicable call sites to the shared component and its canonical variant, then rerun the scan to find remaining candidates. An empty result confirms that this configured inventory is clear; it does not justify replacing semantic native elements or controls without a matching component.
 
 #### 2.2 Parallelize by area
 

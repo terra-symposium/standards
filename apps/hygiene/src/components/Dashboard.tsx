@@ -187,7 +187,7 @@ export default function Dashboard() {
 	const currentBranch = detail?.branches.find(i => i.name === branch);
 	const pageCount = Math.max(1, Math.ceil((detail?.commitTotal ?? 0) / (detail?.commitPageSize ?? 25)));
 
-	// terra-quality-ignore single-use -- Build the complete KPI card set before rendering its mapped elements.
+	// hygiene-ignore single-use -- Build the complete KPI card set before rendering its mapped elements.
 	const kpis = [
 		{
 			key: 'score',
@@ -307,7 +307,7 @@ export default function Dashboard() {
 							<div className='eyebrow'>NO CONNECTED REPOSITORIES</div>
 							<h1>Your dashboard is ready.</h1>
 							<p>Install the Terra Hygiene GitHub App on a selected repository to start collecting trends.</p>
-							<a className='primary' href='https://github.com/apps/terra-hygiene/installations/new'>
+							<a className='primary' href='https://github.com/apps/hygiene/installations/new'>
 								Install GitHub App <span>↗</span>
 							</a>
 						</div>
@@ -329,7 +329,7 @@ export default function Dashboard() {
 									<button className='github-link refresh-button' onClick={() => setSetupOpen(open => !open)}>
 										Local report setup
 									</button>
-									<a className='github-link add-repository' href='https://github.com/apps/terra-hygiene/installations/new' target='_blank' rel='noreferrer'>
+									<a className='github-link add-repository' href='https://github.com/apps/hygiene/installations/new' target='_blank' rel='noreferrer'>
 										Add repositories ↗
 									</a>
 									<a className='github-link' href={detail ? `https://github.com/${detail.repository.owner}/${detail.repository.name}` : '#'} target='_blank' rel='noreferrer'>

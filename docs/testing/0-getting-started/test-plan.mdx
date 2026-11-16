@@ -11,14 +11,14 @@ For agent-led work, use the [Test writing workflow](https://github.com/Terra-Sym
 
 ```sh
 pnpm add -D @terra-symposium/testing
-pnpm exec terra-test run --manifest config/terra-tests.json
+pnpm exec test-runner run --manifest config/tests.json
 ```
 
 Use Node.js `>=20`. The runner validates file ownership before executing the ordered suites.
 
 ## Define the manifest
 
-Use `config/terra-tests.json` for new repositories. A suite has a stable name, one executable, optional argument strings, and repository-relative globs for the files it owns.
+Use `config/tests.json` for new repositories. A suite has a stable name, one executable, optional argument strings, and repository-relative globs for the files it owns.
 
 ```json
 {
@@ -41,7 +41,7 @@ The runner discovers test files in `test/` and `tests/` directories and names ma
 ||| [Full plan]
 
 ```sh
-pnpm exec terra-test run --manifest config/terra-tests.json
+pnpm exec test-runner run --manifest config/tests.json
 ```
 
 Runs shared checks followed by the ordered repository suites.
@@ -51,7 +51,7 @@ Runs shared checks followed by the ordered repository suites.
 ||| [Shared checks only]
 
 ```sh
-pnpm exec terra-test run --manifest config/terra-tests.json --shared-only
+pnpm exec test-runner run --manifest config/tests.json --shared-only
 ```
 
 Use this when a workflow intentionally separates test execution from plan validation.
@@ -61,7 +61,7 @@ Use this when a workflow intentionally separates test execution from plan valida
 ||| [Selected suites]
 
 ```sh
-pnpm exec terra-test run --manifest config/terra-tests.json --suites unit,contracts
+pnpm exec test-runner run --manifest config/tests.json --suites unit,contracts
 ```
 
 Select named custom suites while retaining the shared checks.
@@ -70,7 +70,7 @@ Select named custom suites while retaining the shared checks.
 
 ## Discovery and compatibility
 
-The canonical path is `config/terra-tests.json`. If it is absent, the runner recognizes `tests/terra-tests.json` and the legacy root `.terra-tests.json`. Pass `--manifest PATH` to select another location.
+The canonical path is `config/tests.json`. If it is absent, the runner recognizes `tests/tests.json` and the legacy root `.tests.json`. Pass `--manifest PATH` to select another location.
 
 === [When tests move]
 

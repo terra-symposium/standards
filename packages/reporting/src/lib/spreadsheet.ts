@@ -331,7 +331,7 @@ export const mergeSpreadsheets = async (file: string, srcs: readonly Spreadsheet
 		for (let rowNum = 2; rowNum <= srcSummary.rowCount; rowNum++) {
 			const row = srcSummary.getRow(rowNum);
 			if (!row.hasValues) continue;
-			// terra-quality-ignore single-use -- Keep this new row so each copied cell style targets the same aggregate row.
+			// hygiene-ignore single-use -- Keep this new row so each copied cell style targets the same aggregate row.
 			const aggregateRow = summary.addRow([label, ...valuesForRow(row)]);
 			row.eachCell({ includeEmpty: true }, (s, c) => {
 				aggregateRow.getCell(c + 1).style = structuredClone(s.style);

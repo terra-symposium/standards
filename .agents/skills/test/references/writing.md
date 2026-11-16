@@ -15,7 +15,7 @@ For each behavior, record its owner and identify:
 
 Assign each material case a new test, an existing test ID, or an intentional gap. Do not add duplicates to increase counts.
 
-Resolve each assertion to one canonical source, route, or domain owner and keep its proof with that owner. Use `config/terra-tests.json` as the canonical ordered suite manifest for file ownership and execution. Before reorganizing, map every old file/case to a destination and disposition; document why an assertion is retired and identify surviving proof or an explicit coverage gap. Apply the linked reference's ownership checks.
+Resolve each assertion to one canonical source, route, or domain owner and keep its proof with that owner. Use `config/tests.json` as the canonical ordered suite manifest for file ownership and execution. Before reorganizing, map every old file/case to a destination and disposition; document why an assertion is retired and identify surviving proof or an explicit coverage gap. Apply the linked reference's ownership checks.
 
 ## 2. Choose scope and fixture
 
@@ -35,7 +35,7 @@ Use table-driven tests for equivalent cases and named tests for distinct journey
 
 ## 4. Maintain and validate
 
-Place tests under `tests/<product-domain>/` to mirror the repository source area. Check the owning repository's test manifest and scripts before moving a case; Standards uses `config/terra-tests.json`. Preserve the declared runner context and run the actual manifest validation command when one is defined.
+Place tests under `tests/<product-domain>/` to mirror the repository source area. Check the owning repository's test manifest and scripts before moving a case; Standards uses `config/tests.json`. Preserve the declared runner context and run the actual manifest validation command when one is defined.
 
 Keep registration-time fixtures before tests and runtime-only helpers after the last test under `/* HELPERS */`. Promote helpers only after real reuse.
 

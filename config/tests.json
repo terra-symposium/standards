@@ -1,0 +1,11 @@
+{
+	"version": 1,
+	"suites": [
+		{
+			"name": "standards-workspace",
+			"command": "node",
+			"args": ["packages/hygiene/dist/app/workspace-test-runner.js"],
+			"owns": ["packages/*/tests/**/*", "apps/hygiene/tests/**/*"]
+		}
+	]
+}

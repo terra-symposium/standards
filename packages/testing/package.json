@@ -1,6 +1,6 @@
 {
 	"name": "@terra-symposium/testing",
-	"version": "0.3.0",
+	"version": "0.3.1",
 	"description": "Standards-owned shared CI checks and manifest-driven test execution for Terra repositories",
 	"license": "Apache-2.0",
 	"type": "module",
@@ -13,7 +13,7 @@
 		}
 	},
 	"bin": {
-		"terra-test": "./src/cli.mjs"
+		"test-runner": "./src/cli.mjs"
 	},
 	"files": [
 		"src",

@@ -79,7 +79,7 @@ jobs:
           git -C "$GITHUB_WORKSPACE" cat-file -t "${{ github.event.pull_request.base.sha }}"
       - uses: ./packages/testing
         with:
-          manifest: config/terra-tests.json
+          manifest: config/tests.json
 
   package:
     if: github.event_name == 'pull_request'

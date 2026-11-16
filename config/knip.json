@@ -29,7 +29,7 @@
 			"entry": ["src/index.mjs", "src/cli.mjs"],
 			"project": ["src/**/*.mjs"]
 		},
-		"packages/quality": {
+		"packages/hygiene": {
 			"entry": [
 				"src/index.ts",
 				"src/lib/runner.ts",

@@ -4,7 +4,7 @@ description: Apply Terra coding conventions and review workflow runtime.
 metadata:
   related-files:
     - package.json
-    - packages/quality/package.json
+    - packages/hygiene/package.json
 ---
 
 # Standards
@@ -32,11 +32,11 @@ Use this skill to implement or review changes across Terra repositories, includi
 
 ## Shared quality package
 
-`packages/quality` is the source for `@terra-symposium/quality`. Change and test reusable checks here rather than copying their implementation or policy into a consumer repository.
+`packages/hygiene` is the source for `@terra-symposium/hygiene`. Change and test reusable checks here rather than copying their implementation or policy into a consumer repository.
 
-Add focused tests under `packages/quality/tests`; exercise the public package boundary and assert autofix idempotence when relevant. For a new public API, verify the runtime and types entries in `packages/quality/package.json` exports. Build the package, then test an isolated consumer import by package name and TypeScript type resolution so source aliases or direct `dist` imports cannot hide a broken export. Update the package map in Docs when the public surface changes.
+Add focused tests under `packages/hygiene/tests`; exercise the public package boundary and assert autofix idempotence when relevant. For a new public API, verify the runtime and types entries in `packages/hygiene/package.json` exports. Build the package, then test an isolated consumer import by package name and TypeScript type resolution so source aliases or direct `dist` imports cannot hide a broken export. Update the package map in Docs when the public surface changes.
 
-Implement behavior under `packages/quality/src` and keep runner/config normalization, schema, package documentation, and examples aligned.
+Implement behavior under `packages/hygiene/src` and keep runner/config normalization, schema, package documentation, and examples aligned.
 
 Use the package's build and test scripts. Add a Changeset for publishable package changes; documentation-only edits do not need a version bump.
 

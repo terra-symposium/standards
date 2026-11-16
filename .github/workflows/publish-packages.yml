@@ -31,10 +31,10 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm run build
       - name: Publish quality when missing
-        working-directory: packages/quality
+        working-directory: packages/hygiene
         run: |
           version=$(node -p "require('./package.json').version")
-          if ! npm view "@terra-symposium/quality@$version" version >/dev/null 2>&1; then npm publish --access public; fi
+          if ! npm view "@terra-symposium/hygiene@$version" version >/dev/null 2>&1; then npm publish --access public; fi
         env:
           NODE_AUTH_TOKEN: ${{ secrets.PACKAGES_TOKEN }}
       - name: Publish error boundaries when missing

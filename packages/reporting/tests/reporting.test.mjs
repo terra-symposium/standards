@@ -118,7 +118,7 @@ test('normalizes result summaries and viewport project names', () => {
 // PLAYWRIGHT FIXTURES AND PROJECT CONFIGURATION
 test('captures page navigation for tests that do not destructure the load fixture', async () => {
 	const root = await fs.mkdtemp(path.join(os.tmpdir(), 'reporting-load-fixture-'));
-	// terra-quality-ignore single-use -- Keep the browser spec fixture path distinct from its generated report artifacts.
+	// hygiene-ignore single-use -- Keep the browser spec fixture path distinct from its generated report artifacts.
 	const specFile = path.join(root, 'navigation.spec.mjs');
 	const cfgFile = path.join(root, 'playwright.config.mjs');
 	const reportFile = path.join(root, 'playwright-report.json');
@@ -137,7 +137,7 @@ test('captures page navigation for tests that do not destructure the load fixtur
 				timeout: 60000,
 			});
 		} catch (err) {
-			// terra-quality-ignore single-use -- Capture subprocess failure details before building the test error message.
+			// hygiene-ignore single-use -- Capture subprocess failure details before building the test error message.
 			const details = err instanceof Error && 'stderr' in err ? `\nstdout: ${String(err.stdout || '')}\nstderr: ${String(err.stderr || '')}` : '';
 			throw new Error(`${err instanceof Error ? err.message : String(err)}${details}`, { cause: err });
 		}
@@ -165,7 +165,7 @@ test('captures page navigation for tests that do not destructure the load fixtur
 test('expands regular Playwright projects and preserves single-run setup/capture projects', () => {
 	const orig = process.env.PW_VIEWPORTS;
 	delete process.env.PW_VIEWPORTS;
-	// terra-quality-ignore single-use -- Keep the default viewport inventory named for responsive-report assertions.
+	// hygiene-ignore single-use -- Keep the default viewport inventory named for responsive-report assertions.
 	const defaultViewports = resolveVisualViewports();
 	assert.deepEqual(
 		defaultViewports.map(({ name: n }) => n),
@@ -194,7 +194,7 @@ test('expands regular Playwright projects and preserves single-run setup/capture
 	assert.deepEqual(cfg.projects.find(({ name: n }) => n === 'app-mobile').dependencies, ['auth-setup']);
 	assert.equal(cfg.projects.find(({ name: n }) => n === 'browser-mobile').use.viewport.width, 390);
 	assert.ok(cfg.reporter.some(r => Array.isArray(r) && r[0] === '@terra-symposium/reporting/playwright'));
-	// terra-quality-ignore single-use -- Keep the screenshot-only configuration distinct from the default browser projects.
+	// hygiene-ignore single-use -- Keep the screenshot-only configuration distinct from the default browser projects.
 	const screenshotsOnly = withResponsivePlaywright({ projects: [{ name: 'browser' }] }, { screenshotOnlySlideshow: true });
 	assert.equal(screenshotsOnly.reporter.find(r => Array.isArray(r) && r[0] === '@terra-symposium/reporting/playwright')[1].screenshotOnlySlideshow, true);
 	process.env.PW_VIEWPORTS = 'md,xl';
@@ -281,10 +281,10 @@ test('rebuilds the default screenshot deck from accumulated captures', async () 
 		assert.match(`${currentSlide}${historicalSlide}`, HISTORICAL_CAPTURE_REGEX);
 		const interruptedReporter = new ProgressReporter({ outputRoot, loadTesting: { enabled: false } });
 		interruptedReporter.onBegin({}, { allTests: () => [testCase] });
-		// terra-quality-ignore single-use -- Keep the interrupted test-case object identity for the reporter event sequence.
+		// hygiene-ignore single-use -- Keep the interrupted test-case object identity for the reporter event sequence.
 		const interruptedTest = { ...testCase, parent: { project: () => ({ name: 'browser-mobile' }) } };
 		interruptedReporter.onTestEnd(interruptedTest, { attachments: [{ name: 'screenshot', contentType: 'image/png', path: screenshot }], duration: 5, error: undefined, retry: 0, status: 'passed' });
-		// terra-quality-ignore single-use -- Read the interrupted run record before inspecting its archived slides.
+		// hygiene-ignore single-use -- Read the interrupted run record before inspecting its archived slides.
 		const interruptedRun = JSON.parse(await fs.readFile(path.join(evidenceDir, '.terra-playwright-run.json'), 'utf8'));
 		assert.equal(interruptedRun.collectionFinished, false);
 		const interruptedCaptures = readScreenshotCapturesFromDir(evidenceDir);
@@ -295,7 +295,7 @@ test('rebuilds the default screenshot deck from accumulated captures', async () 
 		const interruptedDeck = path.join(root, 'interrupted-rebuilt.pptx');
 		await writeScreenshotSlideshowFromDir(evidenceDir, interruptedDeck);
 		const { stdout: interruptedArchive } = await execFileAsync('unzip', ['-Z1', interruptedDeck]);
-		// terra-quality-ignore single-use -- Keep interrupted slide paths named while checking presentation archive contents.
+		// hygiene-ignore single-use -- Keep interrupted slide paths named while checking presentation archive contents.
 		const interruptedSlidePaths = interruptedArchive.split('\n').filter(file => /^ppt\/slides\/slide\d+\.xml$/u.test(file));
 		const interruptedSlides = await Promise.all(interruptedSlidePaths.map(async file => (await execFileAsync('unzip', ['-p', interruptedDeck, file])).stdout));
 		assert.match(interruptedSlides.join(''), INCOMPLETE_RUN_REGEX);
@@ -444,7 +444,7 @@ test('aggregates shared screenshot runs across viewport subprocesses and restart
 		const outputRoot = path.join(root, 'visual');
 		const evidenceDir = path.join(outputRoot, 'screenshots');
 		const latestArtifacts = async () => {
-			// terra-quality-ignore single-use -- Read available run directories before choosing the presentation artifact to assert.
+			// hygiene-ignore single-use -- Read available run directories before choosing the presentation artifact to assert.
 			const runs = (await fs.readdir(outputRoot, { withFileTypes: true }))
 				.filter(entry => entry.isDirectory() && entry.name !== 'screenshots')
 				.map(entry => entry.name)
@@ -458,7 +458,7 @@ test('aggregates shared screenshot runs across viewport subprocesses and restart
 			titlePath: () => ['responsive.spec.ts', `renders ${viewport}`],
 			parent: { project: () => ({ name: `browser-${viewport}` }) },
 		});
-		// terra-quality-ignore single-use -- Keep the reporter program fixture text separate from the command that executes it.
+		// hygiene-ignore single-use -- Keep the reporter program fixture text separate from the command that executes it.
 		const reporterProgram = `
 			import ProgressReporter from '@terra-symposium/reporting/playwright';
 			const reporter = new ProgressReporter({ outputRoot: process.env.OUTPUT_ROOT, loadTesting: { enabled: false } });
@@ -516,7 +516,7 @@ test('aggregates shared screenshot runs across viewport subprocesses and restart
 		assert.deepEqual([marker.expectedTestCount, marker.completedTestCount, marker.collectionFinished], [2, 2, true]);
 		assert.ok((await latestArtifacts()).includes('report.xlsx'));
 		assert.ok((await latestArtifacts()).includes('report.pptx'), 'final viewport process builds the accumulated deck');
-		// terra-quality-ignore single-use -- Keep screenshot capture metadata named while asserting its routes and files.
+		// hygiene-ignore single-use -- Keep screenshot capture metadata named while asserting its routes and files.
 		const captures = readScreenshotCapturesFromDir(evidenceDir);
 		assert.deepEqual(captures.map(({ viewport, runId: captureRunId, historical }) => [viewport, captureRunId, historical]).sort(), [
 			['mobile', runId, false],
@@ -529,18 +529,18 @@ test('aggregates shared screenshot runs across viewport subprocesses and restart
 		assert.deepEqual([marker.expectedTestCount, marker.completedTestCount, marker.collectionFinished], [2, 2, true]);
 
 		// A later subset run gets a bounded deck while the directory can still rebuild accumulated evidence.
-		// terra-quality-ignore single-use -- Keep the subset run identifier stable across artifact paths and report assertions.
+		// hygiene-ignore single-use -- Keep the subset run identifier stable across artifact paths and report assertions.
 		const subsetRunId = `subset-${path.basename(root)}`;
 		await runProcess(mobile, { finalize: true, selectedRunId: subsetRunId });
-		// terra-quality-ignore single-use -- Read subset artifacts before inspecting the generated run directories.
+		// hygiene-ignore single-use -- Read subset artifacts before inspecting the generated run directories.
 		const subsetArtifacts = await latestArtifacts();
 		assert.ok(subsetArtifacts.includes('report.pptx'));
-		// terra-quality-ignore single-use -- Read run directory names before selecting the latest generated deck.
+		// hygiene-ignore single-use -- Read run directory names before selecting the latest generated deck.
 		const runDirs = (await fs.readdir(outputRoot, { withFileTypes: true }))
 			.filter(entry => entry.isDirectory() && entry.name !== 'screenshots')
 			.map(entry => entry.name)
 			.sort();
-		// terra-quality-ignore single-use -- Keep the selected subset deck path for checking its archive members.
+		// hygiene-ignore single-use -- Keep the selected subset deck path for checking its archive members.
 		const subsetDeck = path.join(outputRoot, runDirs.at(-1), 'report.pptx');
 		const { stdout: subsetSlide } = await execFileAsync('unzip', ['-p', subsetDeck, 'ppt/slides/slide1.xml']);
 		assert.equal((subsetSlide.match(P_PIC_G_REGEX()) || []).length, 1);
@@ -585,7 +585,7 @@ test('loads and grades per-test and operation timing budgets', async () => {
 	const configDir = path.join(root, 'config');
 	await fs.mkdir(configDir);
 	await fs.writeFile(path.join(configDir, 'quality.json'), JSON.stringify({ loadTesting: { enabled: false } }));
-	// terra-quality-ignore single-use -- Snapshot the working directory before changing it so cleanup restores the exact path.
+	// hygiene-ignore single-use -- Snapshot the working directory before changing it so cleanup restores the exact path.
 	const prevCwd = process.cwd();
 	process.chdir(root);
 	try {
@@ -675,7 +675,7 @@ test('writes neutral spreadsheet and slideshow artifacts', async () => {
 	assert.equal(nestedWorkbook.worksheets[1].name, 'tests_actions_registry.test.mjs');
 	assert.equal(nestedWorkbook.worksheets[2].name, 'tests_actions_registry.test (2)');
 	const responsive = path.join(root, 'responsive.pptx');
-	// terra-quality-ignore single-use -- Keep responsive result objects in one inventory before generating the slideshow.
+	// hygiene-ignore single-use -- Keep responsive result objects in one inventory before generating the slideshow.
 	const responsiveResults = [
 		result({ viewport: 'mobile', viewportSize: '390×844', screenshot }),
 		result({ viewport: 'sm', viewportSize: '640×800', screenshot }),
@@ -761,9 +761,9 @@ test('writes responsive screenshot-only slides', async () => {
 			);
 		}
 		assert.equal(await reporter.onEnd(), undefined);
-		// terra-quality-ignore single-use -- Capture the generated reporter directory before constructing its deck path.
+		// hygiene-ignore single-use -- Capture the generated reporter directory before constructing its deck path.
 		const runDir = (await fs.readdir(path.join(root, 'reporter')))[0];
-		// terra-quality-ignore single-use -- Keep the reporter deck path for checking generated slides.
+		// hygiene-ignore single-use -- Keep the reporter deck path for checking generated slides.
 		const reporterSlides = path.join(root, 'reporter', runDir, 'report.pptx');
 		const { stdout: reporterSlide } = await execFileAsync('unzip', ['-p', reporterSlides, 'ppt/slides/slide1.xml']);
 		assert.equal((reporterSlide.match(P_PIC_G_REGEX()) || []).length, 6);
@@ -864,7 +864,7 @@ test('builds one screenshot deck from nested repository folders and keeps partia
 test('reports load timing details and fails only when enabled budgets are exceeded', async () => {
 	const root = await fs.mkdtemp(path.join(os.tmpdir(), 'terra-load-report-'));
 	const budget = { warnMs: 2000, failMs: 5000 };
-	// terra-quality-ignore single-use -- Keep the browser result object distinct from the supplemental result.
+	// hygiene-ignore single-use -- Keep the browser result object distinct from the supplemental result.
 	const browserResult = result({
 		title: 'dashboard loads',
 		loadTestId: 'tests/dashboard.spec.ts::Dashboard loads',
@@ -874,7 +874,7 @@ test('reports load timing details and fails only when enabled budgets are exceed
 			{ name: 'bulk import', kind: 'operation', durationMs: 6200, budget, grade: 'fail' },
 		],
 	});
-	// terra-quality-ignore single-use -- Keep the supplemental result object distinct from the browser result.
+	// hygiene-ignore single-use -- Keep the supplemental result object distinct from the browser result.
 	const supplementalResult = result({
 		file: 'tests/import.test.mjs',
 		groups: 'imports',
@@ -947,7 +947,7 @@ test('reports load timing details and fails only when enabled budgets are exceed
 		legacyWorkbook.worksheets.map(sheet => sheet.name),
 		['Summary', 'slow.spec.ts', 'Projects', 'Run diagnostics'],
 	);
-	// terra-quality-ignore single-use -- Keep the opted-out slideshow path for asserting no deck was generated.
+	// hygiene-ignore single-use -- Keep the opted-out slideshow path for asserting no deck was generated.
 	const optedOutSlideshow = path.join(root, 'opted-out', optedOutRun, 'report.pptx');
 	const { stdout: legacySlide } = await execFileAsync('unzip', ['-p', optedOutSlideshow, 'ppt/slides/slide1.xml']);
 	assert.doesNotMatch(legacySlide, LOAD_TIMING_SUMMARY_REGEX);

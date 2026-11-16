@@ -1,5 +1,5 @@
 {
-	"$schema": "../packages/quality/quality.schema.json",
+	"$schema": "../packages/hygiene/quality.schema.json",
 	"root": ".",
 	"sourceRoots": ["."],
 	"languageProfiles": ["c", "java", "python"],

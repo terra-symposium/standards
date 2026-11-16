@@ -15,7 +15,7 @@ Executable skills in this repository. Open a skill for its workflow and referenc
 | port | Assign and safely acquire Terra development ports. | [.agents/skills/port/SKILL.md](skills/port/SKILL.md) |
 | pr-review | Review, integrate, and clean up branches and pull requests. | [.agents/skills/pr-review/SKILL.md](skills/pr-review/SKILL.md) |
 | pruning | Prune repository files, generated output, Git refs, worktrees, Codex storage, or duplicate skills by scope. | [.agents/skills/pruning/SKILL.md](skills/pruning/SKILL.md) |
-| quality | Run Quality, audit repository hygiene, and repair source safely. | [.agents/skills/quality/SKILL.md](skills/quality/SKILL.md) |
+| quality | Run Quality, audit repository hygiene, and repair source safely. | [.agents/skills/hygiene/SKILL.md](skills/hygiene/SKILL.md) |
 | readme-standardisation | Write consistent repository, package, and folder READMEs. | [.agents/skills/readme-standardisation/SKILL.md](skills/readme-standardisation/SKILL.md) |
 | review | Review Terra repository health or weekly contributor progress. | [.agents/skills/review/SKILL.md](skills/review/SKILL.md) |
 | semver-retcon | Rewrite Git history into semantic commits. | [.agents/skills/semver-retcon/SKILL.md](skills/semver-retcon/SKILL.md) |

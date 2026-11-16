@@ -1,0 +1,24 @@
+{
+	"extends": "../../../config/tsconfig.base.json",
+	"compilerOptions": {
+		"types": ["node"],
+		"rootDir": "../src",
+		"outDir": "../dist",
+		"baseUrl": "..",
+		"paths": {
+			"@terra-symposium/hygiene/core": ["src/capabilities/core/index.ts"],
+			"@terra-symposium/hygiene/reports": ["src/capabilities/reports/index.ts"],
+			"@terra-symposium/hygiene/ui": ["src/capabilities/ui/index.ts"],
+			"@terra-symposium/hygiene/languages": ["src/capabilities/languages/index.ts"],
+			"@terra-symposium/hygiene/documentation": ["src/capabilities/documentation/index.ts"],
+			"@terra-symposium/hygiene/formatting": ["src/capabilities/formatting/index.ts"],
+			"@terra-symposium/hygiene/imports": ["src/capabilities/imports/index.ts"],
+			"@terra-symposium/hygiene/naming": ["src/capabilities/naming/index.ts"],
+			"@terra-symposium/hygiene/patterns": ["src/capabilities/patterns/index.ts"],
+			"@terra-symposium/hygiene/refactoring": ["src/capabilities/refactoring/index.ts"],
+			"@terra-symposium/hygiene/security": ["src/capabilities/security/index.ts"],
+			"@terra-symposium/hygiene/reports/node-reporter": ["src/capabilities/reports/lib/node-reporter.ts"]
+		}
+	},
+	"include": ["../src"]
+}
