@@ -14,7 +14,7 @@ const ESLINT_BIN = fileURLToPath(new URL('../../../../config/node_modules/.bin/e
 const RUNNER = fileURLToPath(new URL('../../dist/lib/runner.js', import.meta.url));
 
 test('Knip source ownership counts only declared dependencies imported by mapped parent sources', () => {
-	const root = mkdtempSync(join(tmpdir(), 'terra-knip-package-mapping-'));
+	const root = mkdtempSync(join(tmpdir(), 'knip-package-mapping-'));
 	try {
 		for (const dir of ['config', 'src', 'node_modules/used-dep', 'node_modules/unlisted-dep', 'node_modules/style-dep', 'node_modules/require-resolve-dep', 'node_modules/meta-resolve-dep'])
 			mkdirSync(join(root, dir), { recursive: true });

@@ -26,7 +26,7 @@ test('format fix leaves source unchanged when Prettier is unavailable', t => {
 	const orig = 'export const config = {\n\tenabled: true,\n\toptions: {\n\t\tmode: "safe"\n\t}\n};\n';
 	writeFileSync(src, orig);
 	// hygiene-ignore single-use -- Capture the command exit status before asserting its output and side effects.
-	const status = runFormatting({ root, sourceRoots: [join(root, 'src')], extensions: ['.ts'], tools: { prettier: 'terra-prettier-that-does-not-exist' } }, { fix: true });
+	const status = runFormatting({ root, sourceRoots: [join(root, 'src')], extensions: ['.ts'], tools: { prettier: 'prettier-that-does-not-exist' } }, { fix: true });
 	assert.notEqual(status, 0);
 	assert.equal(readFileSync(src, 'utf8'), orig);
 });

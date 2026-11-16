@@ -6,7 +6,7 @@ import test from 'node:test';
 import { discoverTypecheckTargets, runTypecheckTargets } from '../../../../config/scripts/typecheck.mjs';
 
 test('typecheck discovery finds configured package and app projects and rejects missing scripts', () => {
-	const root = mkdtempSync(join(tmpdir(), 'terra-typecheck-discovery-'));
+	const root = mkdtempSync(join(tmpdir(), 'typecheck-discovery-'));
 	try {
 		const packageDir = join(root, 'packages', 'typed');
 		const appDir = join(root, 'apps', 'site');

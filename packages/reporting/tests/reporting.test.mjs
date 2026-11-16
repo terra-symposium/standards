@@ -229,7 +229,7 @@ test('collects only declared viewport scenarios and passes custom dimensions to 
 
 // SCREENSHOT RUN COLLECTION AND AGGREGATION
 test('rebuilds the default screenshot deck from accumulated captures', async () => {
-	const root = await fs.mkdtemp(path.join(os.tmpdir(), 'terra-reporting-capture-folder-'));
+	const root = await fs.mkdtemp(path.join(os.tmpdir(), 'reporting-capture-folder-'));
 	try {
 		const { default: sharp } = await import('sharp');
 		const screenshot = path.join(root, 'source.png');
@@ -318,7 +318,7 @@ test('rebuilds the default screenshot deck from accumulated captures', async () 
 });
 
 test('builds aggregate artifacts from repository screenshot folders and report workbooks', async () => {
-	const root = await fs.mkdtemp(path.join(os.tmpdir(), 'terra-reporting-aggregate-'));
+	const root = await fs.mkdtemp(path.join(os.tmpdir(), 'reporting-aggregate-'));
 	try {
 		const { default: sharp } = await import('sharp');
 		const { default: ExcelJS } = await import('exceljs');
@@ -375,7 +375,7 @@ test('builds aggregate artifacts from repository screenshot folders and report w
 });
 
 test('writes one slide per current capture when a run ID is supplied', async () => {
-	const root = await fs.mkdtemp(path.join(os.tmpdir(), 'terra-reporting-current-run-'));
+	const root = await fs.mkdtemp(path.join(os.tmpdir(), 'reporting-current-run-'));
 	try {
 		const { default: sharp } = await import('sharp');
 		const evidenceDir = path.join(root, 'screenshots');
@@ -433,7 +433,7 @@ test('writes one slide per current capture when a run ID is supplied', async () 
 });
 
 test('aggregates shared screenshot runs across viewport subprocesses and restarts', async () => {
-	const root = await fs.mkdtemp(path.join(os.tmpdir(), 'terra-reporting-matrix-run-'));
+	const root = await fs.mkdtemp(path.join(os.tmpdir(), 'reporting-matrix-run-'));
 	const runId = `matrix-${path.basename(root)}`;
 	try {
 		const { default: sharp } = await import('sharp');
@@ -577,7 +577,7 @@ test('loads and grades per-test and operation timing budgets', async () => {
 		warnMs: 1000,
 		failMs: 9000,
 	});
-	const root = await fs.mkdtemp(path.join(os.tmpdir(), 'terra-load-config-'));
+	const root = await fs.mkdtemp(path.join(os.tmpdir(), 'load-config-'));
 	const cfgFile = path.join(root, 'quality.json');
 	await fs.writeFile(cfgFile, JSON.stringify({ loadTesting: { enabled: false, defaultBudget: { warnMs: 3000, failMs: 7000 } } }));
 	assert.equal(readLoadTestingCfg(cfgFile).enabled, false);
@@ -619,7 +619,7 @@ test('loads and grades per-test and operation timing budgets', async () => {
 });
 
 test('writes neutral spreadsheet and slideshow artifacts', async () => {
-	const root = await fs.mkdtemp(path.join(os.tmpdir(), 'terra-reporting-'));
+	const root = await fs.mkdtemp(path.join(os.tmpdir(), 'reporting-'));
 	const { default: sharp } = await import('sharp');
 	const { default: ExcelJS } = await import('exceljs');
 	const screenshot = path.join(root, 'source.png');
@@ -705,7 +705,7 @@ test('writes neutral spreadsheet and slideshow artifacts', async () => {
 
 // SCREENSHOT-ONLY DECK GENERATION
 test('writes responsive screenshot-only slides', async () => {
-	const root = await fs.mkdtemp(path.join(os.tmpdir(), 'terra-screenshot-slideshow-'));
+	const root = await fs.mkdtemp(path.join(os.tmpdir(), 'screenshot-slideshow-'));
 	try {
 		const { default: sharp } = await import('sharp');
 		const screenshot = path.join(root, 'capture.png');
@@ -774,7 +774,7 @@ test('writes responsive screenshot-only slides', async () => {
 });
 
 test('builds one screenshot deck from nested repository folders and keeps partial and historical captures', async () => {
-	const root = await fs.mkdtemp(path.join(os.tmpdir(), 'terra-screenshot-tree-'));
+	const root = await fs.mkdtemp(path.join(os.tmpdir(), 'screenshot-tree-'));
 	try {
 		const { default: sharp } = await import('sharp');
 		for (const [name, background] of [
@@ -862,7 +862,7 @@ test('builds one screenshot deck from nested repository folders and keeps partia
 
 // LOAD TIMING REPORT CONTRACT
 test('reports load timing details and fails only when enabled budgets are exceeded', async () => {
-	const root = await fs.mkdtemp(path.join(os.tmpdir(), 'terra-load-report-'));
+	const root = await fs.mkdtemp(path.join(os.tmpdir(), 'load-report-'));
 	const budget = { warnMs: 2000, failMs: 5000 };
 	// hygiene-ignore single-use -- Keep the browser result object distinct from the supplemental result.
 	const browserResult = result({

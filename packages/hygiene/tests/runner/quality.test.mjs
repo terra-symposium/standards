@@ -527,7 +527,7 @@ test('format fix leaves source unchanged when Prettier is unavailable', () => {
 	const file = join(srcRoot, 'main.ts');
 	const orig = 'const object = {\n value: true,\n};\n';
 	writeFileSync(file, orig);
-	runQualityCli(createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], tools: { prettier: 'terra-prettier-that-does-not-exist' } }), ['format', '--all', '--fix']);
+	runQualityCli(createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], tools: { prettier: 'prettier-that-does-not-exist' } }), ['format', '--all', '--fix']);
 	assert.equal(readFileSync(file, 'utf8'), orig);
 });
 test('format fix restores source when Prettier rejects a candidate', () => {

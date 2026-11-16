@@ -7,7 +7,7 @@ import ts from 'typescript';
 import { collapseTypesAndObjects } from '../../../dist/capabilities/formatting/lib/collapse.js';
 
 test('collapsing launcher-like objects preserves tokens and valid syntax', () => {
-	const root = mkdtempSync(join(tmpdir(), 'terra-collapse-safety-'));
+	const root = mkdtempSync(join(tmpdir(), 'collapse-safety-'));
 	const file = join(root, 'quality-runner.mjs');
 	const orig = `const repoName = 'salesphere';
 const env = {
