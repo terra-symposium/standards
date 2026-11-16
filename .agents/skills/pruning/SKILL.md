@@ -7,12 +7,7 @@ metadata:
 
 # Pruning
 
-Choose the scope before acting. For repository files and scripts, follow the
-[repository file audit](references/repository-files.md). For generated output and
-caches, follow the [repository output guide](references/repository-output.md).
-For Git branches, pull requests, and worktrees, use the Git scope below. For
-local Codex storage and duplicate skills, use the device scope. A request can
-cover several scopes; inventory and verify each separately.
+Choose the scope before acting. For repository files and scripts, follow the [repository file audit](references/repository-files.md). For generated output and caches, follow the [repository output guide](references/repository-output.md). For Git branches, pull requests, and worktrees, use the Git scope below. For local Codex storage and duplicate skills, use the device scope. A request can cover several scopes; inventory and verify each separately.
 
 ## Git branches and worktrees
 
@@ -39,8 +34,7 @@ Use this skill when a user asks to review, integrate, close, or clean up branche
 
 ### Protect worktrees and local changes
 
-An audit or plan-only request stops after inventory and a disposition plan.
-Do not archive or remove a Git or Codex worktree until cleanup is authorized.
+An audit or plan-only request stops after inventory and a disposition plan. Do not archive or remove a Git or Codex worktree until cleanup is authorized.
 
 Keep dirty, untracked, or otherwise unaccounted work. Inspect its diff before cleanup. Preserve wanted changes in a commit, a clearly named stash, or a recoverable worktree archive before removal.
 
@@ -93,14 +87,7 @@ Keep Codex, ChatGPT, Dia, Warp, Raycast, and plugin-managed skills and assets wh
 1. Measure candidate directories before cleanup. Separate archived transcripts, recent sessions, managed worktrees, rebuildable caches, plugin assets, Git bundles, test evidence, and application state.
 2. Permanently delete only archived threads the user authorized for deletion. Use Codex’s supported thread/session delete control; do not unlink rollout files directly while Codex may index them. Keep active or recent threads unless the user explicitly includes them. Verify the archived-thread inventory and transcript files afterward.
 3. Clear rebuildable caches only after Codex is closed. Do not close the user’s active Codex session to perform cleanup. Preserve plugin-managed assets unless they are confirmed rebuildable and within the user’s requested scope.
-4. Inventory each managed worktree and record its owner, status, unique commits,
-   and recovery plan. An audit or plan-only request stops here. For authorized
-   cleanup, archive through Codex so dirty work has a recoverable snapshot. If
-   the owning thread is unavailable and the Codex control cannot attach the
-   checkout, inspect tracked, staged, untracked, and needed ignored files;
-   make a recoverable Git stash or equivalent snapshot and record its object
-   ID and base commit. Remove with Git only after the worktree is clean.
-   Remove a clean worktree without force and verify it is gone.
+4. Inventory each managed worktree and record its owner, status, unique commits, and recovery plan. An audit or plan-only request stops here. For authorized cleanup, archive through Codex so dirty work has a recoverable snapshot. If the owning thread is unavailable and the Codex control cannot attach the checkout, inspect tracked, staged, untracked, and needed ignored files; make a recoverable Git stash or equivalent snapshot and record its object ID and base commit. Remove with Git only after the worktree is clean. Remove a clean worktree without force and verify it is gone.
 5. Keep Git bundles until each saved tip is verified in another recovery source or the user explicitly abandons it. A missing local branch or unmatched remote branch name is not proof that its contents are disposable.
 6. Delete old test evidence only when it is clearly generated, outside repository source, and covered by the user’s cleanup request. Do not remove recent session logs, databases, credentials, or settings as generic cleanup.
 

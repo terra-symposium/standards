@@ -1,8 +1,6 @@
-
 # Issues
 
-Classify the requested issues using current repository evidence. Inventory all
-open issues only when the request covers the full repository backlog.
+Classify the requested issues using current repository evidence. Inventory all open issues only when the request covers the full repository backlog.
 
 ## Workflow
 
@@ -13,13 +11,10 @@ open issues only when the request covers the full repository backlog.
    - **Complete:** the requested outcome exists and evidence shows it is integrated.
    - **In progress:** relevant implementation or an active pull request exists.
    - **Needs clarification:** a concrete unanswered question blocks a safe implementation.
-   - **Ready:** scope, observable acceptance criteria, and a runnable test or
-     validation path are clear, but the work is not complete.
+   - **Ready:** scope, observable acceptance criteria, and a runnable test or validation path are clear, but the work is not complete.
    - **Stale or duplicate:** explain the evidence and the likely disposition.
 5. Interview the user when a decision blocks implementation. Ask small batches of concise questions. Resolve each answer or mark it unknown.
-6. If the user authorized issue updates, update interviewed issues for handoff.
-   Add confirmed scope, decisions, criteria, exclusions, and tests. Use a concise
-   reply only when editing the description is unsuitable.
+6. If the user authorized issue updates, update interviewed issues for handoff. Add confirmed scope, decisions, criteria, exclusions, and tests. Use a concise reply only when editing the description is unsuitable.
 7. For each **Complete** finding, check whether the issue already has current reviewer-ready evidence. If it does not, use the procedure in [Reviewer-ready completion evidence](#reviewer-ready-completion-evidence).
 8. Report each issue URL, status, evidence, confidence, blockers, and next action.
 

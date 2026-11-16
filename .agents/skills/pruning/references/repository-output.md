@@ -1,11 +1,6 @@
-
 # Repository output and caches
 
-Use this alongside the [Quality hygiene scope](../../quality/references/hygiene.md)
-when the task is to reduce repository clutter. For an execution request,
-inspect every repository in scope and finish by deleting, moving, or merging
-safe candidates. For an audit or plan request, stop at a reviewable inventory
-and proposed changes.
+Use this alongside the [Quality hygiene scope](../../quality/references/hygiene.md) when the task is to reduce repository clutter. For an execution request, inspect every repository in scope and finish by deleting, moving, or merging safe candidates. For an audit or plan request, stop at a reviewable inventory and proposed changes.
 
 ## 1. Establish scope and safety
 
@@ -13,9 +8,7 @@ Read repository instructions and inspect Git status before editing. Preserve exi
 
 Inventory directories and large files while pruning `node_modules`, `.git`, package caches, and other dependency stores from the walk. Include ignored and hidden paths. For each candidate, check whether Git tracks it, find references in scripts/configuration/deployment, identify its owning generator, and confirm that generator recreates it.
 
-Check active build, preview, development, and deployment processes before deleting or moving generated output. Keep any directory a running process is using. Never delete authored content, source assets, lockfiles, credentials, user data, or a directory whose ownership is unclear.
-Resolve `.astro` and other cache symlinks before classifying them; inspect the
-target, active processes, generator, and consumers before proposing deletion.
+Check active build, preview, development, and deployment processes before deleting or moving generated output. Keep any directory a running process is using. Never delete authored content, source assets, lockfiles, credentials, user data, or a directory whose ownership is unclear. Resolve `.astro` and other cache symlinks before classifying them; inspect the target, active processes, generator, and consumers before proposing deletion.
 
 ## 2. Consolidate and prune
 

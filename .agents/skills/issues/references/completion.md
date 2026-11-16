@@ -1,4 +1,3 @@
-
 # Issue completion
 
 Use after an issue audit to implement issues that are ready for agentic work.

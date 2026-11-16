@@ -11,26 +11,16 @@ Use when reconstructing development history from a production baseline or extend
 
 ## Invariants
 
-Record production `main`, source development ref, their SHAs, merge base, and
-target branch before rewriting. Check whether the branches diverged. If so,
-inventory production-only and development-only commits and establish the
-authorized baseline, source range, and target tree. Do not silently drop
-production-only work or replay onto the wrong tree.
+Record production `main`, source development ref, their SHAs, merge base, and target branch before rewriting. Check whether the branches diverged. If so, inventory production-only and development-only commits and establish the authorized baseline, source range, and target tree. Do not silently drop production-only work or replay onto the wrong tree.
 
-Produce linear history without merge commits. Map every source commit to a
-replacement or an explicit no-op. Record many-to-one mapping for coherent
-groups and one-to-many mapping for split commits. For merge commits, show which
-parent changes and conflict resolutions were preserved, or why the merge maps
-to no new tree change.
+Produce linear history without merge commits. Map every source commit to a replacement or an explicit no-op. Record many-to-one mapping for coherent groups and one-to-many mapping for split commits. For merge commits, show which parent changes and conflict resolutions were preserved, or why the merge maps to no new tree change.
 
 Preserve each replacement's primary author name, email, and author timestamp. Use the operator as committer and retain verified co-authors as trailers.
 
 Never group across primary-author boundaries. Group only contiguous, same-author commits with one coherent observable topic. Prefer atomicity; split heterogeneous work even when files overlap.
 
 - Do not infer authorship from the operator, branch owner, or blame. Verify final author metadata.
-- Preserve the exact committed target tree SHA unless the task includes source
-  changes. Dirty working-tree content is outside tree parity; inventory and
-  protect it separately unless the user explicitly includes it in the rewrite.
+- Preserve the exact committed target tree SHA unless the task includes source changes. Dirty working-tree content is outside tree parity; inventory and protect it separately unless the user explicitly includes it in the rewrite.
 
 ## Commit contract
 
@@ -48,14 +38,7 @@ Reasoning:
 - <evidence-based purpose or grouping rationale>
 ```
 
-Assign a unique, monotonically increasing plain SemVer to every commit,
-including development and audit commits. Derive the first replacement version
-from the verified baseline. Distinguish the repository-wide semantic sequence
-from package-scoped tags and manifest versions: use the latter as evidence for
-affected package boundaries, not as a substitute for the repository sequence.
-Record the source-to-version mapping. For grouped commits, use the
-latest source commit's author timestamp and record which commit supplied it;
-retain all other source timestamps in the audit map.
+Assign a unique, monotonically increasing plain SemVer to every commit, including development and audit commits. Derive the first replacement version from the verified baseline. Distinguish the repository-wide semantic sequence from package-scoped tags and manifest versions: use the latter as evidence for affected package boundaries, not as a substitute for the repository sequence. Record the source-to-version mapping. For grouped commits, use the latest source commit's author timestamp and record which commit supplied it; retain all other source timestamps in the audit map.
 
 Use major for breaking integration changes; minor for additive capability/API/schema; patch for fixes, maintenance, docs, tests, refactors, styling, CI, and non-additive work. Reset lower components normally.
 
