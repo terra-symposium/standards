@@ -97,7 +97,8 @@
 							"type": "boolean",
 							"description": "Require TSDoc for exported named functions, including substantive descriptions for every parameter."
 						},
-						"noInlineFunctions": { "type": "boolean" }
+						"noInlineFunctions": { "type": "boolean" },
+						"importSection": { "type": "boolean", "description": "Require an IMPORTS block heading before import declarations in JavaScript and TypeScript source files." }
 					},
 					"additionalProperties": false
 				}

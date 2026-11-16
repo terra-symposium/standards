@@ -69,7 +69,7 @@ Most checks are enabled unless `enabledChecks.<name>` is `false`. `accessibility
 
 Normal runs apply eligible fixes; `--warn` is read-only. Set `autofix.<name>` to `false` to disable one fixer. Fixer keys use camel case (`displayName`, `documentedCommands`, `repeatedClasses`, `regexDedup`, `tailwindCanonical`); check keys use kebab case. Ambiguous changes remain findings for review. The [source](/hygiene/3-checks/source-checks/), [refactoring](/hygiene/3-checks/refactoring-checks/), [repository pattern](/hygiene/3-checks/repository-patterns/), and [tooling](/hygiene/3-checks/tooling-checks/) guides cover behavior and policy examples.
 
-For declaration documentation, `documentation.required` supports `types`, `functions`, `exportedFunctions`, and `noInlineFunctions`. Documentation findings are read-only; Hygiene does not invent descriptions. Set `documentation.commandRoots` to check Markdown command examples.
+For source documentation, `documentation.required` supports `types`, `functions`, `exportedFunctions`, `noInlineFunctions`, and `importSection`. The last option requires an `IMPORTS` block heading before import declarations. Documentation findings are read-only; Hygiene does not invent descriptions. Set `documentation.commandRoots` to check Markdown command examples.
 
 ### Repository commands
 

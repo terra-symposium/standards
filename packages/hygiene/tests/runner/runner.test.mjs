@@ -205,6 +205,21 @@ test('warn and safe-fix quality passes leave missing documentation for an author
 	}
 	resetExitCode();
 });
+test('default documentation command reports missing comments in staged-only files', () => {
+	const root = fixtureRoot('hygiene-staged-documentation-');
+	fixtureFile(root, 'src/main.ts', 'export const ready = true;\n');
+	spawnSync('git', ['init', '-q'], { cwd: root });
+	spawnSync('git', ['add', '.'], { cwd: root });
+	spawnSync('git', ['-c', 'user.name=hygiene-test', '-c', 'user.email=hygiene@example.test', 'commit', '-qm', 'fixture'], { cwd: root });
+	fixtureFile(root, 'src/main.ts', "import { value } from './value';\nexport function readValue() { return value; }\n");
+	fixtureFile(root, 'src/value.ts', 'export const value = true;\n');
+	spawnSync('git', ['add', 'src/main.ts', 'src/value.ts'], { cwd: root });
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], documentation: { required: { functions: true, importSection: true } }, enabledChecks: { format: false } });
+	resetExitCode();
+	runQualityCli(cfg, ['document', '--warn']);
+	assert.equal(process.exitCode, 1, 'staged-only missing documentation fails the normal command');
+	resetExitCode();
+});
 test('repeated naming repair never appends a second import for an already-bound local name', () => {
 	const root = fixtureRoot('hygiene-naming-import-idempotence-');
 	const src = fixtureFile(

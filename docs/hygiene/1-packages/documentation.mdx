@@ -16,7 +16,7 @@ The CLI reads the same `quality.json` as the root runner. With no explicit files
 
 ## Check behavior
 
-The `documentation.required` policy controls types, named functions, exported functions, and inline functions. C and header declaration requirements include Doxygen summaries, parameter descriptions and order, returns, and configured authors. `documentation.commandRoots` opts Markdown command examples into checks for supported pnpm flags. Duplicate imported bindings are also exported for use by focused import checkers.
+The `documentation.required` policy controls types, named functions, exported functions, inline functions, and optional `IMPORTS` block headings before imports. C and header declaration requirements include Doxygen summaries, parameter descriptions and order, returns, and configured authors. `documentation.commandRoots` opts Markdown command examples into checks for supported pnpm flags. Duplicate imported bindings are also exported for use by focused import checkers.
 
 Documentation findings are diagnostic only. The compatibility `documentSrcFile` API is a no-op; no command creates comment scaffolds or placeholders. Keep comments agent-authored and implementation-specific.
 

@@ -175,6 +175,21 @@ test('working-tree discovery includes modified and untracked sources but exclude
 	execFileSync('git', ['rm', '-q', deleted], { cwd: root });
 	assert.deepEqual(workingSrcFiles(createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] })), [join(root, 'src/changed.ts'), join(root, 'src/new.ts')]);
 });
+test('working-tree discovery includes staged-only source changes used by pre-commit checks', () => {
+	const root = fixtureRoot('hygiene-staged-files-');
+	fixtureFile(root, '.gitignore', 'src/ignored.ts\n');
+	fixtureFile(root, 'src/modified.ts', 'export const modified = false;\n');
+	fixtureFile(root, 'src/deleted.ts', 'export const deleted = true;\n');
+	execFileSync('git', ['init', '-q'], { cwd: root });
+	execFileSync('git', ['add', '.'], { cwd: root });
+	execFileSync('git', ['-c', 'user.name=quality-test', '-c', 'user.email=quality@example.test', 'commit', '-qm', 'fixture'], { cwd: root });
+	fixtureFile(root, 'src/modified.ts', 'export const modified = true;\n');
+	fixtureFile(root, 'src/added.ts', 'export const added = true;\n');
+	fixtureFile(root, 'src/ignored.ts', 'export const ignored = true;\n');
+	execFileSync('git', ['add', 'src/modified.ts', 'src/added.ts'], { cwd: root });
+	execFileSync('git', ['rm', '-q', 'src/deleted.ts'], { cwd: root });
+	assert.deepEqual(workingSrcFiles(createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] })), [join(root, 'src/added.ts'), join(root, 'src/modified.ts')]);
+});
 test('path utilities distinguish files, directories, missing paths, and repository-relative display names', () => {
 	const root = fixtureRoot('hygiene-paths-');
 	const file = fixtureFile(root, 'src/main.ts', 'const value = true;\n');

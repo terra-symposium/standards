@@ -1,4 +1,10 @@
-# @terra-symposium/quality
+# @terra-symposium/hygiene
+
+## 2.5.0
+
+### Minor Changes
+
+- Include staged files in default checks and support an opt-in `IMPORTS` heading requirement for JavaScript and TypeScript documentation.
 
 ## 2.4.3
 

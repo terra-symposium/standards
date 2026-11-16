@@ -240,16 +240,20 @@ export function nonProgramSrcFiles(cfg: QualityCfg): string[] {
 }
 
 /**
- * Returns configured source files changed in the working tree, including untracked files.
+ * Returns configured source files changed in the index or working tree, including untracked files.
  *
  * @param cfg Quality configuration whose repository root is used to query Git.
  *
- * @return Sorted configured source files that are changed or untracked in the working tree.
+ * @return Sorted configured source files that are staged, modified, or untracked.
  */
 export function workingSrcFiles(cfg: QualityCfg): string[] {
 	const changed = new Set(
-		execFileSync('git', ['diff', '--name-only', '--diff-filter=ACMR'], { cwd: cfg.root, encoding: 'utf8' })
-			.concat(execFileSync('git', ['ls-files', '--others', '--exclude-standard'], { cwd: cfg.root, encoding: 'utf8' }))
+		[
+			execFileSync('git', ['diff', '--name-only', '--diff-filter=ACMR'], { cwd: cfg.root, encoding: 'utf8' }),
+			execFileSync('git', ['diff', '--cached', '--name-only', '--diff-filter=ACMR'], { cwd: cfg.root, encoding: 'utf8' }),
+			execFileSync('git', ['ls-files', '--others', '--exclude-standard'], { cwd: cfg.root, encoding: 'utf8' }),
+		]
+			.join('\n')
 			.split('\n')
 			.filter(Boolean)
 			.map(p => join(cfg.root, p)),
