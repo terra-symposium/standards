@@ -35,13 +35,13 @@ test('repeated-class detection normalizes whitespace and ignores dynamic and one
 });
 test('repeated-class analysis and fixing ignore markup inside JavaScript strings but process JSX', () => {
 	const root = fixtureRoot('terra-quality-classes-string-data-');
-	const genSource = `export const courseHtml = ${JSON.stringify('<div class="rounded border bg-card"></div> <div class="rounded border bg-card"></div> <div class="rounded border bg-card"></div>')};\n`;
-	fixtureFile(root, 'src/course-data.js', genSource);
+	const genSrc = `export const courseHtml = ${JSON.stringify('<div class="rounded border bg-card"></div> <div class="rounded border bg-card"></div> <div class="rounded border bg-card"></div>')};\n`;
+	fixtureFile(root, 'src/course-data.js', genSrc);
 	fixtureFile(root, 'src/view.tsx', '<><div className="rounded border bg-card" /><div className="rounded border bg-card" /><div class="rounded border bg-card" /></>;\n');
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.js', '.tsx'], repeatedClasses: {} });
 	assert.deepEqual(repeatedClassFindings(cfg), [{ value: 'rounded border bg-card', count: 3, locations: ['src/view.tsx:1', 'src/view.tsx:1', 'src/view.tsx:1'] }]);
 	assert.deepEqual(fixRepeatedClasses(cfg), { fixed: 3, skipped: 0 });
-	assert.equal(fixtureText(root, 'src/course-data.js'), genSource);
+	assert.equal(fixtureText(root, 'src/course-data.js'), genSrc);
 	assert.match(fixtureText(root, 'src/view.tsx'), /const ROUNDED_BORDER_BG_CARD_CLASS = 'rounded border bg-card';/);
 	assert.deepEqual(repeatedClassFindings(cfg), []);
 });
@@ -402,11 +402,11 @@ test('changed-file regex fixing retains exports referenced by unchanged source',
 });
 test('shared regex allocation keeps distinct line-ending expressions distinct from colliding export names', async () => {
 	const root = fixtureRoot('terra-quality-regex-line-endings-');
-	const crlfSource = String.raw`/\r\n?/g`;
-	const lineEndSource = String.raw`/\n+$/`;
+	const crlfSrc = String.raw`/\r\n?/g`;
+	const lineEndSrc = String.raw`/\n+$/`;
 	fixtureFile(root, 'package.json', '{"type":"module"}\n');
-	fixtureFile(root, 'src/one.mjs', `export const firstCrLf = ${crlfSource};\nexport const firstLineEnd = ${lineEndSource};\n`);
-	fixtureFile(root, 'src/two.mjs', `export const secondCrLf = ${crlfSource};\nexport const secondLineEnd = ${lineEndSource};\n`);
+	fixtureFile(root, 'src/one.mjs', `export const firstCrLf = ${crlfSrc};\nexport const firstLineEnd = ${lineEndSrc};\n`);
+	fixtureFile(root, 'src/two.mjs', `export const secondCrLf = ${crlfSrc};\nexport const secondLineEnd = ${lineEndSrc};\n`);
 	fixtureFile(
 		root,
 		'shared/regex.mjs',
@@ -417,8 +417,8 @@ test('shared regex allocation keeps distinct line-ending expressions distinct fr
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.mjs'], regexDedup: { extensions: ['.mjs'], sharedModule: 'shared/regex.mjs' } });
 	assert.deepEqual(fixRegexDedup(cfg), { fixed: 4, skipped: 0 });
 	const genEntries = new Map([...fixtureText(root, 'shared/regex.mjs').matchAll(/export const (\w+) = \(\) => \(\n\t([^\n]+)\n\);/gu)].map(([, name, expression]) => [expression, name]));
-	const crlfName = genEntries.get(crlfSource);
-	const lineEndName = genEntries.get(lineEndSource);
+	const crlfName = genEntries.get(crlfSrc);
+	const lineEndName = genEntries.get(lineEndSrc);
 	assert.equal(crlfName, 'REGEX_R_N_G_REGEX_2');
 	assert.ok(lineEndName);
 	assert.match(fixtureText(root, 'src/one.mjs'), new RegExp(`\\.${crlfName}\\(\\)`));
@@ -442,7 +442,7 @@ test('shared regex imports resolve inside the owning package from shallow and de
 		['site/config/astro.config.mjs', `export const fourth = /shared/g;\n`],
 		['site/src/lib/catalog.ts', `import * as TerraQualityRegex from '../../../src/lib/terra/regex.mjs';\nexport const fifth = /shared/g;\nvoid TerraQualityRegex;\n`],
 	];
-	for (const [file, source] of files) fixtureFile(root, file, source);
+	for (const [file, src] of files) fixtureFile(root, file, src);
 	assert.deepEqual(
 		fixRegexDedup(createQualityCfg({ root, sourceRoots: ['.'], extensions: ['.ts', '.tsx', '.mjs'], regexDedup: { extensions: ['.ts', '.tsx', '.mjs'], sharedModule: 'src/lib/terra/regex.mjs' } })),
 		{ fixed: files.length, skipped: 0 },

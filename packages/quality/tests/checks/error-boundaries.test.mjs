@@ -78,14 +78,14 @@ test('automatically installs the shared hydration boundary in Astro configs', ()
 test('Astro integration autofix stays read-only when no installed dependency exports the integration', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-astro-boundary-missing-dependency-'));
 	const config = join(root, 'astro.config.mjs');
-	const original = "import { defineConfig } from 'astro/config';\nexport default defineConfig({ integrations: [] });\n";
+	const orig = "import { defineConfig } from 'astro/config';\nexport default defineConfig({ integrations: [] });\n";
 	writeFileSync(join(root, 'package.json'), JSON.stringify({ devDependencies: { astro: '^5.0.0' } }));
-	writeFileSync(config, original);
+	writeFileSync(config, orig);
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts', '.tsx'] });
 	assert.equal(errorBoundaryFindings(cfg).length, 1);
 	assert.equal(errorBoundaryFindings(cfg)[0]?.fixable, false);
 	assert.equal(fixErrorBoundaries(cfg), 0);
-	assert.equal(readFileSync(config, 'utf8'), original);
+	assert.equal(readFileSync(config, 'utf8'), orig);
 });
 test('accepts an existing top-level boundary, including a local alias', () => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-quality-error-boundary-existing-'));

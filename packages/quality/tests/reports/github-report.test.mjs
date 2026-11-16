@@ -174,10 +174,10 @@ process.stdout.write('[]');
 `,
 	);
 	chmodSync(gh, 0o755);
-	const originalPath = process.env.PATH;
-	const originalToken = process.env.GH_TOKEN;
+	const origPath = process.env.PATH;
+	const origToken = process.env.GH_TOKEN;
 	try {
-		process.env.PATH = `${bin}:${originalPath}`;
+		process.env.PATH = `${bin}:${origPath}`;
 		process.env.GH_TOKEN = 'fixture-token';
 		// terra-quality-ignore single-use -- Keep this test configuration named so its fixture scope is established before the check under test runs.
 		const cfg = { root, sourceRoots: ['src'], extensions: ['.ts'], github: { repositories: [repo] } };
@@ -191,9 +191,9 @@ process.stdout.write('[]');
 		assert.equal(report.github.repositories[0].features.secretScanning, 'disabled');
 		assert.ok(report.checks.some(check => check.name === 'documentation' && check.status === 'skipped'));
 	} finally {
-		process.env.PATH = originalPath;
-		if (originalToken === undefined) delete process.env.GH_TOKEN;
-		else process.env.GH_TOKEN = originalToken;
+		process.env.PATH = origPath;
+		if (origToken === undefined) delete process.env.GH_TOKEN;
+		else process.env.GH_TOKEN = origToken;
 		process.exitCode = undefined;
 	}
 });

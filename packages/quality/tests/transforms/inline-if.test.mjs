@@ -58,7 +58,7 @@ test('collapseInlineIfs preserves the historical nested-if else owner and runtim
 	const root = fixtureRoot('terra-quality-inline-if-else-owner-');
 	// terra-quality-ignore single-use -- Keep this source fixture path named so the test can identify the exact file under inspection.
 	const file = fixtureFile(root, 'src/main.ts', 'if (outer) { if (inner) run(); } else stop();\n');
-	const original = fixtureText(root, 'src/main.ts');
+	const orig = fixtureText(root, 'src/main.ts');
 	const execute = (src, outer, inner) => {
 		const result = [];
 		// terra-quality-ignore single-use -- Keep this callback identity stable while the inline-if test compares execution order.
@@ -70,9 +70,9 @@ test('collapseInlineIfs preserves the historical nested-if else owner and runtim
 	};
 	assert.equal(collapseInlineIfs(file), false);
 	const retained = fixtureText(root, 'src/main.ts');
-	assert.equal(retained, original);
+	assert.equal(retained, orig);
 	for (const outer of [false, true]) {
-		for (const inner of [false, true]) assert.deepEqual(execute(retained, outer, inner), execute(original, outer, inner));
+		for (const inner of [false, true]) assert.deepEqual(execute(retained, outer, inner), execute(orig, outer, inner));
 	}
 	assert.deepEqual(execute(retained, false, false), ['stop']);
 	assert.deepEqual(execute(retained, true, false), []);

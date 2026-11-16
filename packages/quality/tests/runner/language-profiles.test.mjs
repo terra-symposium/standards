@@ -23,7 +23,7 @@ import { LANGUAGE_CAPABILITIES, QUALITY_CAPABILITY_AUTOFIXES, QUALITY_CAPABILITY
 DATA
 //////////////////////////////////////////////////*/
 
-const DISABLED_SOURCE_CHECKS = {
+const DISABLED_SRC_CHECKS = {
 	document: false,
 	format: false,
 	import: false,
@@ -128,7 +128,7 @@ test('language profiles resolve only matching source files and optional project 
 });
 test('selected profiles with no matching sources are reported as skipped', () => {
 	const root = fixtureRoot('terra-quality-language-profile-empty-');
-	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: [], languageProfiles: ['java'], enabledChecks: DISABLED_SOURCE_CHECKS });
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: [], languageProfiles: ['java'], enabledChecks: DISABLED_SRC_CHECKS });
 	const resolved = resolveLanguageProfiles(cfg);
 	assert.deepEqual(resolved.checks, []);
 	assert.deepEqual(
@@ -176,7 +176,7 @@ test('language documentation commands follow configured extensions when a full p
 test('C documentation is a built-in source check and does not require a Doxyfile', () => {
 	const root = fixtureRoot('terra-quality-documentation-prerequisite-');
 	fixtureFile(root, 'src/main.c', 'static int helper(void) { return 1; }\n');
-	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.c'], enabledChecks: { ...DISABLED_SOURCE_CHECKS, document: true } });
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.c'], enabledChecks: { ...DISABLED_SRC_CHECKS, document: true } });
 	assert.deepEqual(resolveLanguageProfiles(cfg).failed, []);
 	assert.ok(documentationFindings(cfg).some(({ name, reason }) => name === 'helper' && reason.includes('missing documentation block')));
 });
@@ -195,12 +195,12 @@ test('selected profiles fail clearly when a required tool is missing', () => {
 	const root = fixtureRoot('terra-quality-language-profile-missing-tool-');
 	fixtureFile(root, 'src/app.py', 'print("ready")\n');
 	// terra-quality-ignore single-use -- Keep this test configuration named so its fixture scope is established before the check under test runs.
-	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: [], languageProfiles: ['python'], enabledChecks: DISABLED_SOURCE_CHECKS });
-	const previousPath = process.env.PATH;
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: [], languageProfiles: ['python'], enabledChecks: DISABLED_SRC_CHECKS });
+	const prevPath = process.env.PATH;
 	// terra-quality-ignore single-use -- Snapshot console.error before replacing it so cleanup restores the original logger.
-	const previousErr = console.error;
+	const prevErr = console.error;
 	const errs = [];
-	const gitExecutable = previousPath
+	const gitExecutable = prevPath
 		?.split(delimiter)
 		.map(directory => join(directory, process.platform === 'win32' ? 'git.exe' : 'git'))
 		.find(existsSync);
@@ -216,9 +216,9 @@ test('selected profiles fail clearly when a required tool is missing', () => {
 		assert.ok(errs.some(line => line.includes('Required tool "ruff" is unavailable')));
 		assert.ok(errs.some(line => line.includes('uv add --dev ruff')));
 	} finally {
-		if (previousPath === undefined) delete process.env.PATH;
-		else process.env.PATH = previousPath;
-		console.error = previousErr;
+		if (prevPath === undefined) delete process.env.PATH;
+		else process.env.PATH = prevPath;
+		console.error = prevErr;
 		resetExitCode();
 	}
 });
@@ -246,13 +246,13 @@ test('C, Java, and Python profiles invoke their native checks in phase order', (
 	])
 		fakeProfileTool(root, name, version);
 	fixtureFile(root, 'target/classes/Example.class', 'fixture');
-	const previousPath = process.env.PATH;
-	const previousMarker = process.env.TERRA_QUALITY_PROFILE_MARKER;
+	const prevPath = process.env.PATH;
+	const prevMarker = process.env.TERRA_QUALITY_PROFILE_MARKER;
 	const marker = join(root, 'native-calls.jsonl');
-	process.env.PATH = [join(root, 'bin'), dirname(process.execPath), previousPath].filter(Boolean).join(delimiter);
+	process.env.PATH = [join(root, 'bin'), dirname(process.execPath), prevPath].filter(Boolean).join(delimiter);
 	process.env.TERRA_QUALITY_PROFILE_MARKER = marker;
 	try {
-		runQualityCli(createQualityCfg({ root, sourceRoots: ['src'], extensions: [], languageProfiles: ['c', 'java', 'python'], enabledChecks: { ...DISABLED_SOURCE_CHECKS, document: true } }), [
+		runQualityCli(createQualityCfg({ root, sourceRoots: ['src'], extensions: [], languageProfiles: ['c', 'java', 'python'], enabledChecks: { ...DISABLED_SRC_CHECKS, document: true } }), [
 			'quality',
 			'--all',
 			'--warn',
@@ -267,10 +267,10 @@ test('C, Java, and Python profiles invoke their native checks in phase order', (
 		);
 		resetExitCode();
 	} finally {
-		if (previousPath === undefined) delete process.env.PATH;
-		else process.env.PATH = previousPath;
-		if (previousMarker === undefined) delete process.env.TERRA_QUALITY_PROFILE_MARKER;
-		else process.env.TERRA_QUALITY_PROFILE_MARKER = previousMarker;
+		if (prevPath === undefined) delete process.env.PATH;
+		else process.env.PATH = prevPath;
+		if (prevMarker === undefined) delete process.env.TERRA_QUALITY_PROFILE_MARKER;
+		else process.env.TERRA_QUALITY_PROFILE_MARKER = prevMarker;
 	}
 });
 test('profile defaults can be overridden while arbitrary language commands remain available', () => {
@@ -283,7 +283,7 @@ test('profile defaults can be overridden while arbitrary language commands remai
 			sourceRoots: ['src'],
 			extensions: [],
 			languageProfiles: ['python'],
-			enabledChecks: DISABLED_SOURCE_CHECKS,
+			enabledChecks: DISABLED_SRC_CHECKS,
 			enabledCommands: { 'python-mypy': false, 'python-bandit': false, 'python-vulture': false },
 			qualityCommands: [
 				{ name: 'python-format', command: process.execPath, args: append('format') },
@@ -301,9 +301,9 @@ test('profile safe fixes run only in fix mode and use their native formatter/lin
 	fixtureFile(root, 'src/app.py', 'def greet(name): return name\n');
 	fakeProfileTool(root, 'ruff', '0.15.0');
 	const marker = join(root, 'native-fixes.jsonl');
-	const previousPath = process.env.PATH;
-	const previousMarker = process.env.TERRA_QUALITY_PROFILE_MARKER;
-	process.env.PATH = [join(root, 'bin'), dirname(process.execPath), previousPath].filter(Boolean).join(delimiter);
+	const prevPath = process.env.PATH;
+	const prevMarker = process.env.TERRA_QUALITY_PROFILE_MARKER;
+	process.env.PATH = [join(root, 'bin'), dirname(process.execPath), prevPath].filter(Boolean).join(delimiter);
 	process.env.TERRA_QUALITY_PROFILE_MARKER = marker;
 	try {
 		const cfg = createQualityCfg({
@@ -311,7 +311,7 @@ test('profile safe fixes run only in fix mode and use their native formatter/lin
 			sourceRoots: ['src'],
 			extensions: [],
 			languageProfiles: ['python'],
-			enabledChecks: DISABLED_SOURCE_CHECKS,
+			enabledChecks: DISABLED_SRC_CHECKS,
 			enabledCommands: { 'python-mypy': false, 'python-bandit': false, 'python-vulture': false },
 		});
 		runQualityCli(cfg, ['quality', '--all', '--fix']);
@@ -342,9 +342,9 @@ test('profile safe fixes run only in fix mode and use their native formatter/lin
 		);
 		resetExitCode();
 	} finally {
-		if (previousPath === undefined) delete process.env.PATH;
-		else process.env.PATH = previousPath;
-		if (previousMarker === undefined) delete process.env.TERRA_QUALITY_PROFILE_MARKER;
-		else process.env.TERRA_QUALITY_PROFILE_MARKER = previousMarker;
+		if (prevPath === undefined) delete process.env.PATH;
+		else process.env.PATH = prevPath;
+		if (prevMarker === undefined) delete process.env.TERRA_QUALITY_PROFILE_MARKER;
+		else process.env.TERRA_QUALITY_PROFILE_MARKER = prevMarker;
 	}
 });

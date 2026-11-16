@@ -281,8 +281,8 @@ export function createHistoryReport(root: string, opts: { repository?: string; b
 		repository:
 			opts.repository ??
 			(function repoName(root: string): string {
-				const fromEnvironment = process.env.GITHUB_REPOSITORY;
-				if (fromEnvironment && /^[^/]+\/[^/]+$/.test(fromEnvironment)) return fromEnvironment.replace(GIT_I_REGEX, '');
+				const fromEnv = process.env.GITHUB_REPOSITORY;
+				if (fromEnv && /^[^/]+\/[^/]+$/.test(fromEnv)) return fromEnv.replace(GIT_I_REGEX, '');
 				const match = git(root, ['config', '--get', 'remote.origin.url'])
 					.trim()
 					.match(/(?:github\.com[:/])([^/]+\/[^/]+?)(?:\.git)?$/i);

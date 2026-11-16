@@ -158,7 +158,7 @@ function findEslintConfig(root: string, configRoot = resolve(root, 'config')): s
  *
  * @return Whether the file uses CommonJS semantics.
  */
-function isCommonJsSource(root: string, file: string): boolean {
+function isCommonJsSrc(root: string, file: string): boolean {
 	const ext = extname(file);
 	if (ext === '.cjs' || ext === '.cts') return true;
 	if (ext === '.mjs' || ext === '.mts') return false;
@@ -817,9 +817,9 @@ function run(cfg: QualityCfg, cmd: string, args: string[], opts: { quietSuccess?
 		printChildOutput(result.stderr);
 	}
 	if (result.error) {
-		const message = `${cmd} failed: ${result.error.message}`;
-		if (outputPhase) recordQualityDetail(message);
-		else console.error(`  ${message}`);
+		const msg = `${cmd} failed: ${result.error.message}`;
+		if (outputPhase) recordQualityDetail(msg);
+		else console.error(`  ${msg}`);
 	}
 	return status;
 }
@@ -1131,7 +1131,7 @@ function changedFileCount(cfg: QualityCfg, files: string[], before: Map<string, 
  *
  * @return Ordered file batches that fit within the argument budget.
  */
-function argumentBatches(files: string[]): string[][] {
+function argBatches(files: string[]): string[][] {
 	const result: string[][] = [];
 	let batch: string[] = [];
 	let bytes = 0;
@@ -1207,11 +1207,11 @@ function runLint(cfg: QualityCfg, opts: QualityOptions, exhaustive = false, dead
 		const result = spawnSync(process.execPath, ['--input-type=module'], {
 			cwd: cfg.root,
 			stdio: ['pipe', 'pipe', 'inherit'],
-			input: (function eslintApiSource(cfg: QualityCfg, files: string[], opts: QualityOptions, exhaustive: boolean, deadCodeCoordinated: boolean): string {
+			input: (function eslintApiSrc(cfg: QualityCfg, files: string[], opts: QualityOptions, exhaustive: boolean, deadCodeCoordinated: boolean): string {
 				return `
 import { createRequire } from 'node:module';
 import { resolve } from 'node:path';
-const options = ${JSON.stringify({ root: cfg.root, files, commonJsFiles: files.filter(file => isCommonJsSource(cfg.root, file)).map(file => ({ file, pattern: eslintFilePattern(cfg.root, file) })), fix: opts.fix, exhaustive, deadCodeCoordinated, eslintConfig: findEslintConfig(cfg.root, cfg.configRoot) })};
+const options = ${JSON.stringify({ root: cfg.root, files, commonJsFiles: files.filter(file => isCommonJsSrc(cfg.root, file)).map(file => ({ file, pattern: eslintFilePattern(cfg.root, file) })), fix: opts.fix, exhaustive, deadCodeCoordinated, eslintConfig: findEslintConfig(cfg.root, cfg.configRoot) })};
 const qualityProgress = () => {};
 let ESLint;
 let engine;
@@ -1299,7 +1299,7 @@ try {
 	}
 	if (apiUnavailable) {
 		const eslintConfig = findEslintConfig(cfg.root, cfg.configRoot);
-		for (const filesBatch of argumentBatches(files)) {
+		for (const filesBatch of argBatches(files)) {
 			const status = run(cfg, toolPath(cfg, cfg.tools?.eslint, 'eslint'), [...flags, ...(eslintConfig ? ['--config', eslintConfig] : []), ...filesBatch], { quietSuccess: opts.fix });
 			completed += filesBatch.length;
 			qualityProgress('ESLint', completed, files.length);
@@ -1503,7 +1503,7 @@ const root = ${JSON.stringify(cfg.root)};
 const configPath = ${JSON.stringify(flatCfg)};
 const sourceFiles = ${JSON.stringify(files)};
 const filePatterns = ${JSON.stringify(files.map(f => eslintFilePattern(cfg.root, f)))};
-const commonJsFiles = new Set(${JSON.stringify(files.filter(file => isCommonJsSource(cfg.root, file)))});
+const commonJsFiles = new Set(${JSON.stringify(files.filter(file => isCommonJsSrc(cfg.root, file)))});
 try {
 	const requireFromRepo = createRequire(resolve(root, 'package.json'));
 	const { ESLint } = requireFromRepo('eslint');
@@ -1610,7 +1610,7 @@ function collectEslintReports(cfg: QualityCfg, all: boolean, selectedFiles?: str
 	const focusedEslint = canUseFocusedEslint(cfg, flatCfg);
 	let completed = 0;
 	qualityProgress('ESLint dead-code', completed, files.length);
-	for (const filesBatch of argumentBatches(files)) {
+	for (const filesBatch of argBatches(files)) {
 		reports.push(
 			...parseEslintReports(
 				(focusedEslint && flatCfg ? runFocusedEslint(cfg, flatCfg, filesBatch) : undefined) ??
@@ -1864,13 +1864,13 @@ function runProjectTypecheck(cfg: QualityCfg): void {
  */
 function repairMissingImports(cfg: QualityCfg, program: ts.Program, checker: ts.TypeChecker): void {
 	const candidates = new Map<string, ts.SourceFile[]>();
-	const scopedSources = new Set(
+	const scopedSrcs = new Set(
 		srcFiles(cfg)
 			.filter(file => C_M_JS_TS_X_REGEX.test(file))
 			.map(file => resolve(file)),
 	);
 	for (const source of program.getSourceFiles()) {
-		if (!scopedSources.has(resolve(source.fileName)) || !C_M_JS_TS_X_REGEX.test(source.fileName)) continue;
+		if (!scopedSrcs.has(resolve(source.fileName)) || !C_M_JS_TS_X_REGEX.test(source.fileName)) continue;
 		if (hasGeneratedSourceHeader(source.text)) continue;
 		const module = checker.getSymbolAtLocation(source);
 		for (const exported of module ? checker.getExportsOfModule(module) : []) {
@@ -1901,7 +1901,7 @@ function repairMissingImports(cfg: QualityCfg, program: ts.Program, checker: ts.
 	 *
 	 * @return Whether the identifier is part of an `import('module').Type` reference.
 	 */
-	const isImportTypeReference = (n: ts.Identifier): boolean => {
+	const isImportTypeRef = (n: ts.Identifier): boolean => {
 		for (let parent: ts.Node | undefined = n.parent; parent; parent = parent.parent) {
 			if (ts.isImportTypeNode(parent)) return true;
 			if (ts.isStatement(parent)) return false;
@@ -1911,7 +1911,7 @@ function repairMissingImports(cfg: QualityCfg, program: ts.Program, checker: ts.
 
 	// WALKTHROUGH
 	for (const src of program.getSourceFiles()) {
-		if (!scopedSources.has(resolve(src.fileName)) || !C_M_JS_TS_X_REGEX.test(src.fileName)) continue;
+		if (!scopedSrcs.has(resolve(src.fileName)) || !C_M_JS_TS_X_REGEX.test(src.fileName)) continue;
 		const missing = new Map<string, { source: ts.SourceFile; typeOnly: boolean }>();
 		const importedNames = new Set<string>();
 		for (const statement of src.statements.filter(ts.isImportDeclaration)) {
@@ -1919,7 +1919,7 @@ function repairMissingImports(cfg: QualityCfg, program: ts.Program, checker: ts.
 			if (statement.importClause.name) importedNames.add(statement.importClause.name.text);
 			if (statement.importClause.namedBindings && ts.isNamespaceImport(statement.importClause.namedBindings)) importedNames.add(statement.importClause.namedBindings.name.text);
 			if (statement.importClause.namedBindings && ts.isNamedImports(statement.importClause.namedBindings))
-				for (const element of statement.importClause.namedBindings.elements) importedNames.add(element.name.text);
+				for (const el of statement.importClause.namedBindings.elements) importedNames.add(el.name.text);
 		}
 		/**
 		 * Finds identifier references that need a missing-import repair.
@@ -1931,7 +1931,7 @@ function repairMissingImports(cfg: QualityCfg, program: ts.Program, checker: ts.
 				ts.isIdentifier(n) &&
 				!((ts.isJsxOpeningLikeElement(n.parent) || ts.isJsxClosingElement(n.parent)) && n.parent.tagName === n && /^[a-z]/.test(n.text)) &&
 				!(('name' in n.parent && (n.parent as { name?: ts.Node }).name === n) || ('propertyName' in n.parent && (n.parent as { propertyName?: ts.Node }).propertyName === n)) &&
-				!isImportTypeReference(n) &&
+				!isImportTypeRef(n) &&
 				!checker.getSymbolAtLocation(n) &&
 				!ts.isPropertyAccessExpression(n.parent) &&
 				!ts.isPropertyAccessChain(n.parent) &&
@@ -1988,16 +1988,16 @@ function readKnipIssues(cfg: QualityCfg): KnipIssue[] {
 	const excludedContent = nonProgramSrcFiles(cfg)
 		.map(path => relative(knipRoot, path).split(sep).join('/'))
 		.filter(path => path !== '..' && !path.startsWith('../') && !isAbsolute(path));
-	const temporaryConfigRoot = excludedContent.length || configuredToolUsage || mappedDependencyUsage.length ? mkdtempSync(join(tmpdir(), 'terra-quality-knip-')) : undefined;
+	const tempConfigRoot = excludedContent.length || configuredToolUsage || mappedDependencyUsage.length ? mkdtempSync(join(tmpdir(), 'terra-quality-knip-')) : undefined;
 	let effectiveConfig = knipConfig;
-	if (temporaryConfigRoot) {
+	if (tempConfigRoot) {
 		config.ignoreFiles = [
 			...new Set([
 				...(Array.isArray(config.ignoreFiles) ? config.ignoreFiles.filter((item): item is string => typeof item === 'string') : typeof config.ignoreFiles === 'string' ? [config.ignoreFiles] : []),
 				...excludedContent,
 			]),
 		];
-		const genConfig = join(temporaryConfigRoot, 'knip.json');
+		const genConfig = join(tempConfigRoot, 'knip.json');
 		effectiveConfig = genConfig;
 		writeFileSync(genConfig, JSON.stringify(config, null, '\t') + '\n');
 	}
@@ -2010,7 +2010,7 @@ function readKnipIssues(cfg: QualityCfg): KnipIssue[] {
 			maxBuffer: TOOL_OUTPUT_MAX_BUFFER,
 		});
 	} finally {
-		if (temporaryConfigRoot) rmSync(temporaryConfigRoot, { recursive: true, force: true });
+		if (tempConfigRoot) rmSync(tempConfigRoot, { recursive: true, force: true });
 	}
 	if (result.error || (result.status !== 0 && result.status !== 1)) throw new Error(`Knip failed: ${result.error?.message ?? result.stderr ?? result.status}`);
 	let issues: KnipIssue[];
@@ -2072,19 +2072,19 @@ function mappedKnipDependencyUsage(cfg: QualityCfg): string[] {
 				for (const name of Object.keys(dependencies)) declaredDependencies.add(name);
 			}
 		}
-		const sourceRoots = mapping.sourceRoots.map(sourceRoot => resolve(cfg.root, sourceRoot));
-		for (const sourceRoot of sourceRoots) {
-			const sourceRelative = relative(cfg.root, sourceRoot);
-			if (sourceRelative === '..' || sourceRelative.startsWith(`..${sep}`) || isAbsolute(sourceRelative)) throw new Error(`Knip source root is outside the repository: ${sourceRoot}`);
+		const srcRoots = mapping.sourceRoots.map(srcRoot => resolve(cfg.root, srcRoot));
+		for (const sourceRoot of srcRoots) {
+			const srcRelative = relative(cfg.root, sourceRoot);
+			if (srcRelative === '..' || srcRelative.startsWith(`..${sep}`) || isAbsolute(srcRelative)) throw new Error(`Knip source root is outside the repository: ${sourceRoot}`);
 		}
-		const mappedFiles = new Set(sourceFiles.filter(file => sourceRoots.some(sourceRoot => file === sourceRoot || file.startsWith(`${sourceRoot}${sep}`))));
-		for (const sourceRoot of sourceRoots) {
+		const mappedFiles = new Set(sourceFiles.filter(file => srcRoots.some(sourceRoot => file === sourceRoot || file.startsWith(`${sourceRoot}${sep}`))));
+		for (const sourceRoot of srcRoots) {
 			if (existsSync(sourceRoot) && statSync(sourceRoot).isDirectory()) {
 				for (const stylesheet of stylesheetFiles(sourceRoot, cfg.skippedDirectories ?? [])) mappedFiles.add(stylesheet);
 			}
 		}
 		for (const file of mappedFiles) {
-			for (const specifier of sourcePackageSpecifiers(file)) {
+			for (const specifier of srcPackageSpecifiers(file)) {
 				const packageName = packageNameFromSpecifier(specifier);
 				if (packageName && declaredDependencies.has(packageName)) usedDependencies.add(packageName);
 			}
@@ -2125,7 +2125,7 @@ function stylesheetFiles(root: string, additionalSkips: string[]): string[] {
  *
  * @return Package and relative module specifiers found in the file.
  */
-function sourcePackageSpecifiers(file: string): string[] {
+function srcPackageSpecifiers(file: string): string[] {
 	const text = readFileSync(file, 'utf8');
 	const ext = extname(file).toLowerCase();
 	const specifiers: string[] = [];
@@ -2600,28 +2600,28 @@ function importedExportConsumers(cfg: QualityCfg): Map<string, Set<string>> {
 		 */
 		const markupUses = (name: string): boolean => Boolean(markup) && markup.includes(name);
 		const referencedIdentifiers = new Set<string>();
-		const namespaceProperties = new Map<string, Set<string>>();
-		const importTypeReferences: { specifier: string; name: string }[] = [];
+		const namespaceProps = new Map<string, Set<string>>();
+		const importTypeRefs: { specifier: string; name: string }[] = [];
 		/**
 		 * Collects value identifiers and namespace properties referenced by a source file.
 		 *
 		 * @param node Current syntax-tree node being inspected.
 		 */
-		const collectReferences = (node: ts.Node): void => {
+		const collectRefs = (node: ts.Node): void => {
 			if (ts.isImportDeclaration(node)) return;
 			if (ts.isImportTypeNode(node) && ts.isLiteralTypeNode(node.argument) && ts.isStringLiteral(node.argument.literal)) {
 				const qualifier = node.qualifier;
-				importTypeReferences.push({ specifier: node.argument.literal.text, name: qualifier ? (ts.isIdentifier(qualifier) ? qualifier.text : qualifier.right.text) : '*' });
+				importTypeRefs.push({ specifier: node.argument.literal.text, name: qualifier ? (ts.isIdentifier(qualifier) ? qualifier.text : qualifier.right.text) : '*' });
 			}
 			if (ts.isIdentifier(node)) referencedIdentifiers.add(node.text);
 			if (ts.isPropertyAccessExpression(node) && ts.isIdentifier(node.expression)) {
-				const properties = namespaceProperties.get(node.expression.text) ?? new Set<string>();
-				properties.add(node.name.text);
-				namespaceProperties.set(node.expression.text, properties);
+				const props = namespaceProps.get(node.expression.text) ?? new Set<string>();
+				props.add(node.name.text);
+				namespaceProps.set(node.expression.text, props);
 			}
-			ts.forEachChild(node, collectReferences);
+			ts.forEachChild(node, collectRefs);
 		};
-		collectReferences(src);
+		collectRefs(src);
 		for (const statement of src.statements) {
 			if ((!ts.isImportDeclaration(statement) && !ts.isExportDeclaration(statement)) || !statement.moduleSpecifier || !ts.isStringLiteral(statement.moduleSpecifier)) continue;
 			const resolved = ts.resolveModuleName(statement.moduleSpecifier.text, file, compilerOpts, ts.sys, moduleResolutionCache).resolvedModule?.resolvedFileName;
@@ -2641,14 +2641,14 @@ function importedExportConsumers(cfg: QualityCfg): Map<string, Set<string>> {
 					if (referencedIdentifiers.has(specifier.name.text) || markupUses(specifier.name.text)) names.add(specifier.propertyName?.text ?? specifier.name.text);
 				}
 			} else if (ts.isNamespaceImport(bindings)) {
-				for (const property of namespaceProperties.get(bindings.name.text) ?? []) names.add(property);
+				for (const prop of namespaceProps.get(bindings.name.text) ?? []) names.add(prop);
 				if (markupUses(bindings.name.text)) {
 					for (const match of markup.matchAll(new RegExp(`<\\s*${bindings.name.text}\\.([A-Za-z_$][\\w$]*)(?:[\\s/>])`, 'g'))) names.add(match[1]!);
 				}
 			}
 			if (names.size) consumers.set(owner, names);
 		}
-		for (const { specifier, name } of importTypeReferences) {
+		for (const { specifier, name } of importTypeRefs) {
 			const resolved = ts.resolveModuleName(specifier, file, compilerOpts, ts.sys, moduleResolutionCache).resolvedModule?.resolvedFileName;
 			if (!resolved) continue;
 			const owner = resolve(resolved);
@@ -2679,7 +2679,7 @@ function hasImportedExportConsumer(importedConsumers: Map<string, Set<string>>, 
  *
  * @param program TypeScript program representing the original source.
  * @param proposed Proposed source text keyed by absolute filename.
- * @param original Original source text for the same files.
+ * @param orig Original source text for the same files.
  * @param onBatch Optional progress callback for each validation batch.
  *
  * @return Accepted source edits and filenames rejected by the type-safety check.
@@ -2687,7 +2687,7 @@ function hasImportedExportConsumer(importedConsumers: Map<string, Set<string>>, 
 function acceptTypeSafeEdits(
 	program: ts.Program,
 	proposed: Map<string, string>,
-	original: Map<string, string>,
+	orig: Map<string, string>,
 	onBatch?: (checked: number, fileCount: number) => void,
 ): { accepted: Map<string, string>; rejected: Set<string> } {
 	const rejected = new Set<string>();
@@ -2716,7 +2716,7 @@ function acceptTypeSafeEdits(
 	return {
 		accepted: accept(
 			[...proposed].sort(([l], [r]) => l.localeCompare(r)),
-			new Map([...proposed.keys()].map(f => [f, original.get(f)!])),
+			new Map([...proposed.keys()].map(f => [f, orig.get(f)!])),
 		),
 		rejected,
 	};
@@ -3264,7 +3264,7 @@ function fixNames(cfg: QualityCfg, all: boolean): void {
 	 *
 	 * @return Whether the identifier is used as a property key or member name.
 	 */
-	const isPropertyName = (n: ts.Identifier): boolean =>
+	const isPropName = (n: ts.Identifier): boolean =>
 		(ts.isPropertyAccessExpression(n.parent) && n.parent.name === n) ||
 		(ts.isQualifiedName(n.parent) && n.parent.right === n) ||
 		((ts.isPropertyAssignment(n.parent) || ts.isMethodDeclaration(n.parent) || ts.isMethodSignature(n.parent)) && n.parent.name === n);
@@ -3287,7 +3287,7 @@ function fixNames(cfg: QualityCfg, all: boolean): void {
 		 */
 		const visit = (child: ts.Node): void => {
 			if (found || child === n) return;
-			if (ts.isIdentifier(child) && !isPropertyName(child) && child.text === n.text && checker.getSymbolAtLocation(child) === tgt) found = true;
+			if (ts.isIdentifier(child) && !isPropName(child) && child.text === n.text && checker.getSymbolAtLocation(child) === tgt) found = true;
 			ts.forEachChild(child, visit);
 		};
 		visit(n.parent.initializer);
@@ -3300,7 +3300,7 @@ function fixNames(cfg: QualityCfg, all: boolean): void {
 	 *
 	 * @return Whether the initializer has a same-spelled reference to another symbol.
 	 */
-	const hasInitReferenceToOtherSymbol = (n: ts.Identifier): boolean => {
+	const hasInitRefToOtherSymbol = (n: ts.Identifier): boolean => {
 		if (!ts.isVariableDeclaration(n.parent) || !n.parent.initializer) return false;
 		// terra-quality-ignore single-use -- Resolve the declared symbol once before recursively checking differently bound references.
 		const tgt = checker.getSymbolAtLocation(n);
@@ -3312,7 +3312,7 @@ function fixNames(cfg: QualityCfg, all: boolean): void {
 		 */
 		const visit = (child: ts.Node): void => {
 			if (found || child === n) return;
-			if (ts.isIdentifier(child) && !isPropertyName(child) && child.text === n.text && checker.getSymbolAtLocation(child) !== tgt) found = true;
+			if (ts.isIdentifier(child) && !isPropName(child) && child.text === n.text && checker.getSymbolAtLocation(child) !== tgt) found = true;
 			ts.forEachChild(child, visit);
 		};
 		visit(n.parent.initializer);
@@ -3336,7 +3336,7 @@ function fixNames(cfg: QualityCfg, all: boolean): void {
 		 */
 		const visit = (child: ts.Node): void => {
 			if (found) return;
-			if (ts.isIdentifier(child) && !isPropertyName(child)) {
+			if (ts.isIdentifier(child) && !isPropName(child)) {
 				const symbol = checker.getSymbolAtLocation(child);
 				for (const declaration of symbol?.declarations ?? []) {
 					const name = 'name' in declaration && ts.isIdentifier(declaration.name as ts.Node) ? (declaration.name as ts.Identifier) : undefined;
@@ -3419,7 +3419,7 @@ function fixNames(cfg: QualityCfg, all: boolean): void {
 					!protectedNames.has(n.text) &&
 					!parameterRenameCapturesDefault(n, suggestion, checker) &&
 					!hasInitShadow(n) &&
-					!hasInitReferenceToOtherSymbol(n) &&
+					!hasInitRefToOtherSymbol(n) &&
 					!hasInitRenameCollision(n, suggestion) &&
 					!hasInitConsumerCollision(n, suggestion)
 				) {
@@ -3439,7 +3439,7 @@ function fixNames(cfg: QualityCfg, all: boolean): void {
 		 * @param n Identifier or source value currently being analyzed.
 		 */
 		const inspect = (n: ts.Node): void => {
-			if (ts.isIdentifier(n) && isRenamableDeclaration(n) && !n.text.startsWith('_') && !protectedNames.has(n.text) && !hasInitShadow(n) && !hasInitReferenceToOtherSymbol(n)) {
+			if (ts.isIdentifier(n) && isRenamableDeclaration(n) && !n.text.startsWith('_') && !protectedNames.has(n.text) && !hasInitShadow(n) && !hasInitRefToOtherSymbol(n)) {
 				const suggestion = renameDeclaration(n);
 				if (parameterRenameCapturesDefault(n, suggestion, checker)) return;
 				// Reject collisions in this declaration scope below, while allowing
@@ -4142,11 +4142,11 @@ export function syntaxGuard(cfg: QualityCfg): () => void {
 		cfg,
 		srcFiles(cfg).filter(path => exts.test(path)),
 	);
-	const errs = (path: string, source: string): string[] => {
+	const errs = (path: string, src: string): string[] => {
 		return (
 			ts.createSourceFile(
 				path,
-				source,
+				src,
 				ts.ScriptTarget.Latest,
 				true,
 				/\.tsx$/.test(path) ? ts.ScriptKind.TSX : /\.jsx$/.test(path) ? ts.ScriptKind.JSX : /\.[cm]?ts$/.test(path) ? ts.ScriptKind.TS : ts.ScriptKind.JS,
@@ -4154,14 +4154,14 @@ export function syntaxGuard(cfg: QualityCfg): () => void {
 		).parseDiagnostics.map(d => `${d.code}:${ts.flattenDiagnosticMessageText(d.messageText, ' ')}`);
 	};
 	return () => {
-		for (const [path, original] of before) {
+		for (const [path, orig] of before) {
 			if (!existsSync(path)) continue;
 			const current = readFileSync(path, 'utf8');
-			if (current === original) continue;
-			const prior = errs(path, original);
-			const introduced = errs(path, current).filter(message => !prior.includes(message));
+			if (current === orig) continue;
+			const prior = errs(path, orig);
+			const introduced = errs(path, current).filter(msg => !prior.includes(msg));
 			if (!introduced.length) continue;
-			writeFileSync(path, original);
+			writeFileSync(path, orig);
 			process.exitCode = 1;
 			console.error(`Quality restored ${relative(cfg.root, path)} after an autofix introduced syntax errors: ${introduced.join('; ')}`);
 		}
@@ -4341,7 +4341,7 @@ export function runFormatter(cfg: QualityCfg, optsOrArgs: QualityOptions | strin
 		...(!flags.some(f => f === '--config' || f.startsWith('--config=')) && prettierConfig ? ['--config', prettierConfig] : []),
 		...(!flags.some(f => f === '--ignore-path' || f.startsWith('--ignore-path=')) && prettierIgnore ? ['--ignore-path', prettierIgnore] : []),
 	];
-	const targetBatches = argumentBatches(tgts);
+	const targetBatches = argBatches(tgts);
 	for (const tgtBatch of targetBatches) {
 		const status = run(cfg, fmt, [...flags, ...configArgs, ...tgtBatch], { quietSuccess: true });
 		completed += tgtBatch.length;
@@ -4372,9 +4372,9 @@ export function runFormatter(cfg: QualityCfg, optsOrArgs: QualityOptions | strin
 		}
 	}
 	if (failed && before) {
-		for (const [file, original] of before) {
+		for (const [file, orig] of before) {
 			const path = resolve(cfg.root, file);
-			if (existsSync(path) && readFileSync(path, 'utf8') !== original) writeFileSync(path, original);
+			if (existsSync(path) && readFileSync(path, 'utf8') !== orig) writeFileSync(path, orig);
 		}
 		const message = 'Prettier failed; restored source files because formatting did not complete.';
 		if (outputPhase) recordQualityDetail(message);

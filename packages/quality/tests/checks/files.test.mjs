@@ -61,7 +61,7 @@ test('source discovery ignores symlink entries and direct symlink roots', () => 
 test('source discovery separates captured prose and archived Gem attachments from authored source', () => {
 	const root = fixtureRoot('terra-quality-captured-source-');
 	// terra-quality-ignore single-use -- Keep the app source fixture path distinct from JSX and generated attachments in discovery checks.
-	const application = fixtureFile(root, 'src/app.ts', 'export function startApp() {\n\treturn true;\n}\n');
+	const app = fixtureFile(root, 'src/app.ts', 'export function startApp() {\n\treturn true;\n}\n');
 	// terra-quality-ignore single-use -- Keep the JSX fragment fixture path distinct from the other authored source fixtures.
 	const jsxFragment = fixtureFile(root, 'src/controls.tsx', '<><button type="button">Save</button><input aria-label="Search" /></>\n');
 	// terra-quality-ignore single-use -- Keep the long authored source fixture path for the minified-file exclusion assertion.
@@ -102,7 +102,7 @@ This captured page contains ordinary course text.
 	const cfg = createQualityCfg({ root, sourceRoots: ['.'], extensions: ['.js', '.tsx', '.ts'] });
 	assert.deepEqual(
 		srcFiles(cfg),
-		[application, authoredLongLine, gemTool, importedJsx, jsxFragment].sort((left, right) => left.localeCompare(right)),
+		[app, authoredLongLine, gemTool, importedJsx, jsxFragment].sort((left, right) => left.localeCompare(right)),
 	);
 	assert.deepEqual(
 		nonProgramSrcFiles(cfg),
@@ -120,17 +120,17 @@ This captured page contains ordinary course text.
 test('root-wide source discovery excludes nested pnpm dependency sources', () => {
 	const root = fixtureRoot('terra-quality-pnpm-source-scope-');
 	// terra-quality-ignore single-use -- Keep the app source fixture path for the Git-tracking discovery assertion.
-	const appSource = fixtureFile(root, 'src/main.ts', 'export const ready = true;\n');
+	const appSrc = fixtureFile(root, 'src/main.ts', 'export const ready = true;\n');
 	fixtureFile(root, 'node_modules/.pnpm/toolkit@1.0.0/node_modules/toolkit/uncheckedindexed.ts', 'const index = 0;\nexport const result = index + 1;\n');
-	assert.deepEqual(srcFiles(createQualityCfg({ root, sourceRoots: ['.'], extensions: ['.ts'] })), [appSource]);
+	assert.deepEqual(srcFiles(createQualityCfg({ root, sourceRoots: ['.'], extensions: ['.ts'] })), [appSrc]);
 });
 test('root-wide source discovery excludes Rust target build artifacts', () => {
 	const root = fixtureRoot('terra-quality-rust-target-scope-');
 	// terra-quality-ignore single-use -- Keep the app source fixture path for the Git-tracking discovery assertion.
-	const appSource = fixtureFile(root, 'src/main.ts', 'export const ready = true;\n');
+	const appSrc = fixtureFile(root, 'src/main.ts', 'export const ready = true;\n');
 	fixtureFile(root, 'aussieplusplus/target/doc/search-index.js', 'var searchIndex = [];\n');
 	fixtureFile(root, 'aussieplusplus/target/debug/build/generated.rs', 'pub fn generated() {}\n');
-	assert.deepEqual(srcFiles(createQualityCfg({ root, sourceRoots: ['.'], extensions: ['.js', '.rs', '.ts'] })), [appSource]);
+	assert.deepEqual(srcFiles(createQualityCfg({ root, sourceRoots: ['.'], extensions: ['.js', '.rs', '.ts'] })), [appSrc]);
 });
 test('source discovery excludes ignored local artifacts while retaining tracked files', () => {
 	const root = fixtureRoot('terra-quality-git-ignored-source-');

@@ -21,43 +21,43 @@ TESTS
 test('format fix leaves source unchanged when Prettier is unavailable', t => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-formatting-missing-prettier-'));
 	t.after(() => rmSync(root, { recursive: true, force: true }));
-	const source = join(root, 'src', 'config.ts');
+	const src = join(root, 'src', 'config.ts');
 	mkdirSync(join(root, 'src'));
-	const original = 'export const config = {\n\tenabled: true,\n\toptions: {\n\t\tmode: "safe"\n\t}\n};\n';
-	writeFileSync(source, original);
+	const orig = 'export const config = {\n\tenabled: true,\n\toptions: {\n\t\tmode: "safe"\n\t}\n};\n';
+	writeFileSync(src, orig);
 	// terra-quality-ignore single-use -- Capture the command exit status before asserting its output and side effects.
 	const status = runFormatting({ root, sourceRoots: [join(root, 'src')], extensions: ['.ts'], tools: { prettier: 'terra-prettier-that-does-not-exist' } }, { fix: true });
 	assert.notEqual(status, 0);
-	assert.equal(readFileSync(source, 'utf8'), original);
+	assert.equal(readFileSync(src, 'utf8'), orig);
 });
 
 test('format fix restores source when Prettier rejects a candidate', t => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-formatting-failed-prettier-'));
 	t.after(() => rmSync(root, { recursive: true, force: true }));
-	const source = join(root, 'src', 'config.ts');
+	const src = join(root, 'src', 'config.ts');
 	const prettier = join(root, 'prettier-fails-after-version');
 	mkdirSync(join(root, 'src'));
-	const original = 'export const config = {\n\tenabled: true,\n\toptions: {\n\t\tmode: "safe"\n\t}\n};\n';
-	writeFileSync(source, original);
+	const orig = 'export const config = {\n\tenabled: true,\n\toptions: {\n\t\tmode: "safe"\n\t}\n};\n';
+	writeFileSync(src, orig);
 	writeFileSync(prettier, '#!/usr/bin/env node\nif (process.argv.includes("--version")) process.stdout.write("prettier 3\\n");\nelse process.exit(2);\n');
 	chmodSync(prettier, 0o755);
 	// terra-quality-ignore single-use -- Capture the command exit status before asserting its output and side effects.
 	const status = runFormatting({ root, sourceRoots: [join(root, 'src')], extensions: ['.ts'], tools: { prettier } }, { fix: true });
 	assert.equal(status, 2);
-	assert.equal(readFileSync(source, 'utf8'), original);
+	assert.equal(readFileSync(src, 'utf8'), orig);
 });
 
 test('format checking includes configured Astro sources', t => {
 	const root = mkdtempSync(join(tmpdir(), 'terra-formatting-astro-'));
 	t.after(() => rmSync(root, { recursive: true, force: true }));
 	const src = join(root, 'src');
-	const tsSource = join(src, 'config.ts');
-	const astroSource = join(src, 'page.astro');
+	const tsSrc = join(src, 'config.ts');
+	const astroSrc = join(src, 'page.astro');
 	const marker = join(root, 'prettier-args.json');
 	const prettier = join(root, 'recording-prettier.mjs');
 	mkdirSync(src);
-	writeFileSync(tsSource, 'export const enabled = true;\n');
-	writeFileSync(astroSource, '<main />\n');
+	writeFileSync(tsSrc, 'export const enabled = true;\n');
+	writeFileSync(astroSrc, '<main />\n');
 	writeFileSync(
 		prettier,
 		`#!/usr/bin/env node\nimport { appendFileSync } from 'node:fs';\nif (process.argv.includes('--version')) process.stdout.write('prettier 3\\n');\nelse appendFileSync(${JSON.stringify(marker)}, JSON.stringify(process.argv.slice(2)) + '\\n');\n`,
@@ -72,8 +72,8 @@ test('format checking includes configured Astro sources', t => {
 		.map(line => JSON.parse(line));
 	const args = invocations[0];
 	assert.ok(args.includes('--write'));
-	assert.ok(args.includes(tsSource));
-	assert.ok(args.includes(astroSource));
+	assert.ok(args.includes(tsSrc));
+	assert.ok(args.includes(astroSrc));
 	assert.ok(invocations[1].includes('--check'));
 });
 

@@ -55,32 +55,32 @@ function findingsForFile(cfg: QualityCfg, file: string, analysis?: QualityAnalys
 
 	const visit = (node: ts.Node): void => {
 		if (ts.isCallExpression(node) && !isIgnoredCallee(node.expression)) {
-			for (const argument of node.arguments) {
-				if (!ts.isObjectLiteralExpression(argument)) continue;
+			for (const arg of node.arguments) {
+				if (!ts.isObjectLiteralExpression(arg)) continue;
 				const spreads = new Map<string, number>();
-				for (let idx = 0; idx < argument.properties.length; idx++) {
-					const property = argument.properties[idx]!;
+				for (let idx = 0; idx < arg.properties.length; idx++) {
+					const property = arg.properties[idx]!;
 					if (ts.isSpreadAssignment(property) && ts.isIdentifier(property.expression)) spreads.set(property.expression.text, idx);
 				}
 				const bySrc = new Map<string, string[]>();
-				for (let idx = 0; idx < argument.properties.length; idx++) {
-					const property = argument.properties[idx]!;
+				for (let idx = 0; idx < arg.properties.length; idx++) {
+					const property = arg.properties[idx]!;
 					if (!ts.isPropertyAssignment(property) || !ts.isIdentifier(property.name)) continue;
 					if (!ts.isPropertyAccessExpression(property.initializer) || !ts.isIdentifier(property.initializer.expression)) continue;
 					if (property.initializer.name.text !== property.name.text) continue;
 					if ((spreads.get(property.initializer.expression.text) ?? idx) >= idx) continue;
 					bySrc.set(property.initializer.expression.text, [...(bySrc.get(property.initializer.expression.text) ?? []), property.name.text]);
 				}
-				for (const [srcName, properties] of bySrc) {
-					if (!properties.length) continue;
-					const pos = parsed.getLineAndCharacterOfPosition(argument.getStart(parsed));
+				for (const [srcName, props] of bySrc) {
+					if (!props.length) continue;
+					const pos = parsed.getLineAndCharacterOfPosition(arg.getStart(parsed));
 					findings.push({
 						file: displayPath(cfg, file),
 						line: pos.line + 1,
 						column: pos.character + 1,
 						callee: node.expression.getText(parsed),
 						source: srcName,
-						properties,
+						properties: props,
 						recommendation: `remove exact properties already supplied by ...${srcName}`,
 					});
 				}
@@ -128,15 +128,15 @@ export function fixObjectForwarding(cfg: QualityCfg, analysis?: QualityAnalysis)
 
 		const visit = (node: ts.Node): void => {
 			if (ts.isCallExpression(node) && !isIgnoredCallee(node.expression)) {
-				for (const argument of node.arguments) {
-					if (!ts.isObjectLiteralExpression(argument)) continue;
+				for (const arg of node.arguments) {
+					if (!ts.isObjectLiteralExpression(arg)) continue;
 					const spreads = new Map<string, number>();
-					for (let i = 0; i < argument.properties.length; i++) {
-						const property = argument.properties[i];
+					for (let i = 0; i < arg.properties.length; i++) {
+						const property = arg.properties[i];
 						if (ts.isSpreadAssignment(property) && ts.isIdentifier(property.expression)) spreads.set(property.expression.text, i);
 					}
-					for (let i = 0; i < argument.properties.length; i++) {
-						const property = argument.properties[i];
+					for (let i = 0; i < arg.properties.length; i++) {
+						const property = arg.properties[i];
 						if (!ts.isPropertyAssignment(property) || !ts.isIdentifier(property.name)) continue;
 						if (!ts.isPropertyAccessExpression(property.initializer) || !ts.isIdentifier(property.initializer.expression)) continue;
 						if (property.initializer.name.text !== property.name.text || !spreads.has(property.initializer.expression.text)) continue;
