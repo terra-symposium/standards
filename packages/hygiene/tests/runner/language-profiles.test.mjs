@@ -64,7 +64,7 @@ function fakeProfileTool(root, name, version) {
 	return fixtureFile(
 		root,
 		`bin/${name}`,
-		`#!/usr/bin/env node\nimport { appendFileSync } from 'node:fs';\nif (process.argv[2] === '--version' || process.argv[2] === '-version') console.log(${JSON.stringify(`${name} ${version}`)});\nelse if (process.argv.includes('-ast-dump=json')) console.log(JSON.stringify({ kind: 'TranslationUnitDecl', inner: [] }));\nelse appendFileSync(process.env.TERRA_QUALITY_PROFILE_MARKER, JSON.stringify({ name: ${JSON.stringify(name)}, args: process.argv.slice(2) }) + '\\n');\n`,
+		`#!/usr/bin/env node\nimport { appendFileSync } from 'node:fs';\nif (process.argv[2] === '--version' || process.argv[2] === '-version') console.log(${JSON.stringify(`${name} ${version}`)});\nelse if (process.argv.includes('-ast-dump=json')) console.log(JSON.stringify({ kind: 'TranslationUnitDecl', inner: [] }));\nelse appendFileSync(process.env.HYGIENE_PROFILE_MARKER, JSON.stringify({ name: ${JSON.stringify(name)}, args: process.argv.slice(2) }) + '\\n');\n`,
 		0o755,
 	);
 }
@@ -247,10 +247,10 @@ test('C, Java, and Python profiles invoke their native checks in phase order', (
 		fakeProfileTool(root, name, version);
 	fixtureFile(root, 'target/classes/Example.class', 'fixture');
 	const prevPath = process.env.PATH;
-	const prevMarker = process.env.TERRA_QUALITY_PROFILE_MARKER;
+	const prevMarker = process.env.HYGIENE_PROFILE_MARKER;
 	const marker = join(root, 'native-calls.jsonl');
 	process.env.PATH = [join(root, 'bin'), dirname(process.execPath), prevPath].filter(Boolean).join(delimiter);
-	process.env.TERRA_QUALITY_PROFILE_MARKER = marker;
+	process.env.HYGIENE_PROFILE_MARKER = marker;
 	try {
 		runQualityCli(createQualityCfg({ root, sourceRoots: ['src'], extensions: [], languageProfiles: ['c', 'java', 'python'], enabledChecks: { ...DISABLED_SRC_CHECKS, document: true } }), [
 			'quality',
@@ -269,8 +269,8 @@ test('C, Java, and Python profiles invoke their native checks in phase order', (
 	} finally {
 		if (prevPath === undefined) delete process.env.PATH;
 		else process.env.PATH = prevPath;
-		if (prevMarker === undefined) delete process.env.TERRA_QUALITY_PROFILE_MARKER;
-		else process.env.TERRA_QUALITY_PROFILE_MARKER = prevMarker;
+		if (prevMarker === undefined) delete process.env.HYGIENE_PROFILE_MARKER;
+		else process.env.HYGIENE_PROFILE_MARKER = prevMarker;
 	}
 });
 test('profile defaults can be overridden while arbitrary language commands remain available', () => {
@@ -302,9 +302,9 @@ test('profile safe fixes run only in fix mode and use their native formatter/lin
 	fakeProfileTool(root, 'ruff', '0.15.0');
 	const marker = join(root, 'native-fixes.jsonl');
 	const prevPath = process.env.PATH;
-	const prevMarker = process.env.TERRA_QUALITY_PROFILE_MARKER;
+	const prevMarker = process.env.HYGIENE_PROFILE_MARKER;
 	process.env.PATH = [join(root, 'bin'), dirname(process.execPath), prevPath].filter(Boolean).join(delimiter);
-	process.env.TERRA_QUALITY_PROFILE_MARKER = marker;
+	process.env.HYGIENE_PROFILE_MARKER = marker;
 	try {
 		const cfg = createQualityCfg({
 			root,
@@ -344,7 +344,7 @@ test('profile safe fixes run only in fix mode and use their native formatter/lin
 	} finally {
 		if (prevPath === undefined) delete process.env.PATH;
 		else process.env.PATH = prevPath;
-		if (prevMarker === undefined) delete process.env.TERRA_QUALITY_PROFILE_MARKER;
-		else process.env.TERRA_QUALITY_PROFILE_MARKER = prevMarker;
+		if (prevMarker === undefined) delete process.env.HYGIENE_PROFILE_MARKER;
+		else process.env.HYGIENE_PROFILE_MARKER = prevMarker;
 	}
 });

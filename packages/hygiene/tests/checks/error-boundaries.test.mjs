@@ -100,7 +100,7 @@ test('accepts an existing top-level boundary, including a local alias', () => {
 });
 test('recognizes the Quality compatibility re-export for existing Astro configs', () => {
 	const root = mkdtempSync(join(tmpdir(), 'hygiene-astro-boundary-compat-'));
-	writeFileSync(join(root, 'package.json'), JSON.stringify({ devDependencies: { '@terra-symposium/hygiene': '2.4.4' } }));
+	writeFileSync(join(root, 'package.json'), JSON.stringify({ devDependencies: { '@terra-symposium/hygiene': '2.4.5' } }));
 	const packageRoot = join(root, 'node_modules/@terra-symposium/hygiene');
 	mkdirSync(join(packageRoot, 'dist/lib'), { recursive: true });
 	writeFileSync(join(packageRoot, 'package.json'), JSON.stringify({ exports: { './astro-integration': './dist/lib/astro-integration.js' } }));

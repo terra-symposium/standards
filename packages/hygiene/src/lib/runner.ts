@@ -199,7 +199,7 @@ function projectTsconfig(cfg: QualityCfg): string {
 	return candidates.find(p => existsSync(p)) ?? candidates[0]!;
 }
 const ESLINT_API_FALLBACK = 78;
-const FOCUSED_ESLINT_FALLBACK = 'TERRA_QUALITY_FOCUSED_ESLINT_UNAVAILABLE';
+const FOCUSED_ESLINT_FALLBACK = 'HYGIENE_FOCUSED_ESLINT_UNAVAILABLE';
 const ESLINT_GLOB_SPECIALS = new Set(['*', '?', '[', ']', '{', '}', '(', ')', '!', '\\']);
 
 /** Stable, artifact-safe summary of a single CLI invocation. */
@@ -838,7 +838,7 @@ function runTestSuite(cfg: QualityCfg, check: QualityInvocation): { status: numb
 	const env = { ...process.env };
 	if (runner === 'node') {
 		env.NODE_OPTIONS = qualityNodeReporterOptions(env.NODE_OPTIONS, new URL('./node-reporter.js', import.meta.url).href);
-		env.TERRA_QUALITY_NODE_REPORTER_OWNER = '1';
+		env.HYGIENE_NODE_REPORTER_OWNER = '1';
 		args.splice(
 			0,
 			args.length,

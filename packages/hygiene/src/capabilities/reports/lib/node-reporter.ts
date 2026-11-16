@@ -249,8 +249,8 @@ export async function* qualityNodeReporter(src: AsyncIterable<NodeTestE>, opts?:
 async function* defaultQualityNodeReporter(src: AsyncIterable<NodeTestE>, opts?: unknown): AsyncGenerator<string> {
 	const isTestWorker = process.env.NODE_TEST_CONTEXT === 'child-v8';
 	// hygiene-ignore single-use -- Capture ownership before clearing the environment marker in test workers.
-	const ownsReporter = process.env.TERRA_QUALITY_NODE_REPORTER_OWNER === '1' && !isTestWorker;
-	if (isTestWorker) delete process.env.TERRA_QUALITY_NODE_REPORTER_OWNER;
+	const ownsReporter = process.env.HYGIENE_NODE_REPORTER_OWNER === '1' && !isTestWorker;
+	if (isTestWorker) delete process.env.HYGIENE_NODE_REPORTER_OWNER;
 	if (!ownsReporter) {
 		for await (const _event of src) void _event;
 		return;

@@ -142,16 +142,16 @@ test('Node reporter ignores reporter API context values that are not progress wr
 	}
 	assert.match(stderr.join(''), /Cases .*0\/0/u);
 	const nestedOutput = [];
-	const origReporterState = process.env.TERRA_QUALITY_NODE_REPORTER_OWNER;
-	process.env.TERRA_QUALITY_NODE_REPORTER_OWNER = '1';
+	const origReporterState = process.env.HYGIENE_NODE_REPORTER_OWNER;
+	process.env.HYGIENE_NODE_REPORTER_OWNER = '1';
 	try {
 		for await (const chunk of defaultQualityNodeReporter(eSrc([{ type: 'test:fail', data: { name: 'nested child failure', nesting: 0, details: { error: 'failure' } } }]), chunk =>
 			nestedOutput.push(chunk),
 		))
 			void chunk;
 	} finally {
-		if (origReporterState === undefined) delete process.env.TERRA_QUALITY_NODE_REPORTER_OWNER;
-		else process.env.TERRA_QUALITY_NODE_REPORTER_OWNER = origReporterState;
+		if (origReporterState === undefined) delete process.env.HYGIENE_NODE_REPORTER_OWNER;
+		else process.env.HYGIENE_NODE_REPORTER_OWNER = origReporterState;
 	}
 	assert.deepEqual(nestedOutput, []);
 });
