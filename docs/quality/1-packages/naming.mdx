@@ -5,6 +5,8 @@ description: Find nonconforming identifiers and aliases, with scope-aware rename
 
 `@terra-symposium/quality/naming` reports identifier names that do not match Terra's source conventions and configured alias declarations that can be updated safely. Its rename service follows TypeScript references and resolves callback-local collisions.
 
+The concise-name rules recognize words inside camelCase and PascalCase identifiers as well as names separated by underscores or hyphens. For example, `sourcePath` becomes `srcPath` and `destinationPath` becomes `destPath`. Additional mappings include `application → app`, `argument → arg`, `component → comp`, `configuration → config`, `description → desc`, `document → doc`, `element → el`, `environment → env`, `maximum → max`, `message → msg`, `minimum → min`, `number → num`, `original → orig`, `parameter → param`, `previous → prev`, `property → prop`, `reference → ref`, and `temporary → temp`. The same rules cover supported plurals without matching substrings inside unrelated words.
+
 ## Install and run
 
 ```sh

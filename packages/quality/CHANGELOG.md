@@ -1,5 +1,11 @@
 # @terra-symposium/quality
 
+## 2.4.2
+
+### Patch Changes
+
+- Shorten common identifier words, including `sourcePath` to `srcPath` and `destinationPath` to `destPath`, while retaining syntax-aware rename safeguards.
+
 ## 2.4.1
 
 ### Patch Changes

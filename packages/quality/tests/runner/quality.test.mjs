@@ -319,6 +319,34 @@ test('reports concise-name drift without changing source', () => {
 	assert.equal(namingFindings(createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] }))[0].suggestion, 'org');
 });
 test('renames requested words across casing, separators, compounds, plurals, and inflections', () => {
+	const additionalWords = {
+		application: 'app',
+		argument: 'arg',
+		component: 'comp',
+		configuration: 'config',
+		description: 'desc',
+		destination: 'dest',
+		document: 'doc',
+		element: 'el',
+		environment: 'env',
+		maximum: 'max',
+		message: 'msg',
+		minimum: 'min',
+		number: 'num',
+		original: 'orig',
+		parameter: 'param',
+		previous: 'prev',
+		property: 'prop',
+		reference: 'ref',
+		source: 'src',
+		temporary: 'temp',
+	};
+	for (const [word, short] of Object.entries(additionalWords)) {
+		assert.equal(renameId(word), short, word);
+		assert.equal(renameId(`${word}Path`), `${short}Path`, `${word}Path`);
+	}
+	for (const [plural, short] of Object.entries({ sources: 'srcs', destinations: 'dests', configurations: 'configs', parameters: 'params', references: 'refs', properties: 'props', temporaries: 'temps' }))
+		assert.equal(renameId(plural), short, plural);
 	const cases = {
 		error: 'err',
 		Error: 'Err',
@@ -349,16 +377,36 @@ test('renames requested words across casing, separators, compounds, plurals, and
 		directories: 'dirs',
 		functions: 'fns',
 		organisations: 'orgs',
+		SourcePath: 'SrcPath',
+		SOURCE_PATH: 'SRC_PATH',
+		'source-path': 'src-path',
+		destinationPath: 'destPath',
+		DestinationPath: 'DestPath',
+		DESTINATION_PATH: 'DEST_PATH',
+		'destination-path': 'dest-path',
 	};
 	for (const [name, expected] of Object.entries(cases)) assert.equal(renameId(name), expected, name);
-	for (const name of ['articleDefinition', 'category', 'context', 'event', 'index', 'request', 'requestId', 'response', 'source', 'target', 'value'])
+	for (const name of ['articleDefinition', 'category', 'context', 'event', 'index', 'request', 'requestId', 'response', 'target', 'value'])
 		assert.equal(renameId(name), name, `${name} remains a complete domain or API name`);
 	assert.equal(renameId('image'), 'img');
 });
 test('does not rename substrings, protected platform names, or underscore placeholders', () => {
-	for (const name of ['terror', 'deformat', 'repositoryFactory', 'FormData', 'NextResponse', '_']) {
-		assert.equal(renameId(name), name === 'repositoryFactory' ? 'repoFactory' : name, name);
+	for (const name of ['terror', 'deformat', 'resourcePath', 'documentation', 'componentize', 'FormData', 'NextResponse', '_']) {
+		assert.equal(renameId(name), name, name);
 	}
+	assert.equal(renameId('repositoryFactory'), 'repoFactory');
+});
+test('naming fixes source and destination parameters with their JSDoc tags', () => {
+	const root = mkdtempSync(join(tmpdir(), 'terra-quality-path-names-'));
+	mkdirSync(join(root, 'src'));
+	const file = join(root, 'src/main.ts');
+	writeFileSync(file, '/** Copies a file.\n * @param sourcePath Input file.\n * @param destinationPath Output file.\n */\nfunction copy(sourcePath: string, destinationPath: string): string { return sourcePath + destinationPath; }\n');
+	runQualityCli(createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] }), ['naming', '--all', '--fix']);
+	const updated = readFileSync(file, 'utf8');
+	assert.match(updated, /@param srcPath Input file/);
+	assert.match(updated, /@param destPath Output file/);
+	assert.match(updated, /function copy\(srcPath: string, destPath: string\)/);
+	assert.match(updated, /return srcPath \+ destPath/);
 });
 test('does not collapse comment-only blocks before else', () => {
 	const file = join(mkdtempSync(join(tmpdir(), 'terra-quality-')), 'main.ts');
