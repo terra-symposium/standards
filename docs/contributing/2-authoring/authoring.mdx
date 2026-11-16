@@ -3,6 +3,9 @@ title: Documentation authoring
 description: Organise accurate, task-focused Docs pages with supported blocks.
 ---
 
+import { NodesBlock } from '@terra-symposium/docs';
+export const Nodes = props => <NodesBlock block={props} />;
+
 Use directories for sections and numbered groups, and Markdown or MDX files for leaves. Each leaf should answer one primary reader question. Name groups in reading order, such as `0-getting-started` and `1-packages`.
 
 For Terra Docs document blocks and Markdown conversion, use the

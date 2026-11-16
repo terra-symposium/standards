@@ -3,6 +3,9 @@ title: Boundary model and failure scope
 description: Compare React render recovery with Astro hydration recovery and server-owned failures.
 ---
 
+import { NodesBlock } from '@terra-symposium/docs';
+export const Nodes = props => <NodesBlock block={props} />;
+
 A boundary replaces one failed region with recovery UI. It does not make the failed operation succeed, repair data, or retry external work. This comparison shows which layer owns each failure.
 
 | Failure point | React boundary | Astro boundary | Owner when not caught |

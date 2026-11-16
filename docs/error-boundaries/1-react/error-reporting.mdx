@@ -3,6 +3,9 @@ title: Report React boundary errors
 description: Connect the callback to safe application telemetry without making fallback recovery depend on delivery.
 ---
 
+import { NodesBlock } from '@terra-symposium/docs';
+export const Nodes = props => <NodesBlock block={props} />;
+
 The boundary callback is an application-owned extension point. The shared package does not choose an analytics provider, send events, or persist error details.
 
 ## Handle the callback

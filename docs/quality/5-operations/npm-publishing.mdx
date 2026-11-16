@@ -3,8 +3,6 @@ title: npm package publishing
 description: One Terra publisher, the limits of npm tokens and OIDC, and release recovery.
 ---
 
-# npm package publishing
-
 Terra releases use one central publisher in the Standards repository. Maintainers start a GitHub Actions run; they do not need to sign in to npm for each release. The workflow reads one credential from the Standards Actions secret PACKAGES_TOKEN. That credential must be an npm granular token with read and write access to the Terra Symposium packages.
 
 ## One publisher for Terra
