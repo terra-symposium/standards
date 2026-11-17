@@ -24,4 +24,4 @@ Run <exact, current checks>. Report observed results and remaining limits.
 
 - Link focused source or a supporting file only when it exists and supports this workflow.
 
-Remove placeholders and unused sections. Use `related-files: []` only when no repository files establish the workflow. Docs tabs or structured blocks are optional when they make alternatives clearer; follow the Docs repository's [docs-authoring skill](https://github.com/Terra-Symposium/docs/blob/development/.agents/skills/docs-authoring/SKILL.md) and keep the raw file readable.
+Remove placeholders and unused sections. Use `related-files: []` only when no repository files establish the workflow. Docs tabs or structured blocks are optional when they make alternatives clearer; follow the Docs repository's [authoring guide](https://github.com/Terra-Symposium/docs/blob/development/src/content/docs/authoring.md) and keep the raw file readable.
