@@ -185,10 +185,7 @@ test('consumer-defined suites run once each in manifest order and aggregate into
 	mkdirSync(join(root, 'tests'), { recursive: true });
 	writeFileSync(scriptPath, `import { appendFileSync } from 'node:fs';\nappendFileSync(${JSON.stringify(logPath)}, process.argv[2] + '\\n');\n`);
 	const names = ['contracts', 'unit', 'custom'];
-	writeFileSync(
-		join(root, 'tests/tests.json'),
-		JSON.stringify({ version: 1, suites: names.map(name => ({ name, command: process.execPath, args: [scriptPath, name], owns: [`tests/${name}`] })) }),
-	);
+	writeFileSync(join(root, 'tests/tests.json'), JSON.stringify({ version: 1, suites: names.map(name => ({ name, command: process.execPath, args: [scriptPath, name], owns: [`tests/${name}`] })) }));
 	const prevPath = process.env.GITHUB_EVENT_PATH;
 	const prevName = process.env.GITHUB_EVENT_NAME;
 	delete process.env.GITHUB_EVENT_PATH;

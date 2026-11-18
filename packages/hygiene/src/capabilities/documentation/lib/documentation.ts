@@ -959,10 +959,8 @@ function documentationFindingsForFile(
 	if (requirements.importSection) {
 		const firstImport = parsed.statements.find(ts.isImportDeclaration);
 		if (firstImport) {
-			const hasHeading = (ts.getLeadingCommentRanges(src, 0) ?? []).some(
-				comment => comment.end <= firstImport.getStart(parsed) && /(?:^|\n)\s*IMPORTS\s*(?:\r?\n|$)/u.test(src.slice(comment.pos, comment.end)),
-			);
-			if (!hasHeading) findings.push(documentationReport(file, parsed, firstImport, 'IMPORTS', 'file', 'add an IMPORTS block heading before imports', cfg));
+			if (!(ts.getLeadingCommentRanges(src, 0) ?? []).some(comment => comment.end <= firstImport.getStart(parsed) && /(?:^|\n)\s*IMPORTS\s*(?:\r?\n|$)/u.test(src.slice(comment.pos, comment.end))))
+				findings.push(documentationReport(file, parsed, firstImport, 'IMPORTS', 'file', 'add an IMPORTS block heading before imports', cfg));
 		}
 	}
 

@@ -4,9 +4,10 @@
 from __future__ import annotations
 
 import argparse
+import configparser
 import re
-import subprocess
 import sys
+from collections.abc import Iterator
 from pathlib import Path
 
 import yaml
@@ -18,7 +19,12 @@ SITE_OUTPUT = (
 ROOTS = ("contracting", "personal", "terra-symposium")
 
 
-def repositories():
+def repositories() -> Iterator[Path]:
+    """Discover Git repositories beneath the configured Desktop roots.
+
+    Yields:
+        Path: Each repository directory found beneath a configured root.
+    """
     for area in ROOTS:
         folder = DESKTOP / area
         if not folder.exists():
@@ -28,9 +34,22 @@ def repositories():
                 yield repo
 
 
-def skill_details(path: Path, repo: Path):
+def skill_details(path: Path, repo: Path) -> tuple[str, str, list[str]]:
+    """Validate a skill's frontmatter and local links, then return its metadata.
+
+    Args:
+        path (Path): Path to the skill's canonical SKILL.md file.
+        repo (Path): Repository containing the skill.
+
+    Returns:
+        tuple[str, str, list[str]]: Skill name, description, and related file paths.
+
+    Raises:
+        TypeError: When related-files metadata is not a list.
+        ValueError: When frontmatter, metadata, or a relative link is invalid.
+    """
     source = path.read_text()
-    match = re.match(r"\A---\n(.*?)\n---\n", source, re.S)
+    match = re.match(r"\A---\n(.*?)\n---\n", source, re.DOTALL)
     if not match:
         raise ValueError(f"Missing YAML frontmatter: {path}")
     try:
@@ -52,20 +71,20 @@ def skill_details(path: Path, repo: Path):
         raise ValueError(f"Missing metadata.related-files: {path}")
     related_files = metadata["related-files"]
     if not isinstance(related_files, list):
-        raise ValueError(f"metadata.related-files must be a list: {path}")
-    for relative in related_files:
+        raise TypeError(f"metadata.related-files must be a list: {path}")
+    for related_path in related_files:
         if (
-            not isinstance(relative, str)
-            or not relative
-            or Path(relative).is_absolute()
-            or ".." in Path(relative).parts
+            not isinstance(related_path, str)
+            or not related_path
+            or Path(related_path).is_absolute()
+            or ".." in Path(related_path).parts
         ):
             raise ValueError(
-                f"Invalid repository-relative related file in {path}: {relative}"
+                f"Invalid repository-relative related file in {path}: {related_path}"
             )
-        target = (repo / relative).resolve()
+        target = (repo / related_path).resolve()
         if not target.is_relative_to(repo.resolve()) or not target.is_file():
-            raise ValueError(f"Missing related file in {path}: {relative}")
+            raise ValueError(f"Missing related file in {path}: {related_path}")
     for document in path.parent.rglob("*.md"):
         prose = re.sub(r"```[\s\S]*?```", "", document.read_text())
         for link in re.findall(r"(?<!!)\[[^\]]+\]\(([^)]+)\)", prose):
@@ -78,22 +97,45 @@ def skill_details(path: Path, repo: Path):
     return fields["name"], fields["description"], related_files
 
 
-def github_base(repo: Path):
-    result = subprocess.run(
-        ["git", "-C", str(repo), "remote", "get-url", "origin"],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    remote = result.stdout.strip()
+def github_base(repo: Path) -> str | None:
+    """Return a GitHub URL derived from the repository's origin remote.
+
+    Args:
+        repo (Path): Repository whose origin remote should be inspected.
+
+    Returns:
+        str | None: Repository HTTPS GitHub URL, or None for another host.
+    """
+    git_path = repo / ".git"
+    if git_path.is_file():
+        git_dir = (
+            repo / git_path.read_text().strip().removeprefix("gitdir: ")
+        ).resolve()
+        common_dir = git_dir / "commondir"
+        if common_dir.is_file():
+            git_dir = (git_dir / common_dir.read_text().strip()).resolve()
+    else:
+        git_dir = git_path
+    config = configparser.ConfigParser()
+    config.read(git_dir / "config")
+    remote = config.get('remote "origin"', "url", fallback="").strip()
     match = re.search(r"github\.com[:/](.+?)(?:\.git)?$", remote)
     return f"https://github.com/{match.group(1)}" if match else None
 
 
-def generate():
-    entries = []
-    local_entries = {}
-    seen = {}
+def generate() -> tuple[str, dict[Path, list[tuple[str, str, str]]]]:
+    """Build shared and per-repository catalogs from canonical skill files.
+
+    Returns:
+        tuple[str, dict[Path, list[tuple[str, str, str]]]]: Rendered shared catalog
+            and each repository's local skill entries.
+
+    Raises:
+        ValueError: When a skill is invalid or its name duplicates another skill.
+    """
+    entries: list[tuple[str, str, str, str, str, list[str]]] = []
+    local_entries: dict[Path, list[tuple[str, str, str]]] = {}
+    seen: dict[str, Path] = {}
     for repo in repositories():
         base = github_base(repo)
         local_entries[repo] = []
@@ -115,47 +157,80 @@ def generate():
     lines = [
         "# Agent skill catalog",
         "",
-        "This inventory is generated from repository `.agents/skills/*/SKILL.md` files.",
-        "Edit the owning skill, then run `python3 scripts/skills_catalog.py` from Standards.",
+        (
+            "This inventory is generated from repository "
+            "`.agents/skills/*/SKILL.md` files."
+        ),
+        (
+            "Edit the owning skill, then run `python3 scripts/skills_catalog.py` "
+            "from Standards."
+        ),
         "Shared Standards skills are also packaged in the Terra skills plugin.",
         "",
         "## Install shared skills locally",
         "",
-        "From Standards, run `pnpm run skills:package`, then add its repository marketplace:",
+        (
+            "From Standards, run `pnpm run skills:package`, then add its repository "
+            "marketplace:"
+        ),
         "",
         "```sh",
         "codex plugin marketplace add /absolute/path/to/standards",
         "codex plugin add terra-skills@terra-skills-local",
         "```",
         "",
-        "The versioned plugin is built from canonical `.agents/skills/` sources into `dist/`.",
-        "The local marketplace uses that generated bundle. Rebuild and refresh it after edits.",
-        "Cloud availability requires publishing the plugin to a workspace or reachable marketplace.",
+        (
+            "The versioned plugin is built from canonical `.agents/skills/` sources "
+            "into `dist/`."
+        ),
+        (
+            "The local marketplace uses that generated bundle. Rebuild and refresh "
+            "it after edits."
+        ),
+        (
+            "Cloud availability requires publishing the plugin to a workspace or "
+            "reachable marketplace."
+        ),
         "",
         "| Repository | Skill | Use it for | Canonical source | Availability |",
         "| --- | --- | --- | --- | --- |",
     ]
-    for repo, name, description, relative, link, related_files in sorted(entries):
-        availability = "Plugin and Standards" if repo == "standards" else repo
+    for repo_name, name, description, relative, link, _related_files in sorted(entries):
+        availability = "Plugin and Standards" if repo_name == "standards" else repo_name
         lines.append(
-            f"| {repo} | {name} | {description.replace('|', '/')} | "
+            f"| {repo_name} | {name} | {description.replace('|', '/')} | "
             f"[{relative}]({link}) | {availability} |"
         )
     lines.extend(
         [
             "",
-            f"{len(entries)} discoverable skills across {len(set(e[0] for e in entries))} repositories.",
+            (
+                f"{len(entries)} discoverable skills across "
+                f"{len({entry[0] for entry in entries})} repositories."
+            ),
             "",
         ]
     )
     return "\n".join(lines), local_entries
 
 
-def local_catalog(repo: Path, entries):
+def local_catalog(repo: Path, entries: list[tuple[str, str, str]]) -> str:
+    """Render a repository-local README from that repository's skill entries.
+
+    Args:
+        repo (Path): Repository that owns the skills.
+        entries (list[tuple[str, str, str]]): Skill metadata tuples.
+
+    Returns:
+        str: Markdown for that repository's skill README.
+    """
     lines = [
         "# Agent skills",
         "",
-        "Executable skills in this repository. Open a skill for its workflow and references.",
+        (
+            "Executable skills in this repository. Open a skill for its workflow "
+            "and references."
+        ),
         "",
         "| Skill | Purpose | Source |",
         "| --- | --- | --- |",
@@ -178,8 +253,9 @@ if __name__ == "__main__":
     except ValueError as error:
         sys.exit(str(error))
     site = (
-        "---\ntitle: Agent skill catalog\ndescription: Find canonical agent workflows across the Desktop repositories.\n---\n\n"
-        + rendered
+        "---\ntitle: Agent skill catalog\n"
+        "description: Find canonical agent workflows across the Desktop "
+        "repositories.\n---\n\n" + rendered
     )
     if args.check:
         stale = not SITE_OUTPUT.exists() or SITE_OUTPUT.read_text() != site

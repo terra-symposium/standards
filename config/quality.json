@@ -67,7 +67,16 @@
 	},
 	"security": {
 		"clientRoots": ["apps/hygiene/src/components"],
-		"runtimeRoots": [".agents/skills/all-repos/scripts", "apps/hygiene/netlify/functions", "apps/hygiene/scripts", "apps/hygiene/src/lib/server", "config", "packages", "scripts"]
+		"runtimeRoots": [
+			".agents/skills/all-repos/scripts",
+			".agents/skills/quality/scripts",
+			"apps/hygiene/netlify/functions",
+			"apps/hygiene/scripts",
+			"apps/hygiene/src/lib/server",
+			"config",
+			"packages",
+			"scripts"
+		]
 	},
 	"enabledChecks": {
 		"error-boundaries": true,

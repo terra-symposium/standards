@@ -15,6 +15,7 @@ OUT = ROOT / "dist/terra-skills-plugin"
 
 
 def main():
+    """Build the portable skill marketplace bundle and archive."""
     manifest = json.loads(MANIFEST.read_text())
     if not manifest.get("$schema") or not manifest.get("version"):
         sys.exit("Invalid plugin manifest")
@@ -47,7 +48,8 @@ def main():
                 and not (document.parent / path).exists()
             ):
                 sys.exit(
-                    f"Broken packaged skill link: {document.relative_to(OUT)} -> {target}"
+                    f"Broken packaged skill link: {document.relative_to(OUT)} "
+                    f"-> {target}"
                 )
     archive = OUT.parent / f"terra-skills-plugin-{manifest['version']}.zip"
     with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED) as package:
