@@ -2,6 +2,7 @@
 
 export type BoundaryReport = {
 	site: string;
+	delivery?: 'email';
 	category: 'render';
 	component: string;
 	route: string;
@@ -9,7 +10,7 @@ export type BoundaryReport = {
 	stack?: string;
 };
 
-export type BoundaryReportingConfig = { endpoint: string; site: string };
+export type BoundaryReportingConfig = { endpoint: string; site: string; delivery?: 'http' | 'email' };
 
 declare global {
 	interface Window {
@@ -29,6 +30,7 @@ export async function reportBoundaryError(error: unknown, component: string): Pr
 		component,
 		route: window.location.pathname,
 		message: detail.message.slice(0, 500),
+		...(config.delivery === 'email' ? { delivery: 'email' as const } : {}),
 		...(detail.stack ? { stack: detail.stack.slice(0, 4000) } : {}),
 	};
 	try {

@@ -16,7 +16,7 @@ FUNCTIONS
  *
  * @return An Astro integration that handles each failed island without replacing the page.
  */
-export function terraErrorBoundaryIntegration(reporting?: { endpoint: string; site: string }) {
+export function terraErrorBoundaryIntegration(reporting?: { endpoint: string; site: string; delivery?: 'http' | 'email' }) {
 	if (reporting && (!reporting.endpoint || !reporting.site)) throw new Error('Error boundary reporting requires an endpoint and site.');
 	return {
 		name: '@terra-symposium/boundaries',
@@ -56,7 +56,7 @@ export function terraErrorBoundaryIntegration(reporting?: { endpoint: string; si
 			void fetch(config.endpoint, {
 				method: 'POST',
 				headers: { 'content-type': 'application/json' },
-				body: JSON.stringify({ site: config.site, category: 'render', component: 'AstroIsland', route: location.pathname, message: String(error?.message ?? error ?? 'Hydration failed').slice(0, 500), stack: String(error?.stack ?? '').slice(0, 4000) }),
+				body: JSON.stringify({ site: config.site, ...(config.delivery === 'email' ? { delivery: 'email' } : {}), category: 'render', component: 'AstroIsland', route: location.pathname, message: String(error?.message ?? error ?? 'Hydration failed').slice(0, 500), stack: String(error?.stack ?? '').slice(0, 4000) }),
 				keepalive: true,
 			}).then((response) => {
 				if (response.ok) message.textContent = 'The error was recorded. Reload to try this section again.';

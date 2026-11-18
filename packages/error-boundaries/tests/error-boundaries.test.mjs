@@ -75,6 +75,9 @@ test('reports only after the configured receiver accepts a boundary failure', as
 		assert.equal(submissions[0].url, '/api/error-report');
 		assert.equal(submissions[0].body.route, '/docs/example/');
 		assert.equal(submissions[0].body.component, 'Panel');
+		globalThis.window.__terraBoundaryReporting.delivery = 'email';
+		assert.equal(await reportBoundaryError(new Error('mail'), 'Panel'), true);
+		assert.equal(submissions[1].body.delivery, 'email');
 		globalThis.fetch = async () => ({ ok: false });
 		assert.equal(await reportBoundaryError(new Error('broken'), 'Panel'), false);
 		globalThis.fetch = async () => { throw new Error('offline'); };
