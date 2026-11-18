@@ -16,11 +16,13 @@ FUNCTIONS
  *
  * @return An Astro integration that handles each failed island without replacing the page.
  */
-export function terraErrorBoundaryIntegration() {
+export function terraErrorBoundaryIntegration(reporting?: { endpoint: string; site: string }) {
+	if (reporting && (!reporting.endpoint || !reporting.site)) throw new Error('Error boundary reporting requires an endpoint and site.');
 	return {
 		name: '@terra-symposium/boundaries',
 		hooks: {
 			'astro:config:setup': ({ injectScript }: { injectScript: (stage: 'before-hydration', content: string) => void }) => {
+				if (reporting) injectScript('before-hydration', `window.__terraBoundaryReporting = ${JSON.stringify(reporting)};`);
 				injectScript(
 					'before-hydration',
 					`(() => {
@@ -48,6 +50,18 @@ export function terraErrorBoundaryIntegration() {
 		fallback.append(heading, message, reload);
 		island.insertAdjacentElement('afterend', fallback);
 		console.error('[Terra error boundary] island hydration failed', event.detail?.error);
+		const config = window.__terraBoundaryReporting;
+		if (config?.endpoint && config.site) {
+			const error = event.detail?.error;
+			void fetch(config.endpoint, {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({ site: config.site, category: 'render', component: 'AstroIsland', route: location.pathname, message: String(error?.message ?? error ?? 'Hydration failed').slice(0, 500), stack: String(error?.stack ?? '').slice(0, 4000) }),
+				keepalive: true,
+			}).then((response) => {
+				if (response.ok) message.textContent = 'The error was recorded. Reload to try this section again.';
+			}).catch(() => {});
+		}
 	});
 })();`,
 				);
