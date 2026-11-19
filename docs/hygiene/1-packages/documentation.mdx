@@ -7,7 +7,10 @@ description: TSDoc, JSDoc, Doxygen, and documented-command checks.
 
 ## Install and CLI
 
-<CodeBlock language='sh' code={'pnpm add -D @terra-symposium/hygiene\npnpm exec documentation --config config/quality.json --all'} />
+```sh
+pnpm add -D @terra-symposium/hygiene
+pnpm exec documentation --config config/quality.json --all
+```
 
 The CLI reads the same `quality.json` as the root runner. With no explicit files, it checks changed and untracked source files. `--all` scans configured source roots; `--warn` is read-only. Findings are JSON lines and make the command fail.
 
@@ -19,6 +22,8 @@ Documentation findings are diagnostic only. The compatibility `documentSrcFile` 
 
 ## API
 
-<CodeBlock language='ts' code={"import { documentationFindings, documentSrcFile, documentedCommandFindings, fixDocumentedCommands } from '@terra-symposium/hygiene/documentation';"} />
+```ts
+import { documentationFindings, documentSrcFile, documentedCommandFindings, fixDocumentedCommands } from '@terra-symposium/hygiene/documentation';
+```
 
 The subpath API includes TypeScript declarations. Its `/cli` subpath is a public CLI module export. See [configuration](/hygiene/0-getting-started/overview/) for policy fields and [built-in checks](/hygiene/3-checks/check-reference/) for neighboring capabilities.

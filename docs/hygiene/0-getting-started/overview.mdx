@@ -13,28 +13,37 @@ Requires Node.js `>=18.18`. Install the aggregate runner with your repository's 
 
 ||| [pnpm]
 
-<CodeBlock language='sh' code={'pnpm add -D @terra-symposium/hygiene'} />
+```sh
+pnpm add -D @terra-symposium/hygiene
+```
 
 |||
 
 ||| [npm]
 
-<CodeBlock language='sh' code={'npm install --save-dev @terra-symposium/hygiene'} />
+```sh
+npm install --save-dev @terra-symposium/hygiene
+```
 
 |||
 
 Add `quality.json` at the repository root or in `config/`:
 
-<CodeBlock
-	language='json'
-	code={
-		'{\n\t"$schema": "./node_modules/@terra-symposium/hygiene/quality.schema.json",\n\t"sourceRoots": ["src"],\n\t"extensions": [".js", ".jsx", ".ts", ".tsx"],\n\t"enabledChecks": { "format": false, "lint": false, "knip": false, "dead-code": false }\n}'
-	}
-/>
+```json
+{
+	"$schema": "./node_modules/@terra-symposium/hygiene/quality.schema.json",
+	"sourceRoots": ["src"],
+	"extensions": [".js", ".jsx", ".ts", ".tsx"],
+	"enabledChecks": { "format": false, "lint": false, "knip": false, "dead-code": false }
+}
+```
 
 Adjust `$schema` relative to the file. Enable Prettier, ESLint, Knip, and TypeScript checks only after installing and configuring those tools in the consumer repository. Hygiene does not supply their native configuration.
 
-<CodeBlock language='sh' code={'pnpm exec hygiene                         # changed files, fixes enabled\npnpm exec hygiene quality --all --warn     # full read-only review'} />
+```sh
+pnpm exec hygiene                         # changed files, fixes enabled
+pnpm exec hygiene quality --all --warn     # full read-only review
+```
 
 A root `quality.json` uses its directory as the project root and `<root>/config` as `configRoot`. A `config/quality.json` uses its parent as the project root and its own directory as `configRoot`. Set `root` or `configRoot` explicitly to override these defaults.
 
@@ -66,7 +75,12 @@ For source documentation, `documentation.required` supports `types`, `functions`
 
 Use `qualityCommands` only for static checks without a native Hygiene equivalent. Keep builds and functional tests in separate scripts and CI steps. Each entry has a unique lowercase `name`, a `command`, and optional string-array `args`:
 
-<CodeBlock language='json' code={'{\n\t"qualityCommands": [{ "name": "c-doc-params", "command": "make", "args": ["check-doc-params"] }],\n\t"enabledCommands": { "c-doc-params": true }\n}'} />
+```json
+{
+	"qualityCommands": [{ "name": "c-doc-params", "command": "make", "args": ["check-doc-params"] }],
+	"enabledCommands": { "c-doc-params": true }
+}
+```
 
 `recommendationCommands` uses the same shape and `enabledRecommendations` toggle. Commands run from `root`, inherit the environment, and are not limited to changed files. A nonzero exit fails Hygiene. Use `--skip-commands` or `--skip-recommendations` for one run; `enabledChecks.command` and `enabledChecks.recommend` disable those categories.
 
@@ -89,12 +103,14 @@ Changed-file mode needs a Git worktree. Use `--all` for archives and complete CI
 
 Give repositories the same two scripts:
 
-<CodeBlock
-	language='json'
-	code={
-		'{\n\t"scripts": {\n\t\t"quality": "node \\"$(git rev-parse --show-toplevel)/scripts/quality-runner.mjs\\" quality",\n\t\t"quality:all": "node \\"$(git rev-parse --show-toplevel)/scripts/quality-runner.mjs\\" quality --all"\n\t}\n}'
+```json
+{
+	"scripts": {
+		"quality": "node \"$(git rev-parse --show-toplevel)/scripts/quality-runner.mjs\" quality",
+		"quality:all": "node \"$(git rev-parse --show-toplevel)/scripts/quality-runner.mjs\" quality --all"
 	}
-/>
+}
+```
 
 In CI, run `pnpm exec hygiene quality --all --warn`. If static commands already run in separate workflow steps, add `--skip-commands --skip-recommendations`. `--report-json <path>` writes a versioned report without changing the exit status. Upload it even on failure; the Hygiene dashboard expects a `hygiene` artifact with `hygiene.json` and available JUnit files. Run history reporting only from a full Git checkout and outside pull requests.
 

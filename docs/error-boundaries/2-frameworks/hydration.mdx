@@ -7,12 +7,16 @@ Use an Astro hydration boundary for failures that occur before a framework islan
 
 ## Wrap one island
 
-<CodeBlock
-	language='astro'
-	code={
-		"---\nimport AstroErrorBoundary from '@terra-symposium/boundaries/astro-boundary';\nimport Workspace from '../components/Workspace.tsx';\n---\n\n<AstroErrorBoundary title='Workspace unavailable' description='The interactive workspace did not start. Reload to try again.'>\n\t<Workspace client:load />\n</AstroErrorBoundary>"
-	}
-/>
+```astro
+---
+import AstroErrorBoundary from '@terra-symposium/boundaries/astro-boundary';
+import Workspace from '../components/Workspace.tsx';
+---
+
+<AstroErrorBoundary title='Workspace unavailable' description='The interactive workspace did not start. Reload to try again.'>
+	<Workspace client:load />
+</AstroErrorBoundary>
+```
 
 The wrapper provides server-rendered HTML and listens for Astro's cancelable `astro:hydration-error` event. When the failing island is inside it, the component is hidden and the adjacent `role="alert"` fallback is revealed. Its reload link returns to the current URL. Choose a title and description that explain the user-facing impact; do not put error details into the visible fallback.
 
@@ -20,12 +24,14 @@ The wrapper provides server-rendered HTML and listens for Astro's cancelable `as
 
 To provide one fallback for any failed island on a page, add the integration in `astro.config.mjs`:
 
-<CodeBlock
-	language='js'
-	code={
-		"import { defineConfig } from 'astro/config';\nimport { terraErrorBoundaryIntegration } from '@terra-symposium/boundaries/astro-integration';\n\nexport default defineConfig({\n\tintegrations: [terraErrorBoundaryIntegration()],\n});"
-	}
-/>
+```js
+import { defineConfig } from 'astro/config';
+import { terraErrorBoundaryIntegration } from '@terra-symposium/boundaries/astro-integration';
+
+export default defineConfig({
+	integrations: [terraErrorBoundaryIntegration()],
+});
+```
 
 The integration installs a listener before hydration. It ignores already-handled events and disconnected targets, prevents Astro's default handling for the captured event, and inserts an accessible reload fallback next to the failed island.
 

@@ -10,7 +10,9 @@ Use this guide when a client-rendered React region needs a local fallback after 
 
 ## Install and choose a recovery region
 
-<CodeBlock language='sh' code={'pnpm add @terra-symposium/boundaries'} />
+```sh
+pnpm add @terra-symposium/boundaries
+```
 
 Wrap a useful recovery unit, such as one report panel or route region. Keep independent content outside the boundary so one rendering failure does not remove working navigation or sibling panels.
 
@@ -18,12 +20,26 @@ Wrap a useful recovery unit, such as one report panel or route region. Keep inde
 
 The fallback should identify the user-facing problem and offer only an action the application can perform. Do not show raw exception text or a component stack.
 
-<CodeBlock
-	language='tsx'
-	code={
-		"import { ErrorBoundary } from '@terra-symposium/boundaries/react';\n\n<ErrorBoundary\n\tname='Usage report'\n\tresetKey={workspaceId}\n\tonError={(error, context) => reportBoundaryError(error, context)}\n\tfallback={() => (\n\t\t<section role='alert' aria-labelledby='usage-error-title'>\n\t\t\t<h2 id='usage-error-title'>Usage data could not be shown</h2>\n\t\t\t<p>Your workspace and other reports are still available.</p>\n\t\t\t<button onClick={reloadUsage} type='button'>\n\t\t\t\tRetry this report\n\t\t\t</button>\n\t\t</section>\n\t)}\n>\n\t<UsageReport workspaceId={workspaceId} />\n</ErrorBoundary>;"
-	}
-/>
+```tsx
+import { ErrorBoundary } from '@terra-symposium/boundaries/react';
+
+<ErrorBoundary
+	name='Usage report'
+	resetKey={workspaceId}
+	onError={(error, context) => reportBoundaryError(error, context)}
+	fallback={() => (
+		<section role='alert' aria-labelledby='usage-error-title'>
+			<h2 id='usage-error-title'>Usage data could not be shown</h2>
+			<p>Your workspace and other reports are still available.</p>
+			<button onClick={reloadUsage} type='button'>
+				Retry this report
+			</button>
+		</section>
+	)}
+>
+	<UsageReport workspaceId={workspaceId} />
+</ErrorBoundary>;
+```
 
 The diagram traces the render path. A successful child render stays in place; a caught error switches only that boundary to its fallback and invokes the application callback.
 

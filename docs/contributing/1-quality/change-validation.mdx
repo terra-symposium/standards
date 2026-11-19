@@ -11,7 +11,11 @@ Run focused checks while editing, then validate the complete change before reque
 
 Run the owning package checks first, then validate the workspace:
 
-<CodeBlock language='sh' code={'pnpm run build\npnpm run test\npnpm run quality:all'} />
+```sh
+pnpm run build
+pnpm run test
+pnpm run quality:all
+```
 
 The workspace test command follows `config/tests.json`. Quality uses its configured source scope; build and test remain separate steps.
 
@@ -21,7 +25,10 @@ The workspace test command follows `config/tests.json`. Quality uses its configu
 
 Build the Docs site and inspect the affected page and image at the generated route:
 
-<CodeBlock language='sh' code={'pnpm run docs:build\npnpm exec docs preview --port 2050'} />
+```sh
+pnpm run docs:build
+pnpm exec docs preview --port 2050
+```
 
 Use the Docs preview after a build. Rebuild after every content, route, or asset edit; it does not hot-reload.
 

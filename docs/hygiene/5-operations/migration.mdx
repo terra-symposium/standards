@@ -9,7 +9,9 @@ The former `standards-*` npm packages remain published for existing consumers. N
 
 Install one package for the aggregate runner and focused check APIs:
 
-<CodeBlock language='sh' code={'pnpm add -D @terra-symposium/hygiene'} />
+```sh
+pnpm add -D @terra-symposium/hygiene
+```
 
 Remove the former Hygiene packages listed below from the manifest. Use the matching named export when importing APIs, then update the lockfile with the consuming repository's package manager.
 
@@ -44,6 +46,10 @@ Update the corresponding source imports and install only the packages in use. Th
 
 ## Verify the migration
 
-<CodeBlock language='sh' code={'pnpm run quality:all\npnpm run build\npnpm run test'} />
+```sh
+pnpm run quality:all
+pnpm run build
+pnpm run test
+```
 
 Run the commands that exist in the consuming repository. Check its authored source and authoritative lockfile for the former package names. Historical changelog entries can retain the name that was published at the time.

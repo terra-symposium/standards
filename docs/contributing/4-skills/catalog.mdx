@@ -9,7 +9,10 @@ This inventory is generated from repository `.agents/skills/*/SKILL.md` files. E
 
 From Standards, run `pnpm run skills:package`, then add its repository marketplace:
 
-<CodeBlock language='sh' code={'codex plugin marketplace add /absolute/path/to/standards\ncodex plugin add terra-skills@terra-skills-local'} />
+```sh
+codex plugin marketplace add /absolute/path/to/standards
+codex plugin add terra-skills@terra-skills-local
+```
 
 The versioned plugin is built from canonical `.agents/skills/` sources into `dist/`. The local marketplace uses that generated bundle. Rebuild and refresh it after edits. Cloud availability requires publishing the plugin to a workspace or reachable marketplace.
 

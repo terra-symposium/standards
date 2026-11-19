@@ -7,7 +7,10 @@ description: Resolve local imports and detect repeated imports using the shared 
 
 ## Install and run
 
-<CodeBlock language='sh' code={'pnpm add -D @terra-symposium/hygiene\npnpm exec imports --all'} />
+```sh
+pnpm add -D @terra-symposium/hygiene
+pnpm exec imports --all
+```
 
 The CLI reads root `quality.json` or `config/quality.json`; `--config PATH` chooses explicitly. Changed and untracked files are the default scope. `--all` scans the configured source roots, and `--warn` disables fixes.
 
@@ -17,6 +20,8 @@ The CLI reads root `quality.json` or `config/quality.json`; `--config PATH` choo
 
 ## API
 
-<CodeBlock language='ts' code={"import { checkImports, duplicateImportFindings } from '@terra-symposium/hygiene/imports';"} />
+```ts
+import { checkImports, duplicateImportFindings } from '@terra-symposium/hygiene/imports';
+```
 
 Both APIs are available from the declared root export with TypeScript declarations; `./cli` is also exported. See [the config reference](/hygiene/0-getting-started/overview/) for path semantics and [CLI workflows](/hygiene/0-getting-started/overview/) for common scope choices.

@@ -9,12 +9,23 @@ description: Capture page and operation timings and apply configurable budgets.
 
 The default warning/failure thresholds are 2,000 ms and 5,000 ms. Configure global, per-test, and per-operation values in the repository's `quality.json`:
 
-<CodeBlock
-	language='json'
-	code={
-		'{\n\t"loadTesting": {\n\t\t"enabled": true,\n\t\t"defaultBudget": { "warnMs": 2000, "failMs": 5000 },\n\t\t"testBudgets": {\n\t\t\t"tests/account.spec.ts::Account page loads": {\n\t\t\t\t"warnMs": 4000,\n\t\t\t\t"failMs": 8000\n\t\t\t}\n\t\t},\n\t\t"operationBudgets": {\n\t\t\t"load account summary": { "warnMs": 2500, "failMs": 5000 }\n\t\t}\n\t}\n}'
+```json
+{
+	"loadTesting": {
+		"enabled": true,
+		"defaultBudget": { "warnMs": 2000, "failMs": 5000 },
+		"testBudgets": {
+			"tests/account.spec.ts::Account page loads": {
+				"warnMs": 4000,
+				"failMs": 8000
+			}
+		},
+		"operationBudgets": {
+			"load account summary": { "warnMs": 2500, "failMs": 5000 }
+		}
 	}
-/>
+}
+```
 
 A test key uses `<repo-relative test file>::<full title path>`. Operation keys match the name passed to `measure`. Budgets are milliseconds, must be non-negative, and a complete budget's `failMs` must be greater than `warnMs`.
 
@@ -22,12 +33,17 @@ A test key uses `<repo-relative test file>::<full title path>`. Operation keys m
 
 Import `loadTest` for suites that need page-load and operation timings:
 
-<CodeBlock
-	language='ts'
-	code={
-		"import { loadTest as test, expect } from '@terra-symposium/reporting/playwright';\n\ntest('account summary loads', async ({ load, page }) => {\n\tload.setTestBudget({ warnMs: 4000, failMs: 8000 });\n\n\tawait load.measure('load account summary', () => page.goto('/account'));\n\n\tawait expect(page.getByRole('heading', { name: 'Account' })).toBeVisible();\n});"
-	}
-/>
+```ts
+import { loadTest as test, expect } from '@terra-symposium/reporting/playwright';
+
+test('account summary loads', async ({ load, page }) => {
+	load.setTestBudget({ warnMs: 4000, failMs: 8000 });
+
+	await load.measure('load account summary', () => page.goto('/account'));
+
+	await expect(page.getByRole('heading', { name: 'Account' })).toBeVisible();
+});
+```
 
 The fixture records page navigation timing automatically. Use `load.measure(name, operation, budget?)` to time a synchronous or asynchronous operation; the helper returns the operation's value and records elapsed time even if it throws. `load.setTestBudget` applies an override to the test's total duration.
 

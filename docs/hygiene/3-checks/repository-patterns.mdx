@@ -24,7 +24,9 @@ Enable the checks with `enabledChecks.repeated-classes` or `enabledChecks.regex-
 
 Run the separate, read-only recommendation report when reviewing native controls:
 
-<CodeBlock language='sh' code={'pnpm exec hygiene ui-recommendations --all'} />
+```sh
+pnpm exec hygiene ui-recommendations --all
+```
 
 It scans `.astro`, `.jsx`, and `.tsx` and suggests shared `Button`, `Input`, or `ButtonLink` components when source evidence supports them. Plain anchors and primitive implementations under `components/ui` are excluded. Review every suggestion. `uiRecommendations.rules` replaces the default component names and imports; `types` restricts input types, and `when: "button-like"` or `"text-link"` restricts anchor matches. Explicit `variant` overrides inferred variants. `ignoredDirectories` excludes repository-owned primitive implementations.
 
@@ -32,6 +34,8 @@ It scans `.astro`, `.jsx`, and `.tsx` and suggests shared `Button`, `Input`, or 
 
 For a Tailwind CSS v4 consumer, set `tailwindCanonical.stylesheet` and optional `sourceRoots`. Hygiene asks the installed design system for canonical class names and can apply exact replacements, such as `border-[var(--color-border)]` to `border-(--color-border)`.
 
-<CodeBlock language='json' code={'{ "tailwindCanonical": { "stylesheet": "src/styles/global.css", "sourceRoots": ["src"] } }'} />
+```json
+{ "tailwindCanonical": { "stylesheet": "src/styles/global.css", "sourceRoots": ["src"] } }
+```
 
 The normal Hygiene run includes this check. Use `hygiene tailwind-canonical --warn` for a read-only pass, `enabledChecks["tailwind-canonical"]: false` to disable it, or `autofix.tailwindCanonical: false` to retain findings without writes. The exported `runTailwindCanonical(cfg, fix?)` API is read-only by default. The check reports a skip if the installed Tailwind package lacks the required design-system API.
