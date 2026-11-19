@@ -9,12 +9,12 @@ description: Configure responsive projects, capture diagnostics and screenshots,
 
 Wrap the existing config with `withResponsivePlaywright`:
 
-```ts
-import { defineConfig } from '@playwright/test';
-import { withResponsivePlaywright } from '@terra-symposium/reporting/viewports';
-
-export default withResponsivePlaywright(defineConfig({ projects: [{ name: 'chromium', testMatch: '**/*.spec.ts' }] }), { outputRoot: 'tests/results/visual' });
-```
+<CodeBlock
+	language='ts'
+	code={
+		"import { defineConfig } from '@playwright/test';\nimport { withResponsivePlaywright } from '@terra-symposium/reporting/viewports';\n\nexport default withResponsivePlaywright(defineConfig({ projects: [{ name: 'chromium', testMatch: '**/*.spec.ts' }] }), { outputRoot: 'tests/results/visual' });"
+	}
+/>
 
 Regular projects expand across `mobile` (390 × 844), `sm` (640 × 800), `md` (768 × 900), `lg` (1024 × 768), `xl` (1280 × 720), and `2xl` (1536 × 864). Setup and dependency projects run once. Restrict a run with `PW_VIEWPORTS=mobile,lg pnpm exec playwright test`. Aliases include `phone`, `tablet`, `desktop` or `default`, and `wide`.
 
@@ -22,15 +22,12 @@ Regular projects expand across `mobile` (390 × 844), `sm` (640 × 800), `md` (7
 
 `diagnosticsTest` attaches console warnings and errors, uncaught page errors, and failed requests. `visualTest` adds named captures for multiple routes or states:
 
-```ts
-import { visualTest as test, expect } from '@terra-symposium/reporting/playwright';
-
-test('account overview', async ({ page, visuals }) => {
-	await page.goto('/account');
-	await expect(page.getByRole('heading', { name: 'Account' })).toBeVisible();
-	await visuals.capture('account-overview', { title: 'Account overview' });
-});
-```
+<CodeBlock
+	language='ts'
+	code={
+		"import { visualTest as test, expect } from '@terra-symposium/reporting/playwright';\n\ntest('account overview', async ({ page, visuals }) => {\n\tawait page.goto('/account');\n\tawait expect(page.getByRole('heading', { name: 'Account' })).toBeVisible();\n\tawait visuals.capture('account-overview', { title: 'Account overview' });\n});"
+	}
+/>
 
 Keep capture keys stable across viewports and unique within a test result. The default capture is a viewport JPEG; pass screenshot options to customize it. Review diagnostic URLs and messages for sensitive data before uploading artifacts.
 

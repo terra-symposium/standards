@@ -7,18 +7,13 @@ description: Check JSX accessible names, React display names, client-root bounda
 
 ## Install and run
 
-```sh
-pnpm add -D @terra-symposium/hygiene
-pnpm exec ui-quality --all
-```
+<CodeBlock language='sh' code={'pnpm add -D @terra-symposium/hygiene\npnpm exec ui-quality --all'} />
 
 The CLI uses shared Hygiene config and scope. `error-boundaries` is mandatory: Terra Hygiene checks React render roots for a top-level boundary and Astro configuration for the hydration integration, and this check cannot be disabled. `accessibility` and `display-name` remain opt-in through `enabledChecks`; `recommend` uses configured component rules. `--warn` is read-only and prevents the boundary fixer from writing changes.
 
 ## APIs
 
-```ts
-import { accessibilityFindings, displayNameFindings, errorBoundaryFindings, uiComponentRecommendations } from '@terra-symposium/hygiene/ui';
-```
+<CodeBlock language='ts' code={"import { accessibilityFindings, displayNameFindings, errorBoundaryFindings, uiComponentRecommendations } from '@terra-symposium/hygiene/ui';"} />
 
 The APIs cover accessible-name evidence and eligible literal fixes, missing display names on supported React patterns, unguarded client-rendered roots, and configured element-to-component recommendations. The package declares `@terra-symposium/boundaries` as a peer dependency for its error-boundary source checks; install that runtime package when the application also needs the reusable boundary implementation.
 

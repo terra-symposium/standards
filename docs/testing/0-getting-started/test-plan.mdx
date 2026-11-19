@@ -9,10 +9,7 @@ For agent-led work, use the [Test writing workflow](https://github.com/Terra-Sym
 
 ## Install and run
 
-```sh
-pnpm add -D @terra-symposium/testing
-pnpm exec test-runner run --manifest config/tests.json
-```
+<CodeBlock language='sh' code={'pnpm add -D @terra-symposium/testing\npnpm exec test-runner run --manifest config/tests.json'} />
 
 Use Node.js `>=20`. The runner validates file ownership before executing the ordered suites.
 
@@ -20,19 +17,10 @@ Use Node.js `>=20`. The runner validates file ownership before executing the ord
 
 Use `config/tests.json` for new repositories. A suite has a stable name, one executable, optional argument strings, and repository-relative globs for the files it owns.
 
-```json
-{
-	"version": 1,
-	"suites": [
-		{
-			"name": "unit",
-			"command": "pnpm",
-			"args": ["run", "test:unit"],
-			"owns": ["tests/unit/**/*.test.ts"]
-		}
-	]
-}
-```
+<CodeBlock
+	language='json'
+	code={'{\n\t"version": 1,\n\t"suites": [\n\t\t{\n\t\t\t"name": "unit",\n\t\t\t"command": "pnpm",\n\t\t\t"args": ["run", "test:unit"],\n\t\t\t"owns": ["tests/unit/**/*.test.ts"]\n\t\t}\n\t]\n}'}
+/>
 
 The runner discovers test files in `test/` and `tests/` directories and names matching `*.test.*` or `*.spec.*`. It rejects invalid globs, duplicate suite invocations, overlapping ownership, and discovered test files that no suite owns.
 
@@ -40,9 +28,7 @@ The runner discovers test files in `test/` and `tests/` directories and names ma
 
 ||| [Full plan]
 
-```sh
-pnpm exec test-runner run --manifest config/tests.json
-```
+<CodeBlock language='sh' code={'pnpm exec test-runner run --manifest config/tests.json'} />
 
 Runs shared checks followed by the ordered repository suites.
 
@@ -50,9 +36,7 @@ Runs shared checks followed by the ordered repository suites.
 
 ||| [Shared checks only]
 
-```sh
-pnpm exec test-runner run --manifest config/tests.json --shared-only
-```
+<CodeBlock language='sh' code={'pnpm exec test-runner run --manifest config/tests.json --shared-only'} />
 
 Use this when a workflow intentionally separates test execution from plan validation.
 
@@ -60,9 +44,7 @@ Use this when a workflow intentionally separates test execution from plan valida
 
 ||| [Selected suites]
 
-```sh
-pnpm exec test-runner run --manifest config/tests.json --suites unit,contracts
-```
+<CodeBlock language='sh' code={'pnpm exec test-runner run --manifest config/tests.json --suites unit,contracts'} />
 
 Select named custom suites while retaining the shared checks.
 

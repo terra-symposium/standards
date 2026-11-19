@@ -7,10 +7,7 @@ description: Analyze performance, repeated classes, regular expressions, Tailwin
 
 ## Install and run
 
-```sh
-pnpm add -D @terra-symposium/hygiene
-pnpm exec patterns --all
-```
+<CodeBlock language='sh' code={'pnpm add -D @terra-symposium/hygiene\npnpm exec patterns --all'} />
 
 `--all` scans the configured source roots. Use `--warn` to avoid any supported safe fixes while evaluating findings. The CLI uses the same config discovery and source scope as the root runner.
 

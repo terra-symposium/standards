@@ -11,9 +11,7 @@ Use the npm package command in a Node workflow. Shared checks do not replace rep
 
 ||| [Run the npm CLI]
 
-```sh
-pnpm exec test-runner run --manifest config/tests.json
-```
+<CodeBlock language='sh' code={'pnpm exec test-runner run --manifest config/tests.json'} />
 
 The shared stage runs first; selected custom suites run afterward.
 
@@ -23,11 +21,7 @@ The shared stage runs first; selected custom suites run afterward.
 
 Pin the mirror to an immutable commit and pass the manifest path:
 
-```yaml
-- uses: Terra-Symposium/standards/packages/testing@3f9b31323d3617d6b565770880865ec7cf1a9704
-  with:
-    manifest: config/tests.json
-```
+<CodeBlock language='yaml' code={'- uses: Terra-Symposium/standards/packages/testing@3f9b31323d3617d6b565770880865ec7cf1a9704\n  with:\n    manifest: config/tests.json'} />
 
 The package source in this repository is canonical. A published Action change must update the public mirror as well.
 

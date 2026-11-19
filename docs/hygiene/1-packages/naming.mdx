@@ -9,18 +9,13 @@ The concise-name rules recognize words inside camelCase and PascalCase identifie
 
 ## Install and run
 
-```sh
-pnpm add -D @terra-symposium/hygiene
-pnpm exec naming --config config/quality.json --all
-```
+<CodeBlock language='sh' code={'pnpm add -D @terra-symposium/hygiene\npnpm exec naming --config config/quality.json --all'} />
 
 Normal runs select changed and untracked files. `--all` covers all configured roots and `--warn` is read-only. Set `protectedIdentifiers`, `renameExports`, and applicable source scope in `quality.json` to control policy. Framework-reserved filenames and protected source paths are excluded according to the implementation's conventions.
 
 ## API
 
-```ts
-import { namingFindings, aliasFindings, fixNaming, renameId } from '@terra-symposium/hygiene/naming';
-```
+<CodeBlock language='ts' code={"import { namingFindings, aliasFindings, fixNaming, renameId } from '@terra-symposium/hygiene/naming';"} />
 
 The package also exports identifier token and callback alias helpers, protected-name sets, and rename utilities. `fixNaming()` applies eligible TypeScript language-service edits; it does not guess when a binding is protected or its references cannot be safely renamed. Review public API and serialized identifiers before accepting any suggested rename.
 

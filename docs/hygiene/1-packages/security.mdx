@@ -7,10 +7,7 @@ description: Detect configured forbidden source patterns, environment files, and
 
 ## Install and run
 
-```sh
-pnpm add -D @terra-symposium/hygiene
-pnpm exec security --all
-```
+<CodeBlock language='sh' code={'pnpm add -D @terra-symposium/hygiene\npnpm exec security --all'} />
 
 `--all` scans configured source roots and `--warn` guarantees a read-only run. The package loads the same root `quality.json` or `config/quality.json` as the other capabilities.
 

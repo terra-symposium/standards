@@ -20,12 +20,7 @@ Knip's `knip` command and TypeScript's `types` command are available for focused
 
 Use `qualityCommands` only for static or hygiene checks with no native Hygiene equivalent. Keep builds, unit tests, integration tests, browser tests, and example execution in separate scripts and CI steps.
 
-```json
-{
-	"qualityCommands": [{ "name": "c-doc-params", "command": "make", "args": ["check-doc-params"] }],
-	"enabledCommands": { "c-doc-params": true }
-}
-```
+<CodeBlock language='json' code={'{\n\t"qualityCommands": [{ "name": "c-doc-params", "command": "make", "args": ["check-doc-params"] }],\n\t"enabledCommands": { "c-doc-params": true }\n}'} />
 
 Each entry needs a unique lowercase `name`, an executable `command`, and optional string-array `args`. Commands run from `root`, inherit the environment, are not limited to changed files, and fail Hygiene on a nonzero exit. Use `enabledCommands.<name>` to select one, `enabledChecks.command: false` to disable the category, or `--skip-commands` for one run. Run a single configured command with `pnpm exec hygiene domain c-doc-params`.
 

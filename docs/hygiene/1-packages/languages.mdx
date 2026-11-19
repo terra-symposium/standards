@@ -7,10 +7,7 @@ description: Resolve optional C, Java, and Python quality profiles and run their
 
 ## Install and run
 
-```sh
-pnpm add -D @terra-symposium/hygiene
-pnpm exec language-checks --all
-```
+<CodeBlock language='sh' code={'pnpm add -D @terra-symposium/hygiene\npnpm exec language-checks --all'} />
 
 Select profiles in the shared `quality.json`. A profile only runs checks when matching source files are present. If a required native tool is missing or below the tested minimum, the runner reports the requirement and installation guidance. It never installs toolchains.
 
@@ -26,8 +23,6 @@ Pin native tools in the consumer repository or CI image. Run builds and function
 
 ## API
 
-```ts
-import { resolveLanguageProfiles, inspectLanguageProfileTool, runLanguageChecks } from '@terra-symposium/hygiene/languages';
-```
+<CodeBlock language='ts' code={"import { resolveLanguageProfiles, inspectLanguageProfileTool, runLanguageChecks } from '@terra-symposium/hygiene/languages';"} />
 
 The package also exports profile IDs, capability maps, resolved check types, and profile definitions. Its `./cli` export and `language-checks` bin are both public. See [profile configuration](/hygiene/0-getting-started/overview/) for exact option names.
