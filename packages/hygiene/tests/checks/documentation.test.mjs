@@ -26,9 +26,8 @@ test('documentation can require an IMPORTS heading before import declarations', 
 	fixtureFile(root, 'src/missing.tsx', "import React from 'react';\nexport const missing = React.version;\n");
 	fixtureFile(root, 'src/present.tsx', "/** File summary. */\n\n/*/////////////\nIMPORTS\n/////////////*/\nimport React from 'react';\nexport const present = React.version;\n");
 	fixtureFile(root, 'src/no-imports.tsx', 'export const noImports = true;\n');
-	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.tsx'], documentation: { required: { functions: false, importSection: true } } });
 	assert.deepEqual(
-		documentationFindings(cfg)
+		documentationFindings(createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.tsx'], documentation: { required: { functions: false, importSection: true } } }))
 			.filter(({ name }) => name === 'IMPORTS')
 			.map(({ file, kind, line }) => [file, kind, line]),
 		[['src/missing.tsx', 'file', 1]],

@@ -214,9 +214,11 @@ test('default documentation command reports missing comments in staged-only file
 	fixtureFile(root, 'src/main.ts', "import { value } from './value';\nexport function readValue() { return value; }\n");
 	fixtureFile(root, 'src/value.ts', 'export const value = true;\n');
 	spawnSync('git', ['add', 'src/main.ts', 'src/value.ts'], { cwd: root });
-	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], documentation: { required: { functions: true, importSection: true } }, enabledChecks: { format: false } });
 	resetExitCode();
-	runQualityCli(cfg, ['document', '--warn']);
+	runQualityCli(createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], documentation: { required: { functions: true, importSection: true } }, enabledChecks: { format: false } }), [
+		'document',
+		'--warn',
+	]);
 	assert.equal(process.exitCode, 1, 'staged-only missing documentation fails the normal command');
 	resetExitCode();
 });

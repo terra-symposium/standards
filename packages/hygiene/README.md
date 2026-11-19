@@ -29,8 +29,8 @@ git diff
 
 ## Usage
 
-| Command                                        | Scope                       | Writes fixes? |
-| ---------------------------------------------- | --------------------------- | ------------- |
+| Command                                  | Scope                       | Writes fixes? |
+| ---------------------------------------- | --------------------------- | ------------- |
 | `pnpm exec hygiene`                      | Changed and untracked files | Yes           |
 | `pnpm exec hygiene quality --all`        | All configured files        | Yes           |
 | `pnpm exec hygiene quality --all --warn` | All configured files        | No            |
