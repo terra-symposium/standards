@@ -3,9 +3,6 @@ title: Add and configure a React error boundary
 description: Choose a recovery region, provide an accessible fallback, and configure reset and reporting.
 ---
 
-import { NodesBlock } from '@terra-symposium/docs';
-export const Nodes = props => <NodesBlock block={props} />;
-
 Use this guide when a client-rendered React region needs a local fallback after a descendant render failure. The boundary contains the failed UI region; the application still owns recovery, retry policy, and telemetry.
 
 ## Install and choose a recovery region
