@@ -3,8 +3,6 @@ title: Hygiene check map
 description: Choose the reference for built-in source checks or optional tools and repository commands.
 ---
 
-import { NodesBlock } from '@terra-symposium/docs';
-export const Nodes = props => <NodesBlock block={props} />;
 
 Terra Hygiene separates source analysis from native tool and repository command execution. Use the map below to go directly to the check family; exact field names and defaults are in the [quality.json reference](/hygiene/0-getting-started/overview/).
 
@@ -19,63 +17,17 @@ Terra Hygiene separates source analysis from native tool and repository command 
 <Nodes
 	direction='LR'
 	nodes={[
-		{
-			id: 'scope',
-			type: 'origin',
-			data: {
-				title: 'Select source scope',
-			},
-		},
-		{
-			id: 'built-in',
-			type: 'process',
-			data: {
-				title: 'Built-in checks',
-			},
-		},
-		{
-			id: 'tools',
-			type: 'process',
-			data: {
-				title: 'Configured tools',
-			},
-		},
-		{
-			id: 'commands',
-			type: 'process',
-			data: {
-				title: 'Repository commands',
-			},
-		},
-		{
-			id: 'report',
-			type: 'terminal',
-			data: {
-				title: 'Findings and exit status',
-			},
-		},
+		{ id: 'scope', type: 'origin', data: { title: 'Select source scope' } },
+		{ id: 'built-in', type: 'process', data: { title: 'Built-in checks' } },
+		{ id: 'tools', type: 'process', data: { title: 'Configured tools' } },
+		{ id: 'commands', type: 'process', data: { title: 'Repository commands' } },
+		{ id: 'report', type: 'terminal', data: { title: 'Findings and exit status' } }
 	]}
 	edges={[
-		{
-			id: 'scope-built-in',
-			source: 'scope',
-			target: 'built-in',
-		},
-		{
-			id: 'built-in-tools',
-			source: 'built-in',
-			target: 'tools',
-		},
-		{
-			id: 'tools-commands',
-			source: 'tools',
-			target: 'commands',
-		},
-		{
-			id: 'commands-report',
-			source: 'commands',
-			target: 'report',
-		},
+		{ id: 'scope-built-in', source: 'scope', target: 'built-in' },
+		{ id: 'built-in-tools', source: 'built-in', target: 'tools' },
+		{ id: 'tools-commands', source: 'tools', target: 'commands' },
+		{ id: 'commands-report', source: 'commands', target: 'report' }
 	]}
 	height={230}
 />

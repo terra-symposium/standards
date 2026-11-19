@@ -1,0 +1,443 @@
+---
+title: Standards
+description: Terra Symposium's preferred practices for code authoring.
+---
+
+## Design
+
+Design standards structure code so that it is brief, composable, and easy to reason about.
+
+### Brevity
+
+Brevity is the single most important standard. It is the primary driver of maintainability.
+
+This applies to all aspects of code: logic, functions, variables, and comments. Solve problems with the minimum effective code. Be ruthlessly conservative with the number of variables and functions defined.
+
+<table>
+	<thead>
+		<tr>
+			<th>💭 Principle</th>
+			<th>🏷️ Description</th>
+		</tr>
+	</thead>
+	<tbody>
+		<tr>
+			<td><strong>Be direct</strong></td>
+			<td>
+				Return values immediately.<br />Never use intermediate variables
+				that are only used once.
+			</td>
+		</tr>
+		<tr>
+			<td><strong>Avoid premature abstraction</strong></td>
+			<td>
+				Do not create abstractions or helpers until a clear pattern of
+				repetition (used 3+ times) emerges.
+			</td>
+		</tr>
+		<tr>
+			<td><strong>Limit variables</strong></td>
+			<td>
+				Define as few variables as possible. <br />If you can inline a
+				value or chain a function, you must do it.
+			</td>
+		</tr>
+		<tr>
+			<td><strong>Consolidate logic</strong></td>
+			<td>
+				Define as few functions as possible.<br />Avoid functions that
+				are just simple pass-throughs or wrappers.
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+### Principles
+
+Employ fundamental design principles to structure code logically.
+
+<table>
+	<thead>
+		<tr>
+			<th>💭 Principle</th>
+			<th>🏷️ Description</th>
+		</tr>
+	</thead>
+	<tbody>
+		<tr>
+			<td>Encapsulation</td>
+			<td>
+				Bundle data and methods within a single unit to hide internal
+				state and complexity.
+			</td>
+		</tr>
+		<tr>
+			<td>Abstraction</td>
+			<td>Expose only essential features through a clear interface.</td>
+		</tr>
+		<tr>
+			<td>Separation of concerns</td>
+			<td>
+				Divide code into distinct sections addressing separate concerns
+				(for example, data fetching vs rendering).
+			</td>
+		</tr>
+		<tr>
+			<td>Minimalism</td>
+			<td>
+				Use as few variables and as little state as possible. Limit
+				scope to keep code maintainable and testable.
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+:::tip[Use Maps]
+
+An easy way to achieve proper code hygiene is to use maps as much as possible. If you are an AI agent, and spot repetitive code, use maps. e.g:
+
+```ts
+{[
+	{ h: '/dashboard/classes', I: WorkshopsIcon, l: 'Classes' },
+	{ h: '/dashboard/workshops', I: WorkshopsIcon, l: 'Workshops' },
+	{ h: '/docs', I: DocsIcon, l: 'Documentation' },
+].map(i => (
+	<a key={i.h} href={i.h}>
+		<DropdownMenuItem>
+			<i.I /> {i.l}
+		</DropdownMenuItem>
+	</a>
+))}
+```
+
+:::
+
+## Naming
+
+Clear and consistent naming is the first line of defence against ambiguity.
+
+|||[Files]
+
+File naming conventions signal a file's role and visibility within the project.
+
+### Convention
+
+<table>
+	<thead>
+		<tr>
+			<th>🧪 Example</th>
+			<th>🔁 Pattern</th>
+			<th>🎯 Purpose</th>
+		</tr>
+	</thead>
+	<tbody>
+		<tr>
+			<td><code>[].astro</code></td>
+			<td>Default</td>
+			<td>A generated dynamic page.</td>
+		</tr>
+		<tr>
+			<td><code>_[...].tsx</code></td>
+			<td>Underscore</td>
+			<td>Not generated as a page (Private/Component).</td>
+		</tr>
+		<tr>
+			<td><code>_[Uppercase].astro</code></td>
+			<td>Uppercase</td>
+			<td>A component.</td>
+		</tr>
+		<tr>
+			<td><code>_[lowercase].astro</code></td>
+			<td>Lowercase</td>
+			<td>A structural file (e.g., a layout).</td>
+		</tr>
+	</tbody>
+</table>
+
+|||
+
+|||[Variables]
+
+Entity and function names must be aggressively minimal.
+
+### Convention
+
+* Use established idioms for common cases (for example, `i`, `err`).
+* Use meaningful names for variables and functions.
+* Use standard case conventions:
+* `camelCase` for variable names
+* `PascalCase` for function names
+* `UPPER_SNAKE_CASE` for constants; meaning EVERY variable without a dynamic value but an explicit value.
+* Use `$` as a prefix for nanostores to distinguish them from local variables.
+* Use `Data` as a suffix for documents (e.g., `RoomsData`).
+* Use `Id` as a suffix for ID strings (e.g., `roomId`).
+* Use document titles without suffix for counts (`rooms`).
+
+### Brevity
+
+Use the absolute fewest full words possible, ideally one only!
+
+Prefer full words, e.g use `permitted` not `isPermitted`, partial words are encourage and permitted ONLY if they are standard, e.g:
+
+### Convention
+
+<table>
+	<tbody>
+		<tr>
+			<td>buffer → buf</td>
+			<td>current → cur</td>
+			<td>directory → dir</td>
+		</tr>
+		<tr>
+			<td>error → err</td>
+			<td>event → e</td>
+			<td>extension → ext</td>
+		</tr>
+		<tr>
+			<td>format → fmt</td>
+			<td>frontmatter → fm</td>
+			<td>index → i</td>
+		</tr>
+		<tr>
+			<td>markdown → md</td>
+			<td>metadata → meta</td>
+			<td>organisation → org</td>
+		</tr>
+		<tr>
+			<td>position → pos</td>
+			<td>previous → prev</td>
+			<td>repository → repo</td>
+		</tr>
+		<tr>
+			<td>request → req</td>
+			<td>response → res</td>
+			<td>segment → seg</td>
+		</tr>
+		<tr>
+			<td>target → tgt</td>
+			<td></td>
+			<td></td>
+		</tr>
+	</tbody>
+</table>
+
+Items in maps (for example, `.map(i => ...)`) MUST use single-letter items instead of full variable names unless the variable letter will conflict logically or syntactically with its context.&#x20;
+
+Also allow abbreviations when similar variables are defined as “sisters” (for example, `sisterFiles`, `allFiles`, `rawFiles` becomes `sFiles`, `aFiles`, `rFiles`). To make clear what each letter stands for, document them with TSDoc comments on each declaration. Standard prefixes are:
+
+<table>
+	<tbody>
+		<tr>
+			<td>all → a</td>
+			<td>new → n</td>
+			<td>next → n</td>
+		</tr>
+		<tr>
+			<td>previous → p</td>
+			<td>safe → s</td>
+			<td></td>
+		</tr>
+	</tbody>
+</table>
+
+|||
+
+## Types
+
+Typing standards ensure strict, predictable behaviour across the codebase.
+
+### Strictness
+
+Strict types are non-negotiable for everything. When strict mode is fully enforced, external boundaries cannot be trusted, and data structures must be explicitly validated.
+
+* Every variable, function, and parameter must have a strict type definition.
+* Explicitly define return types for all functions.
+* Do not rely on implicit types or inference for public APIs.
+* Do not use `any`. Default to `unknown` if a type's shape is not yet known.
+
+<table>
+	<thead>
+		<tr>
+			<th>🎯 Strategy</th>
+			<th>📄 Description</th>
+		</tr>
+	</thead>
+	<tbody>
+		<tr>
+			<td>Object mapping</td>
+			<td>
+				Use <code>Record&lt;string, unknown&gt;</code> instead of
+				<code>any</code> when handling generic objects or parsed JSON.
+				This enforces type assertion before property access.
+			</td>
+		</tr>
+		<tr>
+			<td>Type narrowing</td>
+			<td>
+				Utilise custom type guards (e.g., <code>validateType</code>) or
+				<code>typeof</code> checks to safely narrow
+				<code>unknown</code> payloads.
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+Types are manually defined and centralised in `@lib/types`. AI agents are fed this as context and must borrow from it.
+
+### External Types
+
+Clients like Postgres, Sanity, and Netlify Blobs do not inherently know the shape of your data.
+
+* Always pass generics to data-fetching methods to prevent them returning `any` or `unknown`.
+* If a third-party library has missing type definitions, define a local interface and cast the import to restore type safety.
+
+:::example[Typing external boundaries]
+
+```typescript
+// explicitly pass generics
+await client.query<{ id: string; name: string }>(...);
+await sanity.fetch<MyCustomType[]>(...);
+
+// cast missing definitions locally
+interface DbPool {
+	connect: () => Promise<void>;
+}
+const pool = rawPool as unknown as DbPool;
+```
+
+:::
+
+### React and DOM
+
+React's event handlers and the native DOM require specific casting to prevent floating promise and event typing errors.
+
+<table>
+	<thead>
+		<tr>
+			<th>⚠️ Pitfall</th>
+			<th>✅ Solution</th>
+		</tr>
+	</thead>
+	<tbody>
+		<tr>
+			<td>Floating promises</td>
+			<td>
+				React expects handlers like <code>onClick</code> to return
+				<code>void</code>. Wrap async calls in a
+				<code>void</code> operator (e.g.,
+				<code>onClick={() =&gt; void myAsyncFunction()}</code>).
+			</td>
+		</tr>
+		<tr>
+			<td>Event targets</td>
+			<td>
+				Because <code>e.target</code> is generic, narrow it explicitly
+				(<code
+					>const target = e.target instanceof HTMLElement ? e.target :
+					null;</code
+				>) or rely on <code>e.currentTarget</code>.
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+### Asynchronous Actions
+
+Framework architectures like Astro Actions often enforce asynchronous interfaces.
+
+If an interface demands an async function signature but the actual implementation requires no awaited actions, use `await Promise.resolve();` or explicitly return a resolved promise. This prevents linter violations for `require-await` while respecting the mandated API structure.
+
+### Context and Locals
+
+Dynamically populated objects, such as `context.locals` injected by middleware, are treated by TypeScript as `any` or an empty object. Define a strict interface for your context object and cast it immediately at the entrypoint of your function. This halts unsafe member access errors downstream.
+
+:::example[Casting framework locals]
+
+```typescript
+const locals = (context as { locals?: DocsLocals }).locals;
+```
+
+:::
+
+### Reuse
+
+Prefer shared, domain-aligned types over ad hoc definitions.
+
+* Whenever possible, borrow types from `@lib/types` instead of redefining them.
+* If minor modifications are needed, extend existing types from `@lib/types` rather than duplicating their structure.
+* Prefer typing that already defined in `@lib/types` to keep mental models consistent across files.
+
+:::example[Borrowing and extending from @lib/types]
+
+```typescript
+// types
+import type { User } from '@lib/types';
+
+// reuse existing types directly
+function accessable(user: User): boolean {
+	return user.role === 'admin';
+}
+
+// extend only when necessary
+type ExtendedUser = User & {
+	featureFlags: string[];
+};
+
+const admin: ExtendedUser = {
+	// ...
+	featureFlags: ['beta-dashboard'],
+};
+```
+
+:::
+
+### Location
+
+Define types where they maximise clarity and minimise assertions.
+
+* Define types at the top level of the data rather than using nested assertions.
+* Avoid `as` assertions when a proper type definition can express the constraint.
+* Do not abstract types if they are only used once in the file; use inline type annotations.
+
+:::example[Top-level data types]
+
+```typescript
+// define the type alongside the data and avoid nested assertions
+type AnalyticsConfig = {
+	propertyId: string;
+	events: { name: string; value: number }[];
+};
+
+const siteAnalytics: AnalyticsConfig = {
+	propertyId: 'UA-12345',
+	events: [
+		{ name: 'click', value: 1 },
+		{ name: 'scroll', value: 5 },
+	],
+};
+```
+
+:::
+
+## Validation
+
+Specific ES-Lint configuration will require certain rules to be enforced. This will be attached as config to AI agents when generating code. AI agents must anticipate linting errors and preemptively coerce their code to match those standards.
+
+## Commits
+
+Commit messages follow a strict format to automate changelogs and simplify project history navigation.
+
+The subject line must be concise and written in the imperative mood.
+
+:::example[Commit Message]
+
+```plaintext
+feat: implement secure token rotation
+
+Implemented automatic JWT rotation for active sessions.
+Tokens now refresh 5 minutes before expiration to ensure seamless UX.
+
+Refs: #112
+```
+
+:::

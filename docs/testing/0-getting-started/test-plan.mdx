@@ -38,7 +38,7 @@ The runner discovers test files in `test/` and `tests/` directories and names ma
 
 ## Select a run
 
-||| [Full plan]
+|||[Full plan]
 
 ```sh
 pnpm exec test-runner run --manifest config/tests.json
@@ -48,7 +48,7 @@ Runs shared checks followed by the ordered repository suites.
 
 |||
 
-||| [Shared checks only]
+|||[Shared checks only]
 
 ```sh
 pnpm exec test-runner run --manifest config/tests.json --shared-only
@@ -58,7 +58,7 @@ Use this when a workflow intentionally separates test execution from plan valida
 
 |||
 
-||| [Selected suites]
+|||[Selected suites]
 
 ```sh
 pnpm exec test-runner run --manifest config/tests.json --suites unit,contracts
@@ -72,7 +72,7 @@ Select named custom suites while retaining the shared checks.
 
 The canonical path is `config/tests.json`. If it is absent, the runner recognizes `tests/tests.json` and the legacy root `.tests.json`. Pass `--manifest PATH` to select another location.
 
-=== [When tests move]
+===[When tests move]
 
 Map each moved or retired test to its new owner. Update the `owns` globs in the same change. Keep a retired assertion only when its behavior is covered elsewhere or the coverage gap is explicitly accepted.
 

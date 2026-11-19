@@ -3,8 +3,6 @@ title: Add and configure a React error boundary
 description: Choose a recovery region, provide an accessible fallback, and configure reset and reporting.
 ---
 
-import { NodesBlock } from '@terra-symposium/docs';
-export const Nodes = props => <NodesBlock block={props} />;
 
 Use this guide when a client-rendered React region needs a local fallback after a descendant render failure. The boundary contains the failed UI region; the application still owns recovery, retry policy, and telemetry.
 
@@ -46,63 +44,17 @@ The diagram traces the render path. A successful child render stays in place; a 
 <Nodes
 	direction='LR'
 	nodes={[
-		{
-			id: 'children',
-			type: 'origin',
-			data: {
-				title: 'Render descendants',
-			},
-		},
-		{
-			id: 'success',
-			type: 'process',
-			data: {
-				title: 'Render normally',
-			},
-		},
-		{
-			id: 'boundary',
-			type: 'process',
-			data: {
-				title: 'Boundary captures error',
-			},
-		},
-		{
-			id: 'fallback',
-			type: 'process',
-			data: {
-				title: 'Show local fallback',
-			},
-		},
-		{
-			id: 'callback',
-			type: 'terminal',
-			data: {
-				title: 'Call onError',
-			},
-		},
+		{ id: 'children', type: 'origin', data: { title: 'Render descendants' } },
+		{ id: 'success', type: 'process', data: { title: 'Render normally' } },
+		{ id: 'boundary', type: 'process', data: { title: 'Boundary captures error' } },
+		{ id: 'fallback', type: 'process', data: { title: 'Show local fallback' } },
+		{ id: 'callback', type: 'terminal', data: { title: 'Call onError' } }
 	]}
 	edges={[
-		{
-			id: 'render-success',
-			source: 'children',
-			target: 'success',
-		},
-		{
-			id: 'render-caught',
-			source: 'children',
-			target: 'boundary',
-		},
-		{
-			id: 'boundary-fallback',
-			source: 'boundary',
-			target: 'fallback',
-		},
-		{
-			id: 'fallback-callback',
-			source: 'fallback',
-			target: 'callback',
-		},
+		{ id: 'render-success', source: 'children', target: 'success' },
+		{ id: 'render-caught', source: 'children', target: 'boundary' },
+		{ id: 'boundary-fallback', source: 'boundary', target: 'fallback' },
+		{ id: 'fallback-callback', source: 'fallback', target: 'callback' }
 	]}
 	height={230}
 />
@@ -111,13 +63,13 @@ The diagram traces the render path. A successful child render stays in place; a 
 
 The package clears its captured error when the configured reset input changes. Choose the reset trigger that matches the state the user can change.
 
-||| [Reset when inputs change]
+|||[Reset when inputs change]
 
 Pass a stable identity such as the selected account or workspace as `resetKey`. A new identity retries the child tree automatically.
 
 |||
 
-||| [Explicit retry]
+|||[Explicit retry]
 
 Have the fallback call an application action that changes the key or input passed to `resetKey`. The boundary does not retry a failed request or backing service on its own.
 
@@ -136,7 +88,7 @@ Have the fallback call an application action that changes the key or input passe
 
 The package root re-exports the React API. Prefer the explicit `/react` subpath in application components.
 
-=== [What React does not catch]
+===[What React does not catch]
 
 React boundaries catch descendant render, constructor, and lifecycle failures. React also documents errors thrown inside a `startTransition` action as boundary-caught. They do not catch ordinary event-handler exceptions, most asynchronous callbacks such as timers, server-rendering failures, errors in the boundary itself, or failures before React starts.
 

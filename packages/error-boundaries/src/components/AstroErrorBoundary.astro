@@ -6,7 +6,7 @@ type Props = {
 	reloadLabel?: string;
 };
 
-const { title = 'This section could not load', description: desc = 'The interactive interface failed to start. The error has been recorded for diagnosis.', reloadLabel = 'Reload page' } = Astro.props;
+const { title = 'This section could not load', description: desc = 'The interactive interface failed to start. Reload to try again.', reloadLabel = 'Reload page' } = Astro.props;
 ---
 
 <terra-error-boundary data-terra-error-boundary>
@@ -35,6 +35,28 @@ const { title = 'This section could not load', description: desc = 'The interact
 			console.error('[Terra error boundary] island hydration failed', event.detail?.error);
 			island.setAttribute('hidden', '');
 			fallback.removeAttribute('hidden');
+			const reporting = window.__terraBoundaryReporting;
+			if (!reporting?.endpoint || !reporting.site) return;
+			const error = event.detail?.error;
+			void fetch(reporting.endpoint, {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({
+					site: reporting.site,
+					...(reporting.delivery === 'email' ? { delivery: 'email' } : {}),
+					category: 'render',
+					component: 'AstroIsland',
+					route: location.pathname,
+					message: String(error?.message ?? error ?? 'Hydration failed').slice(0, 500),
+					stack: String(error?.stack ?? '').slice(0, 4000),
+				}),
+				keepalive: true,
+			})
+				.then(response => {
+					const copy = fallback.querySelector('p');
+					if (response.ok && copy) copy.textContent = 'The error was recorded. Reload to try again.';
+				})
+				.catch(() => {});
 		});
 	})();
 </script>

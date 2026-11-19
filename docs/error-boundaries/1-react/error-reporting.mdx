@@ -3,8 +3,6 @@ title: Report React boundary errors
 description: Connect the callback to safe application telemetry without making fallback recovery depend on delivery.
 ---
 
-import { NodesBlock } from '@terra-symposium/docs';
-export const Nodes = props => <NodesBlock block={props} />;
 
 The boundary callback is an application-owned extension point. The shared package does not choose an analytics provider, send events, or persist error details.
 
@@ -32,13 +30,13 @@ Treat both the Error and component stack as untrusted values. Depending on sourc
 
 ## Select the reporting boundary
 
-||| [Package callback]
+|||[Package callback]
 
 For a consumer application, apply consent, redaction, sampling, access control, and retention before sending error content to a provider. Group incidents by stable fingerprints or boundary plus release, not by raw message alone.
 
 |||
 
-||| [Terra Website adapter]
+|||[Terra Website adapter]
 
 The Website logs locally and sends only category, component, and sanitized route to its Astro collector. Server code validates the payload and derives build and environment metadata; raw message and component stack are not persisted in Error Analysis.
 
@@ -49,63 +47,17 @@ The event path below is specific to the Terra Website, not behavior implemented 
 <Nodes
 	direction='LR'
 	nodes={[
-		{
-			id: 'boundary',
-			type: 'origin',
-			data: {
-				title: 'React boundary',
-			},
-		},
-		{
-			id: 'callback',
-			type: 'process',
-			data: {
-				title: 'Application onError',
-			},
-		},
-		{
-			id: 'sanitize',
-			type: 'process',
-			data: {
-				title: 'Map and sanitize event',
-			},
-		},
-		{
-			id: 'collector',
-			type: 'process',
-			data: {
-				title: 'Validate and rate-limit',
-			},
-		},
-		{
-			id: 'dashboard',
-			type: 'terminal',
-			data: {
-				title: 'Review metadata',
-			},
-		},
+		{ id: 'boundary', type: 'origin', data: { title: 'React boundary' } },
+		{ id: 'callback', type: 'process', data: { title: 'Application onError' } },
+		{ id: 'sanitize', type: 'process', data: { title: 'Map and sanitize event' } },
+		{ id: 'collector', type: 'process', data: { title: 'Validate and rate-limit' } },
+		{ id: 'dashboard', type: 'terminal', data: { title: 'Review metadata' } }
 	]}
 	edges={[
-		{
-			id: 'boundary-callback',
-			source: 'boundary',
-			target: 'callback',
-		},
-		{
-			id: 'callback-sanitize',
-			source: 'callback',
-			target: 'sanitize',
-		},
-		{
-			id: 'sanitize-collector',
-			source: 'sanitize',
-			target: 'collector',
-		},
-		{
-			id: 'collector-dashboard',
-			source: 'collector',
-			target: 'dashboard',
-		},
+		{ id: 'boundary-callback', source: 'boundary', target: 'callback' },
+		{ id: 'callback-sanitize', source: 'callback', target: 'sanitize' },
+		{ id: 'sanitize-collector', source: 'sanitize', target: 'collector' },
+		{ id: 'collector-dashboard', source: 'collector', target: 'dashboard' }
 	]}
 	height={230}
 />

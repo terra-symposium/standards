@@ -25,7 +25,7 @@ Keep every independently running local server on its assigned port. When changin
 | Terra Symposium Website — Sanity Studio  |                                               2013 |
 | Terra Symposium Docs                     |                                               2020 |
 | Terra Symposium Styling docs             |                                               2030 |
-| Terra Symposium Business Docs            |                                               2040 |
+| Terra Symposium Systems                  |                                               2040 |
 | Terra Symposium Standards docs           |                                               2050 |
 | Ambulance Dispatch Prototype             |                                               3000 |
 | Compression docs                         |                                               3010 |

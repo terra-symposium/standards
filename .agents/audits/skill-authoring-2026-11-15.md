@@ -6,7 +6,7 @@ Thirty canonical skills across six Desktop repositories were audited. Each scena
 
 - `uni-canvas-scraping` — Could plan an already-authorized local Canvas export after the skill named its route, layout, and coverage record. Initial audit lacked those details; repeat passed. No live account or export was used.
 
-## Terra Docs
+## Docs
 
 - `docs-authoring` — Could choose and render the registered blocks after aligning the skill with the parser and block registry. Initial block coverage gaps were repaired; repeat passed. Parser and round-trip tests passed separately.
 - `align` — Could align authored content to source after clarifying its input and output boundaries. Fresh repeat passed; no production page was edited by the auditor.

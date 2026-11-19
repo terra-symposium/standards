@@ -12,6 +12,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { terraErrorBoundaryIntegration } from '../dist/lib/astro-integration.js';
 import { withErrorBoundary } from '../dist/components/react.js';
+import { reportBoundaryError } from '../dist/lib/report.js';
 
 // COMPONENTS
 import React from 'react';
@@ -59,4 +60,30 @@ test('captures component metadata and exposes reset-key recovery state', () => {
 		).displayName,
 		'withErrorBoundary(Panel)',
 	);
+});
+test('reports only after the configured receiver accepts a boundary failure', async () => {
+	const originalWindow = globalThis.window;
+	const originalFetch = globalThis.fetch;
+	const submissions = [];
+	try {
+		globalThis.window = { location: { pathname: '/docs/example/' }, __terraBoundaryReporting: { endpoint: '/api/error-report', site: 'docs' } };
+		globalThis.fetch = async (url, request) => {
+			submissions.push({ url, body: JSON.parse(request.body) });
+			return { ok: true };
+		};
+		assert.equal(await reportBoundaryError(new Error('broken'), 'Panel'), true);
+		assert.equal(submissions[0].url, '/api/error-report');
+		assert.equal(submissions[0].body.route, '/docs/example/');
+		assert.equal(submissions[0].body.component, 'Panel');
+		globalThis.window.__terraBoundaryReporting.delivery = 'email';
+		assert.equal(await reportBoundaryError(new Error('mail'), 'Panel'), true);
+		assert.equal(submissions[1].body.delivery, 'email');
+		globalThis.fetch = async () => ({ ok: false });
+		assert.equal(await reportBoundaryError(new Error('broken'), 'Panel'), false);
+		globalThis.fetch = async () => { throw new Error('offline'); };
+		assert.equal(await reportBoundaryError(new Error('broken'), 'Panel'), false);
+	} finally {
+		globalThis.window = originalWindow;
+		globalThis.fetch = originalFetch;
+	}
 });

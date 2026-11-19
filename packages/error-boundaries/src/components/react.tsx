@@ -9,6 +9,7 @@ IMPORTS
 
 // COMPONENTS
 import React, { Component } from 'react';
+import { reportBoundaryError } from '../lib/report.js';
 
 /*//////////////////////////////////////////////////
 CONFIG
@@ -73,7 +74,12 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
 	 * @param info React component stack captured for the failed render.
 	 */
 	componentDidCatch(err: Error, info: React.ErrorInfo): void {
-		this.props.onError?.(err, { name: this.props.name ?? 'Component', componentStack: info.componentStack ?? null });
+		try {
+			this.props.onError?.(err, { name: this.props.name ?? 'Component', componentStack: info.componentStack ?? null });
+		} catch (reporterError) {
+			console.error('[Terra error boundary] application reporter failed', reporterError);
+		}
+		void reportBoundaryError(err, this.props.name ?? 'Component');
 	}
 	/**
 	 * Clears the captured error when the boundary receives a new reset key.
