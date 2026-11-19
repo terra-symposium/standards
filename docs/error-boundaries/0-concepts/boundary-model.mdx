@@ -85,13 +85,13 @@ React boundaries switch to fallback output when a descendant render path fails. 
 
 ## Choose the recovery boundary
 
-||| [React-rendered region]
+|||[React-rendered region]
 
 Wrap a panel, route region, or repeated item when that region can fail independently. Keep unrelated controls outside the boundary and make the fallback action match a real recovery path.
 
 |||
 
-||| [Astro island startup]
+|||[Astro island startup]
 
 Use the package’s Astro wrapper around an island or install the page-level integration when one fallback should cover multiple islands. It cannot repair a server failure that prevented HTML from reaching the browser.
 

@@ -20,7 +20,7 @@ import Workspace from '../components/Workspace.tsx';
 
 The wrapper provides server-rendered HTML and listens for Astro's cancelable `astro:hydration-error` event. When the failing island is inside it, the component is hidden and the adjacent `role="alert"` fallback is revealed. Its reload link returns to the current URL. Choose a title and description that explain the user-facing impact; do not put error details into the visible fallback.
 
-=== [Page-level integration]
+===[Page-level integration]
 
 To provide one fallback for any failed island on a page, add the integration in `astro.config.mjs`:
 

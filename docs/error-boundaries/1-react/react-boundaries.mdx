@@ -111,13 +111,13 @@ The diagram traces the render path. A successful child render stays in place; a 
 
 The package clears its captured error when the configured reset input changes. Choose the reset trigger that matches the state the user can change.
 
-||| [Reset when inputs change]
+|||[Reset when inputs change]
 
 Pass a stable identity such as the selected account or workspace as `resetKey`. A new identity retries the child tree automatically.
 
 |||
 
-||| [Explicit retry]
+|||[Explicit retry]
 
 Have the fallback call an application action that changes the key or input passed to `resetKey`. The boundary does not retry a failed request or backing service on its own.
 
@@ -136,7 +136,7 @@ Have the fallback call an application action that changes the key or input passe
 
 The package root re-exports the React API. Prefer the explicit `/react` subpath in application components.
 
-=== [What React does not catch]
+===[What React does not catch]
 
 React boundaries catch descendant render, constructor, and lifecycle failures. React also documents errors thrown inside a `startTransition` action as boundary-caught. They do not catch ordinary event-handler exceptions, most asynchronous callbacks such as timers, server-rendering failures, errors in the boundary itself, or failures before React starts.
 

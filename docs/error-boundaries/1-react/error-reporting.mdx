@@ -32,13 +32,13 @@ Treat both the Error and component stack as untrusted values. Depending on sourc
 
 ## Select the reporting boundary
 
-||| [Package callback]
+|||[Package callback]
 
 For a consumer application, apply consent, redaction, sampling, access control, and retention before sending error content to a provider. Group incidents by stable fingerprints or boundary plus release, not by raw message alone.
 
 |||
 
-||| [Terra Website adapter]
+|||[Terra Website adapter]
 
 The Website logs locally and sends only category, component, and sanitized route to its Astro collector. Server code validates the payload and derives build and environment metadata; raw message and component stack are not persisted in Error Analysis.
 
