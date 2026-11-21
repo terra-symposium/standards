@@ -42,14 +42,18 @@ const A_Z0_9_GI_REGEX = () => /[^a-z0-9_-]/gi;
 TYPES
 //////////////////////////////////////////////////*/
 
-/** Browser diagnostic captured by the reusable page fixture. */
+/**
+ * Browser diagnostic captured by the reusable page fixture.
+ */
 export type BrowserDiagnostic = { level: string; message: string; url?: string };
 
 /*//////////////////////////////////////////////////
 FIXTURES
 //////////////////////////////////////////////////*/
 
-/** Playwright fixture that records browser console, page, and request failures. */
+/**
+ * Playwright fixture that records browser console, page, and request failures.
+ */
 export const diagnosticsTest = base.extend({
 	page: async ({ page: p, context: c }, u, i): Promise<void> => {
 		const diagnostics: BrowserDiagnostic[] = [];
@@ -83,11 +87,17 @@ export const diagnosticsTest = base.extend({
 	},
 });
 
-/** Test-local load helpers exposed by the reusable load fixture. */
+/**
+ * Test-local load helpers exposed by the reusable load fixture.
+ */
 export type LoadTestController = {
-	/** Sets a budget override for this test's total elapsed duration. */
+	/**
+	 * Sets a budget override for this test's total elapsed duration.
+	 */
 	setTestBudget: (budget: LoadBudgetOverride) => void;
-	/** Measures a named asynchronous or synchronous operation and preserves its return value. */
+	/**
+	 * Measures a named asynchronous or synchronous operation and preserves its return value.
+	 */
 	measure: <T>(name: string, op: () => T | Promise<T>, budget?: LoadBudgetOverride) => Promise<T>;
 };
 
@@ -160,17 +170,27 @@ export const loadTest = diagnosticsTest.extend<{ load: LoadTestController }>({
 	],
 });
 
-/** Screenshot settings accepted by the reusable visual-capture fixture. */
+/**
+ * Screenshot settings accepted by the reusable visual-capture fixture.
+ */
 export type VisualCaptureOptions = {
-	/** Optional label recorded with the capture; it is not printed on screenshot-only slides. */
+	/**
+	 * Optional label recorded with the capture; it is not printed on screenshot-only slides.
+	 */
 	title?: string;
-	/** Playwright screenshot options, excluding the output path owned by the fixture. */
+	/**
+	 * Playwright screenshot options, excluding the output path owned by the fixture.
+	 */
 	screenshot?: Omit<NonNullable<Parameters<Page['screenshot']>[0]>, 'path'>;
 };
 
-/** Captures keyed screenshots and attaches their metadata for cross-viewport reporting. */
+/**
+ * Captures keyed screenshots and attaches their metadata for cross-viewport reporting.
+ */
 export type VisualCaptureController = {
-	/** Captures the current page and associates it with a stable key across projects/viewports. */
+	/**
+	 * Captures the current page and associates it with a stable key across projects/viewports.
+	 */
 	capture: (key: string, options?: VisualCaptureOptions) => Promise<void>;
 };
 
@@ -214,24 +234,32 @@ export const visualTest = loadTest.extend<{ visuals: VisualCaptureController }>(
 	},
 });
 
-/** Application-specific paths and catalog settings for the shared reporter. */
+/**
+ * Application-specific paths and catalog settings for the shared reporter.
+ */
 export type ReportingOptions = {
 	featureFiles?: readonly string[];
 	projects?: readonly ProjectDefinition[];
 	viewportCatalog?: ViewportCatalog;
 	outputRoot?: string;
-	/** Folder for durable screenshot captures shared across partial and repeated test runs. */
+	/**
+	 * Folder for durable screenshot captures shared across partial and repeated test runs.
+	 */
 	screenshotsDirectory?: string;
 	reportFile?: string;
 	slideshowFile?: string;
 	supplementalResultsFile?: string;
 	qualityConfigFile?: string;
 	loadTesting?: LoadTestingConfig;
-	/** Write report.pptx using only keyed screenshots, with no text or diagnostic slides. */
+	/**
+	 * Write report.pptx using only keyed screenshots, with no text or diagnostic slides.
+	 */
 	screenshotOnlySlideshow?: boolean;
 };
 
-/** Describes one Playwright attachment supplied to the shared reporter. */
+/**
+ * Describes one Playwright attachment supplied to the shared reporter.
+ */
 type ReporterAttachment = { body?: Buffer; contentType?: string; name?: string; path?: string };
 
 /*//////////////////////////////////////////////////
@@ -350,9 +378,13 @@ const persistScreenshotCapture = (dir: string, capture: ScreenshotCapture): Scre
 	return persisted;
 };
 const screenshotRunFile = '.terra-playwright-run.json';
-/** Expected test identity paired with the viewports discovered across one logical run. */
+/**
+ * Expected test identity paired with the viewports discovered across one logical run.
+ */
 type ExpectedScreenshotGroup = { group: string; viewports: string[] };
-/** Latest reporter collection state persisted beside accumulated screenshots. */
+/**
+ * Latest reporter collection state persisted beside accumulated screenshots.
+ */
 type ScreenshotRun = {
 	runId: string;
 	startedAt: string;
@@ -576,7 +608,9 @@ const redactEvidence = (val: unknown): string => {
 	return text.replaceAll(process.cwd(), '[workspace]');
 };
 
-/** Creates the reusable Playwright reporter with application-specific output configuration. */
+/**
+ * Creates the reusable Playwright reporter with application-specific output configuration.
+ */
 export default class ProgressReporter {
 	private readonly options: Required<Pick<ReportingOptions, 'featureFiles' | 'projects' | 'viewportCatalog' | 'outputRoot' | 'reportFile' | 'slideshowFile' | 'screenshotsDirectory'>> &
 		Pick<ReportingOptions, 'supplementalResultsFile'> & { loadTesting: ReturnType<typeof readLoadTestingConfig>; screenshotOnlySlideshow: boolean };

@@ -28,7 +28,7 @@ Use this order unless the repository's configuration proves a different dependen
 5. public browser checks;
 6. authenticated and mutation-backed browser checks;
 7. browser checks at the scenario-specific viewports justified by its layout risks;
-8. full configured suite and representation artifacts.
+8. full configured suite and evidence artifacts.
 
 The order is a dependency graph, not a way to hide failures. If an earlier gate fails, report later gates as unexecuted or blocked. Do not skip earlier contracts because a later browser test happens to pass.
 
@@ -42,16 +42,7 @@ The order is a dependency graph, not a way to hide failures. If an earlier gate 
 - Use headless mode for ordinary regression coverage. Use headed mode only for sign-in, visual capture, or a diagnosis that needs a real browser surface.
 - Run the affected viewport first while fixing, then nearby widths that exercise the same source breakpoint or measured transition. Do not expand to a blanket matrix; a single passing viewport proves only that selected scenario and size.
 
-Use the repository's canonical manifest (`config/tests.json` in current Terra repositories) and configured scripts rather than inventing alternate runners. Validate file ownership before execution. Common commands include:
-
-```sh
-pnpm run test:visual
-pnpm exec playwright test --project=root-public tests/astro/public/public.spec.ts
-pnpm run quality
-pnpm run typecheck:strict
-pnpm --filter terra-symposium-frontend run build
-git diff --check
-```
+Use the repository's canonical manifest (`config/tests.json` in current Terra repositories) and configured scripts rather than inventing alternate runners. Validate file ownership before execution. Read the owning package scripts and Playwright config for exact commands; project names and build scripts differ by repository. Record the command actually run. Finish with `git diff --check` and the repository's configured quality gate.
 
 Set `PLAYWRIGHT_ASTRO_URL` for an explicit target instead of silently replacing a required context. Configure viewport selection at collection time from the scenarios' native tags and reasons. Use `PW_VIEWPORTS` only when it represents the declared selections for that run; record selected dimensions and scenario rationale. Do not select `all` by default.
 
@@ -61,7 +52,7 @@ After a failure, rerun the smallest reproducible test with the same project, fix
 
 ## Completion accounting
 
-A run is complete only when the expected inventory matches the executed inventory, including intentional skips and setup failures. Check for:
+A run is complete only when the expected inventory matches the collected and executed inventories, including intentional skips and setup failures. Baseline collection must precede reorganization; compare the same environment and cache state after changes. Check for:
 
 - missing test files, projects, groups, or viewports;
 - unexpected skips, retries, timeouts, and interruptions;

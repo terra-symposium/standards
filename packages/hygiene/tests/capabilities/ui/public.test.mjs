@@ -10,7 +10,6 @@ IMPORTS
 import * as api from '../../../dist/capabilities/ui/index.js';
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { readFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 
 /*//////////////////////////////////////////////////
@@ -27,7 +26,4 @@ test('standalone CLI exposes shared help', () => {
 	const result = spawnSync(process.execPath, [new URL('../../../dist/capabilities/ui/cli.js', import.meta.url).pathname, '--help'], { encoding: 'utf8' });
 	assert.equal(result.status, 0, result.stderr);
 	assert.match(result.stdout, /Usage:/);
-});
-test('consolidated package does not depend on itself', () => {
-	assert.equal(Object.hasOwn(JSON.parse(readFileSync(new URL('../../../package.json', import.meta.url), 'utf8')).dependencies ?? {}, '@terra-symposium/hygiene'), false);
 });

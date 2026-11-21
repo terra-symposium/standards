@@ -1,5 +1,5 @@
 /**
- * packages/hygiene/test/checks/error-boundaries.test.mjs
+ * packages/hygiene/tests/checks/error-boundaries.test.mjs
  * Verifies mandatory React root boundaries and their safe automatic wrapper.
  */
 
@@ -65,20 +65,20 @@ test('automatically installs the shared hydration boundary in Astro configs', ()
 	mkdirSync(join(packageRoot, 'dist/lib'), { recursive: true });
 	writeFileSync(join(packageRoot, 'package.json'), JSON.stringify({ exports: { './astro-integration': './dist/lib/astro-integration.js' } }));
 	writeFileSync(join(packageRoot, 'dist/lib/astro-integration.js'), 'export const terraErrorBoundaryIntegration = () => ({});\n');
-	writeFileSync(config, "import { defineConfig } from 'astro/config';\nexport default defineConfig({ integrations: [] });\n");
+	writeFileSync(config, "import { defineConfig } from 'astro/config';\nimport react from '@astrojs/react';\nexport default defineConfig({ integrations: [react()] });\n");
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts', '.tsx'] });
 	assert.equal(errorBoundaryFindings(cfg).length, 1);
 	assert.equal(fixErrorBoundaries(cfg), 1);
 	const output = readFileSync(config, 'utf8');
 	assert.match(output, /@terra-symposium\/boundaries\/astro-integration/u);
-	assert.match(output, /integrations: \[__terraErrorBoundaryIntegration\(\), \]/u);
+	assert.match(output, /integrations: \[__terraErrorBoundaryIntegration\(\), react\(\)\]/u);
 	assert.deepEqual(errorBoundaryFindings(cfg), []);
 	assert.equal(fixErrorBoundaries(cfg), 0);
 });
 test('Astro integration autofix stays read-only when no installed dependency exports the integration', () => {
 	const root = mkdtempSync(join(tmpdir(), 'hygiene-astro-boundary-missing-dependency-'));
 	const config = join(root, 'astro.config.mjs');
-	const orig = "import { defineConfig } from 'astro/config';\nexport default defineConfig({ integrations: [] });\n";
+	const orig = "import { defineConfig } from 'astro/config';\nimport react from '@astrojs/react';\nexport default defineConfig({ integrations: [react()] });\n";
 	writeFileSync(join(root, 'package.json'), JSON.stringify({ devDependencies: { astro: '^5.0.0' } }));
 	writeFileSync(config, orig);
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts', '.tsx'] });
@@ -109,6 +109,25 @@ test('recognizes the Quality compatibility re-export for existing Astro configs'
 		join(root, 'astro.config.mjs'),
 		"import { terraErrorBoundaryIntegration } from '@terra-symposium/hygiene/astro-integration';\nexport default { integrations: [terraErrorBoundaryIntegration()] };\n",
 	);
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts', '.tsx'] });
+	assert.deepEqual(errorBoundaryFindings(cfg), []);
+	assert.equal(fixErrorBoundaries(cfg), 0);
+});
+test('recognizes the current shared integration and skips static or delegated Astro configs', () => {
+	const root = mkdtempSync(join(tmpdir(), 'hygiene-astro-boundary-current-'));
+	mkdirSync(join(root, 'astro/config'), { recursive: true });
+	mkdirSync(join(root, 'docs'), { recursive: true });
+	writeFileSync(join(root, 'package.json'), JSON.stringify({ devDependencies: { '@terra-symposium/standards-error-boundaries': '0.1.2' } }));
+	const packageRoot = join(root, 'node_modules/@terra-symposium/standards-error-boundaries');
+	mkdirSync(join(packageRoot, 'dist/lib'), { recursive: true });
+	writeFileSync(join(packageRoot, 'package.json'), JSON.stringify({ exports: { './astro-integration': './dist/lib/astro-integration.js' } }));
+	writeFileSync(join(packageRoot, 'dist/lib/astro-integration.js'), 'export const terraErrorBoundaryIntegration = () => ({});\n');
+	writeFileSync(join(root, 'astro/astro.config.mjs'), "export { default } from './config/astro.config.mjs';\n");
+	writeFileSync(
+		join(root, 'astro/config/astro.config.mjs'),
+		"import react from '@astrojs/react';\nimport { terraErrorBoundaryIntegration as boundary } from '@terra-symposium/standards-error-boundaries/astro-integration';\nexport default { integrations: [boundary(), react()] };\n",
+	);
+	writeFileSync(join(root, 'docs/astro.config.mjs'), "import starlight from '@astrojs/starlight';\nexport default { integrations: [starlight({ title: 'Docs' })] };\n");
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts', '.tsx'] });
 	assert.deepEqual(errorBoundaryFindings(cfg), []);
 	assert.equal(fixErrorBoundaries(cfg), 0);

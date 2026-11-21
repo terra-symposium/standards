@@ -3,7 +3,6 @@ title: Boundary model and failure scope
 description: Compare React render recovery with Astro hydration recovery and server-owned failures.
 ---
 
-
 A boundary replaces one failed region with recovery UI. It does not make the failed operation succeed, repair data, or retry external work. This comparison shows which layer owns each failure.
 
 | Failure point | React boundary | Astro boundary | Owner when not caught |
@@ -24,13 +23,13 @@ React boundaries switch to fallback output when a descendant render path fails. 
 		{ id: 'hydration', type: 'process', data: { title: 'Hydrate client island' } },
 		{ id: 'react', type: 'process', data: { title: 'React descendant render' } },
 		{ id: 'fallback', type: 'terminal', data: { title: 'React fallback' } },
-		{ id: 'astro', type: 'terminal', data: { title: 'Astro hydration fallback' } }
+		{ id: 'astro', type: 'terminal', data: { title: 'Astro hydration fallback' } },
 	]}
 	edges={[
 		{ id: 'request-hydration', source: 'request', target: 'hydration' },
 		{ id: 'hydration-react', source: 'hydration', target: 'react' },
 		{ id: 'react-failure', source: 'react', target: 'fallback' },
-		{ id: 'hydration-failure', source: 'hydration', target: 'astro' }
+		{ id: 'hydration-failure', source: 'hydration', target: 'astro' },
 	]}
 	height={300}
 />

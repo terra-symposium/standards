@@ -1,3 +1,6 @@
+/**
+ * config/eslint.config.mjs
+ */
 // Lints all maintained JavaScript and TypeScript package sources.
 
 /*//////////////////////////////////////////////////

@@ -95,7 +95,9 @@ export async function* qualityNodeReporter(src: AsyncIterable<NodeTestE>, opts?:
 	let lastProgressTotal = -1;
 	let terminalProtocol: 'complete' | 'legacy' | undefined;
 	let summaryCounts: NonNullable<NodeTestE['data']>['counts'];
-	/** Tracks whether a pending enqueue belongs to a test case or a suite. */
+	/**
+	 * Tracks whether a pending enqueue belongs to a test case or a suite.
+	 */
 	type Pending = { counted: boolean };
 	const pendingByIdentity = new Map<string, Pending[]>();
 	const seenTerminal = new Set<string>();
@@ -141,7 +143,9 @@ export async function* qualityNodeReporter(src: AsyncIterable<NodeTestE>, opts?:
 			(/(?:^|[/\\])[^/\\]+\.(?:test|spec)\.(?:[cm]?js|tsx?)$/u.test(data.name) && (data.file === undefined || data.line === 1))
 		);
 	};
-	/** Updates displayed test progress from the current event counts. */
+	/**
+	 * Updates displayed test progress from the current event counts.
+	 */
 	const liveProgress = (): void => {
 		lastProgressCompleted = completed;
 		lastProgressTotal = Math.max(completed, enqueued);

@@ -1,5 +1,5 @@
 /**
- * packages/hygiene/test/reports/history-report.test.mjs
+ * packages/hygiene/tests/reports/history-report.test.mjs
  */
 
 /*//////////////////////////////////////////////////

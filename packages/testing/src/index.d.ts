@@ -7,11 +7,17 @@
 TYPES
 //////////////////////////////////////////////////*/
 
-/** Describes one explicitly owned test suite and the command that runs it. */
+/**
+ * Describes one explicitly owned test suite and the command that runs it.
+ */
 export type TestSuite = { name: string; command: string; args?: string[]; cwd?: string; owns: string[] };
-/** A versioned list of repository-specific test suites. */
+/**
+ * A versioned list of repository-specific test suites.
+ */
 export type TestPlan = { version: 1; suites: TestSuite[] };
-/** Aggregate result returned after shared and repository-specific checks run. */
+/**
+ * Aggregate result returned after shared and repository-specific checks run.
+ */
 export type TestPlanResult = { passed: number; failed: number; selected: string[] };
 /**
  * Reads and validates one repository test plan.

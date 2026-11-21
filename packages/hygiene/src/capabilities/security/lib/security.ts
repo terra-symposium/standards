@@ -23,11 +23,15 @@ REGEX
 
 const ENV_REGEX = /(^|\/)\.env(?:\.|$)/;
 const PROCESS_ENV_SRC_REGEX = /\.(?:astro|cjs|cts|js|jsx|mjs|mts|ts|tsx)$/iu;
-/** A source or repository-boundary issue found by a configured security policy. */
+/**
+ * A source or repository-boundary issue found by a configured security policy.
+ */
 export type SecurityFinding = { file?: string; message: string };
 
 // hygiene-ignore single-use -- Keep the documented EnvironmentAccess declaration so its parameter and return contract remains attached.
-/** Source-level environment behavior found outside comments and literal text. */
+/**
+ * Source-level environment behavior found outside comments and literal text.
+ */
 type EnvAccess = { readsProcessEnv: boolean; loadsEnvFile: boolean };
 
 /*//////////////////////////////////////////////////

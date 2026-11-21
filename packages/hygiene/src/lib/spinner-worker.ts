@@ -20,7 +20,9 @@ const state = new Int32Array(sharedBuffer);
 const frames = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
 // hygiene-ignore single-use -- This counter must persist across draw calls to advance the spinner.
 let frame = 0;
-/** Draws spinner frames until the parent worker signals completion. */
+/**
+ * Draws spinner frames until the parent worker signals completion.
+ */
 function draw(): void {
 	if (Atomics.load(state, 0)) {
 		writeSync(2, '\r\u001b[2K');

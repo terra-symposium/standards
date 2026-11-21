@@ -1,4 +1,7 @@
 #!/usr/bin/env node
+/**
+ * packages/testing/src/cli.mjs
+ */
 
 /*//////////////////////////////////////////////////
 IMPORTS

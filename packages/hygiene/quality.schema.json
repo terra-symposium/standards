@@ -98,7 +98,10 @@
 							"description": "Require TSDoc for exported named functions, including substantive descriptions for every parameter."
 						},
 						"noInlineFunctions": { "type": "boolean" },
-						"importSection": { "type": "boolean", "description": "Require an IMPORTS block heading before import declarations in JavaScript and TypeScript source files." }
+						"importSection": {
+							"type": "boolean",
+							"description": "Require one populated IMPORTS section containing every static import and no empty or duplicate section headings in JavaScript, TypeScript, and Astro frontmatter."
+						}
 					},
 					"additionalProperties": false
 				}

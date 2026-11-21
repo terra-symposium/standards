@@ -1,5 +1,5 @@
 /**
- * packages/hygiene/test/checks/files.test.mjs
+ * packages/hygiene/tests/checks/files.test.mjs
  * Verifies source discovery, working-tree scope selection, and path helpers.
  * Fixtures are isolated temporary repositories so cache and Git behavior are
  * tested without modifying the Standards checkout.

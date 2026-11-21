@@ -1,3 +1,12 @@
+/**
+ * packages/hygiene/tests/runner/typecheck-discovery.test.mjs
+ * Checks typecheck command discovery across repository packages.
+ */
+
+/*//////////////////////////////////////////////////
+IMPORTS
+//////////////////////////////////////////////////*/
+
 import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

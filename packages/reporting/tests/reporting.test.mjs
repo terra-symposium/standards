@@ -1,3 +1,8 @@
+/**
+ * packages/reporting/tests/reporting.test.mjs
+ * Checks reporting package data assembly and output contracts.
+ */
+
 /*//////////////////////////////////////////////////
 IMPORTS
 //////////////////////////////////////////////////*/

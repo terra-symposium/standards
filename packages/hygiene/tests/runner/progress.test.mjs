@@ -1,5 +1,5 @@
 /**
- * packages/hygiene/test/runner/progress.test.mjs
+ * packages/hygiene/tests/runner/progress.test.mjs
  * Verifies that quality progress always renders a bar on one updated line.
  */
 

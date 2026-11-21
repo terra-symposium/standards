@@ -11,7 +11,7 @@ IMPORTS
 import ts from 'typescript';
 import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { srcFiles } from '@terra-symposium/hygiene/core';
-import { dirname, resolve } from 'node:path';
+import { basename, dirname, resolve } from 'node:path';
 
 // TYPES
 import type { QualityCfg } from '@terra-symposium/hygiene/core';
@@ -24,9 +24,13 @@ const ERR_BOUNDAR_IU_REGEX = /error.?boundar/iu;
 const ERR_BOUNDARY_IU_REGEX = /error.?boundary$/iu;
 const BINTEGRATIONS_S_S_U_REGEX = /\bintegrations\s*:\s*\[/u;
 
-/** One React root that is mounted without a top-level error boundary. */
+/**
+ * One React root that is mounted without a top-level error boundary.
+ */
 export type ErrorBoundaryFinding = { file: string; line: number; column: number; message: string; fixable: boolean };
-/** Describes one JSX render call that can receive the configured boundary wrapper. */
+/**
+ * Describes one JSX render call that can receive the configured boundary wrapper.
+ */
 type RenderSite = { call: ts.CallExpression; expression: ts.Expression; index: number };
 const SRC_EXTS = new Set(['.js', '.jsx', '.mjs', '.cjs', '.ts', '.tsx', '.mts', '.cts']);
 const FIXABLE_EXTS = new Set(['.js', '.jsx', '.mjs', '.ts', '.tsx', '.mts']);
@@ -202,7 +206,8 @@ export function errorBoundaryFindings(cfg: QualityCfg): ErrorBoundaryFinding[] {
 		}
 	}
 	for (const file of astroConfigFiles(cfg.root)) {
-		if (hasAstroBoundaryIntegration(readFileSync(file, 'utf8'))) continue;
+		const text = readFileSync(file, 'utf8');
+		if (!usesReactAstroIntegration(text) || delegatesAstroConfig(file, cfg.root, text) || hasAstroBoundaryIntegration(text)) continue;
 		const integration = astroIntegrationSpecifier(file, cfg.root);
 		findings.push({
 			file,
@@ -300,6 +305,32 @@ function astroConfigFiles(root: string): string[] {
 }
 
 /**
+ * Whether an Astro config hydrates React islands and therefore needs their boundary integration.
+ *
+ * @param text Astro config source.
+ * @return Whether the config imports Astro's React integration.
+ */
+function usesReactAstroIntegration(text: string): boolean {
+	const imported = text.match(/\bimport\s+([\w$]+)\s+from\s*['"]@astrojs\/react['"]/u);
+	return Boolean(imported && new RegExp(`\\b${imported[1]}\\s*\\(`, 'u').test(text));
+}
+
+/**
+ * Whether a default-entry config delegates to another discovered Astro config in this repository.
+ *
+ * @param file Config file that may delegate.
+ * @param root Repository boundary.
+ * @param text Config source.
+ * @return Whether a local Astro config owns its behavior.
+ */
+function delegatesAstroConfig(file: string, root: string, text: string): boolean {
+	const match = text.match(/\bexport\s*\{\s*default\s*\}\s*from\s*['"](\.[^'"]+)['"]/u);
+	if (!match) return false;
+	const target = resolve(dirname(file), match[1]!);
+	return target !== file && target.startsWith(`${root}/`) && ASTRO_CONFIG.test(basename(target)) && existsSync(target);
+}
+
+/**
  * Detects the shared Astro boundary integration import and invocation.
  *
  * @param text Astro config source.
@@ -307,7 +338,9 @@ function astroConfigFiles(root: string): string[] {
  * @return True when the integration is installed in the config.
  */
 function hasAstroBoundaryIntegration(text: string): boolean {
-	const imported = text.match(/import\s*\{\s*terraErrorBoundaryIntegration(?:\s+as\s+(\w+))?\s*\}\s*from\s*['"]@terra-symposium\/(?:boundaries|hygiene)\/astro-integration['"]/u);
+	const imported = text.match(
+		/import\s*\{\s*terraErrorBoundaryIntegration(?:\s+as\s+(\w+))?\s*\}\s*from\s*['"]@terra-symposium\/(?:boundaries|hygiene|standards-error-boundaries)\/astro-integration['"]/u,
+	);
 	if (!imported) return false;
 	return new RegExp(`\\b${imported[1] ?? 'terraErrorBoundaryIntegration'}\\s*\\(`, 'u').test(text);
 }
@@ -338,7 +371,7 @@ function astroIntegrationSpecifier(configFile: string, root: string): string | u
 	}
 	if (!packageJson) return;
 	const dependencies = [packageJson.dependencies, packageJson.devDependencies, packageJson.peerDependencies].filter((value): value is Record<string, unknown> => !!value && typeof value === 'object');
-	for (const name of ['@terra-symposium/boundaries', '@terra-symposium/hygiene']) {
+	for (const name of ['@terra-symposium/standards-error-boundaries', '@terra-symposium/boundaries', '@terra-symposium/hygiene']) {
 		if (!dependencies.some(group => typeof group[name] === 'string')) continue;
 		const parts = name.split('/');
 		let installedPath: string | undefined;
@@ -373,7 +406,7 @@ function fixAstroBoundaryIntegrations(root: string): number {
 	let fixed = 0;
 	for (const file of astroConfigFiles(root)) {
 		let text = readFileSync(file, 'utf8');
-		if (hasAstroBoundaryIntegration(text)) continue;
+		if (!usesReactAstroIntegration(text) || delegatesAstroConfig(file, root, text) || hasAstroBoundaryIntegration(text)) continue;
 		const specifier = astroIntegrationSpecifier(file, root);
 		if (!specifier) continue;
 		const alias = '__terraErrorBoundaryIntegration';

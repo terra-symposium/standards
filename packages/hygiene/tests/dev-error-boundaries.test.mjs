@@ -1,5 +1,5 @@
 /**
- * packages/hygiene/test/dev-error-boundaries.test.mjs
+ * packages/hygiene/tests/dev-error-boundaries.test.mjs
  * Verifies dev startup applies repository error boundaries before launch.
  */
 
@@ -34,7 +34,7 @@ test('development startup applies React and Astro boundaries before launching th
 	const app = join(src, 'main.tsx');
 	writeFileSync(app, "import { createRoot } from 'react-dom/client';\nconst root = createRoot(document.getElementById('root')!);\nroot.render(<App />);\n");
 	const astroConfig = join(root, 'astro.config.mjs');
-	writeFileSync(astroConfig, "import { defineConfig } from 'astro/config';\nexport default defineConfig({ integrations: [] });\n");
+	writeFileSync(astroConfig, "import { defineConfig } from 'astro/config';\nimport react from '@astrojs/react';\nexport default defineConfig({ integrations: [react()] });\n");
 	writeFileSync(join(root, 'quality.json'), JSON.stringify({ sourceRoots: ['src'], extensions: ['.tsx'] }));
 	const server = join(root, 'fake-dev-server');
 	writeFileSync(server, '#!/bin/sh\nexit 0\n');

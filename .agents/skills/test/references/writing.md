@@ -20,6 +20,7 @@ Resolve each assertion to one canonical source, route, or domain owner and keep 
 ## 2. Choose scope and fixture
 
 - Use pure tests for transformations, source-contract tests for ownership/migrations, API tests for persistence/authorization, and browser tests for real user interaction/accessibility/integration.
+- Give every function that renders output at least one source-owned Playwright test that reaches and asserts its output, including server-rendered markup and generated media or documents. A journey can cover multiple renderers when each is mapped to that test ID; avoid duplicate browser cases for the same assertion.
 - Add screenshots only when geometry/composition is part of the contract; use assertions for functional truth. Capture and report screenshots fully programmatically through the runner and shared fixtures; do not rely on manual screenshots or hand-authored evidence reports.
 - Select browser viewports per scenario from the owning UI's source media rules and measured rendered behavior. Use native Playwright tags and a machine-readable `viewport-reason` annotation to record why each selected size can expose the risk; avoid blanket matrices.
 - Prefer named, small, run-scoped fixtures. Generate unique IDs, clean up in `finally`, and verify removal.
@@ -31,11 +32,11 @@ Resolve each assertion to one canonical source, route, or domain owner and keep 
 
 Assert the observable result and important negative boundary: no unauthorized leakage, no partial mutation on invalid input, no unrelated record changes, no stale content in empty/loading states, idempotent retry, complete cleanup, and reachable readable responsive controls where relevant. Keep diagnostics clean unless the test owns them.
 
-Use table-driven tests for equivalent cases and named tests for distinct journeys. Keep names searchable and contract-oriented; preserve dot-separated IDs and TSDoc conventions.
+Use table-driven tests for equivalent cases and named tests for distinct journeys. Keep names searchable and contract-oriented; preserve dot-separated IDs and TSDoc conventions. In Playwright, use `test.describe` for a source-owned feature, `test.step` for observable phases within one journey, and separate tests when permission, persistence, or recovery needs an independent result. Merge only cases with the same actor, fixture, initial state, and contract; preserve each unique assertion and negative boundary. Do not split a file merely to reduce its line count.
 
 ## 4. Maintain and validate
 
-Place tests under `tests/<product-domain>/` to mirror the repository source area. Check the owning repository's test manifest and scripts before moving a case; Standards uses `config/tests.json`. Preserve the declared runner context and run the actual manifest validation command when one is defined.
+Place tests under the repository's `tests/` root in paths that mirror the source area. Check the owning repository's test manifest and scripts before moving a case; Standards uses `config/tests.json`. Preserve the declared runner context and run the actual manifest validation command when one is defined. After migration, collect every Playwright config and compare the declared and collected project/file/case/viewport inventory before counting a suite as covered.
 
 Keep registration-time fixtures before tests and runtime-only helpers after the last test under `/* HELPERS */`. Promote helpers only after real reuse.
 

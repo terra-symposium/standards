@@ -1,5 +1,5 @@
 /**
- * packages/hygiene/test/reports/node-reporter.test.mjs
+ * packages/hygiene/tests/reports/node-reporter.test.mjs
  * Verifies Node reporter case handling and child-output isolation.
  */
 

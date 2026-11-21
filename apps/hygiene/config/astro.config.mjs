@@ -1,10 +1,12 @@
-import { terraErrorBoundaryIntegration as __terraErrorBoundaryIntegration } from '@terra-symposium/boundaries/astro-integration';
-
+/**
+ * apps/hygiene/config/astro.config.mjs
+ */
 /*//////////////////////////////////////////////////
 IMPORTS
 //////////////////////////////////////////////////*/
 
 // API
+import { terraErrorBoundaryIntegration as __terraErrorBoundaryIntegration } from '@terra-symposium/boundaries/astro-integration';
 import react from '@astrojs/react';
 import { defineConfig } from 'astro/config';
 import { fileURLToPath } from 'node:url';

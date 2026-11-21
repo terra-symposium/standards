@@ -16,7 +16,7 @@
 			"project": ["lib/**/*.js", "tests/**/*.mjs"]
 		},
 		"packages/error-boundaries": {
-			"entry": ["src/index.ts", "src/components/react.tsx", "src/lib/astro.ts", "src/lib/astro-integration.ts", "src/lib/next.ts", "tests/*.test.mjs"],
+			"entry": ["src/index.ts", "src/components/react.tsx", "src/lib/astro.ts", "src/lib/astro-integration.ts", "src/lib/next.ts", "src/lib/report.ts", "tests/*.test.mjs"],
 			"project": ["src/**/*.ts", "tests/**/*.mjs"],
 			"ignoreDependencies": ["@types/react-dom", "react-dom"]
 		},

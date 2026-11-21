@@ -1,5 +1,5 @@
 /**
- * packages/hygiene/test/source-automation.test.mjs
+ * packages/hygiene/tests/source-automation.test.mjs
  * Verifies conservative JSX accessible-name and React display-name automation.
  */
 

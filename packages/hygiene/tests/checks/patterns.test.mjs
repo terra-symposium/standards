@@ -1,5 +1,5 @@
 /**
- * packages/hygiene/test/checks/patterns.test.mjs
+ * packages/hygiene/tests/checks/patterns.test.mjs
  * Verifies repeated classes, UI-pattern diagnostics, regex deduplication, and
  * Tailwind canonicalisation, including configured skips and safe autofixes.
  */
@@ -27,10 +27,10 @@ test('repeated-class detection normalizes whitespace and ignores dynamic and one
 	fixtureFile(root, 'src/one.tsx', `<div ${repeated} />\n<div class="rounded border bg-card" />\n`);
 	fixtureFile(root, 'src/two.tsx', `<div ${repeated} />\n<div className="rounded border bg-card" />\n`);
 	fixtureFile(root, 'src/dynamic.tsx', `<div className={classes} /><div className="rounded {conditional}" />\n`);
-	fixtureFile(root, 'src/test/fixture.tsx', `<div className="rounded border bg-card" />\n`);
+	fixtureFile(root, 'src/tests/fixture.tsx', `<div className="rounded border bg-card" />\n`);
 	fixtureFile(root, 'src/generated/fixture.tsx', `<div className="rounded border bg-card" />\n`);
 	assert.deepEqual(repeatedClassFindings(createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.tsx'], repeatedClasses: { minimumCount: 4 } })), [
-		{ value: 'rounded border bg-card', count: 6, locations: ['src/generated/fixture.tsx:1', 'src/one.tsx:1', 'src/one.tsx:2', 'src/test/fixture.tsx:1', 'src/two.tsx:1', 'src/two.tsx:2'] },
+		{ value: 'rounded border bg-card', count: 6, locations: ['src/generated/fixture.tsx:1', 'src/one.tsx:1', 'src/one.tsx:2', 'src/tests/fixture.tsx:1', 'src/two.tsx:1', 'src/two.tsx:2'] },
 	]);
 });
 test('repeated-class analysis and fixing ignore markup inside JavaScript strings but process JSX', () => {

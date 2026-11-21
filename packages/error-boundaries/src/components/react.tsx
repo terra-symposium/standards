@@ -15,11 +15,17 @@ import { reportBoundaryError } from '../lib/report.js';
 CONFIG
 //////////////////////////////////////////////////*/
 
-/** Receives a render error and boundary metadata for application-owned logging. */
+/**
+ * Receives a render error and boundary metadata for application-owned logging.
+ */
 export type ErrorReporter = (err: Error, report: { name: string; componentStack: string | null }) => void;
-/** Configuration and child content accepted by the reusable React error boundary. */
+/**
+ * Configuration and child content accepted by the reusable React error boundary.
+ */
 export type ErrorBoundaryProps = { children?: React.ReactNode; fallback?: (err: Error) => React.ReactNode; name?: string; resetKey?: string; onError?: ErrorReporter };
-/** Internal React state containing the current descendant render error, if any. */
+/**
+ * Internal React state containing the current descendant render error, if any.
+ */
 export type ErrorBoundaryState = { error: Error | null };
 
 /*//////////////////////////////////////////////////
@@ -54,7 +60,9 @@ export function withErrorBoundary<P extends object>(CompToWrap: React.ComponentT
 	return BoundedComp;
 }
 
-/** Catches render failures while keeping error reporting and fallback UI injectable. */
+/**
+ * Catches render failures while keeping error reporting and fallback UI injectable.
+ */
 export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
 	state: ErrorBoundaryState = { error: null };
 	/**
@@ -76,8 +84,8 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
 	componentDidCatch(err: Error, info: React.ErrorInfo): void {
 		try {
 			this.props.onError?.(err, { name: this.props.name ?? 'Component', componentStack: info.componentStack ?? null });
-		} catch (reporterError) {
-			console.error('[Terra error boundary] application reporter failed', reporterError);
+		} catch (reporterErr) {
+			console.error('[Terra error boundary] application reporter failed', reporterErr);
 		}
 		void reportBoundaryError(err, this.props.name ?? 'Component');
 	}

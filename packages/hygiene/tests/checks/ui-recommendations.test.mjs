@@ -1,5 +1,5 @@
 /**
- * packages/hygiene/test/checks/ui-recommendations.test.mjs
+ * packages/hygiene/tests/checks/ui-recommendations.test.mjs
  * Verifies AST-based, on-demand recommendations for native JSX controls.
  */
 

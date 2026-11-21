@@ -1,4 +1,11 @@
 #!/usr/bin/env node
+/**
+ * config/scripts/build-docs.mjs
+ */
+
+/*//////////////////////////////////////////////////
+IMPORTS
+//////////////////////////////////////////////////*/
 
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';

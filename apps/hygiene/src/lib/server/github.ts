@@ -36,5 +36,7 @@ export async function repositoryAdmin(owner: string, name: string, login: string
 		throw err;
 	}
 }
-/** GitHub repository fields used by the dashboard's installation and repository sync. */
+/**
+ * GitHub repository fields used by the dashboard's installation and repository sync.
+ */
 export type GithubRepository = { id: number; name: string; private: boolean; owner?: { login: string }; full_name?: string };

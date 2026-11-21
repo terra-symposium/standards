@@ -22,14 +22,18 @@ import type { LoadBudget, LoadBudgetOverride, LoadGrade, LoadMeasurement, LoadMe
 CONFIG
 //////////////////////////////////////////////////*/
 
-/** Default warning and failure thresholds used when a repo does not override them. */
+/**
+ * Default warning and failure thresholds used when a repo does not override them.
+ */
 export const DEFAULT_LOAD_BUDGET: LoadBudget = { warnMs: 2000, failMs: 5000 };
 
 /*//////////////////////////////////////////////////
 TYPES
 //////////////////////////////////////////////////*/
 
-/** Fully normalized load testing settings. */
+/**
+ * Fully normalized load testing settings.
+ */
 export type NormalizedLoadTestingConfig = {
 	enabled: boolean;
 	defaultBudget: LoadBudget;
@@ -37,7 +41,9 @@ export type NormalizedLoadTestingConfig = {
 	operationBudgets: Readonly<Record<string, LoadBudgetOverride>>;
 	root?: string;
 };
-/** Optional inputs that have higher precedence than quality.json values. */
+/**
+ * Optional inputs that have higher precedence than quality.json values.
+ */
 export type LoadTestingOverrides = LoadTestingConfig;
 
 /*//////////////////////////////////////////////////

@@ -13,13 +13,19 @@ import { useEffect, useState } from 'react';
 CONFIG
 //////////////////////////////////////////////////*/
 
-/** Repository identity and visibility fields shown in the dashboard. */
+/**
+ * Repository identity and visibility fields shown in the dashboard.
+ */
 type Repo = { id: number; owner: string; name: string; private: boolean };
 
-/** Commit measurements and timestamp used by history charts and tables. */
+/**
+ * Commit measurements and timestamp used by history charts and tables.
+ */
 type Commit = { position: number; sha: string; committed_at: string; additions: number; deletions: number; source_lines: number };
 
-/** Repository detail response returned by the dashboard API. */
+/**
+ * Repository detail response returned by the dashboard API.
+ */
 type Detail = {
 	repository: Repo;
 	branches: {

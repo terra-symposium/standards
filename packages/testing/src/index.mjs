@@ -35,7 +35,7 @@ HELPERS
 
 // hygiene-ignore single-use -- Keep the documented listTestFiles declaration so its parameter and return contract remains attached.
 /**
- * Recursively lists source files under test directories and test-named files.
+ * Recursively lists source files under tests directories and test-named files.
  *
  * @param root Directory to search for workspace tests.
  *
@@ -45,14 +45,15 @@ function listTestFiles(root) {
 	const files = [];
 	const visit = dir => {
 		for (const entry of readdirSync(dir, { withFileTypes: true })) {
-			if (entry.name === 'node_modules' || entry.name === '.git') continue;
+			if (entry.name === 'node_modules' || entry.name === '.git' || entry.name === 'dist') continue;
 			const path = resolve(dir, entry.name);
-			if (entry.isDirectory()) visit(path);
-			else if (
-				entry.isFile() &&
-				((/(^|\/)(test|tests)\//u.test(relative(root, path).replaceAll('\\', '/')) && /\.[cm]?[jt]sx?$/u.test(entry.name)) || /\.(?:test|spec)\.[cm]?[jt]sx?$/u.test(entry.name))
-			)
-				files.push(relative(root, path).replaceAll('\\', '/'));
+			const child = relative(root, path).replaceAll('\\', '/');
+			if (entry.isDirectory()) {
+				if (entry.name === 'test' && child !== '.agents/skills/test') throw new Error(`Legacy test directory ${child}; move it to tests/ and update its generator.`);
+				visit(path);
+			} else if (entry.isFile() && ((/(^|\/)tests\//u.test(child) && /\.[cm]?[jt]sx?$/u.test(entry.name)) || /\.(?:test|spec)\.[cm]?[jt]sx?$/u.test(entry.name))) {
+				files.push(child);
+			}
 		}
 	};
 	visit(root);

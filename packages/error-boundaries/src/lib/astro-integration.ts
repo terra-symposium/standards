@@ -4,15 +4,13 @@
  */
 
 /*//////////////////////////////////////////////////
-CONFIG
-//////////////////////////////////////////////////*/
-
-/*//////////////////////////////////////////////////
 FUNCTIONS
 //////////////////////////////////////////////////*/
 
 /**
  * Adds a shared accessible fallback before Astro starts hydrating any page islands.
+ *
+ * @param reporting Optional endpoint and site used to report hydration failures.
  *
  * @return An Astro integration that handles each failed island without replacing the page.
  */

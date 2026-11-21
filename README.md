@@ -50,7 +50,7 @@ Each consumer owns its `quality.json`, native tool settings, application policy,
 | `pnpm run build`       | Build output                  |
 | `pnpm run docs:build`  | Documentation build           |
 
-Hygiene can apply safe fixes; review the diff before committing. No separate browser or Playwright test command is defined here.
+Hygiene can apply safe fixes; review the diff before committing. No separate browser or Playwright test command is defined here. The full Quality gate checks the two historical `archive/docs-backup/` files against their original bytes; Prettier leaves those originals untouched.
 
 ## Contributing
 

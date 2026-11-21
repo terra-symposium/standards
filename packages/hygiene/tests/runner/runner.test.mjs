@@ -1,5 +1,5 @@
 /**
- * packages/hygiene/test/runner/runner.test.mjs
+ * packages/hygiene/tests/runner/runner.test.mjs
  * Verifies configuration normalization, check/autofix toggles, shared analysis construction,
  * CLI dispatch, subprocess status handling, formatter batching, and the explicit command boundaries.
  * Tool invocations use tiny executable fixtures that record their arguments.
@@ -27,17 +27,9 @@ REGEX
 //////////////////////////////////////////////////*/
 const COULD_NOT_FIND_CONFIG_FILE_REGEX = /Could not find config file/;
 
-/*//////////////////////////////////////////////////
-REGEX
-//////////////////////////////////////////////////*/
-
 const FINDINGS_SUMMARY_REGEX = /FINDINGS SUMMARY/;
 const ERR_KNIP_EXPORTS_SRC_MAIN_TS_1_CLIENT_REGEX = /\[ERROR\] knip\/exports: src\/main\.ts:1 Client/;
 const ESLINT_AVAILABLE = existsSync(fileURLToPath(new URL('../../../../config/node_modules/.bin/eslint', import.meta.url)));
-
-/*//////////////////////////////////////////////////
-REGEX
-//////////////////////////////////////////////////*/
 
 const UNKNOWN_QUALITY_CLI_ARG_REGEX = /Unknown quality CLI argument/;
 /**

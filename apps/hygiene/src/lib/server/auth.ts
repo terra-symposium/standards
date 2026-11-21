@@ -15,7 +15,9 @@ import { repositoryAdmin } from './github.js';
 CONFIG
 //////////////////////////////////////////////////*/
 
-/** GitHub identity and decrypted access token associated with an authenticated session. */
+/**
+ * GitHub identity and decrypted access token associated with an authenticated session.
+ */
 export type Session = { github_user_id: number; github_login: string; access_token: string };
 const COOKIE = 'terra_hygiene_session';
 

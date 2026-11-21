@@ -1,3 +1,12 @@
+/**
+ * packages/hygiene/tests/capabilities/formatting/collapse-safety.test.mjs
+ * Checks that formatting compaction preserves source behavior and syntax.
+ */
+
+/*//////////////////////////////////////////////////
+IMPORTS
+//////////////////////////////////////////////////*/
+
 import assert from 'node:assert/strict';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

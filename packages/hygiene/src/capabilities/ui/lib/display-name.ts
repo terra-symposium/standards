@@ -25,10 +25,14 @@ const S_REGEX = /^\s*$/;
 TYPES
 //////////////////////////////////////////////////*/
 
-/** A forwardRef component declaration without an explicit displayName assignment. */
+/**
+ * A forwardRef component declaration without an explicit displayName assignment.
+ */
 export type DisplayNameFinding = { file: string; line: number; column: number; component: string; recommendation: string };
 
-/** A candidate declaration and its owning variable statement. */
+/**
+ * A candidate declaration and its owning variable statement.
+ */
 type Candidate = { name: string; declaration: ts.VariableDeclaration; statement: ts.VariableStatement; scope: ts.Node; assignment: 'missing' | 'matching' | 'conflicting' };
 
 /*//////////////////////////////////////////////////

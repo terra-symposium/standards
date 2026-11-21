@@ -1,5 +1,5 @@
 /**
- * packages/hygiene/test/transforms/object-forwarding.test.mjs
+ * packages/hygiene/tests/transforms/object-forwarding.test.mjs
  * Verifies forwarding thresholds, recommendations, ignored payload calls, and
  * reuse of the shared TypeScript analysis context.
  */

@@ -20,7 +20,9 @@ import type { QualityAnalysis, QualityCfg } from '@terra-symposium/hygiene/core'
 TYPES
 //////////////////////////////////////////////////*/
 
-/** A call-site object that repeats values from a source object. */
+/**
+ * A call-site object that repeats values from a source object.
+ */
 export type ObjectForwardingFinding = { file: string; line: number; column: number; callee: string; source: string; properties: string[]; recommendation: string };
 
 /*//////////////////////////////////////////////////

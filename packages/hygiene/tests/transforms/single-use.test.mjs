@@ -1,5 +1,5 @@
 /**
- * packages/hygiene/test/transforms/single-use.test.mjs
+ * packages/hygiene/tests/transforms/single-use.test.mjs
  * Verifies candidate discovery, semantic safety classification, cross-file
  * type inlining, import editing, report generation, and no-op boundaries.
  * The fixtures intentionally exercise every classification branch. A finding

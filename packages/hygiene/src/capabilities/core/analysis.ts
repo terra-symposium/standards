@@ -18,7 +18,9 @@ import type { QualityCfg } from './types.js';
 CONFIG
 //////////////////////////////////////////////////*/
 
-/** Shared parsed sources, texts, and checker for one quality analysis run. */
+/**
+ * Shared parsed sources, texts, and checker for one quality analysis run.
+ */
 export type QualityAnalysis = ReturnType<typeof createQualityAnalysis>;
 
 /*//////////////////////////////////////////////////

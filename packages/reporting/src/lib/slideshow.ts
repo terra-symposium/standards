@@ -28,7 +28,9 @@ const require = createRequire(import.meta.url);
 TYPES
 //////////////////////////////////////////////////*/
 
-/** Minimal presentation surface required from the slideshow library. */
+/**
+ * Minimal presentation surface required from the slideshow library.
+ */
 type Presentation = {
 	layout: string;
 	author: string;
@@ -47,59 +49,101 @@ type Presentation = {
 	};
 	writeFile: (options: { fileName: string }) => Promise<string>;
 };
-/** Styling tokens translated to the format expected by the PowerPoint writer. */
+/**
+ * Styling tokens translated to the format expected by the PowerPoint writer.
+ */
 type TerraDocBrand = { colors: { ink: string; line: string; muted: string; paper: string; primaryStrong: string; primarySoft: string; secondary: string }; fonts: { body: string } };
-/** Office-compatible hex colors used to keep slide layout code independent of brand tokens. */
+/**
+ * Office-compatible hex colors used to keep slide layout code independent of brand tokens.
+ */
 type ReportColors = { accent: string; ink: string; line: string; muted: string; surface: string; secondary: string; selected: string };
 
-/** Holds screenshot dimensions and review cues for one slide image. */
+/**
+ * Holds screenshot dimensions and review cues for one slide image.
+ */
 type ImgReview = { cues: string[]; height: number; width: number };
 
-/** Optional visible and metadata overrides for a slideshow artifact. */
+/**
+ * Optional visible and metadata overrides for a slideshow artifact.
+ */
 export type SlideshowOptions = { title?: string; author?: string; company?: string; subject?: string; loadTestingEnabled?: boolean };
 
-/** A named screenshot collected by the shared Playwright visual-capture fixture. */
+/**
+ * A named screenshot collected by the shared Playwright visual-capture fixture.
+ */
 export type ScreenshotCapture = {
-	/** Stable test- and application-scoped group key shared across viewports. */
+	/**
+	 * Stable test- and application-scoped group key shared across viewports.
+	 */
 	group: string;
-	/** Stable capture key shared across responsive projects. */
+	/**
+	 * Stable capture key shared across responsive projects.
+	 */
 	key: string;
-	/** Human-readable scenario label shown above its screenshot group. */
+	/**
+	 * Human-readable scenario label shown above its screenshot group.
+	 */
 	title: string;
-	/** Responsive viewport name. */
+	/**
+	 * Responsive viewport name.
+	 */
 	viewport: string;
-	/** Human-readable viewport dimensions. */
+	/**
+	 * Human-readable viewport dimensions.
+	 */
 	viewportSize: string;
-	/** Accessible screenshot file. */
+	/**
+	 * Accessible screenshot file.
+	 */
 	screenshot: string;
-	/** Retry number used to select the final capture for each viewport. */
+	/**
+	 * Retry number used to select the final capture for each viewport.
+	 */
 	retry?: number;
-	/** Run that produced this capture. Missing IDs identify legacy evidence. */
+	/**
+	 * Run that produced this capture. Missing IDs identify legacy evidence.
+	 */
 	runId?: string;
-	/** Time this capture was persisted. */
+	/**
+	 * Time this capture was persisted.
+	 */
 	capturedAt?: string;
-	/** True when the capture predates the latest run marker in its directory. */
+	/**
+	 * True when the capture predates the latest run marker in its directory.
+	 */
 	historical?: boolean;
-	/** True when this capture belongs to the active run and that run has not finalized. */
+	/**
+	 * True when this capture belongs to the active run and that run has not finalized.
+	 */
 	incomplete?: boolean;
 };
 
-/** Presentation metadata and optional logical-run selection for screenshot-only captures. */
+/**
+ * Presentation metadata and optional logical-run selection for screenshot-only captures.
+ */
 export type ScreenshotSlideshowOptions = {
 	title?: string;
 	author?: string;
 	company?: string;
 	subject?: string;
-	/** Restrict a directory rebuild to this run; omit it to include historical captures. */
+	/**
+	 * Restrict a directory rebuild to this run; omit it to include historical captures.
+	 */
 	currentRunId?: string;
-	/** Restrict a directory-tree rebuild to one or more current run IDs per top-level repository folder. */
+	/**
+	 * Restrict a directory-tree rebuild to one or more current run IDs per top-level repository folder.
+	 */
 	currentRunIdsBySource?: Record<string, string | string[]>;
 };
 
-/** One repository's durable screenshot directory and optional exact Playwright run. */
+/**
+ * One repository's durable screenshot directory and optional exact Playwright run.
+ */
 export type ScreenshotDirectorySource = { label: string; directory: string; runId?: string };
 
-/** One test result paired with a graded timing measurement for the report. */
+/**
+ * One test result paired with a graded timing measurement for the report.
+ */
 type LoadRow = { result: VisualResult; measurement: NonNullable<VisualResult['loadMeasurements']>[number] };
 
 /*//////////////////////////////////////////////////

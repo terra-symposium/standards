@@ -21,13 +21,19 @@ REGEX
 
 const S_U_REGEX = /\s+/u;
 
-/** One configured native JSX element and its suggested shared component. */
+/**
+ * One configured native JSX element and its suggested shared component.
+ */
 export type UiRecommendationRule = { element: string; component: string; import: string; variant?: string; types?: string[]; when?: 'always' | 'button-like' | 'text-link'; reason?: string };
 
-/** Source scope and native-element mappings for the on-demand recommendation pass. */
+/**
+ * Source scope and native-element mappings for the on-demand recommendation pass.
+ */
 export type UiRecommendationSettings = { rules?: UiRecommendationRule[]; extensions?: string[]; ignoredFiles?: string[]; ignoredDirectories?: string[] };
 
-/** A source location and the shared component that may replace its native JSX element. */
+/**
+ * A source location and the shared component that may replace its native JSX element.
+ */
 export type UiComponentRecommendation = { file: string; line: number; column: number; element: string; component: string; import: string; variant?: string; reason: string };
 // hygiene-ignore single-use -- Reuse this module-level rule array across scans rather than allocating it on each invocation.
 const DEFAULT_RULES: UiRecommendationRule[] = [

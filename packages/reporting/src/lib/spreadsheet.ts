@@ -260,7 +260,9 @@ export const writeSpreadsheet = async (file: string, run: ReportRun): Promise<vo
 	await book.xlsx.writeFile(file);
 	await neutralizeApplicationMetadata(file);
 };
-/** A report workbook and its repository label for an aggregate evidence workbook. */
+/**
+ * A report workbook and its repository label for an aggregate evidence workbook.
+ */
 export type SpreadsheetSource = { label: string; file: string };
 
 // AGGREGATE WORKBOOK

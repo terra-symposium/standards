@@ -1,5 +1,5 @@
 /**
- * packages/hygiene/test/checks/documentation.test.mjs
+ * packages/hygiene/tests/checks/documentation.test.mjs
  * Exercises documentation policy reporting, human-authored description audits,
  * read-only compatibility APIs, and documented shell command checks.
  * Fixtures ensure missing prose remains an agent-authored diagnostic and that
@@ -21,6 +21,39 @@ import { fixtureFile, fixtureRoot, fixtureText } from '../../support/fixtures.mj
 TESTS
 //////////////////////////////////////////////////*/
 
+test('documentation reports missing path headers and inline TSDoc openings without rewriting prose', () => {
+	const root = fixtureRoot('hygiene-doc-layout-');
+	fixtureFile(root, 'src/missing.mjs', '/** A purpose. */\nexport const value = 1;\n');
+	fixtureFile(root, 'src/wrong.mjs', '/**\n * src/old.mjs\n */\nexport const value = 1;\n');
+	fixtureFile(root, 'src/valid.mjs', '/**\n * src/valid.mjs\n * A purpose.\n */\nexport const value = 1;\n');
+	fixtureFile(root, 'src/type.mjs', '/**\n * src/type.mjs\n */\nexport const value = /** @type {number} */ (1);\n');
+	assert.deepEqual(
+		documentationFindings(createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.mjs'], documentation: { required: { functions: false, fileHeader: true, multilineTsdoc: true } } }))
+			.filter(({ kind }) => kind === 'file' || kind === 'summary')
+			.map(({ file, kind }) => [file, kind]),
+		[
+			['src/missing.mjs', 'file'],
+			['src/missing.mjs', 'summary'],
+			['src/wrong.mjs', 'file'],
+		],
+	);
+	assert.equal(fixtureText(root, 'src/missing.mjs'), '/** A purpose. */\nexport const value = 1;\n');
+});
+
+test('nested Quality roots accept only their own or containing Git repository path', () => {
+	const root = fixtureRoot('hygiene-doc-nested-root-');
+	fixtureFile(root, '.git/HEAD', 'ref: refs/heads/main\n');
+	fixtureFile(root, 'projects/app/src/repository.mjs', '/**\n * projects/app/src/repository.mjs\n */\nexport const value = 1;\n');
+	fixtureFile(root, 'projects/app/src/local.mjs', '/**\n * src/local.mjs\n */\nexport const value = 1;\n');
+	fixtureFile(root, 'projects/app/src/wrong.mjs', '/**\n * app/src/wrong.mjs\n */\nexport const value = 1;\n');
+	assert.deepEqual(
+		documentationFindings(createQualityCfg({ root: `${root}/projects/app`, sourceRoots: ['src'], extensions: ['.mjs'], documentation: { required: { functions: false, fileHeader: true } } }))
+			.filter(({ kind }) => kind === 'file')
+			.map(({ file }) => file),
+		['src/wrong.mjs'],
+	);
+});
+
 test('documentation can require an IMPORTS heading before import declarations', () => {
 	const root = fixtureRoot('hygiene-import-heading-');
 	fixtureFile(root, 'src/missing.tsx', "import React from 'react';\nexport const missing = React.version;\n");
@@ -30,7 +63,38 @@ test('documentation can require an IMPORTS heading before import declarations', 
 		documentationFindings(createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.tsx'], documentation: { required: { functions: false, importSection: true } } }))
 			.filter(({ name }) => name === 'IMPORTS')
 			.map(({ file, kind, line }) => [file, kind, line]),
-		[['src/missing.tsx', 'file', 1]],
+		[['src/missing.tsx', 'section', 1]],
+	);
+});
+
+test('documentation places every import in one populated section and ignores banner text inside strings', () => {
+	const root = fixtureRoot('hygiene-import-structure-');
+	fixtureFile(root, 'src/late.ts', "import first from 'first';\n/*/////\nIMPORTS\n/////*/\nimport second from 'second';\nvoid [first, second];\n");
+	fixtureFile(
+		root,
+		'src/outside.ts',
+		"/*/////\nIMPORTS\n/////*/\nimport first from 'first';\n/*/////\nCONFIG\n/////*/\nconst value = true;\nimport second from 'second';\nvoid [first, second, value];\n",
+	);
+	fixtureFile(root, 'src/empty.ts', '/*/////\nIMPORTS\n/////*/\n// API\n/*/////\nCONFIG\n/////*/\nconst value = true;\nvoid value;\n');
+	fixtureFile(root, 'src/duplicate.ts', "/*/////\nIMPORTS\n/////*/\nimport first from 'first';\n/*/////\nCONFIG\n/////*/\nconst value = first;\n/*/////\nCONFIG\n/////*/\nvoid value;\n");
+	fixtureFile(root, 'src/literal.ts', 'const banner = `/*/////\\nIMPORTS\\n/////*/`;\nvoid banner;\n');
+	fixtureFile(root, 'src/directive.ts', "'use client';\n/*/////\nIMPORTS\n/////*/\nimport thing from 'thing';\nvoid thing;\n");
+	fixtureFile(root, 'src/ambient.ts', "declare module 'virtual' { import type { Thing } from 'thing'; export const thing: Thing; }\n");
+	fixtureFile(root, 'src/front.astro', "---\n/*/////\nIMPORTS\n/////*/\nimport thing from 'thing';\nconst value = thing;\n---\n<div>{value}</div>\n");
+	fixtureFile(root, 'src/front-missing.astro', "---\nimport thing from 'thing';\nconst value = thing;\n---\n<div>{value}</div>\n");
+	assert.deepEqual(
+		documentationFindings(createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts', '.astro'], documentation: { required: { functions: false, importSection: true } } }))
+			.filter(({ kind }) => kind === 'section')
+			.map(({ file, name, line, reason }) => [file, name, line, reason]),
+		[
+			['src/duplicate.ts', 'CONFIG', 9, 'merge duplicate section headings'],
+			['src/empty.ts', 'IMPORTS', 1, 'remove the empty section heading or add its source content'],
+			['src/empty.ts', 'IMPORTS', 1, 'remove the IMPORTS heading from a file without static imports'],
+			['src/front-missing.astro', 'IMPORTS', 2, 'add an IMPORTS section heading before static imports'],
+			['src/late.ts', 'IMPORTS', 2, 'move the IMPORTS section before source code'],
+			['src/late.ts', 'IMPORTS', 1, 'move this static import inside the IMPORTS section'],
+			['src/outside.ts', 'IMPORTS', 9, 'move this static import inside the IMPORTS section'],
+		],
 	);
 });
 
@@ -313,12 +377,22 @@ export function processValue(value: number): number {
 test('documentation policy skips the explicit generated regex-dedup registry marker', () => {
 	const root = fixtureRoot('hygiene-generated-regex-docs-');
 	fixtureFile(root, 'src/shared/regex.mjs', '// Generated by @terra-symposium/hygiene regex-dedup. Do not edit.\nexport const REGEX_WORD_REGEX = () => /word/;\n');
+	fixtureFile(root, 'src/shared/legacy.mjs', '// Generated by @terra-symposium/quality regex-dedup. Do not edit.\nexport const REGEX_WORD_REGEX = () => /word/;\n');
+	fixtureFile(
+		root,
+		'src/shared/documented.mjs',
+		'/**\n * shared/regex.mjs\n */\n\n// Generated by @terra-symposium/hygiene regex-dedup. Do not edit.\nexport const REGEX_WORD_REGEX = () => /word/;\n',
+	);
+	fixtureFile(root, 'src/spoof.mjs', 'export function before() { return 1; }\n// Generated by @terra-symposium/quality regex-dedup. Do not edit.\n');
 	fixtureFile(root, 'src/handwritten.mjs', 'export function handwritten() { return 1; }\n');
 	// hygiene-ignore single-use -- Keep this test configuration named so its fixture scope is established before the check under test runs.
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.mjs'] });
 	assert.deepEqual(
 		documentationFindings(cfg).map(({ file, name }) => [file, name]),
-		[['src/handwritten.mjs', 'handwritten']],
+		[
+			['src/handwritten.mjs', 'handwritten'],
+			['src/spoof.mjs', 'before'],
+		],
 	);
 });
 test('local object methods need their own documentation despite a documented interface', () => {

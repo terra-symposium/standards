@@ -1,5 +1,5 @@
 /**
- * packages/hygiene/test/runner/language-profiles.test.mjs
+ * packages/hygiene/tests/runner/language-profiles.test.mjs
  * Verifies profile selection, source-scoped command expansion, tool requirements, and command overrides.
  * Native tools are replaced with small executable fixtures so the suite runs on Node-only machines.
  */

@@ -117,7 +117,6 @@ _Source: `archive/docs-backup/development/0-general/000-Standards/index.mdx`._
 > 	</a>
 > ))}
 > ```
->
 
 > :::
 >
@@ -171,16 +170,16 @@ _Source: `archive/docs-backup/development/0-general/000-Standards/index.mdx`._
 >
 > ### Convention
 >
-> * Use established idioms for common cases (for example, `i`, `err`).
-> * Use meaningful names for variables and functions.
-> * Use standard case conventions:
-> * `camelCase` for variable names
-> * `PascalCase` for function names
-> * `UPPER_SNAKE_CASE` for constants; meaning EVERY variable without a dynamic value but an explicit value.
-> * Use `$` as a prefix for nanostores to distinguish them from local variables.
-> * Use `Data` as a suffix for documents (e.g., `RoomsData`).
-> * Use `Id` as a suffix for ID strings (e.g., `roomId`).
-> * Use document titles without suffix for counts (`rooms`).
+> - Use established idioms for common cases (for example, `i`, `err`).
+> - Use meaningful names for variables and functions.
+> - Use standard case conventions:
+> - `camelCase` for variable names
+> - `PascalCase` for function names
+> - `UPPER_SNAKE_CASE` for constants; meaning EVERY variable without a dynamic value but an explicit value.
+> - Use `$` as a prefix for nanostores to distinguish them from local variables.
+> - Use `Data` as a suffix for documents (e.g., `RoomsData`).
+> - Use `Id` as a suffix for ID strings (e.g., `roomId`).
+> - Use document titles without suffix for counts (`rooms`).
 >
 > ### Brevity
 >
@@ -259,10 +258,10 @@ _Source: `archive/docs-backup/development/0-general/000-Standards/index.mdx`._
 >
 > Strict types are non-negotiable for everything. When strict mode is fully enforced, external boundaries cannot be trusted, and data structures must be explicitly validated.
 >
-> * Every variable, function, and parameter must have a strict type definition.
-> * Explicitly define return types for all functions.
-> * Do not rely on implicit types or inference for public APIs.
-> * Do not use `any`. Default to `unknown` if a type's shape is not yet known.
+> - Every variable, function, and parameter must have a strict type definition.
+> - Explicitly define return types for all functions.
+> - Do not rely on implicit types or inference for public APIs.
+> - Do not use `any`. Default to `unknown` if a type's shape is not yet known.
 >
 > <table>
 > 	<thead>
@@ -297,12 +296,12 @@ _Source: `archive/docs-backup/development/0-general/000-Standards/index.mdx`._
 >
 > Clients like Postgres, Sanity, and Netlify Blobs do not inherently know the shape of your data.
 >
-> * Always pass generics to data-fetching methods to prevent them returning `any` or `unknown`.
-> * If a third-party library has missing type definitions, define a local interface and cast the import to restore type safety.
+> - Always pass generics to data-fetching methods to prevent them returning `any` or `unknown`.
+> - If a third-party library has missing type definitions, define a local interface and cast the import to restore type safety.
 >
 > :::example[Typing external boundaries]
 >
-> ```typescript
+> ````typescript
 > ```typescript
 > // explicitly pass generics
 > await client.query<{ id: string; name: string }>(...);
@@ -313,8 +312,7 @@ _Source: `archive/docs-backup/development/0-general/000-Standards/index.mdx`._
 > 	connect: () => Promise<void>;
 > }
 > const pool = rawPool as unknown as DbPool;
-> ```
->
+> ````
 
 > :::
 >
@@ -364,11 +362,10 @@ _Source: `archive/docs-backup/development/0-general/000-Standards/index.mdx`._
 >
 > :::example[Casting framework locals]
 >
-> ```typescript
+> ````typescript
 > ```typescript
 > const locals = (context as { locals?: DocsLocals }).locals;
-> ```
->
+> ````
 
 > :::
 >
@@ -376,13 +373,13 @@ _Source: `archive/docs-backup/development/0-general/000-Standards/index.mdx`._
 >
 > Prefer shared, domain-aligned types over ad hoc definitions.
 >
-> * Whenever possible, borrow types from `@lib/types` instead of redefining them.
-> * If minor modifications are needed, extend existing types from `@lib/types` rather than duplicating their structure.
-> * Prefer typing that already defined in `@lib/types` to keep mental models consistent across files.
+> - Whenever possible, borrow types from `@lib/types` instead of redefining them.
+> - If minor modifications are needed, extend existing types from `@lib/types` rather than duplicating their structure.
+> - Prefer typing that already defined in `@lib/types` to keep mental models consistent across files.
 >
 > :::example[Borrowing and extending from @lib/types]
 >
-> ```typescript
+> ````typescript
 > ```typescript
 > // types
 >
@@ -400,8 +397,7 @@ _Source: `archive/docs-backup/development/0-general/000-Standards/index.mdx`._
 > 	// ...
 > 	featureFlags: ['beta-dashboard'],
 > };
-> ```
->
+> ````
 
 > :::
 >
@@ -409,13 +405,13 @@ _Source: `archive/docs-backup/development/0-general/000-Standards/index.mdx`._
 >
 > Define types where they maximise clarity and minimise assertions.
 >
-> * Define types at the top level of the data rather than using nested assertions.
-> * Avoid `as` assertions when a proper type definition can express the constraint.
-> * Do not abstract types if they are only used once in the file; use inline type annotations.
+> - Define types at the top level of the data rather than using nested assertions.
+> - Avoid `as` assertions when a proper type definition can express the constraint.
+> - Do not abstract types if they are only used once in the file; use inline type annotations.
 >
 > :::example[Top-level data types]
 >
-> ```typescript
+> ````typescript
 > ```typescript
 > // define the type alongside the data and avoid nested assertions
 > type AnalyticsConfig = {
@@ -430,8 +426,7 @@ _Source: `archive/docs-backup/development/0-general/000-Standards/index.mdx`._
 > 		{ name: 'scroll', value: 5 },
 > 	],
 > };
-> ```
->
+> ````
 
 > :::
 >
@@ -447,7 +442,7 @@ _Source: `archive/docs-backup/development/0-general/000-Standards/index.mdx`._
 >
 > :::example[Commit Message]
 >
-> ```plaintext
+> ````plaintext
 > ```plaintext
 > feat: implement secure token rotation
 >
@@ -455,10 +450,9 @@ _Source: `archive/docs-backup/development/0-general/000-Standards/index.mdx`._
 > Tokens now refresh 5 minutes before expiration to ensure seamless UX.
 >
 > Refs: #112
-> ```
->
+> ````
 
-:::
+> :::
 
 ## Commenting
 
@@ -655,8 +649,6 @@ _Source: `archive/docs-backup/development/0-general/1-commenting.mdx`._
 > This hierarchy is strictly required. You MUST use sections as breaks, you MUST use groups with proper whitespace etc.
 >
 > AI Agents when returning code may NOT strip comments, and MUST provide where possible.
->
->
 
 > :::
 >
@@ -676,8 +668,6 @@ _Source: `archive/docs-backup/development/0-general/1-commenting.mdx`._
 >  * Shared MDX editor toolbar controls for docs formatting, block, and component insertion.
 >  */
 > ```
->
->
 
 > :::
 >
@@ -735,8 +725,6 @@ _Source: `archive/docs-backup/development/0-general/1-commenting.mdx`._
 >
 > // TYPES
 > ```
->
->
 
 > :::
 >

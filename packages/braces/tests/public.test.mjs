@@ -1,3 +1,12 @@
+/**
+ * packages/braces/tests/public.test.mjs
+ * Checks the Braces package entrypoint and its public runtime behavior.
+ */
+
+/*//////////////////////////////////////////////////
+IMPORTS
+//////////////////////////////////////////////////*/
+
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import braces from '../index.js';

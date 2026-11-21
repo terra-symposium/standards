@@ -17,9 +17,13 @@ REGEX
 //////////////////////////////////////////////////*/
 
 const S_S_REGEX = /^[^/\s]+\/[^/\s]+$/;
-/** Per-commit history data retained for a repository branch. */
+/**
+ * Per-commit history data retained for a repository branch.
+ */
 type HistoryCommit = { sha: string; authorDate: string; additions: number; deletions: number; sourceLines: number };
-/** Validated snapshot or delta containing the commits through a branch head. */
+/**
+ * Validated snapshot or delta containing the commits through a branch head.
+ */
 export type HistoryReport = {
 	schemaVersion: 1;
 	mode: 'snapshot' | 'delta';
@@ -30,7 +34,9 @@ export type HistoryReport = {
 	generatedAt: string;
 	commits: HistoryCommit[];
 };
-/** Normalized build report containing summary counts and optional validated history. */
+/**
+ * Normalized build report containing summary counts and optional validated history.
+ */
 export type BuildReport = {
 	schemaVersion: 1;
 	repository: string;

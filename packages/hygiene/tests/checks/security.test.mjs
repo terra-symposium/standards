@@ -1,5 +1,5 @@
 /**
- * packages/hygiene/test/checks/security.test.mjs
+ * packages/hygiene/tests/checks/security.test.mjs
  * Verifies environment visibility, forbidden source patterns, client secret
  * boundaries, dotenv loading, and runtime process-environment exceptions.
  */

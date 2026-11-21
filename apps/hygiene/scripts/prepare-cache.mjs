@@ -1,3 +1,10 @@
+/**
+ * apps/hygiene/scripts/prepare-cache.mjs
+ */
+/*//////////////////////////////////////////////////
+IMPORTS
+//////////////////////////////////////////////////*/
+
 import { lstat, mkdir, readlink, symlink } from 'node:fs/promises';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';

@@ -71,16 +71,8 @@ REGEX
 
 const NON_WORKSPACE_DIRS = new Set(['.git', '.next', '.nuxt', '.turbo', '.vercel', '.vite', '.astro', 'build', 'coverage', 'dist', 'node_modules', 'out', 'target', 'vendor']);
 
-/*//////////////////////////////////////////////////
-REGEX
-//////////////////////////////////////////////////*/
-
 const R_N_REGEX = /\r?\n/;
 const SHARED_REGEX = /\/\*|\/\//;
-
-/*//////////////////////////////////////////////////
-REGEX
-//////////////////////////////////////////////////*/
 
 const CJS_JS_JSX_MJS_TS_TSX_REGEX = /\.(?:cjs|js|jsx|mjs|ts|tsx)$/;
 /**
@@ -202,7 +194,9 @@ const ESLINT_API_FALLBACK = 78;
 const FOCUSED_ESLINT_FALLBACK = 'HYGIENE_FOCUSED_ESLINT_UNAVAILABLE';
 const ESLINT_GLOB_SPECIALS = new Set(['*', '?', '[', ']', '{', '}', '(', ')', '!', '\\']);
 
-/** Stable, artifact-safe summary of a single CLI invocation. */
+/**
+ * Stable, artifact-safe summary of a single CLI invocation.
+ */
 export type QualityJsonReport = {
 	schemaVersion: 1;
 	generatedAt: string;
@@ -220,10 +214,6 @@ let qualityCheckName: string | undefined;
 let qualityDetails: string[] = [];
 let qualitySpinner: { worker: Worker; state: Int32Array } | undefined;
 
-/*//////////////////////////////////////////////////
-REGEX
-//////////////////////////////////////////////////*/
-
 const C_M_JS_TS_X_REGEX = /\.(?:c|m)?(?:js|ts)x?$/;
 const C_M_JS_TS_X_CLASS_2 = /\.(?:(?:c|m)?(?:js|ts)x?)$/;
 export type { QualityAutofixName, QualityCfg, QualityCheckName, QualityAnalysis, QualityOptions } from '@terra-symposium/hygiene/core';
@@ -240,10 +230,14 @@ type QualityInvocation = NonNullable<QualityCfg['qualityCommands']>[number] & {
  * Fixed phase assigned to a selected quality command.
  */
 type QualityPhase = LanguageQualityPhase;
-/** Workspace package metadata used only to identify a selected package script. */
+/**
+ * Workspace package metadata used only to identify a selected package script.
+ */
 type WorkspaceManifest = { directory: string; name?: string; scripts: Record<string, unknown> };
 const WORKSPACE_MANIFESTS = new Map<string, WorkspaceManifest[]>();
-/** Shared finding shapes rendered by the generic source-check reporter. */
+/**
+ * Shared finding shapes rendered by the generic source-check reporter.
+ */
 type GenericFinding =
 	| { file?: string; message: string }
 	| { file: string; line: number; column: number; element: string; message: string; fixable: boolean }
@@ -1448,12 +1442,18 @@ function isPureUnusedInit(node: ts.Expression): boolean {
 	if (ts.isObjectLiteralExpression(node)) return node.properties.every(p => ts.isPropertyAssignment(p) && !ts.isComputedPropertyName(p.name) && isPureUnusedInit(p.initializer));
 	return false;
 }
-/** One file's parsed ESLint messages used by the dead-code coordinator. */
+/**
+ * One file's parsed ESLint messages used by the dead-code coordinator.
+ */
 type EslintReport = { filePath: string; messages: Array<{ ruleId?: string; line: number; column: number; message?: string }> };
-/** A safe-to-fix or manual-review result from a dead-code detector. */
+/**
+ * A safe-to-fix or manual-review result from a dead-code detector.
+ */
 type DeadCodeFinding = { rule: string; file: string; line: number; name: string; severity: 'error'; autofixable: boolean; reason: string; agentAction: string };
 
-/** One source-file record in Knip's machine-readable issue inventory. */
+/**
+ * One source-file record in Knip's machine-readable issue inventory.
+ */
 type KnipIssue = { file: string; [kind: string]: unknown };
 
 /**
@@ -2556,7 +2556,9 @@ function fixKnipExports(cfg: QualityCfg, changedFiles: Set<string>): void {
 	}
 }
 
-/** Finds export names that configured source files import and actually reference. */
+/**
+ * Finds export names that configured source files import and actually reference.
+ */
 const importedExportConsumerCache = new WeakMap<QualityCfg, { signature: string; consumers: Map<string, Set<string>> }>();
 /**
  * Builds a cache of exported names referenced by configured source consumers.

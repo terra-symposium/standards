@@ -13,11 +13,17 @@ import { XMLParser } from 'fast-xml-parser';
 CONFIG
 //////////////////////////////////////////////////*/
 
-/** Passed, failed, and skipped testcase totals parsed from a JUnit report. */
+/**
+ * Passed, failed, and skipped testcase totals parsed from a JUnit report.
+ */
 export type TestCounts = { passed: number; failed: number; skipped: number };
-/** Total, enabled, clean, and finding counts parsed from a Terra Quality report. */
+/**
+ * Total, enabled, clean, and finding counts parsed from a Terra Quality report.
+ */
 export type QualityCounts = { total: number; enabled: number; clean: number; findings: number };
-/** Generic XML node used while traversing parsed JUnit content. */
+/**
+ * Generic XML node used while traversing parsed JUnit content.
+ */
 type XmlNode = Record<string, unknown>;
 
 /*//////////////////////////////////////////////////

@@ -1,5 +1,5 @@
 /**
- * packages/hygiene/test/runner/quality.test.mjs
+ * packages/hygiene/tests/runner/quality.test.mjs
  * Exercises consolidated quality checks, fixers, and CLI behavior.
  */
 

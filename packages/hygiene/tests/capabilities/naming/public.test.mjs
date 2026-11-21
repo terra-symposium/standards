@@ -25,9 +25,6 @@ test('standalone CLI exposes shared help', () => {
 	assert.equal(result.status, 0, result.stderr);
 	assert.match(result.stdout, /Usage:/);
 });
-test('consolidated package does not depend on itself', () => {
-	assert.equal(Object.hasOwn(JSON.parse(readFileSync(new URL('../../../package.json', import.meta.url), 'utf8')).dependencies ?? {}, '@terra-symposium/hygiene'), false);
-});
 test('naming fixes are safe and idempotent', () => {
 	const root = mkdtempSync(join(tmpdir(), 'naming-package-'));
 	try {

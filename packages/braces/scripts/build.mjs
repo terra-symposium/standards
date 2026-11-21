@@ -1,3 +1,10 @@
+/**
+ * packages/braces/scripts/build.mjs
+ */
+/*//////////////////////////////////////////////////
+IMPORTS
+//////////////////////////////////////////////////*/
+
 import { readdir } from 'node:fs/promises';
 import { spawnSync } from 'node:child_process';
 

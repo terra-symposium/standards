@@ -1,5 +1,5 @@
 /**
- * packages/hygiene/test/transforms/naming.test.mjs
+ * packages/hygiene/tests/transforms/naming.test.mjs
  * Verifies the public naming and alias-analysis APIs independently from the
  * CLI dispatcher, including tokenisation, scope safety, callback initials,
  * protected framework names, and alias replacement semantics.
@@ -418,6 +418,17 @@ test('safe naming fixes preserve authored TSDoc while renaming code identifiers'
 	assert.equal(updated.slice(0, updated.indexOf('\nconst ')), documentation);
 	assert.match(updated, /const compBrightness = \(normApiPitchers\) => normApiPitchers;/u);
 	assert.ok(updated.endsWith('void compBrightness;\n'));
+});
+test('for-of event bindings use the concise loop alias', () => {
+	const root = fixtureRoot('hygiene-naming-event-loop-');
+	fixtureFile(root, 'src/main.ts', 'for (const event of events) console.log(event.type);\n');
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
+	assert.deepEqual(
+		namingFindings(cfg).map(({ name, suggestion }) => [name, suggestion]),
+		[['event', 'e']],
+	);
+	assert.equal(fixNaming(cfg), 1);
+	assert.equal(fixtureText(root, 'src/main.ts'), 'for (const e of events) console.log(e.type);\n');
 });
 test('safe naming fixes rename only Astro frontmatter callbacks and preserve template bindings', () => {
 	const root = fixtureRoot('hygiene-naming-astro-callbacks-');

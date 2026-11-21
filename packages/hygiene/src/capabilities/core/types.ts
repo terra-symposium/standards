@@ -6,7 +6,9 @@
 CONFIG
 //////////////////////////////////////////////////*/
 
-/** Check switches accepted by the shared quality.json schema. */
+/**
+ * Check switches accepted by the shared quality.json schema.
+ */
 export const QUALITY_CHECK_NAMES = [
 	'document',
 	'format',
@@ -34,9 +36,13 @@ export const QUALITY_CHECK_NAMES = [
 	'error-boundaries',
 	'github',
 ] as const;
-/** A supported identifier for an enabled quality check. */
+/**
+ * A supported identifier for an enabled quality check.
+ */
 export type QualityCheckName = (typeof QUALITY_CHECK_NAMES)[number];
-/** Autofix switches accepted by the shared quality.json schema. */
+/**
+ * Autofix switches accepted by the shared quality.json schema.
+ */
 export type QualityAutofixName =
 	| 'document'
 	| 'format'
@@ -54,9 +60,13 @@ export type QualityAutofixName =
 	| 'documentedCommands'
 	| 'errorBoundaries'
 	| 'duplicateImports';
-/** Options shared by an independently runnable quality capability API and CLI. */
+/**
+ * Options shared by an independently runnable quality capability API and CLI.
+ */
 export type CapabilityOptions = { fix: boolean; all: boolean; files?: string[]; configPath?: string; args?: string[] };
-/** Shared normalized configuration shape retained by the aggregate quality runner. */
+/**
+ * Shared normalized configuration shape retained by the aggregate quality runner.
+ */
 export type QualityCfg = {
 	root: string;
 	configRoot?: string;
@@ -96,7 +106,7 @@ export type QualityCfg = {
 		>
 	> & { document?: false };
 	documentation?: {
-		required?: { types?: boolean; functions?: boolean; exportedFunctions?: boolean; noInlineFunctions?: boolean; importSection?: boolean };
+		required?: { types?: boolean; functions?: boolean; exportedFunctions?: boolean; noInlineFunctions?: boolean; importSection?: boolean; fileHeader?: boolean; multilineTsdoc?: boolean };
 		commandRoots?: string[];
 		cAuthors?: Record<string, string>;
 	};
@@ -134,7 +144,11 @@ export type QualityCfg = {
 		operationBudgets?: Record<string, { warnMs?: number; failMs?: number }>;
 	};
 };
-/** Source paths and extensions used to scope each independent quality capability. */
+/**
+ * Source paths and extensions used to scope each independent quality capability.
+ */
 export type QualityScope = Pick<QualityCfg, 'root' | 'sourceRoots' | 'includeRoots' | 'skippedDirectories' | 'skippedFiles' | 'extensions'>;
-/** Runner switches that control strictness, external commands, and recommendation phases. */
+/**
+ * Runner switches that control strictness, external commands, and recommendation phases.
+ */
 export type QualityOptions = { fix: boolean; all: boolean; strict: boolean; skipCommands?: boolean; skipRecommendations?: boolean };

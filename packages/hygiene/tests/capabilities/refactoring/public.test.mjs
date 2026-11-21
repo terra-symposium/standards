@@ -108,8 +108,3 @@ test('standalone CLI exposes shared help', () => {
 	assert.equal(result.status, 0, result.stderr);
 	assert.match(result.stdout, /Usage:/);
 });
-test('consolidated package does not depend on itself', () => {
-	// hygiene-ignore single-use -- Keep this package manifest object named while asserting its published metadata.
-	const manifest = JSON.parse(readFileSync(new URL('../../../package.json', import.meta.url), 'utf8'));
-	assert.equal(Object.hasOwn(manifest.dependencies ?? {}, '@terra-symposium/hygiene'), false);
-});

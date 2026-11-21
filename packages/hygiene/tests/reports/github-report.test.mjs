@@ -1,5 +1,5 @@
 /**
- * packages/hygiene/test/reports/github-report.test.mjs
+ * packages/hygiene/tests/reports/github-report.test.mjs
  */
 
 /*//////////////////////////////////////////////////

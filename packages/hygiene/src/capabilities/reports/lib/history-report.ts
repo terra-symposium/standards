@@ -19,10 +19,14 @@ const S_REGEX = /\s+/;
 const GIT_I_REGEX = /\.git$/i;
 const A_F_D_40_I_REGEX = /^[a-f\d]{40}$/i;
 
-/** Per-commit history data that is safe to persist in the dashboard. */
+/**
+ * Per-commit history data that is safe to persist in the dashboard.
+ */
 export type HistoryCommitReport = { sha: string; authorDate: string; additions: number; deletions: number; sourceLines: number };
 
-/** Versioned local Git history snapshot or push delta. */
+/**
+ * Versioned local Git history snapshot or push delta.
+ */
 export type HistoryReport = {
 	schemaVersion: 1;
 	mode: 'snapshot' | 'delta';

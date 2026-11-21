@@ -1,6 +1,6 @@
 # Repository output and caches
 
-Use this alongside the [Quality hygiene scope](../../hygiene/references/hygiene.md) when the task is to reduce repository clutter. For an execution request, inspect every repository in scope and finish by deleting, moving, or merging safe candidates. For an audit or plan request, stop at a reviewable inventory and proposed changes.
+Use this alongside the [Quality hygiene scope](../../quality/references/hygiene.md) when the task is to reduce repository clutter. For an execution request, inspect every repository in scope and finish by deleting, moving, or merging safe candidates. For an audit or plan request, stop at a reviewable inventory and proposed changes.
 
 ## 1. Establish scope and safety
 

@@ -1,5 +1,29 @@
 # @terra-symposium/hygiene
 
+## 2.5.4
+
+### Patch Changes
+
+- Resolve package imports from absolute source paths and support packages with a style-only export.
+
+## 2.5.3
+
+### Patch Changes
+
+- Resolve installed package asset exports and CSS entrypoints in import checks.
+
+## 2.5.2
+
+### Patch Changes
+
+- Recognize generated regex registries whose marker follows a single file documentation prelude.
+
+## 2.5.1
+
+### Patch Changes
+
+- Validate the complete `IMPORTS` section in JavaScript, TypeScript, and Astro frontmatter, including section placement, duplicate and empty headings, and module directives before imports.
+
 ## 2.5.0
 
 ### Minor Changes

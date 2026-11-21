@@ -1,3 +1,12 @@
+/**
+ * packages/hygiene/tests/runner/autofix-safety.test.mjs
+ * Checks that Quality autofixes preserve source files across failures.
+ */
+
+/*//////////////////////////////////////////////////
+IMPORTS
+//////////////////////////////////////////////////*/
+
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { chmodSync, existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';

@@ -1,4 +1,11 @@
 #!/usr/bin/env node
+/**
+ * .agents/skills/quality/scripts/create-quality-chats.mjs
+ */
+
+/*//////////////////////////////////////////////////
+IMPORTS
+//////////////////////////////////////////////////*/
 
 import { spawn, spawnSync } from 'node:child_process';
 import { readdir, readFile } from 'node:fs/promises';
@@ -189,7 +196,9 @@ function taskPrompt(repo, skillText) {
 }
 
 // hygiene-ignore single-use -- Keep the documented printHelp declaration so its parameter and return contract remains attached.
-/** Prints the supported command-line options. */
+/**
+ * Prints the supported command-line options.
+ */
 function printHelp() {
 	process.stdout.write(
 		[

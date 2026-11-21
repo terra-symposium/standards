@@ -2,7 +2,7 @@
 
 Use for repository hygiene across environment and security health, source readability, and behavior-preserving compaction. Apply the sections that match the requested scope and keep each change within the repository's ownership and validation rules.
 
-For first-time Husky and Changesets setup, use [Initialisation](../../hygiene/SKILL.md). For rolling a released Terra package through Desktop consumers and restarting their existing local servers, use [Package Update](../../package/references/update.md).
+For rolling a released Terra package through Desktop consumers and restarting their existing local servers, use [Package Update](../../package/references/update.md).
 
 ## Repository and environment health
 
@@ -177,6 +177,12 @@ describeGroup('customer identity resolution', () => {
 ```
 
 Run a Node group by passing its literal title to the suite runner, or use Playwright's native `--grep` against a `test.describe` title. Do not implement a second test-selection DSL in suite code. Use `describe.each` only where the selected runner provides it; otherwise register data-driven cases with a loop and include the case label in each test title.
+
+### Render coverage
+
+Every function that renders output must have at least one Playwright test assigned to it. This includes page, component, server-rendered markup, rich-text, canvas, diagram, media-preview, and document renderers. Map each render function to its owning test ID in the source or coverage inventory. One user journey may cover several render functions when it reaches and asserts each output; do not clone the same browser assertion into separate files to satisfy the count. Verify that the test collects and executes in the declared project and relevant viewport. A source or unit assertion alone does not satisfy this render-coverage rule.
+
+Keep test files under the repository's canonical `tests/` root. Trace scripts, templates, generated files, and CI references when retiring a legacy `test/` path, then run the generator and confirm that it does not recreate the old directory.
 
 ### Quality bar
 

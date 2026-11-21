@@ -1,5 +1,5 @@
 /**
- * packages/hygiene/test/runner/port.test.mjs
+ * packages/hygiene/tests/runner/port.test.mjs
  * Verifies that port acquisition releases existing listeners safely.
  */
 

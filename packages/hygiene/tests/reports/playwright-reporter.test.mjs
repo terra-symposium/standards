@@ -1,5 +1,5 @@
 /**
- * packages/hygiene/test/reports/playwright-reporter.test.mjs
+ * packages/hygiene/tests/reports/playwright-reporter.test.mjs
  * Verifies Playwright reporter retries, terminal statuses, and output ordering.
  */
 

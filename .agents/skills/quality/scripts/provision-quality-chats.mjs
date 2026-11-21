@@ -1,4 +1,11 @@
 #!/usr/bin/env node
+/**
+ * .agents/skills/quality/scripts/provision-quality-chats.mjs
+ */
+/*//////////////////////////////////////////////////
+IMPORTS
+//////////////////////////////////////////////////*/
+
 import { execFile, spawn } from 'node:child_process';
 import { homedir } from 'node:os';
 import { basename, join, resolve } from 'node:path';
@@ -101,7 +108,9 @@ function submit(repo, env, prompt) {
 }
 
 // hygiene-ignore single-use -- Keep the documented main declaration so its parameter and return contract remains attached.
-/** Discovers repositories, validates Cloud access, and submits selected tasks. */
+/**
+ * Discovers repositories, validates Cloud access, and submits selected tasks.
+ */
 async function main() {
 	const config = options(process.argv.slice(2));
 	const selected = (

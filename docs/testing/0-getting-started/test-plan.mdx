@@ -34,7 +34,7 @@ Use `config/tests.json` for new repositories. A suite has a stable name, one exe
 }
 ```
 
-The runner discovers test files in `test/` and `tests/` directories and names matching `*.test.*` or `*.spec.*`. It rejects invalid globs, duplicate suite invocations, overlapping ownership, and discovered test files that no suite owns.
+The runner discovers files under `tests/` and names matching `*.test.*` or `*.spec.*`. It rejects legacy `test/` directories, invalid globs, duplicate suite invocations, overlapping ownership, and discovered test files that no suite owns. Update any script or template that recreates `test/` before running the plan.
 
 ## Select a run
 

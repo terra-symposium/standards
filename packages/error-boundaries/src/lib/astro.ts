@@ -7,9 +7,13 @@
 CONFIG
 //////////////////////////////////////////////////*/
 
-/** Supported HTTP statuses with shared user-facing error-page copy. */
+/**
+ * Supported HTTP statuses with shared user-facing error-page copy.
+ */
 export type ErrorStatus = 400 | 401 | 403 | 404 | 500 | 502 | 503;
-/** Heading and description shown for one supported error status. */
+/**
+ * Heading and description shown for one supported error status.
+ */
 export type ErrorStatusCopy = { title: string; description: string };
 export const ERROR_STATUS_COPY: Readonly<Record<ErrorStatus, ErrorStatusCopy>> = Object.freeze({
 	400: { title: 'Bad Request', description: 'The server could not understand the request due to invalid syntax.' },

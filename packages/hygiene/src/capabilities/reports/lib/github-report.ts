@@ -15,14 +15,22 @@ import { spawnSync as spawnSyncImpl } from 'node:child_process';
 TYPES
 //////////////////////////////////////////////////*/
 
-/** GitHub security or dependency-management feature recorded in a repository report. */
+/**
+ * GitHub security or dependency-management feature recorded in a repository report.
+ */
 export type GitHubFeature = 'dependencyGraph' | 'dependabotAlerts' | 'malwareAlerts' | 'securityUpdates' | 'versionUpdates' | 'groupedUpdates' | 'secretScanning' | 'pushProtection' | 'codeScanning';
-/** Whether the authenticated GitHub view confirms a feature is available. */
+/**
+ * Whether the authenticated GitHub view confirms a feature is available.
+ */
 export type GitHubFeatureState = 'enabled' | 'disabled' | 'unknown';
-/** Why a GitHub REST resource could not provide a reliable result. */
+/**
+ * Why a GitHub REST resource could not provide a reliable result.
+ */
 export type GitHubResourceState = 'available' | 'disabled' | 'not-configured' | 'permission-denied' | 'unauthenticated' | 'unavailable';
 
-/** A GitHub issue, alert, access limitation, or required-setting finding. */
+/**
+ * A GitHub issue, alert, access limitation, or required-setting finding.
+ */
 export type GitHubFinding = {
 	repository: string;
 	category: 'issue' | 'dependabot' | 'malware' | 'code-scanning' | 'secret-scanning' | 'setting' | 'access';
@@ -35,9 +43,13 @@ export type GitHubFinding = {
 	agentInstructions: string;
 };
 
-/** Endpoint status and count, with null preserving an unknown count. */
+/**
+ * Endpoint status and count, with null preserving an unknown count.
+ */
 export type GitHubResourceReport = { state: GitHubResourceState; count: number | null; detail?: string };
-/** Metrics, settings, endpoint status, and findings for one repository. */
+/**
+ * Metrics, settings, endpoint status, and findings for one repository.
+ */
 export type GitHubRepositoryReport = {
 	repository: string;
 	url: string;
@@ -54,14 +66,22 @@ export type GitHubRepositoryReport = {
 	findings: GitHubFinding[];
 };
 
-/** Agent-safe, read-only snapshot for one or more GitHub repositories. */
+/**
+ * Agent-safe, read-only snapshot for one or more GitHub repositories.
+ */
 export type GitHubReport = { schemaVersion: 1; generatedAt: string; state: 'complete' | 'partial' | 'skipped'; detail?: string; repositories: GitHubRepositoryReport[] };
 
-/** Normalized success or failure from a GitHub REST request. */
+/**
+ * Normalized success or failure from a GitHub REST request.
+ */
 type ApiResult = { ok: true; value: unknown } | { ok: false; state: GitHubResourceState; detail: string };
-/** Injectable boundary used by the report collector and its callers. */
+/**
+ * Injectable boundary used by the report collector and its callers.
+ */
 type GitHubApi = (path: string, paginate?: boolean) => ApiResult;
-/** An object after narrowing untrusted JSON data. */
+/**
+ * An object after narrowing untrusted JSON data.
+ */
 type JsonObject = Record<string, unknown>;
 const REQUIRED_FEATURE_LABELS: Record<GitHubFeature, string> = {
 	dependencyGraph: 'Dependency graph',

@@ -23,12 +23,10 @@ REGEX
 
 const C_M_JS_JSX_TS_TSX_U_REGEX = /\.(?:astro|(?:c|m)?(?:js|jsx|ts|tsx))$/u;
 
-/*//////////////////////////////////////////////////
-REGEX
-//////////////////////////////////////////////////*/
-
 const A_Z_REGEX = /^[A-Z]/;
-/** Context used when shortening an identifier without changing its meaning. */
+/**
+ * Context used when shortening an identifier without changing its meaning.
+ */
 type RenameKind = { numericIndex?: boolean; callback?: boolean; reserved?: string[]; disabled?: boolean };
 export const IDENTIFIER_REPLACEMENTS = replacementMap([
 	[['administrator', 'administration'], 'admin'],
@@ -124,14 +122,18 @@ export const PROTECTED_IDENTIFIERS = new Set([
 export const PROTECTED_PATH_PARTS = new Set(['node_modules', '.next', 'out', 'build', 'coverage', 'src/components/ui']);
 export const PROTECTED_FILENAMES = new Set(['page.tsx', 'page.ts', 'layout.tsx', 'layout.ts', 'route.ts', 'route.tsx', 'error.tsx', 'loading.tsx', 'not-found.tsx', 'index.ts', 'index.tsx']);
 export const CODE_EXTS = new Set(['.js', '.jsx', '.mjs', '.cjs', '.ts', '.tsx', '.mts', '.cts']);
-/** A naming issue or concise-name suggestion found in one source file. */
+/**
+ * A naming issue or concise-name suggestion found in one source file.
+ */
 export type NamingFinding = { file: string; name: string; suggestion: string; severity: 'error'; start: number; safe?: boolean; reason?: string };
 
 /*//////////////////////////////////////////////////
 ALIASES
 //////////////////////////////////////////////////*/
 
-/** A declaration that only gives a stable local binding a second local name. */
+/**
+ * A declaration that only gives a stable local binding a second local name.
+ */
 export type AliasFinding = { file: string; line: number; kind: 'const' | 'type'; name: string; replacement: string };
 /**
  * Narrows an initializer to a property or element access that can be aliased safely.
@@ -401,6 +403,7 @@ export function isCallbackDeclaration(node: ts.Identifier): boolean {
  * @return Concise name appropriate for the declaration's scope and callback role.
  */
 export function renameDeclaration(n: ts.Identifier): string {
+	if (n.text === 'event' && ts.isVariableDeclaration(n.parent) && ts.isVariableDeclarationList(n.parent.parent) && ts.isForOfStatement(n.parent.parent.parent)) return 'e';
 	return renameId(n.text, callbackKind(n));
 }
 

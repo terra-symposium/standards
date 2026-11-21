@@ -1,5 +1,5 @@
 /**
- * packages/error-boundaries/test/error-boundaries.test.mjs
+ * packages/error-boundaries/tests/error-boundaries.test.mjs
  * Verifies shared error-boundary exports and recovery behavior.
  */
 
@@ -62,8 +62,8 @@ test('captures component metadata and exposes reset-key recovery state', () => {
 	);
 });
 test('reports only after the configured receiver accepts a boundary failure', async () => {
-	const originalWindow = globalThis.window;
-	const originalFetch = globalThis.fetch;
+	// hygiene-ignore single-use -- The browser globals must be restored after this test's mocks.
+	const origGlobals = { window: globalThis.window, fetch: globalThis.fetch };
 	const submissions = [];
 	try {
 		globalThis.window = { location: { pathname: '/docs/example/' }, __terraBoundaryReporting: { endpoint: '/api/error-report', site: 'docs' } };
@@ -80,10 +80,11 @@ test('reports only after the configured receiver accepts a boundary failure', as
 		assert.equal(submissions[1].body.delivery, 'email');
 		globalThis.fetch = async () => ({ ok: false });
 		assert.equal(await reportBoundaryError(new Error('broken'), 'Panel'), false);
-		globalThis.fetch = async () => { throw new Error('offline'); };
+		globalThis.fetch = async () => {
+			throw new Error('offline');
+		};
 		assert.equal(await reportBoundaryError(new Error('broken'), 'Panel'), false);
 	} finally {
-		globalThis.window = originalWindow;
-		globalThis.fetch = originalFetch;
+		Object.assign(globalThis, origGlobals);
 	}
 });

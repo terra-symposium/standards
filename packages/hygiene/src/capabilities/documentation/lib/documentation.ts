@@ -10,8 +10,8 @@ IMPORTS
 // API
 import ts from 'typescript';
 import { displayPath, srcFiles } from '@terra-symposium/hygiene/core';
-import { extname, relative, resolve, sep } from 'node:path';
-import { readFileSync, renameSync, unlinkSync, writeFileSync } from 'node:fs';
+import { dirname, extname, relative, resolve, sep } from 'node:path';
+import { existsSync, readFileSync, renameSync, unlinkSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 
 // TYPES
@@ -24,21 +24,9 @@ REGEX
 const N_REGEX = /(?<=\n)/;
 const R_N_END_REGEX = /\r?\n$/;
 
-/*//////////////////////////////////////////////////
-REGEX
-//////////////////////////////////////////////////*/
-
 const TYPE_S_REGEX = /^type\s+/;
 
-/*//////////////////////////////////////////////////
-REGEX
-//////////////////////////////////////////////////*/
-
 const R_N_REGEX = /\r?\n/;
-
-/*//////////////////////////////////////////////////
-REGEX
-//////////////////////////////////////////////////*/
 
 const S_ONLY_REGEX = /^\s*$/;
 // hygiene-ignore single-use -- Keep the documented S_S_G_REGEX declaration so its parameter and return contract remains attached.
@@ -49,10 +37,6 @@ const S_ONLY_REGEX = /^\s*$/;
  */
 const S_S_G_REGEX = () => /\/\*\*[\s\S]*?\*\//g;
 
-/*//////////////////////////////////////////////////
-REGEX
-//////////////////////////////////////////////////*/
-
 const S_REGEX = /^\s*/;
 const S_CLASS_3 = /^\s*\* ?/;
 const UFEFF_REGEX = /^\uFEFF/;
@@ -61,10 +45,14 @@ const S_CLASS_5 = /^\{[^}]+\}\s*/;
 const SUPPORTED = new Set(['.cjs', '.cts', '.js', '.jsx', '.mjs', '.mts', '.ts', '.tsx']);
 const IMPORT_SUPPORTED = new Set([...SUPPORTED, '.astro']);
 
-/** Documentation requirements that select which declarations need source comments. */
+/**
+ * Documentation requirements that select which declarations need source comments.
+ */
 export type DocumentationRequirements = NonNullable<NonNullable<QualityCfg['documentation']>['required']>;
 
-/** A repeated named import reported within one source file. */
+/**
+ * A repeated named import reported within one source file.
+ */
 export type DuplicateImportFinding = { file: string; line: number; module: string };
 const PNPM_FENCE = /^\s*```(?:sh|bash|zsh|shell)\s*$/i;
 const FENCE_CLOSE = /^\s*```\s*$/;
@@ -140,20 +128,26 @@ export function fixDocumentedCommands(cfg: QualityCfg): number {
 DOCUMENTATION
 //////////////////////////////////////////////////*/
 
-/** One missing, malformed, or detached source-documentation item. */
+/**
+ * One missing, malformed, or detached source-documentation item.
+ */
 export type DocumentationFinding = {
 	file: string;
 	line: number;
 	column: number;
 	name: string;
-	kind: 'file' | 'summary' | 'param' | 'return' | 'tag' | 'type' | 'function' | 'inline' | 'orphan';
+	kind: 'file' | 'summary' | 'param' | 'return' | 'tag' | 'type' | 'function' | 'inline' | 'orphan' | 'section';
 	reason: string;
 	severity: 'error';
 };
 export const DOCUMENTATION_DESCRIPTION_NOTICE = 'Ask an agent for meaningful documentation prose; this check only reports missing descriptions and never generates them in bulk.';
-/** Source offsets and exact comment text for one TSDoc block. */
+/**
+ * Source offsets and exact comment text for one TSDoc block.
+ */
 type TSDocBlock = { start: number; end: number; text: string };
-/** Character offset and normalized text for one parsed TSDoc line. */
+/**
+ * Character offset and normalized text for one parsed TSDoc line.
+ */
 type TSDocLine = { offset: number; text: string };
 const DESC_OPTIONAL_TAGS = new Set(['abstract', 'const', 'default', 'event', 'hideconstructor', 'internal', 'package', 'private', 'protected', 'public', 'readonly', 'sealed', 'virtual']);
 
@@ -512,7 +506,9 @@ function cDocumentationFindings(cfg: QualityCfg, file: string, src: string, docu
 	}
 	return findings;
 }
-/** Clang AST fields used to inspect C declarations and their Doxygen comments. */
+/**
+ * Clang AST fields used to inspect C declarations and their Doxygen comments.
+ */
 type CNode = {
 	kind?: string;
 	name?: string;
@@ -817,6 +813,21 @@ function descFindingsForFile(cfg: QualityCfg, file: string, src: string, parsed:
 	const blocks = tsdocBlocks(src, parsed);
 	const findings: DocumentationFinding[] = [];
 	const header = fileHeaderBlock(src, blocks);
+	if (cfg.documentation?.required?.fileHeader) {
+		const expected = displayPath(cfg, file).replaceAll('\\', '/');
+		let repoRoot = resolve(cfg.root);
+		while (!existsSync(resolve(repoRoot, '.git'))) {
+			const parent = dirname(repoRoot);
+			if (parent === repoRoot) break;
+			repoRoot = parent;
+		}
+		if (!header || ![expected, existsSync(resolve(repoRoot, '.git')) ? relative(repoRoot, file).replaceAll('\\', '/') : expected].includes(tsdocLines(header).find(line => line.text)?.text ?? ''))
+			findings.push(documentationCommentReport(file, parsed, header?.start ?? 0, expected, 'file', `start the file with a TSDoc header whose first content line is ${expected}`, cfg));
+	}
+	if (cfg.documentation?.required?.multilineTsdoc)
+		for (const block of blocks)
+			if (!/^\/\*\*\r?\n/u.test(block.text) && !/^\/\*\*\s*@(?:type|satisfies)\b/u.test(block.text))
+				findings.push(documentationCommentReport(file, parsed, block.start, '<TSDoc opening>', 'summary', 'put the TSDoc description on the line after /**', cfg));
 	const attached = new Set<number>();
 	const requiredAttached = new Set<number>();
 	const requirements = { functions: true, ...cfg.documentation?.required };
@@ -934,6 +945,61 @@ function documentationReport(file: string, parsed: ts.SourceFile, node: ts.Node,
 }
 
 /**
+ * Checks authored section fences and the position of static imports without
+ * treating section-like text inside strings or comments as source structure.
+ *
+ * @param cfg Quality configuration used for repository-relative locations.
+ * @param file Absolute path of the source file.
+ * @param src JavaScript, TypeScript, or Astro frontmatter source.
+ * @param parsed Parsed source used to identify static import declarations.
+ * @param lineOffset Number of lines before extracted Astro frontmatter.
+ *
+ * @return Missing, misplaced, duplicate, and empty section findings.
+ */
+function sectionFindings(cfg: QualityCfg, file: string, src: string, parsed: ts.SourceFile, lineOffset = 0): DocumentationFinding[] {
+	const scanner = ts.createScanner(ts.ScriptTarget.Latest, false, ts.LanguageVariant.Standard, src);
+	const sections: { start: number; end: number; label: string }[] = [];
+	const code: number[] = [];
+	for (let token = scanner.scan(); token !== ts.SyntaxKind.EndOfFileToken; token = scanner.scan()) {
+		if (token === ts.SyntaxKind.MultiLineCommentTrivia) {
+			const match = /^\/\*\/{3,}[ \t]*\r?\n[ \t]*([A-Z][A-Z0-9 &/_-]*)[ \t]*\r?\n\/{3,}\*\/$/u.exec(scanner.getTokenText());
+			if (match) sections.push({ start: scanner.getTokenPos(), end: scanner.getTextPos(), label: match[1]!.trim() });
+		} else if (token > ts.SyntaxKind.LastTriviaToken) code.push(scanner.getTokenPos());
+	}
+	const findings: DocumentationFinding[] = [];
+	const report = (offset: number, label: string, reason: string): void => {
+		const pos = parsed.getLineAndCharacterOfPosition(offset);
+		findings.push({ file: displayPath(cfg, file), line: pos.line + lineOffset + 1, column: pos.character + 1, name: label, kind: 'section', reason, severity: 'error' });
+	};
+	const seen = new Set<string>();
+	for (const [index, section] of sections.entries()) {
+		if (seen.has(section.label)) report(section.start, section.label, 'merge duplicate section headings');
+		seen.add(section.label);
+		if (!code.some(offset => offset >= section.end && offset < (sections[index + 1]?.start ?? src.length)))
+			report(section.start, section.label, 'remove the empty section heading or add its source content');
+	}
+	const imports = parsed.statements.filter((statement): statement is ts.ImportDeclaration | ts.ImportEqualsDeclaration => ts.isImportDeclaration(statement) || ts.isImportEqualsDeclaration(statement));
+	const importSection = sections.find(section => section.label === 'IMPORTS');
+	const directives: { start: number; end: number }[] = [];
+	for (const statement of parsed.statements) {
+		if (!ts.isExpressionStatement(statement) || !ts.isStringLiteral(statement.expression) || !new Set(['use client', 'use server', 'use strict']).has(statement.expression.text)) break;
+		directives.push({ start: statement.getStart(parsed), end: statement.getEnd() });
+	}
+	if (imports.length && !importSection) report(imports[0]!.getStart(parsed), 'IMPORTS', 'add an IMPORTS section heading before static imports');
+	if (!imports.length && importSection) report(importSection.start, 'IMPORTS', 'remove the IMPORTS heading from a file without static imports');
+	if (importSection) {
+		if (code.some(offset => offset < importSection.start && !directives.some(directive => offset >= directive.start && offset < directive.end)))
+			report(importSection.start, 'IMPORTS', 'move the IMPORTS section before source code');
+		for (const declaration of imports) {
+			const offset = declaration.getStart(parsed);
+			if (offset < importSection.end || offset >= (sections.find(section => section.start > importSection.start)?.start ?? src.length))
+				report(offset, 'IMPORTS', 'move this static import inside the IMPORTS section');
+		}
+	}
+	return findings;
+}
+
+/**
  * Evaluates documentation requirements for one source file.
  *
  * @param cfg Quality configuration used to render diagnostic paths.
@@ -946,23 +1012,22 @@ function documentationReport(file: string, parsed: ts.SourceFile, node: ts.Node,
 function documentationFindingsForFile(
 	cfg: QualityCfg,
 	file: string,
-	requirements: { types?: boolean; functions?: boolean; exportedFunctions?: boolean; noInlineFunctions?: boolean; importSection?: boolean },
+	requirements: { types?: boolean; functions?: boolean; exportedFunctions?: boolean; noInlineFunctions?: boolean; importSection?: boolean; fileHeader?: boolean; multilineTsdoc?: boolean },
 	analysis?: QualityAnalysis,
 ): DocumentationFinding[] {
-	if (!documentationSupported(file)) return [];
+	if (!documentationSupported(file) && extname(file) !== '.astro') return [];
 	const src = analysis?.texts.get(file) ?? readFileSync(file, 'utf8');
 	// Regex-dedup registries are generated API plumbing marked as non-editable;
 	// their exported factories inherit documentation from the authored source use sites.
-	if (/^\/\/ Generated by @terra-symposium\/hygiene regex-dedup\. Do not edit\.$/mu.test(src)) return [];
+	if (/^\uFEFF?(?:\/\*\*(?:(?!\*\/)[\s\S])*\*\/\s*)?\/\/ Generated by @terra-symposium\/(?:hygiene|quality) regex-dedup\. Do not edit\.(?:\r?\n|$)/u.test(src)) return [];
+	if (extname(file) === '.astro') {
+		const frontmatter = duplicateImportSrc(file, src);
+		if (!frontmatter || !requirements.importSection) return [];
+		return sectionFindings(cfg, file, frontmatter.text, ts.createSourceFile(file, frontmatter.text, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS), frontmatter.lineOffset);
+	}
 	const parsed = analysis?.sources.get(file) ?? ts.createSourceFile(file, src, ts.ScriptTarget.Latest, true, documentationScriptKind(file));
 	const findings = descFindingsForFile(cfg, file, src, parsed);
-	if (requirements.importSection) {
-		const firstImport = parsed.statements.find(ts.isImportDeclaration);
-		if (firstImport) {
-			if (!(ts.getLeadingCommentRanges(src, 0) ?? []).some(comment => comment.end <= firstImport.getStart(parsed) && /(?:^|\n)\s*IMPORTS\s*(?:\r?\n|$)/u.test(src.slice(comment.pos, comment.end))))
-				findings.push(documentationReport(file, parsed, firstImport, 'IMPORTS', 'file', 'add an IMPORTS block heading before imports', cfg));
-		}
-	}
+	if (requirements.importSection) findings.push(...sectionFindings(cfg, file, src, parsed));
 
 	const visit = (node: ts.Node): void => {
 		if (requirements.types && (ts.isClassDeclaration(node) || ts.isEnumDeclaration(node) || ts.isInterfaceDeclaration(node) || ts.isTypeAliasDeclaration(node)) && !documented(node, src))
@@ -1022,8 +1087,8 @@ export function documentationFindings(cfg: QualityCfg, analysis?: QualityAnalysi
 	// hygiene-ignore single-use -- Complete the other source scan before selecting primary C declarations below.
 	const otherFindings = (
 		sharedAnalysis?.files
-			? sharedAnalysis.files.filter(f => documentationSrcIncluded(cfg, f) && documentationSupported(f))
-			: srcFiles(cfg).filter(f => documentationSrcIncluded(cfg, f) && documentationSupported(f))
+			? sharedAnalysis.files.filter(f => documentationSrcIncluded(cfg, f) && (documentationSupported(f) || (requirements.importSection && extname(f) === '.astro')))
+			: srcFiles(cfg).filter(f => documentationSrcIncluded(cfg, f) && (documentationSupported(f) || (requirements.importSection && extname(f) === '.astro')))
 	).flatMap(f => documentationFindingsForFile(cfg, f, requirements, sharedAnalysis));
 	const primaryMissing = new Map<string, string>();
 	for (const [target, signature] of missingTargets) if (!primaryMissing.has(signature)) primaryMissing.set(signature, target);

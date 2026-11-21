@@ -1,5 +1,5 @@
 /**
- * packages/hygiene/test/transforms/collapse.test.mjs
+ * packages/hygiene/tests/transforms/collapse.test.mjs
  * Verifies syntax-aware object and type-body whitespace collapsing.
  */
 

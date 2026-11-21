@@ -1,5 +1,8 @@
 #!/usr/bin/env node
 
+/**
+ * packages/hygiene/src/lib/dev.ts
+ */
 // Starts a local development server after acquiring its configured TCP port.
 
 /*//////////////////////////////////////////////////

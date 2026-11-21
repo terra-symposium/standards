@@ -11,13 +11,12 @@ import fs from 'node:fs/promises';
 import { execFileSync } from 'node:child_process';
 import { randomInt } from 'node:crypto';
 
-// COMPONENTS
-import Color from 'colorjs.io';
-import { Presentation, PresentationFile } from '@oai/artifact-tool';
-
 /*//////////////////////////////////////////////////
 CONFIG
 //////////////////////////////////////////////////*/
+
+// The presentation skill supplies these packages in its temporary build workspace.
+const [Color, { Presentation, PresentationFile }] = await Promise.all(['colorjs.io', '@oai/artifact-tool'].map((name, i) => import(name).then(module => (i === 0 ? module.default : module))));
 
 const [inputPath, outputPath] = process.argv.slice(2);
 const report = JSON.parse(await fs.readFile(inputPath, 'utf8'));

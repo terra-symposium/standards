@@ -1,4 +1,11 @@
 #!/usr/bin/env node
+/**
+ * .agents/skills/all-repos/scripts/create-repo-chats.mjs
+ */
+
+/*//////////////////////////////////////////////////
+IMPORTS
+//////////////////////////////////////////////////*/
 
 import { readdir, readFile } from 'node:fs/promises';
 import { basename, resolve } from 'node:path';

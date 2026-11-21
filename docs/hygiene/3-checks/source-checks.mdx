@@ -7,7 +7,7 @@ These checks inspect configured source files. Use `enabledChecks.<name>` to sele
 
 ## Document
 
-`enabledChecks.document` checks declarations against `documentation.required`. The fields are `types` (classes, enums, interfaces, aliases), `functions` (named declarations), `exportedFunctions`, `noInlineFunctions` (arrow and function expressions), and `importSection` (an `IMPORTS` block heading before import declarations). The `document` command reports findings; `maintain` is its compatibility alias. There is no generated comment scaffold: write descriptions after reading the implementation and callers. Default changed-file scope includes staged, unstaged, and untracked files.
+`enabledChecks.document` checks declarations against `documentation.required`. The fields are `types` (classes, enums, interfaces, aliases), `functions` (named declarations), `exportedFunctions`, `noInlineFunctions` (arrow and function expressions), and `importSection` (one populated `IMPORTS` section containing every static import). The section check covers JavaScript, TypeScript, and Astro frontmatter. It rejects duplicate or empty section headings and a heading without imports. The `document` command reports findings; `maintain` is its compatibility alias. There is no generated comment scaffold: write descriptions after reading the implementation and callers. Default changed-file scope includes staged, unstaged, and untracked files.
 
 ## Format
 

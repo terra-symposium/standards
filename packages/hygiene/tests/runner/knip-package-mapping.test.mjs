@@ -1,3 +1,12 @@
+/**
+ * packages/hygiene/tests/runner/knip-package-mapping.test.mjs
+ * Checks repository package mapping for Knip and dead-code discovery.
+ */
+
+/*//////////////////////////////////////////////////
+IMPORTS
+//////////////////////////////////////////////////*/
+
 import assert from 'node:assert/strict';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

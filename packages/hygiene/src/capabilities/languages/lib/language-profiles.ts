@@ -23,10 +23,14 @@ import type { QualityAutofixName, QualityCfg, QualityCheckName } from '@terra-sy
 TYPES
 //////////////////////////////////////////////////*/
 
-/** Tool executable and the minimum version a profile has been checked against. */
+/**
+ * Tool executable and the minimum version a profile has been checked against.
+ */
 export type LanguageProfileTool = { command: string; versionArgs: string[]; minimumVersion: [number, number, number]; install: string };
 
-/** One native command supplied by a language profile. */
+/**
+ * One native command supplied by a language profile.
+ */
 export type LanguageProfileCheck = {
 	name: string;
 	phase: 'Format' | 'Static quality' | 'Tests' | 'Framework / type checks' | 'Build' | 'Repository health';
@@ -40,19 +44,29 @@ export type LanguageProfileCheck = {
 	requiresCompiledClasses?: boolean;
 };
 
-/** Fixed aggregate phase that owns a profile check. */
+/**
+ * Fixed aggregate phase that owns a profile check.
+ */
 export type LanguageQualityPhase = LanguageProfileCheck['phase'];
 
-/** Autofixes available to language profiles; authored TSDoc remains a manual documentation check. */
+/**
+ * Autofixes available to language profiles; authored TSDoc remains a manual documentation check.
+ */
 type LangAutofixName = Exclude<QualityAutofixName, 'document'>;
 
-/** A profile check omitted because its source or optional project configuration is absent. */
+/**
+ * A profile check omitted because its source or optional project configuration is absent.
+ */
 export type SkippedLanguageCheck = { name: string; profileId: string; reason: string };
 
-/** Resolved native checks and skip explanations for the selected profiles. */
+/**
+ * Resolved native checks and skip explanations for the selected profiles.
+ */
 export type LanguageProfileResolution = { checks: (LanguageProfileCheck & { profileId: LanguageProfileId; files: string[] })[]; skipped: SkippedLanguageCheck[]; failed: SkippedLanguageCheck[] };
 
-/** Built-in check names that every language must explicitly support or explain as inapplicable. */
+/**
+ * Built-in check names that every language must explicitly support or explain as inapplicable.
+ */
 export const QUALITY_CAPABILITY_CHECKS: readonly QualityCheckName[] = [
 	'document',
 	'format',
@@ -80,7 +94,9 @@ export const QUALITY_CAPABILITY_CHECKS: readonly QualityCheckName[] = [
 	'github',
 ];
 
-/** Built-in autofixes that every language must explicitly support or explain as inapplicable. */
+/**
+ * Built-in autofixes that every language must explicitly support or explain as inapplicable.
+ */
 export const QUALITY_CAPABILITY_AUTOFIXES: readonly LangAutofixName[] = [
 	'duplicateImports',
 	'format',
@@ -98,7 +114,9 @@ export const QUALITY_CAPABILITY_AUTOFIXES: readonly LangAutofixName[] = [
 	'documentedCommands',
 ];
 
-/** Support status and explanation for one quality capability in a language profile. */
+/**
+ * Support status and explanation for one quality capability in a language profile.
+ */
 export type LanguageCapability = { status: 'supported' | 'not-applicable'; provider: string; reason?: string };
 
 /**
@@ -184,7 +202,9 @@ const NATIVE_AUTOFIXES: Record<LanguageProfileId, Partial<Record<LangAutofixName
 	python: { format: 'Ruff formatter and Ruff --fix' },
 };
 
-/** Full check and autofix disposition for every built-in language. */
+/**
+ * Full check and autofix disposition for every built-in language.
+ */
 export const LANGUAGE_CAPABILITIES: Record<'js-ts' | LanguageProfileId, { checks: Record<QualityCheckName, LanguageCapability>; autofixes: Record<LangAutofixName, LanguageCapability> }> = {
 	'js-ts': {
 		checks: Object.fromEntries(QUALITY_CAPABILITY_CHECKS.map(n => [n, shared(n === 'document' ? 'Terra Quality JS/TS documentation analyzer' : 'Terra Quality JS/TS analyzer')])) as Record<
@@ -247,14 +267,22 @@ export const LANGUAGE_CAPABILITIES: Record<'js-ts' | LanguageProfileId, { checks
 DATA
 //////////////////////////////////////////////////*/
 
-/** Installed profile identifiers accepted by `quality.json`. */
+/**
+ * Installed profile identifiers accepted by `quality.json`.
+ */
 export const LANGUAGE_PROFILE_IDS = ['c', 'java', 'python'] as const;
-/** Union of the profile identifiers distributed by this package. */
+/**
+ * Union of the profile identifiers distributed by this package.
+ */
 export type LanguageProfileId = (typeof LANGUAGE_PROFILE_IDS)[number];
-/** Profile command after source discovery and placeholder expansion. */
+/**
+ * Profile command after source discovery and placeholder expansion.
+ */
 export type ResolvedLanguageCheck = LanguageProfileCheck & { profileId: LanguageProfileId; files: string[] };
 
-/** Opinionated starter checks and install guidance, kept as data for easy extension. */
+/**
+ * Opinionated starter checks and install guidance, kept as data for easy extension.
+ */
 export const LANGUAGE_PROFILES: readonly { id: LanguageProfileId; sourceExtensions: string[]; checks: LanguageProfileCheck[] }[] = [
 	{
 		id: 'c',

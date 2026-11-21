@@ -27,7 +27,9 @@ REGEX
  */
 const A_Z0_9_GI_REGEX = () => /[^a-z0-9-]/gi;
 
-/** The default responsive viewport catalog used by the shared reporter. */
+/**
+ * The default responsive viewport catalog used by the shared reporter.
+ */
 export const VISUAL_VIEWPORTS = {
 	mobile: { height: 844, width: 390 },
 	sm: { height: 800, width: 640 },
@@ -41,13 +43,19 @@ export const VISUAL_VIEWPORTS = {
 TYPES
 //////////////////////////////////////////////////*/
 
-/** A named viewport catalog supplied by an application or test suite. */
+/**
+ * A named viewport catalog supplied by an application or test suite.
+ */
 export type ViewportCatalog = Readonly<Record<string, { height: number; width: number }>>;
 
-/** Names available in the default viewport catalog. */
+/**
+ * Names available in the default viewport catalog.
+ */
 export type VisualViewportName = keyof typeof VISUAL_VIEWPORTS;
 
-/** A resolved viewport with the name retained for project and artifact labels. */
+/**
+ * A resolved viewport with the name retained for project and artifact labels.
+ */
 export type VisualViewport = { name: string; height: number; width: number };
 
 /*//////////////////////////////////////////////////
@@ -133,27 +141,49 @@ export const viewportSizeLabel = (viewport: string, catalog: ViewportCatalog = V
 	return `${size.width}×${size.height}`;
 };
 
-/** Options for the shared responsive Playwright configuration helper. */
+/**
+ * Options for the shared responsive Playwright configuration helper.
+ */
 export type ResponsivePlaywrightOptions = {
-	/** Run scenarios only in projects named by native @viewport:<name> tags. */
+	/**
+	 * Run scenarios only in projects named by native @viewport:<name> tags.
+	 */
 	viewportPolicy?: 'all' | 'declared';
-	/** Viewports available to this suite; defaults to the shared catalog. */
+	/**
+	 * Viewports available to this suite; defaults to the shared catalog.
+	 */
 	viewportCatalog?: ViewportCatalog;
-	/** Project names that represent manual, single-run browser captures. */
+	/**
+	 * Project names that represent manual, single-run browser captures.
+	 */
 	singleRunProjects?: readonly string[];
-	/** Disposable Playwright output directory, separate from timestamped reports. */
+	/**
+	 * Disposable Playwright output directory, separate from timestamped reports.
+	 */
 	outputDir?: string;
-	/** Parent directory for timestamped reports and their shared images folder. */
+	/**
+	 * Parent directory for timestamped reports and their shared images folder.
+	 */
 	outputRoot?: string;
-	/** Persistent directory used to accumulate screenshot and metadata pairs across runs. */
+	/**
+	 * Persistent directory used to accumulate screenshot and metadata pairs across runs.
+	 */
 	screenshotsDirectory?: string;
-	/** Optional structured results file to add to the workbook exactly once. */
+	/**
+	 * Optional structured results file to add to the workbook exactly once.
+	 */
 	supplementalResultsFile?: string;
-	/** Optional path to the repository's quality.json; defaults to the current directory. */
+	/**
+	 * Optional path to the repository's quality.json; defaults to the current directory.
+	 */
 	qualityConfigFile?: string;
-	/** Explicit timing settings that override matching quality.json values. */
+	/**
+	 * Explicit timing settings that override matching quality.json values.
+	 */
 	loadTesting?: LoadTestingConfig;
-	/** Write the shared PowerPoint from keyed screenshots only, with no text slides. */
+	/**
+	 * Write the shared PowerPoint from keyed screenshots only, with no text slides.
+	 */
 	screenshotOnlySlideshow?: boolean;
 };
 

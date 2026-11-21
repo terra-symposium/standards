@@ -1,6 +1,5 @@
 {
 	"$schema": "../packages/hygiene/quality.schema.json",
-	"root": ".",
 	"sourceRoots": ["."],
 	"languageProfiles": ["c", "java", "python"],
 	"extensions": [
@@ -50,7 +49,7 @@
 		"repositories": ["salesphere-vh/salesphere", "Terra-Symposium/terra-symposium-website", "Terra-Symposium/standards", "kaimacann/portfolio"],
 		"requiredFeatures": ["dependencyGraph", "dependabotAlerts", "malwareAlerts", "securityUpdates", "versionUpdates", "groupedUpdates"]
 	},
-	"qualityCommands": [],
+	"qualityCommands": [{ "name": "Docs archive integrity", "command": "bash", "args": ["scripts/check-docs-archive.sh"] }],
 	"autofix": {
 		"document": false
 	},
@@ -59,7 +58,10 @@
 		"required": {
 			"types": true,
 			"functions": true,
-			"exportedFunctions": true
+			"exportedFunctions": true,
+			"importSection": true,
+			"fileHeader": true,
+			"multilineTsdoc": true
 		}
 	},
 	"performancePatterns": {

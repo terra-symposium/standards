@@ -1,5 +1,5 @@
 /**
- * packages/hygiene/test/transforms/inline-if.test.mjs
+ * packages/hygiene/tests/transforms/inline-if.test.mjs
  * Verifies safe single-statement conditional inlining and idempotence.
  */
 

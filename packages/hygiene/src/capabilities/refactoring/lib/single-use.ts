@@ -1,5 +1,5 @@
 /**
- * packages/hygiene/src/lib/single-use.ts
+ * packages/hygiene/src/capabilities/refactoring/lib/single-use.ts
  * AST inventory and safe autofix for single-consumer declarations (types, and helpers).
  */
 
@@ -47,7 +47,8 @@ const C_M_JS_JSX_TS_TSX_REGEX = /\.(?:c|m)?(?:js|jsx|ts|tsx)$/;
 HELPERS
 //////////////////////////////////////////////////*/
 
-/** Reports progress at the start, end, and roughly twenty evenly spaced points of an analysis pass.
+/**
+ * Reports progress at the start, end, and roughly twenty evenly spaced points of an analysis pass.
  *
  * @param label Name of the analysis phase shown to the user.
  * @param idx Number of completed items in the current phase.
@@ -56,9 +57,13 @@ HELPERS
 const reportProgress = (label: string, idx: number, total: number): void => {
 	if (idx === 0 || idx === total || idx % Math.max(1, Math.ceil(total / 20)) === 0) qualityProgress(label, idx, total);
 };
-/** A single-consumer source issue and the safety recommendation for handling it. */
+/**
+ * A single-consumer source issue and the safety recommendation for handling it.
+ */
 export type SingleUseFinding = { file: string; line: number; name: string; decision: 'INLINE' | 'REVIEW'; autofixable: boolean; reason: string; agentAction: string };
-/** A declaration eligible for consumer counting and possible inlining. */
+/**
+ * A declaration eligible for consumer counting and possible inlining.
+ */
 type Candidate = { file: string; source: ts.SourceFile; statement: ts.Statement; name: ts.Identifier; symbol: ts.Symbol; kind: 'type' | 'interface' | 'variable' | 'function' };
 /**
  * Detects authored TSDoc that the single-use fixer must preserve for agent review.
@@ -72,9 +77,13 @@ const hasMeaningfulLeadingTSDoc = (candidate: Candidate): boolean =>
 		const comment = candidate.source.text.slice(range.pos, range.end);
 		return comment.startsWith('/**') && !S_S_W_CM_JT_SX_B_REGEX.test(comment);
 	});
-/** One resolved use of a candidate declaration. */
+/**
+ * One resolved use of a candidate declaration.
+ */
 type Ref = { file: string; source: ts.SourceFile; node: ts.Identifier };
-/** A single-use exception, valid only when it names a declaration and explains its boundary. */
+/**
+ * A single-use exception, valid only when it names a declaration and explains its boundary.
+ */
 type SingleUseIgnoreDirective = { source: ts.SourceFile; line: number; reason?: string; candidateKey?: string };
 const SINGLE_USE_IGNORE_PREFIX_REGEX = /^\/\/\s*hygiene-ignore\s+single-use\b/;
 const SINGLE_USE_IGNORE_DOC_GAP_REGEX = /^[ \t]*\r?\n[ \t]*\/\*\*[\s\S]*?\*\/[ \t]*\r?\n[ \t]*$/;

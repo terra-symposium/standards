@@ -64,10 +64,14 @@ const S_G_REGEX = () => /\s+/g;
 HELPERS
 //////////////////////////////////////////////////*/
 
-/** Counts exact edits applied and conservative candidates left for review. */
+/**
+ * Counts exact edits applied and conservative candidates left for review.
+ */
 export type PatternFixResult = { fixed: number; skipped: number };
 
-/** A repeated collection lookup inside another collection callback. */
+/**
+ * A repeated collection lookup inside another collection callback.
+ */
 export type PerformancePatternFinding = { file: string; line: number; column: number; method: string; receiver: string; recommendation: string };
 const COLLECTION_CALLBACKS = new Set(['filter', 'flatMap', 'forEach', 'map', 'reduce', 'some']);
 const REPEATED_LOOKUPS = new Set(['find', 'filter', 'includes', 'indexOf', 'some']);
@@ -655,7 +659,9 @@ function genFilePrefix(src: string, marker: string): string {
 	const leadingDocumentation = src.slice(0, markerIndex);
 	return `${leadingDocumentation}${leadingDocumentation && !leadingDocumentation.endsWith('\n') ? '\n' : ''}${marker}\n`;
 }
-/** Parsed regular-expression candidate and the source context needed to rewrite it safely. */
+/**
+ * Parsed regular-expression candidate and the source context needed to rewrite it safely.
+ */
 type RegexCandidate = { file: string; source: string; expression: string; node: ts.Node; ast: ts.SourceFile; rewritable: boolean };
 
 /**

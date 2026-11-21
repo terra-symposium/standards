@@ -3,7 +3,6 @@ title: Report React boundary errors
 description: Connect the callback to safe application telemetry without making fallback recovery depend on delivery.
 ---
 
-
 The boundary callback is an application-owned extension point. The shared package does not choose an analytics provider, send events, or persist error details.
 
 ## Handle the callback
@@ -51,13 +50,13 @@ The event path below is specific to the Terra Website, not behavior implemented 
 		{ id: 'callback', type: 'process', data: { title: 'Application onError' } },
 		{ id: 'sanitize', type: 'process', data: { title: 'Map and sanitize event' } },
 		{ id: 'collector', type: 'process', data: { title: 'Validate and rate-limit' } },
-		{ id: 'dashboard', type: 'terminal', data: { title: 'Review metadata' } }
+		{ id: 'dashboard', type: 'terminal', data: { title: 'Review metadata' } },
 	]}
 	edges={[
 		{ id: 'boundary-callback', source: 'boundary', target: 'callback' },
 		{ id: 'callback-sanitize', source: 'callback', target: 'sanitize' },
 		{ id: 'sanitize-collector', source: 'sanitize', target: 'collector' },
-		{ id: 'collector-dashboard', source: 'collector', target: 'dashboard' }
+		{ id: 'collector-dashboard', source: 'collector', target: 'dashboard' },
 	]}
 	height={230}
 />

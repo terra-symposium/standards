@@ -1,5 +1,5 @@
 /**
- * packages/testing/test/runner.test.mjs
+ * packages/testing/tests/runner.test.mjs
  * Verifies shared policy checks and repository-defined suite execution.
  */
 
@@ -164,6 +164,21 @@ test('manifest validation rejects duplicate commands, overlapping file ownership
 			() => validateTestPlan({ version: 1, suites: [{ name: 'first', command: 'node', args: ['test.mjs'], cwd: '../outside' }] }, root),
 			/working directory must be inside the repository/u,
 		);
+	} finally {
+		rmSync(root, { recursive: true, force: true });
+	}
+});
+test('manifest validation rejects a legacy test directory before it can be owned', () => {
+	const root = fixtureRoot();
+	try {
+		mkdirTest(root, 'test/legacy.test.mjs');
+		assert.throws(
+			() => validateTestPlan({ version: 1, suites: [{ name: 'legacy', command: 'node', args: ['test.mjs'], owns: ['test/*.test.mjs'] }] }, root),
+			/Legacy test directory test; move it to tests\/ and update its generator/u,
+		);
+		rmSync(join(root, 'test'), { recursive: true, force: true });
+		mkdirTest(root, 'dist/vendor/test/ignored.test.mjs');
+		assert.doesNotThrow(() => validateTestPlan({ version: 1, suites: [] }, root));
 	} finally {
 		rmSync(root, { recursive: true, force: true });
 	}
