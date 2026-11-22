@@ -1,5 +1,12 @@
 # @terra-symposium/hygiene
 
+## 2.5.7
+
+### Patch Changes
+
+- Require separated, ordered TSDoc descriptions, parameter tags, and return tags when multiline TSDoc is enabled.
+- Accept documented `props` rest bindings and report stale `props` tags.
+
 ## 2.5.6
 
 ### Patch Changes

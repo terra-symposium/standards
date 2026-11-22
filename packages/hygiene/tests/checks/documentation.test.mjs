@@ -592,6 +592,26 @@ export function renderLabel({ label }: { label: string }) { return label; }
 		],
 	);
 });
+test('documentation accepts a props tag for a destructured rest binding', () => {
+	const root = fixtureRoot('hygiene-destructured-rest-doc-');
+	fixtureFile(
+		root,
+		'src/main.ts',
+		`/**
+ * Renders a label with forwarded attributes.
+ *
+ * @param label - Label to render.
+ * @param props - Additional attributes.
+ *
+ * @return The rendered label.
+ */
+export function renderLabel({ label, ...props }: { label: string; id?: string }) { return label + (props.id ?? ''); }
+`,
+	);
+	// hygiene-ignore single-use -- Keep the fixture configuration named for the assertion below.
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], documentation: { required: { exportedFunctions: true, multilineTsdoc: true } } });
+	assert.deepEqual(documentationFindings(cfg), []);
+});
 test('documentation description audits report missing prose while accepting documented tags and optional tags', () => {
 	const root = fixtureRoot('hygiene-documentation-descriptions-');
 	fixtureFile(
