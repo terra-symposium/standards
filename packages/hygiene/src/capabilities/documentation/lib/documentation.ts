@@ -179,13 +179,13 @@ function writeValidatedSrc(fileName: string, src: string): boolean {
 	} catch {
 		return false;
 	}
-	const temp = `${fileName}.${process.pid}.quality.tmp`;
+	const tmp = `${fileName}.${process.pid}.quality.tmp`;
 	try {
-		writeFileSync(temp, src);
-		renameSync(temp, fileName);
+		writeFileSync(tmp, src);
+		renameSync(tmp, fileName);
 	} finally {
 		try {
-			unlinkSync(temp);
+			unlinkSync(tmp);
 		} catch {
 			// The temporary file was renamed successfully.
 		}
@@ -668,22 +668,22 @@ function containsNode(parent: ts.Node, tgt: ts.Node): boolean {
  * @return TSDoc blocks with their source offsets and original text.
  */
 function tsdocBlocks(src: string, parsed: ts.SourceFile): TSDocBlock[] {
-	const blocks = new Map<number, TSDocBlock>();
-
-	const add = (ranges: ts.CommentRange[] | undefined): void => {
-		for (const range of ranges ?? []) {
-			const text = src.slice(range.pos, range.end);
-			if (text.startsWith('/**')) blocks.set(range.pos, { start: range.pos, end: range.end, text });
-		}
-	};
-
+	const blocks: TSDocBlock[] = [];
+	const literals: Array<{ start: number; end: number }> = [];
 	const visit = (node: ts.Node): void => {
-		add(ts.getLeadingCommentRanges(src, node.getFullStart()));
-		add(ts.getTrailingCommentRanges(src, node.end));
+		if (ts.isStringLiteralLike(node) || ts.isRegularExpressionLiteral(node) || ts.isJsxText(node)) literals.push({ start: node.getStart(parsed), end: node.end });
 		ts.forEachChild(node, visit);
 	};
 	visit(parsed);
-	return [...blocks.values()].sort((l, r) => l.start - r.start);
+	const scanner = ts.createScanner(ts.ScriptTarget.Latest, false, parsed.languageVariant, src);
+	for (let token = scanner.scan(); token !== ts.SyntaxKind.EndOfFileToken; token = scanner.scan()) {
+		if (token !== ts.SyntaxKind.MultiLineCommentTrivia) continue;
+		const start = scanner.getTokenPos();
+		const end = scanner.getTextPos();
+		const text = src.slice(start, end);
+		if (text.startsWith('/**') && !literals.some(literal => literal.start <= start && end <= literal.end)) blocks.push({ start, end, text });
+	}
+	return blocks;
 }
 
 /**
@@ -771,12 +771,11 @@ function tsdocTagEntries(lines: TSDocLine[]): { tag: string; subject: string; de
 function tsdocLayoutFindings(cfg: QualityCfg, file: string, parsed: ts.SourceFile, lines: TSDocLine[]): DocumentationFinding[] {
 	const findings: DocumentationFinding[] = [];
 	const params = lines.flatMap((line, idx) => (/^@param\b/iu.test(line.text) ? [idx] : []));
-	const returns = lines.flatMap((line, idx) => (/^@returns?\b/iu.test(line.text) ? [idx] : []));
 	const report = (idx: number, reason: string): void => {
 		findings.push(documentationCommentReport(file, parsed, lines[idx]!.offset, '<TSDoc layout>', 'tag', reason, cfg));
 	};
 	const firstParam = params[0];
-	const firstReturn = returns[0];
+	const firstReturn = lines.flatMap((line, idx) => (/^@returns?\b/iu.test(line.text) ? [idx] : []))[0];
 	if (firstParam !== undefined && (firstReturn === undefined || firstParam < firstReturn) && firstParam > 0 && lines[firstParam - 1]!.text !== '')
 		report(firstParam, 'separate the description and @param group with a blank * line');
 	for (const idx of params.slice(1)) if (idx > 0 && lines[idx - 1]!.text === '') report(idx, 'keep @param tags together without blank lines');
@@ -861,9 +860,11 @@ function descFindingsForFile(cfg: QualityCfg, file: string, src: string, parsed:
 				findings.push(documentationCommentReport(file, parsed, block.start, '<TSDoc opening>', 'summary', 'put the TSDoc description on the line after /**', cfg));
 	const attached = new Set<number>();
 	const requiredAttached = new Set<number>();
+	const inlineContainers: ts.Node[] = [];
 	const requirements = { functions: true, ...cfg.documentation?.required };
 
 	const markAttached = (node: ts.Node): void => {
+		if (ts.isTypeNode(node) || ts.isObjectLiteralExpression(node)) inlineContainers.push(node);
 		const tgt = documentationTgt(node);
 		const requiresDocumentation =
 			((ts.isClassDeclaration(node) || ts.isEnumDeclaration(node) || ts.isInterfaceDeclaration(node) || ts.isTypeAliasDeclaration(node)) && requirements.types) ||
@@ -881,6 +882,7 @@ function descFindingsForFile(cfg: QualityCfg, file: string, src: string, parsed:
 			ts.isConstructSignatureDeclaration(node) ||
 			ts.isIndexSignatureDeclaration(node) ||
 			ts.isTypeParameterDeclaration(node) ||
+			ts.isTypeNode(node) ||
 			ts.isVariableStatement(node)
 		)
 			for (const range of ts.getLeadingCommentRanges(src, tgt.getFullStart()) ?? [])
@@ -891,6 +893,7 @@ function descFindingsForFile(cfg: QualityCfg, file: string, src: string, parsed:
 		ts.forEachChild(node, markAttached);
 	};
 	markAttached(parsed);
+	for (const block of blocks) if (inlineContainers.some(node => node.pos <= block.start && block.end <= node.end)) attached.add(block.start);
 	for (const block of blocks) {
 		if (!tsdocTagEntries(tsdocLines(block)).some(entry => entry.tag.toLowerCase() === 'typedef')) continue;
 		attached.add(block.start);
@@ -898,8 +901,8 @@ function descFindingsForFile(cfg: QualityCfg, file: string, src: string, parsed:
 	}
 	for (const block of blocks) {
 		if (block === header) continue;
-		// JSDoc's parenthesized expression cast is part of the expression, not a detached declaration comment.
-		if (/@type\s*\{/u.test(block.text) && /^[ \t]*\(/u.test(src.slice(block.end))) continue;
+		// JSDoc type casts and parameter annotations document expressions rather than declarations.
+		if (/@type\s*\{/u.test(block.text)) continue;
 		if (!attached.has(block.start)) {
 			findings.push(documentationCommentReport(file, parsed, block.start, '<detached TSDoc>', 'orphan', 'remove or attach this TSDoc to a declaration', cfg));
 			continue;
@@ -1076,7 +1079,7 @@ function documentationFindingsForFile(
 							if (item.tag.toLowerCase() !== 'param' || !item.subject || declaredParams.has(item.subject)) return false;
 							return !declaredParams.has(item.subject.split('.')[0]!);
 						})) {
-						findings.push(documentationCommentReport(file, parsed, entry.offset, `@param ${entry.subject}`, 'param', `remove stale @param ${entry.subject}`, cfg));
+							findings.push(documentationCommentReport(file, parsed, entry.offset, `@param ${entry.subject}`, 'param', `remove stale @param ${entry.subject}`, cfg));
 						}
 						if (returnsVal(node) && !entries.some(e => ['return', 'returns'].includes(e.tag.toLowerCase())))
 							findings.push(documentationReport(file, parsed, node, '@return', 'return', 'document the value returned by this function', cfg));

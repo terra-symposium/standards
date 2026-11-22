@@ -1988,16 +1988,16 @@ function readKnipIssues(cfg: QualityCfg): KnipIssue[] {
 	const excludedContent = nonProgramSrcFiles(cfg)
 		.map(path => relative(knipRoot, path).split(sep).join('/'))
 		.filter(path => path !== '..' && !path.startsWith('../') && !isAbsolute(path));
-	const tempConfigRoot = excludedContent.length || configuredToolUsage || mappedDependencyUsage.length ? mkdtempSync(join(tmpdir(), 'hygiene-knip-')) : undefined;
+	const tmpConfigRoot = excludedContent.length || configuredToolUsage || mappedDependencyUsage.length ? mkdtempSync(join(tmpdir(), 'hygiene-knip-')) : undefined;
 	let effectiveConfig = knipConfig;
-	if (tempConfigRoot) {
+	if (tmpConfigRoot) {
 		config.ignoreFiles = [
 			...new Set([
 				...(Array.isArray(config.ignoreFiles) ? config.ignoreFiles.filter((item): item is string => typeof item === 'string') : typeof config.ignoreFiles === 'string' ? [config.ignoreFiles] : []),
 				...excludedContent,
 			]),
 		];
-		const genConfig = join(tempConfigRoot, 'knip.json');
+		const genConfig = join(tmpConfigRoot, 'knip.json');
 		effectiveConfig = genConfig;
 		writeFileSync(genConfig, JSON.stringify(config, null, '\t') + '\n');
 	}
@@ -2010,7 +2010,7 @@ function readKnipIssues(cfg: QualityCfg): KnipIssue[] {
 			maxBuffer: TOOL_OUTPUT_MAX_BUFFER,
 		});
 	} finally {
-		if (tempConfigRoot) rmSync(tempConfigRoot, { recursive: true, force: true });
+		if (tmpConfigRoot) rmSync(tmpConfigRoot, { recursive: true, force: true });
 	}
 	if (result.error || (result.status !== 0 && result.status !== 1)) throw new Error(`Knip failed: ${result.error?.message ?? result.stderr ?? result.status}`);
 	let issues: KnipIssue[];
@@ -2372,10 +2372,10 @@ function knipWorkspaceRootScore(repoRoot: string, workingRoot: string, workspace
 		for (const pattern of [...(Array.isArray(settings.entry) ? settings.entry : []), ...(Array.isArray(settings.project) ? settings.project : [])]) {
 			if (typeof pattern !== 'string' || !pattern) continue;
 			const literalPrefix = knipLiteralPrefix(pattern);
-			const target = resolve(workspacePath, literalPrefix || '.');
-			const tgtRelative = relative(repo, target);
+			const tgt = resolve(workspacePath, literalPrefix || '.');
+			const tgtRelative = relative(repo, tgt);
 			if (tgtRelative === '..' || tgtRelative.startsWith(`..${sep}`) || isAbsolute(tgtRelative)) return -1;
-			if (existsSync(target)) score += literalPrefix !== pattern ? 1 : 2;
+			if (existsSync(tgt)) score += literalPrefix !== pattern ? 1 : 2;
 		}
 	}
 	return score;
@@ -4281,8 +4281,8 @@ export function runFormatter(cfg: QualityCfg, optsOrArgs: QualityOptions | strin
 	const opts = legacyArgs ? { fix: optsOrArgs.includes('--write') || !optsOrArgs.includes('--check'), all: optsOrArgs.includes('--all'), strict: false } : optsOrArgs;
 	const suppliedArgs = (legacyArgs ? optsOrArgs : args).filter(a => !['--all', '--warn', '--fix', '--safe-fix', '--strict'].includes(a));
 	const suppliedTgts = suppliedArgs.filter((a, i) => a !== 'warn' || suppliedArgs[i - 1] !== '--log-level').filter(a => !a.startsWith('-'));
-	const authoredTgts = (targets: string[]): string[] =>
-		targets.filter(tgt => {
+	const authoredTgts = (tgts: string[]): string[] =>
+		tgts.filter(tgt => {
 			const file = resolve(cfg.root, tgt);
 			return !existsSync(file) || !statSync(file).isFile() || !hasGeneratedSourceHeader(readFileSync(file, 'utf8'));
 		});

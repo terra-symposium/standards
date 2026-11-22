@@ -77,9 +77,9 @@
 		"clientRoots": ["apps/hygiene/src/components"],
 		"runtimeRoots": [
 			".agents/skills/all-repos/scripts",
-			"docs/agents/skills/all-repos/scripts",
+			"docs/developer/all-repos/scripts",
 			".agents/skills/quality/scripts",
-			"docs/agents/skills/quality/scripts",
+			"docs/hygiene/quality/scripts",
 			"apps/hygiene/netlify/functions",
 			"apps/hygiene/scripts",
 			"apps/hygiene/src/lib/server",

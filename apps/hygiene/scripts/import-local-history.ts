@@ -80,8 +80,8 @@ void (async (): Promise<void> => {
 	} catch {
 		revision = git(checkout, ['rev-parse', '--verify', `refs/heads/${branch}^{commit}`]);
 	}
-	const tempRoot = mkdtempSync(join(tmpdir(), 'hygiene-history-'));
-	const worktree = join(tempRoot, basename(checkout) || 'checkout');
+	const tmpRoot = mkdtempSync(join(tmpdir(), 'hygiene-history-'));
+	const worktree = join(tmpRoot, basename(checkout) || 'checkout');
 	try {
 		git(checkout, ['worktree', 'add', '--detach', worktree, revision]);
 		const history = parseHistoryReport(createHistoryReport(worktree, { repository: repo, branch, baseSha: null }));
@@ -93,7 +93,7 @@ void (async (): Promise<void> => {
 		} catch {
 			/* Worktree creation may have failed. */
 		}
-		rmSync(tempRoot, { recursive: true, force: true });
+		rmSync(tmpRoot, { recursive: true, force: true });
 	}
 })().catch((err: unknown) => {
 	console.error(err instanceof Error ? err.message : 'Local history import failed.');

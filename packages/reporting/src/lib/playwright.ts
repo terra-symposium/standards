@@ -368,13 +368,13 @@ const persistScreenshotCapture = (dir: string, capture: ScreenshotCapture): Scre
 			// Replace an incomplete record with the next valid result.
 		}
 	}
-	const tempImg = `${screenshot}.${process.pid}.tmp`;
-	fs.copyFileSync(capture.screenshot, tempImg);
-	fs.renameSync(tempImg, screenshot);
+	const tmpImg = `${screenshot}.${process.pid}.tmp`;
+	fs.copyFileSync(capture.screenshot, tmpImg);
+	fs.renameSync(tmpImg, screenshot);
 	const persisted = { ...capture, screenshot };
-	const tempRecord = `${recordFile}.${process.pid}.tmp`;
-	fs.writeFileSync(tempRecord, JSON.stringify(persisted));
-	fs.renameSync(tempRecord, recordFile);
+	const tmpRecord = `${recordFile}.${process.pid}.tmp`;
+	fs.writeFileSync(tmpRecord, JSON.stringify(persisted));
+	fs.renameSync(tmpRecord, recordFile);
 	return persisted;
 };
 const screenshotRunFile = '.terra-playwright-run.json';
@@ -440,9 +440,9 @@ const readScreenshotRun = (dir: string): ScreenshotRun | undefined => {
 const writeScreenshotRun = (dir: string, run: ScreenshotRun): void => {
 	fs.mkdirSync(dir, { recursive: true });
 	const file = path.join(dir, screenshotRunFile);
-	const tempFile = `${file}.${process.pid}.tmp`;
-	fs.writeFileSync(tempFile, JSON.stringify(run));
-	fs.renameSync(tempFile, file);
+	const tmpFile = `${file}.${process.pid}.tmp`;
+	fs.writeFileSync(tmpFile, JSON.stringify(run));
+	fs.renameSync(tmpFile, file);
 };
 
 /**

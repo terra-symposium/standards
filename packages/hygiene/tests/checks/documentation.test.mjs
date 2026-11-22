@@ -42,19 +42,33 @@ test('documentation reports missing path headers and inline TSDoc openings witho
 
 test('documentation requires descriptions, parameter tags, and return tags in separated order', () => {
 	const root = fixtureRoot('hygiene-tsdoc-layout-');
-	fixtureFile(root, 'src/valid.ts', '/**\n * Converts a value.\n *\n * @param value - Input value.\n * @param radix - Numeric base.\n *\n * @return Converted value.\n */\nexport const valid = (value: string, radix: number) => Number.parseInt(value, radix);\n');
-	fixtureFile(root, 'src/after-return.ts', '/**\n * Converts a value.\n *\n * @return Converted value.\n * @param value - Input value.\n */\nexport const afterReturn = (value: string) => Number(value);\n');
+	fixtureFile(
+		root,
+		'src/valid.ts',
+		'/**\n * Converts a value.\n *\n * @param value - Input value.\n * @param radix - Numeric base.\n *\n * @return Converted value.\n */\nexport const valid = (value: string, radix: number) => Number.parseInt(value, radix);\n',
+	);
+	fixtureFile(
+		root,
+		'src/after-return.ts',
+		'/**\n * Converts a value.\n *\n * @return Converted value.\n * @param value - Input value.\n */\nexport const afterReturn = (value: string) => Number(value);\n',
+	);
 	fixtureFile(root, 'src/no-gaps.ts', '/**\n * Converts a value.\n * @param value - Input value.\n * @return Converted value.\n */\nexport const noGaps = (value: string) => Number(value);\n');
-	fixtureFile(root, 'src/param-gap.ts', '/**\n * Adds values.\n *\n * @param left - First value.\n *\n * @param right - Second value.\n *\n * @return Sum.\n */\nexport const paramGap = (left: number, right: number) => left + right;\n');
-	const findings = documentationFindings(createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], documentation: { required: { functions: false, multilineTsdoc: true } } }))
-		.filter(({ name }) => name === '<TSDoc layout>')
-		.map(({ file, reason }) => [file, reason]);
-	assert.deepEqual(findings, [
-		['src/after-return.ts', 'put every @param tag before @return'],
-		['src/no-gaps.ts', 'separate the description and @param group with a blank * line'],
-		['src/no-gaps.ts', 'separate the @param group and @return with a blank * line'],
-		['src/param-gap.ts', 'keep @param tags together without blank lines'],
-	]);
+	fixtureFile(
+		root,
+		'src/param-gap.ts',
+		'/**\n * Adds values.\n *\n * @param left - First value.\n *\n * @param right - Second value.\n *\n * @return Sum.\n */\nexport const paramGap = (left: number, right: number) => left + right;\n',
+	);
+	assert.deepEqual(
+		documentationFindings(createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], documentation: { required: { functions: false, multilineTsdoc: true } } }))
+			.filter(({ name }) => name === '<TSDoc layout>')
+			.map(({ file, reason }) => [file, reason]),
+		[
+			['src/after-return.ts', 'put every @param tag before @return'],
+			['src/no-gaps.ts', 'separate the description and @param group with a blank * line'],
+			['src/no-gaps.ts', 'separate the @param group and @return with a blank * line'],
+			['src/param-gap.ts', 'keep @param tags together without blank lines'],
+		],
+	);
 });
 
 test('nested Quality roots accept only their own or containing Git repository path', () => {
@@ -611,6 +625,38 @@ export function renderLabel({ label, ...props }: { label: string; id?: string })
 	// hygiene-ignore single-use -- Keep the fixture configuration named for the assertion below.
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], documentation: { required: { exportedFunctions: true, multilineTsdoc: true } } });
 	assert.deepEqual(documentationFindings(cfg), []);
+});
+test('documentation ignores comment markers in glob strings', () => {
+	const root = fixtureRoot('hygiene-comment-glob-');
+	fixtureFile(root, 'src/main.ts', `export const config = { ignored: ['/tmp/render/**'] };\n`);
+	assert.deepEqual(documentationFindings(createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], documentation: { required: { multilineTsdoc: true } } })), []);
+});
+test('documentation accepts multiline TSDoc attached to nested type nodes', () => {
+	const root = fixtureRoot('hygiene-nested-type-doc-');
+	fixtureFile(
+		root,
+		'src/main.ts',
+		`type Choices = ReadonlyArray<
+  /**
+   * Heading choice.
+   */
+  { heading: string }
+  | /**
+     * Insertion choice.
+     */
+    { insertion: string }
+>;
+type Dialogue = { block: /**
+ * Inline block type.
+ */ Choices };
+`,
+	);
+	assert.deepEqual(documentationFindings(createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], documentation: { required: { functions: false, multilineTsdoc: true } } })), []);
+});
+test('documentation accepts inline JSDoc type annotations on parameters', () => {
+	const root = fixtureRoot('hygiene-jsdoc-param-cast-');
+	fixtureFile(root, 'src/main.js', `export function read(/** @type {string} */ value) { return value; }\n`);
+	assert.deepEqual(documentationFindings(createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.js'], documentation: { required: { functions: false, multilineTsdoc: true } } })), []);
 });
 test('documentation description audits report missing prose while accepting documented tags and optional tags', () => {
 	const root = fixtureRoot('hygiene-documentation-descriptions-');

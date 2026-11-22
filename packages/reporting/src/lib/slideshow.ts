@@ -40,7 +40,10 @@ type Presentation = {
 	theme: Record<string, string>;
 	ShapeType: { line: string; roundRect: string };
 	addTable: (rows: unknown[][], options: Record<string, unknown>) => void;
-	addSlide: () => /** Minimal slide surface used by the writer's runtime-compatible adapter. */ {
+	/**
+	 * Minimal slide surface used by the writer's runtime-compatible adapter.
+	 */
+	addSlide: () => {
 		background: { color: string };
 		addText: (text: string, options: Record<string, unknown>) => void;
 		addShape: (shape: string, options: Record<string, unknown>) => void;

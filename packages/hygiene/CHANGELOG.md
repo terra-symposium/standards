@@ -1,11 +1,19 @@
 # @terra-symposium/hygiene
 
+## 2.5.8
+
+### Patch Changes
+
+- Recognize documentation on nested type and object members without reporting it as detached.
+- Allow inline JSDoc `@type` annotations used for casts and parameters.
+
 ## 2.5.7
 
 ### Patch Changes
 
 - Require separated, ordered TSDoc descriptions, parameter tags, and return tags when multiline TSDoc is enabled.
 - Accept documented `props` rest bindings and report stale `props` tags.
+- Ignore comment-shaped text inside string literals while scanning TSDoc.
 
 ## 2.5.6
 
