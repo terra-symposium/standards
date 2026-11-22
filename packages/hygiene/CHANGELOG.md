@@ -1,5 +1,11 @@
 # @terra-symposium/hygiene
 
+## 2.5.6
+
+### Patch Changes
+
+- Enforce the established `target` and `targets` abbreviations in source naming checks.
+
 ## 2.5.4
 
 ### Patch Changes

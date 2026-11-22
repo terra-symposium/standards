@@ -402,11 +402,11 @@ function associatedLabels(src: ts.SourceFile): Map<string, NameState> {
 		if (ts.isJsxElement(node) || ts.isJsxSelfClosingElement(node)) {
 			const state = hiddenState(node);
 			if (!(hidden || state === 'named' || state === 'unknown') && tagOf(node) === 'label') {
-				const target = staticAttr(attrOf(node, 'htmlFor') ?? attrOf(node, 'for'));
-				if (target.state === 'static') {
+				const tgt = staticAttr(attrOf(node, 'htmlFor') ?? attrOf(node, 'for'));
+				if (tgt.state === 'static') {
 					const content = contentState(node, true);
-					const prev = labels.get(target.value);
-					labels.set(target.value, prev === 'named' || content === 'named' ? 'named' : prev === 'unknown' || content === 'unknown' ? 'unknown' : 'empty');
+					const prev = labels.get(tgt.value);
+					labels.set(tgt.value, prev === 'named' || content === 'named' ? 'named' : prev === 'unknown' || content === 'unknown' ? 'unknown' : 'empty');
 				}
 			}
 		}
@@ -534,7 +534,7 @@ function inspectFile(cfg: QualityCfg, file: string, parsed: ts.SourceFile): { fi
 			const currentHidden = hidden || elHidden !== 'empty';
 			let childLabel = nestedLabel;
 			if (tagOf(node) === 'label') childLabel = contentState(node, true);
-			const kind = (function targetKind(el: ElRef): { element: string; labelable: boolean } | undefined {
+			const kind = (function tgtKind(el: ElRef): { element: string; labelable: boolean } | undefined {
 				const tag = tagOf(el);
 				if (A_Z_A_Z_D_REGEX.test(tag) && (INTERACTIVE_NATIVE.has(tag) || tag === 'progress')) {
 					if (tag === 'input') {

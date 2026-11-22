@@ -110,9 +110,9 @@ function runLinearHistory(root) {
 	let base;
 	let head;
 	if (eventName === 'pull_request') {
-		const targetBranch = event.pull_request?.base?.ref;
-		if (!['development', 'main'].includes(targetBranch)) {
-			console.log(`[SKIP] shared:linear-history (PR targets ${targetBranch ?? 'an unknown branch'})`);
+		const tgtBranch = event.pull_request?.base?.ref;
+		if (!['development', 'main'].includes(tgtBranch)) {
+			console.log(`[SKIP] shared:linear-history (PR targets ${tgtBranch ?? 'an unknown branch'})`);
 			return 'skipped';
 		}
 		base = event.pull_request?.base?.sha;

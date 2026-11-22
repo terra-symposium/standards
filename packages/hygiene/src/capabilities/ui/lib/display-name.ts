@@ -179,13 +179,13 @@ function candidatesForFile(file: string, analysis?: QualityAnalysis): Candidate[
 	const inspectAssignments = (node: ts.Node): void => {
 		if (ts.isBinaryExpression(node) && node.operatorToken.kind >= ts.SyntaxKind.FirstAssignment && node.operatorToken.kind <= ts.SyntaxKind.LastAssignment) {
 			const name = assignedComp(node.left);
-			const targets = name ? candidatesForAssignment(node, name, byName) : undefined;
-			if (targets) {
+			const tgts = name ? candidatesForAssignment(node, name, byName) : undefined;
+			if (tgts) {
 				const exact =
 					node.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
 					((ts.isStringLiteralLike(node.right) && node.right.text === name) || (ts.isPropertyAccessExpression(node.right) && !node.right.questionDotToken && node.right.name.text === 'displayName'));
-				for (const target of targets) {
-					if (target.assignment === 'missing' || !exact) target.assignment = exact ? 'matching' : 'conflicting';
+				for (const tgt of tgts) {
+					if (tgt.assignment === 'missing' || !exact) tgt.assignment = exact ? 'matching' : 'conflicting';
 				}
 			}
 		}

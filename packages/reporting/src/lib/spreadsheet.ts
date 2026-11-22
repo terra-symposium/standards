@@ -270,33 +270,33 @@ export type SpreadsheetSource = { label: string; file: string };
  * Copies tabular content, cell styling, merges, and embedded images into one named worksheet.
  *
  * @param src Worksheet whose cells, formatting, merges, and images are copied.
- * @param target Empty destination worksheet receiving the copied content.
+ * @param tgt Empty destination worksheet receiving the copied content.
  * @param srcBook Workbook that owns image references in the source worksheet.
- * @param targetBook Workbook that receives cloned image references.
+ * @param tgtBook Workbook that receives cloned image references.
  */
-const copyWorksheet = (src: ExcelJS.Worksheet, target: ExcelJS.Worksheet, srcBook: ExcelJS.Workbook, targetBook: ExcelJS.Workbook): void => {
-	target.properties = structuredClone(src.properties);
-	target.views = structuredClone(src.views);
-	target.pageSetup = structuredClone(src.pageSetup);
-	target.headerFooter = structuredClone(src.headerFooter);
-	target.state = src.state;
-	target.columns = src.columns.map(c => ({ width: c.width, hidden: c.hidden, outlineLevel: c.outlineLevel, style: structuredClone(c.style), header: structuredClone(c.header), key: c.key }));
+const copyWorksheet = (src: ExcelJS.Worksheet, tgt: ExcelJS.Worksheet, srcBook: ExcelJS.Workbook, tgtBook: ExcelJS.Workbook): void => {
+	tgt.properties = structuredClone(src.properties);
+	tgt.views = structuredClone(src.views);
+	tgt.pageSetup = structuredClone(src.pageSetup);
+	tgt.headerFooter = structuredClone(src.headerFooter);
+	tgt.state = src.state;
+	tgt.columns = src.columns.map(c => ({ width: c.width, hidden: c.hidden, outlineLevel: c.outlineLevel, style: structuredClone(c.style), header: structuredClone(c.header), key: c.key }));
 	src.eachRow({ includeEmpty: true }, (r, v) => {
-		const targetRow = target.getRow(v);
-		targetRow.height = r.height;
-		targetRow.hidden = r.hidden;
-		targetRow.outlineLevel = r.outlineLevel;
+		const tgtRow = tgt.getRow(v);
+		tgtRow.height = r.height;
+		tgtRow.hidden = r.hidden;
+		tgtRow.outlineLevel = r.outlineLevel;
 		r.eachCell({ includeEmpty: true }, (cell, colNumber) => {
-			const targetCell = targetRow.getCell(colNumber);
-			targetCell.value = structuredClone(cell.value);
-			targetCell.style = structuredClone(cell.style);
-			if (cell.note) targetCell.note = structuredClone(cell.note);
-			if (cell.dataValidation) targetCell.dataValidation = structuredClone(cell.dataValidation);
+			const tgtCell = tgtRow.getCell(colNumber);
+			tgtCell.value = structuredClone(cell.value);
+			tgtCell.style = structuredClone(cell.style);
+			if (cell.note) tgtCell.note = structuredClone(cell.note);
+			if (cell.dataValidation) tgtCell.dataValidation = structuredClone(cell.dataValidation);
 		});
 	});
-	for (const range of src.model.merges || []) target.mergeCells(range);
+	for (const range of src.model.merges || []) tgt.mergeCells(range);
 	for (const { imageId: imgId, range } of src.getImages()) {
-		target.addImage(targetBook.addImage(srcBook.getImage(Number(imgId))), structuredClone(range));
+		tgt.addImage(tgtBook.addImage(srcBook.getImage(Number(imgId))), structuredClone(range));
 	}
 };
 /**

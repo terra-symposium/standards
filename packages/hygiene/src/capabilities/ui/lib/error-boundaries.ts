@@ -326,8 +326,8 @@ function usesReactAstroIntegration(text: string): boolean {
 function delegatesAstroConfig(file: string, root: string, text: string): boolean {
 	const match = text.match(/\bexport\s*\{\s*default\s*\}\s*from\s*['"](\.[^'"]+)['"]/u);
 	if (!match) return false;
-	const target = resolve(dirname(file), match[1]!);
-	return target !== file && target.startsWith(`${root}/`) && ASTRO_CONFIG.test(basename(target)) && existsSync(target);
+	const tgt = resolve(dirname(file), match[1]!);
+	return tgt !== file && tgt.startsWith(`${root}/`) && ASTRO_CONFIG.test(basename(tgt)) && existsSync(tgt);
 }
 
 /**
@@ -386,8 +386,8 @@ function astroIntegrationSpecifier(configFile: string, root: string): string | u
 		if (!installedPath) continue;
 		try {
 			const exportEntry = (JSON.parse(readFileSync(resolve(installedPath, 'package.json'), 'utf8')) as { exports?: Record<string, unknown> }).exports?.['./astro-integration'];
-			const target = typeof exportEntry === 'string' ? exportEntry : undefined;
-			if (target && existsSync(resolve(installedPath, target))) return `${name}/astro-integration`;
+			const tgt = typeof exportEntry === 'string' ? exportEntry : undefined;
+			if (tgt && existsSync(resolve(installedPath, tgt))) return `${name}/astro-integration`;
 		} catch {
 			continue;
 		}

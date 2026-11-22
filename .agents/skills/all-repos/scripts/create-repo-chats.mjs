@@ -90,8 +90,8 @@ async function discover(path, repos = new Map()) {
 
 const repos = new Map();
 for (const root of roots) await discover(resolve(root), repos);
-const targets = [...repos.keys()].filter(path => !skipNames.has(basename(path).toLowerCase())).sort();
-if (targets.length === 0) {
+const tgts = [...repos.keys()].filter(path => !skipNames.has(basename(path).toLowerCase())).sort();
+if (tgts.length === 0) {
 	console.error('No Git repositories found after exclusions.');
 	process.exit(1);
 }
@@ -146,5 +146,5 @@ async function run(repo) {
 	});
 }
 
-console.log(`Submitting all ${targets.length} ${basename(resolve(skillFile))} Cloud tasks in one parallel batch; excluding: ${[...skipNames].join(', ') || 'none'}`);
-if ((await Promise.all(targets.map(run))).some(result => result.code !== 0)) process.exitCode = 1;
+console.log(`Submitting all ${tgts.length} ${basename(resolve(skillFile))} Cloud tasks in one parallel batch; excluding: ${[...skipNames].join(', ') || 'none'}`);
+if ((await Promise.all(tgts.map(run))).some(result => result.code !== 0)) process.exitCode = 1;

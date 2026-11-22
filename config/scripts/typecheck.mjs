@@ -54,7 +54,7 @@ function hasTypeScriptSrc(dir) {
  * @return Sorted workspace commands ready to run.
  */
 export function discoverTypecheckTargets(repoRoot = root) {
-	const targets = [];
+	const tgts = [];
 	for (const group of ['packages', 'apps']) {
 		const groupRoot = join(repoRoot, group);
 		if (!statSync(groupRoot, { throwIfNoEntry: false })?.isDirectory()) continue;
@@ -67,24 +67,24 @@ export function discoverTypecheckTargets(repoRoot = root) {
 			if (!tsconfigPath) throw new Error(`${relative(repoRoot, dir)} has TypeScript source but no tsconfig.json`);
 			if (typeof manifest.scripts?.typecheck !== 'string' || !manifest.scripts.typecheck.trim())
 				throw new Error(`${relative(repoRoot, dir)} has a TypeScript project but no package.json typecheck script`);
-			targets.push({ directory: dir, name: manifest.name ?? relative(repoRoot, dir), script: 'typecheck' });
+			tgts.push({ directory: dir, name: manifest.name ?? relative(repoRoot, dir), script: 'typecheck' });
 		}
 	}
-	return targets.sort((left, right) => left.directory.localeCompare(right.directory));
+	return tgts.sort((left, right) => left.directory.localeCompare(right.directory));
 }
 
 /**
  * Runs each discovered workspace typecheck and returns the first failure status.
  *
- * @param targets Workspace scripts returned by discoverTypecheckTargets.
+ * @param tgts Workspace scripts returned by discoverTypecheckTargets.
  * @param repoRoot Standards repository root.
  * @param spawn Child process runner, replaceable by tests.
  *
  * @return Zero when every workspace passes, otherwise the first nonzero status.
  */
-export function runTypecheckTargets(targets, repoRoot = root, spawn = spawnSync) {
-	for (const target of targets) {
-		const result = spawn('pnpm', ['--dir', relative(repoRoot, target.directory), 'run', target.script], { cwd: repoRoot, stdio: 'inherit' });
+export function runTypecheckTargets(tgts, repoRoot = root, spawn = spawnSync) {
+	for (const tgt of tgts) {
+		const result = spawn('pnpm', ['--dir', relative(repoRoot, tgt.directory), 'run', tgt.script], { cwd: repoRoot, stdio: 'inherit' });
 		if (result.error) throw result.error;
 		if (result.status !== 0) return result.status ?? 1;
 	}
@@ -101,9 +101,9 @@ export function runTypecheckTargets(targets, repoRoot = root, spawn = spawnSync)
  * @return Zero when all projects pass, or the failing child exit status.
  */
 export function main(repoRoot = root, spawn = spawnSync) {
-	const targets = discoverTypecheckTargets(repoRoot);
-	if (!targets.length) throw new Error('No TypeScript workspaces with typecheck scripts were discovered.');
-	const status = runTypecheckTargets(targets, repoRoot, spawn);
+	const tgts = discoverTypecheckTargets(repoRoot);
+	if (!tgts.length) throw new Error('No TypeScript workspaces with typecheck scripts were discovered.');
+	const status = runTypecheckTargets(tgts, repoRoot, spawn);
 	if (status) process.exitCode = status;
 	return status;
 }

@@ -52,10 +52,10 @@ test('source discovery includes test and spec files under configured roots', () 
 });
 test('source discovery ignores symlink entries and direct symlink roots', () => {
 	const root = fixtureRoot('hygiene-symlink-files-');
-	const target = fixtureFile(root, 'config/package.json', '{"name":"fixture"}\n');
+	const tgt = fixtureFile(root, 'config/package.json', '{"name":"fixture"}\n');
 	const alias = join(root, 'package.json');
-	symlinkSync(target, alias);
-	assert.deepEqual(srcFiles(createQualityCfg({ root, sourceRoots: ['.'], extensions: ['.json'] })), [target]);
+	symlinkSync(tgt, alias);
+	assert.deepEqual(srcFiles(createQualityCfg({ root, sourceRoots: ['.'], extensions: ['.json'] })), [tgt]);
 	assert.deepEqual(srcFiles(createQualityCfg({ root, sourceRoots: [alias], extensions: ['.json'] })), []);
 });
 test('source discovery separates captured prose and archived Gem attachments from authored source', () => {

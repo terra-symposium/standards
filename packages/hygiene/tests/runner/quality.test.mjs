@@ -394,7 +394,7 @@ test('renames requested words across casing, separators, compounds, plurals, and
 		'destination-path': 'dest-path',
 	};
 	for (const [name, expected] of Object.entries(cases)) assert.equal(renameId(name), expected, name);
-	for (const name of ['articleDefinition', 'category', 'context', 'event', 'index', 'request', 'requestId', 'response', 'target', 'value'])
+	for (const name of ['articleDefinition', 'category', 'context', 'event', 'index', 'request', 'requestId', 'response', 'value'])
 		assert.equal(renameId(name), name, `${name} remains a complete domain or API name`);
 	assert.equal(renameId('image'), 'img');
 });

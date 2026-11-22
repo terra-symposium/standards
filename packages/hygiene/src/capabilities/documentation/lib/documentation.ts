@@ -420,11 +420,11 @@ function documentationSrcIncluded(cfg: QualityCfg, file: string): boolean {
  * @param file C or header source path passed to Clang for declaration parsing.
  * @param src Source text whose documentation declarations are audited.
  * @param documentedSignatures Signatures already documented by matching source/header blocks.
- * @param missingTargets Map populated with missing declaration locations for duplicate suppression.
+ * @param missingTgts Map populated with missing declaration locations for duplicate suppression.
  *
  * @return Findings for missing, malformed, or misordered Doxygen documentation.
  */
-function cDocumentationFindings(cfg: QualityCfg, file: string, src: string, documentedSignatures = new Set<string>(), missingTargets = new Map<string, string>()): DocumentationFinding[] {
+function cDocumentationFindings(cfg: QualityCfg, file: string, src: string, documentedSignatures = new Set<string>(), missingTgts = new Map<string, string>()): DocumentationFinding[] {
 	const parsed = spawnSync(
 		cfg.tools?.clang ?? 'clang',
 		['-x', 'c', '-std=c11', '-fsyntax-only', '-Wno-everything', '-Wno-unknown-pragmas', '-Wno-ignored-attributes', '-Xclang', '-ast-dump=json', file],
@@ -490,7 +490,7 @@ function cDocumentationFindings(cfg: QualityCfg, file: string, src: string, docu
 			findings.push({ file: displayPath(cfg, file), line: declaration.line, column: 1, name, kind, reason, severity: 'error' });
 		};
 		if (!comment) {
-			missingTargets.set(`${displayPath(cfg, file)}|${declaration.line}|${declaration.name}`, declaration.signature);
+			missingTgts.set(`${displayPath(cfg, file)}|${declaration.line}|${declaration.name}`, declaration.signature);
 			report(declaration.name, 'function', `missing documentation block for ${declaration.name}`);
 			continue;
 		}
@@ -528,14 +528,14 @@ type CNode = {
  * @return `true` when a documentation comment directly precedes the node.
  */
 function documented(node: ts.Node, src: string): boolean {
-	const target = documentationTarget(node);
-	const doc = [...src.slice(target.getFullStart(), target.getStart()).matchAll(S_S_G_REGEX())].at(-1);
+	const tgt = documentationTgt(node);
+	const doc = [...src.slice(tgt.getFullStart(), tgt.getStart()).matchAll(S_S_G_REGEX())].at(-1);
 	if (!doc) return false;
 	// The generated file header is source-level metadata, not documentation for
 	// the first declaration. Only exclude it when the block is the first
 	// path-bearing TSDoc in the file; a declaration's own later TSDoc remains
 	// valid even when the file also has a header.
-	let prefix = src.slice(0, target.getFullStart() + doc.index!).replace(UFEFF_REGEX, '');
+	let prefix = src.slice(0, tgt.getFullStart() + doc.index!).replace(UFEFF_REGEX, '');
 	if (prefix.startsWith('#!')) prefix = prefix.slice(prefix.indexOf('\n') + 1);
 	return !(
 		prefix.trim() === '' &&
@@ -555,8 +555,8 @@ function documented(node: ts.Node, src: string): boolean {
  * @return `true` when the node is explicitly exported.
  */
 function exported(node: ts.Node): boolean {
-	const target = documentationTarget(node);
-	return !!(ts.canHaveModifiers(target) && ts.getModifiers(target)?.some(m => m.kind === ts.SyntaxKind.ExportKeyword));
+	const tgt = documentationTgt(node);
+	return !!(ts.canHaveModifiers(tgt) && ts.getModifiers(tgt)?.some(m => m.kind === ts.SyntaxKind.ExportKeyword));
 }
 
 /**
@@ -594,9 +594,9 @@ function fnParamNames(param: ts.ParameterDeclaration, index: number): string[] {
  */
 function documentationNodeName(node: ts.Node): string {
 	if (ts.isConstructorDeclaration(node)) return 'constructor';
-	const target = documentationTarget(node);
-	if (target !== node && ts.isVariableStatement(target)) {
-		const declaration = target.declarationList.declarations.find(c => containsNode(c, node));
+	const tgt = documentationTgt(node);
+	if (tgt !== node && ts.isVariableStatement(tgt)) {
+		const declaration = tgt.declarationList.declarations.find(c => containsNode(c, node));
 		if (declaration) return declaration.name.getText();
 	}
 	const candidate = (node as unknown as { name?: ts.Node }).name ?? node;
@@ -610,12 +610,12 @@ function documentationNodeName(node: ts.Node): string {
  *
  * @return Variable statement for a named function value, otherwise node itself.
  */
-function documentationTarget(node: ts.Node): ts.Node {
+function documentationTgt(node: ts.Node): ts.Node {
 	if (ts.isArrowFunction(node) || ts.isFunctionExpression(node)) {
 		if (ts.isVariableDeclaration(node.parent) && node.parent.initializer === node) {
-			let target: ts.Node = node.parent;
-			while (target.parent && !ts.isVariableStatement(target)) target = target.parent;
-			return target;
+			let tgt: ts.Node = node.parent;
+			while (tgt.parent && !ts.isVariableStatement(tgt)) tgt = tgt.parent;
+			return tgt;
 		}
 	}
 	return node;
@@ -640,8 +640,8 @@ function isNamedDocumentationFn(node: ts.Node): node is ts.SignatureDeclaration 
 		ts.isMethodSignature(node)
 	)
 		return true;
-	if (ts.isFunctionExpression(node)) return Boolean(node.name) || documentationTarget(node) !== node;
-	if (ts.isArrowFunction(node)) return documentationTarget(node) !== node;
+	if (ts.isFunctionExpression(node)) return Boolean(node.name) || documentationTgt(node) !== node;
+	if (ts.isArrowFunction(node)) return documentationTgt(node) !== node;
 	return false;
 }
 
@@ -649,12 +649,12 @@ function isNamedDocumentationFn(node: ts.Node): node is ts.SignatureDeclaration 
  * Tests whether an AST node is nested under a declaration.
  *
  * @param parent Candidate ancestor node.
- * @param target Node whose ancestors should be searched.
+ * @param tgt Node whose ancestors should be searched.
  *
  * @return Whether target is parent or a descendant of parent.
  */
-function containsNode(parent: ts.Node, target: ts.Node): boolean {
-	for (let node: ts.Node | undefined = target; node; node = node.parent) if (node === parent) return true;
+function containsNode(parent: ts.Node, tgt: ts.Node): boolean {
+	for (let node: ts.Node | undefined = tgt; node; node = node.parent) if (node === parent) return true;
 	return false;
 }
 
@@ -758,6 +758,36 @@ function tsdocTagEntries(lines: TSDocLine[]): { tag: string; subject: string; de
 	return entries;
 }
 
+/**
+ * Checks the order and blank-line boundaries of parameter and return tags.
+ *
+ * @param cfg Quality configuration used to render repository-relative paths.
+ * @param file Source file containing the documentation block.
+ * @param parsed Parsed source file used for diagnostic locations.
+ * @param lines Normalized lines in one TSDoc block.
+ *
+ * @return Findings for misplaced tags or missing group separators.
+ */
+function tsdocLayoutFindings(cfg: QualityCfg, file: string, parsed: ts.SourceFile, lines: TSDocLine[]): DocumentationFinding[] {
+	const findings: DocumentationFinding[] = [];
+	const params = lines.flatMap((line, idx) => (/^@param\b/iu.test(line.text) ? [idx] : []));
+	const returns = lines.flatMap((line, idx) => (/^@returns?\b/iu.test(line.text) ? [idx] : []));
+	const report = (idx: number, reason: string): void => {
+		findings.push(documentationCommentReport(file, parsed, lines[idx]!.offset, '<TSDoc layout>', 'tag', reason, cfg));
+	};
+	const firstParam = params[0];
+	const firstReturn = returns[0];
+	if (firstParam !== undefined && (firstReturn === undefined || firstParam < firstReturn) && firstParam > 0 && lines[firstParam - 1]!.text !== '')
+		report(firstParam, 'separate the description and @param group with a blank * line');
+	for (const idx of params.slice(1)) if (idx > 0 && lines[idx - 1]!.text === '') report(idx, 'keep @param tags together without blank lines');
+	if (firstReturn !== undefined) {
+		for (const idx of params.filter(idx => idx > firstReturn)) report(idx, 'put every @param tag before @return');
+		if (firstReturn > 0 && lines[firstReturn - 1]!.text !== '')
+			report(firstReturn, firstParam === undefined ? 'separate the description and @return with a blank * line' : 'separate the @param group and @return with a blank * line');
+	}
+	return findings;
+}
+
 // hygiene-ignore single-use -- Keep the documented returnsVal declaration so its parameter and return contract remains attached.
 /**
  * Determines whether a function exposes a value through its return type or body.
@@ -793,7 +823,7 @@ function returnsVal(node: ts.SignatureDeclaration): boolean {
  * @return The attached TSDoc block, or `undefined` when the declaration is undocumented.
  */
 function documentationBlockFor(src: string, node: ts.Node): TSDocBlock | undefined {
-	const range = (ts.getLeadingCommentRanges(src, documentationTarget(node).getFullStart()) ?? []).at(-1);
+	const range = (ts.getLeadingCommentRanges(src, documentationTgt(node).getFullStart()) ?? []).at(-1);
 	if (!range || range.kind !== ts.SyntaxKind.MultiLineCommentTrivia || !src.slice(range.pos, range.end).startsWith('/**')) return undefined;
 	return { start: range.pos, end: range.end, text: src.slice(range.pos, range.end) };
 }
@@ -833,7 +863,7 @@ function descFindingsForFile(cfg: QualityCfg, file: string, src: string, parsed:
 	const requirements = { functions: true, ...cfg.documentation?.required };
 
 	const markAttached = (node: ts.Node): void => {
-		const target = documentationTarget(node);
+		const tgt = documentationTgt(node);
 		const requiresDocumentation =
 			((ts.isClassDeclaration(node) || ts.isEnumDeclaration(node) || ts.isInterfaceDeclaration(node) || ts.isTypeAliasDeclaration(node)) && requirements.types) ||
 			(isNamedDocumentationFn(node) && (requirements.functions || (requirements.exportedFunctions && exported(node)))) ||
@@ -852,8 +882,8 @@ function descFindingsForFile(cfg: QualityCfg, file: string, src: string, parsed:
 			ts.isTypeParameterDeclaration(node) ||
 			ts.isVariableStatement(node)
 		)
-			for (const range of ts.getLeadingCommentRanges(src, target.getFullStart()) ?? [])
-				if (src.slice(range.pos, range.end).startsWith('/**') && S_ONLY_REGEX.test(src.slice(range.end, target.getStart(parsed)))) {
+			for (const range of ts.getLeadingCommentRanges(src, tgt.getFullStart()) ?? [])
+				if (src.slice(range.pos, range.end).startsWith('/**') && S_ONLY_REGEX.test(src.slice(range.end, tgt.getStart(parsed)))) {
 					attached.add(range.pos);
 					if (requiresDocumentation) requiredAttached.add(range.pos);
 				}
@@ -873,6 +903,7 @@ function descFindingsForFile(cfg: QualityCfg, file: string, src: string, parsed:
 			findings.push(documentationCommentReport(file, parsed, block.start, '<detached TSDoc>', 'orphan', 'remove or attach this TSDoc to a declaration', cfg));
 			continue;
 		}
+		if (cfg.documentation?.required?.multilineTsdoc) findings.push(...tsdocLayoutFindings(cfg, file, parsed, tsdocLines(block)));
 		if (!requiredAttached.has(block.start)) continue;
 		const lines = tsdocLines(block);
 		const firstTag = lines.findIndex(l => l.text.startsWith('@'));
@@ -1079,11 +1110,11 @@ export function documentationFindings(cfg: QualityCfg, analysis?: QualityAnalysi
 	const requirements = { functions: true, ...cfg.documentation?.required };
 	const sharedAnalysis = analysis;
 	const documentedSignatures = new Set<string>();
-	const missingTargets = new Map<string, string>();
+	const missingTgts = new Map<string, string>();
 	// hygiene-ignore single-use -- Analyze C files first to populate documented signatures and missing targets before other findings.
 	const cFindings = srcFiles({ ...cfg, extensions: ['.c', '.h'] })
 		.filter(f => documentationSrcIncluded(cfg, f))
-		.flatMap(f => cDocumentationFindings(cfg, f, readFileSync(f, 'utf8'), documentedSignatures, missingTargets));
+		.flatMap(f => cDocumentationFindings(cfg, f, readFileSync(f, 'utf8'), documentedSignatures, missingTgts));
 	// hygiene-ignore single-use -- Complete the other source scan before selecting primary C declarations below.
 	const otherFindings = (
 		sharedAnalysis?.files
@@ -1091,12 +1122,12 @@ export function documentationFindings(cfg: QualityCfg, analysis?: QualityAnalysi
 			: srcFiles(cfg).filter(f => documentationSrcIncluded(cfg, f) && (documentationSupported(f) || (requirements.importSection && extname(f) === '.astro')))
 	).flatMap(f => documentationFindingsForFile(cfg, f, requirements, sharedAnalysis));
 	const primaryMissing = new Map<string, string>();
-	for (const [target, signature] of missingTargets) if (!primaryMissing.has(signature)) primaryMissing.set(signature, target);
+	for (const [tgt, signature] of missingTgts) if (!primaryMissing.has(signature)) primaryMissing.set(signature, tgt);
 	return [...cFindings, ...otherFindings].filter(f => {
 		if (f.kind !== 'function' || !f.reason.startsWith('missing documentation block')) return true;
-		const target = `${f.file}|${f.line}|${f.name}`;
-		const signature = missingTargets.get(target);
-		return !signature || (!documentedSignatures.has(signature) && primaryMissing.get(signature) === target);
+		const tgt = `${f.file}|${f.line}|${f.name}`;
+		const signature = missingTgts.get(tgt);
+		return !signature || (!documentedSignatures.has(signature) && primaryMissing.get(signature) === tgt);
 	});
 }
 

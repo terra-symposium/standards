@@ -54,8 +54,7 @@ export const IDENTIFIER_REPLACEMENTS = replacementMap([
 	['function', 'fn'],
 	[['generation', 'generate', 'generated', 'generating'], 'gen'],
 	[['identify', 'indentifier'], 'id'],
-	[['initialise', 'initialised', 'initialises', 'initialising', 'initialisation', 'initialize', 'initialized', 'initializes', 'initializing', 'initialization'], 'init'],
-	[['initialiser', 'initializer'], 'init'],
+	[['initialise', 'initialised', 'initialises', 'initialising', 'initialisation', 'initialize', 'initialiser', 'initializer', 'initialized', 'initializes', 'initializing', 'initialization'], 'init'],
 	['language', 'lang'],
 	['maximum', 'max'],
 	['message', 'msg'],
@@ -70,7 +69,7 @@ export const IDENTIFIER_REPLACEMENTS = replacementMap([
 	['reference', 'ref'],
 	['repository', 'repo'],
 	['source', 'src'],
-	['temporary', 'temp'],
+	[['temporary', 'temp'], 'tmp'],
 	['target', 'tgt'],
 ]);
 export const PREFIX_REPLACEMENTS = replacementMap([

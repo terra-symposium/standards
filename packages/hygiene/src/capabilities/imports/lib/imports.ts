@@ -81,9 +81,9 @@ function resolvePackageImport(specifier: string, importer: string, options: ts.C
 			if (isFile(manifest)) {
 				try {
 					const exports = JSON.parse(readFileSync(manifest, 'utf8')).exports;
-					const target = (subpath === '.' ? (exports?.['.'] ?? exports) : exports?.[subpath])?.style;
-					if (typeof target !== 'string' || !target.startsWith('./')) return null;
-					const asset = resolve(packageRoot, target);
+					const tgt = (subpath === '.' ? (exports?.['.'] ?? exports) : exports?.[subpath])?.style;
+					if (typeof tgt !== 'string' || !tgt.startsWith('./')) return null;
+					const asset = resolve(packageRoot, tgt);
 					return asset.startsWith(`${packageRoot}${sep}`) && isFile(asset) ? asset : null;
 				} catch {
 					return null;

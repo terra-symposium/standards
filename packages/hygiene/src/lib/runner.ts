@@ -2373,8 +2373,8 @@ function knipWorkspaceRootScore(repoRoot: string, workingRoot: string, workspace
 			if (typeof pattern !== 'string' || !pattern) continue;
 			const literalPrefix = knipLiteralPrefix(pattern);
 			const target = resolve(workspacePath, literalPrefix || '.');
-			const targetRelative = relative(repo, target);
-			if (targetRelative === '..' || targetRelative.startsWith(`..${sep}`) || isAbsolute(targetRelative)) return -1;
+			const tgtRelative = relative(repo, target);
+			if (tgtRelative === '..' || tgtRelative.startsWith(`..${sep}`) || isAbsolute(tgtRelative)) return -1;
 			if (existsSync(target)) score += literalPrefix !== pattern ? 1 : 2;
 		}
 	}
@@ -4281,18 +4281,18 @@ export function runFormatter(cfg: QualityCfg, optsOrArgs: QualityOptions | strin
 	const opts = legacyArgs ? { fix: optsOrArgs.includes('--write') || !optsOrArgs.includes('--check'), all: optsOrArgs.includes('--all'), strict: false } : optsOrArgs;
 	const suppliedArgs = (legacyArgs ? optsOrArgs : args).filter(a => !['--all', '--warn', '--fix', '--safe-fix', '--strict'].includes(a));
 	const suppliedTgts = suppliedArgs.filter((a, i) => a !== 'warn' || suppliedArgs[i - 1] !== '--log-level').filter(a => !a.startsWith('-'));
-	const authoredTargets = (targets: string[]): string[] =>
-		targets.filter(target => {
-			const file = resolve(cfg.root, target);
+	const authoredTgts = (targets: string[]): string[] =>
+		targets.filter(tgt => {
+			const file = resolve(cfg.root, tgt);
 			return !existsSync(file) || !statSync(file).isFile() || !hasGeneratedSourceHeader(readFileSync(file, 'utf8'));
 		});
-	const fmtSuppliedTgts = suppliedTgts.flatMap(target => {
-		if (/[?*{}[\]!]/u.test(target)) return [target];
-		const absolute = resolve(cfg.root, target);
-		if (existsSync(absolute) && statSync(absolute).isDirectory()) return authoredTargets(filesFor(cfg, opts.all).filter(file => resolve(file).startsWith(`${absolute}${sep}`)));
-		return authoredTargets([target]);
+	const fmtSuppliedTgts = suppliedTgts.flatMap(tgt => {
+		if (/[?*{}[\]!]/u.test(tgt)) return [tgt];
+		const absolute = resolve(cfg.root, tgt);
+		if (existsSync(absolute) && statSync(absolute).isDirectory()) return authoredTgts(filesFor(cfg, opts.all).filter(file => resolve(file).startsWith(`${absolute}${sep}`)));
+		return authoredTgts([tgt]);
 	});
-	const tgts = authoredTargets(fmtSuppliedTgts.length > 0 || suppliedTgts.length > 0 ? fmtSuppliedTgts : authoredTargets(filesFor(cfg, opts.all)));
+	const tgts = authoredTgts(fmtSuppliedTgts.length > 0 || suppliedTgts.length > 0 ? fmtSuppliedTgts : authoredTgts(filesFor(cfg, opts.all)));
 	if (!tgts.length) return;
 	const flags = [
 		...(suppliedArgs.includes('--write') || suppliedArgs.includes('--check') ? [] : [opts.fix ? '--write' : '--check']),
@@ -4343,8 +4343,8 @@ export function runFormatter(cfg: QualityCfg, optsOrArgs: QualityOptions | strin
 		...(!flags.some(f => f === '--config' || f.startsWith('--config=')) && prettierConfig ? ['--config', prettierConfig] : []),
 		...(!flags.some(f => f === '--ignore-path' || f.startsWith('--ignore-path=')) && prettierIgnore ? ['--ignore-path', prettierIgnore] : []),
 	];
-	const targetBatches = argBatches(tgts);
-	for (const tgtBatch of targetBatches) {
+	const tgtBatches = argBatches(tgts);
+	for (const tgtBatch of tgtBatches) {
 		const status = run(cfg, fmt, [...flags, ...configArgs, ...tgtBatch], { quietSuccess: true });
 		completed += tgtBatch.length;
 		qualityProgress('Prettier', completed, tgts.length);
@@ -4355,7 +4355,7 @@ export function runFormatter(cfg: QualityCfg, optsOrArgs: QualityOptions | strin
 	}
 	if (opts.fix && !failed && !flags.includes('--check')) {
 		const checkFlags = [...flags.filter(flag => flag !== '--write'), '--check'];
-		for (const tgtBatch of targetBatches) {
+		for (const tgtBatch of tgtBatches) {
 			const checkArgs = [...checkFlags, ...configArgs, ...tgtBatch];
 			const check = spawnSync(fmt, checkArgs, { cwd: cfg.root, stdio: 'ignore', env: process.env, maxBuffer: TOOL_OUTPUT_MAX_BUFFER });
 			if (!check.error && check.status === 0) continue;

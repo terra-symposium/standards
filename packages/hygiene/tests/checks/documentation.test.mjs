@@ -40,6 +40,23 @@ test('documentation reports missing path headers and inline TSDoc openings witho
 	assert.equal(fixtureText(root, 'src/missing.mjs'), '/** A purpose. */\nexport const value = 1;\n');
 });
 
+test('documentation requires descriptions, parameter tags, and return tags in separated order', () => {
+	const root = fixtureRoot('hygiene-tsdoc-layout-');
+	fixtureFile(root, 'src/valid.ts', '/**\n * Converts a value.\n *\n * @param value - Input value.\n * @param radix - Numeric base.\n *\n * @return Converted value.\n */\nexport const valid = (value: string, radix: number) => Number.parseInt(value, radix);\n');
+	fixtureFile(root, 'src/after-return.ts', '/**\n * Converts a value.\n *\n * @return Converted value.\n * @param value - Input value.\n */\nexport const afterReturn = (value: string) => Number(value);\n');
+	fixtureFile(root, 'src/no-gaps.ts', '/**\n * Converts a value.\n * @param value - Input value.\n * @return Converted value.\n */\nexport const noGaps = (value: string) => Number(value);\n');
+	fixtureFile(root, 'src/param-gap.ts', '/**\n * Adds values.\n *\n * @param left - First value.\n *\n * @param right - Second value.\n *\n * @return Sum.\n */\nexport const paramGap = (left: number, right: number) => left + right;\n');
+	const findings = documentationFindings(createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], documentation: { required: { functions: false, multilineTsdoc: true } } }))
+		.filter(({ name }) => name === '<TSDoc layout>')
+		.map(({ file, reason }) => [file, reason]);
+	assert.deepEqual(findings, [
+		['src/after-return.ts', 'put every @param tag before @return'],
+		['src/no-gaps.ts', 'separate the description and @param group with a blank * line'],
+		['src/no-gaps.ts', 'separate the @param group and @return with a blank * line'],
+		['src/param-gap.ts', 'keep @param tags together without blank lines'],
+	]);
+});
+
 test('nested Quality roots accept only their own or containing Git repository path', () => {
 	const root = fixtureRoot('hygiene-doc-nested-root-');
 	fixtureFile(root, '.git/HEAD', 'ref: refs/heads/main\n');
