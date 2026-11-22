@@ -80,6 +80,7 @@ async function repoIdentity(root) {
  *
  * @param repo Repository name, identity, and workspace path.
  * @param options Whether the user explicitly requested no push.
+ *
  * @return Instructions to show or submit for this repository.
  */
 function promptFor(repo, options) {

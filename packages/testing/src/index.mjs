@@ -181,7 +181,9 @@ export function readTestPlan(root, manifestPath = defaultManifestPath(root)) {
 // hygiene-ignore single-use -- Keep the documented defaultManifestPath declaration so its parameter and return contract remains attached.
 /**
  * Prefer the centralized config location while retaining compatibility with existing consumers.
+ *
  * @param {string} root Repository root.
+ *
  * @return {string} Repository-relative manifest path.
  */
 function defaultManifestPath(root) {

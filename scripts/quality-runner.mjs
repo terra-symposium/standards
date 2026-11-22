@@ -61,6 +61,7 @@ raw.skippedFiles = [...new Set([...(raw.skippedFiles ?? []), ...genLinks])];
  * Identifies repository commands that Quality must not invoke recursively.
  *
  * @param entry Configured command with a name and optional arguments.
+ *
  * @returns Whether the command would launch a build or test suite.
  */
 const isBuildOrTest = entry => {

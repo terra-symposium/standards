@@ -77,6 +77,7 @@ HELPERS
  * Formats a rate as a whole percentage for the KPI cards.
  *
  * @param value Fractional rate between zero and one, or `null` when unavailable.
+ *
  * @returns The rounded percentage string, or an em dash when no rate is available.
  */
 function percent(value: number | null): string {
@@ -87,6 +88,7 @@ function percent(value: number | null): string {
  * Formats an ISO timestamp using the user's locale and a short month name.
  *
  * @param value Timestamp to display.
+ *
  * @returns A localized calendar date.
  */
 function date(value: string): string {
@@ -97,6 +99,7 @@ function date(value: string): string {
  * Extracts the UTC calendar year from a timestamp for year-based grouping.
  *
  * @param value Timestamp whose UTC year should be displayed.
+ *
  * @returns The four-digit year as a string.
  */
 function year(value: string): string {
@@ -109,6 +112,7 @@ function year(value: string): string {
  * @param values Values plotted in order on the chart.
  * @param color Stroke color used for the line.
  * @param label Accessible label describing the chart.
+ *
  * @returns An empty-state message when there is no data, otherwise an SVG line chart.
  */
 function LineChart({ values, color, label }: { values: number[]; color: string; label: string }) {

@@ -837,6 +837,7 @@ function documentationBlockFor(src: string, node: ts.Node): TSDocBlock | undefin
  * @param file Absolute source path being inspected.
  * @param src Source text containing the documentation blocks.
  * @param parsed Parsed source file used for locations and comment scanning.
+ *
  * @return Warning findings for missing file, summary, or tag descriptions.
  */
 function descFindingsForFile(cfg: QualityCfg, file: string, src: string, parsed: ts.SourceFile): DocumentationFinding[] {
@@ -915,12 +916,6 @@ function descFindingsForFile(cfg: QualityCfg, file: string, src: string, parsed:
 		)
 			findings.push(documentationCommentReport(file, parsed, block.start, '<TSDoc summary>', 'summary', 'add a meaningful description for this TSDoc block', cfg));
 		for (const entry of tsdocTagEntries(lines)) {
-			if (entry.tag.toLowerCase() === 'param' && entry.subject.toLowerCase() === 'props') {
-				findings.push(
-					documentationCommentReport(file, parsed, entry.offset, `@${entry.tag} ${entry.subject}`, 'param', 'replace the aggregate props tag with an individual @param tag for each binding', cfg),
-				);
-				continue;
-			}
 			if (DESC_OPTIONAL_TAGS.has(entry.tag.toLowerCase()) || entry.description) continue;
 			const name = `@${entry.tag}${entry.subject ? ` ${entry.subject}` : ''}`;
 			findings.push(
@@ -1081,8 +1076,7 @@ function documentationFindingsForFile(
 							if (item.tag.toLowerCase() !== 'param' || !item.subject || declaredParams.has(item.subject)) return false;
 							return !declaredParams.has(item.subject.split('.')[0]!);
 						})) {
-							if (!(entry.subject === 'props' && node.parameters.some(param => ts.isObjectBindingPattern(param.name))))
-								findings.push(documentationCommentReport(file, parsed, entry.offset, `@param ${entry.subject}`, 'param', `remove stale @param ${entry.subject}`, cfg));
+						findings.push(documentationCommentReport(file, parsed, entry.offset, `@param ${entry.subject}`, 'param', `remove stale @param ${entry.subject}`, cfg));
 						}
 						if (returnsVal(node) && !entries.some(e => ['return', 'returns'].includes(e.tag.toLowerCase())))
 							findings.push(documentationReport(file, parsed, node, '@return', 'return', 'document the value returned by this function', cfg));

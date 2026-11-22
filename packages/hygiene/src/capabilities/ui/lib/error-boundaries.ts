@@ -308,6 +308,7 @@ function astroConfigFiles(root: string): string[] {
  * Whether an Astro config hydrates React islands and therefore needs their boundary integration.
  *
  * @param text Astro config source.
+ *
  * @return Whether the config imports Astro's React integration.
  */
 function usesReactAstroIntegration(text: string): boolean {
@@ -321,6 +322,7 @@ function usesReactAstroIntegration(text: string): boolean {
  * @param file Config file that may delegate.
  * @param root Repository boundary.
  * @param text Config source.
+ *
  * @return Whether a local Astro config owns its behavior.
  */
 function delegatesAstroConfig(file: string, root: string, text: string): boolean {

@@ -49,6 +49,7 @@ if (!envId || !skillFile || roots.length === 0) {
  * Resolve the repository root for a path when the path is inside a Git checkout.
  *
  * @param {string} path - Path to inspect.
+ *
  * @returns {Promise<string | undefined>} Repository root, or undefined when the path is not in a repository.
  */
 async function gitRoot(path) {
@@ -65,6 +66,7 @@ async function gitRoot(path) {
  *
  * @param {string} path - File or directory to inspect.
  * @param {Map<string, string>} repos - Repositories already discovered.
+ *
  * @returns {Promise<Map<string, string>>} The accumulated repository roots.
  */
 async function discover(path, repos = new Map()) {
@@ -108,6 +110,7 @@ try {
  * Submit one repository task to the Codex Cloud executor and collect its output.
  *
  * @param {string} repo - Repository root assigned to the task.
+ *
  * @returns {Promise<{repo: string, code: number, stdout: string, stderr: string}>} Submission result.
  */
 async function run(repo) {

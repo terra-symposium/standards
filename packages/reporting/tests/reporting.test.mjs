@@ -67,6 +67,7 @@ HELPERS
  * Creates a complete passing result fixture and applies scenario-specific field overrides.
  *
  * @param overrides Result fields that differ from the shared passing baseline.
+ *
  * @return A normalized result object suitable for writer and aggregation tests.
  */
 const result = (overrides = {}) => ({

@@ -7,6 +7,7 @@
  * Validates integers represented as numbers or non-empty numeric strings.
  *
  * @param num Value supplied by a parsed range endpoint.
+ *
  * @return Whether the input can be interpreted as an integer.
  */
 const isInteger = num => {

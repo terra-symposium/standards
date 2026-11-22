@@ -569,7 +569,7 @@ test('documentation description audit accepts TSDoc attached to a type member', 
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
 	assert.deepEqual(documentationFindings(cfg), []);
 });
-test('documentation findings reject props aggregates and require individual destructured parameter tags', () => {
+test('documentation findings reject stale props tags and require individual destructured parameter tags', () => {
 	const root = fixtureRoot('hygiene-destructured-function-doc-');
 	fixtureFile(
 		root,
@@ -586,8 +586,8 @@ export function renderLabel({ label }: { label: string }) { return label; }
 	assert.deepEqual(
 		documentationFindings(cfg).map(f => [f.kind, f.name, f.reason]),
 		[
-			['param', '@param props', 'replace the aggregate props tag with an individual @param tag for each binding'],
 			['param', '@param label', 'document the label parameter'],
+			['param', '@param props', 'remove stale @param props'],
 			['return', '@return', 'document the value returned by this function'],
 		],
 	);
