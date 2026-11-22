@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * .agents/skills/all-repos/scripts/create-repo-chats.mjs
+ * docs/agents/skills/all-repos/scripts/create-repo-chats.mjs
  */
 
 /*//////////////////////////////////////////////////

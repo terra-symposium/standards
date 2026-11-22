@@ -46,3 +46,6 @@ error.log
 **/.astro
 **/.ruff_cache
 **/.venv
+
+# Generated agent skills
+/.agents/skills/

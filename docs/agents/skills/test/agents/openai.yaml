@@ -1,0 +1,4 @@
+interface:
+  display_name: 'Test workflow'
+  short_description: 'Write, order, fix, and represent exhaustive tests'
+  default_prompt: 'Use the appropriate test child skill: writing for coverage and fixtures, ordering for efficient execution, fixing for source-of-truth repairs until green, and represent for reviewed Excel and PowerPoint evidence.'

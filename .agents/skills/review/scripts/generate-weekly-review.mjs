@@ -1,5 +1,5 @@
 /**
- * .agents/skills/review/scripts/generate-weekly-review.mjs
+ * docs/agents/skills/review/scripts/generate-weekly-review.mjs
  */
 
 /*//////////////////////////////////////////////////

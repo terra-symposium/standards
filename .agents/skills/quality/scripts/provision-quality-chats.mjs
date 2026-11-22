@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * .agents/skills/quality/scripts/provision-quality-chats.mjs
+ * docs/agents/skills/quality/scripts/provision-quality-chats.mjs
  */
 /*//////////////////////////////////////////////////
 IMPORTS

@@ -3,7 +3,7 @@ name: readme-standardisation
 description: Write consistent repository, package, and folder READMEs.
 metadata:
   related-files:
-    - .agents/skills/readme-standardisation/README.template.md
+    - docs/agents/skills/readme-standardisation/README.template.md
 ---
 
 # README standardisation

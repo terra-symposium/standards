@@ -11,15 +11,18 @@
 		"docs": "pnpm --dir config run docs",
 		"docs:build": "pnpm --dir config run docs:build",
 		"skills:catalog": "python3 scripts/skills_catalog.py",
-		"skills:check": "python3 scripts/skills_catalog.py --check",
-		"skills:package": "python3 scripts/build-skills-plugin.py",
+		"skills:check": "terra-skills check",
+		"skills:catalog:check": "python3 scripts/skills_catalog.py --check",
+		"skills:package": "terra-skills prepare && python3 scripts/build-skills-plugin.py",
 		"prepare": "pnpm --dir config run prepare",
 		"verify": "pnpm run quality:all && pnpm run test && pnpm run build && pnpm run docs:build",
-		"release": "pnpm --dir config exec changeset publish"
+		"release": "pnpm --dir config exec changeset publish",
+		"skills:prepare": "terra-skills prepare"
 	},
 	"devDependencies": {
 		"@changesets/cli": "^3.0.3",
 		"prettier": "^3.9.10",
-		"prettier-plugin-astro": "^1.1.2"
+		"prettier-plugin-astro": "^1.1.2",
+		"@terra-symposium/skills": "0.1.2"
 	}
 }

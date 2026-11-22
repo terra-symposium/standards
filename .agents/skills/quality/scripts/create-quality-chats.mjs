@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * .agents/skills/quality/scripts/create-quality-chats.mjs
+ * docs/agents/skills/quality/scripts/create-quality-chats.mjs
  */
 
 /*//////////////////////////////////////////////////

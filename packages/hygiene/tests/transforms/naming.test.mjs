@@ -97,6 +97,8 @@ test('renameId shortens established terms without abbreviating domain words or t
 		terror: 'terror',
 		isActive: 'isActive',
 		normalizedResponse: 'normResponse',
+		target: 'tgt',
+		targets: 'tgts',
 	};
 	for (const [name, expected] of Object.entries(cases)) assert.equal(renameId(name), expected, name);
 	assert.equal(renameId('activeCard'), 'activeCard');
@@ -119,6 +121,18 @@ test('protected path and filename predicates handle generated folders, declarati
 	assert.equal(isProtectedFilename('C:\\repo\\route.ts'), true);
 	assert.equal(isProtectedFilename('/repo/page.tsx.bak'), false);
 	assert.ok(PROTECTED_IDENTIFIERS.has('Request'));
+});
+test('target identifiers are reported and safely shortened in owned source', () => {
+	const root = fixtureRoot('hygiene-target-naming-');
+	fixtureFile(root, 'src/main.ts', 'const targets = [1];\nconsole.log(targets);\n');
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
+	assert.deepEqual(
+		namingFindings(cfg).map(({ name, suggestion }) => [name, suggestion]),
+		[['targets', 'tgts']],
+	);
+	assert.equal(fixNaming(cfg), 1);
+	assert.match(fixtureText(root, 'src/main.ts'), /const tgts = \[1\];/);
+	assert.deepEqual(namingFindings(cfg), []);
 });
 test('generated headers stay in source scope but do not receive source naming rewrites', () => {
 	const root = fixtureRoot('hygiene-generated-source-');

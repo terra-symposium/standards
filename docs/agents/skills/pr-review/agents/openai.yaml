@@ -1,0 +1,4 @@
+interface:
+  display_name: 'PR Review'
+  short_description: 'Review pull request changes and feedback'
+  default_prompt: 'Use $pr-review to review this pull request for actionable defects and unresolved feedback.'

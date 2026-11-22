@@ -64,8 +64,8 @@ def skill_details(path: Path, repo: Path) -> tuple[str, str, list[str]]:
         or not fields["description"]
     ):
         raise ValueError(f"Missing name or description: {path}")
-    if fields["name"] != path.parent.name:
-        raise ValueError(f"Skill name and directory differ: {path}")
+    if fields.get("skill") is not True:
+        raise ValueError(f"Docs skill page is missing skill: true: {path}")
     metadata = fields.get("metadata")
     if not isinstance(metadata, dict) or "related-files" not in metadata:
         raise ValueError(f"Missing metadata.related-files: {path}")
@@ -139,8 +139,15 @@ def generate() -> tuple[str, dict[Path, list[tuple[str, str, str]]]]:
     for repo in repositories():
         base = github_base(repo)
         local_entries[repo] = []
-        for path in sorted((repo / ".agents/skills").rglob("SKILL.md")):
+        for path in sorted((repo / "docs").rglob("SKILL.md")):
             if any(part in path.parts for part in ("node_modules", "dist")):
+                continue
+            source = path.read_text()
+            frontmatter = re.match(r"\A---\n(.*?)\n---\n", source, re.DOTALL)
+            if (
+                not frontmatter
+                or yaml.safe_load(frontmatter.group(1)).get("skill") is not True
+            ):
                 continue
             name, description, related_files = skill_details(path, repo)
             if name in seen:
@@ -159,10 +166,10 @@ def generate() -> tuple[str, dict[Path, list[tuple[str, str, str]]]]:
         "",
         (
             "This inventory is generated from repository "
-            "`.agents/skills/*/SKILL.md` files."
+            "Docs pages marked `skill: true`."
         ),
         (
-            "Edit the owning skill, then run `python3 scripts/skills_catalog.py` "
+            "Edit the owning Docs page, then run `python3 scripts/skills_catalog.py` "
             "from Standards."
         ),
         "Shared Standards skills are also packaged in the Terra skills plugin.",
@@ -180,7 +187,8 @@ def generate() -> tuple[str, dict[Path, list[tuple[str, str, str]]]]:
         "```",
         "",
         (
-            "The versioned plugin is built from canonical `.agents/skills/` sources "
+            "The versioned plugin is built from Docs-authored generated "
+            "`.agents/skills/` files "
             "into `dist/`."
         ),
         (
@@ -228,18 +236,34 @@ def local_catalog(repo: Path, entries: list[tuple[str, str, str]]) -> str:
         "# Agent skills",
         "",
         (
-            "Executable skills in this repository. Open a skill for its workflow "
-            "and references."
+            "Skill instructions are authored in Docs. Run `pnpm run "
+            "skills:prepare` to generate executable skills."
         ),
         "",
-        "| Skill | Purpose | Source |",
-        "| --- | --- | --- |",
     ]
-    for name, description, relative in sorted(entries):
-        lines.append(
-            f"| {name} | {description.replace('|', '/')} | "
-            f"[{relative}](skills/{name}/SKILL.md) |"
+    if repo.name == "standards":
+        lines[2] = (
+            "Skill instructions are authored in Docs. Run `pnpm run skills:prepare` "
+            "to generate executable\nskills."
         )
+    rows = [["Skill", "Purpose", "Source"]]
+    for name, description, relative in sorted(entries):
+        rows.append(
+            [name, description.replace("|", "/"), f"[{relative}](../{relative})"]
+        )
+    if repo.name in {"docs", "standards"}:
+        widths = [max(len(row[index]) for row in rows) for index in range(3)]
+        for index, row in enumerate(rows):
+            lines.append(
+                "| "
+                + " | ".join(cell.ljust(widths[col]) for col, cell in enumerate(row))
+                + " |"
+            )
+            if index == 0:
+                lines.append("| " + " | ".join("-" * width for width in widths) + " |")
+    else:
+        lines.extend(["| Skill | Purpose | Source |", "| --- | --- | --- |"])
+        lines.extend("| " + " | ".join(row) + " |" for row in rows[1:])
     lines.extend(["", f"{len(entries)} skills.", ""])
     return "\n".join(lines)
 

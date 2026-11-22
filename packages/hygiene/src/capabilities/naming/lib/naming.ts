@@ -71,6 +71,7 @@ export const IDENTIFIER_REPLACEMENTS = replacementMap([
 	['repository', 'repo'],
 	['source', 'src'],
 	['temporary', 'temp'],
+	['target', 'tgt'],
 ]);
 export const PREFIX_REPLACEMENTS = replacementMap([
 	[['normalise', 'normalised', 'normalises', 'normalize', 'normalized', 'normalizes'], 'norm'],
@@ -375,9 +376,9 @@ function callbackKind(n: ts.Identifier): RenameKind | undefined {
 	for (const declaration of declarations) {
 		const numericIndex = paramIndex(declaration);
 		if (declaration === n) {
-			const targetReserved = new Set(reserved);
-			if (fixedDeclarations.has(declaration)) targetReserved.delete(declaration.text);
-			return { callback: true, numericIndex, reserved: [...targetReserved] };
+			const tgtReserved = new Set(reserved);
+			if (fixedDeclarations.has(declaration)) tgtReserved.delete(declaration.text);
+			return { callback: true, numericIndex, reserved: [...tgtReserved] };
 		}
 		if (!fixedDeclarations.has(declaration)) reserved.add(renameId(declaration.text, { callback: true, numericIndex, reserved: [...reserved] }));
 	}
