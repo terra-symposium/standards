@@ -1,15 +1,15 @@
 ---
-title: Recovered development notes
-description: Undated legacy source material from the Docs Backup; current repository docs remain authoritative.
+title: Historical development guidance
+description: Historical standards and commenting guidance consolidated for current contributors.
 ---
 
-# Recovered development notes
+# Historical development guidance
 
-These notes preserve the backup’s original reasoning and proposals. Verify claims against current source before using them as implementation guidance. Exact original MDX files are under `archive/docs-backup/development/`.
+This guide consolidates earlier standards and commenting guidance for reference. Verify technical recommendations against current repository conventions before applying them.
 
 ## Standards
 
-_Source: `archive/docs-backup/development/0-general/000-Standards/index.mdx`._
+_Source: historical Standards development guidance._
 
 > ## Design
 >
@@ -21,84 +21,23 @@ _Source: `archive/docs-backup/development/0-general/000-Standards/index.mdx`._
 >
 > This applies to all aspects of code: logic, functions, variables, and comments. Solve problems with the minimum effective code. Be ruthlessly conservative with the number of variables and functions defined.
 >
-> <table>
-> 	<thead>
-> 		<tr>
-> 			<th>💭 Principle</th>
-> 			<th>🏷️ Description</th>
-> 		</tr>
-> 	</thead>
-> 	<tbody>
-> 		<tr>
-> 			<td><strong>Be direct</strong></td>
-> 			<td>
-> 				Return values immediately.<br />Never use intermediate variables
-> 				that are only used once.
-> 			</td>
-> 		</tr>
-> 		<tr>
-> 			<td><strong>Avoid premature abstraction</strong></td>
-> 			<td>
-> 				Do not create abstractions or helpers until a clear pattern of
-> 				repetition (used 3+ times) emerges.
-> 			</td>
-> 		</tr>
-> 		<tr>
-> 			<td><strong>Limit variables</strong></td>
-> 			<td>
-> 				Define as few variables as possible. <br />If you can inline a
-> 				value or chain a function, you must do it.
-> 			</td>
-> 		</tr>
-> 		<tr>
-> 			<td><strong>Consolidate logic</strong></td>
-> 			<td>
-> 				Define as few functions as possible.<br />Avoid functions that
-> 				are just simple pass-throughs or wrappers.
-> 			</td>
-> 		</tr>
-> 	</tbody>
-> </table>
+> | 💭 Principle                        | 🏷️ Description                                                                                                 |
+> | ----------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+> | > **Be direct** >                   | > Return values immediately. > ; > Never use intermediate variables that are only used once. >                 |
+> | > **Avoid premature abstraction** > | Do not create abstractions or helpers until a clear pattern of repetition (used 3+ times) emerges.             |
+> | > **Limit variables** >             | > Define as few variables as possible. ; > If you can inline a value or chain a function, you must do it. >    |
+> | > **Consolidate logic** >           | > Define as few functions as possible. > ; > Avoid functions that are just simple pass-throughs or wrappers. > |
 >
 > ### Principles
 >
 > Employ fundamental design principles to structure code logically.
 >
-> <table>
-> 	<thead>
-> 		<tr>
-> 			<th>💭 Principle</th>
-> 			<th>🏷️ Description</th>
-> 		</tr>
-> 	</thead>
-> 	<tbody>
-> 		<tr>
-> 			<td>Encapsulation</td>
-> 			<td>
-> 				Bundle data and methods within a single unit to hide internal
-> 				state and complexity.
-> 			</td>
-> 		</tr>
-> 		<tr>
-> 			<td>Abstraction</td>
-> 			<td>Expose only essential features through a clear interface.</td>
-> 		</tr>
-> 		<tr>
-> 			<td>Separation of concerns</td>
-> 			<td>
-> 				Divide code into distinct sections addressing separate concerns
-> 				(for example, data fetching vs rendering).
-> 			</td>
-> 		</tr>
-> 		<tr>
-> 			<td>Minimalism</td>
-> 			<td>
-> 				Use as few variables and as little state as possible. Limit
-> 				scope to keep code maintainable and testable.
-> 			</td>
-> 		</tr>
-> 	</tbody>
-> </table>
+> | 💭 Principle           | 🏷️ Description                                                                                             |
+> | ---------------------- | ---------------------------------------------------------------------------------------------------------- |
+> | Encapsulation          | Bundle data and methods within a single unit to hide internal state and complexity.                        |
+> | Abstraction            | Expose only essential features through a clear interface.                                                  |
+> | Separation of concerns | Divide code into distinct sections addressing separate concerns (for example, data fetching vs rendering). |
+> | Minimalism             | Use as few variables and as little state as possible. Limit scope to keep code maintainable and testable.  |
 >
 > :::tip[Use Maps]
 >
@@ -130,37 +69,12 @@ _Source: `archive/docs-backup/development/0-general/000-Standards/index.mdx`._
 >
 > ### Convention
 >
-> <table>
-> 	<thead>
-> 		<tr>
-> 			<th>🧪 Example</th>
-> 			<th>🔁 Pattern</th>
-> 			<th>🎯 Purpose</th>
-> 		</tr>
-> 	</thead>
-> 	<tbody>
-> 		<tr>
-> 			<td><code>[].astro</code></td>
-> 			<td>Default</td>
-> 			<td>A generated dynamic page.</td>
-> 		</tr>
-> 		<tr>
-> 			<td><code>_[...].tsx</code></td>
-> 			<td>Underscore</td>
-> 			<td>Not generated as a page (Private/Component).</td>
-> 		</tr>
-> 		<tr>
-> 			<td><code>_[Uppercase].astro</code></td>
-> 			<td>Uppercase</td>
-> 			<td>A component.</td>
-> 		</tr>
-> 		<tr>
-> 			<td><code>_[lowercase].astro</code></td>
-> 			<td>Lowercase</td>
-> 			<td>A structural file (e.g., a layout).</td>
-> 		</tr>
-> 	</tbody>
-> </table>
+> | 🧪 Example               | 🔁 Pattern | 🎯 Purpose                                   |
+> | ------------------------ | ---------- | -------------------------------------------- |
+> | > `[].astro` >           | Default    | A generated dynamic page.                    |
+> | > `_[...].tsx` >         | Underscore | Not generated as a page (Private/Component). |
+> | > `_[Uppercase].astro` > | Uppercase  | A component.                                 |
+> | > `_[lowercase].astro` > | Lowercase  | A structural file (e.g., a layout).          |
 >
 > |||
 >
@@ -189,64 +103,39 @@ _Source: `archive/docs-backup/development/0-general/000-Standards/index.mdx`._
 >
 > ### Convention
 >
-> <table>
-> 	<tbody>
-> 		<tr>
-> 			<td>buffer → buf</td>
-> 			<td>current → cur</td>
-> 			<td>directory → dir</td>
-> 		</tr>
-> 		<tr>
-> 			<td>error → err</td>
-> 			<td>event → e</td>
-> 			<td>extension → ext</td>
-> 		</tr>
-> 		<tr>
-> 			<td>format → fmt</td>
-> 			<td>frontmatter → fm</td>
-> 			<td>index → i</td>
-> 		</tr>
-> 		<tr>
-> 			<td>markdown → md</td>
-> 			<td>metadata → meta</td>
-> 			<td>organisation → org</td>
-> 		</tr>
-> 		<tr>
-> 			<td>position → pos</td>
-> 			<td>previous → prev</td>
-> 			<td>repository → repo</td>
-> 		</tr>
-> 		<tr>
-> 			<td>request → req</td>
-> 			<td>response → res</td>
-> 			<td>segment → seg</td>
-> 		</tr>
-> 		<tr>
-> 			<td>target → tgt</td>
-> 			<td></td>
-> 			<td></td>
-> 		</tr>
-> 	</tbody>
-> </table>
+> | 🧠 Term      | ✂️ Abbreviation |
+> | ------------ | --------------- |
+> | buffer       | buf             |
+> | current      | cur             |
+> | directory    | dir             |
+> | error        | err             |
+> | event        | e               |
+> | extension    | ext             |
+> | format       | fmt             |
+> | frontmatter  | fm              |
+> | index        | i               |
+> | markdown     | md              |
+> | metadata     | meta            |
+> | organisation | org             |
+> | position     | pos             |
+> | previous     | prev            |
+> | repository   | repo            |
+> | request      | req             |
+> | response     | res             |
+> | segment      | seg             |
+> | target       | tgt             |
 >
 > Items in maps (for example, `.map(i => ...)`) MUST use single-letter items instead of full variable names unless the variable letter will conflict logically or syntactically with its context.&#x20;
 >
 > Also allow abbreviations when similar variables are defined as “sisters” (for example, `sisterFiles`, `allFiles`, `rawFiles` becomes `sFiles`, `aFiles`, `rFiles`). To make clear what each letter stands for, document them with TSDoc comments on each declaration. Standard prefixes are:
 >
-> <table>
-> 	<tbody>
-> 		<tr>
-> 			<td>all → a</td>
-> 			<td>new → n</td>
-> 			<td>next → n</td>
-> 		</tr>
-> 		<tr>
-> 			<td>previous → p</td>
-> 			<td>safe → s</td>
-> 			<td></td>
-> 		</tr>
-> 	</tbody>
-> </table>
+> | 🧠 Term  | ✂️ Abbreviation |
+> | -------- | --------------- |
+> | all      | a               |
+> | new      | n               |
+> | next     | n               |
+> | previous | p               |
+> | safe     | s               |
 >
 > |||
 >
@@ -263,32 +152,10 @@ _Source: `archive/docs-backup/development/0-general/000-Standards/index.mdx`._
 > - Do not rely on implicit types or inference for public APIs.
 > - Do not use `any`. Default to `unknown` if a type's shape is not yet known.
 >
-> <table>
-> 	<thead>
-> 		<tr>
-> 			<th>🎯 Strategy</th>
-> 			<th>📄 Description</th>
-> 		</tr>
-> 	</thead>
-> 	<tbody>
-> 		<tr>
-> 			<td>Object mapping</td>
-> 			<td>
-> 				Use <code>Record&lt;string, unknown&gt;</code> instead of
-> 				<code>any</code> when handling generic objects or parsed JSON.
-> 				This enforces type assertion before property access.
-> 			</td>
-> 		</tr>
-> 		<tr>
-> 			<td>Type narrowing</td>
-> 			<td>
-> 				Utilise custom type guards (e.g., <code>validateType</code>) or
-> 				<code>typeof</code> checks to safely narrow
-> 				<code>unknown</code> payloads.
-> 			</td>
-> 		</tr>
-> 	</tbody>
-> </table>
+> | 🎯 Strategy    | 📄 Description                                                                                                                                          |
+> | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+> | Object mapping | > Use `Record<string, unknown>` instead of > `any` when handling generic objects or parsed JSON. This enforces type assertion before property access. > |
+> | Type narrowing | > Utilise custom type guards (e.g., `validateType`) or > `typeof` checks to safely narrow > `unknown` payloads. >                                       |
 >
 > Types are manually defined and centralised in `@lib/types`. AI agents are fed this as context and must borrow from it.
 >
@@ -320,35 +187,10 @@ _Source: `archive/docs-backup/development/0-general/000-Standards/index.mdx`._
 >
 > React's event handlers and the native DOM require specific casting to prevent floating promise and event typing errors.
 >
-> <table>
-> 	<thead>
-> 		<tr>
-> 			<th>⚠️ Pitfall</th>
-> 			<th>✅ Solution</th>
-> 		</tr>
-> 	</thead>
-> 	<tbody>
-> 		<tr>
-> 			<td>Floating promises</td>
-> 			<td>
-> 				React expects handlers like <code>onClick</code> to return
-> 				<code>void</code>. Wrap async calls in a
-> 				<code>void</code> operator (e.g.,
-> 				<code>onClick={() =&gt; void myAsyncFunction()}</code>).
-> 			</td>
-> 		</tr>
-> 		<tr>
-> 			<td>Event targets</td>
-> 			<td>
-> 				Because <code>e.target</code> is generic, narrow it explicitly
-> 				(<code
-> 					>const target = e.target instanceof HTMLElement ? e.target :
-> 					null;</code
-> 				>) or rely on <code>e.currentTarget</code>.
-> 			</td>
-> 		</tr>
-> 	</tbody>
-> </table>
+> | ⚠️ Pitfall        | ✅ Solution                                                                                                                                             |
+> | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+> | Floating promises | React expects handlers like `onClick` to return `void`. Wrap async calls in a `void` operator (e.g., `onClick={() => void myAsyncFunction()}`).         |
+> | Event targets     | Because `e.target` is generic, narrow it explicitly (`const target = e.target instanceof HTMLElement ? e.target : null;`) or rely on `e.currentTarget`. |
 >
 > ### Asynchronous Actions
 >
@@ -456,7 +298,7 @@ _Source: `archive/docs-backup/development/0-general/000-Standards/index.mdx`._
 
 ## Commenting
 
-_Source: `archive/docs-backup/development/0-general/1-commenting.mdx`._
+_Source: historical commenting guidance._
 
 > ## Overview
 >
@@ -466,32 +308,12 @@ _Source: `archive/docs-backup/development/0-general/1-commenting.mdx`._
 >
 > Prefer structure, naming, and types first. Use comments only for the information that would otherwise stay invisible to the next reader.
 >
-> <table>
->   <thead>
->     <tr>
->       <th>🧩 Include</th>
->       <th>Why it belongs</th>
->     </tr>
->   </thead>
->   <tbody>
->     <tr>
->       <td>Intent</td>
->       <td>Explains why the code exists or what outcome it protects.</td>
->     </tr>
->     <tr>
->       <td>Constraints</td>
->       <td>Records rules the code must obey, such as API quirks or business limits.</td>
->     </tr>
->     <tr>
->       <td>Trade-offs</td>
->       <td>Captures why this approach was chosen over a reasonable alternative.</td>
->     </tr>
->     <tr>
->       <td>Ambiguous context</td>
->       <td>Clarifies a non-obvious boundary that naming and typing cannot make obvious.</td>
->     </tr>
->   </tbody>
-> </table>
+> | 🧩 Include        | Why it belongs                                                               |
+> | ----------------- | ---------------------------------------------------------------------------- |
+> | Intent            | Explains why the code exists or what outcome it protects.                    |
+> | Constraints       | Records rules the code must obey, such as API quirks or business limits.     |
+> | Trade-offs        | Captures why this approach was chosen over a reasonable alternative.         |
+> | Ambiguous context | Clarifies a non-obvious boundary that naming and typing cannot make obvious. |
 >
 > If naming, typing, or structure can carry the meaning, prefer that over adding a comment.
 >
@@ -499,77 +321,25 @@ _Source: `archive/docs-backup/development/0-general/1-commenting.mdx`._
 >
 > Every comment should satisfy these rules before it stays in the file. If it fails any one of them, rewrite or delete it.
 >
-> <table>
->   <thead>
->     <tr>
->       <th>🧭 Principle</th>
->       <th>Description</th>
->     </tr>
->   </thead>
->   <tbody>
->     <tr>
->       <td>Intent</td>
->       <td>Comments must explain why, not narrate what the code is doing.</td>
->     </tr>
->     <tr>
->       <td>Conciseness</td>
->       <td>Comments must be as concise as possible, but as frequent as necessary.</td>
->     </tr>
->     <tr>
->       <td>Self-documenting</td>
->       <td>Prefer naming, types, and structure over comments when the code can be made self-explanatory.</td>
->     </tr>
->     <tr>
->       <td>Human authorship</td>
->       <td>Comments must leave no trace of AI generation. Remove conversational artefacts, process metadata, and expressions of uncertainty.</td>
->     </tr>
->     <tr>
->       <td>Consolidation</td>
->       <td>Do not create empty sections or scatter related functions. Consolidate related logic under a single, appropriate section block.</td>
->     </tr>
->   </tbody>
-> </table>
+> | 🧭 Principle     | Description                                                                                                                       |
+> | ---------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+> | Intent           | Comments must explain why, not narrate what the code is doing.                                                                    |
+> | Conciseness      | Comments must be as concise as possible, but as frequent as necessary.                                                            |
+> | Self-documenting | Prefer naming, types, and structure over comments when the code can be made self-explanatory.                                     |
+> | Human authorship | Comments must leave no trace of AI generation. Remove conversational artefacts, process metadata, and expressions of uncertainty. |
+> | Consolidation    | Do not create empty sections or scatter related functions. Consolidate related logic under a single, appropriate section block.   |
 >
 > ### Pitfalls
 >
 > Most weak comments fail for predictable reasons. Remove these patterns instead of polishing them.
 >
-> <table>
->   <thead>
->     <tr>
->       <th>❌ Pattern</th>
->       <th>Why it fails</th>
->       <th>✅ Better approach</th>
->     </tr>
->   </thead>
->   <tbody>
->     <tr>
->       <td>Mechanics narration</td>
->       <td>The code already states the action.</td>
->       <td>Explain the reason the action is necessary.</td>
->     </tr>
->     <tr>
->       <td>Process commentary</td>
->       <td>Readers do not need authoring history in source.</td>
->       <td>Keep only the enduring architectural or domain context.</td>
->     </tr>
->     <tr>
->       <td>Uncertainty</td>
->       <td>A comment that says &quot;maybe&quot; reduces trust.</td>
->       <td>Resolve the uncertainty or open a tracked follow-up instead.</td>
->     </tr>
->     <tr>
->       <td>AI-sounding filler</td>
->       <td>It signals automation rather than intent.</td>
->       <td>Rewrite as a direct statement in plain language.</td>
->     </tr>
->     <tr>
->       <td>Empty grouping or scattering</td>
->       <td>It adds structure without clarity.</td>
->       <td>Merge related code into one coherent block or delete headers.</td>
->     </tr>
->   </tbody>
-> </table>
+> | ❌ Pattern                   | Why it fails                                     | ✅ Better approach                                            |
+> | ---------------------------- | ------------------------------------------------ | ------------------------------------------------------------- |
+> | Mechanics narration          | The code already states the action.              | Explain the reason the action is necessary.                   |
+> | Process commentary           | Readers do not need authoring history in source. | Keep only the enduring architectural or domain context.       |
+> | Uncertainty                  | A comment that says "maybe" reduces trust.       | Resolve the uncertainty or open a tracked follow-up instead.  |
+> | AI-sounding filler           | It signals automation rather than intent.        | Rewrite as a direct statement in plain language.              |
+> | Empty grouping or scattering | It adds structure without clarity.               | Merge related code into one coherent block or delete headers. |
 >
 > ## Hierarchy
 >
@@ -577,72 +347,50 @@ _Source: `archive/docs-backup/development/0-general/1-commenting.mdx`._
 >
 > Group titles must touch the code they describe. There should be no whitespace between a capitalised group heading and the code below it. When using section blocks, the comment fences before and after the title must contain exactly 50 slashes, and there must be a blank line before and after the whole block.
 >
-> <table>
->   <thead>
->     <tr>
->       <th>Level</th>
->       <th>Syntax</th>
->       <th>Styling</th>
->       <th>Purpose</th>
->     </tr>
->   </thead>
->   <tbody>
->     <tr>
->       <td>Section</td>
->       <td>
->         <pre>
-> 			<code>
+> **Section**
+>
+> ```ts
 > /*//////////////////////////////////////////////////
 > SECTION
 > //////////////////////////////////////////////////*/
-> 			</code>
->         </pre>
->       </td>
->       <td>UPPERCASE.<br><br>Must have a blank line before and after the section block.<br><br>Valid instances include: Imports, Exports, Functions, Config, Components. Any other instances should be rare.</td>
->       <td>Defines a major segment, such as <code>IMPORTS</code> or <code>FUNCTIONS</code>.</td>
->     </tr>
->     <tr>
->       <td>Group</td>
->       <td>
->         <pre>
-> 			<code>// FIRST GROUP</code>
->         </pre>
->       </td>
->       <td>UPPERCASE. <br><br>Must have a blank line before. Must touch the code below.</td>
->       <td>Scopes the next contiguous block of related code.</td>
->     </tr>
->     <tr>
->       <td>Individual</td>
->       <td>
->         <pre>
-> 			<code>// lowercase details</code>
->         </pre>
->       </td>
->       <td>lowercase. <br><br>No surrounding blank lines.</td>
->       <td>Explains the purpose of the subsequent line or block.</td>
->     </tr>
->     <tr>
->       <td>Inline</td>
->       <td>
->         <pre>
-> 			<code>code(); // brief explanation</code>
->         </pre>
->       </td>
->       <td>lowercase. <br><br>Same line as the code it clarifies.</td>
->       <td>Clarifies non-obvious logic on that specific line.</td>
->     </tr>
->     <tr>
->       <td>TSDoc</td>
->       <td>
->         <pre>
-> 			<code>/** * ... */</code>
->         </pre>
->       </td>
->       <td>Required by linting for exported top-level functions.</td>
->       <td>Documents exported functions, constants, and types for tooling.<br><br>Required on ALL helpers, exported or not, functions or consts.</td>
->     </tr>
->   </tbody>
-> </table>
+> ```
+>
+> Styling: uppercase, with a blank line before and after the section block. Use it for major segments such as imports, exports, functions, config, or components.
+>
+> **Group**
+>
+> ```ts
+> // FIRST GROUP
+> ```
+>
+> Styling: uppercase, with a blank line before and no gap before the code below. It scopes the next contiguous block of related code.
+>
+> **Individual**
+>
+> ```ts
+> // lowercase details
+> ```
+>
+> Styling: lowercase, with no surrounding blank lines. It explains the purpose of the following line or block.
+>
+> **Inline**
+>
+> ```ts
+> code(); // brief explanation
+> ```
+>
+> Styling: lowercase and on the same line as the code. It clarifies non-obvious logic on that line.
+>
+> **TSDoc**
+>
+> ```ts
+> /** * ... */
+> ```
+>
+> Required by linting for exported top-level functions. It documents exported functions, constants, and types for tooling, and is required on helpers too.
+>
+> | 🧠 Term | ✂️ Abbreviation |
+> | ------- | --------------- |
 >
 > :::danger[Required]
 >
@@ -675,36 +423,13 @@ _Source: `archive/docs-backup/development/0-general/1-commenting.mdx`._
 >
 > Imports follow the file header and must be categorised by source. Keep the grouping comments simple, alphabetical, and consistent with the source classes already established in the repo.
 >
-> <table>
->   <thead>
->     <tr>
->       <th>🧩 Rule</th>
->       <th>Requirement</th>
->     </tr>
->   </thead>
->   <tbody>
->     <tr>
->       <td>Group labels</td>
->       <td>Use source-based labels already used in the repo, such as <code>API</code>, <code>COMPONENTS</code>, <code>DATA</code>, <code>ICONS</code>, and <code>TYPES</code>.</td>
->     </tr>
->     <tr>
->       <td>Ordering</td>
->       <td>Sort import grouping comments alphabetically by group label.</td>
->     </tr>
->     <tr>
->       <td>Spacing</td>
->       <td>Include a single blank line before each group comment.</td>
->     </tr>
->     <tr>
->       <td>Types</td>
->       <td>Split <code>import type</code> declarations into a dedicated <code>// TYPES</code> group.</td>
->     </tr>
->     <tr>
->       <td>Restrictions</td>
->       <td>Do not use generic catch-all labels such as <code>// UTILS</code>. Use the established source-based group labels instead.</td>
->     </tr>
->   </tbody>
-> </table>
+> | 🧩 Rule      | Requirement                                                                                                        |
+> | ------------ | ------------------------------------------------------------------------------------------------------------------ |
+> | Group labels | > Use source-based labels already used in the repo, such as `API`, `COMPONENTS`, `DATA`, `ICONS`, and `TYPES`. >   |
+> | Ordering     | Sort import grouping comments alphabetically by group label.                                                       |
+> | Spacing      | Include a single blank line before each group comment.                                                             |
+> | Types        | > Split `import type` declarations into a dedicated `// TYPES` group. >                                            |
+> | Restrictions | > Do not use generic catch-all labels such as `// UTILS`. Use the established source-based group labels instead. > |
 >
 > Preserve source-based import grouping before inventing local conventions. If a new import comment cannot be justified by source category, it probably should not exist.
 >
@@ -732,61 +457,21 @@ _Source: `archive/docs-backup/development/0-general/1-commenting.mdx`._
 >
 > The repo includes automation to enforce these standards. Use it to keep headers, fences, and import structure aligned after edits or file moves. The `scripts/maintain.mjs` utility automatically enforces these standards across supported source files such as `.ts`, `.tsx`, `.astro`, and `.mdx`.
 >
-> <table>
->   <thead>
->     <tr>
->       <th>⚙️ Feature</th>
->       <th>Description</th>
->     </tr>
->   </thead>
->   <tbody>
->     <tr>
->       <td>Header normalisation</td>
->       <td>Generates and updates the relative file path docblocks at the top of files.</td>
->     </tr>
->     <tr>
->       <td>Fence formatting</td>
->       <td>Ensures that section blocks have exactly 50 slashes and appropriate blank lines around them.</td>
->     </tr>
->     <tr>
->       <td>Import organisation</td>
->       <td>Alphabetises import groups, splits <code>import type</code> into a dedicated <code>// types</code> group, and manages multi-line import indentation.</td>
->     </tr>
->     <tr>
->       <td>Frontmatter standardisation</td>
->       <td>Formats YAML frontmatter in <code>.mdx</code> files, ensuring clean list collapsing and layout consistency.</td>
->     </tr>
->   </tbody>
-> </table>
+> | ⚙️ Feature                  | Description                                                                                                                        |
+> | --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+> | Header normalisation        | Generates and updates the relative file path docblocks at the top of files.                                                        |
+> | Fence formatting            | Ensures that section blocks have exactly 50 slashes and appropriate blank lines around them.                                       |
+> | Import organisation         | > Alphabetises import groups, splits `import type` into a dedicated `// types` group, and manages multi-line import indentation. > |
+> | Frontmatter standardisation | > Formats YAML frontmatter in `.mdx` files, ensuring clean list collapsing and layout consistency. >                               |
 >
 > Run the maintenance script whenever comment structure or headers may have drifted. It is cheaper to run it early than to fix formatting by hand at review time.
 >
-> <table>
->   <thead>
->     <tr>
->       <th>🕒 Trigger</th>
->       <th>Why it matters</th>
->     </tr>
->   </thead>
->   <tbody>
->     <tr>
->       <td>After adding files</td>
->       <td>New source files need the correct path header and fence formatting.</td>
->     </tr>
->     <tr>
->       <td>After renaming files</td>
->       <td>The path docblock must match the new relative location.</td>
->     </tr>
->     <tr>
->       <td>After import reshuffles</td>
->       <td>Import groups can drift out of order or lose the dedicated type block.</td>
->     </tr>
->     <tr>
->       <td>Before commit</td>
->       <td>It provides a final consistency pass over supported source files.</td>
->     </tr>
->   </tbody>
-> </table>
+> | 🕒 Trigger              | Why it matters                                                         |
+> | ----------------------- | ---------------------------------------------------------------------- |
+> | After adding files      | New source files need the correct path header and fence formatting.    |
+> | After renaming files    | The path docblock must match the new relative location.                |
+> | After import reshuffles | Import groups can drift out of order or lose the dedicated type block. |
+> | Before commit           | It provides a final consistency pass over supported source files.      |
 >
 > The maintenance script should normalise structure, not compensate for weak comment intent. Human review still decides whether a comment deserves to remain.
 >
@@ -794,39 +479,13 @@ _Source: `archive/docs-backup/development/0-general/1-commenting.mdx`._
 >
 > Before commit, confirm the comments still deserve to exist. A small validation pass prevents noise from accumulating during refactors. Use this checklist after `scripts/maintain.mjs` has run. It keeps the review focused on purpose, scope, and formatting rather than personal preference.
 >
-> <table>
->   <thead>
->     <tr>
->       <th>✅ Check</th>
->       <th>What to confirm</th>
->     </tr>
->   </thead>
->   <tbody>
->     <tr>
->       <td>Purpose</td>
->       <td>Every comment explains intent, constraint, or trade-off rather than mechanics.</td>
->     </tr>
->     <tr>
->       <td>Level</td>
->       <td>Each comment uses the smallest valid hierarchy level for its scope.</td>
->     </tr>
->     <tr>
->       <td>Syntax</td>
->       <td>Section fences, group casing, individual casing, and inline placement are correct.</td>
->     </tr>
->     <tr>
->       <td>Spacing</td>
->       <td>Blank lines follow the exact rules for section, group, and inline comments.</td>
->     </tr>
->     <tr>
->       <td>Headers</td>
->       <td>File path headers and import groups match the repo&apos;s maintained structure.</td>
->     </tr>
->     <tr>
->       <td>Automation</td>
->       <td><code>npm run maintain</code> has been run if headers, fences, or imports changed.</td>
->     </tr>
->   </tbody>
-> </table>
+> | ✅ Check   | What to confirm                                                                    |
+> | ---------- | ---------------------------------------------------------------------------------- |
+> | Purpose    | Every comment explains intent, constraint, or trade-off rather than mechanics.     |
+> | Level      | Each comment uses the smallest valid hierarchy level for its scope.                |
+> | Syntax     | Section fences, group casing, individual casing, and inline placement are correct. |
+> | Spacing    | Blank lines follow the exact rules for section, group, and inline comments.        |
+> | Headers    | File path headers and import groups match the repo's maintained structure.         |
+> | Automation | > `npm run maintain` has been run if headers, fences, or imports changed. >        |
 >
 > Treat a comment pass as incomplete if the code still reads like narrated mechanics after the formatting issues are fixed.

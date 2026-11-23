@@ -1,6 +1,6 @@
 ---
 title: Report React boundary errors
-description: Connect the callback to safe application telemetry without making fallback recovery depend on delivery.
+description: Connect the callback to safe application telemetry without making fallback.
 ---
 
 The boundary callback is an application-owned extension point. The shared package does not choose an analytics provider, send events, or persist error details.
@@ -13,11 +13,7 @@ Keep the callback synchronous, bounded, and nonthrowing. Map the captured failur
 <ErrorBoundary
 	name='Search results'
 	onError={(error, { name, componentStack }) => {
-		telemetry.captureException(error, {
-			boundary: name,
-			componentStack,
-			release: applicationRelease,
-		});
+		telemetry.captureException(error, { boundary: name, componentStack, release: applicationRelease });
 	}}
 	fallback={() => <SearchFailure />}
 >

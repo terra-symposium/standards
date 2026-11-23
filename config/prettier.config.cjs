@@ -6,5 +6,8 @@
  */
 const config = { arrowParens: 'avoid', jsxSingleQuote: true, printWidth: 200, proseWrap: 'never', singleQuote: true, useTabs: true };
 config.plugins = [require.resolve('prettier-plugin-astro')];
-config.overrides = [{ files: ['README.md', '**/README.md'], options: { printWidth: 100, proseWrap: 'always' } }];
+config.overrides = [
+	{ files: ['README.md', '**/README.md'], options: { printWidth: 100, proseWrap: 'always' } },
+	{ files: ['**/*.md', '**/*.mdx'], options: { parser: 'mdx', objectWrap: 'collapse' } },
+];
 module.exports = config;

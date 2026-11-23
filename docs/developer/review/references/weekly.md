@@ -37,15 +37,7 @@ A source-backed plan uses `contributors[].plan`:
 	"end": "2026-10-31",
 	"asOf": "2026-08-24",
 	"outcome": "Short source-backed 90-day outcome.",
-	"milestones": [
-		{
-			"name": "Understand, map, and design",
-			"start": "2026-08-03",
-			"end": "2026-09-01",
-			"progress": 25,
-			"evidence": "Drive update or verified report evidence"
-		}
-	]
+	"milestones": [{ "name": "Understand, map, and design", "start": "2026-08-03", "end": "2026-09-01", "progress": 25, "evidence": "Drive update or verified report evidence" }]
 }
 ```
 

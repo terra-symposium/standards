@@ -28,9 +28,7 @@ To provide one fallback for any failed island on a page, add the integration in 
 import { defineConfig } from 'astro/config';
 import { terraErrorBoundaryIntegration } from '@terra-symposium/boundaries/astro-integration';
 
-export default defineConfig({
-	integrations: [terraErrorBoundaryIntegration()],
-});
+export default defineConfig({ integrations: [terraErrorBoundaryIntegration()] });
 ```
 
 The integration installs a listener before hydration. It ignores already-handled events and disconnected targets, prevents Astro's default handling for the captured event, and inserts an accessible reload fallback next to the failed island.

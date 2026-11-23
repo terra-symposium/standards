@@ -4,7 +4,8 @@ Quality helps teams find and safely fix problems in their source code.
 
 ## Get started
 
-Use Node.js 18.18 or later. Install the package and create a `quality.json` at the repository root (or under `config/`):
+Use Node.js 18.18 or later. Install the package and create a `quality.json` at the repository root
+(or under `config/`):
 
 ```sh
 pnpm add -D @terra-symposium/hygiene
@@ -19,7 +20,8 @@ pnpm add -D @terra-symposium/hygiene
 }
 ```
 
-Enable external checks after installing and configuring their native tools in the consuming repository. Run Quality, then review any edits:
+Enable external checks after installing and configuring their native tools in the consuming
+repository. Run Quality, then review any edits:
 
 ```sh
 pnpm exec hygiene
@@ -35,13 +37,19 @@ git diff
 | `pnpm exec hygiene quality --all`        | All configured files        | Yes           |
 | `pnpm exec hygiene quality --all --warn` | All configured files        | No            |
 
-The package exports focused APIs under `/core`, `/reports`, `/ui`, `/languages`, `/documentation`, `/formatting`, `/imports`, `/naming`, `/patterns`, `/refactoring`, and `/security`. See the [package map](../../docs/hygiene/1-packages/package-map.mdx) for contracts and CLI bins.
+The package exports focused APIs under `/core`, `/reports`, `/ui`, `/languages`, `/documentation`,
+`/formatting`, `/imports`, `/naming`, `/patterns`, `/refactoring`, and `/security`. See the
+[package map](../../docs/hygiene/1-packages/package-map.mdx) for contracts and CLI bins.
 
 ## Configuration
 
-`quality.json` selects source roots, checks, autofixes, tools, and repository-owned static commands. Keep builds and functional tests in separate scripts. Put secrets in the consuming environment, never in config or Quality reports. The React and Astro error-boundary check is mandatory.
+`quality.json` selects source roots, checks, autofixes, tools, and repository-owned static commands.
+Keep builds and functional tests in separate scripts. Put secrets in the consuming environment,
+never in config or Quality reports. The React and Astro error-boundary check is mandatory.
 
-For a specific declaration whose identity or evaluation order must remain, place a `// hygiene-ignore single-use -- <concrete reason>` comment immediately before it or its TSDoc. The exemption applies only to that declaration's single-use finding.
+For a specific declaration whose identity or evaluation order must remain, place a
+`// hygiene-ignore single-use -- <concrete reason>` comment immediately before it or its TSDoc. The
+exemption applies only to that declaration's single-use finding.
 
 ## Validation
 
@@ -51,11 +59,14 @@ For a specific declaration whose identity or evaluation order must remain, place
 | `pnpm run test`        | Unit or project tests         |
 | `pnpm run build`       | Build output                  |
 
-Quality can apply safe fixes; review the diff before committing. No separate browser or Playwright test command is defined here.
+Quality can apply safe fixes; review the diff before committing. No separate browser or Playwright
+test command is defined here.
 
 ## Contributing
 
-`src/capabilities/` owns focused checks and core utilities; `src/lib/` owns aggregate orchestration. Add positive and negative fixtures for transforms, verify syntax and rollback behavior, and review autofix diffs. Published changes need a Changeset.
+`src/capabilities/` owns focused checks and core utilities; `src/lib/` owns aggregate orchestration.
+Add positive and negative fixtures for transforms, verify syntax and rollback behavior, and review
+autofix diffs. Published changes need a Changeset.
 
 Open changes through the repository pull-request workflow; see the [root README](../../README.md).
 

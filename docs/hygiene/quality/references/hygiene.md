@@ -137,11 +137,7 @@ test.describe('authenticated dashboard header', () => {
 		// MEASURE RENDERED STATE
 		const bounds = await page.locator('header').evaluate(element => {
 			const rect = element.getBoundingClientRect();
-			return {
-				left: rect.left,
-				right: rect.right,
-				viewport: window.innerWidth,
-			};
+			return { left: rect.left, right: rect.right, viewport: window.innerWidth };
 		});
 		// ASSERT THE CONTRACT
 		expect(bounds.left).toBeGreaterThanOrEqual(0);

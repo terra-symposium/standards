@@ -49,13 +49,6 @@
 		"repositories": ["salesphere-vh/salesphere", "Terra-Symposium/terra-symposium-website", "Terra-Symposium/standards", "kaimacann/portfolio"],
 		"requiredFeatures": ["dependencyGraph", "dependabotAlerts", "malwareAlerts", "securityUpdates", "versionUpdates", "groupedUpdates"]
 	},
-	"qualityCommands": [
-		{
-			"name": "Docs archive integrity",
-			"command": "bash",
-			"args": ["scripts/check-docs-archive.sh"]
-		}
-	],
 	"autofix": {
 		"document": false
 	},

@@ -7,7 +7,7 @@
 			"ignoreBinaries": ["uv"]
 		},
 		"config": {
-			"entry": ["scripts/build-docs.mjs", "scripts/typecheck.mjs"],
+			"entry": ["scripts/typecheck.mjs"],
 			"project": ["scripts/**/*.mjs"],
 			"ignoreBinaries": ["patch"]
 		},

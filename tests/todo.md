@@ -284,10 +284,6 @@ This checklist inventories repository-owned functions, documents, and configurat
 
 - [ ] File behavior: execute or compile this source, including expected output and failure handling. No direct test file is linked yet.
 
-### `config/scripts/build-docs.mjs`
-
-- [ ] File behavior: execute or compile this source, including expected output and failure handling. No direct test file is linked yet.
-
 ### `config/scripts/typecheck.mjs`
 
 - [ ] `childDirs` (line 16): Test expected input/output, empty and boundary cases, and a relevant failure path. Candidate coverage: [`packages/hygiene/tests/runner/typecheck-discovery.test.mjs`](../packages/hygiene/tests/runner/typecheck-discovery.test.mjs).

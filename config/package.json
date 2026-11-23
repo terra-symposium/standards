@@ -19,8 +19,8 @@
 		"test": "cd .. && node packages/testing/src/cli.mjs run --manifest config/tests.json",
 		"quality": "node \"$(git rev-parse --show-toplevel)/scripts/quality-runner.mjs\" quality",
 		"quality:all": "node \"$(git rev-parse --show-toplevel)/scripts/quality-runner.mjs\" quality --all",
-		"docs": "cd .. && node config/scripts/build-docs.mjs --dev",
-		"docs:build": "cd .. && node config/scripts/build-docs.mjs",
+		"docs": "cd .. && mkdir -p dist/cache/astro-types && docs dev --port 2050 --strictPort",
+		"docs:build": "cd .. && mkdir -p dist/cache/astro-types && docs build --out dist/docs",
 		"prepare": "cd .. && husky config/husky",
 		"changeset": "changeset",
 		"release": "cd .. && pnpm exec changeset publish"

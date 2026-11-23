@@ -1,6 +1,6 @@
 ---
 title: Test plans and ownership
-description: Define ordered test suites, assign discovered files once, and run the Standards test plan.
+description: Define ordered test suites, assign discovered files once, and run the Standards.
 ---
 
 For agent-led work, use the [Test writing workflow](./test/references/writing.md).
@@ -21,17 +21,7 @@ Use Node.js `>=20`. The runner validates file ownership before executing the ord
 Use `config/tests.json` for new repositories. A suite has a stable name, one executable, optional argument strings, and repository-relative globs for the files it owns.
 
 ```json
-{
-	"version": 1,
-	"suites": [
-		{
-			"name": "unit",
-			"command": "pnpm",
-			"args": ["run", "test:unit"],
-			"owns": ["tests/unit/**/*.test.ts"]
-		}
-	]
-}
+{ "version": 1, "suites": [{ "name": "unit", "command": "pnpm", "args": ["run", "test:unit"], "owns": ["tests/unit/**/*.test.ts"] }] }
 ```
 
 The runner discovers files under `tests/` and names matching `*.test.*` or `*.spec.*`. It rejects legacy `test/` directories, invalid globs, duplicate suite invocations, overlapping ownership, and discovered test files that no suite owns. Update any script or template that recreates `test/` before running the plan.

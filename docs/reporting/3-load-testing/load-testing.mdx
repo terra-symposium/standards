@@ -14,15 +14,8 @@ The default warning/failure thresholds are 2,000 ms and 5,000 ms. Configure glob
 	"loadTesting": {
 		"enabled": true,
 		"defaultBudget": { "warnMs": 2000, "failMs": 5000 },
-		"testBudgets": {
-			"tests/account.spec.ts::Account page loads": {
-				"warnMs": 4000,
-				"failMs": 8000
-			}
-		},
-		"operationBudgets": {
-			"load account summary": { "warnMs": 2500, "failMs": 5000 }
-		}
+		"testBudgets": { "tests/account.spec.ts::Account page loads": { "warnMs": 4000, "failMs": 8000 } },
+		"operationBudgets": { "load account summary": { "warnMs": 2500, "failMs": 5000 } }
 	}
 }
 ```

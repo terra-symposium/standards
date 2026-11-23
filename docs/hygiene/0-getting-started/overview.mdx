@@ -76,10 +76,7 @@ For source documentation, `documentation.required` supports `types`, `functions`
 Use `qualityCommands` only for static checks without a native Hygiene equivalent. Keep builds and functional tests in separate scripts and CI steps. Each entry has a unique lowercase `name`, a `command`, and optional string-array `args`:
 
 ```json
-{
-	"qualityCommands": [{ "name": "c-doc-params", "command": "make", "args": ["check-doc-params"] }],
-	"enabledCommands": { "c-doc-params": true }
-}
+{ "qualityCommands": [{ "name": "c-doc-params", "command": "make", "args": ["check-doc-params"] }], "enabledCommands": { "c-doc-params": true } }
 ```
 
 `recommendationCommands` uses the same shape and `enabledRecommendations` toggle. Commands run from `root`, inherit the environment, and are not limited to changed files. A nonzero exit fails Hygiene. Use `--skip-commands` or `--skip-recommendations` for one run; `enabledChecks.command` and `enabledChecks.recommend` disable those categories.
