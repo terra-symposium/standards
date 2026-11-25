@@ -49,7 +49,7 @@ function listTestFiles(root) {
 			const path = resolve(dir, entry.name);
 			const child = relative(root, path).replaceAll('\\', '/');
 			if (entry.isDirectory()) {
-				if (entry.name === 'test' && child !== '.agents/skills/test' && !existsSync(resolve(path, 'SKILL.md')))
+				if (entry.name === 'test' && !/(^|\/)skills\/test$/u.test(child) && !existsSync(resolve(path, 'SKILL.md')))
 					throw new Error(`Legacy test directory ${child}; move it to tests/ and update its generator.`);
 				visit(path);
 			} else if (entry.isFile() && ((/(^|\/)tests\//u.test(child) && /\.[cm]?[jt]sx?$/u.test(entry.name)) || /\.(?:test|spec)\.[cm]?[jt]sx?$/u.test(entry.name))) {

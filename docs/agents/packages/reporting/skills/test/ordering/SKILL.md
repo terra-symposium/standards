@@ -1,6 +1,6 @@
 ---
 name: ordering
-description: Plan and run Terra test suites in dependency order with efficient workers, explicit contexts, and complete coverage accounting.
+description: Plan and run ordered tests with efficient workers and full coverage accounting.
 ---
 
 # Test Ordering

@@ -1,6 +1,6 @@
 ---
 name: package-update
-description: Update Terra shared packages across their Desktop repository consumers, verify each consumer, and restart affected local servers already running on the device.
+description: Update Terra packages across Desktop consumers, verify, and restart affected servers.
 ---
 
 # Terra package updates

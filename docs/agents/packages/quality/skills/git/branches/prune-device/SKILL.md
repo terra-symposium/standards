@@ -1,6 +1,6 @@
 ---
 name: prune-device
-description: Prune Codex storage and deduplicate custom skills across repositories when the user asks for device cleanup.
+description: Prune Codex storage and deduplicate repository skills for device cleanup.
 ---
 
 # Prune Device

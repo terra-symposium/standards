@@ -1,6 +1,6 @@
 ---
 name: pruning
-description: Prune repository files, generated output, Git refs, worktrees, Codex storage, or duplicate skills by scope.
+description: Prune repository files, output, refs, worktrees, Codex storage, and duplicate skills.
 metadata:
   related-files: []
 skill: true

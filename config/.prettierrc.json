@@ -1,20 +1,17 @@
 {
-  "arrowParens": "avoid",
-  "jsxSingleQuote": true,
-  "printWidth": 200,
-  "proseWrap": "never",
-  "singleQuote": true,
-  "useTabs": true,
-  "overrides": [
-    {
-      "files": [
-        "**/*.md",
-        "**/*.mdx"
-      ],
-      "options": {
-        "parser": "mdx",
-        "objectWrap": "collapse"
-      }
-    }
-  ]
+	"arrowParens": "avoid",
+	"jsxSingleQuote": true,
+	"printWidth": 200,
+	"proseWrap": "never",
+	"singleQuote": true,
+	"useTabs": true,
+	"overrides": [
+		{
+			"files": ["**/*.md", "**/*.mdx"],
+			"options": {
+				"parser": "mdx",
+				"objectWrap": "collapse"
+			}
+		}
+	]
 }

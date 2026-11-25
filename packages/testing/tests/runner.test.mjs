@@ -184,6 +184,7 @@ test('manifest validation rejects a legacy test directory before it can be owned
 	const root = fixtureRoot();
 	try {
 		mkdirTest(root, 'docs/testing/0-getting-started/test/SKILL.md');
+		mkdirTest(root, 'docs/agents/packages/reporting/skills/test/ordering/SKILL.md');
 		assert.doesNotThrow(() => validateTestPlan({ version: 1, suites: [] }, root));
 		mkdirTest(root, 'test/legacy.test.mjs');
 		assert.throws(

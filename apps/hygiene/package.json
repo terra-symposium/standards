@@ -7,7 +7,7 @@
 		"quality": "node \"$(git rev-parse --show-toplevel)/scripts/quality-runner.mjs\" quality",
 		"quality:all": "node \"$(git rev-parse --show-toplevel)/scripts/quality-runner.mjs\" quality --all",
 		"dev": "node scripts/prepare-cache.mjs && hygiene-dev -- astro --config config/astro.config.mjs --tsconfig config/tsconfig.json dev --host 127.0.0.1",
-		"build": "node scripts/prepare-cache.mjs && pnpm --dir ../.. exec hygiene error-boundaries --all && astro --config config/astro.config.mjs --tsconfig config/tsconfig.json build",
+		"build": "node scripts/prepare-cache.mjs && pnpm --dir ../.. exec node packages/hygiene/dist/lib/runner.js error-boundaries --all && astro --config config/astro.config.mjs --tsconfig config/tsconfig.json build",
 		"test": "mkdir -p tests/results && tsx --test --test-reporter=spec --test-reporter-destination=stdout --test-reporter=junit --test-reporter-destination=tests/results/junit.xml tests/*.test.ts",
 		"typecheck": "astro check --config config/astro.config.mjs --tsconfig config/tsconfig.json"
 	},

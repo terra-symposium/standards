@@ -1,6 +1,6 @@
 ---
 name: npm
-description: Handle npm package reads, installs, publishing, and access with one persistent read/write credential instead of repeated per-operation sign-in prompts.
+description: Manage npm reads, installs, publishing, and access with one persistent credential.
 ---
 
 # npm access and publishing

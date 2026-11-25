@@ -1,6 +1,6 @@
 ---
 name: package-scripts
-description: Audit and standardize package scripts across Terra repositories, keeping each server launcher in the package that owns it and reducing redundant aliases safely.
+description: Standardize package scripts, preserve server ownership, and remove redundant aliases.
 ---
 
 # Package Scripts

@@ -1,6 +1,6 @@
 ---
 name: compact-files
-description: Find and remove redundant repository folders and files, consolidate generated output, and preserve anything tracked, authored, active, or required to build or deploy.
+description: Prune redundant files and folders; consolidate output, preserving required content.
 ---
 
 # Compact repository files

@@ -1,6 +1,6 @@
 ---
 name: port
-description: Assign and change local development ports across the Terra Symposium repositories, and acquire ports safely before starting servers.
+description: Assign development ports across Terra repositories and acquire them safely.
 ---
 
 # Local development port assignments
