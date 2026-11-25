@@ -1,1 +1,2 @@
-ALTER TABLE runs ADD COLUMN IF NOT EXISTS quality_policy_branch TEXT;
+ALTER TABLE runs
+	ADD COLUMN IF NOT EXISTS quality_policy_branch text;

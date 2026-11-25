@@ -1,0 +1,55 @@
+---
+title: Migrate package imports
+description: Replace former Standards package names with the consolidated Hygiene exports and.
+---
+
+The former `standards-*` npm packages remain published for existing consumers. New work should install the current packages and use the imports below. Update the manifest, source imports, and lockfile together, then run the consuming repository's Hygiene, build, and tests.
+
+## Replace Hygiene dependencies
+
+Install one package for the aggregate runner and focused check APIs:
+
+```sh
+pnpm add -D @terra-symposium/hygiene
+```
+
+Remove the former Hygiene packages listed below from the manifest. Use the matching named export when importing APIs, then update the lockfile with the consuming repository's package manager.
+
+| Former package                               | Current import                           |
+| -------------------------------------------- | ---------------------------------------- |
+| `@terra-symposium/standards-quality`         | `@terra-symposium/hygiene`               |
+| `@terra-symposium/standards-quality-core`    | `@terra-symposium/hygiene/core`          |
+| `@terra-symposium/standards-quality-reports` | `@terra-symposium/hygiene/reports`       |
+| `@terra-symposium/standards-ui-quality`      | `@terra-symposium/hygiene/ui`            |
+| `@terra-symposium/standards-language-checks` | `@terra-symposium/hygiene/languages`     |
+| `@terra-symposium/standards-documentation`   | `@terra-symposium/hygiene/documentation` |
+| `@terra-symposium/standards-formatting`      | `@terra-symposium/hygiene/formatting`    |
+| `@terra-symposium/standards-imports`         | `@terra-symposium/hygiene/imports`       |
+| `@terra-symposium/standards-naming`          | `@terra-symposium/hygiene/naming`        |
+| `@terra-symposium/standards-patterns`        | `@terra-symposium/hygiene/patterns`      |
+| `@terra-symposium/standards-refactoring`     | `@terra-symposium/hygiene/refactoring`   |
+| `@terra-symposium/standards-security`        | `@terra-symposium/hygiene/security`      |
+
+The established `terra-*` executable names remain available from `@terra-symposium/hygiene`. See the [package map](/hygiene/1-packages/package-map/) for each export and CLI.
+
+## Replace independent packages
+
+These packages remain separate because their runtime responsibilities differ from repository Hygiene checks.
+
+| Former package                                | Current package               |
+| --------------------------------------------- | ----------------------------- |
+| `@terra-symposium/standards-error-boundaries` | `@terra-symposium/boundaries` |
+| `@terra-symposium/standards-reporting`        | `@terra-symposium/reporting`  |
+| `@terra-symposium/standards-testing`          | `@terra-symposium/testing`    |
+
+Update the corresponding source imports and install only the packages in use. The unscoped `braces` fork keeps its name.
+
+## Verify the migration
+
+```sh
+pnpm run quality:all
+pnpm run build
+pnpm run test
+```
+
+Run the commands that exist in the consuming repository. Check its authored source and authoritative lockfile for the former package names. Historical changelog entries can retain the name that was published at the time.

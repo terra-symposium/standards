@@ -27,7 +27,9 @@ REGEX
  */
 const A_Z0_9_GI_REGEX = () => /[^a-z0-9-]/gi;
 
-/** The default responsive viewport catalog used by the shared reporter. */
+/**
+ * The default responsive viewport catalog used by the shared reporter.
+ */
 export const VISUAL_VIEWPORTS = {
 	mobile: { height: 844, width: 390 },
 	sm: { height: 800, width: 640 },
@@ -41,13 +43,19 @@ export const VISUAL_VIEWPORTS = {
 TYPES
 //////////////////////////////////////////////////*/
 
-/** A named viewport catalog supplied by an application or test suite. */
+/**
+ * A named viewport catalog supplied by an application or test suite.
+ */
 export type ViewportCatalog = Readonly<Record<string, { height: number; width: number }>>;
 
-/** Names available in the default viewport catalog. */
+/**
+ * Names available in the default viewport catalog.
+ */
 export type VisualViewportName = keyof typeof VISUAL_VIEWPORTS;
 
-/** A resolved viewport with the name retained for project and artifact labels. */
+/**
+ * A resolved viewport with the name retained for project and artifact labels.
+ */
 export type VisualViewport = { name: string; height: number; width: number };
 
 /*//////////////////////////////////////////////////
@@ -73,11 +81,11 @@ export const resolveVisualViewports = (raw = process.env.PW_VIEWPORTS, catalog: 
 			: selection
 					.split(/[\s,]+/)
 					.filter(Boolean)
-					.map((n) => (names.includes(n) ? n : { computer: 'xl', default: 'xl', desktop: 'xl', phone: 'mobile', tablet: 'md', wide: '2xl' }[n] || n));
+					.map(n => (names.includes(n) ? n : { computer: 'xl', default: 'xl', desktop: 'xl', phone: 'mobile', tablet: 'md', wide: '2xl' }[n] || n));
 	const unique = selected.filter((n, i) => selected.indexOf(n) === i);
-	const invalid = unique.filter((n) => !names.includes(n));
+	const invalid = unique.filter(n => !names.includes(n));
 	if (invalid.length) throw new Error(`Unknown PW_VIEWPORTS value(s): ${invalid.join(', ')}. Use default, all, or ${names.join(', ')}.`);
-	return unique.map((n) => ({ name: n, ...catalog[n] }));
+	return unique.map(n => ({ name: n, ...catalog[n] }));
 };
 
 /**
@@ -102,7 +110,7 @@ export const visualProjectName = (baseName: string, viewport: VisualViewport, se
  */
 export const projectViewportName = (projectName: string, catalog: ViewportCatalog = VISUAL_VIEWPORTS): string => {
 	const names = Object.keys(catalog).sort((a, b) => b.length - a.length);
-	const match = names.find((n) => projectName.endsWith(`-${n}`));
+	const match = names.find(n => projectName.endsWith(`-${n}`));
 	if (match) return match;
 	return names.includes(projectName) ? projectName : 'xl';
 };
@@ -133,27 +141,49 @@ export const viewportSizeLabel = (viewport: string, catalog: ViewportCatalog = V
 	return `${size.width}×${size.height}`;
 };
 
-/** Options for the shared responsive Playwright configuration helper. */
+/**
+ * Options for the shared responsive Playwright configuration helper.
+ */
 export type ResponsivePlaywrightOptions = {
-	/** Run scenarios only in projects named by native @viewport:<name> tags. */
+	/**
+	 * Run scenarios only in projects named by native @viewport:<name> tags.
+	 */
 	viewportPolicy?: 'all' | 'declared';
-	/** Viewports available to this suite; defaults to the shared catalog. */
+	/**
+	 * Viewports available to this suite; defaults to the shared catalog.
+	 */
 	viewportCatalog?: ViewportCatalog;
-	/** Project names that represent manual, single-run browser captures. */
+	/**
+	 * Project names that represent manual, single-run browser captures.
+	 */
 	singleRunProjects?: readonly string[];
-	/** Disposable Playwright output directory, separate from timestamped reports. */
+	/**
+	 * Disposable Playwright output directory, separate from timestamped reports.
+	 */
 	outputDir?: string;
-	/** Parent directory for timestamped reports and their shared images folder. */
+	/**
+	 * Parent directory for timestamped reports and their shared images folder.
+	 */
 	outputRoot?: string;
-	/** Persistent directory used to accumulate screenshot and metadata pairs across runs. */
+	/**
+	 * Persistent directory used to accumulate screenshot and metadata pairs across runs.
+	 */
 	screenshotsDirectory?: string;
-	/** Optional structured results file to add to the workbook exactly once. */
+	/**
+	 * Optional structured results file to add to the workbook exactly once.
+	 */
 	supplementalResultsFile?: string;
-	/** Optional path to the repository's quality.json; defaults to the current directory. */
+	/**
+	 * Optional path to the repository's quality.json; defaults to the current directory.
+	 */
 	qualityConfigFile?: string;
-	/** Explicit timing settings that override matching quality.json values. */
+	/**
+	 * Explicit timing settings that override matching quality.json values.
+	 */
 	loadTesting?: LoadTestingConfig;
-	/** Write the shared PowerPoint from keyed screenshots only, with no text slides. */
+	/**
+	 * Write the shared PowerPoint from keyed screenshots only, with no text slides.
+	 */
 	screenshotOnlySlideshow?: boolean;
 };
 
@@ -174,15 +204,16 @@ export const withResponsivePlaywright = <T extends PlaywrightTestConfig>(cfg: T,
 	const viewports = resolveVisualViewports(process.env.PW_VIEWPORTS, opts.viewportCatalog);
 	const loadTesting = readLoadTestingConfig(opts.qualityConfigFile, opts.loadTesting);
 	const sharedDistCandidates = [
-		path.resolve(process.cwd(), 'node_modules/@terra-symposium/standards-reporting/dist'),
+		path.resolve(process.cwd(), 'node_modules/@terra-symposium/reporting/dist'),
 		path.resolve(process.cwd(), 'dist'),
 		path.resolve(process.cwd(), 'packages/reporting/dist'),
 	];
-	const sharedDist = sharedDistCandidates.find((c) => fs.existsSync(c)) || sharedDistCandidates[0];
-	const resolvedSharedDist = fs.existsSync(sharedDist) ? fs.realpathSync(sharedDist) : sharedDist;
-	const external = [...(cfg.build?.external || []), path.join(resolvedSharedDist, '**')];
+	const sharedDist = sharedDistCandidates.find(c => fs.existsSync(c)) || sharedDistCandidates[0];
+	// hygiene-ignore single-use -- Snapshot build externals before expanding project and reporter configuration.
+	const external = [...(cfg.build?.external || []), path.join(fs.existsSync(sharedDist) ? fs.realpathSync(sharedDist) : sharedDist, '**')];
 	const projects = (cfg.projects || []) as Array<{ dependencies?: readonly string[]; name?: string; testMatch?: unknown; grep?: unknown; use?: Record<string, unknown> }>;
-	const dependencyProjects = new Set(projects.flatMap((p) => p.dependencies || []));
+	// hygiene-ignore single-use -- Build the dependency set once before testing each project for setup status.
+	const dependencyProjects = new Set(projects.flatMap(p => p.dependencies || []));
 	const singleRun = new Set(opts.singleRunProjects || []);
 	/**
 	 * Identifies projects that should run once instead of expanding across viewports.
@@ -194,13 +225,17 @@ export const withResponsivePlaywright = <T extends PlaywrightTestConfig>(cfg: T,
 	 */
 	const isSetup = (project: (typeof projects)[number], idx: number): boolean => {
 		const name = project.name || `project-${idx + 1}`;
-		const matchText = (Array.isArray(project.testMatch) ? project.testMatch : [project.testMatch]).map((e) => (e instanceof RegExp ? e.source : String(e || ''))).join(' ');
-		return dependencyProjects.has(name) || /setup/i.test(name) || /\.setup\.[cm]?[jt]sx?/i.test(matchText);
+		return (
+			dependencyProjects.has(name) ||
+			/setup/i.test(name) ||
+			/\.setup\.[cm]?[jt]sx?/i.test((Array.isArray(project.testMatch) ? project.testMatch : [project.testMatch]).map(e => (e instanceof RegExp ? e.source : String(e || ''))).join(' '))
+		);
 	};
+	// hygiene-ignore single-use -- Expand project variants before building reporter configuration from the original config.
 	const responsiveProjects = projects.flatMap((p, i) => {
 		const baseName = p.name || `project-${i + 1}`;
 		if (isSetup(p, i) || singleRun.has(baseName)) return [p];
-		return viewports.map((v) => ({
+		return viewports.map(v => ({
 			...p,
 			name: visualProjectName(baseName, v, viewports),
 			...(opts.viewportPolicy === 'declared'
@@ -216,7 +251,7 @@ export const withResponsivePlaywright = <T extends PlaywrightTestConfig>(cfg: T,
 			use: { ...(p.use || {}), viewport: { width: v.width, height: v.height }, screenshot: { mode: 'on', fullPage: true, caret: 'initial' } },
 		}));
 	});
-	const cfgdReporters = cfg.reporter ? (Array.isArray(cfg.reporter) ? cfg.reporter : [cfg.reporter]) : [];
+	// hygiene-ignore single-use -- Capture reporting options before filtering configured reporters.
 	const reportingOpts = {
 		viewportCatalog: opts.viewportCatalog,
 		outputRoot: opts.outputRoot,
@@ -226,12 +261,13 @@ export const withResponsivePlaywright = <T extends PlaywrightTestConfig>(cfg: T,
 		loadTesting,
 		screenshotOnlySlideshow: opts.screenshotOnlySlideshow ?? process.env.TERRA_SCREENSHOT_ONLY_SLIDESHOW !== '0',
 	};
+	// hygiene-ignore single-use -- Assemble reporters before spreading the returned Playwright configuration.
 	const reporters = [
-		...cfgdReporters.filter((r) => {
+		...(cfg.reporter ? (Array.isArray(cfg.reporter) ? cfg.reporter : [cfg.reporter]) : []).filter(r => {
 			const name = Array.isArray(r) ? r[0] : r;
-			return !(typeof name === 'string' && name.includes('@terra-symposium/standards-reporting/playwright'));
+			return !(typeof name === 'string' && name.includes('@terra-symposium/reporting/playwright'));
 		}),
-		['@terra-symposium/standards-reporting/playwright', reportingOpts],
+		['@terra-symposium/reporting/playwright', reportingOpts],
 	];
 	return {
 		...cfg,

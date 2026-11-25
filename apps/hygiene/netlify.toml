@@ -4,7 +4,7 @@ publish = "dist/apps/hygiene"
 
 [functions]
 directory = "/apps/hygiene/netlify/functions"
-  node_bundler = "esbuild"
+node_bundler = "esbuild"
 
 [[redirects]]
 from = "/api/*"

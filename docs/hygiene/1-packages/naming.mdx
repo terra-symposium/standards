@@ -1,0 +1,27 @@
+---
+title: Naming
+description: Find nonconforming identifiers and aliases, with scope-aware rename fixes.
+---
+
+`@terra-symposium/hygiene/naming` reports identifier names that do not match Terra's source conventions and configured alias declarations that can be updated safely. Its rename service follows TypeScript references and resolves callback-local collisions.
+
+The concise-name rules recognize established replacements inside camelCase and PascalCase identifiers as well as names separated by underscores or hyphens. Examples include `error → err`, `format → fmt`, `initialise → init`, `repository → repo`, and `image → img`, including supported inflections and plurals. Domain and API vocabulary stays intact: `sourcePath`, `destinationPath`, `temporaryPath`, `application`, and `configuration` are not shortened. Replacements do not match substrings inside unrelated words.
+
+## Install and run
+
+```sh
+pnpm add -D @terra-symposium/hygiene
+pnpm exec naming --config config/quality.json --all
+```
+
+Normal runs select changed and untracked files. `--all` covers all configured roots and `--warn` is read-only. Set `protectedIdentifiers`, `renameExports`, and applicable source scope in `quality.json` to control policy. Framework-reserved filenames and protected source paths are excluded according to the implementation's conventions.
+
+## API
+
+```ts
+import { namingFindings, aliasFindings, fixNaming, renameId } from '@terra-symposium/hygiene/naming';
+```
+
+The package also exports identifier token and callback alias helpers, protected-name sets, and rename utilities. `fixNaming()` applies eligible TypeScript language-service edits; it does not guess when a binding is protected or its references cannot be safely renamed. Review public API and serialized identifiers before accepting any suggested rename.
+
+The root API and `./cli` export ship TypeScript declarations. See [Hygiene autofix policy](/hygiene/0-getting-started/overview/) and [review a full run](/hygiene/0-getting-started/overview/).

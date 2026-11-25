@@ -13,11 +13,17 @@ import { XMLParser } from 'fast-xml-parser';
 CONFIG
 //////////////////////////////////////////////////*/
 
-/** Passed, failed, and skipped testcase totals parsed from a JUnit report. */
+/**
+ * Passed, failed, and skipped testcase totals parsed from a JUnit report.
+ */
 export type TestCounts = { passed: number; failed: number; skipped: number };
-/** Total, enabled, clean, and finding counts parsed from a Terra Quality report. */
+/**
+ * Total, enabled, clean, and finding counts parsed from a Terra Quality report.
+ */
 export type QualityCounts = { total: number; enabled: number; clean: number; findings: number };
-/** Generic XML node used while traversing parsed JUnit content. */
+/**
+ * Generic XML node used while traversing parsed JUnit content.
+ */
 type XmlNode = Record<string, unknown>;
 
 /*//////////////////////////////////////////////////
@@ -32,6 +38,7 @@ HELPERS
  * @return Counts of individual passed, failed, and skipped testcases.
  */
 export function parseJUnit(xml: string): TestCounts {
+	// hygiene-ignore single-use -- Parse the XML before creating counters and walking the resulting tree.
 	const root = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '@_', allowBooleanAttributes: true }).parse(xml) as XmlNode;
 	const counts: TestCounts = { passed: 0, failed: 0, skipped: 0 };
 	(function visit(value: unknown): void {

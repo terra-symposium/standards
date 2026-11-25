@@ -1,4 +1,7 @@
 #!/usr/bin/env node
+/**
+ * packages/testing/src/cli.mjs
+ */
 
 /*//////////////////////////////////////////////////
 IMPORTS
@@ -12,6 +15,7 @@ import { runTestPlan } from './index.mjs';
 HELPERS
 //////////////////////////////////////////////////*/
 
+// hygiene-ignore single-use -- Keep the documented parseArgs declaration so its parameter and return contract remains attached.
 /**
  * Parses the workspace test-runner command-line options.
  *
@@ -21,7 +25,7 @@ HELPERS
  */
 function parseArgs(args) {
 	const [cmd, ...rest] = args;
-	if (cmd !== 'run') throw new Error('Usage: terra-test run [--root <path>] [--manifest <path>] [--suites <name,name>] [--shared-only]');
+	if (cmd !== 'run') throw new Error('Usage: test-runner run [--root <path>] [--manifest <path>] [--suites <name,name>] [--shared-only]');
 	const options = { root: process.cwd(), manifest: undefined, suites: [], sharedOnly: false };
 	for (let index = 0; index < rest.length; index++) {
 		const flag = rest[index];
@@ -35,7 +39,7 @@ function parseArgs(args) {
 		} else if (flag === '--suites' && value) {
 			options.suites = value
 				.split(',')
-				.map((name) => name.trim())
+				.map(name => name.trim())
 				.filter(Boolean);
 			index++;
 		} else if (flag === '--shared-only') {

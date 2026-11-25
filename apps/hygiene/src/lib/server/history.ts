@@ -17,9 +17,13 @@ REGEX
 //////////////////////////////////////////////////*/
 
 const S_S_REGEX = /^[^/\s]+\/[^/\s]+$/;
-/** Per-commit history data retained for a repository branch. */
+/**
+ * Per-commit history data retained for a repository branch.
+ */
 type HistoryCommit = { sha: string; authorDate: string; additions: number; deletions: number; sourceLines: number };
-/** Validated snapshot or delta containing the commits through a branch head. */
+/**
+ * Validated snapshot or delta containing the commits through a branch head.
+ */
 export type HistoryReport = {
 	schemaVersion: 1;
 	mode: 'snapshot' | 'delta';
@@ -30,7 +34,9 @@ export type HistoryReport = {
 	generatedAt: string;
 	commits: HistoryCommit[];
 };
-/** Normalized build report containing summary counts and optional validated history. */
+/**
+ * Normalized build report containing summary counts and optional validated history.
+ */
 export type BuildReport = {
 	schemaVersion: 1;
 	repository: string;
@@ -53,7 +59,9 @@ HELPERS
  * Reject malformed, unsupported, or repository-mismatched local Git reports.
  *
  * @param input Untrusted JSON value received from a history import or report.
+ *
  * @returns A normalized report with validated repository, branch, commit, and timestamp fields.
+ *
  * @throws {Error} If the schema, metadata, or any commit entry is invalid or inconsistent.
  */
 export function parseHistoryReport(input: unknown): HistoryReport {
@@ -100,7 +108,9 @@ export function parseHistoryReport(input: unknown): HistoryReport {
  * Validate a build upload and discard raw test and quality report contents.
  *
  * @param input Untrusted JSON value received from a build report upload.
+ *
  * @returns A normalized report containing parsed test and quality counts and optional history.
+ *
  * @throws {Error} If report metadata or nested test, quality, or history data is invalid.
  */
 export function parseBuildReport(input: unknown): BuildReport {
@@ -137,6 +147,7 @@ export function parseBuildReport(input: unknown): BuildReport {
  * @param report Validated history report to check.
  * @param repo Canonical owner/name of the repository that received the report.
  * @param enabledBranches Branch names currently enabled for history collection.
+ *
  * @returns Whether the report belongs to that repository and targets an enabled branch.
  */
 export function reportTargetsTrackedBranch(report: HistoryReport, repo: string, enabledBranches: readonly string[]): boolean {

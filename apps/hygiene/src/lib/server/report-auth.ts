@@ -17,6 +17,7 @@ HELPERS
  * Hashes a report bearer token before it is stored or compared with a stored value.
  *
  * @param token Raw report token.
+ *
  * @returns The lowercase hexadecimal SHA-256 digest.
  */
 export function hashReportToken(token: string): string {
@@ -28,6 +29,7 @@ export function hashReportToken(token: string): string {
  *
  * @param token Raw bearer token supplied with a report request.
  * @param expectedHash Stored lowercase hexadecimal digest, or `null` when no token is configured.
+ *
  * @returns Whether the token hashes to the expected digest.
  */
 export function matchesReportToken(token: string, expectedHash: string | null): boolean {

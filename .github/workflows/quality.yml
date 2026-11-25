@@ -24,11 +24,9 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: uv sync --locked --group dev
       - name: Capture full-repository quality findings
-        run: pnpm run quality --all --warn --report-json standards-quality.json
-      - name: Check formatting
-        run: node packages/quality/dist/lib/runner.js format --all --warn
-      - name: Check lint
-        run: node packages/quality/dist/lib/runner.js lint --all --warn
+        run: pnpm run quality:all -- --report-json standards-quality.json
+      - name: Require committed Quality fixes
+        run: git diff --exit-code
       - name: Upload quality report
         if: always()
         uses: actions/upload-artifact@v4
@@ -55,6 +53,10 @@ jobs:
   tests:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+    container:
+      image: mcr.microsoft.com/playwright:v1.64.1-resolute
+      options: --ipc=host
     steps:
       - uses: actions/checkout@v7
         with:
@@ -68,10 +70,16 @@ jobs:
           cache: pnpm
           cache-dependency-path: config/pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter @terra-symposium/standards-reporting exec playwright install --with-deps chromium
+      - name: Install native test tools
+        run: apt-get update && apt-get install -y clang lsof unzip
+      - name: Verify Git history in test container
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git -C "$GITHUB_WORKSPACE" rev-parse --show-toplevel
+          git -C "$GITHUB_WORKSPACE" cat-file -t "${{ github.event.pull_request.base.sha }}"
       - uses: ./packages/testing
         with:
-          manifest: config/terra-tests.json
+          manifest: config/tests.json
 
   package:
     if: github.event_name == 'pull_request'
@@ -89,4 +97,5 @@ jobs:
           cache: pnpm
           cache-dependency-path: config/pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter @terra-symposium/standards-testing pack --dry-run
+      - run: pnpm -r build
+      - run: python3 config/scripts/verify-publish-graph.py

@@ -1,3 +1,0 @@
-interface:
-  display_name: 'Repository Quality'
-  short_description: 'Run and repair configured repo quality checks'

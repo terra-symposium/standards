@@ -1,0 +1,483 @@
+[build]
+command = "pnpm run docs:build"
+publish = "dist/docs"
+
+[build.environment]
+NODE_VERSION = "24"
+
+[[headers]]
+for = "/*"
+[headers.values]
+X-Robots-Tag = "noindex, nofollow"
+
+[[redirects]]
+from = "/getting-started"
+to = "/hygiene/0-getting-started/overview/"
+status = 301
+
+[[redirects]]
+from = "/hygiene/overview"
+to = "/hygiene/0-getting-started/overview/"
+status = 301
+
+[[redirects]]
+from = "/hygiene/configuration"
+to = "/hygiene/0-getting-started/overview/"
+status = 301
+
+[[redirects]]
+from = "/hygiene/commands"
+to = "/hygiene/0-getting-started/overview/"
+status = 301
+
+[[redirects]]
+from = "/hygiene/troubleshooting"
+to = "/hygiene/5-operations/troubleshooting/"
+status = 301
+
+[[redirects]]
+from = "/hygiene/checks"
+to = "/hygiene/3-checks/check-reference/"
+status = 301
+
+[[redirects]]
+from = "/hygiene/checks/alias"
+to = "/hygiene/3-checks/refactoring-checks/#alias"
+status = 301
+
+[[redirects]]
+from = "/hygiene/checks/command"
+to = "/hygiene/3-checks/tooling-checks/#command"
+status = 301
+
+[[redirects]]
+from = "/hygiene/checks/dead-code"
+to = "/hygiene/3-checks/refactoring-checks/#dead-code"
+status = 301
+
+[[redirects]]
+from = "/hygiene/checks/diff"
+to = "/hygiene/3-checks/tooling-checks/#diff"
+status = 301
+
+[[redirects]]
+from = "/hygiene/checks/document"
+to = "/hygiene/3-checks/source-checks/#document"
+status = 301
+
+[[redirects]]
+from = "/hygiene/checks/format"
+to = "/hygiene/3-checks/source-checks/#format"
+status = 301
+
+[[redirects]]
+from = "/hygiene/checks/forward"
+to = "/hygiene/3-checks/refactoring-checks/#object-forwarding"
+status = 301
+
+[[redirects]]
+from = "/hygiene/checks/import"
+to = "/hygiene/3-checks/source-checks/#import-validation"
+status = 301
+
+[[redirects]]
+from = "/hygiene/checks/knip"
+to = "/hygiene/3-checks/tooling-checks/#knip"
+status = 301
+
+[[redirects]]
+from = "/hygiene/checks/lint"
+to = "/hygiene/3-checks/tooling-checks/#lint"
+status = 301
+
+[[redirects]]
+from = "/hygiene/checks/name"
+to = "/hygiene/3-checks/source-checks/#name"
+status = 301
+
+[[redirects]]
+from = "/hygiene/checks/recommend"
+to = "/hygiene/3-checks/tooling-checks/#recommend"
+status = 301
+
+[[redirects]]
+from = "/hygiene/checks/regex-dedup"
+to = "/hygiene/3-checks/repository-patterns/#regex-deduplication"
+status = 301
+
+[[redirects]]
+from = "/hygiene/checks/repeated-classes"
+to = "/hygiene/3-checks/repository-patterns/#repeated-classes"
+status = 301
+
+[[redirects]]
+from = "/hygiene/checks/security"
+to = "/hygiene/3-checks/repository-patterns/#security"
+status = 301
+
+[[redirects]]
+from = "/hygiene/checks/single-use"
+to = "/hygiene/3-checks/refactoring-checks/#single-use-declarations"
+status = 301
+
+[[redirects]]
+from = "/hygiene/checks/type"
+to = "/hygiene/3-checks/tooling-checks/#type"
+status = 301
+
+[[redirects]]
+from = "/hygiene/checks/ui-patterns"
+to = "/hygiene/3-checks/repository-patterns/#ui-patterns"
+status = 301
+
+[[redirects]]
+from = "/standards/contributing/guide/"
+to = "/contributing/0-workspace/getting-started/"
+status = 301
+
+[[redirects]]
+from = "/standards/error-boundaries/guide/"
+to = "/error-boundaries/1-react/react-boundaries/"
+status = 301
+
+[[redirects]]
+from = "/standards/hygiene/overview/"
+to = "/hygiene/0-getting-started/overview/"
+status = 301
+
+[[redirects]]
+from = "/standards/hygiene/setup/"
+to = "/hygiene/0-getting-started/overview/"
+status = 301
+
+[[redirects]]
+from = "/standards/hygiene/configuration/"
+to = "/hygiene/0-getting-started/overview/"
+status = 301
+
+[[redirects]]
+from = "/standards/hygiene/workflows/"
+to = "/hygiene/0-getting-started/overview/"
+status = 301
+
+[[redirects]]
+from = "/standards/hygiene/troubleshooting/"
+to = "/hygiene/5-operations/troubleshooting/"
+status = 301
+
+[[redirects]]
+from = "/standards/reporting/overview/"
+to = "/reporting/0-getting-started/overview/"
+status = 301
+
+[[redirects]]
+from = "/standards/reporting/artifacts/"
+to = "/reporting/4-artifacts/artifacts/"
+status = 301
+
+[[redirects]]
+from = "/standards/reporting/load-testing/"
+to = "/reporting/3-load-testing/load-testing/"
+status = 301
+
+[[redirects]]
+from = "/standards/reporting/playwright/"
+to = "/reporting/2-playwright/playwright-evidence/"
+status = 301
+
+[[redirects]]
+from = "/packages/hygiene/"
+to = "/hygiene/0-getting-started/overview/"
+status = 301
+
+[[redirects]]
+from = "/packages/hygiene/setup/"
+to = "/hygiene/0-getting-started/overview/"
+status = 301
+
+[[redirects]]
+from = "/packages/hygiene/configuration/"
+to = "/hygiene/0-getting-started/overview/"
+status = 301
+
+[[redirects]]
+from = "/packages/hygiene/workflows/"
+to = "/hygiene/0-getting-started/overview/"
+status = 301
+
+[[redirects]]
+from = "/packages/hygiene/checks/"
+to = "/hygiene/3-checks/check-reference/"
+status = 301
+
+[[redirects]]
+from = "/packages/hygiene/troubleshooting/"
+to = "/hygiene/5-operations/troubleshooting/"
+status = 301
+
+[[redirects]]
+from = "/packages/error-boundaries/"
+to = "/error-boundaries/1-react/react-boundaries/"
+status = 301
+
+[[redirects]]
+from = "/error-boundaries/analytics/production-telemetry/"
+to = "/error-boundaries/3-analytics/production-telemetry/"
+status = 301
+
+[[redirects]]
+from = "/error-boundaries/demos/interactive-lab/"
+to = "/error-boundaries/3-analytics/sanity-error-analysis/"
+status = 301
+
+[[redirects]]
+from = "/error-boundaries/react/overview/"
+to = "/error-boundaries/1-react/react-boundaries/"
+status = 301
+
+[[redirects]]
+from = "/error-boundaries/react/integration/"
+to = "/error-boundaries/1-react/react-boundaries/"
+status = 301
+
+[[redirects]]
+from = "/error-boundaries/react/error-reporting/"
+to = "/error-boundaries/1-react/error-reporting/"
+status = 301
+
+[[redirects]]
+from = "/error-boundaries/concepts/boundary-model/"
+to = "/error-boundaries/0-concepts/boundary-model/"
+status = 301
+
+[[redirects]]
+from = "/error-boundaries/astro/hydration/"
+to = "/error-boundaries/2-frameworks/hydration/"
+status = 301
+
+[[redirects]]
+from = "/error-boundaries/astro/route-errors/"
+to = "/error-boundaries/2-frameworks/route-errors/"
+status = 301
+
+[[redirects]]
+from = "/error-boundaries/packages/package-api/"
+to = "/error-boundaries/4-packages/package-api/"
+status = 301
+
+[[redirects]]
+from = "/packages/reporting/"
+to = "/reporting/0-getting-started/overview/"
+status = 301
+
+[[redirects]]
+from = "/contributing/workspace/guide/"
+to = "/contributing/0-workspace/getting-started/"
+status = 301
+
+[[redirects]]
+from = "/contributing/workspace/setup/"
+to = "/contributing/0-workspace/getting-started/"
+status = 301
+
+[[redirects]]
+from = "/contributing/hygiene/change-validation/"
+to = "/contributing/1-quality/change-validation/"
+status = 301
+
+[[redirects]]
+from = "/contributing/authoring/docs-structure/"
+to = "/contributing/2-authoring/authoring/"
+status = 301
+
+[[redirects]]
+from = "/contributing/authoring/industry-practice/"
+to = "/contributing/2-authoring/authoring/"
+status = 301
+
+[[redirects]]
+from = "/contributing/releases/package-release/"
+to = "/contributing/3-releases/package-release/"
+status = 301
+
+[[redirects]]
+from = "/hygiene/getting-started/overview/"
+to = "/hygiene/0-getting-started/overview/"
+status = 301
+
+[[redirects]]
+from = "/hygiene/getting-started/setup/"
+to = "/hygiene/0-getting-started/overview/"
+status = 301
+
+[[redirects]]
+from = "/hygiene/packages/index/"
+to = "/hygiene/1-packages/package-map/"
+status = 301
+
+[[redirects]]
+from = "/hygiene/1-packages/"
+to = "/hygiene/1-packages/package-map/"
+status = 301
+
+[[redirects]]
+from = "/hygiene/1-packages/index/"
+to = "/hygiene/1-packages/package-map/"
+status = 301
+
+[[redirects]]
+from = "/hygiene/configuration/quality-json/"
+to = "/hygiene/0-getting-started/overview/"
+status = 301
+
+[[redirects]]
+from = "/hygiene/checks/check-reference/"
+to = "/hygiene/3-checks/check-reference/"
+status = 301
+
+[[redirects]]
+from = "/hygiene/workflows/cli-and-ci/"
+to = "/hygiene/0-getting-started/overview/"
+status = 301
+
+[[redirects]]
+from = "/hygiene/operations/troubleshooting/"
+to = "/hygiene/5-operations/troubleshooting/"
+status = 301
+
+[[redirects]]
+from = "/reporting/getting-started/overview/"
+to = "/reporting/0-getting-started/overview/"
+status = 301
+
+[[redirects]]
+from = "/reporting/packages/standards-reporting/"
+to = "/reporting/1-packages/reporting/"
+status = 301
+
+[[redirects]]
+from = "/reporting/playwright/responsive-playwright/"
+to = "/reporting/2-playwright/playwright-evidence/"
+status = 301
+
+[[redirects]]
+from = "/reporting/playwright/diagnostics/"
+to = "/reporting/2-playwright/playwright-evidence/"
+status = 301
+
+[[redirects]]
+from = "/reporting/load-testing/load-testing/"
+to = "/reporting/3-load-testing/load-testing/"
+status = 301
+
+[[redirects]]
+from = "/reporting/artifacts/artifacts/"
+to = "/reporting/4-artifacts/artifacts/"
+status = 301
+
+[[redirects]]
+from = "/reporting/operations/retention-and-data/"
+to = "/reporting/4-artifacts/artifacts/"
+status = 301
+
+[[redirects]]
+from = "/testing/getting-started/runner/"
+to = "/testing/0-getting-started/test-plan/"
+status = 301
+
+[[redirects]]
+from = "/testing/getting-started/manifest/"
+to = "/testing/0-getting-started/test-plan/"
+status = 301
+
+[[redirects]]
+from = "/testing/ci/shared-checks/"
+to = "/testing/1-ci/ci-integration/"
+status = 301
+
+[[redirects]]
+from = "/testing/ci/github-action/"
+to = "/testing/1-ci/ci-integration/"
+status = 301
+
+[[redirects]]
+from = "/testing/coverage/ownership/"
+to = "/testing/0-getting-started/test-plan/#file-ownership"
+status = 301
+
+[[redirects]]
+from = "/testing/coverage/browser-evidence/"
+to = "/testing/2-coverage/browser-evidence/"
+status = 301
+
+[[redirects]]
+from = "/error-boundaries/0-overview/overview/"
+to = "/error-boundaries/1-react/react-boundaries/"
+status = 301
+
+[[redirects]]
+from = "/error-boundaries/0-overview/integration/"
+to = "/error-boundaries/1-react/react-boundaries/"
+status = 301
+
+[[redirects]]
+from = "/error-boundaries/0-overview/error-reporting/"
+to = "/error-boundaries/1-react/error-reporting/"
+status = 301
+
+[[redirects]]
+from = "/error-boundaries/0-overview/boundary-model/"
+to = "/error-boundaries/0-concepts/boundary-model/"
+status = 301
+
+[[redirects]]
+from = "/error-boundaries/1-implementation/hydration/"
+to = "/error-boundaries/2-frameworks/hydration/"
+status = 301
+
+[[redirects]]
+from = "/error-boundaries/1-implementation/route-errors/"
+to = "/error-boundaries/2-frameworks/route-errors/"
+status = 301
+
+[[redirects]]
+from = "/error-boundaries/1-implementation/package-api/"
+to = "/error-boundaries/4-packages/package-api/"
+status = 301
+
+[[redirects]]
+from = "/error-boundaries/2-analytics/production-telemetry/"
+to = "/error-boundaries/3-analytics/production-telemetry/"
+status = 301
+
+[[redirects]]
+from = "/error-boundaries/2-analytics/sanity-error-analysis/"
+to = "/error-boundaries/3-analytics/sanity-error-analysis/"
+status = 301
+
+# Consolidated Quality guide legacy routes.
+
+[[redirects]]
+from = "/hygiene/0-getting-started/setup/"
+to = "/hygiene/0-getting-started/overview/"
+status = 301
+
+[[redirects]]
+from = "/hygiene/0-getting-started/quality-json/"
+to = "/hygiene/0-getting-started/overview/"
+status = 301
+
+[[redirects]]
+from = "/hygiene/0-getting-started/cli-and-ci/"
+to = "/hygiene/0-getting-started/overview/"
+status = 301
+
+[[redirects]]
+from = "/hygiene/2-configuration/quality-json/"
+to = "/hygiene/0-getting-started/overview/"
+status = 301
+
+[[redirects]]
+from = "/hygiene/4-workflows/cli-and-ci/"
+to = "/hygiene/0-getting-started/overview/"
+status = 301

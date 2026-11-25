@@ -1,93 +1,76 @@
 # Reporting
 
-Reusable Playwright evidence reporting: normalizes test results, viewport data, and load grades, then writes spreadsheet and slideshow artifacts.
+Reporting helps teams collect useful evidence from browser tests.
 
-## What it does
-
-Not applicable.
-
-## Prerequisites
-
-Not applicable.
+Reporting normalizes Playwright results and writes review artifacts. The consuming repository owns
+its scenarios, authentication, browser setup, uploads, and retention policy.
 
 ## Get started
 
-### Install
+Node.js `>=18.18` and `@playwright/test >=1.52.0 <2` for Playwright integration.
 
 ```sh
-pnpm add -D @terra-symposium/standards-reporting @playwright/test
+pnpm add -D @terra-symposium/reporting @playwright/test
 ```
-
-From `standards/main/`, run `pnpm install`, then `pnpm --filter @terra-symposium/standards-reporting test` to validate the reporting package.
 
 ## Usage
 
-### Configure responsive projects
+Add the responsive project helper to an existing Playwright config:
 
 ```ts
 import { defineConfig } from '@playwright/test';
-import { withResponsivePlaywright } from '@terra-symposium/standards-reporting/viewports';
+import { withResponsivePlaywright } from '@terra-symposium/reporting/viewports';
 
-## Structure
+export default withResponsivePlaywright(defineConfig({ projects: [{ name: 'chromium' }] }), {
+	outputRoot: 'tests/results/visual',
+});
+```
 
-`src/` exports reporting helpers; `test/` covers the API; `.agents/skills/` contains maintainer guidance. The package depends on Playwright and Office artifact libraries.
+The package also exports `/playwright` for `visualTest`, `diagnosticsTest`, and `loadTest`;
+`/load-testing` for timing helpers; `/spreadsheet` and `/slideshow` for artifact writers; and
+`/core` for shared result types. See the
+[reporting guide](../../docs/reporting/0-getting-started/overview.mdx) for options and examples.
 
-A timestamped directory under `tests/results/visual` contains the workbook, slideshow, and copied screenshots. Each Playwright result screenshot and keyed visual capture is also stored with metadata under `tests/results/visual/screenshots`. Repeated test/viewport captures replace their previous file, and each new slideshow is rebuilt from the whole folder, so interrupted and subset runs retain earlier evidence. The run marker records the current test and viewport inventory across processes in the same logical run; captures outside that inventory, from older runs, or from legacy folders are visibly labeled `HISTORICAL CAPTURE` and never counted as current coverage. The Playwright output directory defaults to `tests/results/playwright-output`.
+## Configuration
 
-### More capabilities
-- Import `diagnosticsTest` from `/playwright` to attach browser console, page, and request failures.
-
-Import `loadTest` to measure named operations and capture page-navigation timings. It reads
-`loadTesting` from `quality.json` by default.
-
-Import `visualTest` to call `visuals.capture(key)` anywhere inside a Playwright test. Matching keys
-are grouped across responsive projects. The reporter writes `report.pptx` as screenshot-backed
-responsive slides by default; set `screenshotOnlySlideshow: false` to use the diagnostic review
-slideshow instead.
-
-Import `writeScreenshotSlideshowFromDirectory` from `/slideshow` to rebuild a screenshot deck from
-persisted evidence without running Playwright. It reads one capture directory or a nested folder of
-repository capture directories, prefixes nested sources in the slide titles, and selects the newest
-capture when a scenario/viewport was repeated. Omit run IDs to include partial and historical
-captures, pass `currentRunId` for one run, or pass one or more `currentRunIdsBySource` values to
-select runs per nested repository folder.
-
-Use `/spreadsheet` and `/slideshow` to write artifacts from normalized results without using the
-Playwright reporter.
-
-- Use `/core`, `/viewports`, and `/load-testing` for shared types and helpers.
-
-The repository remains responsible for test scenarios, authentication, browser setup, CI uploads, and retention. See the [reporting guide](https://standards-docs.netlify.app/reporting/0-getting-started/overview/) for complete options and output details.
-
-## Configuration and security
-
-Not applicable.
-
-## Development and structure
-
-Not applicable.
+`loadTest` reads `loadTesting` from `quality.json` by default. Configure Playwright authentication
+and storage in the consuming repository. Review screenshots and diagnostics before sharing them
+because they may contain application data.
 
 ## Validation
 
-Not applicable.
+| Command                | Checks                        |
+| ---------------------- | ----------------------------- |
+| `pnpm run quality:all` | Full configured Quality scope |
+| `pnpm run test`        | Unit or project tests         |
+| `pnpm run build`       | Build output                  |
 
-## Deployment and operations
-
-Not applicable.
-
-## Data, privacy, and limitations
-
-Not applicable.
-
-## References
-
-Not applicable.
+Quality can apply safe fixes; review the diff before committing. No separate browser or Playwright
+test command is defined here.
 
 ## Contributing
 
-Not applicable.
+`src/` owns the public helpers; `tests/` covers their behavior. Visual artifacts are written under
+`tests/results/visual`; Playwright output defaults to `tests/results/playwright-output`.
 
-## Credits and license
+Update the relevant guide and focused tests with changes to artifact formats or public helpers. Add
+a Changeset for a published behavior change.
 
-Not applicable.
-```
+Open changes through the repository pull-request workflow; see the [root README](../../README.md).
+
+## Documentation
+
+The package is published through the Standards Changesets release workflow. CI must upload or retain
+generated artifacts according to the consuming repository's policy.
+
+The reporter labels captures from older or partial runs as `HISTORICAL CAPTURE`; it does not count
+them as current coverage. Repeated scenario and viewport captures replace earlier files. Browser
+evidence does not prove behavior outside the executed tests and viewports.
+
+See [Playwright evidence](../../docs/reporting/2-playwright/playwright-evidence.mdx),
+[artifacts](../../docs/reporting/4-artifacts/artifacts.mdx), and
+[load testing](../../docs/reporting/3-load-testing/load-testing.mdx).
+
+## License
+
+Maintained by Terra Symposium. See the repository [LICENSE](../../LICENSE).

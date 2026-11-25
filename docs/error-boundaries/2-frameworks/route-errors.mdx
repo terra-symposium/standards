@@ -1,11 +1,11 @@
 ---
 title: Astro and Next.js route helpers
-description: Use the Astro status-copy or Next.js error-digest helper in the framework that owns the route.
+description: Use the Astro status-copy or Next.js error-digest helper in the framework that.
 ---
 
 The package includes small helpers for framework error routes. These helpers provide copy or an identifier; they do not register a route, set a response status, retry work, or send telemetry.
 
-||| [Astro status page]
+|||[Astro status page]
 
 ## Status copy
 
@@ -13,10 +13,11 @@ Import `errorStatusCopy` from the `/astro` entry point:
 
 ```astro
 ---
-import { errorStatusCopy } from '@terra-symposium/standards-error-boundaries/astro';
+import { errorStatusCopy } from '@terra-symposium/boundaries/astro';
 
 const { title, description } = errorStatusCopy(Astro.response.status);
 ---
+
 <main>
 	<h1>{title}</h1>
 	<p>{description}</p>
@@ -29,17 +30,17 @@ The same entry point exports `ErrorStatus`, `ErrorStatusCopy`, and `ERROR_STATUS
 
 |||
 
-||| [Next.js route error]
+|||[Next.js route error]
 
 ## Error digest
 
 ```tsx
-import { errorDigest } from '@terra-symposium/standards-error-boundaries/next';
-import type { NextRouteErrorProps } from '@terra-symposium/standards-error-boundaries/next';
+import { errorDigest } from '@terra-symposium/boundaries/next';
+import type { NextRouteErrorProps } from '@terra-symposium/boundaries/next';
 
 export default function ErrorPage({ error }: NextRouteErrorProps) {
 	const digest = errorDigest(error);
-	return <p role="alert">Reference: {digest ?? 'unavailable'}</p>;
+	return <p role='alert'>Reference: {digest ?? 'unavailable'}</p>;
 }
 ```
 

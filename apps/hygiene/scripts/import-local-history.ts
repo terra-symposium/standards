@@ -8,7 +8,7 @@ IMPORTS
 
 // API
 import { basename, join, resolve } from 'node:path';
-import { createHistoryReport } from '@terra-symposium/standards-quality/reports';
+import { createHistoryReport } from '@terra-symposium/hygiene/reports';
 import { db } from '../src/lib/server/db.js';
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdtempSync, rmSync } from 'node:fs';
@@ -80,13 +80,12 @@ void (async (): Promise<void> => {
 	} catch {
 		revision = git(checkout, ['rev-parse', '--verify', `refs/heads/${branch}^{commit}`]);
 	}
-	const temporaryRoot = mkdtempSync(join(tmpdir(), 'terra-hygiene-history-'));
-	const worktree = join(temporaryRoot, basename(checkout) || 'checkout');
+	const tmpRoot = mkdtempSync(join(tmpdir(), 'hygiene-history-'));
+	const worktree = join(tmpRoot, basename(checkout) || 'checkout');
 	try {
 		git(checkout, ['worktree', 'add', '--detach', worktree, revision]);
 		const history = parseHistoryReport(createHistoryReport(worktree, { repository: repo, branch, baseSha: null }));
-		const report = parseHistoryReport(history);
-		await ingestHistoryReport(repoRow.id, report);
+		await ingestHistoryReport(repoRow.id, parseHistoryReport(history));
 		console.info(`Imported ${history.commits.length.toLocaleString()} commits for ${repo} (${branch}) through ${history.headSha.slice(0, 9)}.`);
 	} finally {
 		try {
@@ -94,7 +93,7 @@ void (async (): Promise<void> => {
 		} catch {
 			/* Worktree creation may have failed. */
 		}
-		rmSync(temporaryRoot, { recursive: true, force: true });
+		rmSync(tmpRoot, { recursive: true, force: true });
 	}
 })().catch((err: unknown) => {
 	console.error(err instanceof Error ? err.message : 'Local history import failed.');

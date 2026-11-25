@@ -28,7 +28,9 @@ const require = createRequire(import.meta.url);
 TYPES
 //////////////////////////////////////////////////*/
 
-/** Minimal presentation surface required from the slideshow library. */
+/**
+ * Minimal presentation surface required from the slideshow library.
+ */
 type Presentation = {
 	layout: string;
 	author: string;
@@ -38,7 +40,10 @@ type Presentation = {
 	theme: Record<string, string>;
 	ShapeType: { line: string; roundRect: string };
 	addTable: (rows: unknown[][], options: Record<string, unknown>) => void;
-	addSlide: () => /** Minimal slide surface used by the writer's runtime-compatible adapter. */ {
+	/**
+	 * Minimal slide surface used by the writer's runtime-compatible adapter.
+	 */
+	addSlide: () => {
 		background: { color: string };
 		addText: (text: string, options: Record<string, unknown>) => void;
 		addShape: (shape: string, options: Record<string, unknown>) => void;
@@ -47,59 +52,101 @@ type Presentation = {
 	};
 	writeFile: (options: { fileName: string }) => Promise<string>;
 };
-/** Styling tokens translated to the format expected by the PowerPoint writer. */
-type TerraDocumentBrand = { colors: { ink: string; line: string; muted: string; paper: string; primaryStrong: string; primarySoft: string; secondary: string }; fonts: { body: string } };
-/** Office-compatible hex colors used to keep slide layout code independent of brand tokens. */
+/**
+ * Styling tokens translated to the format expected by the PowerPoint writer.
+ */
+type TerraDocBrand = { colors: { ink: string; line: string; muted: string; paper: string; primaryStrong: string; primarySoft: string; secondary: string }; fonts: { body: string } };
+/**
+ * Office-compatible hex colors used to keep slide layout code independent of brand tokens.
+ */
 type ReportColors = { accent: string; ink: string; line: string; muted: string; surface: string; secondary: string; selected: string };
 
-/** Holds screenshot dimensions and review cues for one slide image. */
+/**
+ * Holds screenshot dimensions and review cues for one slide image.
+ */
 type ImgReview = { cues: string[]; height: number; width: number };
 
-/** Optional visible and metadata overrides for a slideshow artifact. */
+/**
+ * Optional visible and metadata overrides for a slideshow artifact.
+ */
 export type SlideshowOptions = { title?: string; author?: string; company?: string; subject?: string; loadTestingEnabled?: boolean };
 
-/** A named screenshot collected by the shared Playwright visual-capture fixture. */
+/**
+ * A named screenshot collected by the shared Playwright visual-capture fixture.
+ */
 export type ScreenshotCapture = {
-	/** Stable test- and application-scoped group key shared across viewports. */
+	/**
+	 * Stable test- and application-scoped group key shared across viewports.
+	 */
 	group: string;
-	/** Stable capture key shared across responsive projects. */
+	/**
+	 * Stable capture key shared across responsive projects.
+	 */
 	key: string;
-	/** Human-readable scenario label shown above its screenshot group. */
+	/**
+	 * Human-readable scenario label shown above its screenshot group.
+	 */
 	title: string;
-	/** Responsive viewport name. */
+	/**
+	 * Responsive viewport name.
+	 */
 	viewport: string;
-	/** Human-readable viewport dimensions. */
+	/**
+	 * Human-readable viewport dimensions.
+	 */
 	viewportSize: string;
-	/** Accessible screenshot file. */
+	/**
+	 * Accessible screenshot file.
+	 */
 	screenshot: string;
-	/** Retry number used to select the final capture for each viewport. */
+	/**
+	 * Retry number used to select the final capture for each viewport.
+	 */
 	retry?: number;
-	/** Run that produced this capture. Missing IDs identify legacy evidence. */
+	/**
+	 * Run that produced this capture. Missing IDs identify legacy evidence.
+	 */
 	runId?: string;
-	/** Time this capture was persisted. */
+	/**
+	 * Time this capture was persisted.
+	 */
 	capturedAt?: string;
-	/** True when the capture predates the latest run marker in its directory. */
+	/**
+	 * True when the capture predates the latest run marker in its directory.
+	 */
 	historical?: boolean;
-	/** True when this capture belongs to the active run and that run has not finalized. */
+	/**
+	 * True when this capture belongs to the active run and that run has not finalized.
+	 */
 	incomplete?: boolean;
 };
 
-/** Presentation metadata and optional logical-run selection for screenshot-only captures. */
+/**
+ * Presentation metadata and optional logical-run selection for screenshot-only captures.
+ */
 export type ScreenshotSlideshowOptions = {
 	title?: string;
 	author?: string;
 	company?: string;
 	subject?: string;
-	/** Restrict a directory rebuild to this run; omit it to include historical captures. */
+	/**
+	 * Restrict a directory rebuild to this run; omit it to include historical captures.
+	 */
 	currentRunId?: string;
-	/** Restrict a directory-tree rebuild to one or more current run IDs per top-level repository folder. */
+	/**
+	 * Restrict a directory-tree rebuild to one or more current run IDs per top-level repository folder.
+	 */
 	currentRunIdsBySource?: Record<string, string | string[]>;
 };
 
-/** One repository's durable screenshot directory and optional exact Playwright run. */
+/**
+ * One repository's durable screenshot directory and optional exact Playwright run.
+ */
 export type ScreenshotDirectorySource = { label: string; directory: string; runId?: string };
 
-/** One test result paired with a graded timing measurement for the report. */
+/**
+ * One test result paired with a graded timing measurement for the report.
+ */
 type LoadRow = { result: VisualResult; measurement: NonNullable<VisualResult['loadMeasurements']>[number] };
 
 /*//////////////////////////////////////////////////
@@ -124,14 +171,14 @@ const officeColor = (value: string): string => value.replace(/^#/, '').toUpperCa
 const hexColor = (channels: string): string =>
 	`#${channels
 		.split(' ')
-		.map((c) => Math.round(Number(c)).toString(16).padStart(2, '0'))
+		.map(c => Math.round(Number(c)).toString(16).padStart(2, '0'))
 		.join('')}`;
 /**
  * Creates the low-saturation report palette from Styling's shared hue generator.
  *
  * @return A randomized Terra palette and body font for one generated presentation.
  */
-const createDocumentBrand = (): TerraDocumentBrand => {
+const createDocBrand = (): TerraDocBrand => {
 	const hue = Math.random() * 300;
 	const options = { accentChroma: 0.04 };
 	const [primary] = terraColors(hue, options);
@@ -156,7 +203,7 @@ const createDocumentBrand = (): TerraDocumentBrand => {
  *
  * @return Palette entries normalized for the Office presentation API.
  */
-const reportColors = (brand: TerraDocumentBrand): ReportColors => ({
+const reportColors = (brand: TerraDocBrand): ReportColors => ({
 	accent: officeColor(brand.colors.primaryStrong),
 	ink: officeColor(brand.colors.ink),
 	line: officeColor(brand.colors.line),
@@ -226,9 +273,8 @@ const fitImg = (width: number, height: number, x: number, y: number, maxWidth: n
 const previewImg = async (file: string, viewportSize: string): Promise<{ data: string; height: number; width: number }> => {
 	const metadata = await sharp(file).metadata();
 	const width = metadata.width || 1;
-	const [viewportWidth, viewportHeight] = viewportSize.split('×').map((v) => Number.parseInt(v, 10));
-	const viewportPreviewHeight = viewportWidth && viewportHeight ? Math.round((width * viewportHeight) / viewportWidth) : Math.round(width / 0.38);
-	const height = Math.min(metadata.height || 1, Math.max(1, viewportPreviewHeight));
+	const [viewportWidth, viewportHeight] = viewportSize.split('×').map(v => Number.parseInt(v, 10));
+	const height = Math.min(metadata.height || 1, Math.max(1, viewportWidth && viewportHeight ? Math.round((width * viewportHeight) / viewportWidth) : Math.round(width / 0.38)));
 	return { data: `data:image/png;base64,${(await sharp(file).extract({ height, left: 0, top: 0, width }).png().toBuffer()).toString('base64')}`, height, width };
 };
 /**
@@ -260,14 +306,13 @@ const resultLoadGrade = (r: VisualResult): string => {
  */
 const slideCopy = (r: VisualResult, review: ImgReview): string => {
 	const grade = resultLoadGrade(r);
-	const measurements = r.loadMeasurements || [];
 	const lines = [
 		`${r.project} · ${r.viewport} · ${r.viewportSize}`,
 		r.groups || r.file,
 		`Status: ${r.status}${r.duration ? ` · ${r.duration} ms` : ''}${grade ? ` · Load: ${grade}` : ''}`,
-		...measurements.map((i) => `Load ${i.kind}: ${i.name} — ${i.durationMs.toFixed(1)} ms (${i.grade}; warn ${i.budget.warnMs} / fail ${i.budget.failMs} ms)`),
+		...(r.loadMeasurements || []).map(i => `Load ${i.kind}: ${i.name} — ${i.durationMs.toFixed(1)} ms (${i.grade}; warn ${i.budget.warnMs} / fail ${i.budget.failMs} ms)`),
 		'',
-		...review.cues.map((c) => `• ${c}`),
+		...review.cues.map(c => `• ${c}`),
 	];
 	if (r.error) lines.push('', `Test error: ${r.error}`);
 	if (r.browserErrors) lines.push('', `Browser: ${r.browserErrors}`);
@@ -279,17 +324,17 @@ const slideCopy = (r: VisualResult, review: ImgReview): string => {
  *
  * @param presentation Presentation receiving the slide.
  * @param group Results for the same test across one or more viewports.
- * @param slideNumber One-based slide number shown in the title.
+ * @param slideNum One-based slide number shown in the title.
  * @param colors Palette used for slide surfaces, labels, and separators.
  *
  * @return A promise that resolves after the comparison slide is added.
  */
-const addResponsiveSlide = async (presentation: Presentation, group: readonly VisualResult[], slideNumber: number, colors: ReportColors): Promise<void> => {
+const addResponsiveSlide = async (presentation: Presentation, group: readonly VisualResult[], slideNum: number, colors: ReportColors): Promise<void> => {
 	const first = group[0];
 	if (!first) return;
 	const slide = presentation.addSlide();
 	slide.background = { color: colors.surface };
-	addReportTitle(slide, `${String(slideNumber).padStart(3, '0')}  ${first.title}`, colors);
+	addReportTitle(slide, `${String(slideNum).padStart(3, '0')}  ${first.title}`, colors);
 	slide.addText(`${first.project} · responsive comparison · ${first.groups || first.file}`, {
 		color: colors.muted,
 		fontFace: 'Authentic Sans',
@@ -308,9 +353,8 @@ const addResponsiveSlide = async (presentation: Presentation, group: readonly Vi
 	const width = (12.55 - gap * (cols - 1)) / cols;
 	const height = (5.86 - gap * (rows - 1)) / rows;
 	for (const [idx, r] of group.entries()) {
-		const row = Math.floor(idx / cols);
 		const x = 0.38 + (idx % cols) * (width + gap);
-		const y = 1.22 + row * (height + gap);
+		const y = 1.22 + Math.floor(idx / cols) * (height + gap);
 		slide.addShape(presentation.ShapeType.roundRect, { fill: { color: colors.surface }, line: { color: colors.line, width: 1 }, x, y, w: width, h: height, rectRadius: 0.04 });
 		const loadGrade = resultLoadGrade(r);
 		slide.addText(`${r.viewport} · ${r.viewportSize} · ${r.status}${loadGrade ? ` · Load ${loadGrade}` : ''}`, {
@@ -324,6 +368,7 @@ const addResponsiveSlide = async (presentation: Presentation, group: readonly Vi
 			h: 0.2,
 		});
 		if (r.screenshot && fs.existsSync(r.screenshot)) {
+			// hygiene-ignore single-use -- Finish screenshot review before loading the preview image.
 			const review = await reviewImg(r.screenshot, r);
 			const preview = await previewImg(r.screenshot, r.viewportSize);
 			slide.addImage({ data: preview.data, ...fitImg(preview.width, preview.height, x + 0.08, y + 0.38, width - 0.16, height - 0.46) });
@@ -361,7 +406,7 @@ export const readScreenshotCapturesFromDirectory = (dir: string, currentRunId?: 
 		if (currentRunIds.has(run.runId) && Array.isArray(run.expectedCaptureGroups))
 			currentCaptureGroups = new Map(
 				run.expectedCaptureGroups
-					.filter((i) => i && typeof i.group === 'string' && Array.isArray(i.viewports) && i.viewports.every((viewport) => typeof viewport === 'string'))
+					.filter(i => i && typeof i.group === 'string' && Array.isArray(i.viewports) && i.viewports.every(viewport => typeof viewport === 'string'))
 					.map(({ group: g, viewports: v }) => [g, new Set(v)]),
 			);
 	} catch {
@@ -386,7 +431,7 @@ export const readScreenshotCapturesFromDirectory = (dir: string, currentRunId?: 
 			const viewport = capture.viewport;
 			const screenshot = path.isAbsolute(capture.screenshot)
 				? capture.screenshot
-				: [path.resolve(dir, capture.screenshot), path.resolve(capture.screenshot)].find((candidate) => fs.existsSync(candidate));
+				: [path.resolve(dir, capture.screenshot), path.resolve(capture.screenshot)].find(candidate => fs.existsSync(candidate));
 			if (!screenshot || !fs.existsSync(screenshot)) return [];
 			const captureRunId = typeof capture.runId === 'string' ? capture.runId : undefined;
 			const currentTest =
@@ -415,6 +460,7 @@ export const readScreenshotCapturesFromDirectory = (dir: string, currentRunId?: 
 		}
 	});
 };
+// hygiene-ignore single-use -- Keep the documented addLoadSummarySlide declaration so its parameter and return contract remains attached.
 /**
  * Adds a run-level load summary slide and names the slowest measurements.
  *
@@ -423,7 +469,7 @@ export const readScreenshotCapturesFromDirectory = (dir: string, currentRunId?: 
  * @param colors Palette used for the summary slide's background and text.
  */
 const addLoadSummarySlide = (presentation: Presentation, results: readonly VisualResult[], colors: ReportColors): void => {
-	const measurements: LoadRow[] = results.flatMap((r) => (r.loadMeasurements || []).map((measurement) => ({ result: r, measurement })));
+	const measurements: LoadRow[] = results.flatMap(r => (r.loadMeasurements || []).map(measurement => ({ result: r, measurement })));
 	const counts = loadGradeCounts(measurements.map(({ measurement: m }) => m));
 	const slowest = [...measurements].sort((a, b) => b.measurement.durationMs - a.measurement.durationMs).slice(0, 6);
 	const slide = presentation.addSlide();
@@ -446,6 +492,7 @@ const addLoadSummarySlide = (presentation: Presentation, results: readonly Visua
 		{ color: colors.ink, fontFace: 'Authentic Sans', fontSize: 13, fit: 'shrink', margin: 0.08, valign: 'mid', x: 0.58, y: 2.05, w: 12.1, h: 4.3 },
 	);
 };
+// hygiene-ignore single-use -- Keep the documented addLoadDetailSlides declaration so its parameter and return contract remains attached.
 /**
  * Adds paginated slides containing every individual test, page, and operation measurement.
  *
@@ -456,10 +503,11 @@ const addLoadSummarySlide = (presentation: Presentation, results: readonly Visua
  * @return Number of detail slides added.
  */
 const addLoadDetailSlides = (presentation: Presentation, results: readonly VisualResult[], colors: ReportColors): number => {
-	const measurements: LoadRow[] = results.flatMap((r) => (r.loadMeasurements || []).map((measurement) => ({ result: r, measurement })));
+	const measurements: LoadRow[] = results.flatMap(r => (r.loadMeasurements || []).map(measurement => ({ result: r, measurement })));
 	const pageSize = 12;
 	const pages = Math.max(1, Math.ceil(measurements.length / pageSize));
 	for (let page = 0; page < pages; page += 1) {
+		// hygiene-ignore single-use -- Render measurement text before adding a slide so formatting errors leave the deck unchanged.
 		const lines = measurements
 			.slice(page * pageSize, (page + 1) * pageSize)
 			.map(
@@ -494,8 +542,8 @@ const addLoadDetailSlides = (presentation: Presentation, results: readonly Visua
  * @return A promise that resolves after the slideshow has been written.
  */
 export const writeSlideshow = async (file: string, results: readonly VisualResult[], opts: SlideshowOptions = {}): Promise<void> => {
-	const loadEnabled = opts.loadTestingEnabled ?? results.some((r) => !!r.loadMeasurements?.length);
-	const brand = createDocumentBrand();
+	const loadEnabled = opts.loadTestingEnabled ?? results.some(r => !!r.loadMeasurements?.length);
+	const brand = createDocBrand();
 	const colors = reportColors(brand);
 	const presentation = new /* The runtime package is CommonJS while NodeNext exposes its constructor through a namespace type. */ (require('pptxgenjs') as new () => Presentation)();
 	presentation.layout = 'LAYOUT_WIDE';
@@ -504,10 +552,10 @@ export const writeSlideshow = async (file: string, results: readonly VisualResul
 	presentation.company = opts.company || 'Test evidence';
 	presentation.subject = opts.subject || 'Screenshot evidence and UI review prompts';
 	presentation.title = opts.title || 'Test evidence slideshow';
-	let slideNumber = 0;
+	let slideNum = 0;
 	if (loadEnabled) {
 		addLoadSummarySlide(presentation, results, colors);
-		slideNumber += 1;
+		slideNum += 1;
 	}
 
 	// GROUP RESULTS BY TEST IDENTITY AND SELECT THE FINAL RETRY PER VIEWPORT
@@ -525,13 +573,13 @@ export const writeSlideshow = async (file: string, results: readonly VisualResul
 		await addResponsiveSlide(
 			presentation,
 			[...byViewport.values()].sort((a, b) => viewportWidth(a) - viewportWidth(b)),
-			++slideNumber,
+			++slideNum,
 			colors,
 		);
 	}
 
 	// ENSURE EMPTY RUNS STILL PRODUCE A REVIEWABLE DECK
-	if (!slideNumber) {
+	if (!slideNum) {
 		const slide = presentation.addSlide();
 		slide.background = { color: colors.surface };
 		addReportTitle(slide, 'Test evidence slideshow', colors);
@@ -554,7 +602,7 @@ export const writeSlideshow = async (file: string, results: readonly VisualResul
  */
 export const writeScreenshotSlideshow = async (file: string, captures: readonly ScreenshotCapture[], opts: ScreenshotSlideshowOptions = {}): Promise<void> => {
 	if (!captures.length) throw new Error('No keyed Playwright screenshots were captured for the screenshot slideshow.');
-	const brand = createDocumentBrand();
+	const brand = createDocBrand();
 	const colors = reportColors(brand);
 	const presentation = new /* The runtime package is CommonJS while NodeNext exposes its constructor through a namespace type. */ (require('pptxgenjs') as new () => Presentation)();
 	presentation.layout = 'LAYOUT_WIDE';
@@ -579,10 +627,10 @@ export const writeScreenshotSlideshow = async (file: string, captures: readonly 
 	for (const [, group] of orderedGroups) {
 		const byViewport = new Map<string, ScreenshotCapture>();
 		for (const capture of group) {
-			const previous = byViewport.get(capture.viewport);
-			const sameRun = previous && capture.runId === previous.runId;
-			const isNewer = (Date.parse(capture.capturedAt || '') || 0) >= (Date.parse(previous?.capturedAt || '') || 0);
-			if (!previous || (sameRun ? (capture.retry || 0) > (previous.retry || 0) || ((capture.retry || 0) === (previous.retry || 0) && isNewer) : isNewer)) byViewport.set(capture.viewport, capture);
+			const prev = byViewport.get(capture.viewport);
+			const isNewer = (Date.parse(capture.capturedAt || '') || 0) >= (Date.parse(prev?.capturedAt || '') || 0);
+			if (!prev || (capture.runId === prev.runId ? (capture.retry || 0) > (prev.retry || 0) || ((capture.retry || 0) === (prev.retry || 0) && isNewer) : isNewer))
+				byViewport.set(capture.viewport, capture);
 		}
 		const ordered = [...byViewport.values()].sort((f, s) => {
 			const firstIndex = knownViewports.indexOf(f.viewport);
@@ -609,7 +657,6 @@ export const writeScreenshotSlideshow = async (file: string, captures: readonly 
 		});
 		for (const [index, capture] of ordered.entries()) {
 			if (!fs.existsSync(capture.screenshot)) throw new Error(`Screenshot is missing for ${capture.key} (${capture.viewport}): ${capture.screenshot}`);
-			const row = Math.floor(index / cols);
 			const { data, info } = await sharp(capture.screenshot)
 				.rotate()
 				.resize({ width: 720, height: 405, fit: 'inside', withoutEnlargement: true })
@@ -617,7 +664,7 @@ export const writeScreenshotSlideshow = async (file: string, captures: readonly 
 				.toBuffer({ resolveWithObject: true });
 			slide.addImage({
 				data: `data:image/jpeg;base64,${data.toString('base64')}`,
-				...fitImg(info.width, info.height, margin + (index % cols) * (cellWidth + gap), margin + 0.22 + row * (cellHeight + gap), cellWidth, cellHeight),
+				...fitImg(info.width, info.height, margin + (index % cols) * (cellWidth + gap), margin + 0.22 + Math.floor(index / cols) * (cellHeight + gap), cellWidth, cellHeight),
 			});
 		}
 	}
@@ -625,6 +672,7 @@ export const writeScreenshotSlideshow = async (file: string, captures: readonly 
 	await presentation.writeFile({ fileName: file });
 	await neutralizeApplicationMetadata(file);
 };
+// hygiene-ignore single-use -- Keep the documented readScreenshotCapturesFromDirTree declaration so its parameter and return contract remains attached.
 /**
  * Reads current and historical screenshots beneath a folder, with stable source names for multi-repository reports.
  *
@@ -650,28 +698,29 @@ const readScreenshotCapturesFromDirTree = (root: string, opts: ScreenshotSlidesh
 		} catch {
 			return [];
 		}
-		const sourcePath = path.relative(root, dir);
-		const sourceName = sourcePath ? sourcePath.split(path.sep)[0] : '';
-		const prefix = sourceName ? `${sourceName} · ` : '';
-		const local = readScreenshotCapturesFromDirectory(dir, isRoot ? opts.currentRunId : opts.currentRunIdsBySource?.[sourceName]).map((c) => ({
-			...c,
-			group: `${prefix}${c.group}`,
-			key: sourceName ? `${sourceName}:${c.key}` : c.key,
-			title: `${prefix}${c.title}`,
-		}));
-		const nested = entries
-			.filter((e) => !['.git', 'node_modules'].includes(e.name))
-			.filter((e) => e.isDirectory() || e.isSymbolicLink())
-			.sort((f, s) => f.name.localeCompare(s.name))
-			.flatMap((e) => {
-				const child = path.join(dir, e.name);
-				try {
-					return fs.statSync(child).isDirectory() ? read(child) : [];
-				} catch {
-					return [];
-				}
-			});
-		return [...local, ...nested];
+		const srcPath = path.relative(root, dir);
+		const srcName = srcPath ? srcPath.split(path.sep)[0] : '';
+		const prefix = srcName ? `${srcName} · ` : '';
+		return [
+			...readScreenshotCapturesFromDirectory(dir, isRoot ? opts.currentRunId : opts.currentRunIdsBySource?.[srcName]).map(c => ({
+				...c,
+				group: `${prefix}${c.group}`,
+				key: srcName ? `${srcName}:${c.key}` : c.key,
+				title: `${prefix}${c.title}`,
+			})),
+			...entries
+				.filter(e => !['.git', 'node_modules'].includes(e.name))
+				.filter(e => e.isDirectory() || e.isSymbolicLink())
+				.sort((f, s) => f.name.localeCompare(s.name))
+				.flatMap(e => {
+					const child = path.join(dir, e.name);
+					try {
+						return fs.statSync(child).isDirectory() ? read(child) : [];
+					} catch {
+						return [];
+					}
+				}),
+		];
 	};
 	return read(root);
 };
@@ -683,10 +732,9 @@ const readScreenshotCapturesFromDirTree = (root: string, opts: ScreenshotSlidesh
  * @param opts Presentation metadata and optional run selection.
  */
 export const writeScreenshotSlideshowFromDirectory = async (dir: string, file: string, opts: ScreenshotSlideshowOptions = {}): Promise<void> => {
-	const captures = readScreenshotCapturesFromDirTree(dir, opts).filter((c) => {
+	const captures = readScreenshotCapturesFromDirTree(dir, opts).filter(c => {
 		if (opts.currentRunId) return c.runId === opts.currentRunId && !c.historical;
-		const sourceName = c.group.includes(' · ') ? c.group.slice(0, c.group.indexOf(' · ')) : '';
-		const currentRunIds = opts.currentRunIdsBySource?.[sourceName];
+		const currentRunIds = opts.currentRunIdsBySource?.[c.group.includes(' · ') ? c.group.slice(0, c.group.indexOf(' · ')) : ''];
 		const selectedRunIds = typeof currentRunIds === 'string' ? [currentRunIds] : currentRunIds;
 		return !selectedRunIds?.length || (c.runId !== undefined && selectedRunIds.includes(c.runId) && !c.historical);
 	});
@@ -696,14 +744,17 @@ export const writeScreenshotSlideshowFromDirectory = async (dir: string, file: s
  * Builds one screenshot-only deck from any completed or partial set of repository capture folders.
  *
  * @param file Destination PowerPoint file path.
- * @param sources Repository labels, capture directories, and optional run IDs to include.
+ * @param srcs Repository labels, capture directories, and optional run IDs to include.
  * @param opts Presentation metadata applied to the aggregate deck.
  */
-export const writeScreenshotSlideshowFromDirectories = async (file: string, sources: readonly ScreenshotDirectorySource[], opts: ScreenshotSlideshowOptions = {}): Promise<void> => {
-	const captures = sources.flatMap(({ label: l, directory: d, runId: r }) =>
-		readScreenshotCapturesFromDirectory(d, r)
-			.filter((capture) => !r || capture.runId === r)
-			.map((capture) => ({ ...capture, group: `${l}/${capture.group}`, key: `${l}/${capture.key}`, title: `${l} · ${capture.title}` })),
+export const writeScreenshotSlideshowFromDirectories = async (file: string, srcs: readonly ScreenshotDirectorySource[], opts: ScreenshotSlideshowOptions = {}): Promise<void> => {
+	await writeScreenshotSlideshow(
+		file,
+		srcs.flatMap(({ label: l, directory: d, runId: r }) =>
+			readScreenshotCapturesFromDirectory(d, r)
+				.filter(capture => !r || capture.runId === r)
+				.map(capture => ({ ...capture, group: `${l}/${capture.group}`, key: `${l}/${capture.key}`, title: `${l} · ${capture.title}` })),
+		),
+		opts,
 	);
-	await writeScreenshotSlideshow(file, captures, opts);
 };

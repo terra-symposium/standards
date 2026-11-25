@@ -7,24 +7,6 @@ Use Changesets for public package behavior and metadata changes. Choose the rele
 
 ## Release sequence
 
-<Nodes
-	direction="LR"
-	nodes={[
-		{ id: 'change', type: 'origin', data: { title: 'Implement API change' } },
-		{ id: 'verify', type: 'process', data: { title: 'Build and test package' } },
-		{ id: 'changefile', type: 'process', data: { title: 'Add Changeset' } },
-		{ id: 'review', type: 'process', data: { title: 'Review exports and package' } },
-		{ id: 'publish', type: 'terminal', data: { title: 'Publish in dependency order' } },
-	]}
-	edges={[
-		{ id: 'change-verify', source: 'change', target: 'verify' },
-		{ id: 'verify-changefile', source: 'verify', target: 'changefile' },
-		{ id: 'changefile-review', source: 'changefile', target: 'review' },
-		{ id: 'review-publish', source: 'review', target: 'publish' },
-	]}
-	height={230}
-/>
-
 1. Update implementation, declarations, README, tests, and package metadata together.
 2. Build and test the package, then run the workspace build and test plan.
 3. Run `pnpm changeset` and review the generated Markdown under `.changeset/`.
@@ -43,4 +25,4 @@ Documentation-only changes do not need a package changeset. A README correction 
 | Dependencies          | Package consumers install the required runtime dependencies and peer dependencies. |
 | Release note          | The Changeset names every affected public package and the correct semver impact.   |
 
-A successful workspace build alone does not prove a tarball is self-contained. Review the package’s published files and consumer-facing documentation. See the [Quality package map](/quality/1-packages/package-map/) for package boundaries.
+A successful workspace build alone does not prove a tarball is self-contained. Review the package’s published files and consumer-facing documentation. See the [Quality package map](/hygiene/1-packages/package-map/) for package boundaries.

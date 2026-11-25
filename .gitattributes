@@ -1,0 +1,2 @@
+# Preserve recovered source files verbatim.
+archive/docs-backup/** -diff

@@ -2,7 +2,7 @@ name: Terra test plan
 description: Run a repository test plan once with shared suite validation and reporting.
 inputs:
   manifest:
-    description: Repository-relative JSON test-plan path. Defaults to config/terra-tests.json, then tests/terra-tests.json, then the legacy root path.
+    description: Repository-relative JSON test-plan path. Defaults to config/tests.json, then the legacy config/terra-tests.json, tests/tests.json, tests/terra-tests.json, and root paths.
     required: false
     default: ''
   suites:
@@ -19,19 +19,19 @@ runs:
     - name: Run declared test suites
       shell: bash
       env:
-        TERRA_TEST_MANIFEST: ${{ inputs.manifest }}
-        TERRA_TEST_SUITES: ${{ inputs.suites }}
-        TERRA_TEST_SHARED_ONLY: ${{ inputs.shared-only }}
+        TEST_RUNNER_MANIFEST: ${{ inputs.manifest }}
+        TEST_RUNNER_SUITES: ${{ inputs.suites }}
+        TEST_RUNNER_SHARED_ONLY: ${{ inputs.shared-only }}
       run: |
         set -euo pipefail
         args=(run --root "$GITHUB_WORKSPACE")
-        if [[ -n "$TERRA_TEST_MANIFEST" ]]; then
-          args+=(--manifest "$TERRA_TEST_MANIFEST")
+        if [[ -n "$TEST_RUNNER_MANIFEST" ]]; then
+          args+=(--manifest "$TEST_RUNNER_MANIFEST")
         fi
-        if [[ -n "$TERRA_TEST_SUITES" ]]; then
-          args+=(--suites "$TERRA_TEST_SUITES")
+        if [[ -n "$TEST_RUNNER_SUITES" ]]; then
+          args+=(--suites "$TEST_RUNNER_SUITES")
         fi
-        if [[ "$TERRA_TEST_SHARED_ONLY" == "true" ]]; then
+        if [[ "$TEST_RUNNER_SHARED_ONLY" == "true" ]]; then
           args+=(--shared-only)
         fi
         node "$GITHUB_ACTION_PATH/src/cli.mjs" "${args[@]}"

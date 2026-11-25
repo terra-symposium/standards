@@ -6,26 +6,29 @@
 	"type": "module",
 	"docs": {
 		"title": "Standards",
+		"errorReporting": {
+			"endpoint": "https://terrasymposium.com/api/error-report",
+			"site": "standards"
+		},
 		"description": "Documentation for shared Terra Symposium packages and tools.",
 		"site": "https://standards-docs.netlify.app",
 		"out": "dist/docs"
 	},
 	"scripts": {
-		"build": "cd .. && pnpm -r --filter '@terra-symposium/standards-quality...' build && pnpm --filter @terra-symposium/standards-error-boundaries build && pnpm -r build",
-		"test": "cd .. && node packages/testing/src/cli.mjs run --manifest config/terra-tests.json",
-		"quality": "cd .. && uv run --locked node scripts/quality.mjs quality --all",
-		"quality:fix": "cd .. && uv run --locked node scripts/quality.mjs quality --all --fix",
-		"quality:check": "cd .. && uv run --locked node scripts/quality.mjs quality --all --warn",
-		"docs": "cd .. && node config/scripts/build-docs.mjs --dev",
-		"docs:build": "cd .. && node config/scripts/build-docs.mjs",
+		"build": "cd .. && pnpm -r --filter '!@terra-symposium/standards' --filter '!standards-workspace-adapter' build",
+		"test": "cd .. && node packages/testing/src/cli.mjs run --manifest config/tests.json",
+		"quality": "node \"$(git rev-parse --show-toplevel)/scripts/quality-runner.mjs\" quality",
+		"quality:all": "node \"$(git rev-parse --show-toplevel)/scripts/quality-runner.mjs\" quality --all",
+		"docs": "cd .. && mkdir -p dist/cache/astro-types && docs dev --port 2050 --strictPort",
+		"docs:build": "cd .. && mkdir -p dist/cache/astro-types && docs build --out dist/docs",
 		"prepare": "cd .. && husky config/husky",
 		"changeset": "changeset",
-		"release": "changeset publish"
+		"release": "cd .. && pnpm exec changeset publish"
 	},
 	"devDependencies": {
 		"@changesets/cli": "^3.0.3",
 		"@eslint/js": "^10.0.1",
-		"@terra-symposium/docs": "^0.4.14",
+		"@terra-symposium/docs": "^0.4.35",
 		"@types/node": "^26.6.5",
 		"eslint": "^10.13.0",
 		"globals": "^17.13.0",

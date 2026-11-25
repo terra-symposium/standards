@@ -1,0 +1,49 @@
+---
+title: Hygiene package map
+description: Find the aggregate runner and focused subpath for each reusable Hygiene capability.
+---
+
+`@terra-symposium/hygiene` contains the aggregate runner, shared core, reports, and focused checks. Import a subpath when an integration needs only one capability.
+
+## Choose an entry point
+
+|||[Aggregate workflow]
+
+Use `@terra-symposium/hygiene` for the full schema, phase ordering, configured commands, progress, external-tool orchestration, compatibility APIs, combined reports, and development-port helpers.
+
+|||
+
+|||[Focused capability]
+
+Import a capability subpath for its check family or public helper. All subpaths use the same `quality.json`.
+
+|||
+
+## Export references
+
+Install `@terra-symposium/hygiene` once. Each subpath has a reference for its exports, CLI scope, and configuration.
+
+| Export                                              | Responsibility                                                                               | CLI                      |
+| --------------------------------------------------- | -------------------------------------------------------------------------------------------- | ------------------------ |
+| [Hygiene](/hygiene/1-packages/hygiene/)             | Aggregate schema, phase orchestration, compatibility APIs, commands, reports, and dev ports. | `hygiene`, `hygiene-dev` |
+| [Core](/hygiene/1-packages/core/)                   | Shared configuration, source scope, analysis context, types, and CLI flags.                  | API only                 |
+| [Documentation](/hygiene/1-packages/documentation/) | TSDoc/JSDoc, Doxygen, and documented commands.                                               | `documentation`          |
+| [Formatting](/hygiene/1-packages/formatting/)       | Source layout, safe structural transforms, and Prettier integration.                         | `formatting`             |
+| [Imports](/hygiene/1-packages/imports/)             | Local import resolution and duplicate-import findings.                                       | `imports`                |
+| [Languages](/hygiene/1-packages/languages/)         | Optional C, Java, and Python profiles.                                                       | `language-checks`        |
+| [Naming](/hygiene/1-packages/naming/)               | Naming and alias checks with safe rename helpers.                                            | `naming`                 |
+| [Patterns](/hygiene/1-packages/patterns/)           | Performance, repeated classes, regex, Tailwind, and UI patterns.                             | `patterns`               |
+| [Reports](/hygiene/1-packages/reports/)             | GitHub/history reports and test-runner reporters.                                            | `hygiene-reports`        |
+| [Refactoring](/hygiene/1-packages/refactoring/)     | Forwarding, single-use, and dead-code analysis.                                              | `refactoring`            |
+| [Security](/hygiene/1-packages/security/)           | Built-in repository source-security findings.                                                | `security`               |
+| [UI](/hygiene/1-packages/ui/)                       | Accessibility, display names, boundaries, and UI recommendations.                            | `ui-quality`             |
+
+===[Package authoring boundary]
+
+Core owns generic source scope and shared contracts. Focused checks keep their logic separate from the aggregate runner within the same package.
+
+===
+
+For rule enablement and autofix limits, read the [source check reference](/hygiene/3-checks/source-checks/) and [tool check reference](/hygiene/3-checks/tooling-checks/).
+
+Migrating from the former `standards-*` packages? Use the [package migration guide](/hygiene/5-operations/migration/).

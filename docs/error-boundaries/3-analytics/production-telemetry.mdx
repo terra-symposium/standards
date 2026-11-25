@@ -1,6 +1,6 @@
 ---
 title: Production boundary telemetry
-description: Trace the Terra Website event pipeline and its privacy, retention, and operational limits.
+description: Trace the Terra Website event pipeline and its privacy, retention, and.
 ---
 
 The shared error-boundary package calls an application callback; it does not send or persist events. The Terra Website owns the collector and already has a Sanity Error Analysis dashboard. Other applications should adapt the callback to their own approved monitoring stack.
@@ -24,7 +24,7 @@ The adapter in `astro/src/components/ErrorBoundary.tsx` handles React render fai
 
 The collector keeps only the category, validated component label, allowlisted route family, build ID, environment, and timestamps in the `error-reports` Netlify Blob store. It expires events after 30 days. The error-analysis action in `netlify/lib/error-analysis.ts` groups the retained records into the dashboard's time series and breakdowns. Sanity restricts the view to administrators on supported datasets.
 
-=== [Operational checklist]
+===[Operational checklist]
 
 - Keep `onError` synchronous, nonthrowing, and small. Do not block recovery on telemetry delivery.
 - Send stable labels and route templates. Do not attach raw error text, React stacks, user state, request bodies, email addresses, or credentials unless a separate reviewed design explicitly requires them.

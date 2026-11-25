@@ -20,7 +20,6 @@ import { tmpdir } from 'node:os';
 CONFIG
 //////////////////////////////////////////////////*/
 
-const appRoot = resolve(fileURLToPath(new URL('..', import.meta.url)));
 const args = process.argv.slice(2);
 
 /*//////////////////////////////////////////////////
@@ -67,13 +66,14 @@ function run(cmd: string, cmdArgs: string[], cwd: string): number {
 	if (result.error) throw result.error;
 	return result.status ?? 1;
 }
+// hygiene-ignore single-use -- Keep the documented import workflow as a named script entry point.
 /**
  * Imports verified local test and Quality reports into the Hygiene dashboard.
  *
  * @return Resolves after importing the report and cleaning up its temporary worktree.
  */
 async function main(): Promise<void> {
-	const localEnv = resolve(appRoot, '.env.local');
+	const localEnv = resolve(fileURLToPath(new URL('..', import.meta.url)), '.env.local');
 	if (existsSync(localEnv)) process.loadEnvFile(localEnv);
 	const repo = option('--repository');
 	const checkout = resolve(option('--checkout'));
@@ -104,11 +104,11 @@ async function main(): Promise<void> {
 	} catch {
 		revision = git(checkout, ['rev-parse', '--verify', `refs/heads/${branch}^{commit}`]);
 	}
-	const temporaryRoot = mkdtempSync(join(tmpdir(), 'terra-hygiene-report-'));
-	const worktree = join(temporaryRoot, basename(checkout) || 'checkout');
-	const reports = join(temporaryRoot, 'reports');
+	const tmpRoot = mkdtempSync(join(tmpdir(), 'hygiene-report-'));
+	const worktree = join(tmpRoot, basename(checkout) || 'checkout');
+	const reports = join(tmpRoot, 'reports');
 	const junitPath = join(reports, 'junit.xml');
-	const qualityPath = join(reports, 'terra-quality.json');
+	const qualityPath = join(reports, 'hygiene.json');
 	mkdirSync(reports);
 	try {
 		git(checkout, ['worktree', 'add', '--detach', worktree, revision]);
@@ -120,6 +120,7 @@ async function main(): Promise<void> {
 		const qualityConfigPath = join(worktree, 'config/quality.json');
 		const qualityPolicyBranch = existsSync(qualityConfigPath) ? branch : 'development';
 		if (!existsSync(qualityConfigPath)) {
+			// hygiene-ignore single-use -- Read the branch policy before creating its destination directory.
 			const sharedPolicy = git(checkout, ['show', 'origin/development:config/quality.json']);
 			mkdirSync(join(worktree, 'config'), { recursive: true });
 			writeFileSync(qualityConfigPath, `${sharedPolicy}\n`);
@@ -136,8 +137,8 @@ async function main(): Promise<void> {
 				'--package',
 				'node@24',
 				'--package',
-				'@terra-symposium/standards-quality@0.5.0',
-				'terra-quality',
+				'@terra-symposium/hygiene@0.5.0',
+				'hygiene',
 				'quality',
 				'--all',
 				'--warn',
@@ -148,7 +149,9 @@ async function main(): Promise<void> {
 			],
 			worktree,
 		);
+		// hygiene-ignore single-use -- Read the JUnit artifact before resolving the checkout head and parsing the report.
 		const junitXml = existsSync(junitPath) ? readFileSync(junitPath, 'utf8') : null;
+		// hygiene-ignore single-use -- Read the Quality artifact before resolving the checkout head and parsing the report.
 		const quality = existsSync(qualityPath) ? (JSON.parse(readFileSync(qualityPath, 'utf8')) as unknown) : null;
 		const headSha = git(worktree, ['rev-parse', 'HEAD']);
 		const report = parseBuildReport({
@@ -163,7 +166,9 @@ async function main(): Promise<void> {
 			history: null,
 		});
 		await ingestBuildReport(Number(repoRow.id), report, 'local', qualityPolicyBranch);
+		// hygiene-ignore single-use -- Prepare the test summary before any report lines are emitted.
 		const testCounts = report.tests ? `${report.tests.passed} passed, ${report.tests.failed} failed, ${report.tests.skipped} skipped` : 'JUnit report missing';
+		// hygiene-ignore single-use -- Prepare the Quality summary before any report lines are emitted.
 		const qualityCounts = report.quality
 			? `${report.quality.clean}/${report.quality.enabled} clean checks, ${report.quality.findings} findings, ${report.quality.total} total checks`
 			: 'Terra Quality report missing';
@@ -177,7 +182,7 @@ async function main(): Promise<void> {
 		} catch {
 			/* Worktree creation may have failed. */
 		}
-		rmSync(temporaryRoot, { recursive: true, force: true });
+		rmSync(tmpRoot, { recursive: true, force: true });
 	}
 }
 

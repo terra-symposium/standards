@@ -7,9 +7,13 @@
 CONFIG
 //////////////////////////////////////////////////*/
 
-/** Next.js route error with the optional framework-provided diagnostic digest. */
+/**
+ * Next.js route error with the optional framework-provided diagnostic digest.
+ */
 export type NextRouteError = Error & { digest?: string };
-/** Props used by a Next.js route error component that can retry rendering. */
+/**
+ * Props used by a Next.js route error component that can retry rendering.
+ */
 export type NextRouteErrorProps = { error: NextRouteError; reset: () => void };
 
 /*//////////////////////////////////////////////////

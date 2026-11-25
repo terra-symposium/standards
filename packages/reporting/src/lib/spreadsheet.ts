@@ -98,7 +98,7 @@ const resultLoadGrade = (val: VisualResult): string => {
  * @return A promise that resolves after the workbook has been written.
  */
 export const writeSpreadsheet = async (file: string, run: ReportRun): Promise<void> => {
-	const loadEnabled = run.loadTestingEnabled ?? run.results.some((r) => !!r.loadMeasurements?.length);
+	const loadEnabled = run.loadTestingEnabled ?? run.results.some(r => !!r.loadMeasurements?.length);
 	const book = new ExcelJS.Workbook();
 	book.creator = 'Test evidence reporter';
 	book.lastModifiedBy = 'Test evidence reporter';
@@ -111,13 +111,8 @@ export const writeSpreadsheet = async (file: string, run: ReportRun): Promise<vo
 		for (const file of orderedFiles(run)) {
 			const vals = resultsForFile(run, file);
 			const counts = statusCounts(vals);
-			const loadCounts = loadGradeCounts(vals.flatMap((r) => r.loadMeasurements || []));
-			sheet.addRow([
-				file,
-				...VISUAL_STATUSES.map((s) => counts[s]),
-				VISUAL_STATUSES.reduce((t, s) => t + counts[s], 0),
-				...(loadEnabled ? [loadCounts.pass, loadCounts.warning, loadCounts.fail] : []),
-			]);
+			const loadCounts = loadGradeCounts(vals.flatMap(r => r.loadMeasurements || []));
+			sheet.addRow([file, ...VISUAL_STATUSES.map(s => counts[s]), VISUAL_STATUSES.reduce((t, s) => t + counts[s], 0), ...(loadEnabled ? [loadCounts.pass, loadCounts.warning, loadCounts.fail] : [])]);
 		}
 		styleHeader(sheet);
 		sheet.columns = [{ width: 32 }, ...Array.from({ length: loadEnabled ? 9 : 6 }, () => ({ width: 14 }))];
@@ -125,13 +120,13 @@ export const writeSpreadsheet = async (file: string, run: ReportRun): Promise<vo
 	for (const fileName of orderedFiles(run)) {
 		const base =
 			[...fileName]
-				.map((c) => ('\\/:*?[]'.includes(c) ? '_' : c))
+				.map(c => ('\\/:*?[]'.includes(c) ? '_' : c))
 				.join('')
 				.replace(/^'+|'+$/g, '')
 				.slice(0, 31) || 'Results';
 		let sheetName = base;
 		let suffix = 2;
-		while (new Set([...book.worksheets.map((s) => s.name.toLowerCase()), ...['summary', 'projects', 'run diagnostics']]).has(sheetName.toLowerCase())) {
+		while (new Set([...book.worksheets.map(s => s.name.toLowerCase()), ...['summary', 'projects', 'run diagnostics']]).has(sheetName.toLowerCase())) {
 			const label = ` (${suffix})`;
 			suffix += 1;
 			sheetName = `${base.slice(0, 31 - label.length)}${label}`;
@@ -245,8 +240,8 @@ export const writeSpreadsheet = async (file: string, run: ReportRun): Promise<vo
 		const sheet = book.addWorksheet('Projects');
 		sheet.addRow(['Project', 'Configured files', 'Passed', 'Failed', 'Timed out', 'Skipped', 'Interrupted', 'Total']);
 		for (const project of run.projects) {
-			const counts = statusCounts(run.results.filter((r) => r.project === project.name));
-			sheet.addRow([project.name, project.configuredFiles.join(', '), ...VISUAL_STATUSES.map((s) => counts[s]), VISUAL_STATUSES.reduce((t, s) => t + counts[s], 0)]);
+			const counts = statusCounts(run.results.filter(r => r.project === project.name));
+			sheet.addRow([project.name, project.configuredFiles.join(', '), ...VISUAL_STATUSES.map(s => counts[s]), VISUAL_STATUSES.reduce((t, s) => t + counts[s], 0)]);
 		}
 		sheet.columns = [{ width: 30 }, { width: 48 }, ...Array.from({ length: 6 }, () => ({ width: 14 }))];
 		styleHeader(sheet);
@@ -265,54 +260,55 @@ export const writeSpreadsheet = async (file: string, run: ReportRun): Promise<vo
 	await book.xlsx.writeFile(file);
 	await neutralizeApplicationMetadata(file);
 };
-/** A report workbook and its repository label for an aggregate evidence workbook. */
+/**
+ * A report workbook and its repository label for an aggregate evidence workbook.
+ */
 export type SpreadsheetSource = { label: string; file: string };
 
 // AGGREGATE WORKBOOK
 /**
  * Copies tabular content, cell styling, merges, and embedded images into one named worksheet.
  *
- * @param source Worksheet whose cells, formatting, merges, and images are copied.
- * @param target Empty destination worksheet receiving the copied content.
- * @param sourceBook Workbook that owns image references in the source worksheet.
- * @param targetBook Workbook that receives cloned image references.
+ * @param src Worksheet whose cells, formatting, merges, and images are copied.
+ * @param tgt Empty destination worksheet receiving the copied content.
+ * @param srcBook Workbook that owns image references in the source worksheet.
+ * @param tgtBook Workbook that receives cloned image references.
  */
-const copyWorksheet = (source: ExcelJS.Worksheet, target: ExcelJS.Worksheet, sourceBook: ExcelJS.Workbook, targetBook: ExcelJS.Workbook): void => {
-	target.properties = structuredClone(source.properties);
-	target.views = structuredClone(source.views);
-	target.pageSetup = structuredClone(source.pageSetup);
-	target.headerFooter = structuredClone(source.headerFooter);
-	target.state = source.state;
-	target.columns = source.columns.map((c) => ({ width: c.width, hidden: c.hidden, outlineLevel: c.outlineLevel, style: structuredClone(c.style), header: structuredClone(c.header), key: c.key }));
-	source.eachRow({ includeEmpty: true }, (r, v) => {
-		const targetRow = target.getRow(v);
-		targetRow.height = r.height;
-		targetRow.hidden = r.hidden;
-		targetRow.outlineLevel = r.outlineLevel;
+const copyWorksheet = (src: ExcelJS.Worksheet, tgt: ExcelJS.Worksheet, srcBook: ExcelJS.Workbook, tgtBook: ExcelJS.Workbook): void => {
+	tgt.properties = structuredClone(src.properties);
+	tgt.views = structuredClone(src.views);
+	tgt.pageSetup = structuredClone(src.pageSetup);
+	tgt.headerFooter = structuredClone(src.headerFooter);
+	tgt.state = src.state;
+	tgt.columns = src.columns.map(c => ({ width: c.width, hidden: c.hidden, outlineLevel: c.outlineLevel, style: structuredClone(c.style), header: structuredClone(c.header), key: c.key }));
+	src.eachRow({ includeEmpty: true }, (r, v) => {
+		const tgtRow = tgt.getRow(v);
+		tgtRow.height = r.height;
+		tgtRow.hidden = r.hidden;
+		tgtRow.outlineLevel = r.outlineLevel;
 		r.eachCell({ includeEmpty: true }, (cell, colNumber) => {
-			const targetCell = targetRow.getCell(colNumber);
-			targetCell.value = structuredClone(cell.value);
-			targetCell.style = structuredClone(cell.style);
-			if (cell.note) targetCell.note = structuredClone(cell.note);
-			if (cell.dataValidation) targetCell.dataValidation = structuredClone(cell.dataValidation);
+			const tgtCell = tgtRow.getCell(colNumber);
+			tgtCell.value = structuredClone(cell.value);
+			tgtCell.style = structuredClone(cell.style);
+			if (cell.note) tgtCell.note = structuredClone(cell.note);
+			if (cell.dataValidation) tgtCell.dataValidation = structuredClone(cell.dataValidation);
 		});
 	});
-	for (const range of source.model.merges || []) target.mergeCells(range);
-	for (const { imageId: imgId, range } of source.getImages()) {
-		const img = sourceBook.getImage(Number(imgId));
-		target.addImage(targetBook.addImage(img), structuredClone(range));
+	for (const range of src.model.merges || []) tgt.mergeCells(range);
+	for (const { imageId: imgId, range } of src.getImages()) {
+		tgt.addImage(tgtBook.addImage(srcBook.getImage(Number(imgId))), structuredClone(range));
 	}
 };
 /**
  * Combines per-repository Reporting workbooks into an all-tests workbook.
  *
  * @param file Output path for the aggregate workbook.
- * @param sources Repository labels and source report.xlsx paths.
+ * @param srcs Repository labels and source report.xlsx paths.
  *
  * @return A promise that resolves after summaries, detailed rows, and screenshot images are copied.
  */
-export const mergeSpreadsheets = async (file: string, sources: readonly SpreadsheetSource[]): Promise<void> => {
-	if (!sources.length) throw new Error('At least one Reporting workbook is required to create an aggregate spreadsheet.');
+export const mergeSpreadsheets = async (file: string, srcs: readonly SpreadsheetSource[]): Promise<void> => {
+	if (!srcs.length) throw new Error('At least one Reporting workbook is required to create an aggregate spreadsheet.');
 	const aggregate = new ExcelJS.Workbook();
 	aggregate.creator = 'Test evidence reporter';
 	aggregate.lastModifiedBy = 'Test evidence reporter';
@@ -322,30 +318,31 @@ export const mergeSpreadsheets = async (file: string, sources: readonly Spreadsh
 	const summary = aggregate.addWorksheet('All tests');
 	let summaryHeader: ExcelJS.CellValue[] | undefined;
 	const usedSheetNames = new Set(['all tests']);
-	for (const { label, file: sourceFile } of sources) {
-		const sourceBook = new ExcelJS.Workbook();
-		await sourceBook.xlsx.readFile(sourceFile);
-		const sourceSummary = sourceBook.getWorksheet('Summary');
-		if (!sourceSummary) throw new Error(`Reporting workbook has no Summary worksheet: ${sourceFile}`);
-		const header = valuesForRow(sourceSummary.getRow(1)) as ExcelJS.CellValue[];
+	for (const { label, file: srcFile } of srcs) {
+		const srcBook = new ExcelJS.Workbook();
+		await srcBook.xlsx.readFile(srcFile);
+		const srcSummary = srcBook.getWorksheet('Summary');
+		if (!srcSummary) throw new Error(`Reporting workbook has no Summary worksheet: ${srcFile}`);
+		const header = valuesForRow(srcSummary.getRow(1)) as ExcelJS.CellValue[];
 		if (!summaryHeader) {
 			summaryHeader = ['Repository', ...header];
 			summary.addRow(summaryHeader);
 		} else if (header.length !== summaryHeader.length - 1 || header.some((v, i) => v !== summaryHeader?.[i + 1])) {
-			throw new Error(`Reporting workbook Summary columns do not match the aggregate contract: ${sourceFile}`);
+			throw new Error(`Reporting workbook Summary columns do not match the aggregate contract: ${srcFile}`);
 		}
-		for (let rowNumber = 2; rowNumber <= sourceSummary.rowCount; rowNumber++) {
-			const row = sourceSummary.getRow(rowNumber);
+		for (let rowNum = 2; rowNum <= srcSummary.rowCount; rowNum++) {
+			const row = srcSummary.getRow(rowNum);
 			if (!row.hasValues) continue;
+			// hygiene-ignore single-use -- Keep this new row so each copied cell style targets the same aggregate row.
 			const aggregateRow = summary.addRow([label, ...valuesForRow(row)]);
 			row.eachCell({ includeEmpty: true }, (s, c) => {
 				aggregateRow.getCell(c + 1).style = structuredClone(s.style);
 			});
 		}
-		for (const sourceSheet of sourceBook.worksheets) {
-			if (sourceSheet.name === 'Summary') continue;
+		for (const srcSheet of srcBook.worksheets) {
+			if (srcSheet.name === 'Summary') continue;
 			const base =
-				`${label} ${sourceSheet.name}`
+				`${label} ${srcSheet.name}`
 					.replace(/[\\/*?:[\]]/gu, '_')
 					.replace(/^'+|'+$/gu, '')
 					.slice(0, 31) || 'Results';
@@ -356,7 +353,7 @@ export const mergeSpreadsheets = async (file: string, sources: readonly Spreadsh
 				sheetName = `${base.slice(0, 31 - postfix.length)}${postfix}`;
 			}
 			usedSheetNames.add(sheetName.toLowerCase());
-			copyWorksheet(sourceSheet, aggregate.addWorksheet(sheetName), sourceBook, aggregate);
+			copyWorksheet(srcSheet, aggregate.addWorksheet(sheetName), srcBook, aggregate);
 		}
 	}
 	if (!summaryHeader) throw new Error('No summary rows were available in the Reporting workbooks.');

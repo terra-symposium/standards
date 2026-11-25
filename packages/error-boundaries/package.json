@@ -1,6 +1,6 @@
 {
-	"name": "@terra-symposium/standards-error-boundaries",
-	"version": "0.1.2",
+	"name": "@terra-symposium/boundaries",
+	"version": "0.2.3",
 	"description": "Framework-neutral React error boundaries for Terra Symposium applications",
 	"type": "module",
 	"main": "./dist/index.js",
@@ -18,6 +18,7 @@
 		"./react": "./dist/components/react.js",
 		"./astro": "./dist/lib/astro.js",
 		"./astro-integration": "./dist/lib/astro-integration.js",
+		"./report": "./dist/lib/report.js",
 		"./astro-boundary": "./dist/components/AstroErrorBoundary.astro",
 		"./next": "./dist/lib/next.js"
 	},
@@ -25,8 +26,10 @@
 		"dist"
 	],
 	"scripts": {
+		"quality": "node \"$(git rev-parse --show-toplevel)/scripts/quality-runner.mjs\" quality",
+		"quality:all": "node \"$(git rev-parse --show-toplevel)/scripts/quality-runner.mjs\" quality --all",
 		"build": "tsc -p config/tsconfig.json && mkdir -p dist/components && cp src/components/AstroErrorBoundary.astro dist/components/AstroErrorBoundary.astro",
-		"test": "npm run build && node --test test/*.test.mjs",
+		"test": "npm run build && mkdir -p tests/results && node --test --test-reporter=spec --test-reporter-destination=stdout --test-reporter=junit --test-reporter-destination=tests/results/junit.xml tests/*.test.mjs",
 		"prepare": "npm run build",
 		"typecheck": "tsc --noEmit -p config/tsconfig.json"
 	},

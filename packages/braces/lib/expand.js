@@ -20,7 +20,7 @@ const append = (queue = '', stash = '', enclose = false) => {
 	queue = [].concat(queue);
 	stash = [].concat(stash);
 	if (!stash.length) return queue;
-	if (!queue.length) return enclose ? flatten(stash).map((ele) => `{${ele}}`) : stash;
+	if (!queue.length) return enclose ? flatten(stash).map(ele => `{${ele}}`) : stash;
 	for (const item of queue) {
 		if (Array.isArray(item)) {
 			for (const value of item) {

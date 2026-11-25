@@ -33,8 +33,9 @@ const isInside = (root, path) => {
 HELPERS
 //////////////////////////////////////////////////*/
 
+// hygiene-ignore single-use -- Keep the documented listTestFiles declaration so its parameter and return contract remains attached.
 /**
- * Recursively lists source files under test directories and test-named files.
+ * Recursively lists source files under tests directories and test-named files.
  *
  * @param root Directory to search for workspace tests.
  *
@@ -42,16 +43,18 @@ HELPERS
  */
 function listTestFiles(root) {
 	const files = [];
-	const visit = (dir) => {
+	const visit = dir => {
 		for (const entry of readdirSync(dir, { withFileTypes: true })) {
-			if (entry.name === 'node_modules' || entry.name === '.git') continue;
+			if (entry.name === 'node_modules' || entry.name === '.git' || entry.name === 'dist') continue;
 			const path = resolve(dir, entry.name);
-			if (entry.isDirectory()) visit(path);
-			else if (
-				entry.isFile() &&
-				((/(^|\/)(test|tests)\//u.test(relative(root, path).replaceAll('\\', '/')) && /\.[cm]?[jt]sx?$/u.test(entry.name)) || /\.(?:test|spec)\.[cm]?[jt]sx?$/u.test(entry.name))
-			)
-				files.push(relative(root, path).replaceAll('\\', '/'));
+			const child = relative(root, path).replaceAll('\\', '/');
+			if (entry.isDirectory()) {
+				if (entry.name === 'test' && child !== '.agents/skills/test' && !existsSync(resolve(path, 'SKILL.md')))
+					throw new Error(`Legacy test directory ${child}; move it to tests/ and update its generator.`);
+				visit(path);
+			} else if (entry.isFile() && ((/(^|\/)tests\//u.test(child) && /\.[cm]?[jt]sx?$/u.test(entry.name)) || /\.(?:test|spec)\.[cm]?[jt]sx?$/u.test(entry.name))) {
+				files.push(child);
+			}
 		}
 	};
 	visit(root);
@@ -66,7 +69,7 @@ function listTestFiles(root) {
  * @return A regular expression that matches the complete normalized path.
  */
 function globRegex(pattern) {
-	let source = '^';
+	let src = '^';
 	for (let i = 0; i < pattern.length; i++) {
 		const char = pattern[i];
 		if (char === '*') {
@@ -74,15 +77,16 @@ function globRegex(pattern) {
 				i++;
 				if (pattern[i + 1] === '/') {
 					i++;
-					source += '(?:.*/)?';
-				} else source += '.*';
-			} else source += '[^/]*';
-		} else if (char === '?') source += '[^/]';
-		else source += char.replace(/[|\\{}()[\]^$+?.]/gu, '\\$&');
+					src += '(?:.*/)?';
+				} else src += '.*';
+			} else src += '[^/]*';
+		} else if (char === '?') src += '[^/]';
+		else src += char.replace(/[|\\{}()[\]^$+?.]/gu, '\\$&');
 	}
-	return new RegExp(`${source}$`, 'u');
+	return new RegExp(`${src}$`, 'u');
 }
 
+// hygiene-ignore single-use -- Keep the documented runLinearHistory declaration so its parameter and return contract remains attached.
 /**
  * Checks the current GitHub event range against the shared linear-history policy.
  *
@@ -107,9 +111,9 @@ function runLinearHistory(root) {
 	let base;
 	let head;
 	if (eventName === 'pull_request') {
-		const targetBranch = event.pull_request?.base?.ref;
-		if (!['development', 'main'].includes(targetBranch)) {
-			console.log(`[SKIP] shared:linear-history (PR targets ${targetBranch ?? 'an unknown branch'})`);
+		const tgtBranch = event.pull_request?.base?.ref;
+		if (!['development', 'main'].includes(tgtBranch)) {
+			console.log(`[SKIP] shared:linear-history (PR targets ${tgtBranch ?? 'an unknown branch'})`);
 			return 'skipped';
 		}
 		base = event.pull_request?.base?.sha;
@@ -175,16 +179,23 @@ export function readTestPlan(root, manifestPath = defaultManifestPath(root)) {
 	return plan;
 }
 
+// hygiene-ignore single-use -- Keep the documented defaultManifestPath declaration so its parameter and return contract remains attached.
 /**
  * Prefer the centralized config location while retaining compatibility with existing consumers.
+ *
  * @param {string} root Repository root.
+ *
  * @return {string} Repository-relative manifest path.
  */
 function defaultManifestPath(root) {
 	const absoluteRoot = resolve(root);
+	if (existsSync(resolve(absoluteRoot, 'config/tests.json'))) return 'config/tests.json';
 	if (existsSync(resolve(absoluteRoot, 'config/terra-tests.json'))) return 'config/terra-tests.json';
+	if (existsSync(resolve(absoluteRoot, 'tests/tests.json'))) return 'tests/tests.json';
 	if (existsSync(resolve(absoluteRoot, 'tests/terra-tests.json'))) return 'tests/terra-tests.json';
-	return '.terra-tests.json';
+	if (existsSync(resolve(absoluteRoot, '.tests.json'))) return '.tests.json';
+	if (existsSync(resolve(absoluteRoot, '.terra-tests.json'))) return '.terra-tests.json';
+	return '.tests.json';
 }
 
 /**
@@ -211,29 +222,27 @@ export function validateTestPlan(value, root) {
 		if (names.has(suite.name)) throw new Error(`Duplicate test suite name: ${suite.name}`);
 		names.add(suite.name);
 		if (typeof suite.command !== 'string' || suite.command.trim() === '') throw new Error(`Test suite ${suite.name} must name a command.`);
-		if (suite.args !== undefined && (!Array.isArray(suite.args) || suite.args.some((arg) => typeof arg !== 'string'))) throw new Error(`Test suite ${suite.name} args must be strings.`);
-		const args = /** @type {string[]} */ (suite.args ?? []);
-		const cwd = typeof suite.cwd === 'string' ? suite.cwd : '.';
-		const absoluteCwd = resolve(root, cwd);
+		if (suite.args !== undefined && (!Array.isArray(suite.args) || suite.args.some(arg => typeof arg !== 'string'))) throw new Error(`Test suite ${suite.name} args must be strings.`);
+		const absoluteCwd = resolve(root, typeof suite.cwd === 'string' ? suite.cwd : '.');
 		if (!isInside(resolve(root), absoluteCwd)) throw new Error(`Test suite ${suite.name} working directory must be inside the repository.`);
-		const cmdKey = JSON.stringify([suite.command, args, relative(resolve(root), absoluteCwd)]);
+		const cmdKey = JSON.stringify([suite.command, /** @type {string[]} */ (suite.args ?? []), relative(resolve(root), absoluteCwd)]);
 		if (cmds.has(cmdKey)) throw new Error(`Duplicate test command in suite ${suite.name}; each command must run once.`);
 		cmds.add(cmdKey);
-		if (!Array.isArray(suite.owns) || suite.owns.some((owner) => typeof owner !== 'string' || owner.trim() === ''))
+		if (!Array.isArray(suite.owns) || suite.owns.some(owner => typeof owner !== 'string' || owner.trim() === ''))
 			throw new Error(`Test suite ${suite.name} owns must be a list of non-empty repository-relative file globs.`);
 		for (const owner of /** @type {string[]} */ (suite.owns ?? [])) {
 			const norm = owner.replaceAll('\\', '/').replace(/\/+$/u, '');
 			if (!norm || isAbsolute(norm) || norm === '..' || norm.startsWith('../') || norm.split('/').includes('..')) throw new Error(`Test suite ${suite.name} has an invalid owner: ${owner}`);
 			if (owners.has(norm)) throw new Error(`Test ownership overlaps: ${norm} is claimed by ${owners.get(norm)} and ${suite.name}.`);
 			owners.set(norm, suite.name);
-			for (const file of testFiles.filter((path) => globRegex(norm).test(path))) {
-				const previous = ownedFiles.get(file);
-				if (previous) throw new Error(`Test file ownership overlaps: ${file} is claimed by ${previous} and ${suite.name}.`);
+			for (const file of testFiles.filter(path => globRegex(norm).test(path))) {
+				const prev = ownedFiles.get(file);
+				if (prev) throw new Error(`Test file ownership overlaps: ${file} is claimed by ${prev} and ${suite.name}.`);
 				ownedFiles.set(file, suite.name);
 			}
 		}
 	}
-	const omitted = testFiles.filter((file) => !ownedFiles.has(file));
+	const omitted = testFiles.filter(file => !ownedFiles.has(file));
 	if (omitted.length) throw new Error(`Test files are not owned by any suite: ${omitted.join(', ')}`);
 }
 
@@ -250,9 +259,9 @@ export function validateTestPlan(value, root) {
 export function runTestPlan({ root, manifest, suites: requested = [], sharedOnly = false }) {
 	const absoluteRoot = resolve(root);
 	const allSuites = /** @type {Array<{name: string, command: string, args?: string[], cwd?: string}>} */ ((sharedOnly ? emptyTestPlan : readTestPlan(absoluteRoot, manifest)).suites);
-	const selected = sharedOnly ? [] : requested.length ? allSuites.filter((suite) => requested.includes(suite.name)) : allSuites;
-	const known = new Set(allSuites.map((suite) => suite.name));
-	const unknown = requested.filter((name) => !known.has(name));
+	const selected = sharedOnly ? [] : requested.length ? allSuites.filter(suite => requested.includes(suite.name)) : allSuites;
+	const known = new Set(allSuites.map(suite => suite.name));
+	const unknown = requested.filter(name => !known.has(name));
 	if (unknown.length) throw new Error(`Unknown test suite${unknown.length === 1 ? '' : 's'}: ${unknown.join(', ')}`);
 	let passed = 0;
 	let failed = 0;

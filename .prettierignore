@@ -1,0 +1,4 @@
+.agents/skills/
+
+# Keep authored CSS outside Prettier.
+**/*.css

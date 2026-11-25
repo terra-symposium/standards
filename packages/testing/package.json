@@ -1,6 +1,6 @@
 {
-	"name": "@terra-symposium/standards-testing",
-	"version": "0.1.0",
+	"name": "@terra-symposium/testing",
+	"version": "0.3.2",
 	"description": "Standards-owned shared CI checks and manifest-driven test execution for Terra repositories",
 	"license": "Apache-2.0",
 	"type": "module",
@@ -13,7 +13,7 @@
 		}
 	},
 	"bin": {
-		"terra-test": "./src/cli.mjs"
+		"test-runner": "./src/cli.mjs"
 	},
 	"files": [
 		"src",
@@ -32,7 +32,9 @@
 		"url": "git+https://github.com/Terra-Symposium/standards.git"
 	},
 	"scripts": {
+		"quality": "node \"$(git rev-parse --show-toplevel)/scripts/quality-runner.mjs\" quality",
+		"quality:all": "node \"$(git rev-parse --show-toplevel)/scripts/quality-runner.mjs\" quality --all",
 		"build": "node --check src/index.mjs && node --check src/cli.mjs",
-		"test": "node --test test/*.test.mjs"
+		"test": "mkdir -p tests/results && node --test --test-reporter=spec --test-reporter-destination=stdout --test-reporter=junit --test-reporter-destination=tests/results/junit.xml tests/*.test.mjs"
 	}
 }

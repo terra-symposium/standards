@@ -1,0 +1,478 @@
+# @terra-symposium/hygiene
+
+## 2.5.8
+
+### Patch Changes
+
+- Recognize documentation on nested type and object members without reporting it as detached.
+- Allow inline JSDoc `@type` annotations used for casts and parameters.
+
+## 2.5.7
+
+### Patch Changes
+
+- Require separated, ordered TSDoc descriptions, parameter tags, and return tags when multiline TSDoc is enabled.
+- Accept documented `props` rest bindings and report stale `props` tags.
+- Ignore comment-shaped text inside string literals while scanning TSDoc.
+
+## 2.5.6
+
+### Patch Changes
+
+- Enforce the established `target` and `targets` abbreviations in source naming checks.
+
+## 2.5.4
+
+### Patch Changes
+
+- Resolve package imports from absolute source paths and support packages with a style-only export.
+
+## 2.5.3
+
+### Patch Changes
+
+- Resolve installed package asset exports and CSS entrypoints in import checks.
+
+## 2.5.2
+
+### Patch Changes
+
+- Recognize generated regex registries whose marker follows a single file documentation prelude.
+
+## 2.5.1
+
+### Patch Changes
+
+- Validate the complete `IMPORTS` section in JavaScript, TypeScript, and Astro frontmatter, including section placement, duplicate and empty headings, and module directives before imports.
+
+## 2.5.0
+
+### Minor Changes
+
+- Include staged files in default checks and support an opt-in `IMPORTS` heading requirement for JavaScript and TypeScript documentation.
+
+## 2.4.3
+
+### Patch Changes
+
+- Use the published error-boundaries dependency range so consumers can install the new naming rules outside the Standards workspace.
+
+## 2.4.2
+
+### Patch Changes
+
+- Shorten common identifier words, including `sourcePath` to `srcPath` and `destinationPath` to `destPath`, while retaining syntax-aware rename safeguards.
+
+## 2.4.1
+
+### Patch Changes
+
+- Replace the published package README with the concise Quality setup, usage, validation, and contribution guide.
+
+## 2.4.0
+
+### Minor Changes
+
+- Audit C function documentation from Clang's AST, including declaration parameters, return contracts, and configurable author ownership.
+- Consolidate Quality capabilities under one package with named subpath exports and publish the separate runtime, reporting, and testing packages under one-word names.
+- Keep Knip's project scan aligned with Quality's shared source classifier, map imported dependencies to their declaring package manifest through a temporary overlay, account for configured tools, and resolve nested package executables before changing the working directory.
+- Support reasoned inline markers for review-only single-use boundaries, report stale or malformed markers, avoid recommending that inline test regexes move to the shared runtime registry, and keep transitive generated files outside single-use source scope.
+- Add configurable test, page, and operation timing budgets to shared Playwright evidence reporting and expose the settings through `quality.json`.
+
+### Patch Changes
+
+- Fix the published error-boundary dependency range for clean consumer installs.
+- Keep generated-header files out of formatting and lint checks while continuing to check authored source files.
+- Keep comment and TSDoc diagnostics read-only, resolve the ESLint progress module through the package dependency graph, and restrict callback shortening to explicit aliases.
+- Keep regex deduplication free of generated comment prose, preserve authored TSDoc when applying safe single-use fixes, and retain explicit annotations when inlining could change overload or generic call resolution.
+- Treat Rust `target` directories as generated output during root-wide quality discovery and workspace scanning.
+- Ignore inherited Object prototype properties when resolving identifier replacement words.
+- Updated dependencies
+- Updated dependencies
+  - @terra-symposium/boundaries@0.2.0
+
+## 2.3.7
+
+### Patch Changes
+
+- 5bc2ec1: Keep shared regex exports referenced outside changed-file source roots during safe autofix.
+- Updated dependencies [5bc2ec1]
+  - @terra-symposium/standards-patterns@0.2.3
+
+## 2.3.6
+
+### Patch Changes
+
+- fd7c500: Preserve shared regex exports used by unchanged source files when Quality fixes a changed-file scope.
+- Updated dependencies [fd7c500]
+  - @terra-symposium/standards-patterns@0.2.2
+
+## 2.3.5
+
+### Patch Changes
+
+- 622d20e: Keep a declaration-specific single-use comment valid when a package-only scan has no local consumer of an exported declaration and the repository scan checks its external consumer.
+- Updated dependencies [622d20e]
+  - @terra-symposium/standards-refactoring@0.2.4
+
+## 2.3.4
+
+### Patch Changes
+
+- 62bfc19: Keep a reasoned, declaration-local single-use marker valid when a repository-wide scan sees additional consumers in another module. Package scans still enforce the marker for a sole consumer, and malformed, detached, duplicate, or genuinely stale markers remain errors.
+- Updated dependencies [62bfc19]
+  - @terra-symposium/standards-refactoring@0.2.3
+
+## 2.3.3
+
+### Patch Changes
+
+- Updated dependencies
+  - @terra-symposium/standards-error-boundaries@0.1.3
+  - @terra-symposium/standards-language-checks@0.2.1
+  - @terra-symposium/standards-naming@0.2.1
+  - @terra-symposium/standards-patterns@0.2.1
+  - @terra-symposium/standards-quality-core@0.2.1
+  - @terra-symposium/standards-quality-reports@0.2.1
+  - @terra-symposium/standards-security@0.2.1
+  - @terra-symposium/standards-ui-quality@0.2.1
+  - @terra-symposium/standards-documentation@0.2.2
+  - @terra-symposium/standards-formatting@0.2.3
+  - @terra-symposium/standards-imports@0.2.2
+  - @terra-symposium/standards-refactoring@0.2.2
+
+## 2.3.2
+
+### Patch Changes
+
+- Updated dependencies
+  - @terra-symposium/standards-documentation@0.2.1
+  - @terra-symposium/standards-formatting@0.2.2
+  - @terra-symposium/standards-imports@0.2.1
+
+## 2.3.1
+
+### Patch Changes
+
+- 8e9ae0e: Resolve Knip's working directory from flat configuration entry paths when the configuration file is nested under `config/`. This keeps repository source files and their dependencies in the same Knip workspace.
+
+## 2.3.0
+
+### Minor Changes
+
+- 6cdc7c1: Add explicit `configRoot` support for discovering centralized ESLint, Prettier, Knip, and TypeScript configuration while keeping source paths and subprocesses rooted at the repository.
+
+### Patch Changes
+
+- 51eac04: Discover ESLint flat configs from `config/` after all conventional root config filenames.
+- c35b7f2: Discover quality configuration and tool configs from the repository config directory.
+- 38157d8: Prevent overlapping Quality fix runs and restore files if an autofix introduces syntax errors. Reject token-changing object layout rewrites. Support reasoned, declaration-specific single-use exceptions.
+- c435ddf: Discover `config/tsconfig.json` when a repository has no root TypeScript project config.
+- 62b2b08: Order test suites by scope, preserve recommendation command exit codes, and clarify malformed ESLint report errors.
+- Updated dependencies [38157d8]
+  - @terra-symposium/standards-formatting@0.2.1
+  - @terra-symposium/standards-refactoring@0.2.1
+
+## 2.2.0
+
+### Minor Changes
+
+- Publish quality checks by capability family while keeping the aggregate CLI and compatibility exports.
+
+### Patch Changes
+
+- Updated dependencies
+  - @terra-symposium/standards-quality-core@0.2.0
+  - @terra-symposium/standards-documentation@0.2.0
+  - @terra-symposium/standards-formatting@0.2.0
+  - @terra-symposium/standards-imports@0.2.0
+  - @terra-symposium/standards-naming@0.2.0
+  - @terra-symposium/standards-refactoring@0.2.0
+  - @terra-symposium/standards-security@0.2.0
+  - @terra-symposium/standards-ui-quality@0.2.0
+  - @terra-symposium/standards-patterns@0.2.0
+  - @terra-symposium/standards-language-checks@0.2.0
+  - @terra-symposium/standards-quality-reports@0.2.0
+
+## 2.1.2
+
+### Patch Changes
+
+- Publish the error-boundaries package as a normal semver dependency instead of leaking the workspace protocol into the npm package.
+
+## 2.1.1
+
+### Patch Changes
+
+- Make React application root boundaries mandatory and automatically wrap unguarded JSX and JavaScript roots during Quality fixes.
+- Export the shared React boundary through the Quality package so consumers need only depend on `@terra-symposium/standards-quality`.
+- Run focused commands such as `error-boundaries` without incorrectly applying the full Quality lint-config preflight.
+
+## 2.1.0
+
+### Minor Changes
+
+- Add the `terra-quality-dev` launcher so repositories share Quality's port acquisition and dev-server startup behavior.
+
+## 2.0.8
+
+### Patch Changes
+
+- Autofix arbitrary length utilities to Tailwind spacing utilities when the generated declarations match.
+
+## 2.0.7
+
+### Patch Changes
+
+- Load Tailwind v4 design systems through Tailwind's Node runtime so canonical checks can read legacy configuration and plugin modules.
+
+## 2.0.6
+
+### Patch Changes
+
+- Animate quality check spinners during synchronous work and print each check's findings immediately under its result.
+
+## 2.0.5
+
+### Patch Changes
+
+- Show each quality check as it starts and finishes, and continue the full run after individual checks fail so all errors are reported together.
+
+## 2.0.4
+
+### Patch Changes
+
+- Show each configured quality check before it runs and report its result afterward.
+
+## 2.0.3
+
+### Patch Changes
+
+- Run full ESLint and Prettier file sets in one invocation when they fit the argument limit, avoiding repeated project and file discovery.
+
+## 2.0.2
+
+### Patch Changes
+
+- Disable ESLint's internal concurrency after its runtime reported a lower linting ratio. Keep the reused ESLint engine and file batches, which measured faster for the website's full check without changing findings.
+
+## 2.0.1
+
+### Patch Changes
+
+- Honor configured source exclusions, group full-run diagnostics after completed progress, and reuse a bounded ESLint engine to reduce quality-run overhead.
+
+## 2.0.0
+
+### Major Changes
+
+- acdba7a: Treat every quality finding as an error and remove non-blocking warning policies.
+
+### Patch Changes
+
+- Wait for each test suite's progress to finish before printing its output, and group all quality findings at the end of the run.
+
+## 1.0.0
+
+### Major Changes
+
+- Remove repository-specific source exclusion settings so configured source roots are scanned consistently. Update consumer `quality.json` files that use removed exclusion fields.
+
+## 0.10.0
+
+### Minor Changes
+
+- 7e75525: Add safe JSX accessible-name and React forwardRef display-name checks and autofixes.
+
+## 0.9.1
+
+### Patch Changes
+
+- Scan Astro templates and recommend canonical ButtonLink variants for styled text links.
+- Include inferred ButtonLink variants in recommendation output.
+
+## 0.9.0
+
+### Minor Changes
+
+- Add an advisory scan for native UI controls that have configured shared component equivalents.
+
+## 0.8.1
+
+### Patch Changes
+
+- Standardize full quality phases and test progress, group dead-code output, and remove duplicate test declarations.
+
+## 0.8.0
+
+### Minor Changes
+
+- Fail quality by default when dead-code findings require manual review, with an opt-in warning policy and clear one-by-one remediation guidance.
+
+### Patch Changes
+
+- Preserve transitive alias chains when identifying removable declarations.
+
+## 0.7.0
+
+### Minor Changes
+
+- Treat manual dead-code findings as errors by default, with a configuration option to report them as warnings. Complete all configured checks before failing and give agents actionable fix-before-commit guidance.
+
+## 0.6.0
+
+### Minor Changes
+
+- Add a Tailwind canonical-class check and autofix for arbitrary CSS variable utilities.
+- 10a5480: Add read-only GitHub analytics and agent-ready remediation guidance to quality reports.
+
+### Patch Changes
+
+- ea70e9d: Run dead-code ESLint detection in one focused sweep and recheck only changed files when safe removals expose cascaded unused declarations.
+
+## 0.5.0
+
+### Minor Changes
+
+- d8ad7c5: Add versioned quality and local Git history reports for CI hygiene artifacts.
+
+## 0.4.54
+
+### Patch Changes
+
+- Run ESLint in ten-file batches so long full-source checks update progress more frequently.
+- Report missing parameter and return documentation for documented functions whose signatures expose those contracts.
+- Inline all single-use declarations with syntax-checked, context-aware rewrites and support a rule-specific skipped-directory list.
+
+## 0.4.53
+
+### Patch Changes
+
+- 5b9bdd8: Run read-only dead-code analysis once instead of repeating the full scan in a temporary autofix preview.
+
+## 0.4.52
+
+### Patch Changes
+
+- Fail before quality mutations with an actionable error when a lint-enabled repository is missing an ESLint flat config.
+
+## 0.4.50
+
+### Patch Changes
+
+- Exclude explicitly skipped generated files from dead-code inventory comparisons.
+
+## 0.4.49
+
+### Patch Changes
+
+- Include the repository's shared support modules in read-only dead-code preview copies so ESLint rules can resolve imported source dependencies.
+
+## 0.4.48
+
+### Patch Changes
+
+- Copy TypeScript ESLint configs and their Tailwind preset into read-only dead-code previews so ESLint can load the repository configuration.
+
+## 0.4.47
+
+### Patch Changes
+
+- Run dead-code ESLint in ten-file batches with live progress and explicitly enable the discovered flat config.
+
+## 0.4.46
+
+### Patch Changes
+
+- Pass the repository's discovered flat ESLint config explicitly to dead-code analysis so TypeScript configs are loaded consistently.
+
+## 0.4.45
+
+### Patch Changes
+
+- Set the npm package homepage to https://standards-docs.netlify.app/.
+
+## 0.4.44
+
+### Patch Changes
+
+- Run ESLint in ten-file batches so long full-source checks update progress more frequently.
+
+## 0.4.43
+
+### Patch Changes
+
+- Cache TypeScript module resolution and identifier scans while classifying Knip consumers, and report progress during full-source consumer analysis.
+- Report each dead-code analysis, single-use rewrite pass, and transactional TypeScript safety-check batch so long-running work has visible progress.
+- Report remaining dead-code findings with safe-fix classification and explicit agent remediation guidance; manual-only warnings no longer fail dead-code checks.
+- Never delete unreachable files automatically, avoid broad detached-comment cleanup, and preserve safe fixes in unaffected files when TypeScript validation rejects one file's edits.
+- Consolidate Knip, unused declarations, one-use inlining, and detached TSDoc into one autofixing and read-only dead-code workflow.
+- Validate automatic rewrites against TypeScript diagnostics and roll back only the rejected source file.
+- Make `--warn` preflight the same fixes in an isolated temporary source copy so type-rejected rewrites are manual warnings without mutating the configured repository.
+- Keep Astro frontmatter out of name autofixes; textual replacement could corrupt framework properties and string literals.
+- Keep callback parameters as full words unless the repository's explicit semantic alias map defines a conventional short form.
+
+## 0.4.40
+
+### Patch Changes
+
+- Support safe cross-file regex deduplication through an opt-in shared ESM registry.
+
+## 0.4.39
+
+### Patch Changes
+
+- Make CLI help exit before quality dispatch so help requests cannot run checks or autofixes.
+
+## 0.4.38
+
+### Patch Changes
+
+- Detect TSDoc attached to declarations and scaffold missing parameter and return tags during quality autofix.
+- Report missing TSDoc descriptions with explicit agent-authorship guidance without generating prose.
+
+## 0.4.37
+
+### Patch Changes
+
+- Limit post-inline import and comment maintenance to source files changed by the single-use fixer.
+- Restrict the TypeScript runtime dependency to the supported 5.x API.
+
+## 0.4.36
+
+### Patch Changes
+
+- Normalize imports and remove detached section fragments immediately after single-use fixes, including interrupted one-line fixer output.
+
+## 0.4.35
+
+### Patch Changes
+
+- Expand one-line TSDoc blocks with missing parameter and return scaffolds while preserving existing tag content.
+- Report missing parameter and return documentation for documented functions whose signatures expose those contracts.
+- Inline all single-use declarations with syntax-checked, context-aware rewrites and support a rule-specific skipped-directory list.
+
+## 0.4.33
+
+### Patch Changes
+
+- Add AST-safe automatic fixers for exact object forwarding, repeated class literals, and non-stateful duplicate regular expressions. Reuse one cached analysis context across repository checks and keep unsafe or semantic findings advisory.
+- Shorten parameters for inline callbacks passed to project-specific helper functions.
+- Fix documentation maintenance so prose-only leading file comments receive and preserve their canonical relative filepath header.
+
+## 0.4.1
+
+### Patch Changes
+
+- Exclude generated file-path headers from prose documentation findings while continuing to audit real TSDoc summaries and tags.
+
+## 0.4.0
+
+### Minor Changes
+
+- 26dafc2: Add opt-in protection for canonical one-line imports that exceed the configured Prettier print width.
+- Standardise quality domains around warning, automatic-fix, working-tree, and full-repository modes, including TypeScript-aware naming fixes.
+
+### Patch Changes
+
+- Make quality-stage output readable when stdout and stderr are combined, and ensure the CLI executes correctly when invoked through a symlinked package binary.

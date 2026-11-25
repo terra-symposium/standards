@@ -30,6 +30,7 @@ tests/results/
 
 # Local deployment state
 .netlify
+!docs/.netlify
 
 # Vendored dependencies
 vendor/
@@ -37,3 +38,14 @@ vendor/
 
 # Local error logs
 error.log
+
+# Generated test reports
+**/tests/results/
+
+# Generated cache links
+**/.astro
+**/.ruff_cache
+**/.venv
+
+# Generated agent skills
+/.agents/skills/

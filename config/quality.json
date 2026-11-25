@@ -1,6 +1,5 @@
 {
-	"$schema": "../packages/quality/quality.schema.json",
-	"root": ".",
+	"$schema": "../packages/hygiene/quality.schema.json",
 	"sourceRoots": ["."],
 	"languageProfiles": ["c", "java", "python"],
 	"extensions": [
@@ -36,7 +35,8 @@
 		"eslint": "config/node_modules/.bin/eslint",
 		"knip": "config/node_modules/.bin/knip",
 		"prettier": "config/node_modules/.bin/prettier",
-		"clang": "clang"
+		"clang": "clang",
+		"uv": "uv"
 	},
 	"oneLineImports": true,
 	"renameExports": true,
@@ -49,14 +49,18 @@
 		"repositories": ["salesphere-vh/salesphere", "Terra-Symposium/terra-symposium-website", "Terra-Symposium/standards", "kaimacann/portfolio"],
 		"requiredFeatures": ["dependencyGraph", "dependabotAlerts", "malwareAlerts", "securityUpdates", "versionUpdates", "groupedUpdates"]
 	},
-	"qualityCommands": [],
-	"autofix": { "document": false },
+	"autofix": {
+		"document": false
+	},
 	"documentation": {
 		"commandRoots": ["docs"],
 		"required": {
 			"types": true,
 			"functions": true,
-			"exportedFunctions": true
+			"exportedFunctions": true,
+			"importSection": true,
+			"fileHeader": true,
+			"multilineTsdoc": true
 		}
 	},
 	"performancePatterns": {
@@ -64,7 +68,18 @@
 	},
 	"security": {
 		"clientRoots": ["apps/hygiene/src/components"],
-		"runtimeRoots": ["apps/hygiene/netlify/functions", "apps/hygiene/scripts", "apps/hygiene/src/lib/server", "config", "packages", "scripts"]
+		"runtimeRoots": [
+			".agents/skills/all-repos/scripts",
+			"docs/developer/all-repos/scripts",
+			".agents/skills/quality/scripts",
+			"docs/hygiene/quality/scripts",
+			"apps/hygiene/netlify/functions",
+			"apps/hygiene/scripts",
+			"apps/hygiene/src/lib/server",
+			"config",
+			"packages",
+			"scripts"
+		]
 	},
 	"enabledChecks": {
 		"error-boundaries": true,
@@ -91,6 +106,7 @@
 		"regex-dedup": true,
 		"ui-patterns": true,
 		"ui-recommendations": true,
-		"github": true
-	}
+		"github": false
+	},
+	"skippedDirectories": [".agents/skills"]
 }

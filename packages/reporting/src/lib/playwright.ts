@@ -42,14 +42,18 @@ const A_Z0_9_GI_REGEX = () => /[^a-z0-9_-]/gi;
 TYPES
 //////////////////////////////////////////////////*/
 
-/** Browser diagnostic captured by the reusable page fixture. */
+/**
+ * Browser diagnostic captured by the reusable page fixture.
+ */
 export type BrowserDiagnostic = { level: string; message: string; url?: string };
 
 /*//////////////////////////////////////////////////
 FIXTURES
 //////////////////////////////////////////////////*/
 
-/** Playwright fixture that records browser console, page, and request failures. */
+/**
+ * Playwright fixture that records browser console, page, and request failures.
+ */
 export const diagnosticsTest = base.extend({
 	page: async ({ page: p, context: c }, u, i): Promise<void> => {
 		const diagnostics: BrowserDiagnostic[] = [];
@@ -59,12 +63,12 @@ export const diagnosticsTest = base.extend({
 		 * @param tgt Page whose browser events should be collected for this test.
 		 */
 		const observe = (tgt: typeof p): void => {
-			tgt.on('console', (m) => {
+			tgt.on('console', m => {
 				if (!['error', 'warning'].includes(m.type())) return;
 				diagnostics.push({ level: m.type(), message: m.text(), url: tgt.url() });
 			});
-			tgt.on('pageerror', (e) => diagnostics.push({ level: 'pageerror', message: e.message, url: tgt.url() }));
-			tgt.on('requestfailed', (r) => diagnostics.push({ level: 'requestfailed', message: `${r.method()} ${r.url()} ${r.failure()?.errorText || 'Request failed.'}`, url: r.url() }));
+			tgt.on('pageerror', e => diagnostics.push({ level: 'pageerror', message: e.message, url: tgt.url() }));
+			tgt.on('requestfailed', r => diagnostics.push({ level: 'requestfailed', message: `${r.method()} ${r.url()} ${r.failure()?.errorText || 'Request failed.'}`, url: r.url() }));
 		};
 		observe(p);
 		c.on('page', observe);
@@ -83,11 +87,17 @@ export const diagnosticsTest = base.extend({
 	},
 });
 
-/** Test-local load helpers exposed by the reusable load fixture. */
+/**
+ * Test-local load helpers exposed by the reusable load fixture.
+ */
 export type LoadTestController = {
-	/** Sets a budget override for this test's total elapsed duration. */
+	/**
+	 * Sets a budget override for this test's total elapsed duration.
+	 */
 	setTestBudget: (budget: LoadBudgetOverride) => void;
-	/** Measures a named asynchronous or synchronous operation and preserves its return value. */
+	/**
+	 * Measures a named asynchronous or synchronous operation and preserves its return value.
+	 */
 	measure: <T>(name: string, op: () => T | Promise<T>, budget?: LoadBudgetOverride) => Promise<T>;
 };
 
@@ -114,10 +124,10 @@ export const loadTest = diagnosticsTest.extend<{ load: LoadTestController }>({
 					pending.push(
 						tgt
 							.evaluate(() => {
-								const entry = performance.getEntries().find((i) => String(i.entryType) === 'navigation') as PerformanceNavigationTiming | undefined;
+								const entry = performance.getEntries().find(i => String(i.entryType) === 'navigation') as PerformanceNavigationTiming | undefined;
 								return entry ? { durationMs: entry.duration, pathname: location.pathname } : undefined;
 							})
-							.then((navigation) => {
+							.then(navigation => {
 								if (!navigation || navigation.durationMs <= 0) return;
 								measurements.push({ name: `page load: ${navigation.pathname || '/'}`, kind: 'page', durationMs: navigation.durationMs });
 							})
@@ -129,7 +139,7 @@ export const loadTest = diagnosticsTest.extend<{ load: LoadTestController }>({
 			ctx.on('page', observe);
 			try {
 				await use({
-					setTestBudget: (budget) => {
+					setTestBudget: budget => {
 						testBudget = validateLoadBudgetOverride(budget);
 					},
 					measure: async <T>(name: string, op: () => T | Promise<T>, budget?: LoadBudgetOverride): Promise<T> => {
@@ -137,7 +147,7 @@ export const loadTest = diagnosticsTest.extend<{ load: LoadTestController }>({
 						return timeLoadOperation(
 							name,
 							op,
-							(measurement) => {
+							measurement => {
 								measurements.push(measurement);
 							},
 							budget,
@@ -160,17 +170,27 @@ export const loadTest = diagnosticsTest.extend<{ load: LoadTestController }>({
 	],
 });
 
-/** Screenshot settings accepted by the reusable visual-capture fixture. */
+/**
+ * Screenshot settings accepted by the reusable visual-capture fixture.
+ */
 export type VisualCaptureOptions = {
-	/** Optional label recorded with the capture; it is not printed on screenshot-only slides. */
+	/**
+	 * Optional label recorded with the capture; it is not printed on screenshot-only slides.
+	 */
 	title?: string;
-	/** Playwright screenshot options, excluding the output path owned by the fixture. */
+	/**
+	 * Playwright screenshot options, excluding the output path owned by the fixture.
+	 */
 	screenshot?: Omit<NonNullable<Parameters<Page['screenshot']>[0]>, 'path'>;
 };
 
-/** Captures keyed screenshots and attaches their metadata for cross-viewport reporting. */
+/**
+ * Captures keyed screenshots and attaches their metadata for cross-viewport reporting.
+ */
 export type VisualCaptureController = {
-	/** Captures the current page and associates it with a stable key across projects/viewports. */
+	/**
+	 * Captures the current page and associates it with a stable key across projects/viewports.
+	 */
 	capture: (key: string, options?: VisualCaptureOptions) => Promise<void>;
 };
 
@@ -197,9 +217,8 @@ export const visualTest = loadTest.extend<{ visuals: VisualCaptureController }>(
 					caret: 'hide' as const,
 					...options.screenshot,
 				};
-				const ext = screenshotOptions.type === 'png' ? 'png' : 'jpg';
 				const contentType = screenshotOptions.type === 'png' ? 'image/png' : 'image/jpeg';
-				const screenshotPath = i.outputPath(`${attachmentName}.${ext}`);
+				const screenshotPath = i.outputPath(`${attachmentName}.${screenshotOptions.type === 'png' ? 'png' : 'jpg'}`);
 				await fs.promises.writeFile(screenshotPath, await p.screenshot(screenshotOptions));
 				await i.attach(attachmentName, { path: screenshotPath, contentType });
 				captures.push({ attachmentName, contentType, key: normKey, title: options.title?.trim() || normKey });
@@ -215,24 +234,32 @@ export const visualTest = loadTest.extend<{ visuals: VisualCaptureController }>(
 	},
 });
 
-/** Application-specific paths and catalog settings for the shared reporter. */
+/**
+ * Application-specific paths and catalog settings for the shared reporter.
+ */
 export type ReportingOptions = {
 	featureFiles?: readonly string[];
 	projects?: readonly ProjectDefinition[];
 	viewportCatalog?: ViewportCatalog;
 	outputRoot?: string;
-	/** Folder for durable screenshot captures shared across partial and repeated test runs. */
+	/**
+	 * Folder for durable screenshot captures shared across partial and repeated test runs.
+	 */
 	screenshotsDirectory?: string;
 	reportFile?: string;
 	slideshowFile?: string;
 	supplementalResultsFile?: string;
 	qualityConfigFile?: string;
 	loadTesting?: LoadTestingConfig;
-	/** Write report.pptx using only keyed screenshots, with no text or diagnostic slides. */
+	/**
+	 * Write report.pptx using only keyed screenshots, with no text or diagnostic slides.
+	 */
 	screenshotOnlySlideshow?: boolean;
 };
 
-/** Describes one Playwright attachment supplied to the shared reporter. */
+/**
+ * Describes one Playwright attachment supplied to the shared reporter.
+ */
 type ReporterAttachment = { body?: Buffer; contentType?: string; name?: string; path?: string };
 
 /*//////////////////////////////////////////////////
@@ -292,6 +319,7 @@ const readAttachment = (attachment: ReporterAttachment): string => {
 	return '';
 };
 
+// hygiene-ignore single-use -- Keep the documented diagnosticText declaration so its parameter and return contract remains attached.
 /**
  * Extracts one named JSON diagnostic attachment.
  *
@@ -301,12 +329,13 @@ const readAttachment = (attachment: ReporterAttachment): string => {
  * @return Parsed diagnostic lines from the matching attachment.
  */
 const diagnosticText = (attachments: readonly ReporterAttachment[], name: string): string[] => {
-	const attachment = attachments.find((v) => v.name === name && v.contentType === 'application/json');
+	const attachment = attachments.find(v => v.name === name && v.contentType === 'application/json');
 	const raw = attachment ? readAttachment(attachment) : '';
 	if (!raw) return [];
 	return parseDiagnostics(raw);
 };
 
+// hygiene-ignore single-use -- Keep the documented screenshotAttachment declaration so its parameter and return contract remains attached.
 /**
  * Resolves the path of a captured screenshot attachment.
  *
@@ -315,7 +344,7 @@ const diagnosticText = (attachments: readonly ReporterAttachment[], name: string
  * @return Matching screenshot attachment, or `undefined` when no image attachment exists.
  */
 const screenshotAttachment = (attachments: readonly ReporterAttachment[]): ReporterAttachment | undefined =>
-	attachments.find((v) => ['visual', 'screenshot'].includes(v.name || '') && v.contentType === 'image/png');
+	attachments.find(v => ['visual', 'screenshot'].includes(v.name || '') && v.contentType === 'image/png');
 
 /**
  * Saves one capture under a stable identity so reruns replace it without duplicating the deck.
@@ -328,31 +357,34 @@ const screenshotAttachment = (attachments: readonly ReporterAttachment[]): Repor
 const persistScreenshotCapture = (dir: string, capture: ScreenshotCapture): ScreenshotCapture => {
 	if (!capture.screenshot || !fs.existsSync(capture.screenshot)) return capture;
 	const key = createHash('sha256').update([capture.group, capture.key, capture.viewport].join('\0')).digest('hex');
-	const ext = path.extname(capture.screenshot) || '.png';
-	const screenshot = path.join(dir, `${key}${ext}`);
+	const screenshot = path.join(dir, `${key}${path.extname(capture.screenshot) || '.png'}`);
 	const recordFile = path.join(dir, `${key}.json`);
 	fs.mkdirSync(dir, { recursive: true });
 	if (fs.existsSync(recordFile)) {
 		try {
-			const previous = JSON.parse(fs.readFileSync(recordFile, 'utf8')) as ScreenshotCapture;
-			if (previous.runId === capture.runId && (previous.retry || 0) > (capture.retry || 0)) return { ...previous, screenshot };
+			const prev = JSON.parse(fs.readFileSync(recordFile, 'utf8')) as ScreenshotCapture;
+			if (prev.runId === capture.runId && (prev.retry || 0) > (capture.retry || 0)) return { ...prev, screenshot };
 		} catch {
 			// Replace an incomplete record with the next valid result.
 		}
 	}
-	const temporaryImg = `${screenshot}.${process.pid}.tmp`;
-	fs.copyFileSync(capture.screenshot, temporaryImg);
-	fs.renameSync(temporaryImg, screenshot);
+	const tmpImg = `${screenshot}.${process.pid}.tmp`;
+	fs.copyFileSync(capture.screenshot, tmpImg);
+	fs.renameSync(tmpImg, screenshot);
 	const persisted = { ...capture, screenshot };
-	const temporaryRecord = `${recordFile}.${process.pid}.tmp`;
-	fs.writeFileSync(temporaryRecord, JSON.stringify(persisted));
-	fs.renameSync(temporaryRecord, recordFile);
+	const tmpRecord = `${recordFile}.${process.pid}.tmp`;
+	fs.writeFileSync(tmpRecord, JSON.stringify(persisted));
+	fs.renameSync(tmpRecord, recordFile);
 	return persisted;
 };
 const screenshotRunFile = '.terra-playwright-run.json';
-/** Expected test identity paired with the viewports discovered across one logical run. */
+/**
+ * Expected test identity paired with the viewports discovered across one logical run.
+ */
 type ExpectedScreenshotGroup = { group: string; viewports: string[] };
-/** Latest reporter collection state persisted beside accumulated screenshots. */
+/**
+ * Latest reporter collection state persisted beside accumulated screenshots.
+ */
 type ScreenshotRun = {
 	runId: string;
 	startedAt: string;
@@ -389,8 +421,7 @@ const readScreenshotRun = (dir: string): ScreenshotRun | undefined => {
 						if (!i || typeof i !== 'object') return [];
 						const row = i as Record<string, unknown>;
 						if (typeof row.group !== 'string' || !Array.isArray(row.viewports)) return [];
-						const viewports = row.viewports.filter((viewport): viewport is string => typeof viewport === 'string');
-						return [{ group: row.group, viewports }];
+						return [{ group: row.group, viewports: row.viewports.filter((viewport): viewport is string => typeof viewport === 'string') }];
 					})
 				: undefined,
 			finishedAt: typeof value.finishedAt === 'string' ? value.finishedAt : undefined,
@@ -409,9 +440,9 @@ const readScreenshotRun = (dir: string): ScreenshotRun | undefined => {
 const writeScreenshotRun = (dir: string, run: ScreenshotRun): void => {
 	fs.mkdirSync(dir, { recursive: true });
 	const file = path.join(dir, screenshotRunFile);
-	const temporaryFile = `${file}.${process.pid}.tmp`;
-	fs.writeFileSync(temporaryFile, JSON.stringify(run));
-	fs.renameSync(temporaryFile, file);
+	const tmpFile = `${file}.${process.pid}.tmp`;
+	fs.writeFileSync(tmpFile, JSON.stringify(run));
+	fs.renameSync(tmpFile, file);
 };
 
 /**
@@ -422,7 +453,7 @@ const writeScreenshotRun = (dir: string, run: ScreenshotRun): void => {
  * @return Valid keyed-capture entries from the manifest, or an empty list when it is absent or malformed.
  */
 const visualCaptureManifest = (attachments: readonly ReporterAttachment[]): Array<{ attachmentName: string; contentType: string; key: string; title: string }> => {
-	const attachment = attachments.find((i) => i.name === 'visual-captures' && i.contentType === 'application/json');
+	const attachment = attachments.find(i => i.name === 'visual-captures' && i.contentType === 'application/json');
 	if (!attachment) return [];
 	try {
 		const parsed: unknown = JSON.parse(readAttachment(attachment));
@@ -438,6 +469,7 @@ const visualCaptureManifest = (attachments: readonly ReporterAttachment[]): Arra
 	}
 };
 
+// hygiene-ignore single-use -- Keep the documented loadAttachment declaration so its parameter and return contract remains attached.
 /**
  * Reads timing samples and a test override from the fixture attachment.
  *
@@ -446,10 +478,11 @@ const visualCaptureManifest = (attachments: readonly ReporterAttachment[]): Arra
  * @return Valid timing measurements and optional test budget, or an empty measurement list when the attachment is absent or invalid.
  */
 const loadAttachment = (attachments: readonly ReporterAttachment[]): { measurements: LoadMeasurementInput[]; testBudget?: LoadBudgetOverride } => {
-	const attachment = attachments.find((v) => v.name === 'load-testing' && v.contentType === 'application/json');
+	const attachment = attachments.find(v => v.name === 'load-testing' && v.contentType === 'application/json');
 	if (!attachment) return { measurements: [] };
 	try {
 		const parsed = JSON.parse(readAttachment(attachment)) as Record<string, unknown>;
+		// hygiene-ignore single-use -- Validate each measurement before validating the separate test budget.
 		const measurements = Array.isArray(parsed.measurements)
 			? parsed.measurements.flatMap((v): LoadMeasurementInput[] => {
 					if (!v || typeof v !== 'object') return [];
@@ -487,9 +520,10 @@ const addLoadMeasurements = (
 	cfg: ReturnType<typeof readLoadTestingConfig>,
 ): VisualResult => {
 	if (!cfg.enabled) return result;
+	// hygiene-ignore single-use -- Grade measurements before copying result fields into the returned record.
 	const measurements: LoadMeasurement[] = [
 		gradeLoadMeasurement({ name: 'test duration', kind: 'test', durationMs: result.duration, ...(testBudget ? { budget: testBudget } : {}) }, cfg, id),
-		...inputs.map((i) => gradeLoadMeasurement(i, cfg, id)),
+		...inputs.map(i => gradeLoadMeasurement(i, cfg, id)),
 	];
 	return { ...result, loadMeasurements: measurements, loadTestId: id };
 };
@@ -510,7 +544,7 @@ const testIdentity = (
 ): Omit<VisualResult, 'status' | 'duration' | 'retry' | 'error' | 'browserErrors' | 'terminalErrors' | 'screenshot' | 'visual'> => {
 	const file = path.basename(test.location.file);
 	const fullTitlePath = test.titlePath();
-	const fileIdx = fullTitlePath.findIndex((v) => v.endsWith(file));
+	const fileIdx = fullTitlePath.findIndex(v => v.endsWith(file));
 	const titlePath = fullTitlePath.slice(fileIdx >= 0 ? fileIdx + 1 : 0);
 	const viewport = projectViewportName(cfgdProject, viewportCatalog);
 	return {
@@ -537,6 +571,7 @@ const screenshotTestGroup = (test: { location: { file: string }; title: string; 
 	return [identity.project, path.relative(process.cwd(), test.location.file), identity.groups, identity.title].join('\u0000');
 };
 
+// hygiene-ignore single-use -- Keep the documented testTitleParts declaration so its parameter and return contract remains attached.
 /**
  * Resolves the title path portion used by the stable test budget key.
  *
@@ -547,7 +582,7 @@ const screenshotTestGroup = (test: { location: { file: string }; title: string; 
 const testTitleParts = (test: { location: { file: string }; title: string; titlePath: () => string[] }): string[] => {
 	const file = path.basename(test.location.file);
 	const fullTitlePath = test.titlePath();
-	const fileIdx = fullTitlePath.findIndex((v) => v.endsWith(file));
+	const fileIdx = fullTitlePath.findIndex(v => v.endsWith(file));
 	return fullTitlePath.slice(fileIdx >= 0 ? fileIdx + 1 : 0).filter(Boolean);
 };
 
@@ -560,7 +595,7 @@ const testTitleParts = (test: { location: { file: string }; title: string; title
  */
 const redactEvidence = (val: unknown): string => {
 	let text = Array.from(stripAnsi(String(val ?? '')))
-		.filter((c) => {
+		.filter(c => {
 			const code = c.codePointAt(0) ?? 0;
 			return code === 9 || code === 10 || code === 13 || (code > 31 && code !== 0xfffe && code !== 0xffff);
 		})
@@ -573,7 +608,9 @@ const redactEvidence = (val: unknown): string => {
 	return text.replaceAll(process.cwd(), '[workspace]');
 };
 
-/** Creates the reusable Playwright reporter with application-specific output configuration. */
+/**
+ * Creates the reusable Playwright reporter with application-specific output configuration.
+ */
 export default class ProgressReporter {
 	private readonly options: Required<Pick<ReportingOptions, 'featureFiles' | 'projects' | 'viewportCatalog' | 'outputRoot' | 'reportFile' | 'slideshowFile' | 'screenshotsDirectory'>> &
 		Pick<ReportingOptions, 'supplementalResultsFile'> & { loadTesting: ReturnType<typeof readLoadTestingConfig>; screenshotOnlySlideshow: boolean };
@@ -623,11 +660,11 @@ export default class ProgressReporter {
 		for (const test of suite.allTests()) this.expectedTests.set(test.id, test);
 		if (!process.argv.includes('--list')) {
 			const dir = path.resolve(this.options.screenshotsDirectory);
-			const previous = readScreenshotRun(dir);
-			const sameRun = previous?.runId === this.screenshotRunId ? previous : undefined;
+			const prev = readScreenshotRun(dir);
+			const sameRun = prev?.runId === this.screenshotRunId ? prev : undefined;
 			for (const { group, viewports } of sameRun?.expectedCaptureGroups || []) this.expectedCaptureGroups.set(group, new Set(viewports));
 			for (const test of suite.allTests()) {
-				const configuredProject = test.parent.project()?.name || test.titlePath().find((v) => v.startsWith('root-')) || 'unknown';
+				const configuredProject = test.parent.project()?.name || test.titlePath().find(v => v.startsWith('root-')) || 'unknown';
 				const group = screenshotTestGroup(test, configuredProject, this.options.viewportCatalog);
 				const viewports = this.expectedCaptureGroups.get(group) || new Set<string>();
 				viewports.add(projectViewportName(configuredProject, this.options.viewportCatalog));
@@ -651,7 +688,7 @@ export default class ProgressReporter {
 			const files = new Set<string>();
 			for (const test of suite.allTests()) {
 				const file = path.basename(test.location.file);
-				const project = baseVisualProjectName(test.parent.project()?.name || test.titlePath().find((v) => v.startsWith('root-')) || 'unknown', this.options.viewportCatalog);
+				const project = baseVisualProjectName(test.parent.project()?.name || test.titlePath().find(v => v.startsWith('root-')) || 'unknown', this.options.viewportCatalog);
 				files.add(file);
 				projectFiles.set(project, new Set([...(projectFiles.get(project) || []), file]));
 			}
@@ -728,11 +765,12 @@ export default class ProgressReporter {
 			fs.mkdirSync(path.dirname(screenshot), { recursive: true });
 			fs.writeFileSync(screenshot, attachment.body);
 		}
-		const titleParts = testTitleParts(test);
-		const testId = loadTestId(test.location.file, titleParts, this.options.loadTesting.root);
+		// hygiene-ignore single-use -- Resolve the test ID before parsing attachments and assembling the result.
+		const testId = loadTestId(test.location.file, testTitleParts(test), this.options.loadTesting.root);
 		const attachedLoad = loadAttachment(result.attachments);
+		// hygiene-ignore single-use -- Capture the visual result before adding graded load measurements and mutating results.
 		const norm: VisualResult = {
-			...testIdentity(test, test.parent.project()?.name || test.titlePath().find((v) => v.startsWith('root-')) || 'unknown', this.options.viewportCatalog),
+			...testIdentity(test, test.parent.project()?.name || test.titlePath().find(v => v.startsWith('root-')) || 'unknown', this.options.viewportCatalog),
 			browserErrors: redactEvidence(diagnosticText(result.attachments, 'browser-diagnostics').join('\n')),
 			duration: result.duration,
 			error: redactEvidence(result.error?.message?.split('\n')[0] || ''),
@@ -740,12 +778,12 @@ export default class ProgressReporter {
 			screenshot,
 			status: normalizeVisualStatus(result.status),
 			terminalErrors: redactEvidence(this.terminalDiagnostics.get(result)?.join('\n') || ''),
-			visual: screenshot ? 'Embedded' : result.attachments.some((v) => v.name === 'visual-error') ? 'Capture failed' : 'No visual surface',
+			visual: screenshot ? 'Embedded' : result.attachments.some(v => v.name === 'visual-error') ? 'Capture failed' : 'No visual surface',
 		};
 		this.results.push(addLoadMeasurements(norm, testId, attachedLoad.measurements, attachedLoad.testBudget, this.options.loadTesting));
 		// PERSIST THE TEST'S EXPECTED RESPONSIVE CAPTURES
-		const identity = testIdentity(test, test.parent.project()?.name || test.titlePath().find((v) => v.startsWith('root-')) || 'unknown', this.options.viewportCatalog);
-		const stableTestGroup = screenshotTestGroup(test, test.parent.project()?.name || test.titlePath().find((v) => v.startsWith('root-')) || 'unknown', this.options.viewportCatalog);
+		const identity = testIdentity(test, test.parent.project()?.name || test.titlePath().find(v => v.startsWith('root-')) || 'unknown', this.options.viewportCatalog);
+		const stableTestGroup = screenshotTestGroup(test, test.parent.project()?.name || test.titlePath().find(v => v.startsWith('root-')) || 'unknown', this.options.viewportCatalog);
 		const expectedViewports = this.expectedCaptureGroups.get(stableTestGroup) || new Set<string>();
 		expectedViewports.add(identity.viewport);
 		this.expectedCaptureGroups.set(stableTestGroup, expectedViewports);
@@ -766,15 +804,14 @@ export default class ProgressReporter {
 
 		// RESOLVE AND PERSIST EACH KEYED SCREENSHOT
 		for (const capture of visualCaptureManifest(result.attachments)) {
-			const img = result.attachments.find((i) => i.name === capture.attachmentName && i.contentType === capture.contentType);
+			const img = result.attachments.find(i => i.name === capture.attachmentName && i.contentType === capture.contentType);
 			if (!img) {
 				this.runDiagnostics.push(`Missing screenshot attachment ${capture.attachmentName} for ${capture.key} (${identity.viewport}).`);
 				continue;
 			}
 			let capturePath = img.path || '';
 			if (!capturePath && img.body) {
-				const ext = capture.contentType === 'image/png' ? 'png' : 'jpg';
-				capturePath = path.resolve('tests/results/playwright-output', `${test.id.replace(A_Z0_9_GI_REGEX(), '-')}-${capture.attachmentName}.${ext}`);
+				capturePath = path.resolve('tests/results/playwright-output', `${test.id.replace(A_Z0_9_GI_REGEX(), '-')}-${capture.attachmentName}.${capture.contentType === 'image/png' ? 'png' : 'jpg'}`);
 				fs.mkdirSync(path.dirname(capturePath), { recursive: true });
 				fs.writeFileSync(capturePath, img.body);
 			}
@@ -811,7 +848,7 @@ export default class ProgressReporter {
 		for (const [id, test] of this.expectedTests) {
 			if (this.completedTests.has(id)) continue;
 			this.results.push({
-				...testIdentity(test, test.parent.project()?.name || test.titlePath().find((v) => v.startsWith('root-')) || 'unknown', this.options.viewportCatalog),
+				...testIdentity(test, test.parent.project()?.name || test.titlePath().find(v => v.startsWith('root-')) || 'unknown', this.options.viewportCatalog),
 				browserErrors: '',
 				duration: 0,
 				error: 'Test did not start because an upstream dependency failed or the run was interrupted.',
@@ -826,8 +863,8 @@ export default class ProgressReporter {
 		// UPDATE THE LOGICAL RUN MARKER BEFORE WRITING ARTIFACTS
 		if (!process.argv.includes('--list')) {
 			const dir = path.resolve(this.options.screenshotsDirectory);
-			const previous = readScreenshotRun(dir);
-			const sameRun = previous?.runId === this.screenshotRunId ? previous : undefined;
+			const prev = readScreenshotRun(dir);
+			const sameRun = prev?.runId === this.screenshotRunId ? prev : undefined;
 			const expectedTestIds = [...new Set([...(sameRun?.expectedTestIds || []), ...this.expectedTests.keys()])].sort();
 			const completedTestIds = [...new Set([...(sameRun?.completedTestIds || []), ...this.completedTests])].sort();
 			writeScreenshotRun(dir, {
@@ -847,7 +884,7 @@ export default class ProgressReporter {
 		fs.mkdirSync(path.join(runDir, 'images'), { recursive: true });
 		const browserResults = this.results.map((result, i) => {
 			if (!result.screenshot || !fs.existsSync(result.screenshot)) return result;
-			const destination = path.join(
+			const dest = path.join(
 				runDir,
 				'images',
 				`${String(i + 1).padStart(4, '0')}-${
@@ -857,8 +894,8 @@ export default class ProgressReporter {
 						.toLowerCase() || 'screenshot'
 				}.png`,
 			);
-			fs.copyFileSync(result.screenshot, destination);
-			return { ...result, screenshot: destination };
+			fs.copyFileSync(result.screenshot, dest);
+			return { ...result, screenshot: dest };
 		});
 		const supplemental: { results: VisualResult[]; diagnostics: string[] } = { results: [], diagnostics: [] };
 		if (this.options.supplementalResultsFile) {
@@ -911,7 +948,7 @@ export default class ProgressReporter {
 									row.testId ||
 									loadTestId(
 										String(row.file || path.basename(supplementalFile)),
-										[String(row.groups || ''), String(row.title || 'Untitled supplemental result')].filter(Boolean).flatMap((part) => part.split(' › ')),
+										[String(row.groups || ''), String(row.title || 'Untitled supplemental result')].filter(Boolean).flatMap(part => part.split(' › ')),
 										this.options.loadTesting.root,
 									),
 							),
@@ -942,11 +979,12 @@ export default class ProgressReporter {
 				}
 			}
 		}
+		// hygiene-ignore single-use -- Snapshot combined results before asynchronous report writes and final budget grading.
 		const results = [...browserResults, ...supplemental.results];
 		const spreadsheet = path.join(runDir, this.options.reportFile);
 		const slideshow = path.join(runDir, this.options.slideshowFile);
 		await writeSpreadsheet(spreadsheet, {
-			featureFiles: [...new Set([...this.options.featureFiles, ...supplemental.results.map((r) => r.file)])],
+			featureFiles: [...new Set([...this.options.featureFiles, ...supplemental.results.map(r => r.file)])],
 			projects: [
 				...this.options.projects,
 				...[
@@ -967,7 +1005,7 @@ export default class ProgressReporter {
 			process.stdout.write(`Test slideshow: ${slideshow}\n`);
 		}
 		process.stdout.write(`Test spreadsheet: ${spreadsheet}\n`);
-		const loadCounts = loadGradeCounts(results.flatMap((r) => r.loadMeasurements || []));
+		const loadCounts = loadGradeCounts(results.flatMap(r => r.loadMeasurements || []));
 		if (this.options.loadTesting.enabled) process.stdout.write(`Load budgets: ${loadCounts.pass} pass, ${loadCounts.warning} warning, ${loadCounts.fail} fail.\n`);
 		return loadCounts.fail ? 'failed' : undefined;
 	}

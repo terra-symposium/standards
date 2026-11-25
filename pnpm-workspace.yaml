@@ -5,6 +5,7 @@ packages:
 
 lockfileDir: config
 virtualStoreDir: node_modules/.pnpm
+linkWorkspacePackages: true
 
 allowBuilds:
   esbuild: true
@@ -13,6 +14,8 @@ overrides:
   brace-expansion@5: 5.0.12
   http-cache-semantics: 4.3.0
   image-size: 2.0.4
+  minimatch@10: 11.0.1
   postcss-selector-parser: 7.1.6
   smol-toml: 1.9.1
+  undici: 8.12.2
   uuid: 11.1.1

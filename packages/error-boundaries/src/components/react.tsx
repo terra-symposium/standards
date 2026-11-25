@@ -9,16 +9,23 @@ IMPORTS
 
 // COMPONENTS
 import React, { Component } from 'react';
+import { reportBoundaryError } from '../lib/report.js';
 
 /*//////////////////////////////////////////////////
 CONFIG
 //////////////////////////////////////////////////*/
 
-/** Receives a render error and boundary metadata for application-owned logging. */
+/**
+ * Receives a render error and boundary metadata for application-owned logging.
+ */
 export type ErrorReporter = (err: Error, report: { name: string; componentStack: string | null }) => void;
-/** Configuration and child content accepted by the reusable React error boundary. */
+/**
+ * Configuration and child content accepted by the reusable React error boundary.
+ */
 export type ErrorBoundaryProps = { children?: React.ReactNode; fallback?: (err: Error) => React.ReactNode; name?: string; resetKey?: string; onError?: ErrorReporter };
-/** Internal React state containing the current descendant render error, if any. */
+/**
+ * Internal React state containing the current descendant render error, if any.
+ */
 export type ErrorBoundaryState = { error: Error | null };
 
 /*//////////////////////////////////////////////////
@@ -28,13 +35,13 @@ HELPERS
 /**
  * Wraps a component in a named error boundary without coupling it to application UI.
  *
- * @param ComponentToWrap Component to render inside the error boundary.
+ * @param CompToWrap Component to render inside the error boundary.
  * @param name Stable name reported when the wrapped component fails.
  * @param onErr Optional callback that receives render errors and component metadata.
  *
  * @return A component with the same props that renders through an error boundary.
  */
-export function withErrorBoundary<P extends object>(ComponentToWrap: React.ComponentType<P>, name: string, onErr?: ErrorReporter): React.ComponentType<P> {
+export function withErrorBoundary<P extends object>(CompToWrap: React.ComponentType<P>, name: string, onErr?: ErrorReporter): React.ComponentType<P> {
 	/**
 	 * Renders the wrapped component inside the configured boundary.
 	 *
@@ -42,18 +49,20 @@ export function withErrorBoundary<P extends object>(ComponentToWrap: React.Compo
 	 *
 	 * @return The wrapped component as a React element under the error boundary.
 	 */
-	function BoundedComponent(props: P): React.JSX.Element {
+	function BoundedComp(props: P): React.JSX.Element {
 		return (
 			<ErrorBoundary name={name} onError={onErr}>
-				<ComponentToWrap {...props} />
+				<CompToWrap {...props} />
 			</ErrorBoundary>
 		);
 	}
-	BoundedComponent.displayName = `withErrorBoundary(${ComponentToWrap.displayName || ComponentToWrap.name || 'Component'})`;
-	return BoundedComponent;
+	BoundedComp.displayName = `withErrorBoundary(${CompToWrap.displayName || CompToWrap.name || 'Component'})`;
+	return BoundedComp;
 }
 
-/** Catches render failures while keeping error reporting and fallback UI injectable. */
+/**
+ * Catches render failures while keeping error reporting and fallback UI injectable.
+ */
 export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
 	state: ErrorBoundaryState = { error: null };
 	/**
@@ -73,7 +82,12 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
 	 * @param info React component stack captured for the failed render.
 	 */
 	componentDidCatch(err: Error, info: React.ErrorInfo): void {
-		this.props.onError?.(err, { name: this.props.name ?? 'Component', componentStack: info.componentStack ?? null });
+		try {
+			this.props.onError?.(err, { name: this.props.name ?? 'Component', componentStack: info.componentStack ?? null });
+		} catch (reporterErr) {
+			console.error('[Terra error boundary] application reporter failed', reporterErr);
+		}
+		void reportBoundaryError(err, this.props.name ?? 'Component');
 	}
 	/**
 	 * Clears the captured error when the boundary receives a new reset key.
@@ -91,6 +105,6 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
 	render(): React.ReactNode {
 		if (!this.state.error) return this.props.children;
 		if (this.props.fallback) return this.props.fallback(this.state.error);
-		return <div role="alert">An unexpected error occurred while rendering this section.</div>;
+		return <div role='alert'>An unexpected error occurred while rendering this section.</div>;
 	}
 }

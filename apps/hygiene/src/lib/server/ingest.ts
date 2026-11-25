@@ -40,8 +40,7 @@ export function buildReportCounts(input: unknown): { report: BuildReport; tests:
  * @return A positive numeric identifier derived from the report identity hash.
  */
 export function buildRunId(report: Pick<BuildReport, 'repository' | 'branch' | 'headSha' | 'completedAt'>): number {
-	const identity = [report.repository.toLowerCase(), report.branch, report.headSha, report.completedAt].join('\0');
-	return Number.parseInt(createHash('sha256').update(identity).digest('hex').slice(0, 13), 16) + 1;
+	return Number.parseInt(createHash('sha256').update([report.repository.toLowerCase(), report.branch, report.headSha, report.completedAt].join('\0')).digest('hex').slice(0, 13), 16) + 1;
 }
 
 /**
@@ -53,6 +52,7 @@ export function buildRunId(report: Pick<BuildReport, 'repository' | 'branch' | '
  * @param completedAt Timestamp used to prevent an older snapshot replacing newer history.
  */
 async function persistHistoryReport(repoId: number, runId: number, report: HistoryReport, completedAt: string): Promise<void> {
+	// hygiene-ignore single-use -- Open the database connection before computing snapshot state and executing the history query.
 	const sql = db();
 	const snapshot = report.mode === 'snapshot';
 	await sql`WITH eligible AS (
@@ -89,6 +89,7 @@ async function persistHistoryReport(repoId: number, runId: number, report: Histo
 	WHERE b.repository_id = ${repoId} AND b.name = ${report.branch} AND EXISTS (SELECT 1 FROM recorded)`;
 }
 
+// hygiene-ignore single-use -- Keep report ingestion exported for the HTTP endpoint and future ingestion callers.
 /**
  * Persist a local history import without presenting it as a CI build.
  *
@@ -103,8 +104,7 @@ export async function ingestHistoryReport(repoId: number, input: unknown): Promi
 	const repo = (await sql`SELECT owner, name FROM repositories WHERE id = ${repoId} AND active`)[0] as { owner: string; name: string } | undefined;
 	if (!repo || `${repo.owner}/${repo.name}`.toLowerCase() !== report.repository.toLowerCase()) throw new Error('report does not match an active repository');
 	if (!(await sql`SELECT name FROM branches WHERE repository_id = ${repoId} AND name = ${report.branch} AND enabled`).length) throw new Error('branch is not enabled');
-	const runId = buildRunId({ repository: report.repository, branch: report.branch, headSha: report.headSha, completedAt: report.generatedAt });
-	await persistHistoryReport(repoId, runId, report, report.generatedAt);
+	await persistHistoryReport(repoId, buildRunId({ repository: report.repository, branch: report.branch, headSha: report.headSha, completedAt: report.generatedAt }), report, report.generatedAt);
 }
 
 /**
@@ -112,19 +112,19 @@ export async function ingestHistoryReport(repoId: number, input: unknown): Promi
  *
  * @param repoId Database ID of the repository that owns the build report.
  * @param report Validated build report to persist.
- * @param source Origin label stored with the build record.
+ * @param src Origin label stored with the build record.
  * @param qualityPolicyBranch Branch whose quality configuration produced the report, if known.
  *
  * @throws {Error} If the report does not match an active repository or enabled branch.
  */
-export async function ingestBuildReport(repoId: number, report: BuildReport, source: 'github-actions' | 'local' = 'github-actions', qualityPolicyBranch: string | null = null): Promise<void> {
+export async function ingestBuildReport(repoId: number, report: BuildReport, src: 'github-actions' | 'local' = 'github-actions', qualityPolicyBranch: string | null = null): Promise<void> {
 	const sql = db();
 	const repo = (await sql`SELECT owner, name FROM repositories WHERE id = ${repoId} AND active`)[0] as { owner: string; name: string } | undefined;
 	if (!repo || `${repo.owner}/${repo.name}`.toLowerCase() !== report.repository.toLowerCase()) throw new Error('report does not match an active repository');
 	if (!(await sql`SELECT name FROM branches WHERE repository_id = ${repoId} AND name = ${report.branch} AND enabled`).length) throw new Error('branch is not enabled');
 	const runId = buildRunId(report);
 	await sql`INSERT INTO runs (repository_id, branch, run_id, run_attempt, head_sha, completed_at, conclusion, tests_passed, tests_failed, tests_skipped, checks_enabled, checks_total, checks_clean, quality_findings, run_source, quality_policy_branch)
-		VALUES (${repoId}, ${report.branch}, ${runId}, 1, ${report.headSha}, ${report.completedAt}, ${report.conclusion}, ${report.tests?.passed ?? null}, ${report.tests?.failed ?? null}, ${report.tests?.skipped ?? null}, ${report.quality?.enabled ?? null}, ${report.quality?.total ?? null}, ${report.quality?.clean ?? null}, ${report.quality?.findings ?? null}, ${source}, ${qualityPolicyBranch})
+		VALUES (${repoId}, ${report.branch}, ${runId}, 1, ${report.headSha}, ${report.completedAt}, ${report.conclusion}, ${report.tests?.passed ?? null}, ${report.tests?.failed ?? null}, ${report.tests?.skipped ?? null}, ${report.quality?.enabled ?? null}, ${report.quality?.total ?? null}, ${report.quality?.clean ?? null}, ${report.quality?.findings ?? null}, ${src}, ${qualityPolicyBranch})
 		ON CONFLICT (repository_id, run_id, run_attempt) DO UPDATE SET branch = excluded.branch, head_sha = excluded.head_sha, completed_at = excluded.completed_at,
 			conclusion = excluded.conclusion, tests_passed = excluded.tests_passed, tests_failed = excluded.tests_failed, tests_skipped = excluded.tests_skipped,
 			checks_enabled = excluded.checks_enabled, checks_total = excluded.checks_total, checks_clean = excluded.checks_clean,
