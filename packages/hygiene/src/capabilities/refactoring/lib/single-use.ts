@@ -419,24 +419,25 @@ function astroConsumersFor(cfg: QualityCfg, program: ts.Program): Set<string> {
 			const src = ts.createSourceFile(f, match[1]!, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
 			for (const statement of src.statements) {
 				if (!ts.isImportDeclaration(statement) || !ts.isStringLiteral(statement.moduleSpecifier)) continue;
-				const bindings = statement.importClause?.namedBindings;
-				if (!bindings || !ts.isNamedImports(bindings)) continue;
+				const clause = statement.importClause;
+				if (!clause) continue;
 				const resolved = ts.resolveModuleName(statement.moduleSpecifier.text, f, program.getCompilerOptions(), ts.sys).resolvedModule?.resolvedFileName;
 				if (!resolved) continue;
-				for (const imported of bindings.elements) {
-					if (!raw.slice(match[0].length).includes(imported.name.text)) {
-						let used = false;
-
-						const inspect = (node: ts.Node): void => {
-							if (node === statement || used) return;
-							if (ts.isIdentifier(node) && node.text === imported.name.text && !isImportNode(node)) used = true;
-							ts.forEachChild(node, inspect);
-						};
-						for (const bodyStatement of src.statements) inspect(bodyStatement);
-						if (!used) continue;
-					}
-					consumers.add(`${resolved}\u0000${(imported.propertyName ?? imported.name).text}`);
-				}
+				const isUsed = (local: ts.Identifier): boolean => {
+					if (raw.slice(match[0].length).includes(local.text)) return true;
+					let used = false;
+					const inspect = (node: ts.Node): void => {
+						if (node === statement || used) return;
+						if (ts.isIdentifier(node) && node.text === local.text && !isImportNode(node)) used = true;
+						ts.forEachChild(node, inspect);
+					};
+					for (const bodyStatement of src.statements) inspect(bodyStatement);
+					return used;
+				};
+				if (clause.name && isUsed(clause.name)) consumers.add(`${resolved}\u0000default`);
+				const bindings = clause.namedBindings;
+				if (!bindings || !ts.isNamedImports(bindings)) continue;
+				for (const imported of bindings.elements) if (isUsed(imported.name)) consumers.add(`${resolved}\u0000${(imported.propertyName ?? imported.name).text}`);
 			}
 		}
 		cached = { signature, consumers };
@@ -450,11 +451,15 @@ function astroConsumersFor(cfg: QualityCfg, program: ts.Program): Set<string> {
  *
  * @param candidate Candidate declaration whose Astro use should be checked.
  * @param consumers Source-and-name keys collected from Astro frontmatter and markup.
+ * @param checker Type checker used to resolve a default export to its declaration.
  *
  * @return Whether an Astro file references this declaration.
  */
-function hasAstroConsumer(candidate: Candidate, consumers: Set<string>): boolean {
-	return consumers.has(`${candidate.file}\u0000${candidate.name.text}`);
+function hasAstroConsumer(candidate: Candidate, consumers: Set<string>, checker: ts.TypeChecker): boolean {
+	if (consumers.has(`${candidate.file}\u0000${candidate.name.text}`)) return true;
+	if (!consumers.has(`${candidate.file}\u0000default`)) return false;
+	const moduleSymbol = checker.getSymbolAtLocation(candidate.source);
+	return Boolean(moduleSymbol && checker.getExportsOfModule(moduleSymbol).some(exported => exported.name === 'default' && canonical(checker, exported) === candidate.symbol));
 }
 
 /**
@@ -573,6 +578,35 @@ function isRequiredLifecycleVal(candidate: Candidate, use: Ref): boolean {
 		ts.isIdentifier(use.node.parent.expression.expression) &&
 		use.node.parent.expression.expression.text === 'window' &&
 		use.node.parent.expression.name.text === 'clearInterval'
+	);
+}
+
+/**
+ * Keeps Vite eager glob registries at module scope.
+ *
+ * @param candidate Candidate value declaration whose initializer is checked.
+ *
+ * @return Whether Vite statically imports the glob and the named binding retains its module registry.
+ */
+function isEagerGlobBinding(candidate: Candidate): boolean {
+	if (candidate.kind !== 'variable' || !ts.isVariableStatement(candidate.statement)) return false;
+	const declaration = candidate.statement.declarationList.declarations.find(item => ts.isIdentifier(item.name) && item.name.getStart(candidate.source) === candidate.name.getStart(candidate.source));
+	if (!declaration?.initializer) return false;
+	const init = unwrapExpr(declaration.initializer);
+	if (!ts.isCallExpression(init) || !ts.isPropertyAccessExpression(init.expression) || init.expression.name.text !== 'glob') return false;
+	const meta = init.expression.expression;
+	if (!ts.isMetaProperty(meta) || meta.keywordToken !== ts.SyntaxKind.ImportKeyword || meta.name.text !== 'meta') return false;
+	const options = init.arguments[1];
+	return Boolean(
+		options &&
+		ts.isObjectLiteralExpression(options) &&
+		options.properties.some(
+			property =>
+				ts.isPropertyAssignment(property) &&
+				(ts.isIdentifier(property.name) || ts.isStringLiteral(property.name)) &&
+				property.name.text === 'eager' &&
+				property.initializer.kind === ts.SyntaxKind.TrueKeyword,
+		),
 	);
 }
 
@@ -967,7 +1001,6 @@ function isFirstConsumerEvaluation(ref: ts.Identifier, init: ts.Expression, cons
 	}
 }
 
-// hygiene-ignore single-use -- Keep the documented unwrapExpr declaration so its parameter and return contract remains attached.
 /**
  * Removes syntax-only wrappers around an initializer before checking its receiver behavior.
  *
@@ -1285,7 +1318,7 @@ function findingsFromAnalysis(cfg: QualityCfg, checker: ts.TypeChecker, candidat
 			isModuleExport(c, checker)
 		)
 			usedDirectives.add(directive);
-		if (publicContract) continue;
+		if (publicContract || isEagerGlobBinding(c)) continue;
 		if (uses.length !== 1) continue;
 		const use = uses[0]!;
 		if (isRuntimeRepeatedRef(c, use, checker)) continue;
@@ -1314,7 +1347,7 @@ function findingsFromAnalysis(cfg: QualityCfg, checker: ts.TypeChecker, candidat
 				? 'single-use initializer can move to its first in-scope consumer without changing evaluation order or receiver behavior'
 				: 'inlining is not proven to preserve evaluation order, async context, receiver behavior, or declaration boundaries';
 		} else reason = `${c.kind} declaration has one in-scope consumer`;
-		if (hasAstroConsumer(c, astroConsumers)) continue;
+		if (hasAstroConsumer(c, astroConsumers, checker)) continue;
 		if (c.kind === 'function') [canInline, reason] = [false, 'inlining a function can change its identity, closure, stack, or component behavior'];
 		else if (c.kind === 'variable' && c.file !== use.file && !crossFileVariableSafe(c)) [canInline, reason] = [false, 'cross-file initializer depends on module-local values'];
 		else if ((c.kind === 'type' || c.kind === 'interface') && !crossFileTypeSafe(c, use, checker)) [canInline, reason] = [false, 'type depends on declarations that are not available at the consumer'];
@@ -1557,8 +1590,8 @@ export function fixSingleUseDeclarations(cfg: QualityCfg, changedFileNames?: Set
 		const edits = new Map<string, { start: number; end: number; text: string }[]>();
 		const pending: { fileEdits: { file: string; start: number; end: number; text: string }[]; referenceLength: number; nestedReference: boolean; candidateKey: string; jsxFile?: string }[] = [];
 		for (const c of candidates) {
-			if (hasGeneratedSourceHeader(c.source.text)) continue;
-			if (hasAstroConsumer(c, astroConsumers) || isCfgdPublicContract(cfg, c, checker) || isPackageEntryExport(cfg, c, checker, program)) continue;
+			if (hasGeneratedSourceHeader(c.source.text) || isEagerGlobBinding(c)) continue;
+			if (hasAstroConsumer(c, astroConsumers, checker) || isCfgdPublicContract(cfg, c, checker) || isPackageEntryExport(cfg, c, checker, program)) continue;
 			if (directivesByCandidate.has(`${c.file}:${c.name.getStart(c.source)}`)) continue;
 			if (hasMeaningfulLeadingTSDoc(c)) continue;
 			const uses = c.kind === 'type' || c.kind === 'interface' ? typeRefs(c, refs) : (refs.get(c.symbol) ?? []).filter(r => !isImportNode(r.node) && !isExportSpecifierRef(r));

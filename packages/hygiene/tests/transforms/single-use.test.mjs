@@ -182,6 +182,24 @@ export function View({ enabled }: { enabled: boolean }) {
 	assert.equal(fixSingleUseDeclarations(cfg), 0);
 	assert.match(fixtureText(root, 'src/view.tsx'), /const memo = useMemo/);
 });
+test('single-use analysis preserves eager Vite glob registries at module scope', () => {
+	const root = fixtureRoot('hygiene-single-use-eager-glob-');
+	const source = `const eagerPages = import.meta.glob('./pages/**/index.md', { eager: true });
+const lazyPages = import.meta.glob('./pages/**/preview.md');
+function readPage(path: string) { return eagerPages[path]; }
+function loadPage(path: string) { return lazyPages[path]; }
+`;
+	fixtureFile(root, 'src/local-development.ts', source);
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
+	const findings = singleUseFindings(cfg);
+	assert.equal(
+		findings.some(finding => finding.name === 'eagerPages'),
+		false,
+	);
+	assert.equal(findings.find(finding => finding.name === 'lazyPages')?.decision, 'REVIEW');
+	assert.equal(fixSingleUseDeclarations(cfg), 0);
+	assert.equal(fixtureText(root, 'src/local-development.ts'), source);
+});
 test('single-use agent actions name the actual unsafe boundary without irrelevant React guidance', () => {
 	const root = fixtureRoot('hygiene-single-use-agent-actions-');
 	fixtureFile(root, 'src/script.mjs', `const setting = process.env.SETTING;\nconsole.log(setting);\n`);
@@ -923,6 +941,19 @@ test('single-use analysis discovers Astro named imports outside the configured T
 	);
 	assert.equal(fixSingleUseDeclarations(cfg), 0);
 	assert.match(fixtureText(root, 'src/SiteLayout.tsx'), /export function SiteLayout/);
+});
+test('single-use analysis recognizes default exports consumed by Astro frontmatter', () => {
+	const root = fixtureRoot('hygiene-single-use-astro-default-import-');
+	fixtureFile(root, 'src/Marquee.tsx', `export default function Marquee() { return null; }\n`);
+	fixtureFile(root, 'src/consumer.tsx', `import Marquee from './Marquee';\nexport const preview = <Marquee />;\n`);
+	fixtureFile(root, 'src/page.astro', `---\nimport Marquee from './Marquee';\n---\n<Marquee client:load />\n`);
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts', '.tsx'] });
+	assert.equal(
+		singleUseFindings(cfg).some(finding => finding.name === 'Marquee'),
+		false,
+	);
+	assert.equal(fixSingleUseDeclarations(cfg), 0);
+	assert.match(fixtureText(root, 'src/Marquee.tsx'), /export default function Marquee/);
 });
 test('unused Astro import syntax is not a framework consumer', () => {
 	const root = fixtureRoot('hygiene-single-use-astro-import-only-');
