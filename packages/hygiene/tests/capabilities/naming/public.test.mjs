@@ -124,6 +124,15 @@ test('technical suffix replacements keep local Error and Repository names concis
 	assert.equal(api.renameId('normalizesApiPitchers'), 'normApiPitchers');
 	assert.equal(api.renameId('compareBrightness'), 'compBrightness');
 });
+test('concise replacements do not invent initials for syntax or local vocabulary', () => {
+	assert.equal(api.renameId('Formatter'), 'Fmt');
+	assert.equal(api.renameId('RuntimeError'), 'RuntimeErr');
+	assert.equal(api.renameId('error'), 'err');
+	assert.equal(api.renameId('repository'), 'repo');
+	assert.equal(api.renameId('new_syntax'), 'new_syntax');
+	assert.equal(api.renameId('next'), 'next');
+	assert.equal(api.renameId('newSyntax'), 'newSyntax');
+});
 test('identifier replacement lookup ignores inherited object property names', () => {
 	assert.equal(api.renameId('constructor'), 'constructor');
 	assert.equal(api.renameId('errorConstructor'), 'errConstructor');
