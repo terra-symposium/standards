@@ -27,6 +27,17 @@ test('naming checks ignore archived Markdown prose while keeping Markdown in the
 	assert.deepEqual(namingFindings(createQualityCfg({ root, sourceRoots: ['.'], extensions: ['.md'] })), []);
 	assert.equal(fixtureText(root, 'docs/guide.md'), orig);
 });
+test('naming scanner leaves Rust snake_case identifiers and descriptive locals unchanged', () => {
+	const root = fixtureRoot('hygiene-naming-rust-boundary-');
+	const rust = 'fn main() { let new_syntax = true; let next = new_syntax; println!("{next}"); }\n';
+	fixtureFile(root, 'src/main.rs', rust);
+	fixtureFile(root, 'src/main.ts', 'const new_syntax = true; const next = new_syntax; void next;\n');
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.rs', '.ts'] });
+	assert.deepEqual(namingFindings(cfg), []);
+	assert.equal(fixNaming(cfg), 0);
+	assert.equal(fixtureText(root, 'src/main.rs'), rust);
+	assert.equal(fixtureText(root, 'src/main.ts'), 'const new_syntax = true; const next = new_syntax; void next;\n');
+});
 
 /*//////////////////////////////////////////////////
 HELPERS

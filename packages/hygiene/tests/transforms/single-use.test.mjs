@@ -930,6 +930,22 @@ test('single-use analysis preserves an aliased export consumed by Astro frontmat
 	assert.equal(fixSingleUseDeclarations(cfg), 0);
 	assert.equal(fixtureText(root, 'src/constants.ts'), `export const APP_LABEL = 'Salesphere';\n`);
 });
+test('single-use analysis preserves namespace exports consumed by Astro markup', () => {
+	const root = fixtureRoot('hygiene-single-use-astro-namespace-markup-');
+	fixtureFile(root, 'src/ui-classes.ts', `export const CLASS_MX_AUTO_W_FULL_MAX_W_5XL_PX_5_PB_20_PT_28_SM_PX_8_LG_PX_12 = 'classes';\n`);
+	fixtureFile(
+		root,
+		'src/page.astro',
+		`---\nimport * as SharedClasses from './ui-classes';\n---\n<div class={SharedClasses.CLASS_MX_AUTO_W_FULL_MAX_W_5XL_PX_5_PB_20_PT_28_SM_PX_8_LG_PX_12}>Ready</div>\n`,
+	);
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts', '.astro'] });
+	assert.equal(
+		singleUseFindings(cfg).some(finding => finding.name === 'CLASS_MX_AUTO_W_FULL_MAX_W_5XL_PX_5_PB_20_PT_28_SM_PX_8_LG_PX_12'),
+		false,
+	);
+	assert.equal(fixSingleUseDeclarations(cfg), 0);
+	assert.match(fixtureText(root, 'src/ui-classes.ts'), /export const CLASS_MX_AUTO_W_FULL_MAX_W_5XL_PX_5_PB_20_PT_28_SM_PX_8_LG_PX_12/u);
+});
 test('single-use analysis discovers Astro named imports outside the configured TypeScript extensions', () => {
 	const root = fixtureRoot('hygiene-single-use-astro-configured-extensions-');
 	fixtureFile(root, 'src/SiteLayout.tsx', `export function SiteLayout({ children }: { children: unknown }) { return children; }\n`);

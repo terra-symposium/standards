@@ -402,6 +402,7 @@ function typeRefs(candidate: Candidate, refs: Map<ts.Symbol, Ref[]>): Ref[] {
  * @return Source-and-name keys for declarations referenced from Astro files.
  */
 function astroConsumersFor(cfg: QualityCfg, program: ts.Program): Set<string> {
+	const checker = program.getTypeChecker();
 	const astroFiles = srcFiles({ ...cfg, extensions: [...new Set([...cfg.extensions, '.astro'])] }).filter(path => path.endsWith('.astro'));
 	const signature = astroFiles
 		.map(f => {
@@ -436,8 +437,14 @@ function astroConsumersFor(cfg: QualityCfg, program: ts.Program): Set<string> {
 				};
 				if (clause.name && isUsed(clause.name)) consumers.add(`${resolved}\u0000default`);
 				const bindings = clause.namedBindings;
-				if (!bindings || !ts.isNamedImports(bindings)) continue;
-				for (const imported of bindings.elements) if (isUsed(imported.name)) consumers.add(`${resolved}\u0000${(imported.propertyName ?? imported.name).text}`);
+				if (!bindings) continue;
+				if (ts.isNamedImports(bindings)) {
+					for (const imported of bindings.elements) if (isUsed(imported.name)) consumers.add(`${resolved}\u0000${(imported.propertyName ?? imported.name).text}`);
+				} else if (isUsed(bindings.name)) {
+					const moduleSource = program.getSourceFile(resolved);
+					const moduleSymbol = moduleSource && checker.getSymbolAtLocation(moduleSource);
+					for (const exported of moduleSymbol ? checker.getExportsOfModule(moduleSymbol) : []) consumers.add(`${resolved}\u0000${exported.name}`);
+				}
 			}
 		}
 		cached = { signature, consumers };
