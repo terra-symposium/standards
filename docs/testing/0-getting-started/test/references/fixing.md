@@ -14,6 +14,10 @@ If a local prerequisite requires unavailable secrets or services, preserve the b
 
 The parent reviews each diff, source ownership, and executed evidence; integrates repairs in dependency order; then runs focused and adjacent checks from the parent checkout. Keep one failure-ledger record per failing test and viewport. Never call a partial run green.
 
+For a full-suite maintenance run, document each failing Playwright case, its observed browser/server evidence, root cause, source owner, and disposition in the failure ledger. Map a defect with no existing assertion to a new regression test at the cheapest reliable layer; use Playwright when the browser interaction or rendered state is essential. Before adding or retaining browser cases, compare their journeys, fixtures, roles, and assertions. Merge overlapping cases under one authoritative owner when they can share setup and steps without hiding independent authorization, persistence, accessibility, or recovery failures. Preserve every material assertion, record the retired case's surviving proof, and compare collected cases, viewport combinations, and runtime before and after consolidation.
+
+For application runtime failures exposed by a browser case, verify that the owning error boundary or handler sends a sanitized event to the repository's configured remote reporting service. Exercise the delivery path through a safe development or test fixture; a local console log alone is not remote evidence. Do not send Playwright assertion failures or sensitive data to production telemetry. Inspect the service's current real-user error records with authorized read access, distinguish active incidents from historical or test events, and repair actionable runtime defects that the suite missed. Add focused regression coverage for those defects, then rerun affected checks and the complete configured suite. Record telemetry evidence, unresolved access gaps, and remaining incidents without exposing user data or credentials.
+
 ## Cloud Repair Workflow (explicit Cloud mode)
 
 Read [Cloud Workflow Evidence](cloud-workflow.md) before dispatching a worker.
