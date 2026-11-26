@@ -21,13 +21,13 @@ const repoPackage = packagePath === '' || packagePath === 'config';
 const baseConfig = [join(root, 'quality.json'), join(root, 'config/quality.json')].find(existsSync);
 if (!baseConfig) throw new Error(`Missing quality.json in ${root}`);
 const args = process.argv.slice(2).filter(arg => arg !== '--');
+const repoName = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).name === 'standards-workspace-adapter' ? 'standards' : basename(root);
 
 if (process.env.QUALITY_RUNNER_SCOPE_ONLY === '1') {
-	console.log(JSON.stringify({ root, package: packagePath || '.', scope: repoPackage ? 'repository' : 'package', config: baseConfig, args }));
+	console.log(JSON.stringify({ root, repoName, package: packagePath || '.', scope: repoPackage ? 'repository' : 'package', config: baseConfig, args }));
 	process.exit(0);
 }
 
-const repoName = basename(root);
 if ((repoName === 'uni' || repoName === 'standards') && process.env.QUALITY_RUNNER_UV_ACTIVE !== '1') {
 	const env = { ...process.env, QUALITY_RUNNER_UV_ACTIVE: '1' };
 	if (repoName === 'uni') env.UV_PROJECT_ENVIRONMENT = join(root, 'dist/cache/quality-venv');
