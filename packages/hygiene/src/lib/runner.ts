@@ -2686,9 +2686,8 @@ function importedExportConsumers(cfg: QualityCfg): Map<string, Set<string>> {
 				}
 			} else if (ts.isNamespaceImport(bindings)) {
 				for (const prop of namespaceProps.get(bindings.name.text) ?? []) names.add(prop);
-				if (markupUses(bindings.name.text)) {
-					for (const match of markup.matchAll(new RegExp(`<\\s*${bindings.name.text}\\.([A-Za-z_$][\\w$]*)(?:[\\s/>])`, 'g'))) names.add(match[1]!);
-				}
+				if (markupUses(bindings.name.text))
+					for (const match of markup.matchAll(new RegExp(`\\b${bindings.name.text}\\.([A-Za-z_$][\\w$]*)`, 'g'))) names.add(match[1]!);
 			}
 			if (names.size) consumers.set(owner, names);
 		}

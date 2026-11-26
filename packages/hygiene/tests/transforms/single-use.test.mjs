@@ -465,6 +465,16 @@ test('single-use type fixing expands generic references through namespace import
 	assert.match(consumer, /Types\.Prepared<string>/);
 	assert.equal(ts.createSourceFile('consumer.ts', consumer, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS).parseDiagnostics.length, 0);
 });
+test('single-use export consumers include namespace members used in Astro markup', () => {
+	const root = fixtureRoot('hygiene-single-use-astro-namespace-markup-');
+	fixtureFile(root, 'src/lib/ui-classes.ts', `export const CLASS_USED = 'used';\nexport const CLASS_UNUSED = 'unused';\n`);
+	fixtureFile(root, 'src/pages/index.astro', `---\nimport * as SharedClasses from '@lib/ui-classes';\n---\n<div class={SharedClasses.CLASS_USED}></div>\n`);
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts', '.astro'], aliases: { '@lib/*': 'src/lib/*' } });
+	assert.equal(fixSingleUseDeclarations(cfg), 0);
+	const classes = fixtureText(root, 'src/lib/ui-classes.ts');
+	assert.match(classes, /CLASS_USED/);
+	assert.match(classes, /CLASS_UNUSED/);
+});
 test('single-use fixing inlines only primitive constants and leaves object identity intact', () => {
 	const root = fixtureRoot('hygiene-single-use-no-fix-');
 	// hygiene-ignore single-use -- Keep this source fixture path named so the test can identify the exact file under inspection.
