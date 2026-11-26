@@ -102,6 +102,9 @@ function resolvePackageImport(specifier: string, importer: string, options: ts.C
  * @return Module specifiers found in the file.
  */
 function specifiers(fileName: string): string[] {
+	// Markdown is authored prose; imports in fenced examples or embedded HTML
+	// are not executable module edges for the repository import graph.
+	if (extname(fileName).toLowerCase() === '.md') return [];
 	const file = ts.createSourceFile(fileName, readFileSync(fileName, 'utf8'), ts.ScriptTarget.Latest, true);
 	const vals: string[] = [];
 	ts.forEachChild(file, n => {

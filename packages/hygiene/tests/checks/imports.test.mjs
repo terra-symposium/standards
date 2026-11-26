@@ -44,6 +44,14 @@ void [local, alias, indexed, lazy, asset, dynamic, twoArgRequire];
 	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], aliases: { '@/': 'src/' } });
 	assert.deepEqual(checkImports(cfg), [{ importer: 'src/main.ts', specifier: './missing.js' }]);
 });
+test('import validation ignores module-looking examples in Markdown prose', () => {
+	const root = fixtureRoot('hygiene-imports-markdown-prose-');
+	fixtureFile(root, 'docs/archived.md', '```tsx\nimport Nodes from "@src/pages/docs/components/_Nodes";\n```\n');
+	fixtureFile(root, 'src/main.ts', 'import missing from "./missing";\nvoid missing;\n');
+	assert.deepEqual(checkImports(createQualityCfg({ root, sourceRoots: ['docs', 'src'], extensions: ['.md', '.ts'], aliases: { '@src/': 'src/' } })), [
+		{ importer: 'src/main.ts', specifier: './missing' },
+	]);
+});
 test('import validation respects external prefixes, explicit unsupported extensions, and missing index targets', () => {
 	const root = fixtureRoot('hygiene-import-policy-');
 	fixtureFile(
