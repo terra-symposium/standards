@@ -469,8 +469,7 @@ test('single-use export consumers include namespace members used in Astro markup
 	const root = fixtureRoot('hygiene-single-use-astro-namespace-markup-');
 	fixtureFile(root, 'src/lib/ui-classes.ts', `export const CLASS_USED = 'used';\nexport const CLASS_UNUSED = 'unused';\n`);
 	fixtureFile(root, 'src/pages/index.astro', `---\nimport * as SharedClasses from '@lib/ui-classes';\n---\n<div class={SharedClasses.CLASS_USED}></div>\n`);
-	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts', '.astro'], aliases: { '@lib/*': 'src/lib/*' } });
-	assert.equal(fixSingleUseDeclarations(cfg), 0);
+	assert.equal(fixSingleUseDeclarations(createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts', '.astro'], aliases: { '@lib/*': 'src/lib/*' } })), 0);
 	const classes = fixtureText(root, 'src/lib/ui-classes.ts');
 	assert.match(classes, /CLASS_USED/);
 	assert.match(classes, /CLASS_UNUSED/);
