@@ -2114,7 +2114,11 @@ process.stdout.write(JSON.stringify([{ filePath: file, messages: offset < 0 ? []
 });
 test('dead-code preserves declarations exposed through a local export list', () => {
 	const root = fixtureRoot('hygiene-dead-code-export-list-');
-	const src = fixtureFile(root, 'src/records.ts', `function deepClone(value: unknown) { return value; }\nfunction coerceRecs(value: unknown) { return deepClone(value); }\nfunction privateHelper() { return true; }\nexport { deepClone };\n`);
+	const src = fixtureFile(
+		root,
+		'src/records.ts',
+		`function deepClone(value: unknown) { return value; }\nfunction coerceRecs(value: unknown) { return deepClone(value); }\nfunction privateHelper() { return true; }\nexport { deepClone };\n`,
+	);
 	const eslint = fixtureFile(
 		root,
 		'bin/eslint-export-list.mjs',
@@ -2133,6 +2137,7 @@ process.stdout.write(JSON.stringify([{ filePath: file, messages }]));
 `,
 		0o755,
 	);
+	assert.ok(src && eslint, 'the fixture paths are available to the detector stub');
 	resetExitCode();
 	runQualityCli(createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], tools: { eslint }, enabledChecks: { knip: false } }), ['dead-code', '--all', '--fix']);
 	assert.equal(process.exitCode, 1, 'the preserved public declaration remains a reported finding');

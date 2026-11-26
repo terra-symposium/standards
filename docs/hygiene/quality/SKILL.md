@@ -30,3 +30,7 @@ Run the repository's exact `quality:all` script for a full scan, or `quality` fo
 Quality may apply safe fixes. `--warn` prevents writes but can return zero even with findings, so read the full findings rather than relying on its exit code. Review every resulting edit, especially around public APIs, evaluation order, stored values, and syntax. Use `--warn` when a read-only inspection is needed. A `// hygiene-ignore single-use -- <reason>` comment is permitted only for the specific declaration when inlining would change behavior or a documented API boundary; follow the installed Quality version's directive syntax and keep the concrete reason beside that declaration.
 
 Follow the user's requested execution environment, branch, commit, and push policy. Do not commit or publish solely because a Quality run succeeds. Report commands, scope, exit codes, findings, repairs, verification, and any access or environment blockers separately.
+
+## Delegated work
+
+Model preferences are suggestions: select the lowest-cost available model that is capable of the delegated task, name the selected model explicitly when delegating, and do not choose a costlier model when a cheaper capable model is sufficient.

@@ -1372,7 +1372,13 @@ function fixUnusedDeclarations(cfg: QualityCfg, reports: EslintReport[], changed
 			 */
 			const isExported = (candidate: ts.Node): boolean => ts.canHaveModifiers(candidate) && Boolean(ts.getModifiers(candidate)?.some(m => m.kind === ts.SyntaxKind.ExportKeyword));
 			const isExportedByList = (name: string): boolean =>
-				ast.statements.some(statement => ts.isExportDeclaration(statement) && statement.exportClause && ts.isNamedExports(statement.exportClause) && statement.exportClause.elements.some(specifier => (specifier.propertyName?.text ?? specifier.name.text) === name));
+				ast.statements.some(
+					statement =>
+						ts.isExportDeclaration(statement) &&
+						statement.exportClause &&
+						ts.isNamedExports(statement.exportClause) &&
+						statement.exportClause.elements.some(specifier => (specifier.propertyName?.text ?? specifier.name.text) === name),
+				);
 			const hasSameFileReference = (candidate: ts.Node, name: string): boolean => {
 				let referenced = false;
 				const inspect = (current: ts.Node): void => {
@@ -1382,8 +1388,26 @@ function fixUnusedDeclarations(cfg: QualityCfg, reports: EslintReport[], changed
 				inspect(ast);
 				return referenced;
 			};
-			if (ts.isFunctionDeclaration(node) && node.name && starts.has(node.name.getStart(ast)) && isTopLevel(node) && !isExported(node) && !isExportedByList(node.name.text) && !externallyConsumed && !hasSameFileReference(node, node.name.text)) declaration = node;
-			if ((ts.isTypeAliasDeclaration(node) || ts.isInterfaceDeclaration(node)) && starts.has(node.name.getStart(ast)) && isTopLevel(node) && !isExported(node) && !isExportedByList(node.name.text) && !externallyConsumed && !hasSameFileReference(node, node.name.text))
+			if (
+				ts.isFunctionDeclaration(node) &&
+				node.name &&
+				starts.has(node.name.getStart(ast)) &&
+				isTopLevel(node) &&
+				!isExported(node) &&
+				!isExportedByList(node.name.text) &&
+				!externallyConsumed &&
+				!hasSameFileReference(node, node.name.text)
+			)
+				declaration = node;
+			if (
+				(ts.isTypeAliasDeclaration(node) || ts.isInterfaceDeclaration(node)) &&
+				starts.has(node.name.getStart(ast)) &&
+				isTopLevel(node) &&
+				!isExported(node) &&
+				!isExportedByList(node.name.text) &&
+				!externallyConsumed &&
+				!hasSameFileReference(node, node.name.text)
+			)
 				declaration = node;
 			if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && starts.has(node.name.getStart(ast)) && isTopLevel(node) && !externallyConsumed) {
 				if (
