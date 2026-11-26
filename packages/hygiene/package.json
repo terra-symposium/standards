@@ -1,6 +1,6 @@
 {
 	"name": "@terra-symposium/hygiene",
-	"version": "2.5.8",
+	"version": "2.5.9",
 	"description": "Configurable quality checks and maintenance tooling for software repositories",
 	"homepage": "https://standards-docs.netlify.app/",
 	"type": "module",

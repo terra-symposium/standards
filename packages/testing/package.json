@@ -1,6 +1,6 @@
 {
 	"name": "@terra-symposium/testing",
-	"version": "0.3.2",
+	"version": "0.3.3",
 	"description": "Standards-owned shared CI checks and manifest-driven test execution for Terra repositories",
 	"license": "Apache-2.0",
 	"type": "module",
