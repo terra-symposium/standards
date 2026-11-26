@@ -2329,6 +2329,29 @@ process.stdout.write(JSON.stringify([{ filePath: ${JSON.stringify(src)}, message
 	assert.doesNotMatch(fixtureText(root, 'src/auth.ts'), EXPORT_CONST_EXTRA_REGEX);
 	resetExitCode();
 });
+test('dead-code safe fixes remove an unused declaration and its now-empty section fence', () => {
+	const root = fixtureRoot('hygiene-empty-section-fix-');
+	const src = fixtureFile(root, 'src/main.ts', '/*//////////////////////////////////////////////////\nCONFIG\n//////////////////////////////////////////////////*/\nfunction unused() { return 1; }\n');
+	const knip = fixtureFile(root, 'bin/knip-empty-section.mjs', '#!/usr/bin/env node\nprocess.stdout.write(JSON.stringify({ issues: [] }));\n', 0o755);
+	const eslint = fixtureFile(
+		root,
+		'bin/eslint-empty-section.mjs',
+		`#!/usr/bin/env node
+import { readFileSync } from 'node:fs';
+const source = readFileSync(${JSON.stringify(src)}, 'utf8');
+process.stdout.write(JSON.stringify(source.includes('function unused') ? [{ filePath: ${JSON.stringify(src)}, messages: [{ ruleId: 'unused-imports/no-unused-vars', line: 4, column: 10, message: 'unused declaration' }] }] : [{ filePath: ${JSON.stringify(src)}, messages: [] }]));
+`,
+		0o755,
+	);
+	resetExitCode();
+	runQualityCli(createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], tools: { knip, eslint } }), ['dead-code', '--all', '--fix']);
+	assert.equal(process.exitCode, 0);
+	assert.equal(fixtureText(root, 'src/main.ts'), '');
+	resetExitCode();
+	runQualityCli(createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], tools: { knip, eslint } }), ['documentation']);
+	assert.equal(process.exitCode, 0);
+	resetExitCode();
+});
 test('dead-code passes a discovered TypeScript flat ESLint config explicitly', () => {
 	const root = fixtureRoot('hygiene-eslint-flat-config-');
 	// hygiene-ignore single-use -- Keep the source fixture path visible as the input to this Quality check.

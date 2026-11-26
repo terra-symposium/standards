@@ -599,6 +599,20 @@ test('formatting leaves documentation comments and section labels agent-owned', 
 	assert.equal(maintainSrcFile(root, file), false);
 	assert.equal(readFileSync(file, 'utf8'), fmt);
 });
+test('documentation reports an empty section fence left by a source rewrite', () => {
+	const root = mkdtempSync(join(tmpdir(), 'hygiene-empty-section-fence-'));
+	const srcDir = join(root, 'src');
+	mkdirSync(srcDir);
+	// hygiene-ignore single-use -- Keep the fixture path visible to the documentation check.
+	const file = join(srcDir, 'main.js');
+	writeFileSync(file, '/*//////////////////////////////////////////////////\nCONFIG\n//////////////////////////////////////////////////*/\n');
+	// hygiene-ignore single-use -- Keep the fixture findings available for the section assertion.
+	const findings = documentationFindings(createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.js'], documentation: { required: { importSection: true } } }));
+	assert.deepEqual(
+		findings.filter(({ kind }) => kind === 'section').map(({ name, reason }) => [name, reason]),
+		[['CONFIG', 'remove the empty section heading or add its source content']],
+	);
+});
 test('protects long one-line imports from Prettier wrapping', () => {
 	const file = join(mkdtempSync(join(tmpdir(), 'hygiene-')), 'main.ts');
 	const src = `import { ${'VeryLongTypeName, '.repeat(18)}result } from '@terra-symposium/a-very-long-package-name';\n`;

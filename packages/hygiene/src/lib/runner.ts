@@ -1388,6 +1388,13 @@ function fixUnusedDeclarations(cfg: QualityCfg, reports: EslintReport[], changed
 			}
 			if (declaration) {
 				let start = declaration.getStart(ast);
+				const leading = src.slice(declaration.getFullStart(), start);
+				const section = /\/\*\/{3,}[ \t]*\r?\n[ \t]*[A-Z][A-Z0-9 &/_-]*[ \t]*\r?\n\/{3,}\*\//u.exec(leading);
+				if (section && !/\S/u.test(leading.slice(section.index + section[0].length))) {
+					// hygiene-ignore single-use -- Preserve the section start while removing its only declaration.
+					const sectionStart = declaration.getFullStart() + section.index;
+					start = sectionStart;
+				}
 				const attached = (ts.getLeadingCommentRanges(src, declaration.getFullStart()) ?? []).at(-1);
 				if (attached?.kind === ts.SyntaxKind.MultiLineCommentTrivia && src.slice(attached.end, start).trim() === '' && src.slice(attached.pos, attached.pos + 3) === '/**') start = attached.pos;
 				let end = declaration.end;
