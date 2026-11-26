@@ -2112,6 +2112,35 @@ process.stdout.write(JSON.stringify([{ filePath: file, messages: offset < 0 ? []
 	assert.match(output.join('\\n'), /preserve its enclosing function/);
 	resetExitCode();
 });
+test('dead-code preserves declarations exposed through a local export list', () => {
+	const root = fixtureRoot('hygiene-dead-code-export-list-');
+	const src = fixtureFile(root, 'src/records.ts', `function deepClone(value: unknown) { return value; }\nfunction coerceRecs(value: unknown) { return deepClone(value); }\nfunction privateHelper() { return true; }\nexport { deepClone };\n`);
+	const eslint = fixtureFile(
+		root,
+		'bin/eslint-export-list.mjs',
+		`#!/usr/bin/env node
+import { readFileSync } from 'node:fs';
+const file = ${JSON.stringify(src)};
+const text = readFileSync(file, 'utf8');
+const names = ['deepClone', 'privateHelper'];
+const messages = names.flatMap(name => {
+		const offset = text.indexOf(name);
+		if (offset < 0) return [];
+		const before = text.slice(0, offset).split('\\n');
+		return [{ ruleId: 'unused-imports/no-unused-vars', line: before.length, column: before.at(-1).length + 1, message: name + ' is unused' }];
+});
+process.stdout.write(JSON.stringify([{ filePath: file, messages }]));
+`,
+		0o755,
+	);
+	resetExitCode();
+	runQualityCli(createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], tools: { eslint }, enabledChecks: { knip: false } }), ['dead-code', '--all', '--fix']);
+	assert.equal(process.exitCode, 1, 'the preserved public declaration remains a reported finding');
+	assert.match(fixtureText(root, 'src/records.ts'), /function deepClone/);
+	assert.match(fixtureText(root, 'src/records.ts'), /return deepClone\(value\)/);
+	assert.doesNotMatch(fixtureText(root, 'src/records.ts'), /function privateHelper/);
+	resetExitCode();
+});
 test('dead-code fails closed when ESLint returns malformed detector output', () => {
 	const root = fixtureRoot('hygiene-dead-code-malformed-');
 	// hygiene-ignore single-use -- Keep the source fixture path visible as the input to this Quality check.
