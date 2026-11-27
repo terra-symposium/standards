@@ -10,6 +10,7 @@ IMPORTS
 // API
 import fs from 'node:fs';
 import path from 'node:path';
+import sharp from 'sharp';
 import { baseVisualProjectName, projectViewportName, viewportSizeLabel } from './viewports.js';
 import { createHash, randomUUID } from 'node:crypto';
 import { diagnosticCount, normalizeVisualStatus } from './core.js';
@@ -376,6 +377,17 @@ const persistScreenshotCapture = (dir: string, capture: ScreenshotCapture): Scre
 	fs.writeFileSync(tmpRecord, JSON.stringify(persisted));
 	fs.renameSync(tmpRecord, recordFile);
 	return persisted;
+};
+
+/**
+ * Rejects screenshots with no visible pixel variation while preserving test outcomes.
+ *
+ * @param file Screenshot file to inspect.
+ * @return Whether at least one RGB channel varies across the image.
+ */
+const hasVisualContent = async (file: string): Promise<boolean> => {
+	const { channels } = await sharp(file).stats();
+	return channels.slice(0, 3).some(channel => channel.stdev > 0);
 };
 const screenshotRunFile = '.terra-playwright-run.json';
 /**
@@ -859,6 +871,46 @@ export default class ProgressReporter {
 				visual: 'No visual surface',
 			});
 		}
+		// OMIT EMPTY VISUAL EVIDENCE WITHOUT CHANGING TEST STATUS OR DIAGNOSTICS.
+		for (const result of this.results) {
+			if (!result.screenshot || !fs.existsSync(result.screenshot)) continue;
+			try {
+				if (await hasVisualContent(result.screenshot)) continue;
+				this.runDiagnostics.push(`Uniform screenshot omitted for ${result.project} › ${result.title} (${result.viewport}).`);
+				result.screenshot = '';
+				result.visual = 'Uniform screenshot omitted';
+			} catch (err) {
+				this.runDiagnostics.push(`Could not inspect screenshot for ${result.project} › ${result.title} (${result.viewport}): ${err instanceof Error ? err.message : String(err)}`);
+			}
+		}
+		const informativeCaptures: ScreenshotCapture[] = [];
+		for (const capture of this.screenshotCaptures) {
+			if (!capture.screenshot || !fs.existsSync(capture.screenshot)) continue;
+			try {
+				if (await hasVisualContent(capture.screenshot)) {
+					informativeCaptures.push(capture);
+					continue;
+				}
+				this.runDiagnostics.push(`Uniform screenshot omitted for ${capture.title} (${capture.viewport}).`);
+				const key = createHash('sha256').update([capture.group, capture.key, capture.viewport].join('\0')).digest('hex');
+				const dir = path.resolve(this.options.screenshotsDirectory);
+				const recordFile = path.join(dir, `${key}.json`);
+				if (fs.existsSync(recordFile)) {
+					try {
+						if ((JSON.parse(fs.readFileSync(recordFile, 'utf8')) as ScreenshotCapture).runId === this.screenshotRunId) {
+							fs.rmSync(recordFile, { force: true });
+							fs.rmSync(path.join(dir, `${key}${path.extname(capture.screenshot) || '.png'}`), { force: true });
+						}
+					} catch {
+						// Keep malformed or unrelated historical records intact.
+					}
+				}
+			} catch (err) {
+				informativeCaptures.push(capture);
+				this.runDiagnostics.push(`Could not inspect screenshot for ${capture.title} (${capture.viewport}): ${err instanceof Error ? err.message : String(err)}`);
+			}
+		}
+		this.screenshotCaptures.splice(0, this.screenshotCaptures.length, ...informativeCaptures);
 
 		// UPDATE THE LOGICAL RUN MARKER BEFORE WRITING ARTIFACTS
 		if (!process.argv.includes('--list')) {

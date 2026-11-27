@@ -88,6 +88,20 @@ const result = (overrides = {}) => ({
 	...overrides,
 });
 
+/**
+ * Writes a small image with visible contrast for evidence assertions.
+ *
+ * @param sharp Sharp image factory loaded by the test.
+ * @param file Destination image path.
+ *
+ * @return Promise that resolves when the image is written.
+ */
+const writeVariedScreenshot = async (sharp, file) =>
+	sharp({ create: { width: 24, height: 16, channels: 3, background: { r: 60, g: 100, b: 140 } } })
+		.composite([{ input: Buffer.from('<svg width="24" height="16"><rect width="12" height="16" fill="#ffffff"/></svg>') }])
+		.png()
+		.toFile(file);
+
 /*//////////////////////////////////////////////////
 TESTS
 //////////////////////////////////////////////////*/
@@ -168,6 +182,34 @@ test('captures page navigation for tests that do not destructure the load fixtur
 	}
 });
 
+test('omits uniform screenshots while retaining the passing result and a diagnostic', async () => {
+	const root = await fs.mkdtemp(path.join(os.tmpdir(), 'reporting-uniform-screenshot-'));
+	try {
+		const { default: sharp } = await import('sharp');
+		const screenshot = path.join(root, 'blank.png');
+		await sharp({ create: { width: 24, height: 16, channels: 3, background: { r: 255, g: 255, b: 255 } } })
+			.png()
+			.toFile(screenshot);
+		const reporter = new ProgressReporter({ outputRoot: path.join(root, 'visual'), loadTesting: { enabled: false } });
+		const selectedTest = {
+			id: 'uniform-screenshot',
+			location: { file: path.join(root, 'tests', 'contract.spec.ts') },
+			title: 'checks source ownership',
+			titlePath: () => ['contract.spec.ts', 'checks source ownership'],
+			parent: { project: () => ({ name: 'root-astro' }) },
+		};
+		reporter.onBegin({}, { allTests: () => [selectedTest] });
+		reporter.onTestEnd(selectedTest, { attachments: [{ name: 'screenshot', contentType: 'image/png', path: screenshot }], duration: 5, error: undefined, retry: 0, status: 'passed' });
+		await reporter.onEnd();
+		assert.equal(reporter.results[0].status, 'passed');
+		assert.equal(reporter.results[0].screenshot, '');
+		assert.equal(reporter.results[0].visual, 'Uniform screenshot omitted');
+		assert.match(reporter.runDiagnostics.join('\n'), /Uniform screenshot omitted for root-astro/);
+	} finally {
+		await fs.rm(root, { recursive: true, force: true });
+	}
+});
+
 test('expands regular Playwright projects and preserves single-run setup/capture projects', () => {
 	const orig = process.env.PW_VIEWPORTS;
 	delete process.env.PW_VIEWPORTS;
@@ -239,9 +281,7 @@ test('rebuilds the default screenshot deck from accumulated captures', async () 
 	try {
 		const { default: sharp } = await import('sharp');
 		const screenshot = path.join(root, 'source.png');
-		await sharp({ create: { width: 24, height: 16, channels: 3, background: { r: 60, g: 100, b: 140 } } })
-			.png()
-			.toFile(screenshot);
+		await writeVariedScreenshot(sharp, screenshot);
 		const outputRoot = path.join(root, 'visual');
 		const testCase = {
 			id: 'result-screenshot',
@@ -329,9 +369,7 @@ test('builds aggregate artifacts from repository screenshot folders and report w
 		const { default: sharp } = await import('sharp');
 		const { default: ExcelJS } = await import('exceljs');
 		const screenshot = path.join(root, 'source.png');
-		await sharp({ create: { width: 24, height: 16, channels: 3, background: { r: 60, g: 100, b: 140 } } })
-			.png()
-			.toFile(screenshot);
+		await writeVariedScreenshot(sharp, screenshot);
 		const repos = ['Website', 'Salesphere'];
 		const screenshotSrcs = [];
 		const spreadsheetSrcs = [];
@@ -444,9 +482,7 @@ test('aggregates shared screenshot runs across viewport subprocesses and restart
 	try {
 		const { default: sharp } = await import('sharp');
 		const screenshot = path.join(root, 'source.png');
-		await sharp({ create: { width: 24, height: 16, channels: 3, background: { r: 60, g: 100, b: 140 } } })
-			.png()
-			.toFile(screenshot);
+		await writeVariedScreenshot(sharp, screenshot);
 		const outputRoot = path.join(root, 'visual');
 		const evidenceDir = path.join(outputRoot, 'screenshots');
 		const latestArtifacts = async () => {
@@ -715,9 +751,7 @@ test('writes responsive screenshot-only slides', async () => {
 	try {
 		const { default: sharp } = await import('sharp');
 		const screenshot = path.join(root, 'capture.png');
-		await sharp({ create: { width: 32, height: 18, channels: 3, background: { r: 40, g: 80, b: 120 } } })
-			.png()
-			.toFile(screenshot);
+		await writeVariedScreenshot(sharp, screenshot);
 		const viewports = [
 			['mobile', '390×844'],
 			['sm', '640×800'],
