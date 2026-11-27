@@ -145,7 +145,7 @@
 	},
 	"dependencies": {
 		"typescript": "^5.0.0",
-		"@terra-symposium/boundaries": "^0.2.3"
+		"@terra-symposium/boundaries": "latest"
 	},
 	"peerDependencies": {
 		"eslint": ">=9"

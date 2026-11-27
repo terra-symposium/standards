@@ -15,7 +15,7 @@
 		"@astrojs/react": "^7.1.0",
 		"@neondatabase/serverless": "^1.0.2",
 		"@terra-symposium/boundaries": "workspace:*",
-		"@terra-symposium/styling": "^0.2.0",
+		"@terra-symposium/styling": "latest",
 		"astro": "^7.4.0",
 		"fast-xml-parser": "^5.2.5",
 		"react": "^19.3.1",

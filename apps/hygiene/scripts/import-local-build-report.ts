@@ -137,7 +137,7 @@ async function main(): Promise<void> {
 				'--package',
 				'node@24',
 				'--package',
-				'@terra-symposium/hygiene@0.5.0',
+				'@terra-symposium/hygiene@latest',
 				'hygiene',
 				'quality',
 				'--all',

@@ -41,7 +41,7 @@
 		"jszip": "^3.10.2",
 		"pptxgenjs": "^4.0.1",
 		"sharp": "^0.35.3",
-		"@terra-symposium/styling": "^0.2.0"
+		"@terra-symposium/styling": "latest"
 	},
 	"peerDependencies": {
 		"@playwright/test": ">=1.52.0 <2"

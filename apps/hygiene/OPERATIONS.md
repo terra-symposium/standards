@@ -51,6 +51,6 @@ For the Terra Symposium website, import test and quality metrics from a clean ch
 pnpm --filter @terra-symposium/hygiene-dashboard reports:import -- --repository Terra-Symposium/terra-symposium-website --checkout /path/to/terra-symposium-website --branch development
 ```
 
-Use `--branch main` for the main branch. The importer runs the repository's JUnit suite and `@terra-symposium/hygiene@0.5.0`, then discards the raw files. Its current test command is specific to the Terra Symposium website; another repository needs its JUnit test command configured before local test metrics can be imported. If a branch has no `quality.json`, the importer uses `origin/development:quality.json` and records that policy branch beside the local report.
+Use `--branch main` for the main branch. The importer runs the repository's JUnit suite and the latest `@terra-symposium/hygiene` package, then discards the raw files. Its current test command is specific to the Terra Symposium website; another repository needs its JUnit test command configured before local test metrics can be imported. If a branch has no `quality.json`, the importer uses `origin/development:quality.json` and records that policy branch beside the local report.
 
 For UI-only work, `pnpm --filter @terra-symposium/hygiene-dashboard dev` starts Astro without Netlify Functions. Run `pnpm --filter @terra-symposium/hygiene-dashboard test` for parser, authorization, score, and report policy tests.
