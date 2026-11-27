@@ -7,6 +7,8 @@ Terra releases use one central publisher in the Standards repository. Maintainer
 
 An `npm whoami` 401 in a maintainer's terminal does not block this workflow. Use the Standards Actions publisher for its supported packages and check the workflow's authentication result. For packages outside that workflow, start `npm login --auth-type=web`, open the generated login URL in the in-app browser, leave that tab open for the maintainer, and wait for them to complete authentication before resuming the release. Do not end the release task on the first local 401. Never request a token value in chat or put it in task text.
 
+For a direct publish that returns `EOTP`, use the CLI's structured `error.authUrl` and `error.doneUrl`; human-readable output may mask the challenge URL. Open the exact auth URL in the in-app browser and keep the release task active. When the browser says **Authentication Successful**, fetch the short-lived code from the matching done URL and retry the publish with `npm_config_otp` without logging the code. If the done URL returns 404, retry the publish instead of treating the 404 as proof that browser authentication failed. A new `EOTP` means a new challenge: open its new URL and continue. Verify the published version in the registry before updating consumers.
+
 ## One publisher for Terra
 
 The workflow at .github/workflows/publish-packages.yml is the single publisher. It builds and publishes the four Standards packages and @terra-symposium/docs. Keep the npm credential only in the Standards repository secret. Do not add per-repository tokens or copy it into consumer repositories.
