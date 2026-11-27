@@ -8,6 +8,7 @@ IMPORTS
 
 // API
 import { useEffect, useState } from 'react';
+import { MappedFormFields } from '@terra-symposium/styling/ui';
 
 /*//////////////////////////////////////////////////
 CONFIG
@@ -411,7 +412,18 @@ export default function Dashboard() {
 										})(event);
 									}}
 								>
-									<input name='branch' aria-label='Additional branch' placeholder='Add branch' pattern='[A-Za-z0-9._/-]+' />
+									<MappedFormFields
+										fields={[
+											{
+												name: 'branch',
+												id: 'branch-input',
+												label: 'Additional branch',
+												labelClassName: 'sr-only',
+												control: <input id='branch-input' name='branch' aria-label='Additional branch' placeholder='Add branch' pattern='[A-Za-z0-9._/-]+' />,
+											},
+										]}
+										layout='inline'
+									/>
 									<button title='Track branch'>+</button>
 								</form>
 							</div>
