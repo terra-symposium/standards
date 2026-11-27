@@ -202,9 +202,9 @@ See [Terra conventions](conventions.md) for the repository-derived rules and qua
 
 ## Prevent recurring manual fixes
 
-After repeated code repairs, inspect the diff for a deterministic pattern and its safety boundaries. Propose a shared rule only when multiple examples show it would help and the owner package can express it safely. Implement package automation only when the task includes that scope.
+After every Hygiene run, review each distinct finding class from the baseline and gate output, including classes handled by existing fixers and classes that required no consumer edit. Record the owner package, the deterministic transformation that could resolve the class, the unsafe boundary, and whether existing automation covers it. This retrospective is part of each run; do not wait for the same manual repair to recur.
 
-When implementing a rule, prefer an idempotent fixer in the owning package's normal Quality workflow. Add focused positive and negative tests, apply it to the relevant eligible files, run it twice, and inspect every edit. Preserve literals, generated content, public contracts, and behavior. Keep comments, TSDoc, documentation prose, and other explanations agent-authored after inspecting the implementation. Record what was automated, its coverage and scope, and what still needs contextual judgment.
+When the request authorizes package work and a safe, repeatable transformation exists, implement an idempotent fixer in the owning package's normal Quality workflow before hand-editing consumers. Add focused positive and unsafe-boundary tests, apply it to eligible findings, run it twice, and inspect every edit. Preserve literals, generated content, public contracts, and behavior. Keep comments, TSDoc, documentation prose, and other explanations agent-authored after inspecting the implementation. Record what was automated, its coverage and scope, and what still needs contextual judgment.
 
 ## Full browser and runtime issue review
 
