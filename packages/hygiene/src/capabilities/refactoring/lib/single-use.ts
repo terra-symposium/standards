@@ -84,9 +84,10 @@ type Ref = { file: string; source: ts.SourceFile; node: ts.Identifier };
 /**
  * A single-use exception, valid only when it names a declaration and explains its boundary.
  */
-type SingleUseIgnoreDirective = { source: ts.SourceFile; line: number; reason?: string; candidateKey?: string };
+type SingleUseIgnoreDirective = { source: ts.SourceFile; start: number; line: number; reason?: string; candidateKey?: string };
 const SINGLE_USE_IGNORE_PREFIX_REGEX = /^\/\/\s*hygiene-ignore\s+single-use\b/;
 const SINGLE_USE_IGNORE_DOC_GAP_REGEX = /^[ \t]*\r?\n[ \t]*\/\*\*[\s\S]*?\*\/[ \t]*\r?\n[ \t]*$/;
+const singleUseDirectiveFindingStarts = new WeakMap<SingleUseFinding, number>();
 const rejectedInlineCandidates = new Map<string, string>();
 const astroConsumerCache = new WeakMap<QualityCfg, { signature: string; consumers: Set<string> }>();
 const repeatedCallbackOwnerCache = new WeakMap<ts.SourceFile, Set<ts.Symbol>>();
@@ -158,7 +159,7 @@ function singleUseIgnoreDirectives(
 				);
 			});
 			const candidateKey = attached ? `${attached.file}:${attached.name.getStart(attached.source)}` : undefined;
-			const directive = { source: src, line, reason: /^\/\/\s*hygiene-ignore\s+single-use\s+--\s*(\S.*)$/.exec(src.text.slice(range.pos, range.end))?.[1]?.trim(), candidateKey };
+			const directive = { source: src, start, line, reason: /^\/\/\s*hygiene-ignore\s+single-use\s+--\s*(\S.*)$/.exec(src.text.slice(range.pos, range.end))?.[1]?.trim(), candidateKey };
 			directives.push(directive);
 			if (candidateKey && !byCandidate.has(candidateKey)) byCandidate.set(candidateKey, directive);
 		}
@@ -175,12 +176,12 @@ function singleUseIgnoreDirectives(
  * @return A blocking finding that requires the marker to be corrected or removed.
  */
 function singleUseDirectiveFinding(cfg: QualityCfg, directive: SingleUseIgnoreDirective): SingleUseFinding {
-	return {
+	const finding: SingleUseFinding = {
 		file: relative(cfg.root, directive.source.fileName),
 		line: directive.line,
 		name: 'single-use-ignore',
 		decision: 'REVIEW',
-		autofixable: false,
+		autofixable: Boolean(directive.reason && directive.candidateKey),
 		reason: !directive.reason
 			? 'single-use ignore markers require a concrete reason after --'
 			: !directive.candidateKey
@@ -188,6 +189,8 @@ function singleUseDirectiveFinding(cfg: QualityCfg, directive: SingleUseIgnoreDi
 				: 'single-use ignore marker is stale or duplicated; its declaration has no matching single-use finding',
 		agentAction: 'Attach the marker to one declaration with a concrete reason, or remove it when the declaration no longer has one in-scope consumer.',
 	};
+	singleUseDirectiveFindingStarts.set(finding, directive.start);
+	return finding;
 }
 
 /**
@@ -1593,7 +1596,43 @@ export function fixSingleUseDeclarations(cfg: QualityCfg, changedFileNames?: Set
 		const checker = program.getTypeChecker();
 		const { candidates, references: refs } = collect(cfg, program, checker);
 		const astroConsumers = astroConsumersFor(cfg, program);
-		const { byCandidate: directivesByCandidate } = singleUseIgnoreDirectives(cfg, program.getSourceFiles(), candidates);
+		const { directives, byCandidate: directivesByCandidate } = singleUseIgnoreDirectives(cfg, program.getSourceFiles(), candidates);
+		// hygiene-ignore single-use -- Keep the completed analysis named before selecting stale marker directives.
+		const findings = findingsFromAnalysis(cfg, checker, candidates, refs, astroConsumers, program);
+		const staleStarts = new Set(
+			findings.filter(finding => finding.name === 'single-use-ignore' && finding.autofixable).map(finding => `${finding.file}:${singleUseDirectiveFindingStarts.get(finding)}`),
+		);
+		const staleEdits = new Map<string, { start: number; end: number; text: string }[]>();
+		for (const directive of directives) {
+			// hygiene-ignore single-use -- Keep this repository-relative path explicit in the stale-marker lookup.
+			const file = relative(cfg.root, directive.source.fileName);
+			if (!staleStarts.has(`${file}:${directive.start}`)) continue;
+			const lineStart = directive.source.getPositionOfLineAndCharacter(directive.line - 1, 0);
+			const lineEnd = directive.source.text.indexOf('\n', lineStart);
+			const end = lineEnd < 0 ? directive.source.text.length : lineEnd + 1;
+			const line = directive.source.text.slice(lineStart, lineEnd < 0 ? end : lineEnd);
+			const commentStart = lineStart + line.search(/\/\/\s*hygiene-ignore\s+single-use\b/);
+			if (commentStart < lineStart) continue;
+			const standalone = S_REGEX.test(line.slice(0, commentStart - lineStart)) && S_REGEX.test(line.slice(commentStart - lineStart).replace(/^\/\/[^\r\n]*/, ''));
+			const fileEdits = staleEdits.get(directive.source.fileName) ?? [];
+			fileEdits.push({
+				start: standalone ? lineStart : commentStart > lineStart && line[commentStart - lineStart - 1] === ' ' ? commentStart - 1 : commentStart,
+				end: standalone ? end : lineEnd < 0 ? end : lineEnd,
+				text: '',
+			});
+			staleEdits.set(directive.source.fileName, fileEdits);
+		}
+		if (staleEdits.size) {
+			for (const [file, fileEdits] of staleEdits) {
+				const src = readFileSync(file, 'utf8');
+				const updated = [...fileEdits].sort((a, b) => b.start - a.start).reduce((text, edit) => text.slice(0, edit.start) + edit.text + text.slice(edit.end), src);
+				if (updated !== src) {
+					writeFileSync(file, updated);
+					changedFiles.add(file);
+				}
+			}
+			continue;
+		}
 		const edits = new Map<string, { start: number; end: number; text: string }[]>();
 		const pending: { fileEdits: { file: string; start: number; end: number; text: string }[]; referenceLength: number; nestedReference: boolean; candidateKey: string; jsxFile?: string }[] = [];
 		for (const c of candidates) {

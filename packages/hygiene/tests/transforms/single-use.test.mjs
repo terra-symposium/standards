@@ -1322,6 +1322,35 @@ test('malformed, detached, and stale single-use exceptions remain findings', () 
 		'detached markers do not hide the candidate',
 	);
 });
+test('autofix removes only attached stale or duplicate single-use markers', () => {
+	const root = fixtureRoot('hygiene-single-use-ignore-autofix-');
+	// hygiene-ignore single-use -- Keep the multi-marker fixture text intact for post-fix assertions.
+	const source = `function unused() { return 1; } // hygiene-ignore single-use -- No in-scope consumer remains.\nfunction active() { return 2; } // hygiene-ignore single-use -- Preserve the named boundary.\nexport const result = active();\nconst malformed = 3; // hygiene-ignore single-use --\nexport const malformedResult = malformed;\n`;
+	fixtureFile(root, 'src/main.ts', source);
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
+	const initial = singleUseFindings(cfg);
+	assert.equal(initial.filter(finding => finding.name === 'single-use-ignore').length, 2);
+	assert.equal(initial.filter(finding => finding.name === 'single-use-ignore' && finding.autofixable).length, 1);
+	assert.equal(fixSingleUseDeclarations(cfg), 1);
+	const updated = fixtureText(root, 'src/main.ts');
+	assert.doesNotMatch(updated, /unused\(\).*hygiene-ignore/);
+	assert.match(updated, /active\(\).*hygiene-ignore single-use -- Preserve the named boundary/);
+	assert.match(updated, /const malformed = 3; \/\/ hygiene-ignore single-use --\n/);
+	assert.equal(fixSingleUseDeclarations(cfg), 0, 'the cleanup is idempotent');
+});
+test('autofix removes a duplicate trailing marker while retaining the active marker', () => {
+	const root = fixtureRoot('hygiene-single-use-ignore-duplicate-');
+	// hygiene-ignore single-use -- Keep the duplicate-marker fixture text intact for post-fix assertions.
+	const source = `// hygiene-ignore single-use -- Preserve this named boundary.\nfunction boundary() { return 1; } // hygiene-ignore single-use -- Duplicate marker.\nexport const result = boundary();\n`;
+	fixtureFile(root, 'src/main.ts', source);
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
+	assert.ok(singleUseFindings(cfg).some(finding => finding.name === 'single-use-ignore' && finding.autofixable));
+	assert.equal(fixSingleUseDeclarations(cfg), 1);
+	const updated = fixtureText(root, 'src/main.ts');
+	assert.match(updated, /hygiene-ignore single-use -- Preserve this named boundary/);
+	assert.doesNotMatch(updated, /Duplicate marker/);
+	assert.equal(fixSingleUseDeclarations(cfg), 0, 'the cleanup is idempotent');
+});
 test('inline markers remain agent-owned and block automatic declaration edits', () => {
 	const root = fixtureRoot('hygiene-single-use-malformed-inline-');
 	const orig = `const safe = 3; // hygiene-ignore single-use --\nexport const result = safe;\n`;
