@@ -501,6 +501,85 @@ void { sharedItem, nested: { ...sharedItem } };
 	assert.equal(fixSingleUseTypes(cfg), 0);
 	assert.equal(file.endsWith('src/main.ts'), true);
 });
+test('single-use fixing inlines stable const aliases but preserves mutable and shadowed bindings', () => {
+	const root = fixtureRoot('hygiene-single-use-stable-alias-');
+	fixtureFile(
+		root,
+		'src/stable.ts',
+		`export {};
+type Value = { ready: boolean };
+function getValue(): Value { return { ready: true }; }
+function consume(value: Value): Value { return value; }
+const source = getValue();
+const alias = source;
+function readLater() { return consume(alias); }
+void source;
+readLater();
+`,
+	);
+	fixtureFile(
+		root,
+		'src/mutable.ts',
+		`export {};
+let source = 1;
+const alias = source;
+source = 2;
+function consume(value: number) { return value; }
+consume(alias);
+void source;
+`,
+	);
+	fixtureFile(
+		root,
+		'src/shadowed.ts',
+		`export {};
+const source = 'outer';
+const alias = source;
+function read(source: string) { return alias; }
+void read('inner');
+void source;
+`,
+	);
+	fixtureFile(
+		root,
+		'src/tdz.ts',
+		`export {};
+const alias = source;
+const source = 1;
+function consume(value: number) { return value; }
+consume(alias);
+void source;
+`,
+	);
+	fixtureFile(root, 'src/imported.ts', `export const source = 1;\n`);
+	fixtureFile(
+		root,
+		'src/import-alias.ts',
+		`export {};
+import { source } from './imported';
+const alias = source;
+function consume(value: number) { return value; }
+consume(alias);
+`,
+	);
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
+	const findings = new Map(singleUseFindings(cfg).map(({ file, name, autofixable }) => [`${file}:${name}`, autofixable]));
+	assert.equal(findings.get('src/stable.ts:alias'), true);
+	assert.equal(findings.get('src/mutable.ts:alias'), false);
+	assert.equal(findings.get('src/shadowed.ts:alias'), false);
+	assert.equal(findings.get('src/tdz.ts:alias'), false);
+	assert.equal(findings.get('src/import-alias.ts:alias'), false);
+	assert.equal(fixSingleUseDeclarations(cfg), 1);
+	const stable = fixtureText(root, 'src/stable.ts');
+	assert.doesNotMatch(stable, /const alias = source/u);
+	assert.match(stable, /consume\(\(source\)\)/u);
+	assert.equal(ts.createSourceFile('stable.ts', stable, ts.ScriptTarget.Latest, true).parseDiagnostics.length, 0);
+	assert.equal(fixSingleUseDeclarations(cfg), 0);
+	assert.match(fixtureText(root, 'src/mutable.ts'), /const alias = source/u);
+	assert.match(fixtureText(root, 'src/shadowed.ts'), /const alias = source/u);
+	assert.match(fixtureText(root, 'src/tdz.ts'), /const alias = source/u);
+	assert.match(fixtureText(root, 'src/import-alias.ts'), /const alias = source/u);
+});
 test('single-use fixing moves initializers only to an immediate first-evaluation use', () => {
 	const root = fixtureRoot('hygiene-single-use-immediate-value-');
 	fixtureFile(

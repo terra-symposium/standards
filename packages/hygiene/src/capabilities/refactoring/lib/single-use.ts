@@ -1103,6 +1103,29 @@ function initSafeToInline(candidate: Candidate, checker: ts.TypeChecker, ref?: R
 			!boundarySensitive
 		)
 			return true;
+		const sourceSymbol = ts.isIdentifier(init) ? checker.getSymbolAtLocation(init) : undefined;
+		const sourceDeclaration = sourceSymbol?.valueDeclaration;
+		if (
+			!hasDynamicScope &&
+			ts.isIdentifier(init) &&
+			candidate.file === ref.file &&
+			ts.isVariableDeclaration(candidate.name.parent) &&
+			!candidate.name.parent.type &&
+			sourceSymbol &&
+			sourceSymbol !== candidate.symbol &&
+			checker.getSymbolsInScope(ref.node, ts.SymbolFlags.Value).find(symbol => symbol.name === init.text) === sourceSymbol &&
+			sourceDeclaration &&
+			ts.isVariableDeclaration(sourceDeclaration) &&
+			sourceDeclaration.getSourceFile() === candidate.source &&
+			ts.isIdentifier(sourceDeclaration.name) &&
+			ts.isVariableDeclarationList(sourceDeclaration.parent) &&
+			Boolean(sourceDeclaration.parent.flags & ts.NodeFlags.Const) &&
+			sourceDeclaration.getStart(candidate.source) < candidate.statement.getStart(candidate.source) &&
+			!(ts.getLeadingCommentRanges(candidate.source.text, candidate.statement.getFullStart()) ?? []).length &&
+			!containsCommentTrivia(candidate.source, candidate.statement.getStart(candidate.source), candidate.statement.getEnd()) &&
+			checker.typeToString(checker.getTypeAtLocation(candidate.name)) === checker.typeToString(checker.getTypeAtLocation(init))
+		)
+			return true;
 	}
 	const declaration = candidate.name.parent;
 	if (ref && ts.isVariableDeclaration(declaration) && !declaration.type && isModuleCallArg(candidate, ref) && isStaticLiteralExpr(init)) return true;
