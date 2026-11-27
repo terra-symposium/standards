@@ -5,9 +5,13 @@ description: One Terra publisher, the limits of npm tokens and OIDC, and release
 
 Terra releases use one central publisher in the Standards repository. Maintainers start a GitHub Actions run; they do not need to sign in to npm for each release. The workflow reads one credential from the Standards Actions secret PACKAGES_TOKEN. That credential must be an npm granular token with read and write access to the Terra Symposium packages.
 
+An `npm whoami` 401 in a maintainer's terminal does not block this workflow. Use the Standards Actions publisher for its supported packages and check the workflow's authentication result. For packages outside that workflow, start `npm login --auth-type=web`, open the generated login URL in the in-app browser, leave that tab open for the maintainer, and wait for them to complete authentication before resuming the release. Do not end the release task on the first local 401. Never request a token value in chat or put it in task text.
+
 ## One publisher for Terra
 
 The workflow at .github/workflows/publish-packages.yml is the single publisher. It builds and publishes the four Standards packages and @terra-symposium/docs. Keep the npm credential only in the Standards repository secret. Do not add per-repository tokens or copy it into consumer repositories.
+
+Styling and Scraping are not published by this workflow. Release them from their source repositories using their configured publishing process and authenticated npm account before updating consumers to their new versions.
 
 The workflow checks out Docs at an explicit 40-character commit SHA, installs from its config lockfile, builds, and verifies the package name before publishing. Standards packages come from the checked-out Standards revision.
 
