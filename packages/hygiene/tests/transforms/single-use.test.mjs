@@ -24,6 +24,89 @@ REGEX
 
 const EXPORT_TYPE_PAYLOAD_REGEX = /export type Payload/;
 const EXPORT_FN_PARSEREPORT_REGEX = /export function parseReport/;
+test('single-use fixing inlines typed DOM closest as the final returned record field', () => {
+	const root = fixtureRoot('hygiene-single-use-dom-closest-record-');
+	fixtureFile(
+		root,
+		'src/main.ts',
+		`function context(target: Element) {
+	const form = target.closest<HTMLFormElement>('form');
+	return { action: 'submit', form };
+}
+`,
+	);
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
+	assert.equal(fixSingleUseDeclarations(cfg), 1);
+	const updated = fixtureText(root, 'src/main.ts');
+	assert.doesNotMatch(updated, /const form/);
+	assert.match(updated, /return \{ action: 'submit', form: \(target\.closest<HTMLFormElement>\('form'\)\) \}/);
+	assert.equal(fixSingleUseDeclarations(cfg), 0, 'the transform is idempotent');
+});
+test('single-use fixing keeps a DOM closest binding when earlier record fields can run code', () => {
+	const root = fixtureRoot('hygiene-single-use-dom-closest-effect-');
+	const original = `function context(target: Element, action: () => string) {
+	const form = target.closest<HTMLFormElement>('form');
+	return { action: action(), form };
+}
+`;
+	fixtureFile(root, 'src/main.ts', original);
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
+	assert.ok(singleUseFindings(cfg).some(finding => finding.name === 'form' && finding.decision === 'REVIEW'));
+	assert.equal(fixSingleUseDeclarations(cfg), 0);
+	assert.equal(fixtureText(root, 'src/main.ts'), original);
+});
+test('single-use fixing keeps a closest binding with authored comments or non-DOM types', () => {
+	const root = fixtureRoot('hygiene-single-use-closest-review-boundaries-');
+	const commented = `function context(target: Element) {
+	const form = target.closest<HTMLFormElement>('form');
+	// Keep the lookup boundary visible.
+	return { action: 'submit', form };
+}
+`;
+	const custom = `function context(target: { closest: (selector: string) => Element | null }) {
+	const form = target.closest('form');
+	return { action: 'submit', form };
+}
+`;
+	fixtureFile(root, 'src/commented.ts', commented);
+	fixtureFile(root, 'src/custom.ts', custom);
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
+	assert.equal(singleUseFindings(cfg).filter(finding => finding.name === 'form').length, 2);
+	assert.equal(fixSingleUseDeclarations(cfg), 0);
+	assert.equal(fixtureText(root, 'src/commented.ts'), commented);
+	assert.equal(fixtureText(root, 'src/custom.ts'), custom);
+});
+test('single-use fixing inlines the exact awaited boolean fallback into its guard', () => {
+	const root = fixtureRoot('hygiene-single-use-awaited-fallback-');
+	fixtureFile(
+		root,
+		'src/main.ts',
+		`async function verify(run: () => Promise<void>) {
+	const valid = await run().then(() => true).catch(() => false);
+	if (!valid) throw new Error('invalid');
+}
+`,
+	);
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
+	assert.equal(fixSingleUseDeclarations(cfg), 1);
+	const updated = fixtureText(root, 'src/main.ts');
+	assert.doesNotMatch(updated, /const valid/);
+	assert.match(updated, /if \(!\(await run\(\)\.then\(\(\) => true\)\.catch\(\(\) => false\)\)\) throw/);
+	assert.equal(fixSingleUseDeclarations(cfg), 0, 'the transform is idempotent');
+});
+test('single-use fixing keeps modified promise fallback chains for review', () => {
+	const root = fixtureRoot('hygiene-single-use-awaited-fallback-boundary-');
+	const original = `async function verify(run: () => Promise<void>) {
+	const valid = await run().then(() => true).catch(() => true);
+	if (!valid) throw new Error('invalid');
+}
+`;
+	fixtureFile(root, 'src/main.ts', original);
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] });
+	assert.ok(singleUseFindings(cfg).some(finding => finding.name === 'valid' && finding.decision === 'REVIEW'));
+	assert.equal(fixSingleUseDeclarations(cfg), 0);
+	assert.equal(fixtureText(root, 'src/main.ts'), original);
+});
 test('root-wide single-use fixes ignore dependency files loaded by TypeScript', () => {
 	const root = fixtureRoot('hygiene-single-use-node-modules-');
 	const dependencyPath = 'node_modules/.pnpm/sample-package@1.0.0/node_modules/sample-package/index.ts';

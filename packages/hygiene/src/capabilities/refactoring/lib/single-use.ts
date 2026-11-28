@@ -908,7 +908,6 @@ function containsCommentTrivia(src: ts.SourceFile, start: number, end: number): 
 	return false;
 }
 
-// hygiene-ignore single-use -- Keep the documented isFirstConsumerEvaluation declaration so its parameter and return contract remains attached.
 /**
  * Checks whether a single-use reference is evaluated before any other consumer expression.
  *
@@ -1082,6 +1081,79 @@ function initSafeToInline(candidate: Candidate, checker: ts.TypeChecker, ref?: R
 			if (!boundarySensitive) ts.forEachChild(node, inspectInit);
 		};
 		inspectInit(init);
+		if (candidate.kind === 'variable' && ts.isVariableStatement(candidate.statement) && ts.isAwaitExpression(init) && checker.getTypeAtLocation(init).flags & ts.TypeFlags.BooleanLike) {
+			const fallback = init.expression;
+			if (ts.isCallExpression(fallback) && ts.isPropertyAccessExpression(fallback.expression) && fallback.expression.name.text === 'catch' && fallback.arguments.length === 1) {
+				const catchBody = fallback.arguments[0];
+				const primary = fallback.expression.expression;
+				if (
+					catchBody &&
+					ts.isArrowFunction(catchBody) &&
+					catchBody.parameters.length === 0 &&
+					catchBody.body.kind === ts.SyntaxKind.FalseKeyword &&
+					ts.isCallExpression(primary) &&
+					ts.isPropertyAccessExpression(primary.expression) &&
+					primary.expression.name.text === 'then' &&
+					primary.arguments.length === 1
+				) {
+					const thenBody = primary.arguments[0];
+					let condition: ts.Expression = ref.node;
+					while (ts.isParenthesizedExpression(condition.parent) || ts.isAsExpression(condition.parent) || ts.isNonNullExpression(condition.parent)) condition = condition.parent;
+					const negation = condition.parent;
+					if (
+						thenBody &&
+						ts.isArrowFunction(thenBody) &&
+						thenBody.parameters.length === 0 &&
+						thenBody.body.kind === ts.SyntaxKind.TrueKeyword &&
+						ts.isPrefixUnaryExpression(negation) &&
+						negation.operator === ts.SyntaxKind.ExclamationToken &&
+						negation.operand === condition &&
+						ts.isIfStatement(negation.parent) &&
+						negation.parent.expression === negation &&
+						useStatement &&
+						candidateIndex >= 0 &&
+						statements?.[candidateIndex + 1] === useStatement &&
+						isFirstConsumerEvaluation(ref.node, init, useStatement) &&
+						!hasDynamicScope &&
+						!(ts.getLeadingCommentRanges(candidate.source.text, candidate.statement.getFullStart()) ?? []).length &&
+						!containsCommentTrivia(candidate.source, candidate.statement.getStart(candidate.source), candidate.statement.getEnd()) &&
+						!containsCommentTrivia(candidate.source, candidate.statement.getEnd(), useStatement.getStart(candidate.source))
+					)
+						return true;
+				}
+			}
+		}
+		if (
+			candidate.kind === 'variable' &&
+			ts.isVariableStatement(candidate.statement) &&
+			ts.isCallExpression(init) &&
+			!init.questionDotToken &&
+			ts.isPropertyAccessExpression(init.expression) &&
+			init.expression.name.text === 'closest'
+		) {
+			const property = ref.node.parent;
+			if (
+				ts.isIdentifier(init.expression.expression) &&
+				init.arguments.length === 1 &&
+				ts.isStringLiteral(init.arguments[0]!) &&
+				checker.getResolvedSignature(init)?.declaration?.getSourceFile().fileName.endsWith('/lib.dom.d.ts') &&
+				((ts.isPropertyAssignment(property) && property.initializer === ref.node) || (ts.isShorthandPropertyAssignment(property) && property.name === ref.node)) &&
+				ts.isObjectLiteralExpression(property.parent) &&
+				property.parent.properties[property.parent.properties.length - 1] === property &&
+				ts.isReturnStatement(property.parent.parent) &&
+				property.parent.parent.expression === property.parent &&
+				property.parent.properties.slice(0, -1).every(previous => ts.isPropertyAssignment(previous) && !ts.isComputedPropertyName(previous.name) && isStaticLiteralExpr(previous.initializer)) &&
+				useStatement &&
+				candidateIndex >= 0 &&
+				statements?.[candidateIndex + 1] === useStatement &&
+				!hasDynamicScope &&
+				!boundarySensitive &&
+				!(ts.getLeadingCommentRanges(candidate.source.text, candidate.statement.getFullStart()) ?? []).length &&
+				!containsCommentTrivia(candidate.source, candidate.statement.getStart(candidate.source), candidate.statement.getEnd()) &&
+				!containsCommentTrivia(candidate.source, candidate.statement.getEnd(), useStatement.getStart(candidate.source))
+			)
+				return true;
+		}
 		if (
 			useStatement &&
 			candidateIndex >= 0 &&

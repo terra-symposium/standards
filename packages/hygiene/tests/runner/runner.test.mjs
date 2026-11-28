@@ -158,7 +158,6 @@ test('warn and safe-fix quality passes leave missing documentation for an author
 		sourceRoots: ['src'],
 		extensions: ['.ts'],
 		documentation: { required: { types: false, functions: true, exportedFunctions: true } },
-		autofix: { document: false },
 		enabledChecks: {
 			accessibility: false,
 			alias: false,
