@@ -21,6 +21,8 @@ import type { QualityAnalysis, QualityCfg } from '@terra-symposium/hygiene/core'
 REGEX
 //////////////////////////////////////////////////*/
 
+const R_N_U_REGEX = /^\/\*\*\r?\n/u;
+const S_TYPE_SATISFIES_B_U_REGEX = /^\/\*\*\s*@(?:type|satisfies)\b/u;
 const N_REGEX = /(?<=\n)/;
 const R_N_END_REGEX = /\r?\n$/;
 
@@ -658,7 +660,6 @@ function containsNode(parent: ts.Node, tgt: ts.Node): boolean {
 	return false;
 }
 
-// hygiene-ignore single-use -- Keep the documented tsdocBlocks declaration so its parameter and return contract remains attached.
 /**
  * Scans source text for TSDoc blocks without treating comment-shaped text inside literals as documentation.
  *
@@ -671,7 +672,7 @@ function tsdocBlocks(src: string, parsed: ts.SourceFile): TSDocBlock[] {
 	const blocks: TSDocBlock[] = [];
 	const literals: Array<{ start: number; end: number }> = [];
 	const visit = (node: ts.Node): void => {
-		if (ts.isStringLiteralLike(node) || ts.isRegularExpressionLiteral(node) || ts.isJsxText(node)) literals.push({ start: node.getStart(parsed), end: node.end });
+		if (ts.isStringLiteralLike(node) || ts.isRegularExpressionLiteral(node) || ts.isJsxText(node) || ts.isTemplateExpression(node)) literals.push({ start: node.getStart(parsed), end: node.end });
 		ts.forEachChild(node, visit);
 	};
 	visit(parsed);
@@ -856,7 +857,7 @@ function descFindingsForFile(cfg: QualityCfg, file: string, src: string, parsed:
 	}
 	if (cfg.documentation?.required?.multilineTsdoc)
 		for (const block of blocks)
-			if (!/^\/\*\*\r?\n/u.test(block.text) && !/^\/\*\*\s*@(?:type|satisfies)\b/u.test(block.text))
+			if (!R_N_U_REGEX.test(block.text) && !S_TYPE_SATISFIES_B_U_REGEX.test(block.text))
 				findings.push(documentationCommentReport(file, parsed, block.start, '<TSDoc opening>', 'summary', 'put the TSDoc description on the line after /**', cfg));
 	const attached = new Set<number>();
 	const requiredAttached = new Set<number>();
@@ -1129,16 +1130,42 @@ export function documentationFindings(cfg: QualityCfg, analysis?: QualityAnalysi
 }
 
 /**
- * Retains the historical API without generating placeholder documentation.
- * Missing prose is reported for an author to write after reviewing the source.
+ * Normalizes existing TSDoc openings without inventing or changing their prose.
  *
  * @param cfg Quality configuration containing documentation requirements.
  * @param file Absolute source path to inspect.
  *
- * @return Always `false`; the documentation workflow is read-only.
+ * @return Whether an existing TSDoc block was reformatted.
  */
 export function documentSrcFile(cfg: QualityCfg, file: string): boolean {
-	void cfg;
-	void file;
-	return false;
+	if (!cfg.documentation?.required?.multilineTsdoc || !SUPPORTED.has(extname(file))) return false;
+	const src = readFileSync(file, 'utf8');
+	const parsed = ts.createSourceFile(file, src, ts.ScriptTarget.Latest, true, srcKind(file));
+	const newline = src.includes('\r\n') ? '\r\n' : '\n';
+	const opening = '/' + '*'.repeat(2);
+	const edits: { start: number; end: number; text: string }[] = [];
+	for (const block of tsdocBlocks(src, parsed)) {
+		if (src.slice(src.lastIndexOf('\n', block.start - 1) + 1, block.start).trim()) continue;
+		if (R_N_U_REGEX.test(block.text) || S_TYPE_SATISFIES_B_U_REGEX.test(block.text)) continue;
+		const body = block.text.slice(3, -2);
+		const lineEnd = body.indexOf('\n');
+		let fmt: string;
+		if (lineEnd < 0) {
+			const description = body.trim();
+			if (!description) continue;
+			fmt = `${opening}${newline} * ${description}${newline} */`;
+		} else {
+			const description = body.slice(0, lineEnd).replace(/\r$/u, '').trim();
+			if (!description) continue;
+			const separator = body[lineEnd - 1] === '\r' ? '\r\n' : '\n';
+			fmt = `${opening}${separator} * ${description}${separator}${body.slice(lineEnd + 1)}*/`;
+		}
+		if (fmt !== block.text) edits.push({ start: block.start, end: block.end, text: fmt });
+	}
+	if (!edits.length) return false;
+	let updated = src;
+	for (const edit of edits.reverse()) updated = `${updated.slice(0, edit.start)}${edit.text}${updated.slice(edit.end)}`;
+	if (updated === src) return false;
+	writeFileSync(file, updated);
+	return true;
 }

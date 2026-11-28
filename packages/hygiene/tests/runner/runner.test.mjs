@@ -196,6 +196,97 @@ test('warn and safe-fix quality passes leave missing documentation for an author
 	}
 	resetExitCode();
 });
+test('safe-fix formats existing TSDoc while leaving missing documentation for an author', () => {
+	const root = fixtureRoot('hygiene-documentation-format-safe-fix-');
+	const src = fixtureFile(root, 'src/main.ts', '/** Existing description. */\nexport function documented() { return true; }\nexport function missing() { return false; }\n');
+	const cfg = createQualityCfg({
+		root,
+		sourceRoots: ['src'],
+		extensions: ['.ts'],
+		documentation: { required: { types: false, functions: true, exportedFunctions: true, multilineTsdoc: true } },
+		enabledChecks: {
+			accessibility: false,
+			alias: false,
+			command: false,
+			'dead-code': false,
+			diff: false,
+			'display-name': false,
+			document: true,
+			'documented-commands': false,
+			'error-boundaries': false,
+			forward: false,
+			format: false,
+			github: false,
+			import: false,
+			knip: false,
+			lint: false,
+			name: false,
+			'performance-patterns': false,
+			recommend: false,
+			'repeated-classes': false,
+			'regex-dedup': false,
+			security: false,
+			'tailwind-canonical': false,
+			type: false,
+			'ui-patterns': false,
+			'ui-recommendations': false,
+		},
+	});
+	resetExitCode();
+	runQualityCli(cfg, ['quality', '--all', '--warn', '--skip-commands', '--skip-recommendations']);
+	assert.equal(readFileSync(src, 'utf8').startsWith('/** Existing description. */'), true, 'warn mode is read-only');
+	resetExitCode();
+	runQualityCli(cfg, ['quality', '--all', '--safe-fix', '--skip-commands', '--skip-recommendations']);
+	assert.equal(readFileSync(src, 'utf8'), '/**\n * Existing description.\n */\nexport function documented() { return true; }\nexport function missing() { return false; }\n');
+	resetExitCode();
+});
+test('safe-fix formats only the reported TSDoc opening and preserves inline casts', () => {
+	const root = fixtureRoot('hygiene-documentation-format-runner-');
+	fixtureFile(root, 'src/main.ts', '/** Existing description. */\nexport function documented() { return true; }\nconst cast = /** @type {number} */ (1);\n');
+	spawnSync('git', ['init', '-q'], { cwd: root });
+	spawnSync('git', ['add', '.'], { cwd: root });
+	spawnSync('git', ['-c', 'user.name=hygiene-test', '-c', 'user.email=hygiene@example.test', 'commit', '-qm', 'fixture'], { cwd: root });
+	resetExitCode();
+	runQualityCli(
+		createQualityCfg({
+			root,
+			sourceRoots: ['src'],
+			extensions: ['.ts'],
+			documentation: { required: { functions: false, multilineTsdoc: true } },
+			autofix: { document: true },
+			enabledChecks: {
+				document: true,
+				format: false,
+				import: false,
+				name: false,
+				forward: false,
+				accessibility: false,
+				'display-name': false,
+				'performance-patterns': false,
+				'documented-commands': false,
+				lint: false,
+				knip: false,
+				'dead-code': false,
+				type: false,
+				recommend: false,
+				command: false,
+				diff: false,
+				alias: false,
+				security: false,
+				'repeated-classes': false,
+				'tailwind-canonical': false,
+				'regex-dedup': false,
+				'ui-patterns': false,
+				'ui-recommendations': false,
+				github: false,
+			},
+		}),
+		['quality', '--all', '--safe-fix', '--skip-commands', '--skip-recommendations'],
+	);
+	assert.equal(readFileSync(join(root, 'src/main.ts'), 'utf8'), '/**\n * Existing description.\n */\nexport function documented() { return true; }\nconst cast = /** @type {number} */ (1);\n');
+	assert.equal(process.exitCode, 0);
+	resetExitCode();
+});
 test('default documentation command reports missing comments in staged-only files', () => {
 	const root = fixtureRoot('hygiene-staged-documentation-');
 	fixtureFile(root, 'src/main.ts', 'export const ready = true;\n');

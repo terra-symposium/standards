@@ -628,7 +628,7 @@ export function renderLabel({ label, ...props }: { label: string; id?: string })
 });
 test('documentation ignores comment markers in glob strings', () => {
 	const root = fixtureRoot('hygiene-comment-glob-');
-	fixtureFile(root, 'src/main.ts', `export const config = { ignored: ['/tmp/render/**'] };\n`);
+	fixtureFile(root, 'src/main.ts', "export const config = { ignored: ['/tmp/render/**'] };\nconst template = `/** Generated text ${value} */`;\n");
 	assert.deepEqual(documentationFindings(createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], documentation: { required: { multilineTsdoc: true } } })), []);
 });
 test('documentation accepts multiline TSDoc attached to nested type nodes', () => {
@@ -826,6 +826,22 @@ void [existing, missing, publicMissing, inline];
 	assert.equal(documentSrcFile({ ...cfg, documentation: { required: { types: true } }, root }, fixtureFile(root, 'src/notes.json', '{"value": true}\n')), false);
 	assert.equal(fixtureText(root, 'src/notes.json'), '{"value": true}\n');
 	assert.equal(documentSrcFile(createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'] }), file), false);
+});
+test('documentSrcFile formats existing TSDoc openings without changing prose or inline type casts', () => {
+	const root = fixtureRoot('hygiene-document-format-tsdoc-');
+	const file = fixtureFile(
+		root,
+		'src/main.ts',
+		'/** Keeps this description. */\r\nexport const documented = true;\r\n/** @type {number} */\r\nconst inline = 1;\r\nconst cast = /** @type {number} */ (1);\r\n/** Existing details.\r\n * The second line remains.\r\n */\r\nexport const value = inline + cast;\r\n',
+	);
+	const cfg = createQualityCfg({ root, sourceRoots: ['src'], extensions: ['.ts'], documentation: { required: { functions: false, multilineTsdoc: true } } });
+	assert.equal(documentSrcFile(cfg, file), true);
+	assert.equal(
+		fixtureText(root, 'src/main.ts'),
+		'/**\r\n * Keeps this description.\r\n */\r\nexport const documented = true;\r\n/** @type {number} */\r\nconst inline = 1;\r\nconst cast = /** @type {number} */ (1);\r\n/**\r\n * Existing details.\r\n * The second line remains.\r\n */\r\nexport const value = inline + cast;\r\n',
+	);
+	assert.equal(documentSrcFile(cfg, file), false, 'formatting is idempotent');
+	assert.deepEqual(documentationFindings(cfg), []);
 });
 test('legacy source maintenance preserves authored comments and section labels', () => {
 	const root = fixtureRoot('hygiene-documentation-maintenance-no-op-');

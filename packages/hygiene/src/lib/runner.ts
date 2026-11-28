@@ -41,7 +41,7 @@ import {
 } from '@terra-symposium/hygiene/core';
 // prettier-ignore
 import { deadCodeEditsIntroduceTypeErrors, deadCodeTypeProgram, fixObjectForwarding, fixSingleUseDeclarations, objectForwardingFindings, singleUseFindings } from '@terra-symposium/hygiene/refactoring';
-import { documentationFindings, documentedCommandFindings, fixDocumentedCommands } from '@terra-symposium/hygiene/documentation';
+import { documentSrcFile, documentationFindings, documentedCommandFindings, fixDocumentedCommands } from '@terra-symposium/hygiene/documentation';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { isBuiltin } from 'node:module';
@@ -3878,6 +3878,7 @@ function runFullQuality(cfg: QualityCfg, args: string[], opts: QualityOptions): 
 	if (qualityCheckEnabled(cfg, 'document'))
 		sFix('documentation', () => {
 			if (opts.fix && qualityAutofixEnabled(cfg, 'document', opts.fix)) {
+				for (const finding of documentationFindings(scopedCfg(cfg, opts.all)).filter(f => f.name === '<TSDoc opening>')) documentSrcFile(cfg, resolve(cfg.root, finding.file));
 				if (filesFor(cfg, opts.all).length) runDocumentation(cfg, opts, true);
 			} else {
 				if (documentationFindings(scopedCfg(cfg, opts.all)).some(f => f.severity === 'error')) runDocumentation(cfg, opts, true);
